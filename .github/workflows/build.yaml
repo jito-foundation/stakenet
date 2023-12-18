@@ -1,0 +1,99 @@
+name: Build
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+env:
+  SOLANA_CLI_VERSION: 1.16.17
+jobs:
+  build-and-test:
+    name: Build and test programs
+    runs-on: big-runner-1
+
+    steps:
+      # Setup
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup/
+      - uses: ./.github/actions/setup-solana/
+      - uses: actions/cache@v2
+        name: Cache Cargo registry + index
+        id: cache-anchor
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-anchor-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo install --git https://github.com/coral-xyz/anchor --tag v0.28.0 anchor-cli --locked --force
+        working-directory: /
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2023-10-05-x86_64-unknown-linux-gnu
+          components: rustfmt, clippy
+
+      # --force is hack around cargo caching, figure out later
+      - name: Setup Rust tools
+        run: |
+          cargo +nightly-2023-10-05 install cargo-sort --force
+          cargo +nightly-2023-10-05 install cargo-udeps --force
+        shell: bash
+
+      - name: cargo sort
+        run: cargo +nightly-2023-10-05 sort --workspace --check
+        shell: bash
+
+      - name: cargo fmt
+        run: cargo +nightly-2023-10-05 fmt --all --check
+        shell: bash
+
+      - name: clippy
+        run: cargo +nightly-2023-10-05 clippy --all-features --all-targets --tests -- -D warnings
+        shell: bash
+
+      - name: cargo udeps
+        run: cargo +nightly-2023-10-05 udeps --all-features --all-targets --tests
+        shell: bash
+
+      # Build IDLs
+      - name: Build validator-history
+        run: anchor build --idl idl --program-name validator_history
+
+      # Make sure no uncommitted changes
+      - name: Check for diff
+        run: git diff --exit-code
+
+      - name: cargo test
+        run: RUST_LOG=debug cargo test --all-targets --all-features --color auto
+        shell: bash
+
+  verified-build:
+    name: Build Verifiable Artifact
+    runs-on: big-runner-1
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      # --force because the cargo cache has it saved
+      - name: Install Solana Verify
+        run: |
+          cargo install solana-verify --force
+          solana-verify --version
+
+      - name: Verifiable Build
+        run: |
+          solana-verify build --library-name validator_history
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: |
+            target/deploy/validator_history.so

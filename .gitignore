@@ -1,0 +1,12 @@
+.anchor
+.DS_Store
+**/target
+*/debug
+*/node_modules
+*/deps
+*/dist
+*/build
+test-ledger
+*/test-ledger
+.idea/
+**/targets
