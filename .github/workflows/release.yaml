@@ -1,0 +1,66 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  SOLANA_CLI_VERSION: 1.16.17
+jobs:
+  release:
+    name: Create the jito programs release
+    runs-on: big-runner-1
+
+    steps:
+      # Setup
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup/
+      - uses: ./.github/actions/setup-solana/
+      - uses: actions/cache@v2
+        name: Cache Cargo registry + index
+        id: cache-anchor
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-anchor-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo install --git https://github.com/coral-xyz/anchor --tag v0.28.0 anchor-cli --locked --force
+
+      # Build IDLs + programs
+      - name: Build program
+        run: anchor build --idl idl --program-name validator_history
+
+      # Verified build
+      # --force because the cargo cache has it saved
+      - name: Install Solana Verify
+        run: |
+          cargo install solana-verify --force
+          solana-verify --version
+
+      - name: Verifiable Build
+        run: |
+          solana-verify build --library-name validator_history
+
+      # Make sure no uncommitted changes
+      - name: Check for diff
+        run: git diff --exit-code
+
+      # Upload artifacts
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: |
+            target/deploy/validator_history.so
+            programs/validator-history/idl/validator_history.json
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/deploy/validator_history.so
+            programs/validator-history/idl/validator_history.json

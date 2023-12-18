@@ -1,0 +1,21 @@
+[features]
+seeds = false
+skip-lint = false
+[programs.localnet]
+validator_history = "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa"
+
+[workspace]
+members = [
+    "programs/validator-history",
+]
+exclude = ["keepers", "utils"]
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo +nightly test"
