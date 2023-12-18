@@ -4,7 +4,7 @@ use solana_program_test::*;
 use solana_sdk::{
     clock::Clock, pubkey::Pubkey, signature::Keypair, signer::Signer, transaction::Transaction,
 };
-use test_solana::fixtures::{system_account, TestFixture};
+use tests::fixtures::{system_account, TestFixture};
 use validator_history::{Config, ValidatorHistory};
 
 #[tokio::test]

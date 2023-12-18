@@ -13,7 +13,7 @@ use solana_sdk::{
     ed25519_instruction::new_ed25519_instruction, signer::Signer, transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
-use test_solana::fixtures::TestFixture;
+use tests::fixtures::TestFixture;
 use validator_history::{
     crds_value::{CrdsData as ValidatorHistoryCrdsData, LegacyVersion, LegacyVersion1},
     ValidatorHistory,
