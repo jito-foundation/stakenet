@@ -48,13 +48,11 @@ pub fn handler(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
 
     let (crds_data_pubkey, last_signed_ts) = match &crds_data {
         CrdsData::LegacyContactInfo(contact_info) => {
-            (contact_info.pubkey().clone(), contact_info.wallclock())
+            (*contact_info.pubkey(), contact_info.wallclock())
         }
-        CrdsData::ContactInfo(contact_info) => {
-            (contact_info.pubkey().clone(), contact_info.wallclock())
-        }
-        CrdsData::Version(version) => (version.from.clone(), version.wallclock),
-        CrdsData::LegacyVersion(version) => (version.from.clone(), version.wallclock),
+        CrdsData::ContactInfo(contact_info) => (*contact_info.pubkey(), contact_info.wallclock()),
+        CrdsData::Version(version) => (version.from, version.wallclock),
+        CrdsData::LegacyVersion(version) => (version.from, version.wallclock),
         _ => {
             return Err(ValidatorHistoryError::GossipDataInvalid.into());
         }

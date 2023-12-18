@@ -91,8 +91,6 @@ async fn test_stake_history_basic_update() {
     assert!(account.history.arr[1].activated_stake_lamports == stake + 1);
     assert!(account.history.arr[1].is_superminority == 1);
     assert!(account.history.arr[1].rank == rank - 1);
-
-    drop(fixture);
 }
 
 #[tokio::test]

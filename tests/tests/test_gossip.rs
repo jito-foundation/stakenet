@@ -10,7 +10,8 @@ use solana_gossip::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    ed25519_instruction::new_ed25519_instruction, signer::Signer, transaction::Transaction,
+    clock::Clock, ed25519_instruction::new_ed25519_instruction, signer::Signer,
+    transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
 use tests::fixtures::TestFixture;
@@ -54,10 +55,11 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_validator_history_account().await;
 
     // create legacycontactinfo as signed crdsdata struct
-    let legacy_contact_info = LegacyContactInfo::new_rand(
+    let mut legacy_contact_info = LegacyContactInfo::new_rand(
         &mut rand::thread_rng(),
         Some(fixture.identity_keypair.pubkey()),
     );
+    legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
 
@@ -81,7 +83,7 @@ async fn test_copy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
-    let wallclock = 100000;
+    let wallclock = 0;
     let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
@@ -115,7 +117,7 @@ async fn test_copy_legacy_version() {
     // can't import LegacyVersion from gossip cause inner fields are private
     let version = LegacyVersion {
         from: fixture.identity_keypair.pubkey(),
-        wallclock: 100000,
+        wallclock: 0,
         version: LegacyVersion1 {
             major: 1,
             minor: 2,
@@ -168,7 +170,7 @@ async fn test_copy_version() {
 
     let version = Version {
         from: fixture.identity_keypair.pubkey(),
-        wallclock: 100000,
+        wallclock: 0,
         version: LegacyVersion2 {
             major: 1,
             minor: 2,
@@ -200,7 +202,7 @@ async fn test_gossip_wrong_signer() {
 
     let version = Version {
         from: fixture.identity_keypair.pubkey(),
-        wallclock: 100000,
+        wallclock: 0,
         version: LegacyVersion2 {
             major: 1,
             minor: 2,
@@ -249,7 +251,7 @@ async fn test_gossip_wrong_node_pubkey() {
     // vote account instead of identity account
     let version = Version {
         from: fixture.vote_account,
-        wallclock: 100000,
+        wallclock: 0,
         version: LegacyVersion2 {
             major: 1,
             minor: 2,
@@ -316,5 +318,88 @@ async fn test_gossip_wrong_message() {
 
     fixture
         .submit_transaction_assert_error(transaction, "GossipDataInvalid")
+        .await;
+}
+
+#[tokio::test]
+async fn test_gossip_timestamps() {
+    let fixture = TestFixture::new().await;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+    let mut banks_client = {
+        let ctx = fixture.ctx.borrow_mut();
+        ctx.banks_client.clone()
+    };
+
+    let clock: Clock = banks_client.get_sysvar().await.unwrap();
+    let wallclock = clock.unix_timestamp as u64;
+    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
+    let ip = IpAddr::V4(ipv4);
+    contact_info
+        .set_socket(0, SocketAddr::new(ip, 1234))
+        .expect("could not set socket");
+    let crds_data = CrdsData::ContactInfo(contact_info.clone());
+
+    let transaction = create_gossip_tx(&fixture, &crds_data);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert!(account.last_ip_timestamp == wallclock);
+    assert!(account.last_version_timestamp == wallclock);
+
+    contact_info.set_wallclock(wallclock + 1);
+
+    let crds_data = CrdsData::ContactInfo(contact_info.clone());
+    let transaction = create_gossip_tx(&fixture, &crds_data);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert!(account.last_ip_timestamp == wallclock + 1);
+    assert!(account.last_version_timestamp == wallclock + 1);
+
+    // LegacyContactInfo with old wallclock
+    let mut legacy_contact_info = LegacyContactInfo::new_rand(
+        &mut rand::thread_rng(),
+        Some(fixture.identity_keypair.pubkey()),
+    );
+    legacy_contact_info.set_wallclock(wallclock);
+
+    let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info);
+    let transaction = create_gossip_tx(&fixture, &crds_data);
+    fixture
+        .submit_transaction_assert_error(transaction, "GossipDataTooOld")
+        .await;
+
+    // LegacyVersion with old wallclock
+    let version = Version {
+        from: fixture.identity_keypair.pubkey(),
+        wallclock,
+        version: LegacyVersion2 {
+            major: 1,
+            minor: 2,
+            patch: 3,
+            commit: None,
+            feature_set: 0,
+        },
+    };
+    let crds_data = CrdsData::Version(version);
+    let transaction = create_gossip_tx(&fixture, &crds_data);
+
+    fixture
+        .submit_transaction_assert_error(transaction, "GossipDataTooOld")
+        .await;
+
+    // ContactInfo with 11 minutes in the future wallclock - will fail
+    contact_info.set_wallclock(wallclock + 11 * 60);
+    let crds_data = CrdsData::ContactInfo(contact_info.clone());
+    let transaction = create_gossip_tx(&fixture, &crds_data);
+
+    fixture
+        .submit_transaction_assert_error(transaction, "GossipDataInFuture")
         .await;
 }
