@@ -524,6 +524,151 @@ impl ValidatorHistory {
     }
 }
 
+#[account(zero_copy)]
+pub struct ClusterHistory {
+    pub struct_version: u64, // TODO tweak
+    pub bump: u8,
+    pub _padding0: [u8; 7],
+    pub history: CircBufCluster,
+}
+
+#[zero_copy]
+pub struct ClusterHistoryEntry {
+    pub total_blocks: u32,
+    pub epoch: u16,
+    pub padding: [u8; 122],
+}
+
+impl Default for ClusterHistoryEntry {
+    fn default() -> Self {
+        Self {
+            total_blocks: u32::MAX,
+            epoch: u16::MAX,
+            padding: [u8::MAX; 122],
+        }
+    }
+}
+
+#[zero_copy]
+pub struct CircBufCluster {
+    pub idx: u64,
+    pub is_empty: u8,
+    pub padding: [u8; 7],
+    pub arr: [ClusterHistoryEntry; MAX_ITEMS],
+}
+
+impl CircBufCluster {
+    pub fn push(&mut self, item: ClusterHistoryEntry) {
+        self.idx = (self.idx + 1) % self.arr.len() as u64;
+        self.arr[self.idx as usize] = item;
+        self.is_empty = 0;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.is_empty == 1
+    }
+
+    pub fn last(&self) -> Option<&ClusterHistoryEntry> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(&self.arr[self.idx as usize])
+        }
+    }
+
+    pub fn last_mut(&mut self) -> Option<&mut ClusterHistoryEntry> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(&mut self.arr[self.idx as usize])
+        }
+    }
+
+    pub fn arr_mut(&mut self) -> &mut [ClusterHistoryEntry] {
+        &mut self.arr
+    }
+}
+
+impl ClusterHistory {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const MAX_ITEMS: usize = MAX_ITEMS;
+    pub const SEED: &'static [u8] = b"cluster-history";
+
+    pub fn epoch_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Option<Vec<&ClusterHistoryEntry>> {
+        // Returns &ClusterHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
+        // Returns None if either start_epoch or end_epoch is not in the CircBuf
+        let start_epoch_index = self
+            .history
+            .arr
+            .iter()
+            .position(|entry| entry.epoch == start_epoch)?;
+
+        let mut end_epoch_index = self
+            .history
+            .arr
+            .iter()
+            .position(|entry| entry.epoch == end_epoch)?;
+
+        if start_epoch_index > end_epoch_index {
+            end_epoch_index += self.history.arr.len();
+        }
+
+        let epoch_range: Vec<&ClusterHistoryEntry> = (start_epoch_index..=end_epoch_index)
+            .map(|i| &self.history.arr[i % self.history.arr.len()])
+            .collect();
+
+        Some(epoch_range)
+    }
+
+    pub fn total_blocks_latest(&self) -> Option<u32> {
+        if let Some(entry) = self.history.last() {
+            if entry.total_blocks != ClusterHistoryEntry::default().total_blocks {
+                return Some(entry.total_blocks);
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn total_blocks_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
+        let epoch_range = self.epoch_range(start_epoch, end_epoch).unwrap_or_default();
+        epoch_range
+            .iter()
+            .map(|entry| {
+                if entry.total_blocks != ClusterHistoryEntry::default().total_blocks {
+                    Some(entry.total_blocks)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<Option<u32>>>()
+    }
+
+    // Sets total blocks for the target epoch
+    pub fn set_blocks(&mut self, epoch: u16, blocks_in_epoch: u32) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            if entry.epoch == epoch {
+                entry.total_blocks = blocks_in_epoch;
+                return Ok(());
+            }
+        }
+        let entry = ClusterHistoryEntry {
+            epoch,
+            total_blocks: blocks_in_epoch,
+            ..ClusterHistoryEntry::default()
+        };
+        self.history.push(entry);
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -53,6 +53,18 @@ pub mod validator_history {
         instructions::realloc_validator_history_account::handler(ctx)
     }
 
+    pub fn initialize_cluster_history_account(
+        ctx: Context<InitializeClusterHistoryAccount>,
+    ) -> Result<()> {
+        instructions::initialize_cluster_history_account::handler(ctx)
+    }
+
+    pub fn realloc_cluster_history_account(
+        ctx: Context<ReallocClusterHistoryAccount>,
+    ) -> Result<()> {
+        instructions::realloc_cluster_history_account::handler(ctx)
+    }
+
     pub fn copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
         instructions::copy_vote_account::handler(ctx)
     }
@@ -93,5 +105,9 @@ pub mod validator_history {
 
     pub fn copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
         instructions::copy_gossip_contact_info::handler(ctx)
+    }
+
+    pub fn copy_slot_index(ctx: Context<CopyClusterInfo>) -> Result<()> {
+        instructions::copy_cluster_info::handler(ctx)
     }
 }
