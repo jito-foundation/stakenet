@@ -134,9 +134,7 @@ macro_rules! field_latest {
 
 macro_rules! field_range {
     ($self:expr, $start_epoch:expr, $end_epoch:expr, $field:ident, $type:ty) => {{
-        let epoch_range = $self
-            .epoch_range($start_epoch, $end_epoch)
-            .unwrap_or_default();
+        let epoch_range = $self.epoch_range($start_epoch, $end_epoch);
         epoch_range
             .iter()
             .map(|entry| {
@@ -181,29 +179,16 @@ impl CircBuf {
         &mut self.arr
     }
 
-    pub fn epoch_range(
-        &self,
-        start_epoch: u16,
-        end_epoch: u16,
-    ) -> Option<Vec<&ValidatorHistoryEntry>> {
-        // Returns &ValidatorHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
-        // Returns None if either start_epoch or end_epoch is not in the CircBuf
-        let start_epoch_index = self
-            .arr
+    /// Returns &ValidatorHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
+    /// Returns None if either start_epoch or end_epoch is not in the CircBuf
+    pub fn epoch_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<&ValidatorHistoryEntry> {
+        // creates an iterator that lays out the entries in consecutive order, handling wraparound
+        // if self.idx + 1 == self.arr.len() this will just return an empty slice
+        self.arr[(self.idx as usize + 1)..]
             .iter()
-            .position(|entry| entry.epoch == start_epoch)?;
-
-        let mut end_epoch_index = self.arr.iter().position(|entry| entry.epoch == end_epoch)?;
-
-        if start_epoch_index > end_epoch_index {
-            end_epoch_index += self.arr.len();
-        }
-
-        let epoch_range: Vec<&ValidatorHistoryEntry> = (start_epoch_index..=end_epoch_index)
-            .map(|i| &self.arr[i % self.arr.len()])
-            .collect();
-
-        Some(epoch_range)
+            .chain(self.arr[..=(self.idx as usize)].iter())
+            .filter(|entry| entry.epoch >= start_epoch && entry.epoch <= end_epoch)
+            .collect()
     }
 
     pub fn commission_latest(&self) -> Option<u8> {
@@ -562,10 +547,13 @@ mod tests {
             circ_buf.push(entry);
         }
         // Test epoch range [0, 3]
-        let epoch_range = circ_buf.epoch_range(0, 3).unwrap();
-        assert_eq!(epoch_range.len(), 4);
+        let epoch_range: Vec<&ValidatorHistoryEntry> = circ_buf.epoch_range(0, 3);
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![0, 1, 2, 3]
+        );
 
-        // skip an epoch in the middle
+        // Creates a new CircBuf with entries from epochs [0, 1, 3]
         circ_buf = CircBuf::default();
         for i in 0..4 {
             if i == 2 {
@@ -579,23 +567,50 @@ mod tests {
         }
 
         // Test epoch range [0, 3]
-        let epoch_range = circ_buf.epoch_range(0, 3).unwrap();
-        assert_eq!(epoch_range.len(), 3);
+        let epoch_range = circ_buf.epoch_range(0, 3);
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![0, 1, 3]
+        );
 
         // same start and end epoch
-        let epoch_range = circ_buf.epoch_range(0, 0).unwrap();
-        assert_eq!(epoch_range.len(), 1);
-
-        // Test start epoch out of range
-        let epoch_range = circ_buf.epoch_range(4, 3);
-        assert!(epoch_range.is_none());
-
         // Test end epoch out of range
         let epoch_range = circ_buf.epoch_range(0, 5);
-        assert!(epoch_range.is_none());
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![0, 1, 3]
+        );
 
         // None if start epoch is none
         let epoch_range = circ_buf.epoch_range(2, 3);
-        assert!(epoch_range.is_none());
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![3]
+        );
+
+        let epoch_range = circ_buf.epoch_range(3, 3);
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![3]
+        );
+
+        let epoch_range = circ_buf.epoch_range(4, 3);
+        assert_eq!(epoch_range.len(), 0);
+
+        // Create entries that wrap around
+        circ_buf = CircBuf::default();
+        (0..=circ_buf.arr.len() + 4).for_each(|i| {
+            circ_buf.push(ValidatorHistoryEntry {
+                epoch: i as u16,
+                ..ValidatorHistoryEntry::default()
+            })
+        });
+
+        let epoch_range =
+            circ_buf.epoch_range(circ_buf.arr.len() as u16 - 4, circ_buf.arr.len() as u16 + 4);
+        assert_eq!(
+            epoch_range.iter().map(|e| e.epoch).collect::<Vec<u16>>(),
+            vec![508, 509, 510, 511, 512, 513, 514, 515, 516]
+        );
     }
 }
