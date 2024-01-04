@@ -107,7 +107,15 @@ pub mod validator_history {
         instructions::copy_gossip_contact_info::handler(ctx)
     }
 
-    pub fn copy_slot_index(ctx: Context<CopyClusterInfo>) -> Result<()> {
+    pub fn copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
         instructions::copy_cluster_info::handler(ctx)
+    }
+
+    pub fn backfill_total_blocks(
+        ctx: Context<BackfillTotalBlocks>,
+        epoch: u64,
+        blocks_in_epoch: u32,
+    ) -> Result<()> {
+        instructions::backfill_total_blocks::handler(ctx, epoch, blocks_in_epoch)
     }
 }

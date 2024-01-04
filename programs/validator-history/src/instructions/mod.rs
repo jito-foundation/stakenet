@@ -1,4 +1,5 @@
 #![allow(ambiguous_glob_reexports)]
+pub mod backfill_total_blocks;
 pub mod copy_cluster_info;
 pub mod copy_gossip_contact_info;
 pub mod copy_vote_account;
@@ -13,6 +14,7 @@ pub mod set_new_tip_distribution_program;
 pub mod update_mev_commission;
 pub mod update_stake_history;
 
+pub use backfill_total_blocks::*;
 pub use copy_cluster_info::*;
 pub use copy_gossip_contact_info::*;
 pub use copy_vote_account::*;

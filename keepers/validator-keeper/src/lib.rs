@@ -4,7 +4,7 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, Discriminator};
-use keeper_core::CreateUpdateStats;
+use keeper_core::{CreateUpdateStats, SubmitStats};
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
@@ -26,8 +26,9 @@ use solana_sdk::{
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{ClusterHistory, ValidatorHistory, ValidatorHistoryEntry};
 
+pub mod cluster_info;
 pub mod gossip;
 pub mod mev_commission;
 pub mod stake;
@@ -91,10 +92,19 @@ pub fn emit_validator_commission_datapoint(stats: CreateUpdateStats, runs_for_ep
     );
 }
 
+pub fn emit_cluster_history_datapoint(stats: SubmitStats, runs_for_epoch: i64) {
+    datapoint_info!(
+        "cluster-history-stats",
+        ("num_success", stats.successes, i64),
+        ("num_errors", stats.errors, i64),
+        ("runs_for_epoch", runs_for_epoch, i64),
+    );
+}
+
 pub async fn emit_validator_history_metrics(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
-) -> Result<(), ClientError> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let epoch = client.get_epoch_info().await?;
 
     // Fetch every ValidatorHistory account
@@ -161,6 +171,21 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
+    let (cluster_history_address, _) =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &program_id);
+    let cluster_history_account = client.get_account(&cluster_history_address).await?;
+    let cluster_history =
+        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
+
+    let mut cluster_history_blocks: i64 = 0;
+    let cluster_history_entry = cluster_history.history.last();
+    if let Some(cluster_history) = cluster_history_entry {
+        // Looking for previous epoch to be updated
+        if cluster_history.epoch as u64 == epoch.epoch - 1 {
+            cluster_history_blocks = 1;
+        }
+    }
+
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
@@ -171,8 +196,10 @@ pub async fn emit_validator_history_metrics(
         ("num_commissions", comms, i64),
         ("num_epoch_credits", epoch_credits, i64),
         ("num_stakes", stakes, i64),
+        ("cluster_history_blocks", cluster_history_blocks, i64),
         ("slot_index", epoch.slot_index, i64),
     );
+
     Ok(())
 }
 

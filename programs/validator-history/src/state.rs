@@ -587,45 +587,20 @@ impl CircBufCluster {
     pub fn arr_mut(&mut self) -> &mut [ClusterHistoryEntry] {
         &mut self.arr
     }
-}
 
-impl ClusterHistory {
-    pub const SIZE: usize = 8 + size_of::<Self>();
-    pub const MAX_ITEMS: usize = MAX_ITEMS;
-    pub const SEED: &'static [u8] = b"cluster-history";
-
-    pub fn epoch_range(
-        &self,
-        start_epoch: u16,
-        end_epoch: u16,
-    ) -> Option<Vec<&ClusterHistoryEntry>> {
-        // Returns &ClusterHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
-        // Returns None if either start_epoch or end_epoch is not in the CircBuf
-        let start_epoch_index = self
-            .history
-            .arr
+    /// Returns &ClusterHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
+    /// Returns None if either start_epoch or end_epoch is not in the CircBuf
+    pub fn epoch_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<&ClusterHistoryEntry> {
+        // creates an iterator that lays out the entries in consecutive order, handling wraparound
+        self.arr[(self.idx as usize + 1)..]
             .iter()
-            .position(|entry| entry.epoch == start_epoch)?;
-
-        let mut end_epoch_index = self
-            .history
-            .arr
-            .iter()
-            .position(|entry| entry.epoch == end_epoch)?;
-
-        if start_epoch_index > end_epoch_index {
-            end_epoch_index += self.history.arr.len();
-        }
-
-        let epoch_range: Vec<&ClusterHistoryEntry> = (start_epoch_index..=end_epoch_index)
-            .map(|i| &self.history.arr[i % self.history.arr.len()])
-            .collect();
-
-        Some(epoch_range)
+            .chain(self.arr[..=(self.idx as usize)].iter())
+            .filter(|entry| entry.epoch >= start_epoch && entry.epoch <= end_epoch)
+            .collect()
     }
 
     pub fn total_blocks_latest(&self) -> Option<u32> {
-        if let Some(entry) = self.history.last() {
+        if let Some(entry) = self.last() {
             if entry.total_blocks != ClusterHistoryEntry::default().total_blocks {
                 return Some(entry.total_blocks);
             } else {
@@ -637,7 +612,7 @@ impl ClusterHistory {
     }
 
     pub fn total_blocks_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
-        let epoch_range = self.epoch_range(start_epoch, end_epoch).unwrap_or_default();
+        let epoch_range = self.epoch_range(start_epoch, end_epoch);
         epoch_range
             .iter()
             .map(|entry| {
@@ -649,6 +624,12 @@ impl ClusterHistory {
             })
             .collect::<Vec<Option<u32>>>()
     }
+}
+
+impl ClusterHistory {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const MAX_ITEMS: usize = MAX_ITEMS;
+    pub const SEED: &'static [u8] = b"cluster-history";
 
     // Sets total blocks for the target epoch
     pub fn set_blocks(&mut self, epoch: u16, blocks_in_epoch: u32) -> Result<()> {

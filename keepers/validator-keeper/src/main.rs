@@ -7,7 +7,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use clap::{arg, command, Parser};
-use keeper_core::{Cluster, CreateUpdateStats};
+use keeper_core::{Cluster, CreateUpdateStats, SubmitStats};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::{datapoint_error, set_host_id};
@@ -17,8 +17,9 @@ use solana_sdk::{
 };
 use tokio::time::sleep;
 use validator_keeper::{
-    emit_mev_commission_datapoint, emit_validator_commission_datapoint,
-    emit_validator_history_metrics,
+    cluster_info::update_cluster_info,
+    emit_cluster_history_datapoint, emit_mev_commission_datapoint,
+    emit_validator_commission_datapoint, emit_validator_history_metrics,
     gossip::{emit_gossip_datapoint, upload_gossip_values},
     mev_commission::update_mev_commission,
     stake::{emit_stake_history_datapoint, update_stake_history},
@@ -262,6 +263,56 @@ async fn gossip_upload_loop(
     }
 }
 
+async fn cluster_history_loop(
+    client: Arc<RpcClient>,
+    keypair: Arc<Keypair>,
+    program_id: Pubkey,
+    interval: u64,
+) {
+    let mut runs_for_epoch = 0;
+    let mut current_epoch = 0;
+
+    loop {
+        let epoch_info = match client.get_epoch_info().await {
+            Ok(epoch_info) => epoch_info,
+            Err(e) => {
+                error!("Failed to get epoch info: {}", e);
+                sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+        };
+        let epoch = epoch_info.epoch;
+
+        let mut stats = SubmitStats::default();
+
+        if current_epoch != epoch {
+            runs_for_epoch = 0;
+        }
+
+        // Run at 0.1%, 50% and 90% completion of epoch
+        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
+            && runs_for_epoch < 1)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
+        if should_run {
+            stats = match update_cluster_info(client.clone(), keypair.clone(), &program_id).await {
+                Ok(run_stats) => {
+                    runs_for_epoch += 1;
+                    run_stats
+                }
+                Err((e, run_stats)) => {
+                    datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
+                    run_stats
+                }
+            };
+        }
+
+        current_epoch = epoch;
+        emit_cluster_history_datapoint(stats, runs_for_epoch);
+        sleep(Duration::from_secs(interval)).await;
+    }
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
@@ -280,6 +331,13 @@ async fn main() {
 
     tokio::spawn(monitoring_loop(
         Arc::clone(&client),
+        args.program_id,
+        args.interval,
+    ));
+
+    tokio::spawn(cluster_history_loop(
+        Arc::clone(&client),
+        Arc::clone(&keypair),
         args.program_id,
         args.interval,
     ));
