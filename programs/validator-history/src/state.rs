@@ -183,8 +183,7 @@ impl CircBuf {
     /// Returns None if either start_epoch or end_epoch is not in the CircBuf
     pub fn epoch_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<&ValidatorHistoryEntry> {
         // creates an iterator that lays out the entries in consecutive order, handling wraparound
-        // if self.idx + 1 == self.arr.len() this will just return an empty slice
-        self.arr[(self.idx as usize + 1)..]
+        self.arr[(self.idx as usize + 1)..] // if self.idx + 1 == self.arr.len() this will just return an empty slice
             .iter()
             .chain(self.arr[..=(self.idx as usize)].iter())
             .filter(|entry| entry.epoch >= start_epoch && entry.epoch <= end_epoch)
