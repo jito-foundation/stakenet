@@ -13,16 +13,18 @@ pub struct CopyClusterInfo<'info> {
         bump,
     )]
     pub cluster_history_account: AccountLoader<'info, ClusterHistory>,
+    pub slot_history: UncheckedAccount<'info>,
     #[account(mut)]
     pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
-    let clock = Clock::get()?;
+    let slot_history: Box<SlotHistory> =
+        Box::new(bincode::deserialize(&ctx.accounts.slot_history.try_borrow_data()?).unwrap());
 
+    let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
-    let slot_history = SlotHistory::get()?;
 
     let start_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch - 1);
     let end_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);

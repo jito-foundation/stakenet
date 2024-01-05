@@ -1,14 +1,12 @@
-use crate::{
-    constants::MAX_ALLOC_BYTES, state::ValidatorHistory, ClusterHistory, ClusterHistoryEntry,
-};
+use crate::{constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry};
 use anchor_lang::prelude::*;
 
 fn get_realloc_size(account_info: &AccountInfo) -> usize {
     let account_size = account_info.data_len();
 
     // If account is already over-allocated, don't try to shrink
-    if account_size < ValidatorHistory::SIZE {
-        ValidatorHistory::SIZE.min(account_size + MAX_ALLOC_BYTES)
+    if account_size < ClusterHistory::SIZE {
+        ClusterHistory::SIZE.min(account_size + MAX_ALLOC_BYTES)
     } else {
         account_size
     }
@@ -32,7 +30,7 @@ pub struct ReallocClusterHistoryAccount<'info> {
         realloc = get_realloc_size(cluster_history_account.as_ref()),
         realloc::payer = signer,
         realloc::zero = false,
-        seeds = [ValidatorHistory::SEED ],
+        seeds = [ClusterHistory::SEED],
         bump
     )]
     pub cluster_history_account: AccountLoader<'info, ClusterHistory>,
