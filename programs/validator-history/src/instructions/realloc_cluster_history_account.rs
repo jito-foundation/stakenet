@@ -12,7 +12,6 @@ fn get_realloc_size(account_info: &AccountInfo) -> usize {
     }
 }
 
-// TODO need to find a thing that's initialized here, maybe is_initialized field
 fn is_initialized(account_info: &AccountInfo) -> Result<bool> {
     let account_data = account_info.as_ref().try_borrow_data()?;
 
@@ -48,7 +47,7 @@ pub fn handler(ctx: Context<ReallocClusterHistoryAccount>) -> Result<()> {
         let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
 
         cluster_history_account.bump = *ctx.bumps.get("cluster_history_account").unwrap();
-        cluster_history_account.struct_version = 0; // TODO make a struct
+        cluster_history_account.struct_version = 0;
         cluster_history_account.history.idx =
             (cluster_history_account.history.arr.len() - 1) as u64;
         for _ in 0..cluster_history_account.history.arr.len() {

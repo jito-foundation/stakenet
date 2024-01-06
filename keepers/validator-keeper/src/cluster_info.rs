@@ -11,8 +11,6 @@ pub async fn update_cluster_info(
     keypair: Arc<Keypair>,
     program_id: &Pubkey,
 ) -> Result<SubmitStats, (TransactionExecutionError, SubmitStats)> {
-    // literally just build one instruction and submit it...
-
     let (cluster_history_account, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], program_id);
 

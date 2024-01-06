@@ -526,7 +526,7 @@ impl ValidatorHistory {
 
 #[account(zero_copy)]
 pub struct ClusterHistory {
-    pub struct_version: u64, // TODO tweak
+    pub struct_version: u64,
     pub bump: u8,
     pub _padding0: [u8; 7],
     pub history: CircBufCluster,
