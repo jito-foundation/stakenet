@@ -26,6 +26,8 @@ async fn test_copy_cluster_info() {
 
     let latest_slot = ctx.borrow_mut().banks_client.get_root_slot().await.unwrap();
     slot_history.add(latest_slot);
+    slot_history.add(latest_slot + 1);
+    println!("latest_slot: {}", latest_slot);
 
     // Submit instruction
     let instruction = Instruction {
@@ -61,7 +63,10 @@ async fn test_copy_cluster_info() {
         .expect("clock");
 
     assert!(clock.epoch == 1);
-    assert!(account.history.idx == 0);
+    assert!(account.history.idx == 1);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].total_blocks == 3);
+    assert!(account.history.arr[1].epoch == 1);
+    assert!(account.history.arr[1].total_blocks == 2);
+    assert_eq!(account.cluster_history_last_update_slot, latest_slot)
 }

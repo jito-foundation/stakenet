@@ -529,6 +529,8 @@ pub struct ClusterHistory {
     pub struct_version: u64,
     pub bump: u8,
     pub _padding0: [u8; 7],
+    pub cluster_history_last_update_slot: u64,
+    pub _padding1: [u8; 232],
     pub history: CircBufCluster,
 }
 
@@ -536,7 +538,7 @@ pub struct ClusterHistory {
 pub struct ClusterHistoryEntry {
     pub total_blocks: u32,
     pub epoch: u16,
-    pub padding: [u8; 122],
+    pub padding: [u8; 250],
 }
 
 impl Default for ClusterHistoryEntry {
@@ -544,7 +546,7 @@ impl Default for ClusterHistoryEntry {
         Self {
             total_blocks: u32::MAX,
             epoch: u16::MAX,
-            padding: [u8::MAX; 122],
+            padding: [u8::MAX; 250],
         }
     }
 }
