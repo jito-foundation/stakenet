@@ -15,7 +15,8 @@ use solana_sdk::{
 use std::{cell::RefCell, rc::Rc};
 
 use jito_tip_distribution::{
-    sdk::derive_tip_distribution_account_address, state::TipDistributionAccount,
+    sdk::derive_tip_distribution_account_address,
+    state::{MerkleRoot, TipDistributionAccount},
 };
 use validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory};
 
@@ -326,10 +327,17 @@ pub fn new_vote_account(
     }
 }
 
-pub fn new_tip_distribution_account(vote_account: Pubkey, mev_commission_bps: u16) -> Account {
+pub fn new_tip_distribution_account(
+    vote_account: Pubkey,
+    mev_commission_bps: u16,
+    mev_earned: u64,
+) -> Account {
+    let mut merkle_root = MerkleRoot::default();
+    merkle_root.max_total_claim = mev_earned;
     let tda = TipDistributionAccount {
         validator_vote_account: vote_account,
         validator_commission_bps: mev_commission_bps,
+        merkle_root: Some(merkle_root),
         ..TipDistributionAccount::default()
     };
     let mut data = vec![];

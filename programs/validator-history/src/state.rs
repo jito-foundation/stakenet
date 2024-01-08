@@ -52,7 +52,8 @@ pub struct ValidatorHistoryEntry {
     pub client_type: u8,
     pub version: ClientVersion,
     pub ip: [u8; 4],
-    // Required to keep 8-byte alignment
+    // Required so that `rank` is aligned such that curr_offset % 4 == 0 (u32 field.alignment) as per https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
+    // without it - `rank` would have offset 27, and the compiler would add an implicit padding byte after `is_superminority` and before `rank`
     pub padding0: u8,
     // 0 if not a superminority validator, 1 if superminority validator
     pub is_superminority: u8,
@@ -60,7 +61,9 @@ pub struct ValidatorHistoryEntry {
     pub rank: u32,
     // Most recent updated slot for epoch credits and commission
     pub vote_account_last_update_slot: u64,
-    pub padding1: [u8; 88],
+    // MEV earned
+    pub mev_earned: u64,
+    pub padding1: [u8; 80],
 }
 
 impl Default for ValidatorHistoryEntry {
@@ -82,7 +85,8 @@ impl Default for ValidatorHistoryEntry {
             is_superminority: u8::MAX,
             rank: u32::MAX,
             vote_account_last_update_slot: u64::MAX,
-            padding1: [u8::MAX; 88],
+            mev_earned: u64::MAX,
+            padding1: [u8::MAX; 80],
         }
     }
 }
@@ -278,7 +282,12 @@ impl ValidatorHistory {
     pub const MAX_ITEMS: usize = MAX_ITEMS;
     pub const SEED: &'static [u8] = b"validator-history";
 
-    pub fn set_mev_commission(&mut self, epoch: u16, commission: u16) -> Result<()> {
+    pub fn set_mev_commission(
+        &mut self,
+        epoch: u16,
+        commission: u16,
+        mev_earned: u64,
+    ) -> Result<()> {
         // check if entry exists for the epoch
         if let Some(entry) = self.history.last_mut() {
             if entry.epoch == epoch {
@@ -289,6 +298,7 @@ impl ValidatorHistory {
         let entry = ValidatorHistoryEntry {
             epoch,
             mev_commission: commission,
+            mev_earned,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

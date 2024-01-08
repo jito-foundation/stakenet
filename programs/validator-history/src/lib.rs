@@ -69,8 +69,8 @@ pub mod validator_history {
         instructions::copy_vote_account::handler(ctx)
     }
 
-    pub fn update_mev_commission(ctx: Context<UpdateMevCommission>) -> Result<()> {
-        instructions::update_mev_commission::handler(ctx)
+    pub fn update_mev_commission(ctx: Context<UpdateMevCommission>, epoch: u64) -> Result<()> {
+        instructions::update_mev_commission::handler(ctx, epoch)
     }
 
     pub fn initialize_config(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
