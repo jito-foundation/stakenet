@@ -289,12 +289,14 @@ impl ValidatorHistory {
         mev_earned: u64,
     ) -> Result<()> {
         // check if entry exists for the epoch
-        if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
+        self.history
+            .arr
+            .iter_mut()
+            .filter(|entry| entry.epoch == epoch)
+            .for_each(|entry| {
+                entry.mev_earned = mev_earned;
                 entry.mev_commission = commission;
-                return Ok(());
-            }
-        }
+            });
         let entry = ValidatorHistoryEntry {
             epoch,
             mev_commission: commission,
