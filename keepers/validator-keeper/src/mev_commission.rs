@@ -34,6 +34,7 @@ pub struct ValidatorMevCommissionEntry {
     pub config: Pubkey,
     pub program_id: Pubkey,
     pub signer: Pubkey,
+    pub epoch: u64,
 }
 
 impl ValidatorMevCommissionEntry {
@@ -67,6 +68,7 @@ impl ValidatorMevCommissionEntry {
             config,
             program_id: *program_id,
             signer: *signer,
+            epoch,
         }
     }
 }
@@ -122,7 +124,7 @@ impl UpdateInstruction for ValidatorMevCommissionEntry {
                 signer: self.signer,
             }
             .to_account_metas(None),
-            data: validator_history::instruction::UpdateMevCommission {}.data(),
+            data: validator_history::instruction::UpdateMevCommission { epoch: self.epoch }.data(),
         }
     }
 }
