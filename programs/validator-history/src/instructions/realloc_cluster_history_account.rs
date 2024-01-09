@@ -16,7 +16,7 @@ fn is_initialized(account_info: &AccountInfo) -> Result<bool> {
     let account_data = account_info.as_ref().try_borrow_data()?;
 
     // discriminator + version_number
-    let vote_account_pubkey_bytes = account_data[(8 + 4)..(8 + 4 + 32)].to_vec();
+    let vote_account_pubkey_bytes = account_data[(8 + 8)..(8 + 8 + 32)].to_vec();
 
     // If pubkey is all zeroes, then it's not initialized
     Ok(vote_account_pubkey_bytes.iter().any(|&x| x != 0))

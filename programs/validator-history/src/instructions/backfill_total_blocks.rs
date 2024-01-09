@@ -20,7 +20,7 @@ pub fn handler(ctx: Context<BackfillTotalBlocks>, epoch: u64, blocks_in_epoch: u
 
     let epoch = cast_epoch(epoch);
 
-    // Need to backfill in ascending order when initially filling in the account
+    // Need to backfill in ascending order when initially filling in the account otherwise entries will be out of order
     if !cluster_history_account.history.is_empty()
         && epoch != cluster_history_account.history.last().unwrap().epoch + 1
     {

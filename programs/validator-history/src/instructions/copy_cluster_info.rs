@@ -28,7 +28,10 @@ pub fn handler(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let epoch = cast_epoch(clock.epoch);
 
     // Sets the slot history for the previous epoch, since the current epoch is not yet complete.
-    cluster_history_account.set_blocks(epoch - 1, blocks_in_epoch(epoch - 1, &slot_history)?)?;
+    if epoch > 0 {
+        cluster_history_account
+            .set_blocks(epoch - 1, blocks_in_epoch(epoch - 1, &slot_history)?)?;
+    }
     cluster_history_account.set_blocks(epoch, blocks_in_epoch(epoch, &slot_history)?)?;
 
     cluster_history_account.cluster_history_last_update_slot = clock.slot;
