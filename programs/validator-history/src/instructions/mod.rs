@@ -1,8 +1,12 @@
 #![allow(ambiguous_glob_reexports)]
+pub mod backfill_total_blocks;
+pub mod copy_cluster_info;
 pub mod copy_gossip_contact_info;
 pub mod copy_vote_account;
+pub mod initialize_cluster_history_account;
 pub mod initialize_config;
 pub mod initialize_validator_history_account;
+pub mod realloc_cluster_history_account;
 pub mod realloc_validator_history_account;
 pub mod set_new_admin;
 pub mod set_new_oracle_authority;
@@ -10,10 +14,14 @@ pub mod set_new_tip_distribution_program;
 pub mod update_mev_commission;
 pub mod update_stake_history;
 
+pub use backfill_total_blocks::*;
+pub use copy_cluster_info::*;
 pub use copy_gossip_contact_info::*;
 pub use copy_vote_account::*;
+pub use initialize_cluster_history_account::*;
 pub use initialize_config::*;
 pub use initialize_validator_history_account::*;
+pub use realloc_cluster_history_account::*;
 pub use realloc_validator_history_account::*;
 pub use set_new_admin::*;
 pub use set_new_oracle_authority::*;

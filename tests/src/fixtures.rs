@@ -17,12 +17,13 @@ use std::{cell::RefCell, rc::Rc};
 use jito_tip_distribution::{
     sdk::derive_tip_distribution_account_address, state::TipDistributionAccount,
 };
-use validator_history::{self, constants::MAX_ALLOC_BYTES, ValidatorHistory};
+use validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory};
 
 pub struct TestFixture {
     pub ctx: Rc<RefCell<ProgramTestContext>>,
     pub vote_account: Pubkey,
     pub identity_keypair: Keypair,
+    pub cluster_history_account: Pubkey,
     pub validator_history_account: Pubkey,
     pub validator_history_config: Pubkey,
     pub tip_distribution_account: Pubkey,
@@ -52,6 +53,8 @@ impl TestFixture {
         let vote_account = Pubkey::new_unique();
         let identity_keypair = Keypair::new();
         let identity_pubkey = identity_keypair.pubkey();
+        let cluster_history_account =
+            Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
         let tip_distribution_account = derive_tip_distribution_account_address(
             &jito_tip_distribution::id(),
             &vote_account,
@@ -86,6 +89,7 @@ impl TestFixture {
             ctx,
             validator_history_config,
             validator_history_account,
+            cluster_history_account,
             identity_keypair,
             vote_account,
             tip_distribution_account,
@@ -179,6 +183,44 @@ impl TestFixture {
                 }
                 .to_account_metas(None),
                 data: validator_history::instruction::ReallocValidatorHistoryAccount {}.data(),
+            };
+            num_reallocs
+        ]);
+        let transaction = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn initialize_cluster_history_account(&self) {
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::InitializeClusterHistoryAccount {
+                cluster_history_account: self.cluster_history_account,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
+        };
+
+        let mut ixs = vec![instruction];
+
+        // Realloc cluster history account
+        let num_reallocs = (ClusterHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        ixs.extend(vec![
+            Instruction {
+                program_id: validator_history::id(),
+                accounts: validator_history::accounts::ReallocClusterHistoryAccount {
+                    cluster_history_account: self.cluster_history_account,
+                    system_program: anchor_lang::solana_program::system_program::id(),
+                    signer: self.keypair.pubkey(),
+                }
+                .to_account_metas(None),
+                data: validator_history::instruction::ReallocClusterHistoryAccount {}.data(),
             };
             num_reallocs
         ]);

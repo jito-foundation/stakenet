@@ -11,7 +11,9 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{
+    constants::MAX_ALLOC_BYTES, ClusterHistory, Config, ValidatorHistory, ValidatorHistoryEntry,
+};
 
 #[derive(Parser)]
 #[command(about = "CLI for validator history program")]
@@ -32,8 +34,10 @@ struct Args {
 #[derive(Subcommand)]
 enum Commands {
     InitConfig(InitConfig),
+    InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
     History(History),
+    BackfillClusterHistory(BackfillClusterHistory),
 }
 
 #[derive(Parser)]
@@ -60,6 +64,14 @@ struct InitConfig {
     stake_authority: Option<Pubkey>,
 }
 
+#[derive(Parser)]
+#[command(about = "Initialize cluster history account")]
+struct InitClusterHistory {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+}
+
 #[derive(Parser, Debug)]
 #[command(about = "Get cranker status")]
 struct CrankerStatus {
@@ -77,6 +89,22 @@ struct History {
     /// Start epoch
     #[arg(short, long, env)]
     start_epoch: Option<u64>,
+}
+
+#[derive(Parser)]
+#[command(about = "Backfill cluster history")]
+struct BackfillClusterHistory {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+
+    /// Epoch to backfill
+    #[arg(short, long, env)]
+    epoch: u64,
+
+    /// Number of blocks in epoch
+    #[arg(short, long, env)]
+    blocks_in_epoch: u32,
 }
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
@@ -135,6 +163,55 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
             data: validator_history::instruction::SetNewOracleAuthority {}.data(),
         });
     }
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
+fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
+    // Creates cluster history account
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+
+    let mut instructions = vec![];
+    let (cluster_history_pda, _) =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+    instructions.push(Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::InitializeClusterHistoryAccount {
+            cluster_history_account: cluster_history_pda,
+            system_program: solana_program::system_program::id(),
+            signer: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
+    });
+    // Realloc insturctions
+    let num_reallocs = (ClusterHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    instructions.extend(vec![
+        Instruction {
+            program_id: validator_history::ID,
+            accounts: validator_history::accounts::ReallocClusterHistoryAccount {
+                cluster_history_account: cluster_history_pda,
+                system_program: solana_program::system_program::id(),
+                signer: keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::ReallocClusterHistoryAccount {}.data(),
+        };
+        num_reallocs
+    ]);
 
     let blockhash = client
         .get_latest_blockhash()
@@ -427,12 +504,53 @@ fn command_history(args: History, client: RpcClient) {
     }
 }
 
+fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcClient) {
+    // Backfill cluster history account for a specific epoch
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+
+    let mut instructions = vec![];
+    let (cluster_history_pda, _) =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+    let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    instructions.push(Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::BackfillTotalBlocks {
+            cluster_history_account: cluster_history_pda,
+            config,
+            signer: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::BackfillTotalBlocks {
+            epoch: args.epoch,
+            blocks_in_epoch: args.blocks_in_epoch,
+        }
+        .data(),
+    });
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
+        Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::History(args) => command_history(args, client),
+        Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
     };
 }

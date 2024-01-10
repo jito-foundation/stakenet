@@ -1,0 +1,927 @@
+{
+  "version": "0.1.0",
+  "name": "validator_history",
+  "instructions": [
+    {
+      "name": "initializeValidatorHistoryAccount",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reallocValidatorHistoryAccount",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Used to read validator commission."
+          ]
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeClusterHistoryAccount",
+      "accounts": [
+        {
+          "name": "clusterHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reallocClusterHistoryAccount",
+      "accounts": [
+        {
+          "name": "clusterHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "copyVoteAccount",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateMevCommission",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "Used to read validator commission."
+          ]
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tipDistributionAccount",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "`owner = config.tip_distribution_program.key()` here is sufficient."
+          ]
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initializeConfig",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "setNewTipDistributionProgram",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newTipDistributionProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setNewAdmin",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newAdmin",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "setNewOracleAuthority",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newOracleAuthority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateStakeHistory",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "oracleAuthority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "lamports",
+          "type": "u64"
+        },
+        {
+          "name": "rank",
+          "type": "u32"
+        },
+        {
+          "name": "isSuperminority",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "copyGossipContactInfo",
+      "accounts": [
+        {
+          "name": "validatorHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "copyClusterInfo",
+      "accounts": [
+        {
+          "name": "clusterHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "slotHistory",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "backfillTotalBlocks",
+      "accounts": [
+        {
+          "name": "clusterHistoryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "blocksInEpoch",
+          "type": "u32"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tipDistributionProgram",
+            "type": "publicKey"
+          },
+          {
+            "name": "admin",
+            "type": "publicKey"
+          },
+          {
+            "name": "oracleAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "counter",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorHistory",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "structVersion",
+            "type": "u32"
+          },
+          {
+            "name": "voteAccount",
+            "type": "publicKey"
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "lastIpTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "lastVersionTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                232
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": "CircBuf"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClusterHistory",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "structVersion",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "clusterHistoryLastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                232
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": "CircBufCluster"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "ValidatorHistoryEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "activatedStakeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "mevCommission",
+            "type": "u16"
+          },
+          {
+            "name": "epochCredits",
+            "type": "u32"
+          },
+          {
+            "name": "commission",
+            "type": "u8"
+          },
+          {
+            "name": "clientType",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": {
+              "defined": "ClientVersion"
+            }
+          },
+          {
+            "name": "ip",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "padding0",
+            "type": "u8"
+          },
+          {
+            "name": "isSuperminority",
+            "type": "u8"
+          },
+          {
+            "name": "rank",
+            "type": "u32"
+          },
+          {
+            "name": "voteAccountLastUpdateSlot",
+            "type": "u64"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                88
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClientVersion",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "major",
+            "type": "u8"
+          },
+          {
+            "name": "minor",
+            "type": "u8"
+          },
+          {
+            "name": "patch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircBuf",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "idx",
+            "type": "u64"
+          },
+          {
+            "name": "isEmpty",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "arr",
+            "type": {
+              "array": [
+                {
+                  "defined": "ValidatorHistoryEntry"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClusterHistoryEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "totalBlocks",
+            "type": "u32"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                250
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircBufCluster",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "idx",
+            "type": "u64"
+          },
+          {
+            "name": "isEmpty",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "arr",
+            "type": {
+              "array": [
+                {
+                  "defined": "ClusterHistoryEntry"
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CrdsData",
+      "docs": [
+        "CrdsData that defines the different types of items CrdsValues can hold",
+        "* Merge Strategy - Latest wallclock is picked",
+        "* LowestSlot index is deprecated"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "LegacyContactInfo",
+            "fields": [
+              {
+                "defined": "LegacyContactInfo"
+              }
+            ]
+          },
+          {
+            "name": "Vote"
+          },
+          {
+            "name": "LowestSlot"
+          },
+          {
+            "name": "LegacySnapshotHashes"
+          },
+          {
+            "name": "AccountsHashes"
+          },
+          {
+            "name": "EpochSlots"
+          },
+          {
+            "name": "LegacyVersion",
+            "fields": [
+              {
+                "defined": "LegacyVersion"
+              }
+            ]
+          },
+          {
+            "name": "Version",
+            "fields": [
+              {
+                "defined": "Version2"
+              }
+            ]
+          },
+          {
+            "name": "NodeInstance"
+          },
+          {
+            "name": "DuplicateShred"
+          },
+          {
+            "name": "SnapshotHashes"
+          },
+          {
+            "name": "ContactInfo",
+            "fields": [
+              {
+                "defined": "ContactInfo"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Error",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DuplicateIpAddr",
+            "fields": [
+              {
+                "defined": "IpAddr"
+              }
+            ]
+          },
+          {
+            "name": "DuplicateSocket",
+            "fields": [
+              "u8"
+            ]
+          },
+          {
+            "name": "InvalidIpAddrIndex",
+            "fields": [
+              {
+                "name": "index",
+                "type": "u8"
+              },
+              {
+                "name": "num_addrs",
+                "type": {
+                  "defined": "usize"
+                }
+              }
+            ]
+          },
+          {
+            "name": "InvalidPort",
+            "fields": [
+              "u16"
+            ]
+          },
+          {
+            "name": "InvalidQuicSocket",
+            "fields": [
+              {
+                "option": {
+                  "defined": "SocketAddr"
+                }
+              },
+              {
+                "option": {
+                  "defined": "SocketAddr"
+                }
+              }
+            ]
+          },
+          {
+            "name": "IpAddrsSaturated"
+          },
+          {
+            "name": "MulticastIpAddr",
+            "fields": [
+              {
+                "defined": "IpAddr"
+              }
+            ]
+          },
+          {
+            "name": "PortOffsetsOverflow"
+          },
+          {
+            "name": "SocketNotFound",
+            "fields": [
+              "u8"
+            ]
+          },
+          {
+            "name": "UnspecifiedIpAddr",
+            "fields": [
+              {
+                "defined": "IpAddr"
+              }
+            ]
+          },
+          {
+            "name": "UnusedIpAddr",
+            "fields": [
+              {
+                "defined": "IpAddr"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorHistoryVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "V0"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AccountFullySized",
+      "msg": "Account already reached proper size, no more allocations allowed"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidEpochCredits",
+      "msg": "Invalid epoch credits, credits must be greater than previous credits"
+    },
+    {
+      "code": 6002,
+      "name": "EpochOutOfRange",
+      "msg": "Epoch is out of range of history"
+    },
+    {
+      "code": 6003,
+      "name": "NotSigVerified",
+      "msg": "Gossip Signature Verification not performed"
+    },
+    {
+      "code": 6004,
+      "name": "GossipDataInvalid",
+      "msg": "Gossip Data Invalid"
+    },
+    {
+      "code": 6005,
+      "name": "UnsupportedIpFormat",
+      "msg": "Unsupported IP Format, only IpAddr::V4 is supported"
+    },
+    {
+      "code": 6006,
+      "name": "NotEnoughVotingHistory",
+      "msg": "Not enough voting history to create account. Minimum 10 epochs required"
+    },
+    {
+      "code": 6007,
+      "name": "GossipDataTooOld",
+      "msg": "Gossip data too old. Data cannot be older than the last recorded timestamp for a field"
+    },
+    {
+      "code": 6008,
+      "name": "GossipDataInFuture",
+      "msg": "Gossip timestamp too far in the future"
+    },
+    {
+      "code": 6009,
+      "name": "ArithmeticError",
+      "msg": "Arithmetic Error (overflow/underflow)"
+    },
+    {
+      "code": 6010,
+      "name": "SlotHistoryOutOfDate",
+      "msg": "Slot history sysvar is not containing expected slots"
+    }
+  ]
+}
