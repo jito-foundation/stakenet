@@ -131,7 +131,7 @@ impl UpdateInstruction for StakeHistoryEntry {
                 validator_history_account: self.address,
                 vote_account: self.vote_account,
                 config: self.config_address,
-                stake_authority: self.signer,
+                oracle_authority: self.signer,
             }
             .to_account_metas(None),
             data: validator_history::instruction::UpdateStakeHistory {

@@ -21,12 +21,12 @@ pub struct UpdateStakeHistory<'info> {
     #[account(
         seeds = [Config::SEED],
         bump = config.bump,
-        has_one = stake_authority
+        has_one = oracle_authority
     )]
     pub config: Account<'info, Config>,
 
     #[account(mut)]
-    pub stake_authority: Signer<'info>,
+    pub oracle_authority: Signer<'info>,
 }
 
 pub fn handler(

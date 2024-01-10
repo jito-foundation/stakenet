@@ -38,8 +38,8 @@ async fn test_initialize() {
         .await;
 
     assert!(config.counter == 0);
-    assert!(config.stake_authority == test.keypair.pubkey());
-    assert!(config.tip_distribution_authority == test.keypair.pubkey());
+    assert!(config.oracle_authority == test.keypair.pubkey());
+    assert!(config.admin == test.keypair.pubkey());
 
     // Initialize validator history account
 
@@ -170,7 +170,7 @@ async fn test_extra_realloc() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            stake_authority: fixture.keypair.pubkey(),
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };

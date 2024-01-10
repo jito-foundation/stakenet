@@ -78,6 +78,7 @@ impl TestFixture {
             new_vote_account(identity_pubkey, vote_account, 1, Some(vec![(0, 0, 0); 10])),
         );
         program.add_account(keypair.pubkey(), system_account(100_000_000_000));
+        program.add_account(identity_pubkey, system_account(100_000_000_000));
 
         let ctx = Rc::new(RefCell::new(program.start_with_context().await));
 
@@ -127,7 +128,7 @@ impl TestFixture {
             accounts: validator_history::accounts::SetNewTipDistributionProgram {
                 config: self.validator_history_config,
                 new_tip_distribution_program: jito_tip_distribution::id(),
-                tip_distribution_authority: self.keypair.pubkey(),
+                admin: self.keypair.pubkey(),
             }
             .to_account_metas(None),
             data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),

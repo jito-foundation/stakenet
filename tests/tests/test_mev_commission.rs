@@ -203,13 +203,13 @@ async fn test_change_tip_distribution_authority() {
     // Change tip distribution authority
     let instruction = Instruction {
         program_id: validator_history::id(),
-        accounts: validator_history::accounts::SetNewTipDistributionAuthority {
+        accounts: validator_history::accounts::SetNewAdmin {
             config: fixture.validator_history_config,
-            new_authority,
-            tip_distribution_authority: fixture.keypair.pubkey(),
+            new_admin: new_authority,
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::SetNewTipDistributionAuthority {}.data(),
+        data: validator_history::instruction::SetNewAdmin {}.data(),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
@@ -224,18 +224,18 @@ async fn test_change_tip_distribution_authority() {
         .load_and_deserialize(&fixture.validator_history_config)
         .await;
 
-    assert!(config.tip_distribution_authority == new_authority);
+    assert!(config.admin == new_authority);
 
     // Change tip distribution authority
     let instruction = Instruction {
         program_id: validator_history::id(),
-        accounts: validator_history::accounts::SetNewTipDistributionAuthority {
+        accounts: validator_history::accounts::SetNewAdmin {
             config: fixture.validator_history_config,
-            new_authority: fixture.keypair.pubkey(),
-            tip_distribution_authority: fixture.keypair.pubkey(),
+            new_admin: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::SetNewTipDistributionAuthority {}.data(),
+        data: validator_history::instruction::SetNewAdmin {}.data(),
     };
 
     let transaction = Transaction::new_signed_with_payer(
