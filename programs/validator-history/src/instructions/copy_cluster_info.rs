@@ -13,6 +13,8 @@ pub struct CopyClusterInfo<'info> {
         bump,
     )]
     pub cluster_history_account: AccountLoader<'info, ClusterHistory>,
+    /// CHECK: slot_history sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::slot_history::id())]
     pub slot_history: UncheckedAccount<'info>,
     #[account(mut)]
     pub signer: Signer<'info>,
@@ -39,7 +41,7 @@ pub fn handler(ctx: Context<CopyClusterInfo>) -> Result<()> {
     Ok(())
 }
 
-fn blocks_in_epoch(epoch: u16, slot_history: &Box<SlotHistory>) -> Result<u32> {
+fn blocks_in_epoch(epoch: u16, slot_history: &SlotHistory) -> Result<u32> {
     let epoch_schedule = EpochSchedule::get()?;
     let start_slot = epoch_schedule.get_first_slot_in_epoch(epoch as u64);
     let end_slot = epoch_schedule.get_last_slot_in_epoch(epoch as u64);

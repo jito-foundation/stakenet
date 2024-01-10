@@ -604,7 +604,7 @@ impl CircBufCluster {
     pub fn total_blocks_latest(&self) -> Option<u32> {
         if let Some(entry) = self.last() {
             if entry.total_blocks != ClusterHistoryEntry::default().total_blocks {
-                return Some(entry.total_blocks);
+                Some(entry.total_blocks)
             } else {
                 None
             }

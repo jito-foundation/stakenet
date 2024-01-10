@@ -8,7 +8,6 @@ use keeper_core::{CreateUpdateStats, SubmitStats};
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
-    client_error::ClientError,
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
