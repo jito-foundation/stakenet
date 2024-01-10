@@ -18,8 +18,8 @@ pub struct InitializeConfig<'info> {
 }
 
 pub fn handler(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
-    ctx.accounts.config.stake_authority = authority;
-    ctx.accounts.config.tip_distribution_authority = authority;
+    ctx.accounts.config.oracle_authority = authority;
+    ctx.accounts.config.admin = authority;
     ctx.accounts.config.bump = *ctx.bumps.get("config").unwrap();
     ctx.accounts.config.counter = 0;
     Ok(())

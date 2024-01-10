@@ -32,7 +32,7 @@ async fn test_stake_history_basic_update() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            stake_authority: fixture.keypair.pubkey(),
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -70,7 +70,7 @@ async fn test_stake_history_basic_update() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            stake_authority: fixture.keypair.pubkey(),
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -122,7 +122,7 @@ async fn test_stake_history_wrong_authority() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            stake_authority: new_authority.pubkey(),
+            oracle_authority: new_authority.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -169,7 +169,7 @@ async fn test_stake_history_future_epoch() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            stake_authority: fixture.keypair.pubkey(),
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -185,7 +185,7 @@ async fn test_stake_history_future_epoch() {
 }
 
 #[tokio::test]
-async fn test_change_stake_authority() {
+async fn test_change_oracle_authority() {
     let test = TestFixture::new().await;
     let ctx = &test.ctx;
 
@@ -196,13 +196,13 @@ async fn test_change_stake_authority() {
     // Change stake authority
     let instruction = Instruction {
         program_id: validator_history::id(),
-        accounts: validator_history::accounts::SetNewStakeAuthority {
+        accounts: validator_history::accounts::SetNewOracleAuthority {
             config: test.validator_history_config,
-            new_authority,
-            stake_authority: test.keypair.pubkey(),
+            new_oracle_authority: new_authority,
+            admin: test.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::SetNewStakeAuthority {}.data(),
+        data: validator_history::instruction::SetNewOracleAuthority {}.data(),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
@@ -217,23 +217,23 @@ async fn test_change_stake_authority() {
         .load_and_deserialize(&test.validator_history_config)
         .await;
 
-    assert!(config.stake_authority == new_authority);
+    assert!(config.oracle_authority == new_authority);
 
     // Try to change it back with wrong signer
     let instruction = Instruction {
         program_id: validator_history::id(),
-        accounts: validator_history::accounts::SetNewStakeAuthority {
+        accounts: validator_history::accounts::SetNewOracleAuthority {
             config: test.validator_history_config,
-            new_authority: test.keypair.pubkey(),
-            stake_authority: test.keypair.pubkey(),
+            new_oracle_authority: test.keypair.pubkey(),
+            admin: test.identity_keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::SetNewStakeAuthority {}.data(),
+        data: validator_history::instruction::SetNewOracleAuthority {}.data(),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
-        Some(&test.keypair.pubkey()),
-        &[&test.keypair],
+        Some(&test.identity_keypair.pubkey()),
+        &[&test.identity_keypair],
         ctx.borrow().last_blockhash,
     );
 
