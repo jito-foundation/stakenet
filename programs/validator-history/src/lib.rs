@@ -83,14 +83,12 @@ pub mod validator_history {
         instructions::set_new_tip_distribution_program::handler(ctx)
     }
 
-    pub fn set_new_tip_distribution_authority(
-        ctx: Context<SetNewTipDistributionAuthority>,
-    ) -> Result<()> {
-        instructions::set_new_tip_distribution_authority::handler(ctx)
+    pub fn set_new_admin(ctx: Context<SetNewAdmin>) -> Result<()> {
+        instructions::set_new_admin::handler(ctx)
     }
 
-    pub fn set_new_stake_authority(ctx: Context<SetNewStakeAuthority>) -> Result<()> {
-        instructions::set_new_stake_authority::handler(ctx)
+    pub fn set_new_oracle_authority(ctx: Context<SetNewOracleAuthority>) -> Result<()> {
+        instructions::set_new_oracle_authority::handler(ctx)
     }
 
     pub fn update_stake_history(

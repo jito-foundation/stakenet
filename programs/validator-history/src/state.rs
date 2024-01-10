@@ -19,10 +19,10 @@ pub struct Config {
     pub tip_distribution_program: Pubkey,
 
     // Has the ability to upgrade the tip_distribution_program in case of a program upgrade
-    pub tip_distribution_authority: Pubkey,
+    pub admin: Pubkey,
 
     // Has the ability to publish stake amounts per validator
-    pub stake_authority: Pubkey,
+    pub oracle_authority: Pubkey,
 
     // Tracks number of initialized ValidatorHistory accounts
     pub counter: u32,

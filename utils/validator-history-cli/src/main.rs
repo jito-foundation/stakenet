@@ -132,7 +132,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
         accounts: validator_history::accounts::SetNewTipDistributionProgram {
             config: config_pda,
             new_tip_distribution_program: args.tip_distribution_program_id,
-            tip_distribution_authority: keypair.pubkey(),
+            admin: keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),
@@ -141,26 +141,26 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     if let Some(new_authority) = args.tip_distribution_authority {
         instructions.push(Instruction {
             program_id: validator_history::ID,
-            accounts: validator_history::accounts::SetNewTipDistributionAuthority {
+            accounts: validator_history::accounts::SetNewAdmin {
                 config: config_pda,
-                new_authority,
-                tip_distribution_authority: keypair.pubkey(),
+                new_admin: new_authority,
+                admin: keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: validator_history::instruction::SetNewTipDistributionAuthority {}.data(),
+            data: validator_history::instruction::SetNewAdmin {}.data(),
         });
     }
 
     if let Some(new_authority) = args.stake_authority {
         instructions.push(Instruction {
             program_id: validator_history::ID,
-            accounts: validator_history::accounts::SetNewStakeAuthority {
+            accounts: validator_history::accounts::SetNewOracleAuthority {
                 config: config_pda,
-                new_authority,
-                stake_authority: keypair.pubkey(),
+                new_oracle_authority: new_authority,
+                admin: keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: validator_history::instruction::SetNewStakeAuthority {}.data(),
+            data: validator_history::instruction::SetNewOracleAuthority {}.data(),
         });
     }
 

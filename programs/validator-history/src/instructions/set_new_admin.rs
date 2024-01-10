@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::state::Config;
 
 #[derive(Accounts)]
-pub struct SetNewTipDistributionProgram<'info> {
+pub struct SetNewAdmin<'info> {
     #[account(
         mut,
         seeds = [Config::SEED],
@@ -12,12 +12,11 @@ pub struct SetNewTipDistributionProgram<'info> {
     )]
     pub config: Account<'info, Config>,
     /// CHECK: fine since we are not deserializing account
-    #[account(executable)]
-    pub new_tip_distribution_program: AccountInfo<'info>,
+    pub new_admin: AccountInfo<'info>,
     pub admin: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<SetNewTipDistributionProgram>) -> Result<()> {
-    ctx.accounts.config.tip_distribution_program = ctx.accounts.new_tip_distribution_program.key();
+pub fn handler(ctx: Context<SetNewAdmin>) -> Result<()> {
+    ctx.accounts.config.admin = ctx.accounts.new_admin.key();
     Ok(())
 }
