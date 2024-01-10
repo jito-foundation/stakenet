@@ -24,4 +24,6 @@ pub enum ValidatorHistoryError {
     GossipDataInFuture,
     #[msg("Arithmetic Error (overflow/underflow)")]
     ArithmeticError,
+    #[msg("Slot history sysvar is not containing expected slots")]
+    SlotHistoryOutOfDate,
 }
