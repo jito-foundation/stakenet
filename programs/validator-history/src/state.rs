@@ -18,10 +18,10 @@ pub struct Config {
     // This program is used to distribute MEV + track which validators are running jito-solana for a given epoch
     pub tip_distribution_program: Pubkey,
 
-    // Has the ability to upgrade the tip_distribution_program in case of a program upgrade
+    // Has the ability to upgrade config fields
     pub admin: Pubkey,
 
-    // Has the ability to publish stake amounts per validator
+    // Has the ability to publish data for specific permissioned fields (e.g. stake per validator)
     pub oracle_authority: Pubkey,
 
     // Tracks number of initialized ValidatorHistory accounts

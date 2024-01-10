@@ -11,7 +11,7 @@ pub struct BackfillTotalBlocks<'info> {
     )]
     pub cluster_history_account: AccountLoader<'info, ClusterHistory>,
     pub config: Account<'info, Config>,
-    #[account(mut, address = config.stake_authority )]
+    #[account(mut, address = config.oracle_authority )]
     pub signer: Signer<'info>,
 }
 
