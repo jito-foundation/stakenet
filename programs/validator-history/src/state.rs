@@ -62,8 +62,8 @@ pub struct ValidatorHistoryEntry {
     // Most recent updated slot for epoch credits and commission
     pub vote_account_last_update_slot: u64,
     // MEV earned
-    pub mev_earned: u64,
-    pub padding1: [u8; 80],
+    pub mev_earned: u32,
+    pub padding1: [u8; 84],
 }
 
 impl Default for ValidatorHistoryEntry {
@@ -85,8 +85,8 @@ impl Default for ValidatorHistoryEntry {
             is_superminority: u8::MAX,
             rank: u32::MAX,
             vote_account_last_update_slot: u64::MAX,
-            mev_earned: u64::MAX,
-            padding1: [u8::MAX; 80],
+            mev_earned: u32::MAX,
+            padding1: [u8::MAX; 84],
         }
     }
 }
@@ -286,17 +286,29 @@ impl ValidatorHistory {
         &mut self,
         epoch: u16,
         commission: u16,
-        mev_earned: u64,
+        mev_earned: u32,
     ) -> Result<()> {
-        // check if entry exists for the epoch
-        self.history
-            .arr
-            .iter_mut()
-            .filter(|entry| entry.epoch == epoch)
-            .for_each(|entry| {
-                entry.mev_earned = mev_earned;
-                entry.mev_commission = commission;
-            });
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.mev_earned = mev_earned;
+                    entry.mev_commission = commission;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.mev_earned = mev_earned;
+                            entry.mev_commission = commission;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
+            }
+        }
         let entry = ValidatorHistoryEntry {
             epoch,
             mev_commission: commission,
@@ -395,10 +407,24 @@ impl ValidatorHistory {
 
     pub fn set_commission_and_slot(&mut self, epoch: u16, commission: u8, slot: u64) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
-                entry.commission = commission;
-                entry.vote_account_last_update_slot = slot;
-                return Ok(());
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.commission = commission;
+                    entry.vote_account_last_update_slot = slot;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.commission = commission;
+                            entry.vote_account_last_update_slot = slot;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
             }
         }
         let entry = ValidatorHistoryEntry {
@@ -432,16 +458,32 @@ impl ValidatorHistory {
         self.last_version_timestamp = contact_info_ts;
 
         if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
-                entry.ip = ip;
-                entry.client_type = contact_info.version.client as u8;
-                entry.version.major = contact_info.version.major as u8;
-                entry.version.minor = contact_info.version.minor as u8;
-                entry.version.patch = contact_info.version.patch;
-                return Ok(());
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.ip = ip;
+                    entry.client_type = contact_info.version.client as u8;
+                    entry.version.major = contact_info.version.major as u8;
+                    entry.version.minor = contact_info.version.minor as u8;
+                    entry.version.patch = contact_info.version.patch;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.ip = ip;
+                            entry.client_type = contact_info.version.client as u8;
+                            entry.version.major = contact_info.version.major as u8;
+                            entry.version.minor = contact_info.version.minor as u8;
+                            entry.version.patch = contact_info.version.patch;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
             }
         }
-
         let entry = ValidatorHistoryEntry {
             epoch,
             ip,
@@ -475,9 +517,22 @@ impl ValidatorHistory {
         self.last_ip_timestamp = contact_info_ts;
 
         if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
-                entry.ip = ip;
-                return Ok(());
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.ip = ip;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.ip = ip;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
             }
         }
 
@@ -497,11 +552,26 @@ impl ValidatorHistory {
         self.last_version_timestamp = version_ts;
 
         if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
-                entry.version.major = version.version.major as u8;
-                entry.version.minor = version.version.minor as u8;
-                entry.version.patch = version.version.patch;
-                return Ok(());
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.version.major = version.version.major as u8;
+                    entry.version.minor = version.version.minor as u8;
+                    entry.version.patch = version.version.patch;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.version.major = version.version.major as u8;
+                            entry.version.minor = version.version.minor as u8;
+                            entry.version.patch = version.version.patch;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
             }
         }
         let entry = ValidatorHistoryEntry {
@@ -529,11 +599,26 @@ impl ValidatorHistory {
         self.last_version_timestamp = version_ts;
 
         if let Some(entry) = self.history.last_mut() {
-            if entry.epoch == epoch {
-                entry.version.major = legacy_version.version.major as u8;
-                entry.version.minor = legacy_version.version.minor as u8;
-                entry.version.patch = legacy_version.version.patch;
-                return Ok(());
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.version.major = legacy_version.version.major as u8;
+                    entry.version.minor = legacy_version.version.minor as u8;
+                    entry.version.patch = legacy_version.version.patch;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    self.history
+                        .arr_mut()
+                        .iter_mut()
+                        .filter(|entry| entry.epoch == epoch)
+                        .for_each(|entry| {
+                            entry.version.major = legacy_version.version.major as u8;
+                            entry.version.minor = legacy_version.version.minor as u8;
+                            entry.version.patch = legacy_version.version.patch;
+                        });
+                    return Ok(());
+                }
+                Ordering::Less => {}
             }
         }
         let entry = ValidatorHistoryEntry {

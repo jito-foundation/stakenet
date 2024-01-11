@@ -1,11 +1,9 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{clock::Clock, vote},
-};
+use anchor_lang::{prelude::*, solana_program::vote};
 
 use crate::{
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
+    utils::fixed_point_sol,
 };
 use jito_tip_distribution::state::TipDistributionAccount;
 
@@ -56,10 +54,10 @@ pub fn handler(ctx: Context<UpdateMevCommission>, epoch: u64) -> Result<()> {
 
     let tip_distribution_account = TipDistributionAccount::try_deserialize(&mut tda_data)?;
     let mev_commission_bps = tip_distribution_account.validator_commission_bps;
-    let mut mev_earned: u64 = 0;
+    let mut mev_earned: u32 = 0;
     // if the merkle_root has been uploaded pull the mev_earned for the epoch
     if let Some(merkle_root) = tip_distribution_account.merkle_root {
-        mev_earned = merkle_root.max_total_claim;
+        mev_earned = fixed_point_sol(merkle_root.max_total_claim);
     }
     let epoch = cast_epoch(epoch);
     validator_history_account.set_mev_commission(epoch, mev_commission_bps, mev_earned)?;

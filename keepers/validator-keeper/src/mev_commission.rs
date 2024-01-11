@@ -1,7 +1,8 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
+use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{
     build_create_and_update_instructions, get_multiple_accounts_batched,
     get_vote_accounts_with_retry, submit_create_and_update, Address, CreateTransaction,
@@ -192,6 +193,73 @@ pub async fn update_mev_commission(
     submit_result.map_err(|(e, stats)| (e.into(), stats))
 }
 
+pub async fn update_mev_earned(
+    client: Arc<RpcClient>,
+    keypair: Arc<Keypair>,
+    validator_history_program_id: &Pubkey,
+    tip_distribution_program_id: &Pubkey,
+    validators_updated: &mut HashMap<Pubkey, Pubkey>,
+    curr_epoch: &mut u64,
+) -> Result<CreateUpdateStats, (MevCommissionError, CreateUpdateStats)> {
+    let epoch = client
+        .get_epoch_info()
+        .await
+        .map_err(|e| (e.into(), CreateUpdateStats::default()))?
+        .epoch;
+
+    if epoch > *curr_epoch {
+        // new epoch started, we assume here that all the validators with TDAs from curr_epoch-1 have had their merkle roots uploaded/processed by this point
+        // clear our map of TDAs derived from curr_epoch -1 and start fresh for epoch-1 (or curr_epoch)
+        validators_updated.clear();
+    }
+    *curr_epoch = epoch;
+
+    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None)
+        .await
+        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+
+    let entries = vote_accounts
+        .iter()
+        .map(|vote_account| {
+            ValidatorMevCommissionEntry::new(
+                vote_account,
+                epoch - 1, // TDA derived from the prev epoch since the merkle roots are uploaded shortly after rollover
+                validator_history_program_id,
+                tip_distribution_program_id,
+                &keypair.pubkey(),
+            )
+        })
+        .collect::<Vec<ValidatorMevCommissionEntry>>();
+
+    let uploaded_merkleroot_entries =
+        get_entries_with_uploaded_merkleroot(client.clone(), &entries)
+            .await
+            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+
+    let entries_to_update = uploaded_merkleroot_entries
+        .into_iter()
+        .filter(|entry| !validators_updated.contains_key(&entry.tip_distribution_account))
+        .collect::<Vec<ValidatorMevCommissionEntry>>();
+    let (create_transactions, update_instructions) =
+        build_create_and_update_instructions(&client, &entries_to_update)
+            .await
+            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+
+    let submit_result =
+        submit_create_and_update(&client, create_transactions, update_instructions, &keypair).await;
+    if submit_result.is_ok() {
+        for ValidatorMevCommissionEntry {
+            vote_account,
+            tip_distribution_account,
+            ..
+        } in entries_to_update
+        {
+            validators_updated.insert(tip_distribution_account, vote_account);
+        }
+    }
+    submit_result.map_err(|(e, stats)| (e.into(), stats))
+}
+
 async fn get_existing_entries(
     client: Arc<RpcClient>,
     entries: &[ValidatorMevCommissionEntry],
@@ -215,5 +283,40 @@ async fn get_existing_entries(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     // Fetch existing tip distribution accounts for this epoch
+    Ok(result)
+}
+
+async fn get_entries_with_uploaded_merkleroot(
+    client: Arc<RpcClient>,
+    entries: &[ValidatorMevCommissionEntry],
+) -> Result<Vec<ValidatorMevCommissionEntry>, MultipleAccountsError> {
+    /* Filters tip distribution tuples to the addresses, then fetches accounts to see which ones have an uploaded merkle root */
+    let tip_distribution_addresses = entries
+        .iter()
+        .map(|entry| entry.tip_distribution_account)
+        .collect::<Vec<Pubkey>>();
+
+    let accounts = get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
+    let result = accounts
+        .iter()
+        .enumerate()
+        .filter_map(|(i, account_data)| {
+            if let Some(account_data) = account_data {
+                let mut data: &[u8] = &account_data.data;
+                if let Ok(tda) = TipDistributionAccount::try_deserialize(&mut data) {
+                    if let Some(_) = tda.merkle_root {
+                        return Some(entries[i].clone());
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        })
+        .collect::<Vec<ValidatorMevCommissionEntry>>();
+    // Fetch tip distribution accounts with uploaded merkle roots for this epoch
     Ok(result)
 }

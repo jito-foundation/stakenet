@@ -80,6 +80,16 @@ pub fn emit_mev_commission_datapoint(stats: CreateUpdateStats) {
     );
 }
 
+pub fn emit_mev_earned_datapoint(stats: CreateUpdateStats) {
+    datapoint_info!(
+        "mev-earned-stats",
+        ("num_creates_success", stats.creates.successes, i64),
+        ("num_creates_error", stats.creates.errors, i64),
+        ("num_updates_success", stats.updates.successes, i64),
+        ("num_updates_error", stats.updates.errors, i64),
+    );
+}
+
 pub fn emit_validator_commission_datapoint(stats: CreateUpdateStats, runs_for_epoch: i64) {
     datapoint_info!(
         "vote-account-stats",

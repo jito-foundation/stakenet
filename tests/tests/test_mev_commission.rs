@@ -22,7 +22,7 @@ async fn test_mev_commission() {
     .0;
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(fixture.vote_account, 42, 123456).into(),
+        &new_tip_distribution_account(fixture.vote_account, 42, 123_236_567_899).into(),
     );
 
     // update mev commission
@@ -62,7 +62,8 @@ async fn test_mev_commission() {
     assert!(account.history.idx == 0);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].mev_commission == 42);
-    assert!(account.history.arr[0].mev_earned == 123456);
+    assert!(account.history.arr[0].mev_earned == 12324); // fixed point representation
+    assert!((account.history.arr[0].mev_earned as f64 / 100.0) == 123.24 as f64);
     // TODO this is causing a hash mismatch issue
     // fixture.advance_num_epochs(1).await;
 
