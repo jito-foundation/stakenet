@@ -573,6 +573,18 @@ pub struct CircBufCluster {
     pub arr: [ClusterHistoryEntry; MAX_ITEMS],
 }
 
+#[cfg(test)]
+impl Default for CircBufCluster {
+    fn default() -> Self {
+        Self {
+            arr: [ClusterHistoryEntry::default(); MAX_ITEMS],
+            idx: 0,
+            is_empty: 1,
+            padding: [0; 7],
+        }
+    }
+}
+
 impl CircBufCluster {
     pub fn push(&mut self, item: ClusterHistoryEntry) {
         self.idx = (self.idx + 1) % self.arr.len() as u64;
@@ -606,12 +618,27 @@ impl CircBufCluster {
 
     /// Returns &ClusterHistoryEntry for each existing entry in range [start_epoch, end_epoch], factoring for wraparound
     /// Returns None if either start_epoch or end_epoch is not in the CircBuf
-    pub fn epoch_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<&ClusterHistoryEntry> {
+    pub fn epoch_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<&ClusterHistoryEntry>> {
         // creates an iterator that lays out the entries in consecutive order, handling wraparound
-        self.arr[(self.idx as usize + 1)..]
+        let mut entries = self.arr[(self.idx as usize + 1)..] // if self.idx + 1 == self.arr.len() this will just return an empty slice
             .iter()
             .chain(self.arr[..=(self.idx as usize)].iter())
             .filter(|entry| entry.epoch >= start_epoch && entry.epoch <= end_epoch)
+            .peekable();
+        (start_epoch..=end_epoch)
+            .map(|epoch| {
+                if let Some(&entry) = entries.peek() {
+                    if entry.epoch == epoch {
+                        entries.next();
+                        return Some(entry);
+                    }
+                }
+                None
+            })
             .collect()
     }
 
@@ -631,12 +658,11 @@ impl CircBufCluster {
         let epoch_range = self.epoch_range(start_epoch, end_epoch);
         epoch_range
             .iter()
-            .map(|entry| {
-                if entry.total_blocks != ClusterHistoryEntry::default().total_blocks {
-                    Some(entry.total_blocks)
-                } else {
-                    None
-                }
+            .map(|option_entry| {
+                option_entry
+                    .as_ref()
+                    .map(|entry| entry.total_blocks)
+                    .filter(|&field| field != ClusterHistoryEntry::default().total_blocks)
             })
             .collect::<Vec<Option<u32>>>()
     }
@@ -770,6 +796,46 @@ mod tests {
                 .filter_map(|maybe_e| maybe_e.map(|e| e.epoch))
                 .collect::<Vec<u16>>(),
             vec![508, 509, 510, 511, 512, 513, 514, 515, 516]
+        );
+
+        // Test ClusterHistory CircBuf epoch range with wraparound
+        let mut cluster_circ_buf = CircBufCluster::default();
+        (0..=cluster_circ_buf.arr.len() + 4).for_each(|i| {
+            cluster_circ_buf.push(ClusterHistoryEntry {
+                epoch: i as u16,
+                ..ClusterHistoryEntry::default()
+            })
+        });
+        let epoch_range = cluster_circ_buf.epoch_range(508, 516);
+        assert_eq!(
+            epoch_range
+                .iter()
+                .filter_map(|maybe_e| maybe_e.map(|e| e.epoch))
+                .collect::<Vec<u16>>(),
+            vec![508, 509, 510, 511, 512, 513, 514, 515, 516]
+        );
+
+        // Creates a new CircBuf with entries from epochs [0, 1, 3]
+        cluster_circ_buf = CircBufCluster::default();
+        for i in 0..4 {
+            if i == 2 {
+                continue;
+            }
+            let entry = ClusterHistoryEntry {
+                epoch: i,
+                ..ClusterHistoryEntry::default()
+            };
+            cluster_circ_buf.push(entry);
+        }
+
+        // Test epoch range [0, 3]
+        let epoch_range = cluster_circ_buf.epoch_range(0, 3);
+        assert_eq!(
+            epoch_range
+                .iter()
+                .map(|maybe_e| maybe_e.map(|e| e.epoch))
+                .collect::<Vec<Option<u16>>>(),
+            vec![Some(0), Some(1), None, Some(3)]
         );
     }
 }
