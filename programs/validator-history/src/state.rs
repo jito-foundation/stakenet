@@ -137,8 +137,8 @@ macro_rules! field_range {
         let epoch_range = $self.epoch_range($start_epoch, $end_epoch);
         epoch_range
             .iter()
-            .map(|option_entry| {
-                option_entry
+            .map(|maybe_entry| {
+                maybe_entry
                     .as_ref()
                     .map(|entry| entry.$field)
                     .filter(|&field| field != ValidatorHistoryEntry::default().$field)
@@ -658,8 +658,8 @@ impl CircBufCluster {
         let epoch_range = self.epoch_range(start_epoch, end_epoch);
         epoch_range
             .iter()
-            .map(|option_entry| {
-                option_entry
+            .map(|maybe_entry| {
+                maybe_entry
                     .as_ref()
                     .map(|entry| entry.total_blocks)
                     .filter(|&field| field != ClusterHistoryEntry::default().total_blocks)
@@ -815,7 +815,6 @@ mod tests {
             vec![508, 509, 510, 511, 512, 513, 514, 515, 516]
         );
 
-        // Creates a new CircBuf with entries from epochs [0, 1, 3]
         cluster_circ_buf = CircBufCluster::default();
         for i in 0..4 {
             if i == 2 {
@@ -828,7 +827,7 @@ mod tests {
             cluster_circ_buf.push(entry);
         }
 
-        // Test epoch range [0, 3]
+        // Test with None epoch
         let epoch_range = cluster_circ_buf.epoch_range(0, 3);
         assert_eq!(
             epoch_range
