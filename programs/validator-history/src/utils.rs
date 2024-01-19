@@ -32,6 +32,5 @@ mod tests {
         assert_eq!(fixed_point_sol(4294967295000000000), 4294967295);
 
         assert_eq!(fixed_point_sol(429496729600000000), 4294967295)
-
     }
 }
