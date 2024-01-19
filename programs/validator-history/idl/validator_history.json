@@ -126,7 +126,7 @@
       "args": []
     },
     {
-      "name": "updateMevCommission",
+      "name": "copyTipDistributionAccount",
       "accounts": [
         {
           "name": "validatorHistoryAccount",

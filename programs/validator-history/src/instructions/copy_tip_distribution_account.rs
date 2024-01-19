@@ -9,7 +9,7 @@ use jito_tip_distribution::state::TipDistributionAccount;
 
 #[derive(Accounts)]
 #[instruction(epoch: u64)]
-pub struct UpdateMevCommission<'info> {
+pub struct CopyTipDistributionAccount<'info> {
     #[account(
         mut,
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -47,7 +47,7 @@ pub struct UpdateMevCommission<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<UpdateMevCommission>, epoch: u64) -> Result<()> {
+pub fn handler(ctx: Context<CopyTipDistributionAccount>, epoch: u64) -> Result<()> {
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
 
     let mut tda_data: &[u8] = &ctx.accounts.tip_distribution_account.try_borrow_data()?;

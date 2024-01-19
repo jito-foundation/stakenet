@@ -117,7 +117,7 @@ impl UpdateInstruction for ValidatorMevCommissionEntry {
     fn update_instruction(&self) -> Instruction {
         Instruction {
             program_id: self.program_id,
-            accounts: validator_history::accounts::UpdateMevCommission {
+            accounts: validator_history::accounts::CopyTipDistributionAccount {
                 validator_history_account: self.validator_history_account,
                 vote_account: self.vote_account,
                 tip_distribution_account: self.tip_distribution_account,
@@ -125,7 +125,8 @@ impl UpdateInstruction for ValidatorMevCommissionEntry {
                 signer: self.signer,
             }
             .to_account_metas(None),
-            data: validator_history::instruction::UpdateMevCommission { epoch: self.epoch }.data(),
+            data: validator_history::instruction::CopyTipDistributionAccount { epoch: self.epoch }
+                .data(),
         }
     }
 }

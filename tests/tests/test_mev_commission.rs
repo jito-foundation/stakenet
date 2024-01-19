@@ -28,8 +28,8 @@ async fn test_mev_commission() {
     // update mev commission
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::UpdateMevCommission { epoch }.data(),
-        accounts: validator_history::accounts::UpdateMevCommission {
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch }.data(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
@@ -126,8 +126,8 @@ async fn test_mev_commission_fail() {
     .0;
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::UpdateMevCommission { epoch }.data(),
-        accounts: validator_history::accounts::UpdateMevCommission {
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch }.data(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
@@ -152,8 +152,8 @@ async fn test_mev_commission_fail() {
     // explicitly pass the instruction a different epoch than the one used to generate the tip_distribution pda
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::UpdateMevCommission { epoch: 1 }.data(),
-        accounts: validator_history::accounts::UpdateMevCommission {
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch: 1 }.data(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
@@ -184,8 +184,8 @@ async fn test_mev_commission_fail() {
     // test update mev commission with wrong validator's TDA
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::UpdateMevCommission { epoch }.data(),
-        accounts: validator_history::accounts::UpdateMevCommission {
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch }.data(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
             validator_history_account: fixture.validator_history_account,
             vote_account: new_vote_account,
             config: fixture.validator_history_config,
