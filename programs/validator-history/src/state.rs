@@ -61,7 +61,7 @@ pub struct ValidatorHistoryEntry {
     pub rank: u32,
     // Most recent updated slot for epoch credits and commission
     pub vote_account_last_update_slot: u64,
-    // MEV earned
+    // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1 SOL earned
     pub mev_earned: u32,
     pub padding1: [u8; 84],
 }
@@ -296,14 +296,15 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.mev_earned = mev_earned;
-                            entry.mev_commission = commission;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.mev_earned = mev_earned;
+                        entry.mev_commission = commission;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}
@@ -414,14 +415,15 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.commission = commission;
-                            entry.vote_account_last_update_slot = slot;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.commission = commission;
+                        entry.vote_account_last_update_slot = slot;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}
@@ -468,17 +470,18 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.ip = ip;
-                            entry.client_type = contact_info.version.client as u8;
-                            entry.version.major = contact_info.version.major as u8;
-                            entry.version.minor = contact_info.version.minor as u8;
-                            entry.version.patch = contact_info.version.patch;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.ip = ip;
+                        entry.client_type = contact_info.version.client as u8;
+                        entry.version.major = contact_info.version.major as u8;
+                        entry.version.minor = contact_info.version.minor as u8;
+                        entry.version.patch = contact_info.version.patch;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}
@@ -523,13 +526,14 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.ip = ip;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.ip = ip;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}
@@ -560,15 +564,16 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.version.major = version.version.major as u8;
-                            entry.version.minor = version.version.minor as u8;
-                            entry.version.patch = version.version.patch;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.version.major = version.version.major as u8;
+                        entry.version.minor = version.version.minor as u8;
+                        entry.version.patch = version.version.patch;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}
@@ -607,15 +612,16 @@ impl ValidatorHistory {
                     return Ok(());
                 }
                 Ordering::Greater => {
-                    self.history
+                    if let Some(entry) = self
+                        .history
                         .arr_mut()
                         .iter_mut()
-                        .filter(|entry| entry.epoch == epoch)
-                        .for_each(|entry| {
-                            entry.version.major = legacy_version.version.major as u8;
-                            entry.version.minor = legacy_version.version.minor as u8;
-                            entry.version.patch = legacy_version.version.patch;
-                        });
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.version.major = legacy_version.version.major as u8;
+                        entry.version.minor = legacy_version.version.minor as u8;
+                        entry.version.patch = legacy_version.version.patch;
+                    }
                     return Ok(());
                 }
                 Ordering::Less => {}

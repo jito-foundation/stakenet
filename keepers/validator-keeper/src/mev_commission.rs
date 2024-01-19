@@ -305,17 +305,12 @@ async fn get_entries_with_uploaded_merkleroot(
             if let Some(account_data) = account_data {
                 let mut data: &[u8] = &account_data.data;
                 if let Ok(tda) = TipDistributionAccount::try_deserialize(&mut data) {
-                    if let Some(_) = tda.merkle_root {
+                    if tda.merkle_root.is_some() {
                         return Some(entries[i].clone());
-                    } else {
-                        return None;
                     }
-                } else {
-                    return None;
                 }
-            } else {
-                return None;
             }
+            None
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     // Fetch tip distribution accounts with uploaded merkle roots for this epoch

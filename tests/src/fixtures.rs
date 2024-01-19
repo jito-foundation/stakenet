@@ -332,8 +332,10 @@ pub fn new_tip_distribution_account(
     mev_commission_bps: u16,
     mev_earned: u64,
 ) -> Account {
-    let mut merkle_root = MerkleRoot::default();
-    merkle_root.max_total_claim = mev_earned;
+    let merkle_root = MerkleRoot {
+        max_total_claim: mev_earned,
+        ..Default::default()
+    };
     let tda = TipDistributionAccount {
         validator_vote_account: vote_account,
         validator_commission_bps: mev_commission_bps,
