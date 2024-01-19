@@ -4,7 +4,7 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, Discriminator};
-use keeper_core::CreateUpdateStats;
+use keeper_core::{get_vote_accounts_with_retry, CreateUpdateStats, SubmitStats};
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
@@ -26,7 +26,9 @@ use solana_sdk::{
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{
+    constants::MIN_VOTE_EPOCHS, ValidatorHistory, ValidatorHistoryEntry,
+};
 
 pub mod gossip;
 pub mod mev_commission;
@@ -161,6 +163,11 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
+
+    let get_vote_accounts_count = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
+        .await?
+        .len();
+
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
@@ -172,6 +179,11 @@ pub async fn emit_validator_history_metrics(
         ("num_epoch_credits", epoch_credits, i64),
         ("num_stakes", stakes, i64),
         ("slot_index", epoch.slot_index, i64),
+        (
+            "num_get_vote_accounts_responses",
+            get_vote_accounts_count,
+            i64
+        ),
     );
     Ok(())
 }

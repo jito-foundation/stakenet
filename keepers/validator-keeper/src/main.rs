@@ -136,7 +136,7 @@ async fn vote_account_loop(
             runs_for_epoch = 0;
         }
         // Run at 10%, 50% and 90% completion of epoch
-        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 10
+        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
             && runs_for_epoch < 1)
             || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
