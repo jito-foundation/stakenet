@@ -8,6 +8,7 @@ use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::hash::Hash;
 use solana_sdk::packet::PACKET_DATA_SIZE;
+use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
     account::Account, commitment_config::CommitmentConfig, instruction::AccountMeta,
     instruction::Instruction, packet::Packet, pubkey::Pubkey, signature::Keypair,
@@ -206,7 +207,7 @@ async fn parallel_submit_transactions(
     executed_signatures: &mut HashMap<Signature, usize>,
 ) -> Result<(), TransactionExecutionError> {
     // Converts arrays of instructions into transactions and submits them in parallel, in batches of 50 (arbitrary, to avoid spamming RPC)
-    // Saves signatures associated with the indexes of instructions it contains
+    // Saves signatures associated with the indexes of instructions it contains. Drops transactions that fail simulation, unless the error is BlockhashNotFound
 
     const TX_BATCH_SIZE: usize = 50;
     for transaction_batch in transactions.chunks(TX_BATCH_SIZE) {
@@ -237,8 +238,17 @@ async fn parallel_submit_transactions(
                 match res {
                     Ok(signature) => Some((signature, i)),
                     Err(e) => {
-                        warn!("Send transaction failed: {:?}", e);
-                        None
+                        match e.get_transaction_error() {
+                            // If blockhash not found, transaction is still valid and should not be dropped
+                            Some(TransactionError::BlockhashNotFound) => {
+                                Some((tx.signatures[0], i))
+                            }
+                            // If another error is returned, transaction probably won't succeed on retries
+                            Some(_) | None => {
+                                warn!("Send transaction failed: {:?}", e);
+                                None
+                            }
+                        }
                     }
                 }
             })
