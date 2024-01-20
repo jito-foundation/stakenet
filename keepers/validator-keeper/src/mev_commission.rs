@@ -195,8 +195,8 @@ pub async fn update_mev_commission(
 }
 
 pub async fn update_mev_earned(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    keypair: &Arc<Keypair>,
     validator_history_program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
@@ -224,7 +224,7 @@ pub async fn update_mev_earned(
         .map(|vote_account| {
             ValidatorMevCommissionEntry::new(
                 vote_account,
-                epoch - 1, // TDA derived from the prev epoch since the merkle roots are uploaded shortly after rollover
+                epoch.saturating_sub(1), // TDA derived from the prev epoch since the merkle roots are uploaded shortly after rollover
                 validator_history_program_id,
                 tip_distribution_program_id,
                 &keypair.pubkey(),
@@ -232,10 +232,9 @@ pub async fn update_mev_earned(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
 
-    let uploaded_merkleroot_entries =
-        get_entries_with_uploaded_merkleroot(client.clone(), &entries)
-            .await
-            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let uploaded_merkleroot_entries = get_entries_with_uploaded_merkleroot(&client, &entries)
+        .await
+        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
 
     let entries_to_update = uploaded_merkleroot_entries
         .into_iter()
@@ -288,7 +287,7 @@ async fn get_existing_entries(
 }
 
 async fn get_entries_with_uploaded_merkleroot(
-    client: Arc<RpcClient>,
+    client: &Arc<RpcClient>,
     entries: &[ValidatorMevCommissionEntry],
 ) -> Result<Vec<ValidatorMevCommissionEntry>, MultipleAccountsError> {
     /* Filters tip distribution tuples to the addresses, then fetches accounts to see which ones have an uploaded merkle root */

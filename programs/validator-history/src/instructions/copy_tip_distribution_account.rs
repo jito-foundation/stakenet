@@ -50,7 +50,7 @@ pub struct CopyTipDistributionAccount<'info> {
 }
 
 pub fn handler(ctx: Context<CopyTipDistributionAccount>, epoch: u64) -> Result<()> {
-    // Cannot set stake for future epochs
+    // cant set data in validator history for future epochs
     if epoch > Clock::get()?.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }

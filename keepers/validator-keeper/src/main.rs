@@ -130,8 +130,8 @@ async fn mev_earned_loop(
         // Continuously runs throughout an epoch, polling for tip distribution accounts from the prev epoch with uploaded merkle roots
         // and submitting update_mev_earned (technically update_mev_comission) txs when the uploaded merkle roots are detected
         match update_mev_earned(
-            client.clone(),
-            keypair.clone(),
+            &client,
+            &keypair,
             &commission_history_program_id,
             &tip_distribution_program_id,
             &mut validators_updated,
@@ -399,16 +399,16 @@ async fn main() {
     }
 
     tokio::spawn(mev_commission_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
+        client.clone(),
+        keypair.clone(),
         args.program_id,
         args.tip_distribution_program_id,
         args.interval,
     ));
 
     tokio::spawn(mev_earned_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
+        client.clone(),
+        keypair.clone(),
         args.program_id,
         args.tip_distribution_program_id,
         args.interval,
