@@ -215,7 +215,7 @@ pub async fn update_mev_earned(
     }
     *curr_epoch = epoch;
 
-    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None)
+    let vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
         .await
         .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
 
@@ -232,7 +232,7 @@ pub async fn update_mev_earned(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
 
-    let uploaded_merkleroot_entries = get_entries_with_uploaded_merkleroot(&client, &entries)
+    let uploaded_merkleroot_entries = get_entries_with_uploaded_merkleroot(client, &entries)
         .await
         .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
 
@@ -241,12 +241,12 @@ pub async fn update_mev_earned(
         .filter(|entry| !validators_updated.contains_key(&entry.tip_distribution_account))
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&client, &entries_to_update)
+        build_create_and_update_instructions(client, &entries_to_update)
             .await
             .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
 
     let submit_result =
-        submit_create_and_update(&client, create_transactions, update_instructions, &keypair).await;
+        submit_create_and_update(client, create_transactions, update_instructions, keypair).await;
     if submit_result.is_ok() {
         for ValidatorMevCommissionEntry {
             vote_account,
@@ -296,7 +296,7 @@ async fn get_entries_with_uploaded_merkleroot(
         .map(|entry| entry.tip_distribution_account)
         .collect::<Vec<Pubkey>>();
 
-    let accounts = get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
+    let accounts = get_multiple_accounts_batched(&tip_distribution_addresses, client).await?;
     let result = accounts
         .iter()
         .enumerate()
