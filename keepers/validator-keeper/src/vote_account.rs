@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -16,6 +17,8 @@ use thiserror::Error as ThisError;
 use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
 use validator_history::Config;
+
+use crate::get_validator_history_accounts_with_retry;
 
 #[derive(ThisError, Debug)]
 pub enum UpdateCommissionError {
@@ -36,20 +39,14 @@ pub struct CopyVoteAccountEntry {
 }
 
 impl CopyVoteAccountEntry {
-    pub fn new(vote_account: &RpcVoteAccountInfo, program_id: &Pubkey, signer: &Pubkey) -> Self {
-        let vote_account = Pubkey::from_str(&vote_account.vote_pubkey)
-            .map_err(|e| {
-                error!("Invalid vote account pubkey");
-                e
-            })
-            .expect("Invalid vote account pubkey");
+    pub fn new(vote_account: &Pubkey, program_id: &Pubkey, signer: &Pubkey) -> Self {
         let (validator_history_account, _) = Pubkey::find_program_address(
             &[ValidatorHistory::SEED, &vote_account.to_bytes()],
             program_id,
         );
         let (config_address, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
         Self {
-            vote_account,
+            vote_account: *vote_account,
             validator_history_account,
             config_address,
             program_id: *program_id,
@@ -119,9 +116,28 @@ pub async fn update_vote_accounts(
 ) -> Result<CreateUpdateStats, (UpdateCommissionError, CreateUpdateStats)> {
     let stats = CreateUpdateStats::default();
 
-    let vote_accounts = get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None)
+    let rpc_vote_accounts = get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None)
         .await
         .map_err(|e| (e.into(), stats))?;
+
+    let validator_histories =
+        get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
+            .await
+            .map_err(|e| (e.into(), stats))?;
+
+    // Merges new and active RPC vote accounts with all validator history accounts, and dedupes
+    let vote_accounts = rpc_vote_accounts
+        .iter()
+        .filter_map(|rpc_va| {
+            Pubkey::from_str(&rpc_va.vote_pubkey)
+                .map_err(|e| {
+                    error!("Invalid vote account pubkey");
+                    e
+                })
+                .ok()
+        })
+        .chain(validator_histories.iter().map(|vh| vh.vote_account))
+        .collect::<HashSet<_>>();
 
     let entries = vote_accounts
         .iter()
