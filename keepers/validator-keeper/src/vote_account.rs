@@ -9,7 +9,6 @@ use keeper_core::{
     TransactionExecutionError, UpdateInstruction,
 };
 use log::error;
-use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};

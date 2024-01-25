@@ -237,9 +237,8 @@ pub async fn get_validator_history_accounts_with_retry(
     program_id: Pubkey,
 ) -> Result<Vec<ValidatorHistory>, ClientError> {
     for _ in 0..4 {
-        match get_validator_history_accounts(client, program_id).await {
-            Ok(validator_histories) => return Ok(validator_histories),
-            Err(_) => {}
+        if let Ok(validator_histories) = get_validator_history_accounts(client, program_id).await {
+            return Ok(validator_histories);
         }
     }
     get_validator_history_accounts(client, program_id).await
