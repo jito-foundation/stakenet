@@ -797,7 +797,7 @@
                 "type": "u8"
               },
               {
-                "name": "numAddrs",
+                "name": "num_addrs",
                 "type": {
                   "defined": "usize"
                 }
