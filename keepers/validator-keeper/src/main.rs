@@ -18,10 +18,10 @@ use solana_sdk::{
 use tokio::time::sleep;
 use validator_keeper::{
     cluster_info::update_cluster_info,
-    emit_cluster_history_datapoint, emit_mev_commission_datapoint,
+    emit_cluster_history_datapoint, emit_mev_commission_datapoint, emit_mev_earned_datapoint,
     emit_validator_commission_datapoint, emit_validator_history_metrics,
     gossip::{emit_gossip_datapoint, upload_gossip_values},
-    mev_commission::update_mev_commission,
+    mev_commission::{update_mev_commission, update_mev_earned},
     stake::{emit_stake_history_datapoint, update_stake_history},
     vote_account::update_vote_accounts,
 };
@@ -109,6 +109,43 @@ async fn mev_commission_loop(
             Err((e, stats)) => {
                 emit_mev_commission_datapoint(stats);
                 datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
+                sleep(Duration::from_secs(5)).await;
+            }
+        };
+    }
+}
+
+async fn mev_earned_loop(
+    client: Arc<RpcClient>,
+    keypair: Arc<Keypair>,
+    commission_history_program_id: Pubkey,
+    tip_distribution_program_id: Pubkey,
+    interval: u64,
+) {
+    let mut curr_epoch = 0;
+    // {TipDistributionAccount : VoteAccount}
+    let mut validators_updated: HashMap<Pubkey, Pubkey> = HashMap::new();
+
+    loop {
+        // Continuously runs throughout an epoch, polling for tip distribution accounts from the prev epoch with uploaded merkle roots
+        // and submitting update_mev_earned (technically update_mev_comission) txs when the uploaded merkle roots are detected
+        match update_mev_earned(
+            &client,
+            &keypair,
+            &commission_history_program_id,
+            &tip_distribution_program_id,
+            &mut validators_updated,
+            &mut curr_epoch,
+        )
+        .await
+        {
+            Ok(stats) => {
+                emit_mev_earned_datapoint(stats);
+                sleep(Duration::from_secs(interval)).await;
+            }
+            Err((e, stats)) => {
+                emit_mev_earned_datapoint(stats);
+                datapoint_error!("mev-earned-error", ("error", e.to_string(), String),);
                 sleep(Duration::from_secs(5)).await;
             }
         };
@@ -362,12 +399,19 @@ async fn main() {
     }
 
     tokio::spawn(mev_commission_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
+        client.clone(),
+        keypair.clone(),
         args.program_id,
         args.tip_distribution_program_id,
         args.interval,
     ));
 
+    tokio::spawn(mev_earned_loop(
+        client.clone(),
+        keypair.clone(),
+        args.program_id,
+        args.tip_distribution_program_id,
+        args.interval,
+    ));
     gossip_upload_loop(client, keypair, args.program_id, entrypoint, args.interval).await;
 }

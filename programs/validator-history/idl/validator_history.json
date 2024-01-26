@@ -126,7 +126,7 @@
       "args": []
     },
     {
-      "name": "updateMevCommission",
+      "name": "copyTipDistributionAccount",
       "accounts": [
         {
           "name": "validatorHistoryAccount",
@@ -160,7 +160,12 @@
           "isSigner": true
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "initializeConfig",
@@ -564,11 +569,15 @@
             "type": "u64"
           },
           {
+            "name": "mevEarned",
+            "type": "u32"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                88
+                84
               ]
             }
           }
