@@ -1,11 +1,9 @@
-use std::borrow::BorrowMut;
 use std::fmt::{Display, Formatter};
 use std::mem::size_of;
-use std::sync::Mutex;
 use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use clap::{error, ValueEnum};
+use clap::ValueEnum;
 use log::*;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
@@ -224,7 +222,7 @@ async fn parallel_submit_transactions(
             )
         })?;
         // Convert instructions to transactions in batches and send them all, saving their signatures
-        let transactions: Vec<Transaction> = transaction_batch
+        let submitted_transactions: Vec<Transaction> = transaction_batch
             .iter()
             .map(|batch| {
                 Transaction::new_signed_with_payer(
@@ -236,7 +234,7 @@ async fn parallel_submit_transactions(
             })
             .collect();
 
-        let tx_futures = transactions
+        let tx_futures = submitted_transactions
             .iter()
             .map(|tx| async move { client.send_transaction(tx).await })
             .collect::<Vec<_>>();
@@ -251,15 +249,13 @@ async fn parallel_submit_transactions(
                     match e.get_transaction_error() {
                         // If blockhash not found, transaction is still valid and should not be dropped
                         Some(TransactionError::BlockhashNotFound) => {
-                            executed_signatures.insert(
-                                transactions[i + index_offset].signatures[0],
-                                i + index_offset,
-                            );
+                            executed_signatures
+                                .insert(submitted_transactions[i].signatures[0], i + index_offset);
                         }
                         // If another error is returned, transaction probably won't succeed on retries
                         Some(_) | None => {
                             let message = e.to_string();
-                            warn!("Transaction failed: {}", message);
+                            warn!("Transaction failed: {:?}", e);
                             error_messages.insert(i + index_offset, message);
                         }
                     }
@@ -269,7 +265,7 @@ async fn parallel_submit_transactions(
 
         debug!(
             "Transactions sent: {}, executed_signatures: {}",
-            transactions.len(),
+            submitted_transactions.len(),
             executed_signatures.len()
         );
     }
@@ -372,38 +368,69 @@ pub async fn parallel_execute_transactions(
 
     let mut error_messages = HashMap::new();
 
+    let mut confirmed_txs = vec![false; transactions.len()];
+    // is there a better way to track these than just an index or a signature
+
     for _ in 0..retry_count {
+        // Before submitting, filter transactions based on confirmed_txs
+        // Also store indices
+        let remaining_transactions_with_idx: Vec<_> = transactions
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tx)| {
+                if confirmed_txs[i] {
+                    None
+                } else {
+                    Some((i, *tx))
+                }
+            })
+            .collect();
+        let remaining_transactions = remaining_transactions_with_idx
+            .clone()
+            .iter()
+            .map(|(_, tx)| *tx)
+            .collect::<Vec<_>>();
+
         let (executed_signatures, current_error_messages) =
-            parallel_submit_transactions(client, signer, &transactions).await?;
-        error_messages.extend(current_error_messages);
+            parallel_submit_transactions(client, signer, &remaining_transactions).await?;
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
 
-        let remaining_signatures =
+        let unconfirmed_signatures =
             parallel_confirm_transactions(client, executed_signatures.clone()).await;
 
-        // All have been executed
-        if remaining_signatures.is_empty() {
-            return Ok(());
+        let confirmed_signatures = executed_signatures
+            .keys()
+            .filter(|sig| !unconfirmed_signatures.contains_key(sig));
+
+        for sig in confirmed_signatures {
+            confirmed_txs[remaining_transactions_with_idx[executed_signatures[sig]].0] = true;
         }
 
-        // Update transactions to the ones remaining
-        transactions = executed_signatures
-            .into_values()
-            .map(|i| transactions[i])
-            .collect::<Vec<_>>();
+        error_messages.extend(
+            current_error_messages
+                .iter()
+                .map(|(i, message)| (remaining_transactions_with_idx[*i].0, message.clone())),
+        );
+
+        // All have been executed
+        if transactions.is_empty() {
+            break;
+        }
     }
 
     let not_confirmed_message = NOT_CONFIRMED_MESSAGE.to_string();
+    let remaining_transactions_and_errors = transactions
+        .iter()
+        .enumerate()
+        .map(|(i, tx)| {
+            let message = error_messages.get(&i).unwrap_or(&not_confirmed_message);
+            (tx.to_vec(), message.clone())
+        })
+        .collect::<Vec<_>>();
+
     Err(TransactionExecutionError::TransactionRetryError(
-        transactions
-            .iter()
-            .enumerate()
-            .map(|(i, tx)| {
-                let message = error_messages.get(&i).unwrap_or(&not_confirmed_message);
-                (tx.to_vec(), message.clone())
-            })
-            .collect::<Vec<_>>(),
+        remaining_transactions_and_errors,
     ))
 }
 
