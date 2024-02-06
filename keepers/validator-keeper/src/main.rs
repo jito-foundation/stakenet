@@ -21,9 +21,10 @@ use validator_keeper::{
     emit_cluster_history_datapoint, emit_mev_commission_datapoint, emit_mev_earned_datapoint,
     emit_validator_commission_datapoint, emit_validator_history_metrics,
     gossip::{emit_gossip_datapoint, upload_gossip_values},
-    mev_commission::{update_mev_commission, update_mev_earned, MevCommissionError},
-    stake::{emit_stake_history_datapoint, update_stake_history, StakeHistoryError},
-    vote_account::{update_vote_accounts, UpdateCommissionError},
+    mev_commission::{update_mev_commission, update_mev_earned},
+    stake::{emit_stake_history_datapoint, update_stake_history},
+    vote_account::update_vote_accounts,
+    KeeperError,
 };
 
 #[derive(Parser, Debug)]
@@ -108,7 +109,7 @@ async fn mev_commission_loop(
             }
             Err((e, stats)) => {
                 match e {
-                    MevCommissionError::TransactionExecutionError(
+                    KeeperError::TransactionExecutionError(
                         TransactionExecutionError::TransactionRetryError(instructions_and_errors),
                     ) => {
                         for (_, error) in instructions_and_errors {
@@ -201,7 +202,7 @@ async fn vote_account_loop(
                 }
                 Err((e, stats)) => {
                     match e {
-                        UpdateCommissionError::TransactionExecutionError(
+                        KeeperError::TransactionExecutionError(
                             TransactionExecutionError::TransactionRetryError(
                                 instructions_and_errors,
                             ),
@@ -261,7 +262,7 @@ async fn stake_upload_loop(
                 }
                 Err((e, run_stats)) => {
                     match e {
-                        StakeHistoryError::TransactionExecutionError(
+                        KeeperError::TransactionExecutionError(
                             TransactionExecutionError::TransactionRetryError(
                                 instructions_and_errors,
                             ),
@@ -393,7 +394,21 @@ async fn cluster_history_loop(
                     run_stats
                 }
                 Err((e, run_stats)) => {
-                    datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
+                    match e {
+                        TransactionExecutionError::TransactionRetryError(
+                            instructions_and_errors,
+                        ) => {
+                            for (_, error) in instructions_and_errors {
+                                datapoint_error!("cluster-history-error", ("error", error, String),);
+                            }
+                        }
+                        _ => {
+                            datapoint_error!(
+                                "cluster-history-error",
+                                ("error", e.to_string(), String),
+                            );
+                        }
+                    }
                     run_stats
                 }
             };

@@ -6,26 +6,17 @@ use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{
     build_create_and_update_instructions, get_multiple_accounts_batched,
     get_vote_accounts_with_retry, submit_create_and_update, Address, CreateTransaction,
-    CreateUpdateStats, MultipleAccountsError, TransactionExecutionError, UpdateInstruction,
+    CreateUpdateStats, MultipleAccountsError, UpdateInstruction,
 };
 use log::error;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
-use thiserror::Error as ThisError;
 use validator_history::constants::MIN_VOTE_EPOCHS;
 use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
 
-#[derive(ThisError, Debug)]
-pub enum MevCommissionError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-}
+use crate::KeeperError;
 
 #[derive(Clone)]
 pub struct ValidatorMevCommissionEntry {
@@ -138,7 +129,7 @@ pub async fn update_mev_commission(
     tip_distribution_program_id: &Pubkey,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     prev_epoch: &mut u64,
-) -> Result<CreateUpdateStats, (MevCommissionError, CreateUpdateStats)> {
+) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
     let epoch = client
         .get_epoch_info()
         .await

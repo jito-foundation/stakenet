@@ -17,7 +17,7 @@ use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
 use validator_history::Config;
 
-use crate::get_validator_history_accounts_with_retry;
+use crate::{get_validator_history_accounts_with_retry, KeeperError};
 
 #[derive(ThisError, Debug)]
 pub enum UpdateCommissionError {
@@ -112,7 +112,7 @@ pub async fn update_vote_accounts(
     rpc_client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     validator_history_program_id: Pubkey,
-) -> Result<CreateUpdateStats, (UpdateCommissionError, CreateUpdateStats)> {
+) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
     let stats = CreateUpdateStats::default();
 
     let rpc_vote_accounts = get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None)

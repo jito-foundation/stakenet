@@ -3,12 +3,11 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use keeper_core::{
     build_create_and_update_instructions, get_vote_accounts_with_retry, submit_create_and_update,
-    submit_instructions, Address, CreateTransaction, CreateUpdateStats, MultipleAccountsError,
-    SubmitStats, TransactionExecutionError, UpdateInstruction,
+    submit_instructions, Address, CreateTransaction, CreateUpdateStats, SubmitStats,
+    UpdateInstruction,
 };
 use log::error;
 use solana_client::{
-    client_error::ClientError,
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
@@ -19,23 +18,12 @@ use solana_sdk::{
     commitment_config::CommitmentConfig, instruction::Instruction, pubkey::Pubkey,
     signature::Keypair, signer::Signer,
 };
-use thiserror::Error as ThisError;
 use validator_history::{
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
     state::{Config, ValidatorHistory},
 };
 
-#[derive(ThisError, Debug)]
-pub enum StakeHistoryError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-    #[error("Epoch mismatch")]
-    EpochMismatch,
-}
+use crate::KeeperError;
 
 pub struct StakeHistoryEntry {
     pub stake: u64,
@@ -183,7 +171,7 @@ pub async fn update_stake_history(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: &Pubkey,
-) -> Result<CreateUpdateStats, (StakeHistoryError, CreateUpdateStats)> {
+) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
     let vote_accounts = get_vote_accounts_with_retry(
         &client,
         MIN_VOTE_EPOCHS,
@@ -212,7 +200,7 @@ pub async fn update_stake_history(
 
     if max_vote_account_epoch != epoch {
         return Err((
-            StakeHistoryError::EpochMismatch,
+            KeeperError::Custom("Epoch mismatch".into()),
             CreateUpdateStats::default(),
         ));
     }
@@ -253,7 +241,7 @@ pub async fn _recompute_superminority_and_rank(
     program_id: &Pubkey,
     start_epoch: u64,
     end_epoch: u64,
-) -> Result<(), (StakeHistoryError, SubmitStats)> {
+) -> Result<(), (KeeperError, SubmitStats)> {
     // Fetch every ValidatorHistory account
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
