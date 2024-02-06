@@ -7,7 +7,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use clap::{arg, command, Parser};
-use keeper_core::{Cluster, CreateUpdateStats, SubmitStats};
+use keeper_core::{Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::{datapoint_error, set_host_id};
@@ -21,9 +21,9 @@ use validator_keeper::{
     emit_cluster_history_datapoint, emit_mev_commission_datapoint, emit_mev_earned_datapoint,
     emit_validator_commission_datapoint, emit_validator_history_metrics,
     gossip::{emit_gossip_datapoint, upload_gossip_values},
-    mev_commission::{update_mev_commission, update_mev_earned},
-    stake::{emit_stake_history_datapoint, update_stake_history},
-    vote_account::update_vote_accounts,
+    mev_commission::{update_mev_commission, update_mev_earned, MevCommissionError},
+    stake::{emit_stake_history_datapoint, update_stake_history, StakeHistoryError},
+    vote_account::{update_vote_accounts, UpdateCommissionError},
 };
 
 #[derive(Parser, Debug)]
@@ -107,8 +107,19 @@ async fn mev_commission_loop(
                 sleep(Duration::from_secs(interval)).await;
             }
             Err((e, stats)) => {
+                match e {
+                    MevCommissionError::TransactionExecutionError(
+                        TransactionExecutionError::TransactionRetryError(instructions_and_errors),
+                    ) => {
+                        for (_, error) in instructions_and_errors {
+                            datapoint_error!("mev-commission-error", ("error", error, String),);
+                        }
+                    }
+                    _ => {
+                        datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
+                    }
+                }
                 emit_mev_commission_datapoint(stats);
-                datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
                 sleep(Duration::from_secs(5)).await;
             }
         };
@@ -180,18 +191,32 @@ async fn vote_account_loop(
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
 
         if should_run {
-            stats =
-                match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id).await {
-                    Ok(stats) => {
-                        runs_for_epoch += 1;
-                        sleep(Duration::from_secs(interval)).await;
-                        stats
+            stats = match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id)
+                .await
+            {
+                Ok(stats) => {
+                    runs_for_epoch += 1;
+                    sleep(Duration::from_secs(interval)).await;
+                    stats
+                }
+                Err((e, stats)) => {
+                    match e {
+                        UpdateCommissionError::TransactionExecutionError(
+                            TransactionExecutionError::TransactionRetryError(
+                                instructions_and_errors,
+                            ),
+                        ) => {
+                            for (_, error) in instructions_and_errors {
+                                datapoint_error!("vote-account-error", ("error", error, String),);
+                            }
+                        }
+                        _ => {
+                            datapoint_error!("vote-account-error", ("error", e.to_string(), String),)
+                        }
                     }
-                    Err((e, stats)) => {
-                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                        stats
-                    }
-                };
+                    stats
+                }
+            };
         }
         current_epoch = epoch_info.epoch;
         emit_validator_commission_datapoint(stats, runs_for_epoch);
@@ -235,7 +260,23 @@ async fn stake_upload_loop(
                     run_stats
                 }
                 Err((e, run_stats)) => {
-                    datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
+                    match e {
+                        StakeHistoryError::TransactionExecutionError(
+                            TransactionExecutionError::TransactionRetryError(
+                                instructions_and_errors,
+                            ),
+                        ) => {
+                            for (_, error) in instructions_and_errors {
+                                datapoint_error!("stake-history-error", ("error", error, String),);
+                            }
+                        }
+                        _ => {
+                            datapoint_error!(
+                                "stake-history-error",
+                                ("error", e.to_string(), String),
+                            );
+                        }
+                    }
                     run_stats
                 }
             };
@@ -289,7 +330,21 @@ async fn gossip_upload_loop(
                     stats
                 }
                 Err((e, stats)) => {
-                    datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
+                    match e.downcast_ref::<TransactionExecutionError>() {
+                        Some(TransactionExecutionError::TransactionRetryError(
+                            instructions_and_errors,
+                        )) => {
+                            for (_, error) in instructions_and_errors {
+                                datapoint_error!("gossip-upload-error", ("error", error, String),);
+                            }
+                        }
+                        _ => {
+                            datapoint_error!(
+                                "gossip-upload-error",
+                                ("error", e.to_string(), String),
+                            );
+                        }
+                    }
                     stats
                 }
             };

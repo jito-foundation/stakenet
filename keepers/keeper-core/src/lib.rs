@@ -23,6 +23,7 @@ pub struct SubmitStats {
     pub successes: u64,
     pub errors: u64,
 }
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CreateUpdateStats {
     pub creates: SubmitStats,
@@ -524,10 +525,6 @@ pub async fn submit_instructions(
                 TransactionExecutionError::ClientError(_, instructions) => instructions.len(),
                 TransactionExecutionError::TransactionClientError(_, instructions) => {
                     instructions.concat().len()
-                }
-                _ => {
-                    error!("Hit unreachable statement in submit_instructions");
-                    unreachable!();
                 }
             };
             stats.successes = num_instructions as u64 - instructions_len as u64;
