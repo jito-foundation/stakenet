@@ -354,7 +354,7 @@ pub async fn parallel_execute_instructions(
 
 pub async fn parallel_execute_transactions(
     client: &Arc<RpcClient>,
-    mut transactions: Vec<&[Instruction]>,
+    transactions: Vec<&[Instruction]>,
     signer: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
@@ -369,30 +369,28 @@ pub async fn parallel_execute_transactions(
     let mut error_messages = HashMap::new();
 
     let mut confirmed_txs = vec![false; transactions.len()];
-    // is there a better way to track these than just an index or a signature
 
     for _ in 0..retry_count {
-        // Before submitting, filter transactions based on confirmed_txs
-        // Also store indices
-        let remaining_transactions_with_idx: Vec<_> = transactions
-            .iter()
-            .enumerate()
-            .filter_map(|(i, tx)| {
-                if confirmed_txs[i] {
-                    None
-                } else {
-                    Some((i, *tx))
-                }
-            })
-            .collect();
-        let remaining_transactions = remaining_transactions_with_idx
-            .clone()
-            .iter()
-            .map(|(_, tx)| *tx)
-            .collect::<Vec<_>>();
-
+        // Before submitting, filter transactions based on confirmed_txs and store indices
+        let (remaining_transactions_indices, remaining_transactions): (Vec<_>, Vec<_>) =
+            transactions.iter().enumerate().fold(
+                (Vec::new(), Vec::new()),
+                |(mut idx_vec, mut tx_vec), (i, tx)| {
+                    if !confirmed_txs[i] {
+                        idx_vec.push(i); // Accumulate index and transaction
+                        tx_vec.push(*tx); // Accumulate transaction only
+                    }
+                    (idx_vec, tx_vec) // Return the accumulated vectors for the next iteration
+                },
+            );
         let (executed_signatures, current_error_messages) =
             parallel_submit_transactions(client, signer, &remaining_transactions).await?;
+
+        error_messages.extend(
+            current_error_messages
+                .iter()
+                .map(|(i, message)| (remaining_transactions_indices[*i], message.clone())),
+        );
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
 
@@ -404,28 +402,27 @@ pub async fn parallel_execute_transactions(
             .filter(|sig| !unconfirmed_signatures.contains_key(sig));
 
         for sig in confirmed_signatures {
-            confirmed_txs[remaining_transactions_with_idx[executed_signatures[sig]].0] = true;
+            confirmed_txs[remaining_transactions_indices[executed_signatures[sig]]] = true;
         }
 
-        error_messages.extend(
-            current_error_messages
-                .iter()
-                .map(|(i, message)| (remaining_transactions_with_idx[*i].0, message.clone())),
-        );
-
         // All have been executed
-        if transactions.is_empty() {
-            break;
+        if confirmed_txs.iter().all(|&confirmed| confirmed) {
+            return Ok(());
         }
     }
 
     let not_confirmed_message = NOT_CONFIRMED_MESSAGE.to_string();
-    let remaining_transactions_and_errors = transactions
+    let remaining_transactions_and_errors = confirmed_txs
         .iter()
         .enumerate()
-        .map(|(i, tx)| {
+        .filter(|(_, &confirmed)| !confirmed)
+        .map(|(i, _)| {
             let message = error_messages.get(&i).unwrap_or(&not_confirmed_message);
-            (tx.to_vec(), message.clone())
+            let tx = transactions
+                .get(i)
+                .map(|tx| tx.to_vec())
+                .unwrap_or_default();
+            (tx, message.clone())
         })
         .collect::<Vec<_>>();
 
@@ -480,7 +477,7 @@ pub async fn submit_transactions(
         transactions.iter().map(AsRef::as_ref).collect(),
         keypair,
         10,
-        60,
+        30,
     )
     .await
     {
@@ -489,8 +486,8 @@ pub async fn submit_transactions(
         }
         Err(e) => {
             let transactions_len = match e.clone() {
-                TransactionExecutionError::TransactionRetryError(transactions) => {
-                    transactions.len()
+                TransactionExecutionError::TransactionRetryError(transactions_with_errors) => {
+                    transactions_with_errors.len()
                 }
                 TransactionExecutionError::TransactionClientError(_, transactions) => {
                     transactions.len()
@@ -521,6 +518,9 @@ pub async fn submit_instructions(
         }
         Err(e) => {
             let instructions_len = match e.clone() {
+                TransactionExecutionError::TransactionRetryError(instructions_with_errors) => {
+                    instructions_with_errors.len()
+                }
                 TransactionExecutionError::ClientError(_, instructions) => instructions.len(),
                 TransactionExecutionError::TransactionClientError(_, instructions) => {
                     instructions.concat().len()
