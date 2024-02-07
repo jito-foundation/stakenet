@@ -1,31 +1,22 @@
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{
     build_create_and_update_instructions, get_vote_accounts_with_retry, submit_create_and_update,
-    Address, CreateTransaction, CreateUpdateStats, MultipleAccountsError,
-    TransactionExecutionError, UpdateInstruction,
+    Address, CreateTransaction, CreateUpdateStats, UpdateInstruction,
 };
 use log::error;
-use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
-use thiserror::Error as ThisError;
+
 use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
 use validator_history::Config;
 
-#[derive(ThisError, Debug)]
-pub enum UpdateCommissionError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-}
+use crate::{get_validator_history_accounts_with_retry, KeeperError};
 
 pub struct CopyVoteAccountEntry {
     pub vote_account: Pubkey,
@@ -36,20 +27,14 @@ pub struct CopyVoteAccountEntry {
 }
 
 impl CopyVoteAccountEntry {
-    pub fn new(vote_account: &RpcVoteAccountInfo, program_id: &Pubkey, signer: &Pubkey) -> Self {
-        let vote_account = Pubkey::from_str(&vote_account.vote_pubkey)
-            .map_err(|e| {
-                error!("Invalid vote account pubkey");
-                e
-            })
-            .expect("Invalid vote account pubkey");
+    pub fn new(vote_account: &Pubkey, program_id: &Pubkey, signer: &Pubkey) -> Self {
         let (validator_history_account, _) = Pubkey::find_program_address(
             &[ValidatorHistory::SEED, &vote_account.to_bytes()],
             program_id,
         );
         let (config_address, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
         Self {
-            vote_account,
+            vote_account: *vote_account,
             validator_history_account,
             config_address,
             program_id: *program_id,
@@ -116,12 +101,27 @@ pub async fn update_vote_accounts(
     rpc_client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     validator_history_program_id: Pubkey,
-) -> Result<CreateUpdateStats, (UpdateCommissionError, CreateUpdateStats)> {
-    let stats = CreateUpdateStats::default();
+) -> Result<CreateUpdateStats, KeeperError> {
+    let rpc_vote_accounts =
+        get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None).await?;
 
-    let vote_accounts = get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), stats))?;
+    let validator_histories =
+        get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
+            .await?;
+
+    // Merges new and active RPC vote accounts with all validator history accounts, and dedupes
+    let vote_accounts = rpc_vote_accounts
+        .iter()
+        .filter_map(|rpc_va| {
+            Pubkey::from_str(&rpc_va.vote_pubkey)
+                .map_err(|e| {
+                    error!("Invalid vote account pubkey");
+                    e
+                })
+                .ok()
+        })
+        .chain(validator_histories.iter().map(|vh| vh.vote_account))
+        .collect::<HashSet<_>>();
 
     let entries = vote_accounts
         .iter()
@@ -129,9 +129,7 @@ pub async fn update_vote_accounts(
         .collect::<Vec<_>>();
 
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&rpc_client, &entries)
-            .await
-            .map_err(|e| (e.into(), stats))?;
+        build_create_and_update_instructions(&rpc_client, &entries).await?;
 
     let submit_result = submit_create_and_update(
         &rpc_client,
@@ -141,5 +139,5 @@ pub async fn update_vote_accounts(
     )
     .await;
 
-    submit_result.map_err(|(e, stats)| (e.into(), stats))
+    submit_result.map_err(|e| e.into())
 }

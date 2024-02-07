@@ -250,7 +250,7 @@ pub async fn upload_gossip_values(
     keypair: Arc<Keypair>,
     entrypoint: SocketAddr,
     program_id: &Pubkey,
-) -> Result<CreateUpdateStats, (Box<dyn std::error::Error>, CreateUpdateStats)> {
+) -> Result<CreateUpdateStats, Box<dyn std::error::Error>> {
     let gossip_port = 0;
 
     let spy_socket_addr = SocketAddr::new(
@@ -261,19 +261,13 @@ pub async fn upload_gossip_values(
     let (_gossip_service, cluster_info) =
         start_spy_server(entrypoint, gossip_port, spy_socket_addr, &keypair, &exit);
 
-    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
 
     // Wait for all active validators to be received
     sleep(Duration::from_secs(30)).await;
 
     let gossip_entries = {
-        let crds = cluster_info
-            .gossip
-            .crds
-            .read()
-            .map_err(|e| (e.to_string().into(), CreateUpdateStats::default()))?;
+        let crds = cluster_info.gossip.crds.read().map_err(|e| e.to_string())?;
 
         vote_accounts
             .iter()
@@ -290,9 +284,7 @@ pub async fn upload_gossip_values(
         .iter()
         .map(|a| a.address())
         .collect::<Vec<Pubkey>>();
-    let existing_accounts_response = get_multiple_accounts_batched(&addresses, &client)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let existing_accounts_response = get_multiple_accounts_batched(&addresses, &client).await?;
 
     let create_transactions = existing_accounts_response
         .iter()
@@ -311,22 +303,10 @@ pub async fn upload_gossip_values(
         .map(|entry| entry.build_update_tx())
         .collect::<Vec<_>>();
 
-    let mut stats = CreateUpdateStats::default();
-    stats.creates = submit_transactions(&client, create_transactions, &keypair)
-        .await
-        .map_err(|(e, submit_stats)| {
-            stats.creates = submit_stats;
-            (e.into(), stats)
-        })?;
-
-    stats.updates = submit_transactions(&client, update_transactions, &keypair)
-        .await
-        .map_err(|(e, submit_stats)| {
-            stats.updates = submit_stats;
-            (e.into(), stats)
-        })?;
-
-    Ok(stats)
+    Ok(CreateUpdateStats {
+        creates: submit_transactions(&client, create_transactions, &keypair).await?,
+        updates: submit_transactions(&client, update_transactions, &keypair).await?,
+    })
 }
 
 // CODE BELOW SLIGHTLY MODIFIED FROM

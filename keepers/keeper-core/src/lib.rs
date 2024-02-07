@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::mem::size_of;
+use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use clap::ValueEnum;
@@ -8,6 +10,7 @@ use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::hash::Hash;
 use solana_sdk::packet::PACKET_DATA_SIZE;
+use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
     account::Account, commitment_config::CommitmentConfig, instruction::AccountMeta,
     instruction::Instruction, packet::Packet, pubkey::Pubkey, signature::Keypair,
@@ -16,12 +19,13 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 use tokio::task::{self, JoinError};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct SubmitStats {
     pub successes: u64,
     pub errors: u64,
+    pub results: Vec<Result<(), SendTransactionError>>,
 }
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct CreateUpdateStats {
     pub creates: SubmitStats,
     pub updates: SubmitStats,
@@ -30,14 +34,20 @@ pub struct CreateUpdateStats {
 pub type Error = Box<dyn std::error::Error>;
 #[derive(ThisError, Debug, Clone)]
 pub enum TransactionExecutionError {
-    #[error("Transactions failed to execute after multiple retries")]
-    RetryError(Vec<Instruction>),
-    #[error("Transactions failed to execute after multiple retries")]
-    TransactionRetryError(Vec<Vec<Instruction>>),
     #[error("RPC Client error: {0:?}")]
-    ClientError(String, Vec<Instruction>),
+    ClientError(String),
     #[error("RPC Client error: {0:?}")]
-    TransactionClientError(String, Vec<Vec<Instruction>>),
+    TransactionClientError(String, Vec<Result<(), SendTransactionError>>),
+}
+
+#[derive(ThisError, Clone, Debug)]
+pub enum SendTransactionError {
+    #[error("Exceeded retries")]
+    ExceededRetries,
+    // Stores ClientError.to_string(), since ClientError does not impl Clone, and we want to track both
+    // io/reqwest errors as well as transaction errors
+    #[error("Transaction error: {0}")]
+    TransactionError(String),
 }
 
 #[derive(ThisError, Debug)]
@@ -197,73 +207,14 @@ async fn calculate_instructions_per_tx(
     Ok(size_max.min(compute_max))
 }
 
-async fn parallel_submit_transactions(
-    client: &RpcClient,
-    signer: &Arc<Keypair>,
-    // Each &[Instruction] represents a transaction
-    transactions: &[&[Instruction]],
-    // Map of signature to index of tx in `transactions`
-    executed_signatures: &mut HashMap<Signature, usize>,
-) -> Result<(), TransactionExecutionError> {
-    // Converts arrays of instructions into transactions and submits them in parallel, in batches of 50 (arbitrary, to avoid spamming RPC)
-    // Saves signatures associated with the indexes of instructions it contains
-
-    const TX_BATCH_SIZE: usize = 50;
-    for transaction_batch in transactions.chunks(TX_BATCH_SIZE) {
-        let recent_blockhash = get_latest_blockhash_with_retry(client).await.map_err(|e| {
-            TransactionExecutionError::TransactionClientError(
-                e.to_string(),
-                transactions.iter().map(|&tx| tx.to_vec()).collect(),
-            )
-        })?;
-        // Convert instructions to transactions in batches and send them all, saving their signatures
-        let transactions: Vec<Transaction> = transaction_batch
-            .iter()
-            .map(|batch| {
-                Transaction::new_signed_with_payer(
-                    batch,
-                    Some(&signer.pubkey()),
-                    &[signer.as_ref()],
-                    recent_blockhash,
-                )
-            })
-            .collect();
-
-        let tx_futures = transactions
-            .iter()
-            .enumerate()
-            .map(|(i, tx)| async move {
-                let res = client.send_transaction(tx).await;
-                match res {
-                    Ok(signature) => Some((signature, i)),
-                    Err(e) => {
-                        warn!("Send transaction failed: {:?}", e);
-                        None
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let results = futures::future::join_all(tx_futures).await;
-        for (signature, ix_index) in results.into_iter().flatten() {
-            executed_signatures.insert(signature, ix_index);
-        }
-        debug!(
-            "Transactions sent: {}, executed_signatures: {}",
-            transactions.len(),
-            executed_signatures.len()
-        );
-    }
-    Ok(())
-}
-
 async fn parallel_confirm_transactions(
     client: &RpcClient,
-    executed_signatures: &mut HashMap<Signature, usize>,
-) {
-    // Confirmes TXs in batches of 256 (max allowed by RPC method)
+    submitted_signatures: HashSet<Signature>,
+) -> HashSet<Signature> {
+    // Confirmes TXs in batches of 256 (max allowed by RPC method). Returns confirmed signatures
     const SIG_STATUS_BATCH_SIZE: usize = 256;
-    let signatures_to_confirm = executed_signatures.clone().into_keys().collect::<Vec<_>>();
+    let num_transactions_submitted = submitted_signatures.len();
+    let signatures_to_confirm = submitted_signatures.into_iter().collect::<Vec<_>>();
 
     // Imperfect logic here: if a transaction is slow to confirm on first submission, and it can only be called once succesfully,
     // it will be resubmitted and fail. Ideally on the next loop it will not be included in the instructions list
@@ -284,12 +235,12 @@ async fn parallel_confirm_transactions(
 
     let results = futures::future::join_all(confirmation_futures).await;
 
-    let num_transactions_submitted = executed_signatures.len();
+    let mut confirmed_signatures: HashSet<Signature> = HashSet::new();
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
                 if status.satisfies_commitment(client.commitment()) && status.err.is_none() {
-                    executed_signatures.remove(sig);
+                    confirmed_signatures.insert(*sig);
                 }
             }
         }
@@ -298,17 +249,123 @@ async fn parallel_confirm_transactions(
     info!(
         "{} transactions submitted, {} confirmed",
         num_transactions_submitted,
-        num_transactions_submitted - executed_signatures.len()
+        confirmed_signatures.len()
     );
+    confirmed_signatures
 }
 
-pub async fn parallel_execute_instructions(
-    client: &RpcClient,
-    mut instructions: Vec<Instruction>,
+fn sign_txs(
+    transactions: &[&[Instruction]],
+    signer: &Arc<Keypair>,
+    blockhash: Hash,
+) -> Vec<Transaction> {
+    transactions
+        .iter()
+        .map(|instructions| {
+            Transaction::new_signed_with_payer(
+                instructions,
+                Some(&signer.pubkey()),
+                &[signer.as_ref()],
+                blockhash,
+            )
+        })
+        .collect()
+}
+
+pub async fn parallel_execute_transactions(
+    client: &Arc<RpcClient>,
+    transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
-) -> Result<(), TransactionExecutionError> {
+) -> Result<Vec<Result<(), SendTransactionError>>, TransactionExecutionError> {
+    let mut results = vec![Err(SendTransactionError::ExceededRetries); transactions.len()];
+    let mut retries = 0;
+
+    if transactions.is_empty() {
+        return Ok(results);
+    }
+
+    let blockhash = get_latest_blockhash_with_retry(client)
+        .await
+        .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+    let mut signed_txs = sign_txs(transactions, signer, blockhash);
+
+    while retries < retry_count {
+        let mut submitted_signatures = HashMap::new();
+        let mut is_blockhash_not_found = false;
+
+        for (idx, tx) in signed_txs.iter().enumerate() {
+            if results[idx].is_ok() {
+                continue;
+            }
+
+            // Future optimization: submit these in parallel batches and refresh blockhash for every batch
+            match client.send_transaction(tx).await {
+                Ok(signature) => {
+                    submitted_signatures.insert(signature, idx);
+                }
+                Err(e) => match e.get_transaction_error() {
+                    Some(TransactionError::BlockhashNotFound) => {
+                        is_blockhash_not_found = true;
+                        break;
+                    }
+                    Some(TransactionError::AlreadyProcessed) => {
+                        submitted_signatures.insert(tx.signatures[0], idx);
+                    }
+                    Some(_) | None => {
+                        warn!("Transaction error: {}", e.to_string());
+                        results[idx] = Err(SendTransactionError::TransactionError(e.to_string()))
+                    }
+                },
+            }
+        }
+
+        tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
+
+        for signature in parallel_confirm_transactions(
+            client,
+            submitted_signatures.clone().into_keys().collect(),
+        )
+        .await
+        {
+            results[submitted_signatures[&signature]] = Ok(());
+        }
+
+        if results.iter().all(|r| r.is_ok()) {
+            break;
+        }
+
+        if is_blockhash_not_found
+            || !client
+                .is_blockhash_valid(&blockhash, CommitmentConfig::processed())
+                .await
+                .map_err(|e| {
+                    TransactionExecutionError::TransactionClientError(
+                        e.to_string(),
+                        results.clone(),
+                    )
+                })?
+        {
+            // Re-sign transactions with fresh blockhash
+            let blockhash = get_latest_blockhash_with_retry(client).await.map_err(|e| {
+                TransactionExecutionError::TransactionClientError(e.to_string(), results.clone())
+            })?;
+            signed_txs = sign_txs(transactions, signer, blockhash);
+            retries += 1;
+        }
+    }
+
+    Ok(results)
+}
+
+pub async fn parallel_execute_instructions(
+    client: &Arc<RpcClient>,
+    instructions: &[Instruction],
+    signer: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
+) -> Result<Vec<Result<(), SendTransactionError>>, TransactionExecutionError> {
     /*
         Note: Assumes all instructions are equivalent in compute, equivalent in size, and can be executed in any order
 
@@ -321,84 +378,22 @@ pub async fn parallel_execute_instructions(
     */
 
     if instructions.is_empty() {
-        return Ok(());
+        return Ok(vec![]);
     }
 
-    let instructions_per_tx = calculate_instructions_per_tx(client, &instructions, signer)
+    let instructions_per_tx = calculate_instructions_per_tx(client, instructions, signer)
         .await
-        .map_err(|e| {
-            TransactionExecutionError::ClientError(e.to_string(), instructions.to_vec())
-        })?;
+        .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+    let transactions: Vec<&[Instruction]> = instructions.chunks(instructions_per_tx).collect();
 
-    for _ in 0..retry_count {
-        let mut executed_signatures: HashMap<Signature, usize> = HashMap::new();
-        let instruction_batches: Vec<&[Instruction]> =
-            instructions.chunks(instructions_per_tx).collect();
-        parallel_submit_transactions(
-            client,
-            signer,
-            &instruction_batches,
-            &mut executed_signatures,
-        )
-        .await?;
-
-        tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
-
-        parallel_confirm_transactions(client, &mut executed_signatures).await;
-
-        // All have been executed
-        if executed_signatures.is_empty() {
-            return Ok(());
-        }
-
-        // Update instructions to the ones remaining
-        instructions = executed_signatures
-            .into_values()
-            .flat_map(|i| instruction_batches[i])
-            .cloned()
-            .collect::<Vec<_>>();
-    }
-    Err(TransactionExecutionError::RetryError(instructions))
-}
-
-pub async fn parallel_execute_transactions(
-    client: &Arc<RpcClient>,
-    mut transactions: Vec<&[Instruction]>,
-    signer: &Arc<Keypair>,
-    retry_count: u16,
-    confirmation_time: u64,
-) -> Result<(), TransactionExecutionError> {
-    // Accepts a list of transactions (each represented as &[Instruction])
-    // Executes them in parallel, returns the ones that failed to execute
-    // And repeats up to retry_count number of times until all have executed
-    if transactions.is_empty() {
-        return Ok(());
-    }
-
-    for _ in 0..retry_count {
-        let mut executed_signatures: HashMap<Signature, usize> = HashMap::new();
-        parallel_submit_transactions(client, signer, &transactions, &mut executed_signatures)
-            .await?;
-
-        tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
-
-        parallel_confirm_transactions(client, &mut executed_signatures).await;
-
-        // All have been executed
-        if executed_signatures.is_empty() {
-            return Ok(());
-        }
-
-        // Update transactions to the ones remaining
-        transactions = executed_signatures
-            .into_values()
-            .map(|i| transactions[i])
-            .collect::<Vec<_>>();
-    }
-
-    Err(TransactionExecutionError::TransactionRetryError(
-        transactions.iter().map(|t| t.to_vec()).collect(),
-    ))
+    parallel_execute_transactions(
+        client,
+        &transactions,
+        signer,
+        retry_count,
+        confirmation_time,
+    )
+    .await
 }
 
 pub async fn build_create_and_update_instructions<
@@ -439,71 +434,41 @@ pub async fn submit_transactions(
     client: &Arc<RpcClient>,
     transactions: Vec<Vec<Instruction>>,
     keypair: &Arc<Keypair>,
-) -> Result<SubmitStats, (TransactionExecutionError, SubmitStats)> {
+) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let num_transactions = transactions.len();
-    match parallel_execute_transactions(
-        client,
-        transactions.iter().map(AsRef::as_ref).collect(),
-        keypair,
-        10,
-        60,
-    )
-    .await
-    {
-        Ok(_) => {
-            stats.successes = num_transactions as u64;
+    let tx_slice = transactions
+        .iter()
+        .map(|t| t.as_slice())
+        .collect::<Vec<_>>();
+
+    match parallel_execute_transactions(client, &tx_slice, keypair, 10, 30).await {
+        Ok(results) => {
+            stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
+            stats.errors = num_transactions as u64 - stats.successes;
+            stats.results = results;
+            Ok(stats)
         }
-        Err(e) => {
-            let transactions_len = match e.clone() {
-                TransactionExecutionError::TransactionRetryError(transactions) => {
-                    transactions.len()
-                }
-                TransactionExecutionError::TransactionClientError(_, transactions) => {
-                    transactions.len()
-                }
-                _ => {
-                    error!("Hit unreachable statement in submit_transactions");
-                    unreachable!();
-                }
-            };
-            stats.successes = num_transactions as u64 - transactions_len as u64;
-            stats.errors = transactions_len as u64;
-            return Err((e, stats));
-        }
+        Err(e) => Err(e),
     }
-    Ok(stats)
 }
 
 pub async fn submit_instructions(
     client: &Arc<RpcClient>,
     instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
-) -> Result<SubmitStats, (TransactionExecutionError, SubmitStats)> {
+) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let num_instructions = instructions.len();
-    match parallel_execute_instructions(client, instructions, keypair, 10, 30).await {
-        Ok(_) => {
-            stats.successes = num_instructions as u64;
+    match parallel_execute_instructions(client, &instructions, keypair, 10, 30).await {
+        Ok(results) => {
+            stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
+            stats.errors = num_instructions as u64 - stats.successes;
+            stats.results = results;
+            Ok(stats)
         }
-        Err(e) => {
-            let instructions_len = match e.clone() {
-                TransactionExecutionError::RetryError(instructions) => instructions.len(),
-                TransactionExecutionError::ClientError(_, instructions) => instructions.len(),
-                TransactionExecutionError::TransactionClientError(_, instructions) => {
-                    instructions.concat().len()
-                }
-                _ => {
-                    error!("Hit unreachable statement in submit_instructions");
-                    unreachable!();
-                }
-            };
-            stats.successes = num_instructions as u64 - instructions_len as u64;
-            stats.errors = instructions_len as u64;
-            return Err((e, stats));
-        }
+        Err(e) => Err(e),
     }
-    Ok(stats)
 }
 
 pub async fn submit_create_and_update(
@@ -511,19 +476,9 @@ pub async fn submit_create_and_update(
     create_transactions: Vec<Vec<Instruction>>,
     update_instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
-) -> Result<CreateUpdateStats, (TransactionExecutionError, CreateUpdateStats)> {
-    let mut stats = CreateUpdateStats::default();
-    stats.creates = submit_transactions(client, create_transactions, keypair)
-        .await
-        .map_err(|(e, submit_stats)| {
-            stats.creates = submit_stats;
-            (e, stats)
-        })?;
-    stats.updates = submit_instructions(client, update_instructions, keypair)
-        .await
-        .map_err(|(e, submit_stats)| {
-            stats.updates = submit_stats;
-            (e, stats)
-        })?;
-    Ok(stats)
+) -> Result<CreateUpdateStats, TransactionExecutionError> {
+    Ok(CreateUpdateStats {
+        creates: submit_transactions(client, create_transactions, keypair).await?,
+        updates: submit_instructions(client, update_instructions, keypair).await?,
+    })
 }

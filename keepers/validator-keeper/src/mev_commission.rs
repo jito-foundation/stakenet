@@ -6,26 +6,17 @@ use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{
     build_create_and_update_instructions, get_multiple_accounts_batched,
     get_vote_accounts_with_retry, submit_create_and_update, Address, CreateTransaction,
-    CreateUpdateStats, MultipleAccountsError, TransactionExecutionError, UpdateInstruction,
+    CreateUpdateStats, MultipleAccountsError, UpdateInstruction,
 };
 use log::error;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
-use thiserror::Error as ThisError;
 use validator_history::constants::MIN_VOTE_EPOCHS;
 use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
 
-#[derive(ThisError, Debug)]
-pub enum MevCommissionError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-}
+use crate::KeeperError;
 
 #[derive(Clone)]
 pub struct ValidatorMevCommissionEntry {
@@ -138,20 +129,14 @@ pub async fn update_mev_commission(
     tip_distribution_program_id: &Pubkey,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     prev_epoch: &mut u64,
-) -> Result<CreateUpdateStats, (MevCommissionError, CreateUpdateStats)> {
-    let epoch = client
-        .get_epoch_info()
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?
-        .epoch;
+) -> Result<CreateUpdateStats, KeeperError> {
+    let epoch = client.get_epoch_info().await?.epoch;
     if epoch > *prev_epoch {
         validators_updated.clear();
     }
     *prev_epoch = epoch;
 
-    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
 
     let entries = vote_accounts
         .iter()
@@ -166,32 +151,33 @@ pub async fn update_mev_commission(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
 
-    let existing_entries = get_existing_entries(client.clone(), &entries)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let existing_entries = get_existing_entries(client.clone(), &entries).await?;
 
     let entries_to_update = existing_entries
         .into_iter()
         .filter(|entry| !validators_updated.contains_key(&entry.tip_distribution_account))
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&client, &entries_to_update)
-            .await
-            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+        build_create_and_update_instructions(&client, &entries_to_update).await?;
 
-    let submit_result =
-        submit_create_and_update(&client, create_transactions, update_instructions, &keypair).await;
-    if submit_result.is_ok() {
-        for ValidatorMevCommissionEntry {
-            vote_account,
-            tip_distribution_account,
-            ..
-        } in entries_to_update
-        {
-            validators_updated.insert(tip_distribution_account, vote_account);
+    match submit_create_and_update(&client, create_transactions, update_instructions, &keypair)
+        .await
+    {
+        Ok(submit_result) => {
+            if submit_result.creates.errors == 0 && submit_result.updates.errors == 0 {
+                for ValidatorMevCommissionEntry {
+                    vote_account,
+                    tip_distribution_account,
+                    ..
+                } in entries_to_update
+                {
+                    validators_updated.insert(tip_distribution_account, vote_account);
+                }
+            }
+            Ok(submit_result)
         }
+        Err(e) => Err(e.into()),
     }
-    submit_result.map_err(|(e, stats)| (e.into(), stats))
 }
 
 pub async fn update_mev_earned(
@@ -201,12 +187,8 @@ pub async fn update_mev_earned(
     tip_distribution_program_id: &Pubkey,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     curr_epoch: &mut u64,
-) -> Result<CreateUpdateStats, (MevCommissionError, CreateUpdateStats)> {
-    let epoch = client
-        .get_epoch_info()
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?
-        .epoch;
+) -> Result<CreateUpdateStats, KeeperError> {
+    let epoch = client.get_epoch_info().await?.epoch;
 
     if epoch > *curr_epoch {
         // new epoch started, we assume here that all the validators with TDAs from curr_epoch-1 have had their merkle roots uploaded/processed by this point
@@ -215,9 +197,7 @@ pub async fn update_mev_earned(
     }
     *curr_epoch = epoch;
 
-    let vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None).await?;
 
     let entries = vote_accounts
         .iter()
@@ -232,18 +212,15 @@ pub async fn update_mev_earned(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
 
-    let uploaded_merkleroot_entries = get_entries_with_uploaded_merkleroot(client, &entries)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let uploaded_merkleroot_entries =
+        get_entries_with_uploaded_merkleroot(client, &entries).await?;
 
     let entries_to_update = uploaded_merkleroot_entries
         .into_iter()
         .filter(|entry| !validators_updated.contains_key(&entry.tip_distribution_account))
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(client, &entries_to_update)
-            .await
-            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+        build_create_and_update_instructions(client, &entries_to_update).await?;
 
     let submit_result =
         submit_create_and_update(client, create_transactions, update_instructions, keypair).await;
@@ -257,7 +234,7 @@ pub async fn update_mev_earned(
             validators_updated.insert(tip_distribution_account, vote_account);
         }
     }
-    submit_result.map_err(|(e, stats)| (e.into(), stats))
+    submit_result.map_err(|e| e.into())
 }
 
 async fn get_existing_entries(

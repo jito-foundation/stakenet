@@ -4,10 +4,14 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, Discriminator};
-use keeper_core::{CreateUpdateStats, SubmitStats};
+use keeper_core::{
+    get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
+    TransactionExecutionError,
+};
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
+    client_error::ClientError,
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
@@ -25,7 +29,10 @@ use solana_sdk::{
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
-use validator_history::{ClusterHistory, ValidatorHistory, ValidatorHistoryEntry};
+use thiserror::Error as ThisError;
+use validator_history::{
+    constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory, ValidatorHistoryEntry,
+};
 
 pub mod cluster_info;
 pub mod gossip;
@@ -34,6 +41,18 @@ pub mod stake;
 pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
+
+#[derive(ThisError, Debug)]
+pub enum KeeperError {
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+    #[error(transparent)]
+    TransactionExecutionError(#[from] TransactionExecutionError),
+    #[error(transparent)]
+    MultipleAccountsError(#[from] MultipleAccountsError),
+    #[error("Custom: {0}")]
+    Custom(String),
+}
 
 pub async fn get_tip_distribution_accounts(
     rpc_client: &RpcClient,
@@ -116,28 +135,7 @@ pub async fn emit_validator_history_metrics(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch = client.get_epoch_info().await?;
 
-    // Fetch every ValidatorHistory account
-    let gpa_config = RpcProgramAccountsConfig {
-        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-            0,
-            ValidatorHistory::discriminator().into(),
-        ))]),
-        account_config: RpcAccountInfoConfig {
-            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
-            ..RpcAccountInfoConfig::default()
-        },
-        ..RpcProgramAccountsConfig::default()
-    };
-    let mut validator_history_accounts = client
-        .get_program_accounts_with_config(&program_id, gpa_config)
-        .await?;
-
-    let validator_histories = validator_history_accounts
-        .iter_mut()
-        .filter_map(|(_, account)| {
-            ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
-        })
-        .collect::<Vec<_>>();
+    let validator_histories = get_validator_history_accounts(client, program_id).await?;
 
     let mut ips = 0;
     let mut versions = 0;
@@ -195,6 +193,10 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
+    let get_vote_accounts_count = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
+        .await?
+        .len();
+
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
@@ -207,9 +209,55 @@ pub async fn emit_validator_history_metrics(
         ("num_stakes", stakes, i64),
         ("cluster_history_blocks", cluster_history_blocks, i64),
         ("slot_index", epoch.slot_index, i64),
+        (
+            "num_get_vote_accounts_responses",
+            get_vote_accounts_count,
+            i64
+        ),
     );
 
     Ok(())
+}
+
+pub async fn get_validator_history_accounts(
+    client: &RpcClient,
+    program_id: Pubkey,
+) -> Result<Vec<ValidatorHistory>, ClientError> {
+    let gpa_config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            0,
+            ValidatorHistory::discriminator().into(),
+        ))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+    let mut validator_history_accounts = client
+        .get_program_accounts_with_config(&program_id, gpa_config)
+        .await?;
+
+    let validator_histories = validator_history_accounts
+        .iter_mut()
+        .filter_map(|(_, account)| {
+            ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+        })
+        .collect::<Vec<_>>();
+
+    Ok(validator_histories)
+}
+
+pub async fn get_validator_history_accounts_with_retry(
+    client: &RpcClient,
+    program_id: Pubkey,
+) -> Result<Vec<ValidatorHistory>, ClientError> {
+    for _ in 0..4 {
+        if let Ok(validator_histories) = get_validator_history_accounts(client, program_id).await {
+            return Ok(validator_histories);
+        }
+    }
+    get_validator_history_accounts(client, program_id).await
 }
 
 pub fn start_spy_server(

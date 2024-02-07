@@ -10,7 +10,7 @@ pub async fn update_cluster_info(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: &Pubkey,
-) -> Result<SubmitStats, (TransactionExecutionError, SubmitStats)> {
+) -> Result<SubmitStats, TransactionExecutionError> {
     let (cluster_history_account, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], program_id);
 
