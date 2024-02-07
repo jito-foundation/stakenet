@@ -129,20 +129,14 @@ pub async fn update_mev_commission(
     tip_distribution_program_id: &Pubkey,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     prev_epoch: &mut u64,
-) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
-    let epoch = client
-        .get_epoch_info()
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?
-        .epoch;
+) -> Result<CreateUpdateStats, KeeperError> {
+    let epoch = client.get_epoch_info().await?.epoch;
     if epoch > *prev_epoch {
         validators_updated.clear();
     }
     *prev_epoch = epoch;
 
-    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
 
     let entries = vote_accounts
         .iter()
@@ -157,21 +151,20 @@ pub async fn update_mev_commission(
         })
         .collect::<Vec<ValidatorMevCommissionEntry>>();
 
-    let existing_entries = get_existing_entries(client.clone(), &entries)
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    let existing_entries = get_existing_entries(client.clone(), &entries).await?;
 
     let entries_to_update = existing_entries
         .into_iter()
         .filter(|entry| !validators_updated.contains_key(&entry.tip_distribution_account))
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&client, &entries_to_update)
-            .await
-            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+        build_create_and_update_instructions(&client, &entries_to_update).await?;
 
     let submit_result =
         submit_create_and_update(&client, create_transactions, update_instructions, &keypair).await;
+
+    // TODO this is wrong
+
     if submit_result.is_ok() {
         for ValidatorMevCommissionEntry {
             vote_account,
@@ -182,7 +175,7 @@ pub async fn update_mev_commission(
             validators_updated.insert(tip_distribution_account, vote_account);
         }
     }
-    submit_result.map_err(|(e, stats)| (e.into(), stats))
+    submit_result.map_err(|e| e.into())
 }
 
 pub async fn update_mev_earned(

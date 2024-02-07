@@ -171,14 +171,13 @@ pub async fn update_stake_history(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: &Pubkey,
-) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
+) -> Result<CreateUpdateStats, KeeperError> {
     let vote_accounts = get_vote_accounts_with_retry(
         &client,
         MIN_VOTE_EPOCHS,
         Some(CommitmentConfig::finalized()),
     )
-    .await
-    .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+    .await?;
 
     // Need to ensure that the response contains update stake amounts for the current epoch,
     // so we find the largest epoch a validator has voted on to confirm the data is fresh
@@ -194,15 +193,11 @@ pub async fn update_stake_history(
 
     let epoch = client
         .get_epoch_info_with_commitment(CommitmentConfig::finalized())
-        .await
-        .map_err(|e| (e.into(), CreateUpdateStats::default()))?
+        .await?
         .epoch;
 
     if max_vote_account_epoch != epoch {
-        return Err((
-            KeeperError::Custom("Epoch mismatch".into()),
-            CreateUpdateStats::default(),
-        ));
+        return Err(KeeperError::Custom("EpochMismatch".into()));
     }
 
     let stake_history_entries = vote_accounts
@@ -222,13 +217,11 @@ pub async fn update_stake_history(
         .collect::<Vec<_>>();
 
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&client, &stake_history_entries)
-            .await
-            .map_err(|e| (e.into(), CreateUpdateStats::default()))?;
+        build_create_and_update_instructions(&client, &stake_history_entries).await?;
 
     submit_create_and_update(&client, create_transactions, update_instructions, &keypair)
         .await
-        .map_err(|(e, stats)| (e.into(), stats))
+        .map_err(|e| e.into())
 }
 
 /*
@@ -241,7 +234,7 @@ pub async fn _recompute_superminority_and_rank(
     program_id: &Pubkey,
     start_epoch: u64,
     end_epoch: u64,
-) -> Result<(), (KeeperError, SubmitStats)> {
+) -> Result<(), KeeperError> {
     // Fetch every ValidatorHistory account
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
@@ -321,7 +314,7 @@ pub async fn _recompute_superminority_and_rank(
 
         match submit_instructions(&client, update_instructions, &keypair).await {
             Ok(_) => println!("completed epoch {}", epoch),
-            Err((e, stats)) => return Err((e.into(), stats)),
+            Err(e) => return Err(e.into()),
         };
     }
 

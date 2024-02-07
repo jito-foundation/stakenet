@@ -105,22 +105,13 @@ async fn mev_commission_loop(
         {
             Ok(stats) => {
                 emit_mev_commission_datapoint(stats);
+                // TODO print out errors here
                 sleep(Duration::from_secs(interval)).await;
             }
-            Err((e, stats)) => {
-                match e {
-                    KeeperError::TransactionExecutionError(
-                        TransactionExecutionError::TransactionRetryError(instructions_and_errors),
-                    ) => {
-                        for (_, error) in instructions_and_errors {
-                            datapoint_error!("mev-commission-error", ("error", error, String),);
-                        }
-                    }
-                    _ => {
-                        datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
-                    }
-                }
-                emit_mev_commission_datapoint(stats);
+            Err(e) => {
+                // TODO maybe match and find number of transactions succeeded if KeeperError::TransactionRetryError
+                emit_mev_commission_datapoint(CreateUpdateStats::default());
+                datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
                 sleep(Duration::from_secs(5)).await;
             }
         };
@@ -192,35 +183,34 @@ async fn vote_account_loop(
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
 
         if should_run {
-            stats = match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id)
-                .await
-            {
-                Ok(stats) => {
-                    runs_for_epoch += 1;
-                    sleep(Duration::from_secs(interval)).await;
-                    stats
-                }
-                Err((e, stats)) => {
-                    match e {
-                        KeeperError::TransactionExecutionError(
-                            TransactionExecutionError::TransactionRetryError(
-                                instructions_and_errors,
-                            ),
-                        ) => {
-                            for (_, error) in instructions_and_errors {
-                                datapoint_error!("vote-account-error", ("error", error, String),);
+            stats =
+                match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id).await {
+                    Ok(stats) => {
+                        // TODO only if all transactions succeed
+                        runs_for_epoch += 1;
+                        // TODO print out errors here
+                        for message in stats
+                            .creates
+                            .results
+                            .iter()
+                            .chain(stats.updates.results.iter())
+                        {
+                            if let Err(e) = message {
+                                println!("Error: {:?}", e)
                             }
                         }
-                        _ => {
-                            datapoint_error!("vote-account-error", ("error", e.to_string(), String),)
-                        }
+                        sleep(Duration::from_secs(interval)).await;
+                        stats
                     }
-                    stats
-                }
-            };
+                    Err(e) => {
+                        let mut stats = CreateUpdateStats::default();
+                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                        stats
+                    }
+                };
         }
         current_epoch = epoch_info.epoch;
-        emit_validator_commission_datapoint(stats, runs_for_epoch);
+        emit_validator_commission_datapoint(stats.clone(), runs_for_epoch);
         sleep(Duration::from_secs(interval)).await;
     }
 }
@@ -257,28 +247,40 @@ async fn stake_upload_loop(
         if should_run {
             stats = match update_stake_history(client.clone(), keypair.clone(), &program_id).await {
                 Ok(run_stats) => {
-                    runs_for_epoch += 1;
-                    run_stats
-                }
-                Err((e, run_stats)) => {
-                    match e {
-                        KeeperError::TransactionExecutionError(
-                            TransactionExecutionError::TransactionRetryError(
-                                instructions_and_errors,
-                            ),
-                        ) => {
-                            for (_, error) in instructions_and_errors {
-                                datapoint_error!("stake-history-error", ("error", error, String),);
-                            }
-                        }
-                        _ => {
+                    for message in stats
+                        .creates
+                        .results
+                        .iter()
+                        .chain(stats.updates.results.iter())
+                    {
+                        if let Err(e) = message {
                             datapoint_error!(
                                 "stake-history-error",
                                 ("error", e.to_string(), String),
                             );
                         }
                     }
+
+                    if stats.creates.errors == 0 && stats.updates.errors == 0 {
+                        runs_for_epoch += 1;
+                    }
                     run_stats
+                }
+                Err(e) => {
+                    let mut stats = CreateUpdateStats::default();
+                    match e {
+                        KeeperError::TransactionExecutionError(
+                            TransactionExecutionError::TransactionClientError(_, results),
+                        ) => {
+                            stats.updates.successes =
+                                results.iter().filter(|r| r.is_ok()).count() as i64;
+                            stats.updates.errors =
+                                results.iter().filter(|r| r.is_err()).count() as i64;
+                        }
+                        _ => {}
+                    }
+                    datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
+                    stats
                 }
             };
         }
@@ -327,25 +329,37 @@ async fn gossip_upload_loop(
             .await
             {
                 Ok(stats) => {
-                    runs_for_epoch += 1;
-                    stats
-                }
-                Err((e, stats)) => {
-                    match e.downcast_ref::<TransactionExecutionError>() {
-                        Some(TransactionExecutionError::TransactionRetryError(
-                            instructions_and_errors,
-                        )) => {
-                            for (_, error) in instructions_and_errors {
-                                datapoint_error!("gossip-upload-error", ("error", error, String),);
-                            }
-                        }
-                        _ => {
+                    for message in stats
+                        .creates
+                        .results
+                        .iter()
+                        .chain(stats.updates.results.iter())
+                    {
+                        if let Err(e) = message {
                             datapoint_error!(
                                 "gossip-upload-error",
                                 ("error", e.to_string(), String),
                             );
                         }
                     }
+                    if stats.creates.errors == 0 && stats.updates.errors == 0 {
+                        runs_for_epoch += 1;
+                    }
+                    stats
+                }
+                Err(e) => {
+                    let mut stats = CreateUpdateStats::default();
+                    match e.downcast_ref::<TransactionExecutionError>() {
+                        Some(TransactionExecutionError::TransactionClientError(_, results)) => {
+                            stats.updates.successes =
+                                results.iter().filter(|r| r.is_ok()).count() as i64;
+                            stats.updates.errors =
+                                results.iter().filter(|r| r.is_err()).count() as i64;
+                        }
+                        _ => {}
+                    }
+
+                    datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
                     stats
                 }
             };
@@ -393,23 +407,17 @@ async fn cluster_history_loop(
                     runs_for_epoch += 1;
                     run_stats
                 }
-                Err((e, run_stats)) => {
+                Err(e) => {
+                    let mut stats = SubmitStats::default();
                     match e {
-                        TransactionExecutionError::TransactionRetryError(
-                            instructions_and_errors,
-                        ) => {
-                            for (_, error) in instructions_and_errors {
-                                datapoint_error!("cluster-history-error", ("error", error, String),);
-                            }
+                        TransactionExecutionError::TransactionClientError(_, results) => {
+                            stats.successes = results.iter().filter(|r| r.is_ok()).count() as i64;
+                            stats.errors = results.iter().filter(|r| r.is_err()).count() as i64;
                         }
-                        _ => {
-                            datapoint_error!(
-                                "cluster-history-error",
-                                ("error", e.to_string(), String),
-                            );
-                        }
+                        _ => {}
                     }
-                    run_stats
+                    datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
+                    stats
                 }
             };
         }

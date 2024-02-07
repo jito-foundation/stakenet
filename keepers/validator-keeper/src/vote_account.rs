@@ -19,16 +19,6 @@ use validator_history::Config;
 
 use crate::{get_validator_history_accounts_with_retry, KeeperError};
 
-#[derive(ThisError, Debug)]
-pub enum UpdateCommissionError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-}
-
 pub struct CopyVoteAccountEntry {
     pub vote_account: Pubkey,
     pub validator_history_account: Pubkey,
@@ -112,17 +102,13 @@ pub async fn update_vote_accounts(
     rpc_client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     validator_history_program_id: Pubkey,
-) -> Result<CreateUpdateStats, (KeeperError, CreateUpdateStats)> {
-    let stats = CreateUpdateStats::default();
-
-    let rpc_vote_accounts = get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None)
-        .await
-        .map_err(|e| (e.into(), stats))?;
+) -> Result<CreateUpdateStats, KeeperError> {
+    let rpc_vote_accounts =
+        get_vote_accounts_with_retry(&rpc_client, MIN_VOTE_EPOCHS, None).await?;
 
     let validator_histories =
         get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
-            .await
-            .map_err(|e| (e.into(), stats))?;
+            .await?;
 
     // Merges new and active RPC vote accounts with all validator history accounts, and dedupes
     let vote_accounts = rpc_vote_accounts
@@ -144,9 +130,7 @@ pub async fn update_vote_accounts(
         .collect::<Vec<_>>();
 
     let (create_transactions, update_instructions) =
-        build_create_and_update_instructions(&rpc_client, &entries)
-            .await
-            .map_err(|e| (e.into(), stats))?;
+        build_create_and_update_instructions(&rpc_client, &entries).await?;
 
     let submit_result = submit_create_and_update(
         &rpc_client,
@@ -156,5 +140,5 @@ pub async fn update_vote_accounts(
     )
     .await;
 
-    submit_result.map_err(|(e, stats)| (e.into(), stats))
+    submit_result.map_err(|e| e.into())
 }
