@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::mem::size_of;
 use std::vec;
@@ -208,11 +209,12 @@ async fn calculate_instructions_per_tx(
 
 async fn parallel_confirm_transactions(
     client: &RpcClient,
-    executed_signatures: HashMap<Signature, usize>,
-) -> HashMap<Signature, usize> {
+    submitted_signatures: HashSet<Signature>,
+) -> HashSet<Signature> {
     // Confirmes TXs in batches of 256 (max allowed by RPC method). Returns confirmed signatures
     const SIG_STATUS_BATCH_SIZE: usize = 256;
-    let signatures_to_confirm = executed_signatures.clone().into_keys().collect::<Vec<_>>();
+    let num_transactions_submitted = submitted_signatures.len();
+    let signatures_to_confirm = submitted_signatures.into_iter().collect::<Vec<_>>();
 
     // Imperfect logic here: if a transaction is slow to confirm on first submission, and it can only be called once succesfully,
     // it will be resubmitted and fail. Ideally on the next loop it will not be included in the instructions list
@@ -233,13 +235,12 @@ async fn parallel_confirm_transactions(
 
     let results = futures::future::join_all(confirmation_futures).await;
 
-    let num_transactions_submitted = executed_signatures.len();
-    let mut confirmed_signatures: HashMap<Signature, usize> = HashMap::new();
+    let mut confirmed_signatures: HashSet<Signature> = HashSet::new();
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
                 if status.satisfies_commitment(client.commitment()) && status.err.is_none() {
-                    confirmed_signatures.insert(*sig, executed_signatures[sig]);
+                    confirmed_signatures.insert(*sig);
                 }
             }
         }
@@ -250,17 +251,15 @@ async fn parallel_confirm_transactions(
         num_transactions_submitted,
         confirmed_signatures.len()
     );
-    confirmed_signatures.clone()
+    confirmed_signatures
 }
 
-async fn sign_txs(
-    client: &Arc<RpcClient>,
+fn sign_txs(
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
-) -> Result<Vec<Transaction>, ClientError> {
-    let blockhash = get_latest_blockhash_with_retry(client).await?;
-
-    let signed_txs = transactions
+    blockhash: Hash,
+) -> Vec<Transaction> {
+    transactions
         .iter()
         .map(|instructions| {
             Transaction::new_signed_with_payer(
@@ -270,9 +269,7 @@ async fn sign_txs(
                 blockhash,
             )
         })
-        .collect();
-
-    Ok(signed_txs)
+        .collect()
 }
 
 pub async fn parallel_execute_transactions(
@@ -289,12 +286,14 @@ pub async fn parallel_execute_transactions(
         return Ok(results);
     }
 
-    let mut signed_txs = sign_txs(client, transactions, signer)
+    let blockhash = get_latest_blockhash_with_retry(client)
         .await
         .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+    let mut signed_txs = sign_txs(transactions, signer, blockhash);
 
     while retries < retry_count {
         let mut submitted_signatures = HashMap::new();
+        let mut is_blockhash_not_found = false;
 
         for (idx, tx) in signed_txs.iter().enumerate() {
             if results[idx].is_ok() {
@@ -307,8 +306,11 @@ pub async fn parallel_execute_transactions(
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => match e.get_transaction_error() {
-                    Some(TransactionError::BlockhashNotFound)
-                    | Some(TransactionError::AlreadyProcessed) => {
+                    Some(TransactionError::BlockhashNotFound) => {
+                        is_blockhash_not_found = true;
+                        break;
+                    }
+                    Some(TransactionError::AlreadyProcessed) => {
                         submitted_signatures.insert(tx.signatures[0], idx);
                     }
                     Some(_) | None => {
@@ -321,22 +323,37 @@ pub async fn parallel_execute_transactions(
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
 
-        for idx in parallel_confirm_transactions(client, submitted_signatures)
-            .await
-            .into_values()
+        for signature in parallel_confirm_transactions(
+            client,
+            submitted_signatures.clone().into_keys().collect(),
+        )
+        .await
         {
-            results[idx] = Ok(());
+            results[submitted_signatures[&signature]] = Ok(());
         }
 
         if results.iter().all(|r| r.is_ok()) {
             break;
         }
 
-        // Re-sign transactions with fresh blockhash
-        signed_txs = sign_txs(client, transactions, signer).await.map_err(|e| {
-            TransactionExecutionError::TransactionClientError(e.to_string(), results.clone())
-        })?;
-        retries += 1;
+        if is_blockhash_not_found
+            || !client
+                .is_blockhash_valid(&blockhash, CommitmentConfig::processed())
+                .await
+                .map_err(|e| {
+                    TransactionExecutionError::TransactionClientError(
+                        e.to_string(),
+                        results.clone(),
+                    )
+                })?
+        {
+            // Re-sign transactions with fresh blockhash
+            let blockhash = get_latest_blockhash_with_retry(client).await.map_err(|e| {
+                TransactionExecutionError::TransactionClientError(e.to_string(), results.clone())
+            })?;
+            signed_txs = sign_txs(transactions, signer, blockhash);
+            retries += 1;
+        }
     }
 
     Ok(results)
