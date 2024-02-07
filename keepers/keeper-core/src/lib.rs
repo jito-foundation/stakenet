@@ -39,7 +39,15 @@ pub enum TransactionExecutionError {
     TransactionClientError(String, Vec<Result<(), SendTransactionError>>),
 }
 
-pub const NOT_CONFIRMED_MESSAGE: &str = "Transaction failed to confirm after multiple retries";
+#[derive(ThisError, Clone, Debug)]
+pub enum SendTransactionError {
+    #[error("Exceeded retries")]
+    ExceededRetries,
+    // Stores ClientError.to_string(), since ClientError does not impl Clone, and we want to track both
+    // io/reqwest errors as well as transaction errors
+    #[error("Transaction error: {0}")]
+    TransactionError(String),
+}
 
 #[derive(ThisError, Debug)]
 pub enum MultipleAccountsError {
@@ -253,7 +261,7 @@ async fn sign_txs(
     let blockhash = get_latest_blockhash_with_retry(client).await?;
 
     let signed_txs = transactions
-        .into_iter()
+        .iter()
         .map(|instructions| {
             Transaction::new_signed_with_payer(
                 instructions,
@@ -265,14 +273,6 @@ async fn sign_txs(
         .collect();
 
     Ok(signed_txs)
-}
-
-#[derive(Clone, Debug)]
-pub enum SendTransactionError {
-    ExceededRetries,
-    // Stores ClientError.to_string(), since ClientError does not impl Clone, and we want to track both
-    // io/reqwest errors as well as transaction errors
-    TransactionError(String),
 }
 
 pub async fn parallel_execute_transactions(
@@ -364,7 +364,7 @@ pub async fn parallel_execute_instructions(
         return Ok(vec![]);
     }
 
-    let instructions_per_tx = calculate_instructions_per_tx(client, &instructions, signer)
+    let instructions_per_tx = calculate_instructions_per_tx(client, instructions, signer)
         .await
         .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
     let transactions: Vec<&[Instruction]> = instructions.chunks(instructions_per_tx).collect();
@@ -460,8 +460,8 @@ pub async fn submit_create_and_update(
     update_instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
 ) -> Result<CreateUpdateStats, TransactionExecutionError> {
-    let mut stats = CreateUpdateStats::default();
-    stats.creates = submit_transactions(client, create_transactions, keypair).await?;
-    stats.updates = submit_instructions(client, update_instructions, keypair).await?;
-    Ok(stats)
+    Ok(CreateUpdateStats {
+        creates: submit_transactions(client, create_transactions, keypair).await?,
+        updates: submit_instructions(client, update_instructions, keypair).await?,
+    })
 }

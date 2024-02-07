@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use keeper_core::{
     build_create_and_update_instructions, get_vote_accounts_with_retry, submit_create_and_update,
-    submit_instructions, Address, CreateTransaction, CreateUpdateStats, SubmitStats,
+    submit_instructions, Address, CreateTransaction, CreateUpdateStats,
     UpdateInstruction,
 };
 use log::error;

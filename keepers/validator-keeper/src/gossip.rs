@@ -303,11 +303,10 @@ pub async fn upload_gossip_values(
         .map(|entry| entry.build_update_tx())
         .collect::<Vec<_>>();
 
-    let mut stats = CreateUpdateStats::default();
-    stats.creates = submit_transactions(&client, create_transactions, &keypair).await?;
-    stats.updates = submit_transactions(&client, update_transactions, &keypair).await?;
-
-    Ok(stats)
+    Ok(CreateUpdateStats {
+        creates: submit_transactions(&client, create_transactions, &keypair).await?,
+        updates: submit_transactions(&client, update_transactions, &keypair).await?,
+    })
 }
 
 // CODE BELOW SLIGHTLY MODIFIED FROM

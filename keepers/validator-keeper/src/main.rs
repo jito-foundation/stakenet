@@ -93,7 +93,7 @@ async fn mev_commission_loop(
     loop {
         // Continuously runs throughout an epoch, polling for new tip distribution accounts
         // and submitting update txs when new accounts are detected
-        match update_mev_commission(
+        let stats = match update_mev_commission(
             client.clone(),
             keypair.clone(),
             &commission_history_program_id,
@@ -103,18 +103,22 @@ async fn mev_commission_loop(
         )
         .await
         {
-            Ok(stats) => {
-                emit_mev_commission_datapoint(stats);
-                // TODO print out errors here
-                sleep(Duration::from_secs(interval)).await;
-            }
+            Ok(stats) => stats,
             Err(e) => {
-                // TODO maybe match and find number of transactions succeeded if KeeperError::TransactionRetryError
-                emit_mev_commission_datapoint(CreateUpdateStats::default());
+                let mut stats = CreateUpdateStats::default();
+                if let KeeperError::TransactionExecutionError(
+                    TransactionExecutionError::TransactionClientError(_, results),
+                ) = &e
+                {
+                    stats.updates.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
+                    stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
+                }
                 datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
-                sleep(Duration::from_secs(5)).await;
+                stats
             }
         };
+        emit_mev_commission_datapoint(stats);
+        sleep(Duration::from_secs(interval)).await;
     }
 }
 
@@ -183,31 +187,43 @@ async fn vote_account_loop(
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
 
         if should_run {
-            stats =
-                match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id).await {
-                    Ok(stats) => {
-                        // TODO only if all transactions succeed
-                        runs_for_epoch += 1;
-                        // TODO print out errors here
-                        for message in stats
-                            .creates
-                            .results
-                            .iter()
-                            .chain(stats.updates.results.iter())
-                        {
-                            if let Err(e) = message {
-                                println!("Error: {:?}", e)
-                            }
+            stats = match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id)
+                .await
+            {
+                Ok(stats) => {
+                    for message in stats
+                        .creates
+                        .results
+                        .iter()
+                        .chain(stats.updates.results.iter())
+                    {
+                        if let Err(e) = message {
+                            datapoint_error!(
+                                "vote-account-error",
+                                ("error", e.to_string(), String),
+                            );
                         }
-                        sleep(Duration::from_secs(interval)).await;
-                        stats
                     }
-                    Err(e) => {
-                        let mut stats = CreateUpdateStats::default();
-                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                        stats
+                    if stats.updates.errors == 0 && stats.creates.errors == 0 {
+                        runs_for_epoch += 1;
                     }
-                };
+                    sleep(Duration::from_secs(interval)).await;
+                    stats
+                }
+                Err(e) => {
+                    let mut stats = CreateUpdateStats::default();
+                    if let KeeperError::TransactionExecutionError(
+                        TransactionExecutionError::TransactionClientError(_, results),
+                    ) = &e
+                    {
+                        stats.updates.successes =
+                            results.iter().filter(|r| r.is_ok()).count() as u64;
+                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
+                    }
+                    datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    stats
+                }
+            };
         }
         current_epoch = epoch_info.epoch;
         emit_validator_commission_datapoint(stats.clone(), runs_for_epoch);
@@ -268,16 +284,13 @@ async fn stake_upload_loop(
                 }
                 Err(e) => {
                     let mut stats = CreateUpdateStats::default();
-                    match e {
-                        KeeperError::TransactionExecutionError(
-                            TransactionExecutionError::TransactionClientError(_, results),
-                        ) => {
-                            stats.updates.successes =
-                                results.iter().filter(|r| r.is_ok()).count() as i64;
-                            stats.updates.errors =
-                                results.iter().filter(|r| r.is_err()).count() as i64;
-                        }
-                        _ => {}
+                    if let KeeperError::TransactionExecutionError(
+                        TransactionExecutionError::TransactionClientError(_, results),
+                    ) = &e
+                    {
+                        stats.updates.successes =
+                            results.iter().filter(|r| r.is_ok()).count() as u64;
+                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
                     }
                     datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
                     stats
@@ -349,14 +362,12 @@ async fn gossip_upload_loop(
                 }
                 Err(e) => {
                     let mut stats = CreateUpdateStats::default();
-                    match e.downcast_ref::<TransactionExecutionError>() {
-                        Some(TransactionExecutionError::TransactionClientError(_, results)) => {
-                            stats.updates.successes =
-                                results.iter().filter(|r| r.is_ok()).count() as i64;
-                            stats.updates.errors =
-                                results.iter().filter(|r| r.is_err()).count() as i64;
-                        }
-                        _ => {}
+                    if let Some(TransactionExecutionError::TransactionClientError(_, results)) =
+                        e.downcast_ref::<TransactionExecutionError>()
+                    {
+                        stats.updates.successes =
+                            results.iter().filter(|r| r.is_ok()).count() as u64;
+                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
                     }
 
                     datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
@@ -404,17 +415,16 @@ async fn cluster_history_loop(
         if should_run {
             stats = match update_cluster_info(client.clone(), keypair.clone(), &program_id).await {
                 Ok(run_stats) => {
-                    runs_for_epoch += 1;
+                    if run_stats.errors == 0 {
+                        runs_for_epoch += 1;
+                    }
                     run_stats
                 }
                 Err(e) => {
                     let mut stats = SubmitStats::default();
-                    match e {
-                        TransactionExecutionError::TransactionClientError(_, results) => {
-                            stats.successes = results.iter().filter(|r| r.is_ok()).count() as i64;
-                            stats.errors = results.iter().filter(|r| r.is_err()).count() as i64;
-                        }
-                        _ => {}
+                    if let TransactionExecutionError::TransactionClientError(_, results) = &e {
+                        stats.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
+                        stats.errors = results.iter().filter(|r| r.is_err()).count() as u64;
                     }
                     datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
                     stats

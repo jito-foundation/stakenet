@@ -5,14 +5,13 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{
     build_create_and_update_instructions, get_vote_accounts_with_retry, submit_create_and_update,
-    Address, CreateTransaction, CreateUpdateStats, MultipleAccountsError,
-    TransactionExecutionError, UpdateInstruction,
+    Address, CreateTransaction, CreateUpdateStats, UpdateInstruction,
 };
 use log::error;
-use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
+use solana_client::{nonblocking::rpc_client::RpcClient};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
-use thiserror::Error as ThisError;
+
 use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
 use validator_history::Config;
