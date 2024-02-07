@@ -136,7 +136,7 @@ async fn mev_earned_loop(
     loop {
         // Continuously runs throughout an epoch, polling for tip distribution accounts from the prev epoch with uploaded merkle roots
         // and submitting update_mev_earned (technically update_mev_comission) txs when the uploaded merkle roots are detected
-        match update_mev_earned(
+        let stats = match update_mev_earned(
             &client,
             &keypair,
             &commission_history_program_id,
@@ -146,16 +146,22 @@ async fn mev_earned_loop(
         )
         .await
         {
-            Ok(stats) => {
-                emit_mev_earned_datapoint(stats);
-                sleep(Duration::from_secs(interval)).await;
-            }
-            Err((e, stats)) => {
-                emit_mev_earned_datapoint(stats);
+            Ok(stats) => stats,
+            Err(e) => {
+                let mut stats = CreateUpdateStats::default();
+                if let KeeperError::TransactionExecutionError(
+                    TransactionExecutionError::TransactionClientError(_, results),
+                ) = &e
+                {
+                    stats.updates.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
+                    stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
+                }
                 datapoint_error!("mev-earned-error", ("error", e.to_string(), String),);
-                sleep(Duration::from_secs(5)).await;
+                stats
             }
         };
+        emit_mev_earned_datapoint(stats);
+        sleep(Duration::from_secs(interval)).await;
     }
 }
 
