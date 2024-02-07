@@ -8,7 +8,7 @@ use keeper_core::{
     Address, CreateTransaction, CreateUpdateStats, UpdateInstruction,
 };
 use log::error;
-use solana_client::{nonblocking::rpc_client::RpcClient};
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
 
