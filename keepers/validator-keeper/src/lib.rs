@@ -4,7 +4,10 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, Discriminator};
-use keeper_core::{get_vote_accounts_with_retry, CreateUpdateStats, SubmitStats};
+use keeper_core::{
+    get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
+    TransactionExecutionError,
+};
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
@@ -26,9 +29,8 @@ use solana_sdk::{
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
-use validator_history::{
-    constants::MIN_VOTE_EPOCHS, ValidatorHistory, ValidatorHistoryEntry,
-};
+use thiserror::Error as ThisError;
+use validator_history::{constants::MIN_VOTE_EPOCHS, ValidatorHistory, ValidatorHistoryEntry};
 
 pub mod gossip;
 pub mod mev_commission;
@@ -36,6 +38,18 @@ pub mod stake;
 pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
+
+#[derive(ThisError, Debug)]
+pub enum KeeperError {
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+    #[error(transparent)]
+    TransactionExecutionError(#[from] TransactionExecutionError),
+    #[error(transparent)]
+    MultipleAccountsError(#[from] MultipleAccountsError),
+    #[error("Custom: {0}")]
+    Custom(String),
+}
 
 pub async fn get_tip_distribution_accounts(
     rpc_client: &RpcClient,
@@ -162,7 +176,6 @@ pub async fn emit_validator_history_metrics(
             }
         }
     }
-
 
     let get_vote_accounts_count = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
         .await?

@@ -103,10 +103,12 @@ async fn mev_commission_loop(
         {
             Ok(stats) => {
                 emit_mev_commission_datapoint(stats);
+                // TODO print out errors here
                 sleep(Duration::from_secs(interval)).await;
             }
-            Err((e, stats)) => {
-                emit_mev_commission_datapoint(stats);
+            Err(e) => {
+                // TODO maybe match and find number of transactions succeeded if KeeperError::TransactionRetryError
+                emit_mev_commission_datapoint(CreateUpdateStats::default());
                 datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
                 sleep(Duration::from_secs(5)).await;
             }
@@ -145,18 +147,30 @@ async fn vote_account_loop(
             stats =
                 match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id).await {
                     Ok(stats) => {
+                        // TODO only if all transactions succeed
                         runs_for_epoch += 1;
+                        // TODO print out errors here
+                        for message in stats
+                            .creates
+                            .results
+                            .iter()
+                            .chain(stats.updates.results.iter())
+                        {
+                            if let Err(e) = message {
+                                println!("Error: {:?}", e)
+                            }
+                        }
                         sleep(Duration::from_secs(interval)).await;
                         stats
                     }
-                    Err((e, stats)) => {
+                    Err(e) => {
                         datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                        stats
+                        CreateUpdateStats::default()
                     }
                 };
         }
         current_epoch = epoch_info.epoch;
-        emit_validator_commission_datapoint(stats, runs_for_epoch);
+        emit_validator_commission_datapoint(stats.clone(), runs_for_epoch);
         sleep(Duration::from_secs(interval)).await;
     }
 }
@@ -193,12 +207,25 @@ async fn stake_upload_loop(
         if should_run {
             stats = match update_stake_history(client.clone(), keypair.clone(), &program_id).await {
                 Ok(run_stats) => {
+                    // TODO print out errors here
+                    for message in stats
+                        .creates
+                        .results
+                        .iter()
+                        .chain(stats.updates.results.iter())
+                    {
+                        if let Err(e) = message {
+                            println!("Error: {:?}", e)
+                        }
+                    }
+
+                    // TODO only if all transactions succeed
                     runs_for_epoch += 1;
                     run_stats
                 }
-                Err((e, run_stats)) => {
+                Err(e) => {
                     datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
-                    run_stats
+                    CreateUpdateStats::default()
                 }
             };
         }
@@ -247,12 +274,23 @@ async fn gossip_upload_loop(
             .await
             {
                 Ok(stats) => {
+                    // TODO only if all transactions succeed
                     runs_for_epoch += 1;
+                    for message in stats
+                        .creates
+                        .results
+                        .iter()
+                        .chain(stats.updates.results.iter())
+                    {
+                        if let Err(e) = message {
+                            println!("Error: {:?}", e)
+                        }
+                    }
                     stats
                 }
-                Err((e, stats)) => {
+                Err(e) => {
                     datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
-                    stats
+                    CreateUpdateStats::default()
                 }
             };
         }
@@ -291,25 +329,25 @@ async fn main() {
         args.interval,
     ));
 
-    if let Some(stake_upload_keypair) = args.stake_upload_keypair {
-        let stake_upload_keypair = Arc::new(
-            read_keypair_file(stake_upload_keypair).expect("Failed reading stake keypair file"),
-        );
-        tokio::spawn(stake_upload_loop(
-            Arc::clone(&client),
-            Arc::clone(&stake_upload_keypair),
-            args.program_id,
-            args.interval,
-        ));
-    }
+    // if let Some(stake_upload_keypair) = args.stake_upload_keypair {
+    //     let stake_upload_keypair = Arc::new(
+    //         read_keypair_file(stake_upload_keypair).expect("Failed reading stake keypair file"),
+    //     );
+    //     tokio::spawn(stake_upload_loop(
+    //         Arc::clone(&client),
+    //         Arc::clone(&stake_upload_keypair),
+    //         args.program_id,
+    //         args.interval,
+    //     ));
+    // }
 
-    tokio::spawn(mev_commission_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
-        args.program_id,
-        args.tip_distribution_program_id,
-        args.interval,
-    ));
+    // tokio::spawn(mev_commission_loop(
+    //     Arc::clone(&client),
+    //     Arc::clone(&keypair),
+    //     args.program_id,
+    //     args.tip_distribution_program_id,
+    //     args.interval,
+    // ));
 
     gossip_upload_loop(client, keypair, args.program_id, entrypoint, args.interval).await;
 }
