@@ -15,7 +15,11 @@ pub struct BackfillTotalBlocks<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<BackfillTotalBlocks>, epoch: u64, blocks_in_epoch: u32) -> Result<()> {
+pub fn handle_backfill_total_blocks(
+    ctx: Context<BackfillTotalBlocks>,
+    epoch: u64,
+    blocks_in_epoch: u32,
+) -> Result<()> {
     let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
 
     let epoch = cast_epoch(epoch);

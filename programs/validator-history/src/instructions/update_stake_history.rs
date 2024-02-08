@@ -29,7 +29,7 @@ pub struct UpdateStakeHistory<'info> {
     pub oracle_authority: Signer<'info>,
 }
 
-pub fn handler(
+pub fn handle_update_stake_history(
     ctx: Context<UpdateStakeHistory>,
     epoch: u64,
     lamports: u64,

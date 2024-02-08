@@ -17,7 +17,7 @@ pub struct InitializeConfig<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
+pub fn handle_initialize_config(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
     ctx.accounts.config.oracle_authority = authority;
     ctx.accounts.config.admin = authority;
     ctx.accounts.config.bump = *ctx.bumps.get("config").unwrap();

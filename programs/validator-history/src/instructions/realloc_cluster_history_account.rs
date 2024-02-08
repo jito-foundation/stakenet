@@ -38,7 +38,9 @@ pub struct ReallocClusterHistoryAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<ReallocClusterHistoryAccount>) -> Result<()> {
+pub fn handle_realloc_cluster_history_account(
+    ctx: Context<ReallocClusterHistoryAccount>,
+) -> Result<()> {
     let account_size = ctx.accounts.cluster_history_account.as_ref().data_len();
     if account_size >= ClusterHistory::SIZE
         && !is_initialized(ctx.accounts.cluster_history_account.as_ref())?

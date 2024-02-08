@@ -44,54 +44,54 @@ pub mod validator_history {
     pub fn initialize_validator_history_account(
         ctx: Context<InitializeValidatorHistoryAccount>,
     ) -> Result<()> {
-        instructions::initialize_validator_history_account::handler(ctx)
+        handle_initialize_validator_history_account(ctx)
     }
 
     pub fn realloc_validator_history_account(
         ctx: Context<ReallocValidatorHistoryAccount>,
     ) -> Result<()> {
-        instructions::realloc_validator_history_account::handler(ctx)
+        handle_realloc_validator_history_account(ctx)
     }
 
     pub fn initialize_cluster_history_account(
         ctx: Context<InitializeClusterHistoryAccount>,
     ) -> Result<()> {
-        instructions::initialize_cluster_history_account::handler(ctx)
+        handle_initialize_cluster_history_account(ctx)
     }
 
     pub fn realloc_cluster_history_account(
         ctx: Context<ReallocClusterHistoryAccount>,
     ) -> Result<()> {
-        instructions::realloc_cluster_history_account::handler(ctx)
+        handle_realloc_cluster_history_account(ctx)
     }
 
     pub fn copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
-        instructions::copy_vote_account::handler(ctx)
+        handle_copy_vote_account(ctx)
     }
 
     pub fn copy_tip_distribution_account(
         ctx: Context<CopyTipDistributionAccount>,
         epoch: u64,
     ) -> Result<()> {
-        instructions::copy_tip_distribution_account::handler(ctx, epoch)
+        handle_copy_tip_distribution_account(ctx, epoch)
     }
 
     pub fn initialize_config(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
-        instructions::initialize_config::handler(ctx, authority)
+        handle_initialize_config(ctx, authority)
     }
 
     pub fn set_new_tip_distribution_program(
         ctx: Context<SetNewTipDistributionProgram>,
     ) -> Result<()> {
-        instructions::set_new_tip_distribution_program::handler(ctx)
+        handle_set_new_tip_distribution_program(ctx)
     }
 
     pub fn set_new_admin(ctx: Context<SetNewAdmin>) -> Result<()> {
-        instructions::set_new_admin::handler(ctx)
+        handle_set_new_admin(ctx)
     }
 
     pub fn set_new_oracle_authority(ctx: Context<SetNewOracleAuthority>) -> Result<()> {
-        instructions::set_new_oracle_authority::handler(ctx)
+        handle_set_new_oracle_authority(ctx)
     }
 
     pub fn update_stake_history(
@@ -101,15 +101,15 @@ pub mod validator_history {
         rank: u32,
         is_superminority: bool,
     ) -> Result<()> {
-        instructions::update_stake_history::handler(ctx, epoch, lamports, rank, is_superminority)
+        handle_update_stake_history(ctx, epoch, lamports, rank, is_superminority)
     }
 
     pub fn copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
-        instructions::copy_gossip_contact_info::handler(ctx)
+        handle_copy_gossip_contact_info(ctx)
     }
 
     pub fn copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
-        instructions::copy_cluster_info::handler(ctx)
+        handle_copy_cluster_info(ctx)
     }
 
     pub fn backfill_total_blocks(
@@ -117,6 +117,6 @@ pub mod validator_history {
         epoch: u64,
         blocks_in_epoch: u32,
     ) -> Result<()> {
-        instructions::backfill_total_blocks::handler(ctx, epoch, blocks_in_epoch)
+        handle_backfill_total_blocks(ctx, epoch, blocks_in_epoch)
     }
 }

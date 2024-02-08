@@ -16,6 +16,8 @@ pub struct InitializeClusterHistoryAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(_: Context<InitializeClusterHistoryAccount>) -> Result<()> {
+pub fn handle_initialize_cluster_history_account(
+    _: Context<InitializeClusterHistoryAccount>,
+) -> Result<()> {
     Ok(())
 }

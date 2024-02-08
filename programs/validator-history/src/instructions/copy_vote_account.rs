@@ -22,7 +22,7 @@ pub struct CopyVoteAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<CopyVoteAccount>) -> Result<()> {
+pub fn handle_copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
     let clock = Clock::get()?;
     let epoch = cast_epoch(clock.epoch);

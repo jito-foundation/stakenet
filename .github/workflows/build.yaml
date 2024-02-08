@@ -3,97 +3,149 @@ on:
   push:
     branches:
       - master
+    tags:
+      - "v*"
   pull_request:
     branches:
       - master
-env:
-  SOLANA_CLI_VERSION: 1.16.17
-jobs:
-  build-and-test:
-    name: Build and test programs
-    runs-on: big-runner-1
 
+jobs:
+  security_audit:
+    name: security_audit
+    runs-on: ubuntu-latest
     steps:
-      # Setup
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: ./.github/actions/setup/
-      - uses: ./.github/actions/setup-solana/
-      - uses: actions/cache@v2
-        name: Cache Cargo registry + index
-        id: cache-anchor
+      - name: Install cargo-audit from crates.io
+        uses: baptiste0928/cargo-install@v3
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-anchor-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo install --git https://github.com/coral-xyz/anchor --tag v0.28.0 anchor-cli --locked --force
-        working-directory: /
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+          crate: cargo-audit
+      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2023-0065
+
+  lint:
+    name: lint
+    runs-on: big-runner-1
+    steps:
+      - uses: actions/checkout@v4
         with:
-          toolchain: nightly-2023-10-05-x86_64-unknown-linux-gnu
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
           components: rustfmt, clippy
+          toolchain: nightly-2023-10-05
+      - name: Install cargo-sort from crates.io
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-sort
+      - run: cargo +nightly-2023-10-05 sort --workspace --check
+      - run: cargo +nightly-2023-10-05 fmt --all --check
+      - run: cargo +nightly-2023-10-05 clippy --all-features --all-targets --tests -- -D warnings
 
-      # --force is hack around cargo caching, figure out later
-      - name: Setup Rust tools
-        run: |
-          cargo +nightly-2023-10-05 install cargo-sort --force
-          cargo +nightly-2023-10-05 install cargo-udeps --force
-        shell: bash
+  udeps:
+    name: udeps
+    runs-on: big-runner-1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2023-10-05
+      - name: Install cargo-udeps from crates.io
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-udeps
+      - run: cargo +nightly-2023-10-05 udeps --all-features --all-targets --tests
 
-      - name: cargo sort
-        run: cargo +nightly-2023-10-05 sort --workspace --check
-        shell: bash
+  verified_build:
+    name: verified_build
+    runs-on: big-runner-1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install solana-verify from crates.io
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: solana-verify
+      - name: Install anchor-cli from crates.io
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: anchor-cli
+          version: "0.29.0"
+      - name: install solana toolsuite
+        run: sh -c "$(curl -sSfL https://release.solana.com/v1.16.20/install)"
+      - name: add to path
+        run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      - name: cargo fmt
-        run: cargo +nightly-2023-10-05 fmt --all --check
-        shell: bash
-
-      - name: clippy
-        run: cargo +nightly-2023-10-05 clippy --all-features --all-targets --tests -- -D warnings
-        shell: bash
-
-      - name: cargo udeps
-        run: cargo +nightly-2023-10-05 udeps --all-features --all-targets --tests
-        shell: bash
-
-      # Build IDLs
-      - name: Build validator-history
-        run: anchor build --idl idl --program-name validator_history
-
-      # Make sure no uncommitted changes
-      - name: Check for diff
+      # build the program and IDL; exit if error
+      - run: anchor build --idl idl --program-name validator_history
+      - name: Check for diff on IDL
         run: git diff --exit-code
 
-      - name: cargo test
-        run: RUST_LOG=debug cargo test --all-targets --all-features --color auto
-        shell: bash
+      # run verified build
+      - run: solana-verify build --library-name validator_history
 
-  verified-build:
-    name: Build Verifiable Artifact
+      # upload the IDL and verified build
+      - name: Upload validator_history.so
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator_history.so
+          path: target/deploy/validator_history.so
+      - name: Upload IDL
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator_history.json
+          path: programs/validator-history/idl/validator_history.json
+
+  # tests run on verified build
+  test:
+    name: test
     runs-on: big-runner-1
+    needs:
+      - verified_build
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      # --force because the cargo cache has it saved
-      - name: Install Solana Verify
-        run: |
-          cargo install solana-verify --force
-          solana-verify --version
-
-      - name: Verifiable Build
-        run: |
-          solana-verify build --library-name validator_history
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions/download-artifact@v4
         with:
-          name: build
-          path: |
-            target/deploy/validator_history.so
+          name: validator_history.so
+          path: target/deploy/
+      - name: cargo test
+        run: cargo test --all-targets --all-features --color auto
+        shell: bash
+        env:
+          RUST_LOG: trace
+          SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
+
+  # release only runs on tagged commits
+  # it should wait for all the other steps to finish, to ensure releases are the highest quality
+  # after waiting, it will download the verified build and IDL from the verified_build step and release the artifacts
+  release:
+    name: release
+    runs-on: big-runner-1
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - security_audit
+      - lint
+      - udeps
+      - verified_build
+      - test
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: validator_history.so
+      - uses: actions/download-artifact@v4
+        with:
+          name: validator_history.json
+      - name: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            validator_history.so
+            validator_history.json

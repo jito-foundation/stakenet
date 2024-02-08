@@ -49,7 +49,10 @@ pub struct CopyTipDistributionAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<CopyTipDistributionAccount>, epoch: u64) -> Result<()> {
+pub fn handle_copy_tip_distribution_account(
+    ctx: Context<CopyTipDistributionAccount>,
+    epoch: u64,
+) -> Result<()> {
     // cant set data in validator history for future epochs
     if epoch > Clock::get()?.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());

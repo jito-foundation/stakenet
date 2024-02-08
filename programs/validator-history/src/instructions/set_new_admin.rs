@@ -16,7 +16,7 @@ pub struct SetNewAdmin<'info> {
     pub admin: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<SetNewAdmin>) -> Result<()> {
+pub fn handle_set_new_admin(ctx: Context<SetNewAdmin>) -> Result<()> {
     ctx.accounts.config.admin = ctx.accounts.new_admin.key();
     Ok(())
 }

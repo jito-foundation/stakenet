@@ -24,7 +24,9 @@ pub struct InitializeValidatorHistoryAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<InitializeValidatorHistoryAccount>) -> Result<()> {
+pub fn handle_initialize_validator_history_account(
+    ctx: Context<InitializeValidatorHistoryAccount>,
+) -> Result<()> {
     // Need minimum 5 epochs of vote credits to be valid
     let epoch_credits = VoteStateVersions::deserialize_epoch_credits(&ctx.accounts.vote_account)?;
     if epoch_credits.len() < MIN_VOTE_EPOCHS {
