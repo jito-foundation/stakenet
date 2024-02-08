@@ -224,17 +224,22 @@ pub async fn update_mev_earned(
 
     let submit_result =
         submit_create_and_update(client, create_transactions, update_instructions, keypair).await;
-    if submit_result.is_ok() {
-        for ValidatorMevCommissionEntry {
-            vote_account,
-            tip_distribution_account,
-            ..
-        } in entries_to_update
-        {
-            validators_updated.insert(tip_distribution_account, vote_account);
+    match submit_result {
+        Ok(submit_result) => {
+            if submit_result.creates.errors == 0 && submit_result.updates.errors == 0 {
+                for ValidatorMevCommissionEntry {
+                    vote_account,
+                    tip_distribution_account,
+                    ..
+                } in entries_to_update
+                {
+                    validators_updated.insert(tip_distribution_account, vote_account);
+                }
+            }
+            Ok(submit_result)
         }
+        Err(e) => Err(e.into()),
     }
-    submit_result.map_err(|e| e.into())
 }
 
 async fn get_existing_entries(
