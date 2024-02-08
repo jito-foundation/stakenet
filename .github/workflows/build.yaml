@@ -74,7 +74,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
-          git: https://github.com/coral-xyz/anchor/tree/master
+          git: https://github.com/coral-xyz/anchor
           tag: "v0.28.0"
       - name: install solana toolsuite
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.16.20/install)"
