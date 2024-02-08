@@ -20,7 +20,7 @@ pub struct CopyClusterInfo<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<CopyClusterInfo>) -> Result<()> {
+pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
     let slot_history: Box<SlotHistory> =
         Box::new(bincode::deserialize(&ctx.accounts.slot_history.try_borrow_data()?).unwrap());

@@ -6,24 +6,12 @@ edition = "2021"
 license = "Apache-2.0"
 authors = ["Jito Foundation <team@jito.network>"]
 
-[lib]
-crate-type = ["cdylib", "lib"]
-name = "tests"
-
-[features]
-no-entrypoint = []
-no-idl = []
-no-log-ix-name = []
-cpi = ["no-entrypoint"]
-default = []
-
 [dependencies]
 anchor-lang = "0.28.0"
 bincode = "1.3.3"
 bytemuck = { version = "1.13.1", features = ["derive", "min_const_generics"] }
 cfg-if = "1.0.0"
 ed25519-dalek = "1.0.1"
-
 futures = "0.3.25"
 jito-tip-distribution = { git = "https://github.com/jito-foundation/jito-programs", rev = "b8f8d315306d6ac32450bd1aa23b7c1322a83bc7", features = ["no-entrypoint"] }
 matches = "0.1.10"

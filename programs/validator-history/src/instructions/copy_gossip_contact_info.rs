@@ -26,7 +26,7 @@ pub struct CopyGossipContactInfo<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
+pub fn handle_copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
     let instructions = ctx.accounts.instructions.to_account_info();
     let clock = Clock::get()?;

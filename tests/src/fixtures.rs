@@ -39,16 +39,11 @@ impl TestFixture {
 
            Returns a fixture with relevant account addresses and keypairs.
         */
-        let mut program = ProgramTest::new(
-            "validator-history",
-            validator_history::ID,
-            processor!(validator_history::entry),
-        );
-        program.add_program(
-            "jito-tip-distribution",
-            jito_tip_distribution::id(),
-            processor!(jito_tip_distribution::entry),
-        );
+
+        // prefer bpf on this to not run as a built-in program with actual runtime limitations
+        // make sure the program is compiled and SBF_OUT_DIR is set correctly when running this!
+        let mut program = ProgramTest::new("validator_history", validator_history::ID, None);
+        program.add_program("jito_tip_distribution", jito_tip_distribution::id(), None);
 
         let epoch = 0;
         let vote_account = Pubkey::new_unique();

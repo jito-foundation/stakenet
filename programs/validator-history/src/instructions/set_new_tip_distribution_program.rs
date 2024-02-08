@@ -17,7 +17,9 @@ pub struct SetNewTipDistributionProgram<'info> {
     pub admin: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<SetNewTipDistributionProgram>) -> Result<()> {
+pub fn handle_set_new_tip_distribution_program(
+    ctx: Context<SetNewTipDistributionProgram>,
+) -> Result<()> {
     ctx.accounts.config.tip_distribution_program = ctx.accounts.new_tip_distribution_program.key();
     Ok(())
 }
