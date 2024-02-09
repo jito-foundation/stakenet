@@ -405,7 +405,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let mut ranks = 0;
     let mut superminorities = 0;
 
-    let mut missed_mev_earned = 0;
     let default = ValidatorHistoryEntry::default();
     for validator_history in validator_histories {
         match get_entry(validator_history, epoch) {
@@ -427,11 +426,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 }
                 if entry.mev_earned != default.mev_earned {
                     mev_earned += 1;
-                }
-                if entry.mev_earned == default.mev_earned
-                    && entry.mev_commission != default.mev_commission
-                {
-                    missed_mev_earned += 1;
                 }
                 if entry.commission != default.commission {
                     comms += 1;
@@ -475,7 +469,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     println!("Validators with Epoch Credits:\t{}", epoch_credits);
     println!("Validators with Stake:\t\t{}", stakes);
     println!("Validators with Rank:\t\t{}", ranks);
-    println!("Missed MEV Earned:\t\t{}", missed_mev_earned);
 }
 
 fn command_history(args: History, client: RpcClient) {
@@ -537,20 +530,6 @@ fn command_cluster_history(client: RpcClient) {
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
             .expect("Failed to deserialize cluster history account");
 
-    // let start_epoch = cluster_history
-    //     .history
-    //     .arr
-    //     .iter()
-    //     .filter_map(|entry| {
-    //         if entry.epoch > 0 {
-    //             Some(entry.epoch as u64)
-    //         } else {
-    //             None
-    //         }
-    //     })
-    //     .min()
-    //     .unwrap_or(0);
-
     for entry in cluster_history.history.arr.iter() {
         println!(
             "Epoch: {} | Total Blocks: {}",
@@ -571,32 +550,33 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     let mut instructions = vec![];
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
-    // let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
-    // let cluster_history_account = client
-    //     .get_account(&cluster_history_pda)
-    //     .expect("Failed to get cluster history account");
-    // let cluster_history =
-    //     ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
-    //         .expect("Failed to deserialize cluster history account");
+    let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let cluster_history_account = client
+        .get_account(&cluster_history_pda)
+        .expect("Failed to get cluster history account");
+    let cluster_history =
+        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
+            .expect("Failed to deserialize cluster history account");
 
-    // if !cluster_history.history.is_empty()
-    //     && cluster_history.history.last().unwrap().epoch + 1 != args.epoch as u16
-    // {
-    //     panic!("Cannot set this epoch, you would mess up the ordering");
-    // }
-    let max_heap_instruction: Instruction =
-        ComputeBudgetInstruction::request_heap_frame(148 * 1024);
-    instructions.push(max_heap_instruction);
+    if !cluster_history.history.is_empty()
+        && cluster_history.history.last().unwrap().epoch + 1 != args.epoch as u16
+    {
+        panic!("Cannot set this epoch, you would mess up the ordering");
+    }
 
     instructions.push(Instruction {
         program_id: validator_history::ID,
-        accounts: validator_history::accounts::CopyClusterInfo {
+        accounts: validator_history::accounts::BackfillTotalBlocks {
             cluster_history_account: cluster_history_pda,
-            slot_history: solana_program::sysvar::slot_history::id(),
+            config,
             signer: keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::CopyClusterInfo {}.data(),
+        data: validator_history::instruction::BackfillTotalBlocks {
+            epoch: args.epoch,
+            blocks_in_epoch: args.blocks_in_epoch,
+        }
+        .data(),
     });
 
     let blockhash = client
@@ -610,14 +590,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     );
 
     let signature = client
-        .send_and_confirm_transaction_with_spinner_and_config(
-            &transaction,
-            CommitmentConfig::processed(),
-            RpcSendTransactionConfig {
-                skip_preflight: true,
-                ..RpcSendTransactionConfig::default()
-            },
-        )
+        .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
     println!("Signature: {}", signature);
 }
