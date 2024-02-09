@@ -2,11 +2,11 @@ use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use anchor_lang::{system_program, InstructionData, ToAccountMetas};
+use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{
     build_create_and_update_instructions, get_multiple_accounts_batched,
-    get_multiple_accounts_with_retry, get_vote_accounts_with_retry, submit_create_and_update,
-    Address, CreateTransaction, CreateUpdateStats, UpdateInstruction,
+    get_vote_accounts_with_retry, submit_create_and_update, Address, CreateTransaction,
+    CreateUpdateStats, UpdateInstruction,
 };
 use log::error;
 use solana_client::nonblocking::rpc_client::RpcClient;

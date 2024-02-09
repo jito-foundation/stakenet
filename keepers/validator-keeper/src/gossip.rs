@@ -19,7 +19,6 @@ use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAcc
 use solana_gossip::{
     crds::Crds,
     crds_value::{CrdsData, CrdsValue, CrdsValueLabel},
-    legacy_contact_info,
 };
 use solana_metrics::datapoint_info;
 use solana_sdk::{

@@ -411,6 +411,7 @@ async fn gossip_upload_loop(
     }
 }
 
+#[allow(dead_code)]
 async fn cluster_history_loop(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,

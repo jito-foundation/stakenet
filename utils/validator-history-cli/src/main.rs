@@ -4,13 +4,12 @@ use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountM
 use clap::{arg, command, Parser, Subcommand};
 use solana_client::{
     rpc_client::RpcClient,
-    rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcSendTransactionConfig},
+    rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
 };
-use solana_program::{instruction::Instruction, native_token::lamports_to_sol};
+use solana_program::instruction::Instruction;
 use solana_sdk::{
-    commitment_config::CommitmentConfig, compute_budget::ComputeBudgetInstruction, pubkey::Pubkey,
-    signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -403,7 +402,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let mut epoch_credits = 0;
     let mut stakes = 0;
     let mut ranks = 0;
-    let mut superminorities = 0;
 
     let default = ValidatorHistoryEntry::default();
     for validator_history in validator_histories {
@@ -438,9 +436,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 }
                 if entry.rank != default.rank {
                     ranks += 1;
-                }
-                if entry.is_superminority != default.is_superminority {
-                    superminorities += 1;
                 }
                 println!(
                     "{}.\tVote Account: {} | {}",
