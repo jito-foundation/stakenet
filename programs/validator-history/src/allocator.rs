@@ -81,7 +81,7 @@ impl BumpAllocator {
             if pos == 0 {
                 return 0;
             }
-            return pos - heap_start;
+            pos - heap_start
         }
     }
 }
