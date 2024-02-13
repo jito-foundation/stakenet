@@ -411,7 +411,6 @@ async fn gossip_upload_loop(
     }
 }
 
-#[allow(dead_code)]
 async fn cluster_history_loop(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
@@ -499,13 +498,12 @@ async fn main() {
         args.interval,
     ));
 
-    // TODO fix cluster history instruction
-    // tokio::spawn(cluster_history_loop(
-    //     Arc::clone(&client),
-    //     Arc::clone(&keypair),
-    //     args.program_id,
-    //     args.interval,
-    // ));
+    tokio::spawn(cluster_history_loop(
+        Arc::clone(&client),
+        Arc::clone(&keypair),
+        args.program_id,
+        args.interval,
+    ));
 
     tokio::spawn(vote_account_loop(
         Arc::clone(&client),
