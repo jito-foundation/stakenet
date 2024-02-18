@@ -1,9 +1,14 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{clock::Clock, slot_history::Check},
+use {
+    crate::{
+        errors::ValidatorHistoryError,
+        utils::{cast_epoch, cast_epoch_start_timestamp},
+        ClusterHistory,
+    },
+    anchor_lang::{
+        prelude::*,
+        solana_program::{clock::Clock, slot_history::Check},
+    },
 };
-
-use crate::{errors::ValidatorHistoryError, utils::cast_epoch, ClusterHistory};
 
 #[derive(Accounts)]
 pub struct CopyClusterInfo<'info> {
@@ -29,12 +34,14 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
 
     let epoch = cast_epoch(clock.epoch);
 
+    let epoch_start_timestamp = cast_epoch_start_timestamp(clock.epoch_start_timestamp);
     // Sets the slot history for the previous epoch, since the current epoch is not yet complete.
     if epoch > 0 {
         cluster_history_account
             .set_blocks(epoch - 1, blocks_in_epoch(epoch - 1, &slot_history)?)?;
     }
     cluster_history_account.set_blocks(epoch, blocks_in_epoch(epoch, &slot_history)?)?;
+    cluster_history_account.set_epoch_start_timestamp(epoch, epoch_start_timestamp)?;
 
     cluster_history_account.cluster_history_last_update_slot = clock.slot;
 

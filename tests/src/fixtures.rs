@@ -1,24 +1,25 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use anchor_lang::{
-    solana_program::{
-        clock::Clock,
-        pubkey::Pubkey,
-        vote::state::{VoteInit, VoteState, VoteStateVersions},
+use {
+    anchor_lang::{
+        solana_program::{
+            clock::Clock,
+            pubkey::Pubkey,
+            vote::state::{VoteInit, VoteState, VoteStateVersions},
+        },
+        AccountSerialize, InstructionData, ToAccountMetas,
     },
-    AccountSerialize, InstructionData, ToAccountMetas,
+    jito_tip_distribution::{
+        sdk::derive_tip_distribution_account_address,
+        state::{MerkleRoot, TipDistributionAccount},
+    },
+    solana_program_test::*,
+    solana_sdk::{
+        account::Account, epoch_schedule::EpochSchedule, instruction::Instruction,
+        signature::Keypair, signer::Signer, transaction::Transaction,
+    },
+    std::{cell::RefCell, rc::Rc},
+    validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory},
 };
-use solana_program_test::*;
-use solana_sdk::{
-    account::Account, epoch_schedule::EpochSchedule, instruction::Instruction, signature::Keypair,
-    signer::Signer, transaction::Transaction,
-};
-use std::{cell::RefCell, rc::Rc};
-
-use jito_tip_distribution::{
-    sdk::derive_tip_distribution_account_address,
-    state::{MerkleRoot, TipDistributionAccount},
-};
-use validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory};
 
 pub struct TestFixture {
     pub ctx: Rc<RefCell<ProgramTestContext>>,
@@ -133,6 +134,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),
         };
+
         let transaction = Transaction::new_signed_with_payer(
             &[instruction, set_tip_distribution_instruction],
             Some(&self.keypair.pubkey()),
@@ -245,6 +247,26 @@ impl TestFixture {
             .borrow_mut()
             .warp_to_slot(target_slot)
             .expect("Failed warping to future epoch");
+    }
+
+    pub async fn advance_clock(&self, num_epochs: u64, ms_per_slot: u64) -> u64 {
+        let mut clock: Clock = self
+            .ctx
+            .borrow_mut()
+            .banks_client
+            .get_sysvar()
+            .await
+            .expect("Failed getting clock");
+
+        let epoch_schedule: EpochSchedule = self.ctx.borrow().genesis_config().epoch_schedule;
+        let target_epoch = clock.epoch + num_epochs;
+        let dif_slots = epoch_schedule.get_first_slot_in_epoch(target_epoch) - clock.slot;
+
+        clock.epoch_start_timestamp += (dif_slots * ms_per_slot) as i64;
+        clock.unix_timestamp += (dif_slots * ms_per_slot) as i64;
+        self.ctx.borrow_mut().set_sysvar(&clock);
+
+        dif_slots
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {

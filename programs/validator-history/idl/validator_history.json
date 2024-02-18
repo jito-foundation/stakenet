@@ -650,6 +650,10 @@
             "type": "u32"
           },
           {
+            "name": "epochStartTimestamp",
+            "type": "u32"
+          },
+          {
             "name": "epoch",
             "type": "u16"
           },
@@ -658,7 +662,7 @@
             "type": {
               "array": [
                 "u8",
-                250
+                246
               ]
             }
           }

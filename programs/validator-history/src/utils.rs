@@ -1,8 +1,14 @@
-use anchor_lang::prelude::{AccountInfo, Pubkey};
-use anchor_lang::solana_program::native_token::lamports_to_sol;
+use anchor_lang::{
+    prelude::{AccountInfo, Pubkey},
+    solana_program::native_token::lamports_to_sol,
+};
 
 pub fn cast_epoch(epoch: u64) -> u16 {
     (epoch % u16::MAX as u64).try_into().unwrap()
+}
+
+pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u32 {
+    start_timestamp.try_into().unwrap()
 }
 
 pub fn fixed_point_sol(lamports: u64) -> u32 {
