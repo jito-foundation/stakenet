@@ -133,6 +133,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),
         };
+
         let transaction = Transaction::new_signed_with_payer(
             &[instruction, set_tip_distribution_instruction],
             Some(&self.keypair.pubkey()),
