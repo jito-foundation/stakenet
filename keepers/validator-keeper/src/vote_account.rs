@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{
-    build_create_and_update_instructions, get_vote_accounts_with_retry, submit_create_and_update,
-    Address, CreateTransaction, CreateUpdateStats, UpdateInstruction,
+    build_create_and_update_instructions, get_multiple_accounts_batched,
+    get_vote_accounts_with_retry, submit_create_and_update, Address, CreateTransaction,
+    CreateUpdateStats, UpdateInstruction,
 };
 use log::error;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_program::vote;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
 
@@ -109,8 +111,29 @@ pub async fn update_vote_accounts(
         get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
             .await?;
 
+    let vote_account_pubkeys = validator_histories
+        .iter()
+        .map(|vh| vh.vote_account)
+        .collect::<Vec<_>>();
+
+    let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, &rpc_client).await?;
+    let closed_vote_accounts: HashSet<Pubkey> = vote_accounts
+        .iter()
+        .enumerate()
+        .filter_map(|(i, account)| match account {
+            Some(account) => {
+                if account.owner != vote::program::id() {
+                    Some(vote_account_pubkeys[i])
+                } else {
+                    None
+                }
+            }
+            None => Some(vote_account_pubkeys[i]),
+        })
+        .collect();
+
     // Merges new and active RPC vote accounts with all validator history accounts, and dedupes
-    let vote_accounts = rpc_vote_accounts
+    let mut all_vote_accounts = rpc_vote_accounts
         .iter()
         .filter_map(|rpc_va| {
             Pubkey::from_str(&rpc_va.vote_pubkey)
@@ -123,7 +146,10 @@ pub async fn update_vote_accounts(
         .chain(validator_histories.iter().map(|vh| vh.vote_account))
         .collect::<HashSet<_>>();
 
-    let entries = vote_accounts
+    // Remove closed vote accounts from all vote accounts
+    all_vote_accounts.retain(|va| !closed_vote_accounts.contains(va));
+
+    let entries = all_vote_accounts
         .iter()
         .map(|va| CopyVoteAccountEntry::new(va, &validator_history_program_id, &keypair.pubkey()))
         .collect::<Vec<_>>();

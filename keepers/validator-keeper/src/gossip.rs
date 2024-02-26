@@ -34,7 +34,7 @@ use validator_history::{
     Config, ValidatorHistory,
 };
 
-use crate::start_spy_server;
+use crate::{get_validator_history_accounts_with_retry, start_spy_server};
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
@@ -148,12 +148,38 @@ pub fn emit_gossip_datapoint(stats: CreateUpdateStats, runs_for_epoch: i64) {
     );
 }
 
-fn check_entry_valid(entry: &CrdsValue, validator_identity: Pubkey) -> bool {
+fn check_entry_valid(
+    entry: &CrdsValue,
+    validator_history: &ValidatorHistory,
+    validator_identity: Pubkey,
+) -> bool {
+    // Filters out invalid gossip entries that would fail transaction submission. Checks for:
+    // 0. Entry belongs to one of the expected types
+    // 1. Entry timestamp is not too old
+    // 2. Entry is for the correct validator
     match &entry.data {
-        CrdsData::LegacyContactInfo(_) => {}
-        CrdsData::LegacyVersion(_) => {}
-        CrdsData::Version(_) => {}
-        CrdsData::ContactInfo(_) => {}
+        CrdsData::LegacyContactInfo(legacy_contact_info) => {
+            if legacy_contact_info.wallclock() < validator_history.last_ip_timestamp {
+                return false;
+            }
+        }
+        CrdsData::LegacyVersion(legacy_version) => {
+            if legacy_version.wallclock < validator_history.last_version_timestamp {
+                return false;
+            }
+        }
+        CrdsData::Version(version) => {
+            if version.wallclock < validator_history.last_version_timestamp {
+                return false;
+            }
+        }
+        CrdsData::ContactInfo(contact_info) => {
+            if contact_info.wallclock() < validator_history.last_ip_timestamp
+                || contact_info.wallclock() < validator_history.last_version_timestamp
+            {
+                return false;
+            }
+        }
         _ => {
             return false;
         }
@@ -173,6 +199,7 @@ fn check_entry_valid(entry: &CrdsValue, validator_identity: Pubkey) -> bool {
 
 fn build_gossip_entry(
     vote_account: &RpcVoteAccountInfo,
+    validator_history: &ValidatorHistory,
     crds: &RwLockReadGuard<'_, Crds>,
     program_id: Pubkey,
     keypair: &Arc<Keypair>,
@@ -189,7 +216,7 @@ fn build_gossip_entry(
     // Current ContactInfo has both IP and Version, but LegacyContactInfo has only IP.
     // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
-        if !check_entry_valid(entry, validator_identity) {
+        if !check_entry_valid(entry, validator_history, validator_identity) {
             return None;
         }
         Some(vec![GossipEntry::new(
@@ -203,7 +230,7 @@ fn build_gossip_entry(
     } else {
         let mut entries = vec![];
         if let Some(entry) = crds.get::<&CrdsValue>(&legacy_contact_info_key) {
-            if !check_entry_valid(entry, validator_identity) {
+            if !check_entry_valid(entry, validator_history, validator_identity) {
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -217,7 +244,7 @@ fn build_gossip_entry(
         }
 
         if let Some(entry) = crds.get::<&CrdsValue>(&version_key) {
-            if !check_entry_valid(entry, validator_identity) {
+            if !check_entry_valid(entry, validator_history, validator_identity) {
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -229,7 +256,7 @@ fn build_gossip_entry(
                 &keypair.pubkey(),
             ))
         } else if let Some(entry) = crds.get::<&CrdsValue>(&legacy_version_key) {
-            if !check_entry_valid(entry, validator_identity) {
+            if !check_entry_valid(entry, validator_history, validator_identity) {
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -262,6 +289,8 @@ pub async fn upload_gossip_values(
         start_spy_server(entrypoint, gossip_port, spy_socket_addr, &keypair, &exit);
 
     let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
+    let validator_history_accounts =
+        get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
     // Wait for all active validators to be received
     sleep(Duration::from_secs(30)).await;
@@ -272,7 +301,18 @@ pub async fn upload_gossip_values(
         vote_accounts
             .iter()
             .filter_map(|vote_account| {
-                build_gossip_entry(vote_account, &crds, *program_id, &keypair)
+                let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
+                let validator_history_account = validator_history_accounts
+                    .iter()
+                    .find(|account| account.vote_account == vote_account_pubkey)?;
+
+                build_gossip_entry(
+                    vote_account,
+                    validator_history_account,
+                    &crds,
+                    *program_id,
+                    &keypair,
+                )
             })
             .flatten()
             .collect::<Vec<_>>()
