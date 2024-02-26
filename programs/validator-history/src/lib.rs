@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+mod allocator;
 pub mod constants;
 pub mod crds_value;
 pub mod errors;
