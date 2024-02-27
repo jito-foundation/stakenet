@@ -803,7 +803,6 @@ impl ClusterHistory {
         if let Some(entry) = self.history.last_mut() {
             if entry.epoch == epoch {
                 entry.epoch_start_timestamp = epoch_start_timestamp;
-                return Ok(());
             }
         }
         Ok(())
