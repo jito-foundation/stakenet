@@ -103,7 +103,19 @@ async fn mev_commission_loop(
         )
         .await
         {
-            Ok(stats) => stats,
+            Ok(stats) => {
+                for message in stats
+                    .creates
+                    .results
+                    .iter()
+                    .chain(stats.updates.results.iter())
+                {
+                    if let Err(e) = message {
+                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    }
+                }
+                stats
+            }
             Err(e) => {
                 let mut stats = CreateUpdateStats::default();
                 if let KeeperError::TransactionExecutionError(
@@ -146,7 +158,19 @@ async fn mev_earned_loop(
         )
         .await
         {
-            Ok(stats) => stats,
+            Ok(stats) => {
+                for message in stats
+                    .creates
+                    .results
+                    .iter()
+                    .chain(stats.updates.results.iter())
+                {
+                    if let Err(e) = message {
+                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    }
+                }
+                stats
+            }
             Err(e) => {
                 let mut stats = CreateUpdateStats::default();
                 if let KeeperError::TransactionExecutionError(
@@ -421,6 +445,14 @@ async fn cluster_history_loop(
         if should_run {
             stats = match update_cluster_info(client.clone(), keypair.clone(), &program_id).await {
                 Ok(run_stats) => {
+                    for message in run_stats.results.iter() {
+                        if let Err(e) = message {
+                            datapoint_error!(
+                                "cluster-history-error",
+                                ("error", e.to_string(), String),
+                            );
+                        }
+                    }
                     if run_stats.errors == 0 {
                         runs_for_epoch += 1;
                     }

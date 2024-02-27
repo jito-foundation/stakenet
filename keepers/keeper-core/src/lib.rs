@@ -314,7 +314,7 @@ pub async fn parallel_execute_transactions(
                         submitted_signatures.insert(tx.signatures[0], idx);
                     }
                     Some(_) | None => {
-                        warn!("Transaction error: {}", e.to_string());
+                        warn!("Transaction error: {:?}", e);
                         results[idx] = Err(SendTransactionError::TransactionError(e.to_string()))
                     }
                 },
@@ -436,7 +436,6 @@ pub async fn submit_transactions(
     keypair: &Arc<Keypair>,
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    let num_transactions = transactions.len();
     let tx_slice = transactions
         .iter()
         .map(|t| t.as_slice())
@@ -445,7 +444,7 @@ pub async fn submit_transactions(
     match parallel_execute_transactions(client, &tx_slice, keypair, 10, 30).await {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
-            stats.errors = num_transactions as u64 - stats.successes;
+            stats.errors = results.len() as u64 - stats.successes;
             stats.results = results;
             Ok(stats)
         }
@@ -459,11 +458,10 @@ pub async fn submit_instructions(
     keypair: &Arc<Keypair>,
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    let num_instructions = instructions.len();
     match parallel_execute_instructions(client, &instructions, keypair, 10, 30).await {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
-            stats.errors = num_instructions as u64 - stats.successes;
+            stats.errors = results.len() as u64 - stats.successes;
             stats.results = results;
             Ok(stats)
         }

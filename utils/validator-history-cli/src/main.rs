@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
@@ -12,7 +12,8 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use validator_history::{
-    constants::MAX_ALLOC_BYTES, ClusterHistory, Config, ValidatorHistory, ValidatorHistoryEntry,
+    constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
+    ValidatorHistoryEntry,
 };
 
 #[derive(Parser)]
@@ -36,6 +37,7 @@ enum Commands {
     InitConfig(InitConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
+    ClusterHistoryStatus,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
 }
@@ -259,6 +261,12 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
             entry.mev_commission.to_string()
         };
 
+    let mev_earned_str = if entry.mev_earned == ValidatorHistoryEntry::default().mev_earned {
+        "[NULL]".to_string()
+    } else {
+        (entry.mev_earned as f64 / 100.0).to_string()
+    };
+
     let stake_str = if entry.activated_stake_lamports
         == ValidatorHistoryEntry::default().activated_stake_lamports
     {
@@ -317,10 +325,11 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     };
 
     format!(
-        "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
+        "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
         commission_str,
         epoch_credits_str,
         mev_commission_str,
+        mev_earned_str,
         stake_str,
         rank_str,
         superminority_str,
@@ -388,11 +397,12 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let mut versions = 0;
     let mut types = 0;
     let mut mev_comms = 0;
+    let mut mev_earned = 0;
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
     let mut ranks = 0;
-    let mut superminorities = 0;
+
     let default = ValidatorHistoryEntry::default();
     for validator_history in validator_histories {
         match get_entry(validator_history, epoch) {
@@ -412,6 +422,9 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 if entry.mev_commission != default.mev_commission {
                     mev_comms += 1;
                 }
+                if entry.mev_earned != default.mev_earned {
+                    mev_earned += 1;
+                }
                 if entry.commission != default.commission {
                     comms += 1;
                 }
@@ -423,9 +436,6 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 }
                 if entry.rank != default.rank {
                     ranks += 1;
-                }
-                if entry.is_superminority != default.is_superminority {
-                    superminorities += 1;
                 }
                 println!(
                     "{}.\tVote Account: {} | {}",
@@ -449,11 +459,11 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     println!("Validators with Version:\t{}", versions);
     println!("Validators with Client Type:\t{}", types);
     println!("Validators with MEV Commission: {}", mev_comms);
+    println!("Validators with MEV Earned: \t{}", mev_earned);
     println!("Validators with Commission:\t{}", comms);
     println!("Validators with Epoch Credits:\t{}", epoch_credits);
     println!("Validators with Stake:\t\t{}", stakes);
     println!("Validators with Rank:\t\t{}", ranks);
-    println!("Validators with Superminority:\t\t{}", superminorities);
 }
 
 fn command_history(args: History, client: RpcClient) {
@@ -504,14 +514,51 @@ fn command_history(args: History, client: RpcClient) {
     }
 }
 
+fn command_cluster_history(client: RpcClient) {
+    let (cluster_history_pda, _) =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+
+    let cluster_history_account = client
+        .get_account(&cluster_history_pda)
+        .expect("Failed to get cluster history account");
+    let cluster_history =
+        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
+            .expect("Failed to deserialize cluster history account");
+
+    for entry in cluster_history.history.arr.iter() {
+        println!(
+            "Epoch: {} | Total Blocks: {}",
+            entry.epoch, entry.total_blocks
+        );
+
+        if entry.epoch == ClusterHistoryEntry::default().epoch {
+            break;
+        }
+    }
+}
+
 fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcClient) {
     // Backfill cluster history account for a specific epoch
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    sleep(Duration::from_secs(5));
 
     let mut instructions = vec![];
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
     let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let cluster_history_account = client
+        .get_account(&cluster_history_pda)
+        .expect("Failed to get cluster history account");
+    let cluster_history =
+        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
+            .expect("Failed to deserialize cluster history account");
+
+    if !cluster_history.history.is_empty()
+        && cluster_history.history.last().unwrap().epoch + 1 != args.epoch as u16
+    {
+        panic!("Cannot set this epoch, you would mess up the ordering");
+    }
+
     instructions.push(Instruction {
         program_id: validator_history::ID,
         accounts: validator_history::accounts::BackfillTotalBlocks {
@@ -550,6 +597,7 @@ fn main() {
         Commands::InitConfig(args) => command_init_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
+        Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
     };

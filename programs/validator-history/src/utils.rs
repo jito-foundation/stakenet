@@ -34,9 +34,9 @@ mod tests {
 
     #[test]
     fn test_fixed_point_sol() {
-        assert_eq!(fixed_point_sol(1000000000), 100);
-        assert_eq!(fixed_point_sol(4294967295000000000), 4294967295);
+        assert_eq!(fixed_point_sol(1_000_000_000), 100);
+        assert_eq!(fixed_point_sol(4_294_967_295_000_000_000), 4294967295);
 
-        assert_eq!(fixed_point_sol(429496729600000000), 4294967295)
+        assert_eq!(fixed_point_sol(429_496_729_600_000_000), 4294967295)
     }
 }
