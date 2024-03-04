@@ -2,6 +2,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use bincode::serialize;
+use bytemuck::bytes_of;
+use ed25519_dalek::Signer as Ed25519Signer;
 use rand::thread_rng;
 use solana_gossip::{
     contact_info::ContactInfo,
@@ -10,14 +12,18 @@ use solana_gossip::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock, ed25519_instruction::new_ed25519_instruction, signer::Signer,
+    clock::Clock,
+    ed25519_instruction::{
+        new_ed25519_instruction, DATA_START, PUBKEY_SERIALIZED_SIZE, SIGNATURE_SERIALIZED_SIZE,
+    },
+    signer::Signer,
     transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
 use tests::fixtures::TestFixture;
 use validator_history::{
     crds_value::{CrdsData as ValidatorHistoryCrdsData, LegacyVersion, LegacyVersion1},
-    ValidatorHistory,
+    Ed25519SignatureOffsets, ValidatorHistory,
 };
 
 fn create_gossip_tx(fixture: &TestFixture, crds_data: &CrdsData) -> Transaction {
@@ -405,5 +411,119 @@ async fn test_gossip_timestamps() {
 
     fixture
         .submit_transaction_assert_error(transaction, "GossipDataInFuture")
+        .await;
+}
+
+#[tokio::test]
+async fn test_fake_offsets() {
+    // Put in fake offsets, and make sure we get a GossipDataInvalid error
+    let fixture = TestFixture::new().await;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+    let mut banks_client = {
+        let ctx = fixture.ctx.borrow_mut();
+        ctx.banks_client.clone()
+    };
+
+    // Initial valid instruction
+    let dalek_keypair =
+        ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
+
+    let clock: Clock = banks_client.get_sysvar().await.unwrap();
+    let wallclock = clock.unix_timestamp as u64 * 1000;
+    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
+    let ip = IpAddr::V4(ipv4);
+    contact_info
+        .set_socket(0, SocketAddr::new(ip, 1234))
+        .expect("could not set socket");
+    let crds_data = CrdsData::ContactInfo(contact_info.clone());
+
+    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
+
+    // Invalid instruction
+    let fake_ipv4 = Ipv4Addr::new(5, 5, 5, 5);
+    let fake_ip = IpAddr::V4(fake_ipv4);
+    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    contact_info
+        .set_socket(0, SocketAddr::new(fake_ip, 1234))
+        .unwrap();
+    let crds_data = CrdsData::ContactInfo(contact_info.clone());
+
+    // Code from new_ed25519_instruction with modified instruction indices
+    let message = serialize(&crds_data).unwrap();
+
+    let signature = dalek_keypair.sign(&message).to_bytes();
+    let pubkey = dalek_keypair.public.to_bytes();
+
+    assert_eq!(pubkey.len(), PUBKEY_SERIALIZED_SIZE);
+    assert_eq!(signature.len(), SIGNATURE_SERIALIZED_SIZE);
+
+    let mut instruction_data = Vec::with_capacity(
+        DATA_START
+            .saturating_add(SIGNATURE_SERIALIZED_SIZE)
+            .saturating_add(PUBKEY_SERIALIZED_SIZE)
+            .saturating_add(message.len()),
+    );
+
+    let num_signatures: u8 = 1;
+    let public_key_offset = DATA_START;
+    let signature_offset = public_key_offset.saturating_add(PUBKEY_SERIALIZED_SIZE);
+    let message_data_offset = signature_offset.saturating_add(SIGNATURE_SERIALIZED_SIZE);
+
+    instruction_data.extend_from_slice(bytes_of(&[num_signatures, 0]));
+
+    let offsets = Ed25519SignatureOffsets {
+        signature_offset: signature_offset as u16,
+        signature_instruction_index: 0, // Index of real signature
+        public_key_offset: public_key_offset as u16,
+        public_key_instruction_index: 0, // Index of real signer
+        message_data_offset: message_data_offset as u16,
+        message_data_size: message.len() as u16,
+        message_instruction_index: 1, // Index of fake data
+    };
+
+    instruction_data.extend_from_slice(bytes_of(&offsets));
+
+    debug_assert_eq!(instruction_data.len(), public_key_offset);
+
+    instruction_data.extend_from_slice(&pubkey);
+
+    debug_assert_eq!(instruction_data.len(), signature_offset);
+
+    instruction_data.extend_from_slice(&signature);
+
+    debug_assert_eq!(instruction_data.len(), message_data_offset);
+
+    instruction_data.extend_from_slice(&message);
+
+    let fake_instruction = Instruction {
+        program_id: solana_sdk::ed25519_program::id(),
+        accounts: vec![],
+        data: instruction_data,
+    };
+
+    let copy_gossip_ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyGossipContactInfo {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            instructions: anchor_lang::solana_program::sysvar::instructions::id(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyGossipContactInfo {}.data(),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[ed25519_ix, fake_instruction, copy_gossip_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(transaction, "GossipDataInvalid")
         .await;
 }

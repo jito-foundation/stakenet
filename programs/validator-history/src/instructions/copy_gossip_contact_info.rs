@@ -14,13 +14,13 @@ use validator_history_vote_state::VoteStateVersions;
 #[derive(Default, Debug, Copy, Clone, Zeroable, Pod, Eq, PartialEq)]
 #[repr(C)]
 pub struct Ed25519SignatureOffsets {
-    signature_offset: u16,             // offset to ed25519 signature of 64 bytes
-    signature_instruction_index: u16,  // instruction index to find signature
-    pub public_key_offset: u16,        // offset to public key of 32 bytes
-    public_key_instruction_index: u16, // instruction index to find public key
-    pub message_data_offset: u16,      // offset to start of message data
-    message_data_size: u16,            // size of message data
-    message_instruction_index: u16,    // index of instruction data to get message data
+    pub signature_offset: u16, // offset to ed25519 signature of 64 bytes
+    pub signature_instruction_index: u16, // instruction index to find signature
+    pub public_key_offset: u16, // offset to public key of 32 bytes
+    pub public_key_instruction_index: u16, // instruction index to find public key
+    pub message_data_offset: u16, // offset to start of message data
+    pub message_data_size: u16, // size of message data
+    pub message_instruction_index: u16, // index of instruction data to get message data
 }
 
 pub const PUBKEY_SERIALIZED_SIZE: usize = 32;
@@ -71,6 +71,19 @@ pub fn handle_copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> R
         &verify_instruction.data
             [SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE],
     );
+
+    // Check offsets and indices are correct so an attacker cannot submit invalid data
+    if ed25519_offsets.signature_instruction_index != ed25519_offsets.public_key_instruction_index
+        || ed25519_offsets.signature_instruction_index != ed25519_offsets.message_instruction_index
+        || ed25519_offsets.public_key_offset
+            != (SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE) as u16
+        || ed25519_offsets.signature_offset
+            != ed25519_offsets.public_key_offset + PUBKEY_SERIALIZED_SIZE as u16
+        || ed25519_offsets.message_data_offset
+            != ed25519_offsets.signature_offset + SIGNATURE_SERIALIZED_SIZE as u16
+    {
+        return Err(ValidatorHistoryError::GossipDataInvalid.into());
+    }
 
     let message_signer = Pubkey::try_from(
         &verify_instruction.data[ed25519_offsets.public_key_offset as usize
