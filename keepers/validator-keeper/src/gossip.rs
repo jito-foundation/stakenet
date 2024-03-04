@@ -128,7 +128,8 @@ impl GossipEntry {
                 validator_history_account: self.validator_history_account,
                 vote_account: self.vote_account,
                 instructions: solana_program::sysvar::instructions::id(),
-                signer: self.signer,
+                config: self.config,
+                oracle_authority: self.signer,
             }
             .to_account_metas(None),
             data: validator_history::instruction::CopyGossipContactInfo {}.data(),

@@ -10,7 +10,7 @@ use solana_gossip::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock, ed25519_instruction::new_ed25519_instruction, signer::Signer,
+    clock::Clock, ed25519_instruction::new_ed25519_instruction, pubkey::Pubkey, signer::Signer,
     transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
@@ -35,7 +35,8 @@ fn create_gossip_tx(fixture: &TestFixture, crds_data: &CrdsData) -> Transaction 
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             instructions: anchor_lang::solana_program::sysvar::instructions::id(),
-            signer: fixture.keypair.pubkey(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::CopyGossipContactInfo {}.data(),
@@ -140,7 +141,8 @@ async fn test_copy_legacy_version() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             instructions: anchor_lang::solana_program::sysvar::instructions::id(),
-            signer: fixture.keypair.pubkey(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::CopyGossipContactInfo {}.data(),
@@ -224,7 +226,8 @@ async fn test_gossip_wrong_signer() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             instructions: anchor_lang::solana_program::sysvar::instructions::id(),
-            signer: fixture.keypair.pubkey(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::CopyGossipContactInfo {}.data(),
@@ -281,7 +284,8 @@ async fn test_gossip_missing_sigverify_instruction() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             instructions: anchor_lang::solana_program::sysvar::instructions::id(),
-            signer: fixture.keypair.pubkey(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::CopyGossipContactInfo {}.data(),

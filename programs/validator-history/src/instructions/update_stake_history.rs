@@ -29,6 +29,8 @@ pub struct UpdateStakeHistory<'info> {
     pub oracle_authority: Signer<'info>,
 }
 
+// NOTE: If using this instruction to backfill a new validator history account, you must ensure that epochs are added in ascending order.
+// This is because new entries cannot be inserted for an epoch that is lower than the last entry's if missed.
 pub fn handle_update_stake_history(
     ctx: Context<UpdateStakeHistory>,
     epoch: u64,
@@ -36,13 +38,14 @@ pub fn handle_update_stake_history(
     rank: u32,
     is_superminority: bool,
 ) -> Result<()> {
-    let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
+    let mut validator_history_account: std::cell::RefMut<'_, ValidatorHistory> =
+        ctx.accounts.validator_history_account.load_mut()?;
 
     // Cannot set stake for future epochs
     if epoch > Clock::get()?.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
-    let epoch = cast_epoch(epoch);
+    let epoch = cast_epoch(epoch)?;
 
     validator_history_account.set_stake(epoch, lamports, rank, is_superminority)?;
 

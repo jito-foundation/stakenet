@@ -26,4 +26,6 @@ pub enum ValidatorHistoryError {
     ArithmeticError,
     #[msg("Slot history sysvar is not containing expected slots")]
     SlotHistoryOutOfDate,
+    #[msg("Epoch larger than 65535, cannot be stored")]
+    EpochTooLarge,
 }

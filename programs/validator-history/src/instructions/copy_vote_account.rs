@@ -25,7 +25,7 @@ pub struct CopyVoteAccount<'info> {
 pub fn handle_copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
     let clock = Clock::get()?;
-    let epoch = cast_epoch(clock.epoch);
+    let epoch = cast_epoch(clock.epoch)?;
 
     let commission = VoteStateVersions::deserialize_commission(&ctx.accounts.vote_account)?;
     validator_history_account.set_commission_and_slot(epoch, commission, clock.slot)?;

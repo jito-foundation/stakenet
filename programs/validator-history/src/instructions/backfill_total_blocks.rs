@@ -22,7 +22,7 @@ pub fn handle_backfill_total_blocks(
 ) -> Result<()> {
     let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
 
-    let epoch = cast_epoch(epoch);
+    let epoch = cast_epoch(epoch)?;
 
     // Need to backfill in ascending order when initially filling in the account otherwise entries will be out of order
     if !cluster_history_account.history.is_empty()

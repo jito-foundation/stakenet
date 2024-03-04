@@ -57,7 +57,7 @@ pub fn handle_copy_tip_distribution_account(
     if epoch > Clock::get()?.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
-    let epoch = cast_epoch(epoch);
+    let epoch = cast_epoch(epoch)?;
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
 
     let mut tda_data: &[u8] = &ctx.accounts.tip_distribution_account.try_borrow_data()?;
