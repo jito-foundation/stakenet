@@ -45,7 +45,9 @@
           "name": "voteAccount",
           "isMut": false,
           "isSigner": false,
-          "docs": ["Used to read validator commission."]
+          "docs": [
+            "Used to read validator commission."
+          ]
         },
         {
           "name": "systemProgram",
@@ -135,7 +137,9 @@
           "name": "voteAccount",
           "isMut": false,
           "isSigner": false,
-          "docs": ["Used to read validator commission."]
+          "docs": [
+            "Used to read validator commission."
+          ]
         },
         {
           "name": "config",
@@ -431,7 +435,10 @@
           {
             "name": "padding0",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -445,7 +452,10 @@
           {
             "name": "padding1",
             "type": {
-              "array": ["u8", 232]
+              "array": [
+                "u8",
+                232
+              ]
             }
           },
           {
@@ -473,7 +483,10 @@
           {
             "name": "padding0",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -483,7 +496,10 @@
           {
             "name": "padding1",
             "type": {
-              "array": ["u8", 232]
+              "array": [
+                "u8",
+                232
+              ]
             }
           },
           {
@@ -535,7 +551,10 @@
           {
             "name": "ip",
             "type": {
-              "array": ["u8", 4]
+              "array": [
+                "u8",
+                4
+              ]
             }
           },
           {
@@ -561,7 +580,10 @@
           {
             "name": "padding1",
             "type": {
-              "array": ["u8", 84]
+              "array": [
+                "u8",
+                84
+              ]
             }
           }
         ]
@@ -603,7 +625,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -636,7 +661,10 @@
           {
             "name": "padding0",
             "type": {
-              "array": ["u8", 2]
+              "array": [
+                "u8",
+                2
+              ]
             }
           },
           {
@@ -646,7 +674,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 240]
+              "array": [
+                "u8",
+                240
+              ]
             }
           }
         ]
@@ -668,7 +699,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -769,7 +803,9 @@
           },
           {
             "name": "DuplicateSocket",
-            "fields": ["u8"]
+            "fields": [
+              "u8"
+            ]
           },
           {
             "name": "InvalidIpAddrIndex",
@@ -779,7 +815,7 @@
                 "type": "u8"
               },
               {
-                "name": "",
+                "name": "numAddrs",
                 "type": {
                   "defined": "usize"
                 }
@@ -788,7 +824,9 @@
           },
           {
             "name": "InvalidPort",
-            "fields": ["u16"]
+            "fields": [
+              "u16"
+            ]
           },
           {
             "name": "InvalidQuicSocket",
@@ -821,7 +859,9 @@
           },
           {
             "name": "SocketNotFound",
-            "fields": ["u8"]
+            "fields": [
+              "u8"
+            ]
           },
           {
             "name": "UnspecifiedIpAddr",
