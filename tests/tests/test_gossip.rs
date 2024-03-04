@@ -10,7 +10,7 @@ use solana_gossip::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock, ed25519_instruction::new_ed25519_instruction, pubkey::Pubkey, signer::Signer,
+    clock::Clock, ed25519_instruction::new_ed25519_instruction, signer::Signer,
     transaction::Transaction,
 };
 use solana_version::LegacyVersion2;

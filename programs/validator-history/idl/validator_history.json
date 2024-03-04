@@ -318,7 +318,12 @@
           "isSigner": false
         },
         {
-          "name": "signer",
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "oracleAuthority",
           "isMut": true,
           "isSigner": true
         }
@@ -650,19 +655,28 @@
             "type": "u32"
           },
           {
-            "name": "epochStartTimestamp",
-            "type": "u32"
-          },
-          {
             "name": "epoch",
             "type": "u16"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "epochStartTimestamp",
+            "type": "u64"
           },
           {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                246
+                240
               ]
             }
           }
@@ -801,7 +815,7 @@
                 "type": "u8"
               },
               {
-                "name": "numAddrs",
+                "name": "num_addrs",
                 "type": {
                   "defined": "usize"
                 }
@@ -935,6 +949,11 @@
       "code": 6010,
       "name": "SlotHistoryOutOfDate",
       "msg": "Slot history sysvar is not containing expected slots"
+    },
+    {
+      "code": 6011,
+      "name": "EpochTooLarge",
+      "msg": "Epoch larger than 65535, cannot be stored"
     }
   ]
 }
