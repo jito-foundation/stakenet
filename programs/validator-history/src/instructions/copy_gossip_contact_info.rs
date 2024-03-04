@@ -68,7 +68,8 @@ pub fn handle_copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> R
     }
 
     let ed25519_offsets = from_bytes::<Ed25519SignatureOffsets>(
-        &verify_instruction.data[SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_SERIALIZED_SIZE],
+        &verify_instruction.data
+            [SIGNATURE_OFFSETS_START..SIGNATURE_OFFSETS_START + SIGNATURE_OFFSETS_SERIALIZED_SIZE],
     );
 
     let message_signer = Pubkey::try_from(
