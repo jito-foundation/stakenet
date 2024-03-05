@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::{
@@ -26,6 +27,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signable, Signature},
     signer::Signer,
+    vote,
 };
 use tokio::time::sleep;
 use validator_history::{
@@ -289,6 +291,28 @@ pub async fn upload_gossip_values(
         start_spy_server(entrypoint, gossip_port, spy_socket_addr, &keypair, &exit);
 
     let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
+
+    let vote_account_pubkeys = vote_accounts
+        .iter()
+        .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
+        .collect::<Vec<_>>();
+
+    let raw_vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, &client).await?;
+    let closed_vote_accounts: HashSet<Pubkey> = raw_vote_accounts
+        .iter()
+        .enumerate()
+        .filter_map(|(i, account)| match account {
+            Some(account) => {
+                if account.owner != vote::program::id() {
+                    Some(vote_account_pubkeys[i])
+                } else {
+                    None
+                }
+            }
+            None => Some(vote_account_pubkeys[i]),
+        })
+        .collect();
+
     let validator_history_accounts =
         get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
@@ -302,6 +326,9 @@ pub async fn upload_gossip_values(
             .iter()
             .filter_map(|vote_account| {
                 let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
+                if closed_vote_accounts.contains(&vote_account_pubkey) {
+                    return None;
+                }
                 let validator_history_account = validator_history_accounts
                     .iter()
                     .find(|account| account.vote_account == vote_account_pubkey)?;
