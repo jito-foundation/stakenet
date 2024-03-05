@@ -3,7 +3,9 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer};
+use solana_sdk::{
+    compute_budget, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
+};
 use validator_history::state::ClusterHistory;
 
 pub async fn update_cluster_info(
@@ -14,6 +16,9 @@ pub async fn update_cluster_info(
     let (cluster_history_account, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], program_id);
 
+    let heap_request_ix = compute_budget::ComputeBudgetInstruction::request_heap_frame(256 * 1024);
+    let compute_budget_ix =
+        compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(300_000);
     let update_instruction = Instruction {
         program_id: *program_id,
         accounts: validator_history::accounts::CopyClusterInfo {
@@ -25,5 +30,10 @@ pub async fn update_cluster_info(
         data: validator_history::instruction::CopyClusterInfo {}.data(),
     };
 
-    submit_instructions(&client, vec![update_instruction], &keypair).await
+    submit_instructions(
+        &client,
+        vec![heap_request_ix, compute_budget_ix, update_instruction],
+        &keypair,
+    )
+    .await
 }
