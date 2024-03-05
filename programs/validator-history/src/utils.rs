@@ -1,13 +1,21 @@
 use anchor_lang::{
-    prelude::{AccountInfo, Pubkey},
+    prelude::{AccountInfo, Pubkey, Result},
+    require,
     solana_program::native_token::lamports_to_sol,
 };
 
-pub fn cast_epoch(epoch: u64) -> u16 {
-    (epoch % u16::MAX as u64).try_into().unwrap()
+use crate::errors::ValidatorHistoryError;
+
+pub fn cast_epoch(epoch: u64) -> Result<u16> {
+    require!(
+        epoch < (u16::MAX as u64),
+        ValidatorHistoryError::EpochTooLarge
+    );
+    let epoch_u16: u16 = (epoch % u16::MAX as u64).try_into().unwrap();
+    Ok(epoch_u16)
 }
 
-pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u32 {
+pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
     start_timestamp.try_into().unwrap()
 }
 

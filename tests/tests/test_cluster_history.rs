@@ -113,10 +113,10 @@ async fn test_start_epoch_timestamp() {
 
     assert_eq!(account.history.arr[0].epoch, 0);
     assert_eq!(account.history.arr[1].epoch, 1);
-    assert_ne!(account.history.arr[0].epoch_start_timestamp, u32::MAX);
-    assert_ne!(account.history.arr[1].epoch_start_timestamp, u32::MAX);
+    assert_ne!(account.history.arr[0].epoch_start_timestamp, u64::MAX);
+    assert_ne!(account.history.arr[1].epoch_start_timestamp, u64::MAX);
     assert_eq!(
         account.history.arr[0].epoch_start_timestamp,
-        account.history.arr[1].epoch_start_timestamp - (dif_slots * MS_PER_SLOT) as u32
+        account.history.arr[1].epoch_start_timestamp - dif_slots * MS_PER_SLOT
     );
 }

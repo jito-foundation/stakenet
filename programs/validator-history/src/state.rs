@@ -61,11 +61,13 @@ pub struct ValidatorHistoryEntry {
     pub rank: u32,
     // Most recent updated slot for epoch credits and commission
     pub vote_account_last_update_slot: u64,
-    // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1 SOL earned
+    // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
     pub padding1: [u8; 84],
 }
 
+// Default values for fields in `ValidatorHistoryEntry` are the type's max value.
+// It's important to ensure that the max value is not a valid value for the field, so we can check if the field has been set.
 impl Default for ValidatorHistoryEntry {
     fn default() -> Self {
         Self {
@@ -378,7 +380,7 @@ impl ValidatorHistory {
         let epoch_credits_map: HashMap<u16, u32> =
             HashMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
                 (
-                    cast_epoch(*epoch),
+                    cast_epoch(*epoch).unwrap(), // all epochs in list will be valid if current epoch is valid
                     (cur.checked_sub(*prev)
                         .ok_or(ValidatorHistoryError::InvalidEpochCredits)
                         .unwrap() as u32),
@@ -654,9 +656,10 @@ pub struct ClusterHistory {
 #[zero_copy]
 pub struct ClusterHistoryEntry {
     pub total_blocks: u32,
-    pub epoch_start_timestamp: u32,
     pub epoch: u16,
-    pub padding: [u8; 246],
+    pub padding0: [u8; 2],
+    pub epoch_start_timestamp: u64,
+    pub padding: [u8; 240],
 }
 
 impl Default for ClusterHistoryEntry {
@@ -664,8 +667,9 @@ impl Default for ClusterHistoryEntry {
         Self {
             total_blocks: u32::MAX,
             epoch: u16::MAX,
-            epoch_start_timestamp: u32::MAX,
-            padding: [u8::MAX; 246],
+            padding0: [u8::MAX; 2],
+            epoch_start_timestamp: u64::MAX,
+            padding: [u8::MAX; 240],
         }
     }
 }
@@ -798,7 +802,7 @@ impl ClusterHistory {
     pub fn set_epoch_start_timestamp(
         &mut self,
         epoch: u16,
-        epoch_start_timestamp: u32,
+        epoch_start_timestamp: u64,
     ) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             if entry.epoch == epoch {

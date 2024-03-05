@@ -32,9 +32,10 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
 
     let clock = Clock::get()?;
 
-    let epoch = cast_epoch(clock.epoch);
+    let epoch = cast_epoch(clock.epoch)?;
 
     let epoch_start_timestamp = cast_epoch_start_timestamp(clock.epoch_start_timestamp);
+
     // Sets the slot history for the previous epoch, since the current epoch is not yet complete.
     if epoch > 0 {
         cluster_history_account
