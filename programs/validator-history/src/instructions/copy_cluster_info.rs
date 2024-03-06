@@ -85,21 +85,20 @@ pub fn confirmed_blocks_in_epoch(
     // The bitvec inner data is taken ownership of, then returned to be reused.
     let mut blocks_in_epoch: u32 = 0;
 
-    let first_full_block_slot = if (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {
+    let first_full_block_slot = if start_slot % BITVEC_BLOCK_SIZE == 0 {
         start_slot
     } else {
         start_slot
             .checked_add(
-                (BITVEC_BLOCK_SIZE
-                    .checked_sub(start_slot % MAX_ENTRIES)
-                    .ok_or(ValidatorHistoryError::ArithmeticError)?)
-                    % BITVEC_BLOCK_SIZE,
+                BITVEC_BLOCK_SIZE
+                    .checked_sub(start_slot % BITVEC_BLOCK_SIZE)
+                    .ok_or(ValidatorHistoryError::ArithmeticError)?,
             )
             .ok_or(ValidatorHistoryError::ArithmeticError)?
     };
 
     let last_full_block_slot = end_slot
-        .checked_sub((end_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE)
+        .checked_sub(end_slot % BITVEC_BLOCK_SIZE)
         .ok_or(ValidatorHistoryError::ArithmeticError)?;
 
     // First and last slots, in partial blocks
