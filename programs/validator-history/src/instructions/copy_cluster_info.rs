@@ -49,7 +49,8 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
             confirmed_blocks_in_epoch(start_slot, end_slot, *slot_history)?;
         // Sets the slot history for the previous epoch, since the total number of blocks in the epoch is now final
         cluster_history_account.set_blocks(epoch - 1, num_blocks)?;
-        // recreates SlotHistory with same heap memory chunk
+        // The original bits are consumed by the set_blocks method, so this recreates
+        // SlotHistory with same heap memory chunk, with no modifications
         Box::new(SlotHistory {
             bits: bitvec_inner.into(),
             next_slot: slot_history_next_slot,
