@@ -6,11 +6,11 @@ use {
     },
     solana_program_test::*,
     solana_sdk::{
-        clock::Clock, compute_budget::ComputeBudgetInstruction, signer::Signer,
-        transaction::Transaction,
+        clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
+        signer::Signer, transaction::Transaction,
     },
     tests::fixtures::TestFixture,
-    validator_history::ClusterHistory,
+    validator_history::{confirmed_blocks_in_epoch, ClusterHistory},
 };
 
 const MS_PER_SLOT: u64 = 400;
@@ -27,7 +27,7 @@ fn create_copy_cluster_history_transaction(fixture: &TestFixture) -> Transaction
         .to_account_metas(None),
     };
     let heap_request_ix = ComputeBudgetInstruction::request_heap_frame(256 * 1024);
-    let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(300_000);
+    let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_000_000);
 
     Transaction::new_signed_with_payer(
         &[heap_request_ix, compute_budget_ix, instruction],
@@ -119,4 +119,71 @@ async fn test_start_epoch_timestamp() {
         account.history.arr[0].epoch_start_timestamp,
         account.history.arr[1].epoch_start_timestamp - dif_slots * MS_PER_SLOT
     );
+}
+
+#[tokio::test]
+async fn test_cluster_history_compute_limit() {
+    // Initialize
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_cluster_history_account().await;
+
+    // Set EpochSchedule with 432,000 slots
+    let epoch_schedule = EpochSchedule::default();
+    ctx.borrow_mut().set_sysvar(&epoch_schedule);
+
+    fixture
+        .advance_num_epochs(epoch_schedule.first_normal_epoch + 1)
+        .await;
+    fixture
+        .advance_clock(epoch_schedule.first_normal_epoch + 1, 400)
+        .await;
+
+    let clock: Clock = ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .expect("clock");
+    println!("epoch: {}", clock.epoch);
+
+    // Set SlotHistory sysvar
+    let mut slot_history = SlotHistory::default();
+    for i in epoch_schedule.get_first_slot_in_epoch(clock.epoch - 1)
+        ..=epoch_schedule.get_last_slot_in_epoch(clock.epoch)
+    {
+        if i % 2 == 0 {
+            slot_history.add(i);
+        }
+    }
+
+    ctx.borrow_mut().set_sysvar(&slot_history);
+
+    // Submit instruction
+    let transaction = create_copy_cluster_history_transaction(&fixture);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ClusterHistory = fixture
+        .load_and_deserialize(&fixture.cluster_history_account)
+        .await;
+
+    assert!(account.history.arr[0].epoch as u64 == clock.epoch - 1);
+    assert!(account.history.arr[0].total_blocks == 216_000);
+    assert!(account.history.arr[1].epoch as u64 == clock.epoch);
+    assert!(account.history.arr[1].total_blocks == 216_000);
+}
+
+// Non-fixture test to ensure that the SlotHistory partial slot logic works
+#[test]
+fn test_confirmed_blocks_in_epoch_partial_blocks() {
+    let mut slot_history = SlotHistory::default();
+    for i in 50..=149 {
+        slot_history.add(i);
+    }
+    // First partial block: 50 -> 64
+    // Full block: 64 -> 127
+    // Last partial block: 128 -> 149
+    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 149, Box::new(slot_history)).unwrap();
+    assert_eq!(num_blocks, 100);
 }
