@@ -34,7 +34,6 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let slot_history: Box<SlotHistory> =
         Box::new(bincode::deserialize(&ctx.accounts.slot_history.try_borrow_data()?).unwrap());
 
-    sol_log_compute_units();
     let clock = Clock::get()?;
 
     let epoch = cast_epoch(clock.epoch)?;
@@ -83,7 +82,6 @@ pub fn confirmed_blocks_in_epoch(
     // with `.count_ones()`.
     // The epoch is not guaranteed to align perfectly with Blocks so we need to count the first and last partial Blocks separately.
     // The bitvec inner data is taken ownership of, then returned to be reused.
-
     let mut blocks_in_epoch = 0;
 
     let first_full_block_slot = if (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {

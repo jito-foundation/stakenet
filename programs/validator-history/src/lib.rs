@@ -14,11 +14,11 @@ pub use state::*;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "mainnet-beta")] {
-        declare_id!("HisTBTgDnsdxfMp3m63fgKxCx9xVQE17MhA9BWRdrAP");
+        declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");
     } else if #[cfg(feature = "testnet")] {
         declare_id!("HisTBTgDnsdxfMp3m63fgKxCx9xVQE17MhA9BWRdrAP");
     } else {
-        declare_id!("HisTBTgDnsdxfMp3m63fgKxCx9xVQE17MhA9BWRdrAP");
+        declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");
     }
 }
 
