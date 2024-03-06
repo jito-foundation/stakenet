@@ -8,7 +8,6 @@ use {
         prelude::*,
         solana_program::{
             clock::Clock,
-            log::sol_log_compute_units,
             slot_history::{Check, MAX_ENTRIES},
         },
     },
@@ -47,7 +46,7 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
         let start_slot = epoch_schedule.get_first_slot_in_epoch((epoch - 1).into());
         let end_slot = epoch_schedule.get_last_slot_in_epoch((epoch - 1).into());
         let (num_blocks, bitvec_inner) =
-            confirmed_blocks_in_epoch(start_slot, end_slot, slot_history)?;
+            confirmed_blocks_in_epoch(start_slot, end_slot, *slot_history)?;
         // Sets the slot history for the previous epoch, since the total number of blocks in the epoch is now final
         cluster_history_account.set_blocks(epoch - 1, num_blocks)?;
         // recreates SlotHistory with same heap memory chunk
@@ -61,7 +60,7 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
 
     let start_slot = epoch_schedule.get_first_slot_in_epoch(epoch.into());
     let end_slot = epoch_schedule.get_last_slot_in_epoch(epoch.into());
-    let (num_blocks, _) = confirmed_blocks_in_epoch(start_slot, end_slot, slot_history)?;
+    let (num_blocks, _) = confirmed_blocks_in_epoch(start_slot, end_slot, *slot_history)?;
     cluster_history_account.set_blocks(epoch, num_blocks)?;
     cluster_history_account.set_epoch_start_timestamp(epoch, epoch_start_timestamp)?;
 
@@ -75,7 +74,7 @@ const BITVEC_BLOCK_SIZE: u64 = 64;
 pub fn confirmed_blocks_in_epoch(
     start_slot: u64,
     end_slot: u64,
-    slot_history: Box<SlotHistory>,
+    slot_history: SlotHistory,
 ) -> Result<(u32, Box<[u64]>)> {
     // The SlotHistory BitVec wraps a slice of "Blocks", usizes representing 64 slots each (different than solana blocks).
     // Iterating through each slot uses too much compute, but we can count the bits of each u64 altogether efficiently
@@ -87,7 +86,7 @@ pub fn confirmed_blocks_in_epoch(
     let first_full_block_slot = if (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {
         start_slot
     } else {
-        start_slot + (64 - (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE)
+        start_slot + (BITVEC_BLOCK_SIZE - (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE)
     };
 
     let last_full_block_slot = if (end_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {

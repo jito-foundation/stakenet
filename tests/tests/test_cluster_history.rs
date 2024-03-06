@@ -146,7 +146,6 @@ async fn test_cluster_history_compute_limit() {
         .get_sysvar()
         .await
         .expect("clock");
-    println!("epoch: {}", clock.epoch);
 
     // Set SlotHistory sysvar
     let mut slot_history = SlotHistory::default();
@@ -184,6 +183,6 @@ fn test_confirmed_blocks_in_epoch_partial_blocks() {
     // First partial block: 50 -> 64
     // Full block: 64 -> 127
     // Last partial block: 128 -> 149
-    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 149, Box::new(slot_history)).unwrap();
+    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 149, slot_history).unwrap();
     assert_eq!(num_blocks, 100);
 }
