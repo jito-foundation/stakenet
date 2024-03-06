@@ -5877,6 +5877,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "bincode",
+ "bv",
  "bytemuck",
  "cfg-if",
  "ed25519-dalek",
