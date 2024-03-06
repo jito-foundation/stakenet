@@ -77,23 +77,29 @@ pub fn confirmed_blocks_in_epoch(
     slot_history: SlotHistory,
 ) -> Result<(u32, Box<[u64]>)> {
     // The SlotHistory BitVec wraps a slice of "Blocks", usizes representing 64 slots each (different than solana blocks).
+    // It contains the last 1,048,576 slots, which means it always has all slots from the previous and current epoch.
     // Iterating through each slot uses too much compute, but we can count the bits of each u64 altogether efficiently
     // with `.count_ones()`.
     // The epoch is not guaranteed to align perfectly with Blocks so we need to count the first and last partial Blocks separately.
     // The bitvec inner data is taken ownership of, then returned to be reused.
-    let mut blocks_in_epoch = 0;
+    let mut blocks_in_epoch: u32 = 0;
 
     let first_full_block_slot = if (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {
         start_slot
     } else {
-        start_slot + (BITVEC_BLOCK_SIZE - (start_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE)
+        start_slot
+            .checked_add(
+                (BITVEC_BLOCK_SIZE
+                    .checked_sub(start_slot % MAX_ENTRIES)
+                    .ok_or(ValidatorHistoryError::ArithmeticError)?)
+                    % BITVEC_BLOCK_SIZE,
+            )
+            .ok_or(ValidatorHistoryError::ArithmeticError)?
     };
 
-    let last_full_block_slot = if (end_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE == 0 {
-        end_slot
-    } else {
-        end_slot - (end_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE
-    };
+    let last_full_block_slot = end_slot
+        .checked_sub((end_slot % MAX_ENTRIES) % BITVEC_BLOCK_SIZE)
+        .ok_or(ValidatorHistoryError::ArithmeticError)?;
 
     // First and last slots, in partial blocks
     for i in (start_slot..first_full_block_slot).chain(last_full_block_slot..=end_slot) {
@@ -117,7 +123,9 @@ pub fn confirmed_blocks_in_epoch(
 
     for i in (first_full_block_slot..last_full_block_slot).step_by(BITVEC_BLOCK_SIZE as usize) {
         let block_index = (i % MAX_ENTRIES) / BITVEC_BLOCK_SIZE;
-        blocks_in_epoch += inner_bitvec[block_index as usize].count_ones();
+        blocks_in_epoch = blocks_in_epoch
+            .checked_add(inner_bitvec[block_index as usize].count_ones())
+            .ok_or(ValidatorHistoryError::ArithmeticError)?;
     }
 
     Ok((blocks_in_epoch, inner_bitvec))
