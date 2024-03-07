@@ -74,13 +74,15 @@ async fn test_copy_cluster_info() {
         .await
         .expect("clock");
 
-    assert!(clock.epoch == 1);
     assert!(account.history.idx == 1);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].total_blocks == 3);
+    assert!(clock.epoch == 1);
+    assert!(clock.slot == 32);
+    assert!(clock.slot == latest_slot);
+    assert!(account.cluster_history_last_update_slot == latest_slot);
     assert!(account.history.arr[1].epoch == 1);
-    assert!(account.history.arr[1].total_blocks == 2);
-    assert_eq!(account.cluster_history_last_update_slot, latest_slot)
+    assert!(account.history.arr[1].total_blocks == 1);
 }
 
 #[tokio::test]
@@ -170,7 +172,7 @@ async fn test_cluster_history_compute_limit() {
     assert!(account.history.arr[0].epoch as u64 == clock.epoch - 1);
     assert!(account.history.arr[0].total_blocks == 216_000);
     assert!(account.history.arr[1].epoch as u64 == clock.epoch);
-    assert!(account.history.arr[1].total_blocks == 216_000);
+    assert!(account.history.arr[1].total_blocks == 1);
 }
 
 // Non-fixture test to ensure that the SlotHistory partial slot logic works
@@ -183,6 +185,18 @@ fn test_confirmed_blocks_in_epoch_partial_blocks() {
     // First partial block: 50 -> 64
     // Full block: 64 -> 127
     // Last partial block: 128 -> 149
-    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 149, slot_history).unwrap();
+    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 149, slot_history.clone()).unwrap();
     assert_eq!(num_blocks, 100);
+
+    let (num_blocks, _) = confirmed_blocks_in_epoch(50, 99, slot_history.clone()).unwrap();
+    assert_eq!(num_blocks, 50);
+
+    let (num_blocks, _) = confirmed_blocks_in_epoch(64, 127, slot_history.clone()).unwrap();
+    assert_eq!(num_blocks, 64);
+
+    let (num_blocks, _) = confirmed_blocks_in_epoch(64, 64, slot_history.clone()).unwrap();
+    assert_eq!(num_blocks, 1);
+
+    let (num_blocks, _) = confirmed_blocks_in_epoch(100, 149, slot_history.clone()).unwrap();
+    assert_eq!(num_blocks, 50);
 }
