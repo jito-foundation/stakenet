@@ -18,7 +18,7 @@ pub async fn update_cluster_info(
 
     let heap_request_ix = compute_budget::ComputeBudgetInstruction::request_heap_frame(256 * 1024);
     let compute_budget_ix =
-        compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(1_000_000);
+        compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
     let update_instruction = Instruction {
         program_id: *program_id,
         accounts: validator_history::accounts::CopyClusterInfo {

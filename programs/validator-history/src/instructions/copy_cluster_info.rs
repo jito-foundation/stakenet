@@ -60,8 +60,7 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
     };
 
     let start_slot = epoch_schedule.get_first_slot_in_epoch(epoch.into());
-    let end_slot = epoch_schedule.get_last_slot_in_epoch(epoch.into());
-    let (num_blocks, _) = confirmed_blocks_in_epoch(start_slot, end_slot, *slot_history)?;
+    let (num_blocks, _) = confirmed_blocks_in_epoch(start_slot, clock.slot, *slot_history)?;
     cluster_history_account.set_blocks(epoch, num_blocks)?;
     cluster_history_account.set_epoch_start_timestamp(epoch, epoch_start_timestamp)?;
 
@@ -95,11 +94,13 @@ pub fn confirmed_blocks_in_epoch(
                     .ok_or(ValidatorHistoryError::ArithmeticError)?,
             )
             .ok_or(ValidatorHistoryError::ArithmeticError)?
+            .min(end_slot)
     };
 
     let last_full_block_slot = end_slot
         .checked_sub(end_slot % BITVEC_BLOCK_SIZE)
-        .ok_or(ValidatorHistoryError::ArithmeticError)?;
+        .ok_or(ValidatorHistoryError::ArithmeticError)?
+        .max(first_full_block_slot);
 
     // First and last slots, in partial blocks
     for i in (start_slot..first_full_block_slot).chain(last_full_block_slot..=end_slot) {

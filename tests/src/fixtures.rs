@@ -264,6 +264,7 @@ impl TestFixture {
 
         clock.epoch_start_timestamp += (dif_slots * ms_per_slot) as i64;
         clock.unix_timestamp += (dif_slots * ms_per_slot) as i64;
+        clock.slot += dif_slots;
         self.ctx.borrow_mut().set_sysvar(&clock);
 
         dif_slots
