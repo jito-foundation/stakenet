@@ -643,6 +643,7 @@ impl ValidatorHistory {
     }
 }
 
+#[derive(AnchorSerialize)]
 #[account(zero_copy)]
 pub struct ClusterHistory {
     pub struct_version: u64,
@@ -653,6 +654,7 @@ pub struct ClusterHistory {
     pub history: CircBufCluster,
 }
 
+#[derive(AnchorSerialize)]
 #[zero_copy]
 pub struct ClusterHistoryEntry {
     pub total_blocks: u32,
@@ -674,6 +676,7 @@ impl Default for ClusterHistoryEntry {
     }
 }
 
+#[derive(AnchorSerialize)]
 #[zero_copy]
 pub struct CircBufCluster {
     pub idx: u64,

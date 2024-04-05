@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError};
+use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     compute_budget, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
@@ -30,9 +30,9 @@ pub async fn update_cluster_info(
         data: validator_history::instruction::CopyClusterInfo {}.data(),
     };
 
-    submit_instructions(
+    submit_transactions(
         &client,
-        vec![heap_request_ix, compute_budget_ix, update_instruction],
+        vec![vec![heap_request_ix, compute_budget_ix, update_instruction]],
         &keypair,
     )
     .await
