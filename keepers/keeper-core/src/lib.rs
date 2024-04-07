@@ -9,6 +9,7 @@ use log::*;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::hash::Hash;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::packet::PACKET_DATA_SIZE;
 use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
@@ -365,6 +366,7 @@ pub async fn parallel_execute_instructions(
     signer: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
+    microlamports: u64,
 ) -> Result<Vec<Result<(), SendTransactionError>>, TransactionExecutionError> {
     /*
         Note: Assumes all instructions are equivalent in compute, equivalent in size, and can be executed in any order
@@ -383,8 +385,20 @@ pub async fn parallel_execute_instructions(
 
     let instructions_per_tx = calculate_instructions_per_tx(client, instructions, signer)
         .await
-        .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
-    let transactions: Vec<&[Instruction]> = instructions.chunks(instructions_per_tx).collect();
+        .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?
+        - 1;
+
+    let mut transactions: Vec<Vec<Instruction>> = instructions
+        .chunks(instructions_per_tx)
+        .map(|c| c.to_vec())
+        .collect();
+    for tx in transactions.iter_mut() {
+        tx.insert(
+            0,
+            ComputeBudgetInstruction::set_compute_unit_price(microlamports).into(),
+        );
+    }
+    let transactions: Vec<&[Instruction]> = transactions.iter().map(|c| c.as_slice()).collect();
 
     parallel_execute_transactions(
         client,
@@ -456,9 +470,11 @@ pub async fn submit_instructions(
     client: &Arc<RpcClient>,
     instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
+    microlamports: u64,
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    match parallel_execute_instructions(client, &instructions, keypair, 10, 30).await {
+    match parallel_execute_instructions(client, &instructions, keypair, 10, 30, microlamports).await
+    {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
             stats.errors = results.len() as u64 - stats.successes;
@@ -474,9 +490,10 @@ pub async fn submit_create_and_update(
     create_transactions: Vec<Vec<Instruction>>,
     update_instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
+    microlamports: u64,
 ) -> Result<CreateUpdateStats, TransactionExecutionError> {
     Ok(CreateUpdateStats {
         creates: submit_transactions(client, create_transactions, keypair).await?,
-        updates: submit_instructions(client, update_instructions, keypair).await?,
+        updates: submit_instructions(client, update_instructions, keypair, microlamports).await?,
     })
 }

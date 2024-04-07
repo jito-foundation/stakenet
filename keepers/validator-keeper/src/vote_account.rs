@@ -18,7 +18,7 @@ use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
 use validator_history::Config;
 
-use crate::{get_validator_history_accounts_with_retry, KeeperError};
+use crate::{get_validator_history_accounts_with_retry, KeeperError, PRIORITY_FEE};
 
 pub struct CopyVoteAccountEntry {
     pub vote_account: Pubkey,
@@ -162,6 +162,7 @@ pub async fn update_vote_accounts(
         create_transactions,
         update_instructions,
         &keypair,
+        PRIORITY_FEE,
     )
     .await;
 

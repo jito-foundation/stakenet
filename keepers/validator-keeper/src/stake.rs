@@ -22,7 +22,7 @@ use validator_history::{
     state::{Config, ValidatorHistory},
 };
 
-use crate::KeeperError;
+use crate::{KeeperError, PRIORITY_FEE};
 
 pub struct StakeHistoryEntry {
     pub stake: u64,
@@ -218,9 +218,15 @@ pub async fn update_stake_history(
     let (create_transactions, update_instructions) =
         build_create_and_update_instructions(&client, &stake_history_entries).await?;
 
-    submit_create_and_update(&client, create_transactions, update_instructions, &keypair)
-        .await
-        .map_err(|e| e.into())
+    submit_create_and_update(
+        &client,
+        create_transactions,
+        update_instructions,
+        &keypair,
+        PRIORITY_FEE,
+    )
+    .await
+    .map_err(|e| e.into())
 }
 
 /*
@@ -311,7 +317,7 @@ pub async fn _recompute_superminority_and_rank(
             .map(|entry| entry.update_instruction())
             .collect::<Vec<_>>();
 
-        match submit_instructions(&client, update_instructions, &keypair).await {
+        match submit_instructions(&client, update_instructions, &keypair, PRIORITY_FEE).await {
             Ok(_) => println!("completed epoch {}", epoch),
             Err(e) => return Err(e.into()),
         };
