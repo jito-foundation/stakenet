@@ -116,17 +116,31 @@ pub async fn get_multiple_accounts_batched(
 async fn get_latest_blockhash_with_retry(client: &RpcClient) -> Result<Hash, ClientError> {
     for _ in 1..4 {
         let result = client
-            .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
+            .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
             .await;
         if result.is_ok() {
             return Ok(result?.0);
         }
     }
     Ok(client
-        .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
+        .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
         .await?
         .0)
 }
+
+// async fn get_global_priority_fee_with_retry(client: &RpcClient) -> Result<u64, ClientError> {
+//     for _ in 1..4 {
+//         let result = client.get_recent_prioritization_fees(&[]).await;
+//         if result.is_ok() {
+//             if let Some(fee) = result?.last() {
+//                 return Ok(fee.prioritization_fee);
+//             } else {
+//                 return Ok(0);
+//             }
+//         }
+//     }
+//     Ok(client.get_fee_rate_governor().await?.value.min_priority_fee)
+// }
 
 pub async fn get_multiple_accounts_with_retry(
     client: &RpcClient,
@@ -339,7 +353,7 @@ pub async fn parallel_execute_transactions(
 
         if is_blockhash_not_found
             || !client
-                .is_blockhash_valid(&blockhash, CommitmentConfig::processed())
+                .is_blockhash_valid(&blockhash, CommitmentConfig::confirmed())
                 .await
                 .map_err(|e| {
                     TransactionExecutionError::TransactionClientError(
@@ -455,7 +469,7 @@ pub async fn submit_transactions(
         .map(|t| t.as_slice())
         .collect::<Vec<_>>();
 
-    match parallel_execute_transactions(client, &tx_slice, keypair, 10, 30).await {
+    match parallel_execute_transactions(client, &tx_slice, keypair, 100, 20).await {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
             stats.errors = results.len() as u64 - stats.successes;
@@ -473,7 +487,8 @@ pub async fn submit_instructions(
     microlamports: u64,
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    match parallel_execute_instructions(client, &instructions, keypair, 10, 30, microlamports).await
+    match parallel_execute_instructions(client, &instructions, keypair, 100, 20, microlamports)
+        .await
     {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
