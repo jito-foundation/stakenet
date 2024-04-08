@@ -116,14 +116,14 @@ pub async fn get_multiple_accounts_batched(
 async fn get_latest_blockhash_with_retry(client: &RpcClient) -> Result<Hash, ClientError> {
     for _ in 1..4 {
         let result = client
-            .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
+            .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
             .await;
         if result.is_ok() {
             return Ok(result?.0);
         }
     }
     Ok(client
-        .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
+        .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
         .await?
         .0)
 }
@@ -353,7 +353,7 @@ pub async fn parallel_execute_transactions(
 
         if is_blockhash_not_found
             || !client
-                .is_blockhash_valid(&blockhash, CommitmentConfig::confirmed())
+                .is_blockhash_valid(&blockhash, CommitmentConfig::processed())
                 .await
                 .map_err(|e| {
                     TransactionExecutionError::TransactionClientError(
