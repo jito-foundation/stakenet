@@ -323,7 +323,6 @@ pub async fn parallel_execute_transactions(
                 Err(e) => match e.get_transaction_error() {
                     Some(TransactionError::BlockhashNotFound) => {
                         is_blockhash_not_found = true;
-                        break;
                     }
                     Some(TransactionError::AlreadyProcessed) => {
                         submitted_signatures.insert(tx.signatures[0], idx);
