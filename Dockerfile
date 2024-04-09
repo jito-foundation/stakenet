@@ -21,3 +21,4 @@ ENV APP="validator-keeper"
 COPY --from=builder /usr/src/app/target/release/$APP ./$APP
 
 ENTRYPOINT ./$APP
+ 
