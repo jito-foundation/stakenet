@@ -24,9 +24,10 @@ Note that this is a `zero_copy` account, which allows us to initialize a lot of 
 
 ## Test
 
-Tests are in `tests/` written with solana-program-test. 
+Tests are in `tests/` written with solana-program-test.
 
 One should run their tests in the SBF interpreter. That can be done with the following:
+
 ```shell
 $ anchor build && SBF_OUT_DIR=$(pwd)/target/deploy cargo test
 ```
@@ -48,9 +49,9 @@ Run as binary:
 
 Build: `cargo b -r --package validator-keeper`
 
-Run: `./target/release/validator-keeper --json-rpc-url <YOUR RPC> --cluster mainnet --tip-distribution-program-id F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa --interval 600 --keypair <YOUR KEYPAIR> --gossip-entrypoint <GOSSIP ENDPOINT>`
+Run: `./target/release/validator-keeper --json-rpc-url <YOUR RPC> --cluster mainnet --tip-distribution-program-id F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa --interval 600 --keypair <YOUR KEYPAIR>`
 
-Run as docker container:
+Run as docker container (need to set environment variables in config/.env file):
 
 `docker compose --env-file config/.env up -d --build  validator-keeper`
 
