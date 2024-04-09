@@ -41,7 +41,7 @@ struct Args {
 
     /// Gossip entrypoint in the form of URL:PORT
     #[arg(short, long, env)]
-    gossip_entrypoint: String,
+    gossip_entrypoint: Option<String>,
 
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
@@ -49,7 +49,7 @@ struct Args {
 
     /// Path to keypair used specifically for submitting stake upload transactions
     #[arg(short, long, env)]
-    stake_upload_keypair: Option<PathBuf>,
+    oracle_authority_keypair: Option<PathBuf>,
 
     /// Validator history program ID (Pubkey as base58 string)
     #[arg(short, long, env)]
@@ -487,8 +487,6 @@ async fn main() {
         Duration::from_secs(60),
     ));
     let keypair = Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
-    let entrypoint = solana_net_utils::parse_host_port(&args.gossip_entrypoint)
-        .expect("Failed to parse host and port from gossip entrypoint");
 
     info!("Starting validator history keeper...");
 
@@ -512,18 +510,6 @@ async fn main() {
         args.interval,
     ));
 
-    if let Some(stake_upload_keypair) = args.stake_upload_keypair {
-        let stake_upload_keypair = Arc::new(
-            read_keypair_file(stake_upload_keypair).expect("Failed reading stake keypair file"),
-        );
-        tokio::spawn(stake_upload_loop(
-            Arc::clone(&client),
-            Arc::clone(&stake_upload_keypair),
-            args.program_id,
-            args.interval,
-        ));
-    }
-
     tokio::spawn(mev_commission_loop(
         client.clone(),
         keypair.clone(),
@@ -539,5 +525,34 @@ async fn main() {
         args.tip_distribution_program_id,
         args.interval,
     ));
-    gossip_upload_loop(client, keypair, args.program_id, entrypoint, args.interval).await;
+
+    if let Some(oracle_authority_keypair) = args.oracle_authority_keypair {
+        let oracle_authority_keypair = Arc::new(
+            read_keypair_file(oracle_authority_keypair).expect("Failed reading stake keypair file"),
+        );
+        tokio::spawn(stake_upload_loop(
+            Arc::clone(&client),
+            Arc::clone(&oracle_authority_keypair),
+            args.program_id,
+            args.interval,
+        ));
+
+        if let Some(gossip_entrypoint) = args.gossip_entrypoint {
+            let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
+                .expect("Failed to parse host and port from gossip entrypoint");
+            // Cannot be sent to thread because there's a Box<dyn Error> inside
+            gossip_upload_loop(
+                client.clone(),
+                oracle_authority_keypair,
+                args.program_id,
+                entrypoint,
+                args.interval,
+            )
+            .await;
+        }
+    }
+    // Need final infinite loop to keep all threads alive
+    loop {
+        sleep(Duration::from_secs(60)).await;
+    }
 }
