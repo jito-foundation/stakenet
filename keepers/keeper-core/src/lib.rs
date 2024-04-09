@@ -128,20 +128,6 @@ async fn get_latest_blockhash_with_retry(client: &RpcClient) -> Result<Hash, Cli
         .0)
 }
 
-// async fn get_global_priority_fee_with_retry(client: &RpcClient) -> Result<u64, ClientError> {
-//     for _ in 1..4 {
-//         let result = client.get_recent_prioritization_fees(&[]).await;
-//         if result.is_ok() {
-//             if let Some(fee) = result?.last() {
-//                 return Ok(fee.prioritization_fee);
-//             } else {
-//                 return Ok(0);
-//             }
-//         }
-//     }
-//     Ok(client.get_fee_rate_governor().await?.value.min_priority_fee)
-// }
-
 pub async fn get_multiple_accounts_with_retry(
     client: &RpcClient,
     pubkeys: &[Pubkey],
