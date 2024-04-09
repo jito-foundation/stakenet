@@ -408,7 +408,7 @@ pub async fn parallel_execute_instructions(
     for tx in transactions.iter_mut() {
         tx.insert(
             0,
-            ComputeBudgetInstruction::set_compute_unit_price(microlamports).into(),
+            ComputeBudgetInstruction::set_compute_unit_price(microlamports),
         );
     }
     let transactions: Vec<&[Instruction]> = transactions.iter().map(|c| c.as_slice()).collect();
