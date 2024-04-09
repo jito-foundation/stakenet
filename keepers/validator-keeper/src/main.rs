@@ -47,7 +47,7 @@ struct Args {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair: PathBuf,
 
-    /// Path to keypair used specifically for submitting stake upload transactions
+    /// Path to keypair used specifically for submitting permissioned transactions
     #[arg(short, long, env)]
     oracle_authority_keypair: Option<PathBuf>,
 
