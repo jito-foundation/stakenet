@@ -181,7 +181,7 @@ pub async fn update_mev_earned(
 
     let vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None).await?;
     let validator_histories =
-        get_validator_history_accounts_with_retry(&client, *validator_history_program_id).await?;
+        get_validator_history_accounts_with_retry(client, *validator_history_program_id).await?;
 
     let validator_history_map =
         HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));

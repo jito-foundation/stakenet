@@ -4,7 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use clap::{arg, command, Parser};
 use keeper_core::{Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError};
@@ -13,7 +13,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::{datapoint_error, set_host_id};
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair},
+    signature::{read_keypair_file, Keypair, Signer},
 };
 use tokio::time::sleep;
 use validator_keeper::{
@@ -67,9 +67,14 @@ struct Args {
     cluster: Cluster,
 }
 
-async fn monitoring_loop(client: Arc<RpcClient>, program_id: Pubkey, interval: u64) {
+async fn monitoring_loop(
+    client: Arc<RpcClient>,
+    program_id: Pubkey,
+    keeper_address: Pubkey,
+    interval: u64,
+) {
     loop {
-        match emit_validator_history_metrics(&client, program_id).await {
+        match emit_validator_history_metrics(&client, program_id, keeper_address).await {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to emit validator history metrics: {}", e);
@@ -481,6 +486,7 @@ async fn main() {
     tokio::spawn(monitoring_loop(
         Arc::clone(&client),
         args.program_id,
+        keypair.pubkey(),
         args.interval,
     ));
 
