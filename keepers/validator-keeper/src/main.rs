@@ -86,10 +86,6 @@ async fn mev_commission_loop(
     tip_distribution_program_id: Pubkey,
     interval: u64,
 ) {
-    let mut prev_epoch = 0;
-    // {TipDistributionAccount : VoteAccount}
-    let mut validators_updated: HashMap<Pubkey, Pubkey> = HashMap::new();
-
     loop {
         // Continuously runs throughout an epoch, polling for new tip distribution accounts
         // and submitting update txs when new accounts are detected
@@ -98,8 +94,6 @@ async fn mev_commission_loop(
             keypair.clone(),
             &commission_history_program_id,
             &tip_distribution_program_id,
-            &mut validators_updated,
-            &mut prev_epoch,
         )
         .await
         {
@@ -141,10 +135,6 @@ async fn mev_earned_loop(
     tip_distribution_program_id: Pubkey,
     interval: u64,
 ) {
-    let mut curr_epoch = 0;
-    // {TipDistributionAccount : VoteAccount}
-    let mut validators_updated: HashMap<Pubkey, Pubkey> = HashMap::new();
-
     loop {
         // Continuously runs throughout an epoch, polling for tip distribution accounts from the prev epoch with uploaded merkle roots
         // and submitting update_mev_earned (technically update_mev_comission) txs when the uploaded merkle roots are detected
@@ -153,8 +143,6 @@ async fn mev_earned_loop(
             &keypair,
             &commission_history_program_id,
             &tip_distribution_program_id,
-            &mut validators_updated,
-            &mut curr_epoch,
         )
         .await
         {

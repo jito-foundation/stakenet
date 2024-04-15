@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::{
@@ -31,7 +32,7 @@ use tokio::time::sleep;
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
-    Config, ValidatorHistory,
+    Config, ValidatorHistory, ValidatorHistoryEntry,
 };
 
 use crate::{get_validator_history_accounts_with_retry, start_spy_server};
@@ -293,6 +294,12 @@ pub async fn upload_gossip_values(
     let validator_history_accounts =
         get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
+    let validator_history_map = HashMap::from_iter(
+        validator_history_accounts
+            .iter()
+            .map(|vh| (vh.vote_account, vh)),
+    );
+
     // Wait for all active validators to be received
     sleep(Duration::from_secs(30)).await;
 
@@ -321,10 +328,19 @@ pub async fn upload_gossip_values(
 
     exit.store(true, Ordering::Relaxed);
 
+    let epoch = client.get_epoch_info().await?.epoch;
+
     let addresses = gossip_entries
         .iter()
-        .map(|a| a.address())
+        .filter_map(|a| {
+            if gossip_data_uploaded(&validator_history_map, a.address(), epoch) {
+                None
+            } else {
+                Some(a.address())
+            }
+        })
         .collect::<Vec<Pubkey>>();
+
     let existing_accounts_response = get_multiple_accounts_batched(&addresses, &client).await?;
 
     let create_transactions = existing_accounts_response
@@ -348,6 +364,27 @@ pub async fn upload_gossip_values(
         creates: submit_transactions(&client, create_transactions, &keypair).await?,
         updates: submit_transactions(&client, update_transactions, &keypair).await?,
     })
+}
+
+fn gossip_data_uploaded(
+    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
+    vote_account: Pubkey,
+    epoch: u64,
+) -> bool {
+    let validator_history = validator_history_map.get(&vote_account);
+    if validator_history.is_none() {
+        return false;
+    }
+
+    let validator_history = validator_history.unwrap();
+
+    if let Some(latest_entry) = validator_history.history.last() {
+        return latest_entry.epoch == epoch as u16
+            && latest_entry.ip != ValidatorHistoryEntry::default().ip
+            && latest_entry.version.major != ValidatorHistoryEntry::default().version.major
+            && latest_entry.client_type != ValidatorHistoryEntry::default().client_type;
+    }
+    false
 }
 
 // CODE BELOW SLIGHTLY MODIFIED FROM

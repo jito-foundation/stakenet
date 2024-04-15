@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -111,9 +111,12 @@ pub async fn update_vote_accounts(
         get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
             .await?;
 
-    let vote_account_pubkeys = validator_histories
-        .iter()
-        .map(|vh| vh.vote_account)
+    let validator_history_map =
+        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
+
+    let vote_account_pubkeys = validator_history_map
+        .clone()
+        .into_keys()
         .collect::<Vec<_>>();
 
     let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, &rpc_client).await?;
@@ -146,8 +149,13 @@ pub async fn update_vote_accounts(
         .chain(validator_histories.iter().map(|vh| vh.vote_account))
         .collect::<HashSet<_>>();
 
+    let slot = rpc_client.get_epoch_info().await?.absolute_slot;
     // Remove closed vote accounts from all vote accounts
-    all_vote_accounts.retain(|va| !closed_vote_accounts.contains(va));
+    // Remove vote accounts for which this instruction has been called within 50,000 slots
+    all_vote_accounts.retain(|va| {
+        !closed_vote_accounts.contains(va)
+            && !vote_account_uploaded_recently(&validator_history_map, va, slot)
+    });
 
     let entries = all_vote_accounts
         .iter()
@@ -167,4 +175,26 @@ pub async fn update_vote_accounts(
     .await;
 
     submit_result.map_err(|e| e.into())
+}
+
+fn vote_account_uploaded_recently(
+    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
+    vote_account: &Pubkey,
+    slot: u64,
+) -> bool {
+    let validator_history = validator_history_map.get(vote_account);
+    if validator_history.is_none() {
+        return false;
+    }
+    let validator_history = validator_history.unwrap();
+
+    if let Some(last_updated_slot) = validator_history
+        .history
+        .vote_account_last_update_slot_latest()
+    {
+        if last_updated_slot > slot - 50000 {
+            return true;
+        }
+    }
+    false
 }
