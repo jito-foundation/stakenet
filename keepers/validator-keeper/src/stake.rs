@@ -349,19 +349,15 @@ fn stake_entry_uploaded(
             e
         })
         .expect("Invalid vote account pubkey");
-    let validator_history = validator_history_map.get(&vote_account);
-    if validator_history.is_none() {
-        return false;
-    }
-
-    let validator_history = validator_history.unwrap();
-
-    if let Some(latest_entry) = validator_history.history.last() {
-        return latest_entry.epoch == epoch as u16
-            && latest_entry.is_superminority != ValidatorHistoryEntry::default().is_superminority
-            && latest_entry.rank != ValidatorHistoryEntry::default().rank
-            && latest_entry.activated_stake_lamports
-                != ValidatorHistoryEntry::default().activated_stake_lamports;
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.is_superminority
+                    != ValidatorHistoryEntry::default().is_superminority
+                && latest_entry.rank != ValidatorHistoryEntry::default().rank
+                && latest_entry.activated_stake_lamports
+                    != ValidatorHistoryEntry::default().activated_stake_lamports;
+        }
     }
     false
 }

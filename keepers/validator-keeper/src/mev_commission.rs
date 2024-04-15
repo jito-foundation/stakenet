@@ -282,16 +282,11 @@ fn mev_commission_uploaded(
     vote_account: Pubkey,
     epoch: u64,
 ) -> bool {
-    let validator_history = validator_history_map.get(&vote_account);
-    if validator_history.is_none() {
-        return false;
-    }
-
-    let validator_history = validator_history.unwrap();
-
-    if let Some(latest_entry) = validator_history.history.last() {
-        return latest_entry.epoch == epoch as u16
-            && latest_entry.mev_commission != ValidatorHistoryEntry::default().mev_commission;
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.mev_commission != ValidatorHistoryEntry::default().mev_commission;
+        }
     }
     false
 }
@@ -301,16 +296,11 @@ fn mev_earned_uploaded(
     vote_account: Pubkey,
     epoch: u64,
 ) -> bool {
-    let validator_history = validator_history_map.get(&vote_account);
-    if validator_history.is_none() {
-        return false;
-    }
-
-    let validator_history = validator_history.unwrap();
-
-    if let Some(latest_entry) = validator_history.history.last() {
-        return latest_entry.epoch == epoch as u16
-            && latest_entry.mev_earned != ValidatorHistoryEntry::default().mev_earned;
-    }
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.mev_earned != ValidatorHistoryEntry::default().mev_earned;
+        }
+    };
     false
 }

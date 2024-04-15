@@ -149,12 +149,17 @@ pub async fn update_vote_accounts(
         .chain(validator_histories.iter().map(|vh| vh.vote_account))
         .collect::<HashSet<_>>();
 
-    let slot = rpc_client.get_epoch_info().await?.absolute_slot;
+    let epoch_info = rpc_client.get_epoch_info().await?;
     // Remove closed vote accounts from all vote accounts
     // Remove vote accounts for which this instruction has been called within 50,000 slots
     all_vote_accounts.retain(|va| {
         !closed_vote_accounts.contains(va)
-            && !vote_account_uploaded_recently(&validator_history_map, va, slot)
+            && !vote_account_uploaded_recently(
+                &validator_history_map,
+                va,
+                epoch_info.epoch,
+                epoch_info.absolute_slot,
+            )
     });
 
     let entries = all_vote_accounts
@@ -180,20 +185,14 @@ pub async fn update_vote_accounts(
 fn vote_account_uploaded_recently(
     validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
     vote_account: &Pubkey,
+    epoch: u64,
     slot: u64,
 ) -> bool {
-    let validator_history = validator_history_map.get(vote_account);
-    if validator_history.is_none() {
-        return false;
-    }
-    let validator_history = validator_history.unwrap();
-
-    if let Some(last_updated_slot) = validator_history
-        .history
-        .vote_account_last_update_slot_latest()
-    {
-        if last_updated_slot > slot - 50000 {
-            return true;
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(entry) = validator_history.history.last() {
+            if entry.epoch == epoch as u16 && entry.vote_account_last_update_slot > slot - 50000 {
+                return true;
+            }
         }
     }
     false

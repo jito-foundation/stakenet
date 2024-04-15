@@ -371,18 +371,13 @@ fn gossip_data_uploaded(
     vote_account: Pubkey,
     epoch: u64,
 ) -> bool {
-    let validator_history = validator_history_map.get(&vote_account);
-    if validator_history.is_none() {
-        return false;
-    }
-
-    let validator_history = validator_history.unwrap();
-
-    if let Some(latest_entry) = validator_history.history.last() {
-        return latest_entry.epoch == epoch as u16
-            && latest_entry.ip != ValidatorHistoryEntry::default().ip
-            && latest_entry.version.major != ValidatorHistoryEntry::default().version.major
-            && latest_entry.client_type != ValidatorHistoryEntry::default().client_type;
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.ip != ValidatorHistoryEntry::default().ip
+                && latest_entry.version.major != ValidatorHistoryEntry::default().version.major
+                && latest_entry.client_type != ValidatorHistoryEntry::default().client_type;
+        }
     }
     false
 }
