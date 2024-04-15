@@ -188,7 +188,7 @@ fn vote_account_uploaded_recently(
     epoch: u64,
     slot: u64,
 ) -> bool {
-    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
         if let Some(entry) = validator_history.history.last() {
             if entry.epoch == epoch as u16 && entry.vote_account_last_update_slot > slot - 50000 {
                 return true;
