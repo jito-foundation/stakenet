@@ -297,7 +297,10 @@ fn mev_earned_uploaded(
     epoch: u64,
 ) -> bool {
     if let Some(validator_history) = validator_history_map.get(&vote_account) {
-        if let Some(latest_entry) = validator_history.history.last() {
+        if let Some(latest_entry) = validator_history
+            .history
+            .epoch_range(epoch as u16, epoch as u16)[0]
+        {
             return latest_entry.epoch == epoch as u16
                 && latest_entry.mev_earned != ValidatorHistoryEntry::default().mev_earned;
         }
