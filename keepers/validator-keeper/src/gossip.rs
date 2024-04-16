@@ -23,6 +23,7 @@ use solana_gossip::{
 };
 use solana_metrics::datapoint_info;
 use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signable, Signature},
@@ -35,7 +36,7 @@ use validator_history::{
     Config, ValidatorHistory, ValidatorHistoryEntry,
 };
 
-use crate::{get_validator_history_accounts_with_retry, start_spy_server};
+use crate::{get_validator_history_accounts_with_retry, start_spy_server, PRIORITY_FEE};
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
@@ -116,12 +117,16 @@ impl CreateTransaction for GossipEntry {
 }
 
 impl GossipEntry {
-    pub fn build_update_tx(&self) -> Vec<Instruction> {
-        let mut ixs = vec![build_verify_signature_ix(
-            self.signature.as_ref(),
-            self.identity.to_bytes(),
-            &self.message,
-        )];
+    pub fn build_update_tx(&self, priority_fee: u64) -> Vec<Instruction> {
+        let mut ixs = vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(100_000),
+            ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
+            build_verify_signature_ix(
+                self.signature.as_ref(),
+                self.identity.to_bytes(),
+                &self.message,
+            ),
+        ];
 
         ixs.push(Instruction {
             program_id: self.program_id,
@@ -362,7 +367,7 @@ pub async fn upload_gossip_values(
 
     let update_transactions = gossip_entries
         .iter()
-        .map(|entry| entry.build_update_tx())
+        .map(|entry| entry.build_update_tx(PRIORITY_FEE))
         .collect::<Vec<_>>();
 
     Ok(CreateUpdateStats {
