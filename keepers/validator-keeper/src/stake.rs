@@ -191,9 +191,16 @@ pub async fn update_stake_history(
     let validator_histories =
         get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
-    let validator_history_map: HashMap<Pubkey, &ValidatorHistory> =
-        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
-
+    let validator_history_map = HashMap::from_iter(validator_histories.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
     let (stake_rank_map, superminority_threshold) =
         get_stake_rank_map_and_superminority_count(&vote_accounts);
 

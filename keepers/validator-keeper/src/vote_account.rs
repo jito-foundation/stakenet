@@ -111,9 +111,16 @@ pub async fn update_vote_accounts(
         get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
             .await?;
 
-    let validator_history_map =
-        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
-
+    let validator_history_map = HashMap::from_iter(validator_histories.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                &validator_history_program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
     let vote_account_pubkeys = validator_history_map
         .clone()
         .into_keys()

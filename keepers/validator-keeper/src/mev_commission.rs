@@ -135,9 +135,16 @@ pub async fn update_mev_commission(
     let validator_histories =
         get_validator_history_accounts_with_retry(&client, *validator_history_program_id).await?;
 
-    let validator_history_map =
-        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
-
+    let validator_history_map = HashMap::from_iter(validator_histories.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                validator_history_program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
     let entries = vote_accounts
         .iter()
         .map(|vote_account| {
@@ -183,9 +190,16 @@ pub async fn update_mev_earned(
     let validator_histories =
         get_validator_history_accounts_with_retry(client, *validator_history_program_id).await?;
 
-    let validator_history_map =
-        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
-
+    let validator_history_map = HashMap::from_iter(validator_histories.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                validator_history_program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
     let entries = vote_accounts
         .iter()
         .map(|vote_account| {

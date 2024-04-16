@@ -294,11 +294,16 @@ pub async fn upload_gossip_values(
     let validator_history_accounts =
         get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
-    let validator_history_map = HashMap::from_iter(
-        validator_history_accounts
-            .iter()
-            .map(|vh| (vh.vote_account, vh)),
-    );
+    let validator_history_map = HashMap::from_iter(validator_history_accounts.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
 
     // Wait for all active validators to be received
     sleep(Duration::from_secs(30)).await;
