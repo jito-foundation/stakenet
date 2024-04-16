@@ -42,7 +42,7 @@ pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
 
-pub const PRIORITY_FEE: u64 = 100_000;
+pub const PRIORITY_FEE: u64 = 200_000;
 
 #[derive(ThisError, Debug)]
 pub enum KeeperError {

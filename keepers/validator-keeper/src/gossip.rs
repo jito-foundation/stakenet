@@ -306,7 +306,7 @@ pub async fn upload_gossip_values(
     }));
 
     // Wait for all active validators to be received
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(150)).await;
 
     let gossip_entries = {
         let crds = cluster_info.gossip.crds.read().map_err(|e| e.to_string())?;
