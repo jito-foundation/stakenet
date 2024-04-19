@@ -16,7 +16,7 @@ use solana_sdk::{signature::Keypair, signer::Signer};
 
 use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
-use validator_history::Config;
+use validator_history::{Config, ValidatorHistoryEntry};
 
 use crate::{get_validator_history_accounts_with_retry, KeeperError, PRIORITY_FEE};
 
@@ -149,6 +149,7 @@ pub async fn update_vote_accounts(
         .collect::<HashSet<_>>();
 
     let epoch_info = rpc_client.get_epoch_info().await?;
+
     // Remove closed vote accounts from all vote accounts
     // Remove vote accounts for which this instruction has been called within 50,000 slots
     all_vote_accounts.retain(|va| {
@@ -189,7 +190,11 @@ fn vote_account_uploaded_recently(
 ) -> bool {
     if let Some(validator_history) = validator_history_map.get(vote_account) {
         if let Some(entry) = validator_history.history.last() {
-            if entry.epoch == epoch as u16 && entry.vote_account_last_update_slot > slot - 50000 {
+            if entry.epoch == epoch as u16
+                && entry.vote_account_last_update_slot
+                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
+                && entry.vote_account_last_update_slot > slot - 50000
+            {
                 return true;
             }
         }
