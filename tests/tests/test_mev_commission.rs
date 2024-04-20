@@ -4,7 +4,7 @@ use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
 use tests::fixtures::{new_tip_distribution_account, TestFixture};
-use validator_history::{Config, ValidatorHistory};
+use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
 
 #[tokio::test]
 async fn test_mev_commission() {
@@ -20,9 +20,10 @@ async fn test_mev_commission() {
         epoch,
     )
     .0;
+    // No MEV earned
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(fixture.vote_account, 42, 123_236_567_899).into(),
+        &new_tip_distribution_account(fixture.vote_account, 42, None).into(),
     );
 
     // update mev commission
@@ -39,31 +40,47 @@ async fn test_mev_commission() {
         .to_account_metas(None),
     };
 
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[instruction.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        blockhash,
     );
 
-    if let Err(e) = ctx
-        .borrow_mut()
-        .banks_client
-        .process_transaction_with_preflight(transaction)
-        .await
-    {
-        panic!("Error: {}", e);
-    }
+    fixture.submit_transaction_assert_success(transaction).await;
 
-    // assert value
+    // assert values, mev earned default
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
     assert!(account.history.idx == 0);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].mev_commission == 42);
+    assert!(account.history.arr[0].mev_earned == ValidatorHistoryEntry::default().mev_earned);
+
+    ctx.borrow_mut().set_account(
+        &tip_distribution_account,
+        &new_tip_distribution_account(fixture.vote_account, 42, Some(123_236_567_899)).into(),
+    );
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    // assert mev earned no longer default
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
     assert!(account.history.arr[0].mev_earned == 12324); // fixed point representation
     assert!((account.history.arr[0].mev_earned as f64 / 100.0) == 123.24_f64);
+
     // TODO this is causing a hash mismatch issue
     // fixture.advance_num_epochs(1).await;
 
@@ -178,7 +195,7 @@ async fn test_mev_commission_fail() {
             .0;
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(new_vote_account, 42, 123456).into(),
+        &new_tip_distribution_account(new_vote_account, 42, Some(123456)).into(),
     );
 
     // test update mev commission with wrong validator's TDA
