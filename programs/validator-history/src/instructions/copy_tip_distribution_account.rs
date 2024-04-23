@@ -3,8 +3,8 @@ use anchor_lang::{prelude::*, solana_program::vote};
 use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
-    utils::cast_epoch,
-    utils::fixed_point_sol,
+    utils::{cast_epoch, fixed_point_sol},
+    ValidatorHistoryEntry,
 };
 
 use jito_tip_distribution::state::TipDistributionAccount;
@@ -64,11 +64,13 @@ pub fn handle_copy_tip_distribution_account(
 
     let tip_distribution_account = TipDistributionAccount::try_deserialize(&mut tda_data)?;
     let mev_commission_bps = tip_distribution_account.validator_commission_bps;
-    let mut mev_earned: u32 = 0;
+
     // if the merkle_root has been uploaded pull the mev_earned for the epoch
-    if let Some(merkle_root) = tip_distribution_account.merkle_root {
-        mev_earned = fixed_point_sol(merkle_root.max_total_claim);
-    }
+    let mev_earned = if let Some(merkle_root) = tip_distribution_account.merkle_root {
+        fixed_point_sol(merkle_root.max_total_claim)
+    } else {
+        ValidatorHistoryEntry::default().mev_earned
+    };
 
     validator_history_account.set_mev_commission(epoch, mev_commission_bps, mev_earned)?;
 
