@@ -12,6 +12,8 @@ pub mod utils;
 pub use instructions::*;
 pub use state::*;
 
+// declare_program!(jito_tip_distribution);
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "mainnet-beta")] {
         declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");

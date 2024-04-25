@@ -2,6 +2,10 @@
 members = [
   "keepers/*",
   "programs/*",
-  "tests",
+  # "tests",
   "utils/*"
 ]
+
+
+[profile.release]
+overflow-checks = true

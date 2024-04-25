@@ -3,7 +3,9 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use anchor_lang::{AccountDeserialize, Discriminator};
+use anchor_lang::{
+    prelude::account, AccountDeserialize, AnchorDeserialize, AnchorSerialize, Discriminator,
+};
 use keeper_core::{
     get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
     TransactionExecutionError,
@@ -28,7 +30,6 @@ use solana_sdk::{
 };
 use solana_streamer::socket::SocketAddrSpace;
 
-use jito_tip_distribution::state::TipDistributionAccount;
 use thiserror::Error as ThisError;
 use validator_history::{
     constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory, ValidatorHistoryEntry,
@@ -52,6 +53,53 @@ pub enum KeeperError {
     MultipleAccountsError(#[from] MultipleAccountsError),
     #[error("Custom: {0}")]
     Custom(String),
+}
+
+// TODO: can we use anchor's declare-program macro here?
+/// Copied from https://github.com/jito-foundation/jito-programs/blob/master/mev-programs/programs/tip-distribution/src/state.rs#L102 to remove the dependency on that program
+/// The account that validators register as **tip_receiver** with the tip-payment program.
+#[account]
+#[derive(Default)]
+pub struct TipDistributionAccount {
+    /// The validator's vote account, also the recipient of remaining lamports after
+    /// upon closing this account.
+    pub validator_vote_account: Pubkey,
+
+    /// The only account authorized to upload a merkle-root for this account.
+    pub merkle_root_upload_authority: Pubkey,
+
+    /// The merkle root used to verify user claims from this account.
+    pub merkle_root: Option<MerkleRoot>,
+
+    /// Epoch for which this account was created.  
+    pub epoch_created_at: u64,
+
+    /// The commission basis points this validator charges.
+    pub validator_commission_bps: u16,
+
+    /// The epoch (upto and including) that tip funds can be claimed.
+    pub expires_at: u64,
+
+    /// The bump used to generate this account
+    pub bump: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
+pub struct MerkleRoot {
+    /// The 256-bit merkle root.
+    pub root: [u8; 32],
+
+    /// Maximum number of funds that can ever be claimed from this [MerkleRoot].
+    pub max_total_claim: u64,
+
+    /// Maximum number of nodes that can ever be claimed from this [MerkleRoot].
+    pub max_num_nodes: u64,
+
+    /// Total funds that have been claimed.
+    pub total_funds_claimed: u64,
+
+    /// Number of nodes that have been claimed.
+    pub num_nodes_claimed: u64,
 }
 
 pub async fn get_tip_distribution_accounts(

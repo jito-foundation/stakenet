@@ -20,7 +20,7 @@ pub struct InitializeConfig<'info> {
 pub fn handle_initialize_config(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
     ctx.accounts.config.oracle_authority = authority;
     ctx.accounts.config.admin = authority;
-    ctx.accounts.config.bump = *ctx.bumps.get("config").unwrap();
+    ctx.accounts.config.bump = ctx.bumps.config;
     ctx.accounts.config.counter = 0;
     Ok(())
 }
