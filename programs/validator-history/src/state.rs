@@ -244,6 +244,21 @@ impl CircBuf {
         None
     }
 
+    pub fn superminority_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u8>> {
+        field_range!(self, start_epoch, end_epoch, is_superminority, u8)
+            .into_iter()
+            .map(|maybe_value| {
+                maybe_value.and_then(|value| {
+                    if value == 0 || value == 1 {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+
     pub fn vote_account_last_update_slot_latest(&self) -> Option<u64> {
         field_latest!(self, vote_account_last_update_slot)
     }
