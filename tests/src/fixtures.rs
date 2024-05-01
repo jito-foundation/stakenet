@@ -351,16 +351,16 @@ pub fn new_vote_account(
 pub fn new_tip_distribution_account(
     vote_account: Pubkey,
     mev_commission_bps: u16,
-    mev_earned: u64,
+    mev_earned: Option<u64>,
 ) -> Account {
-    let merkle_root = MerkleRoot {
-        max_total_claim: mev_earned,
+    let merkle_root = mev_earned.map(|max_total_claim| MerkleRoot {
+        max_total_claim,
         ..Default::default()
-    };
+    });
     let tda = TipDistributionAccount {
         validator_vote_account: vote_account,
         validator_commission_bps: mev_commission_bps,
-        merkle_root: Some(merkle_root),
+        merkle_root,
         ..TipDistributionAccount::default()
     };
     let mut data = vec![];

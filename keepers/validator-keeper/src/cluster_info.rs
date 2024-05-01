@@ -8,6 +8,8 @@ use solana_sdk::{
 };
 use validator_history::state::ClusterHistory;
 
+use crate::PRIORITY_FEE;
+
 pub async fn update_cluster_info(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
@@ -16,6 +18,8 @@ pub async fn update_cluster_info(
     let (cluster_history_account, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], program_id);
 
+    let priority_fee_ix =
+        compute_budget::ComputeBudgetInstruction::set_compute_unit_price(PRIORITY_FEE);
     let heap_request_ix = compute_budget::ComputeBudgetInstruction::request_heap_frame(256 * 1024);
     let compute_budget_ix =
         compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
@@ -32,7 +36,12 @@ pub async fn update_cluster_info(
 
     submit_transactions(
         &client,
-        vec![vec![heap_request_ix, compute_budget_ix, update_instruction]],
+        vec![vec![
+            priority_fee_ix,
+            heap_request_ix,
+            compute_budget_ix,
+            update_instruction,
+        ]],
         &keypair,
     )
     .await

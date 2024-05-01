@@ -19,7 +19,7 @@ use validator_history::{
     Config, ValidatorHistory,
 };
 
-use crate::KeeperError;
+use crate::{KeeperError, PRIORITY_FEE};
 
 #[derive(Clone)]
 pub struct ValidatorMevCommissionEntry {
@@ -163,8 +163,14 @@ pub async fn update_mev_commission(
     let (create_transactions, update_instructions) =
         build_create_and_update_instructions(&client, &entries_to_update).await?;
 
-    match submit_create_and_update(&client, create_transactions, update_instructions, &keypair)
-        .await
+    match submit_create_and_update(
+        &client,
+        create_transactions,
+        update_instructions,
+        &keypair,
+        PRIORITY_FEE,
+    )
+    .await
     {
         Ok(submit_result) => {
             if submit_result.creates.errors == 0 && submit_result.updates.errors == 0 {
@@ -225,8 +231,14 @@ pub async fn update_mev_earned(
     let (create_transactions, update_instructions) =
         build_create_and_update_instructions(client, &entries_to_update).await?;
 
-    let submit_result =
-        submit_create_and_update(client, create_transactions, update_instructions, keypair).await;
+    let submit_result = submit_create_and_update(
+        client,
+        create_transactions,
+        update_instructions,
+        keypair,
+        PRIORITY_FEE,
+    )
+    .await;
     match submit_result {
         Ok(submit_result) => {
             if submit_result.creates.errors == 0 && submit_result.updates.errors == 0 {
