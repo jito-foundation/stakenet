@@ -1,5 +1,5 @@
 [features]
-seeds = false
+resolution = false
 skip-lint = false
 [programs.localnet]
 validator_history = "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa"

@@ -31,7 +31,7 @@ use tokio::time::sleep;
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
-    Config, ValidatorHistory,
+    ValidatorHistory, Config,
 };
 
 use crate::{get_validator_history_accounts_with_retry, start_spy_server};
@@ -287,7 +287,7 @@ pub async fn upload_gossip_values(
     );
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
     let (_gossip_service, cluster_info) =
-        start_spy_server(entrypoint, gossip_port, spy_socket_addr, &keypair, &exit);
+        start_spy_server(entrypoint, gossip_port, spy_socket_addr, &keypair, exit.clone());
 
     let vote_accounts = get_vote_accounts_with_retry(&client, MIN_VOTE_EPOCHS, None).await?;
     let validator_history_accounts =

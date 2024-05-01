@@ -35,7 +35,7 @@ pub struct CopyTipDistributionAccount<'info> {
     /// `owner = config.tip_distribution_program.key()` here is sufficient.
     #[account(
         seeds = [
-            TipDistributionAccount::SEED,
+            b"TIP_DISTRIBUTION_ACCOUNT",
             vote_account.key().as_ref(),
             epoch.to_le_bytes().as_ref(),
         ],

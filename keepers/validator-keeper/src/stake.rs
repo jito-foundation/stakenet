@@ -19,7 +19,7 @@ use solana_sdk::{
 };
 use validator_history::{
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
-    state::{Config, ValidatorHistory},
+    state::{ValidatorHistory, Config},
 };
 
 use crate::{KeeperError, PRIORITY_FEE};
@@ -55,7 +55,8 @@ impl StakeHistoryEntry {
             &[ValidatorHistory::SEED, &vote_pubkey.to_bytes()],
             program_id,
         );
-        let (config_address, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
+        let (config_address, _) =
+            Pubkey::find_program_address(&[Config::SEED], program_id);
 
         StakeHistoryEntry {
             stake: vote_account.activated_stake,

@@ -564,7 +564,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
         accounts: validator_history::accounts::BackfillTotalBlocks {
             cluster_history_account: cluster_history_pda,
             config,
-            signer: keypair.pubkey(),
+            oracle_authority: keypair.pubkey(),
         }
         .to_account_metas(None),
         data: validator_history::instruction::BackfillTotalBlocks {

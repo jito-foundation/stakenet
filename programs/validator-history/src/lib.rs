@@ -12,7 +12,6 @@ pub mod utils;
 pub use instructions::*;
 pub use state::*;
 
-// declare_program!(jito_tip_distribution);
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "mainnet-beta")] {
