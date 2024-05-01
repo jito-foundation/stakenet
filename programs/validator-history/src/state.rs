@@ -37,7 +37,7 @@ impl Config {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 
-#[derive(AnchorSerialize, TypeLayout)]
+#[derive(BorshSerialize, TypeLayout)]
 #[zero_copy]
 pub struct ValidatorHistoryEntry {
     pub activated_stake_lamports: u64,
@@ -103,7 +103,7 @@ pub struct ClientVersion {
 
 const MAX_ITEMS: usize = 512;
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct CircBuf {
     pub idx: u64,
@@ -270,7 +270,7 @@ pub enum ValidatorHistoryVersion {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistory>(), 65848);
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct ValidatorHistory {
     // Cannot be enum due to Pod and Zeroable trait limitations
@@ -658,7 +658,7 @@ impl ValidatorHistory {
     }
 }
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct ClusterHistory {
     pub struct_version: u64,
@@ -669,7 +669,7 @@ pub struct ClusterHistory {
     pub history: CircBufCluster,
 }
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct ClusterHistoryEntry {
     pub total_blocks: u32,
@@ -691,7 +691,7 @@ impl Default for ClusterHistoryEntry {
     }
 }
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct CircBufCluster {
     pub idx: u64,
