@@ -7,6 +7,7 @@ use anchor_lang::{AccountDeserialize, Discriminator};
 use keeper_core::{
     get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
     TransactionExecutionError,
+    get_multiple_accounts_batched,
 };
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
@@ -25,6 +26,7 @@ use solana_net_utils::bind_in_range;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
+    vote::program::id as get_vote_program_id,
 };
 use solana_streamer::socket::SocketAddrSpace;
 
@@ -148,6 +150,8 @@ pub async fn emit_validator_history_metrics(
     let mut stakes = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
+
+    let mut all_history_vote_accounts = Vec::new(); 
     for validator_history in validator_histories {
         if let Some(entry) = validator_history.history.last() {
             if entry.epoch as u64 != epoch.epoch {
@@ -177,7 +181,10 @@ pub async fn emit_validator_history_metrics(
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
             }
+
         }
+
+        all_history_vote_accounts.push(validator_history.vote_account);
     }
 
     let (cluster_history_address, _) =
@@ -195,13 +202,34 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
-    let get_vote_accounts_count = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
-        .await?
-        .len();
+
+    let get_vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
+        .await?;
+
+    let get_vote_accounts_count = get_vote_accounts.len() as i64;
+
+    let vote_program_id = get_vote_program_id();
+    let alive_history_vote_account_count = get_multiple_accounts_batched(&all_history_vote_accounts, client)
+        .await
+        .expect("Cannot fetch all accounts")
+        .iter()
+        .filter_map(|account| account.as_ref()) // Filter out None and unwrap the Some values.
+        .filter(|account| vote_program_id == account.owner) // Filter accounts whose owner matches the vote_program_id.
+        .count(); // Count the filtered accounts.
+
+    let get_vote_accounts_live_validators = get_vote_accounts
+    .iter()
+    .filter(|x| {
+        // Check if the last epoch credit is the current epoch
+        x.epoch_credits.last().unwrap().0 == epoch.epoch
+    })
+    .count();
+    
 
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
+        ("num_alive_validator_histories", alive_history_vote_account_count, i64),
         ("num_ips", ips, i64),
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
@@ -216,6 +244,7 @@ pub async fn emit_validator_history_metrics(
             get_vote_accounts_count,
             i64
         ),
+        ("num_get_vote_accounts_live_validators", get_vote_accounts_live_validators, i64),
     );
 
     Ok(())
