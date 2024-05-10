@@ -20,9 +20,10 @@ use solana_sdk::{
 use validator_history::{
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
     state::{Config, ValidatorHistory},
+    ValidatorHistoryEntry,
 };
 
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::{get_validator_history_accounts_with_retry, KeeperError, PRIORITY_FEE};
 
 pub struct StakeHistoryEntry {
     pub stake: u64,
@@ -187,6 +188,11 @@ pub async fn update_stake_history(
         .max()
         .unwrap_or(0);
 
+    let validator_histories =
+        get_validator_history_accounts_with_retry(&client, *program_id).await?;
+
+    let validator_history_map =
+        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
     let (stake_rank_map, superminority_threshold) =
         get_stake_rank_map_and_superminority_count(&vote_accounts);
 
@@ -201,17 +207,22 @@ pub async fn update_stake_history(
 
     let stake_history_entries = vote_accounts
         .iter()
-        .map(|va| {
+        .filter_map(|va| {
             let rank = stake_rank_map[&va.vote_pubkey.clone()];
             let is_superminority = rank <= superminority_threshold;
-            StakeHistoryEntry::new(
+
+            if stake_entry_uploaded(&validator_history_map, va, epoch) {
+                return None;
+            }
+
+            Some(StakeHistoryEntry::new(
                 va,
                 program_id,
                 &keypair.pubkey(),
                 epoch,
                 rank,
                 is_superminority,
-            )
+            ))
         })
         .collect::<Vec<_>>();
 
@@ -324,6 +335,30 @@ pub async fn _recompute_superminority_and_rank(
     }
 
     Ok(())
+}
+
+fn stake_entry_uploaded(
+    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
+    vote_account: &RpcVoteAccountInfo,
+    epoch: u64,
+) -> bool {
+    let vote_account = Pubkey::from_str(&vote_account.vote_pubkey)
+        .map_err(|e| {
+            error!("Invalid vote account pubkey");
+            e
+        })
+        .expect("Invalid vote account pubkey");
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.is_superminority
+                    != ValidatorHistoryEntry::default().is_superminority
+                && latest_entry.rank != ValidatorHistoryEntry::default().rank
+                && latest_entry.activated_stake_lamports
+                    != ValidatorHistoryEntry::default().activated_stake_lamports;
+        }
+    }
+    false
 }
 
 pub fn emit_stake_history_datapoint(stats: CreateUpdateStats, runs_for_epoch: i64) {
