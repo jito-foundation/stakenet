@@ -5,9 +5,8 @@ use std::{
 
 use anchor_lang::{AccountDeserialize, Discriminator};
 use keeper_core::{
-    get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
-    TransactionExecutionError,
-    get_multiple_accounts_batched,
+    get_multiple_accounts_batched, get_vote_accounts_with_retry, CreateUpdateStats,
+    MultipleAccountsError, SubmitStats, TransactionExecutionError,
 };
 use log::error;
 use solana_account_decoder::UiDataSliceConfig;
@@ -151,7 +150,7 @@ pub async fn emit_validator_history_metrics(
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
 
-    let mut all_history_vote_accounts = Vec::new(); 
+    let mut all_history_vote_accounts = Vec::new();
     for validator_history in validator_histories {
         if let Some(entry) = validator_history.history.last() {
             if entry.epoch as u64 != epoch.epoch {
@@ -181,7 +180,6 @@ pub async fn emit_validator_history_metrics(
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
             }
-
         }
 
         all_history_vote_accounts.push(validator_history.vote_account);
@@ -202,33 +200,39 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
-
-    let get_vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
-        .await?;
+    let get_vote_accounts = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None).await?;
 
     let get_vote_accounts_count = get_vote_accounts.len() as i64;
 
     let vote_program_id = get_vote_program_id();
-    let live_validator_histories_count = get_multiple_accounts_batched(&all_history_vote_accounts, client)
-        .await
-        .expect("Cannot fetch validator history vote accounts")
-        .iter()
-        .filter(|&account| account.as_ref().map_or(false, |acc| acc.owner == vote_program_id))
-        .count();
+    let live_validator_histories_count =
+        get_multiple_accounts_batched(&all_history_vote_accounts, client)
+            .await
+            .expect("Cannot fetch validator history vote accounts")
+            .iter()
+            .filter(|&account| {
+                account
+                    .as_ref()
+                    .map_or(false, |acc| acc.owner == vote_program_id)
+            })
+            .count();
 
     let get_vote_accounts_voting = get_vote_accounts
-    .iter()
-    .filter(|x| {
-        // Check if the last epoch credit ( most recent ) is the current epoch
-        x.epoch_credits.last().unwrap().0 == epoch.epoch
-    })
-    .count();
-    
+        .iter()
+        .filter(|x| {
+            // Check if the last epoch credit ( most recent ) is the current epoch
+            x.epoch_credits.last().unwrap().0 == epoch.epoch
+        })
+        .count();
 
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
-        ("num_live_validator_histories", live_validator_histories_count, i64),
+        (
+            "num_live_validator_histories",
+            live_validator_histories_count,
+            i64
+        ),
         ("num_ips", ips, i64),
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
@@ -243,7 +247,11 @@ pub async fn emit_validator_history_metrics(
             get_vote_accounts_count,
             i64
         ),
-        ("num_get_vote_accounts_voting", get_vote_accounts_voting, i64),
+        (
+            "num_get_vote_accounts_voting",
+            get_vote_accounts_voting,
+            i64
+        ),
     );
 
     Ok(())
