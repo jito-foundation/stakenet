@@ -19,6 +19,7 @@ use solana_sdk::{
 };
 use thiserror::Error as ThisError;
 use tokio::task::{self, JoinError};
+use tokio::time::sleep;
 
 #[derive(Debug, Default, Clone)]
 pub struct SubmitStats {
@@ -299,6 +300,10 @@ pub async fn parallel_execute_transactions(
         for (idx, tx) in signed_txs.iter().enumerate() {
             if results[idx].is_ok() {
                 continue;
+            }
+            if idx % 50 == 0 {
+                // Need to avoid spamming the rpc or lots of transactions will get dropped
+                sleep(Duration::from_secs(3)).await;
             }
 
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch

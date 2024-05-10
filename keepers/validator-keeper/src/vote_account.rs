@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ use solana_sdk::{signature::Keypair, signer::Signer};
 
 use validator_history::constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS};
 use validator_history::state::ValidatorHistory;
-use validator_history::Config;
+use validator_history::{Config, ValidatorHistoryEntry};
 
 use crate::{get_validator_history_accounts_with_retry, KeeperError, PRIORITY_FEE};
 
@@ -111,9 +111,11 @@ pub async fn update_vote_accounts(
         get_validator_history_accounts_with_retry(&rpc_client, validator_history_program_id)
             .await?;
 
-    let vote_account_pubkeys = validator_histories
-        .iter()
-        .map(|vh| vh.vote_account)
+    let validator_history_map =
+        HashMap::from_iter(validator_histories.iter().map(|vh| (vh.vote_account, vh)));
+    let vote_account_pubkeys = validator_history_map
+        .clone()
+        .into_keys()
         .collect::<Vec<_>>();
 
     let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, &rpc_client).await?;
@@ -146,8 +148,19 @@ pub async fn update_vote_accounts(
         .chain(validator_histories.iter().map(|vh| vh.vote_account))
         .collect::<HashSet<_>>();
 
+    let epoch_info = rpc_client.get_epoch_info().await?;
+
     // Remove closed vote accounts from all vote accounts
-    all_vote_accounts.retain(|va| !closed_vote_accounts.contains(va));
+    // Remove vote accounts for which this instruction has been called within 50,000 slots
+    all_vote_accounts.retain(|va| {
+        !closed_vote_accounts.contains(va)
+            && !vote_account_uploaded_recently(
+                &validator_history_map,
+                va,
+                epoch_info.epoch,
+                epoch_info.absolute_slot,
+            )
+    });
 
     let entries = all_vote_accounts
         .iter()
@@ -167,4 +180,24 @@ pub async fn update_vote_accounts(
     .await;
 
     submit_result.map_err(|e| e.into())
+}
+
+fn vote_account_uploaded_recently(
+    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
+    vote_account: &Pubkey,
+    epoch: u64,
+    slot: u64,
+) -> bool {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
+        if let Some(entry) = validator_history.history.last() {
+            if entry.epoch == epoch as u16
+                && entry.vote_account_last_update_slot
+                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
+                && entry.vote_account_last_update_slot > slot - 50000
+            {
+                return true;
+            }
+        }
+    }
+    false
 }

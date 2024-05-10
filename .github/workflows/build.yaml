@@ -56,6 +56,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
+          version: 0.1.47 # Remove once anchor 0.30 is merged
       - run: cargo +nightly-2023-10-05 udeps --all-features --all-targets --tests
 
   verified_build:

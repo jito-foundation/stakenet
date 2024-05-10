@@ -43,7 +43,7 @@ pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
 
-pub const PRIORITY_FEE: u64 = 500_000;
+pub const PRIORITY_FEE: u64 = 200_000;
 
 #[derive(ThisError, Debug)]
 pub enum KeeperError {
@@ -135,6 +135,7 @@ pub fn emit_cluster_history_datapoint(stats: SubmitStats, runs_for_epoch: i64) {
 pub async fn emit_validator_history_metrics(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
+    keeper_address: Pubkey,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch = client.get_epoch_info().await?;
 
@@ -225,6 +226,8 @@ pub async fn emit_validator_history_metrics(
         })
         .count();
 
+    let keeper_balance = get_balance_with_retry(client, keeper_address).await?;
+
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
@@ -252,6 +255,11 @@ pub async fn emit_validator_history_metrics(
             get_vote_accounts_voting,
             i64
         ),
+    );
+
+    datapoint_info!(
+        "stakenet-keeper-stats",
+        ("balance_lamports", keeper_balance, i64),
     );
 
     Ok(())
@@ -296,6 +304,24 @@ pub async fn get_validator_history_accounts_with_retry(
         }
     }
     get_validator_history_accounts(client, program_id).await
+}
+
+pub async fn get_balance_with_retry(
+    client: &RpcClient,
+    account: Pubkey,
+) -> Result<u64, ClientError> {
+    let mut retries = 5;
+    loop {
+        match client.get_balance(&account).await {
+            Ok(balance) => return Ok(balance),
+            Err(e) => {
+                if retries == 0 {
+                    return Err(e);
+                }
+                retries -= 1;
+            }
+        }
+    }
 }
 
 pub fn start_spy_server(

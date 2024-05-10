@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::{
@@ -22,6 +23,7 @@ use solana_gossip::{
 };
 use solana_metrics::datapoint_info;
 use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signable, Signature},
@@ -31,10 +33,10 @@ use tokio::time::sleep;
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
-    Config, ValidatorHistory,
+    Config, ValidatorHistory, ValidatorHistoryEntry,
 };
 
-use crate::{get_validator_history_accounts_with_retry, start_spy_server};
+use crate::{get_validator_history_accounts_with_retry, start_spy_server, PRIORITY_FEE};
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
@@ -115,12 +117,16 @@ impl CreateTransaction for GossipEntry {
 }
 
 impl GossipEntry {
-    pub fn build_update_tx(&self) -> Vec<Instruction> {
-        let mut ixs = vec![build_verify_signature_ix(
-            self.signature.as_ref(),
-            self.identity.to_bytes(),
-            &self.message,
-        )];
+    pub fn build_update_tx(&self, priority_fee: u64) -> Vec<Instruction> {
+        let mut ixs = vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(100_000),
+            ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
+            build_verify_signature_ix(
+                self.signature.as_ref(),
+                self.identity.to_bytes(),
+                &self.message,
+            ),
+        ];
 
         ixs.push(Instruction {
             program_id: self.program_id,
@@ -293,8 +299,19 @@ pub async fn upload_gossip_values(
     let validator_history_accounts =
         get_validator_history_accounts_with_retry(&client, *program_id).await?;
 
+    let validator_history_map = HashMap::from_iter(validator_history_accounts.iter().map(|vh| {
+        (
+            Pubkey::find_program_address(
+                &[ValidatorHistory::SEED, &vh.vote_account.to_bytes()],
+                program_id,
+            )
+            .0,
+            vh,
+        )
+    }));
+
     // Wait for all active validators to be received
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(150)).await;
 
     let gossip_entries = {
         let crds = cluster_info.gossip.crds.read().map_err(|e| e.to_string())?;
@@ -321,10 +338,19 @@ pub async fn upload_gossip_values(
 
     exit.store(true, Ordering::Relaxed);
 
+    let epoch = client.get_epoch_info().await?.epoch;
+
     let addresses = gossip_entries
         .iter()
-        .map(|a| a.address())
+        .filter_map(|a| {
+            if gossip_data_uploaded(&validator_history_map, a.address(), epoch) {
+                None
+            } else {
+                Some(a.address())
+            }
+        })
         .collect::<Vec<Pubkey>>();
+
     let existing_accounts_response = get_multiple_accounts_batched(&addresses, &client).await?;
 
     let create_transactions = existing_accounts_response
@@ -341,13 +367,29 @@ pub async fn upload_gossip_values(
 
     let update_transactions = gossip_entries
         .iter()
-        .map(|entry| entry.build_update_tx())
+        .map(|entry| entry.build_update_tx(PRIORITY_FEE))
         .collect::<Vec<_>>();
 
     Ok(CreateUpdateStats {
         creates: submit_transactions(&client, create_transactions, &keypair).await?,
         updates: submit_transactions(&client, update_transactions, &keypair).await?,
     })
+}
+
+fn gossip_data_uploaded(
+    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
+    vote_account: Pubkey,
+    epoch: u64,
+) -> bool {
+    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+        if let Some(latest_entry) = validator_history.history.last() {
+            return latest_entry.epoch == epoch as u16
+                && latest_entry.ip != ValidatorHistoryEntry::default().ip
+                && latest_entry.version.major != ValidatorHistoryEntry::default().version.major
+                && latest_entry.client_type != ValidatorHistoryEntry::default().client_type;
+        }
+    }
+    false
 }
 
 // CODE BELOW SLIGHTLY MODIFIED FROM
