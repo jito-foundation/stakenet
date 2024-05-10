@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use anchor_lang::{AccountDeserialize, Discriminator};
+use anchor_lang::{ToAccountMetas, InstructionData, AccountDeserialize, Discriminator};
 use keeper_core::{
     get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
     TransactionExecutionError,
@@ -23,15 +23,18 @@ use solana_gossip::{
 use solana_metrics::datapoint_info;
 use solana_net_utils::bind_in_range;
 use solana_sdk::{
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    feature_set::full_inflation::mainnet::certusone::vote, instruction::Instruction, pubkey::Pubkey, signature::{Keypair, Signer}
 };
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
 use thiserror::Error as ThisError;
 use validator_history::{
-    constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory, ValidatorHistoryEntry,
+    constants::{MIN_VOTE_EPOCHS, MAX_ALLOC_BYTES}, 
+    Config, 
+    ClusterHistory, 
+    ValidatorHistory, 
+    ValidatorHistoryEntry,
 };
 
 pub mod cluster_info;
@@ -132,7 +135,7 @@ pub fn emit_cluster_history_datapoint(stats: SubmitStats, runs_for_epoch: i64) {
 }
 
 pub async fn emit_validator_history_metrics(
-    client: &Arc<RpcClient>,
+    client: &RpcClient,
     program_id: Pubkey,
     keeper_address: Pubkey,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -227,6 +230,67 @@ pub async fn emit_validator_history_metrics(
     );
 
     Ok(())
+}
+
+pub fn get_validator_history_address(
+    vote_account: &Pubkey,
+    program_id: &Pubkey,
+) -> Pubkey {
+    let (address, _) = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, &vote_account.to_bytes()],
+        program_id,
+    );
+
+    address
+}
+
+pub fn get_validator_history_config_address(
+    program_id: &Pubkey,
+) -> Pubkey {
+    let (config, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
+
+    config
+}
+
+pub fn get_create_validator_history_instructions (
+    vote_account: &Pubkey,
+    program_id: &Pubkey,
+    signer: &Keypair,
+) -> Vec<Instruction> {
+
+    let validator_history_account = get_validator_history_address(vote_account, program_id);
+    let config_account = get_validator_history_config_address(program_id);
+
+    let mut ixs = vec![Instruction {
+        program_id: program_id.clone(),
+        accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
+            validator_history_account,
+            vote_account: vote_account.clone(),
+            system_program: solana_program::system_program::id(),
+            signer: signer.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeValidatorHistoryAccount {}.data(),
+    }];
+
+    let num_reallocs = (ValidatorHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    ixs.extend(vec![
+        Instruction {
+            program_id: program_id.clone(),
+            accounts: validator_history::accounts::ReallocValidatorHistoryAccount {
+                validator_history_account: validator_history_account,
+                vote_account: vote_account.clone(),
+                config: config_account,
+                system_program: solana_program::system_program::id(),
+                signer: signer.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::ReallocValidatorHistoryAccount {}.data(),
+        };
+        num_reallocs
+    ]);
+
+    ixs
 }
 
 pub async fn get_validator_history_accounts(
