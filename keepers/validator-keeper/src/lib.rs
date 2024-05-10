@@ -209,18 +209,17 @@ pub async fn emit_validator_history_metrics(
     let get_vote_accounts_count = get_vote_accounts.len() as i64;
 
     let vote_program_id = get_vote_program_id();
-    let alive_history_vote_account_count = get_multiple_accounts_batched(&all_history_vote_accounts, client)
+    let live_validator_histories_count = get_multiple_accounts_batched(&all_history_vote_accounts, client)
         .await
-        .expect("Cannot fetch all accounts")
+        .expect("Cannot fetch validator history vote accounts")
         .iter()
-        .filter_map(|account| account.as_ref()) // Filter out None and unwrap the Some values.
-        .filter(|account| vote_program_id == account.owner) // Filter accounts whose owner matches the vote_program_id.
-        .count(); // Count the filtered accounts.
+        .filter(|&account| account.as_ref().map_or(false, |acc| acc.owner == vote_program_id))
+        .count();
 
-    let get_vote_accounts_live_validators = get_vote_accounts
+    let get_vote_accounts_voting = get_vote_accounts
     .iter()
     .filter(|x| {
-        // Check if the last epoch credit is the current epoch
+        // Check if the last epoch credit ( most recent ) is the current epoch
         x.epoch_credits.last().unwrap().0 == epoch.epoch
     })
     .count();
@@ -229,7 +228,7 @@ pub async fn emit_validator_history_metrics(
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
-        ("num_alive_validator_histories", alive_history_vote_account_count, i64),
+        ("num_live_validator_histories", live_validator_histories_count, i64),
         ("num_ips", ips, i64),
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
@@ -244,7 +243,7 @@ pub async fn emit_validator_history_metrics(
             get_vote_accounts_count,
             i64
         ),
-        ("num_get_vote_accounts_live_validators", get_vote_accounts_live_validators, i64),
+        ("num_get_vote_accounts_voting", get_vote_accounts_voting, i64),
     );
 
     Ok(())
