@@ -11,8 +11,8 @@ clap = { version = "4.3.0", features = ["derive", "env"] }
 env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
-keeper-core = { path = "../keeper-core" }
 jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
+keeper-core = { path = "../keeper-core" }
 log = "0.4.18"
 solana-account-decoder = "1.18"
 solana-clap-utils = "1.18"

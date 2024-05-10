@@ -3,10 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use anchor_lang::{
-    declare_program, prelude::borsh, AccountDeserialize, AnchorDeserialize, AnchorSerialize,
-    Discriminator,
-};
+use anchor_lang::{AccountDeserialize, Discriminator};
 use keeper_core::{
     get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
     TransactionExecutionError,
@@ -31,11 +28,11 @@ use solana_sdk::{
 };
 use solana_streamer::socket::SocketAddrSpace;
 
+use jito_tip_distribution::state::TipDistributionAccount;
 use thiserror::Error as ThisError;
 use validator_history::{
     constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory, ValidatorHistoryEntry,
 };
-use jito_tip_distribution::state::TipDistributionAccount;
 
 pub mod cluster_info;
 pub mod gossip;

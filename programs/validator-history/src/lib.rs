@@ -12,7 +12,6 @@ pub mod utils;
 pub use instructions::*;
 pub use state::*;
 
-
 cfg_if::cfg_if! {
     if #[cfg(feature = "mainnet-beta")] {
         declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");

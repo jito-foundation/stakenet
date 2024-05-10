@@ -34,8 +34,7 @@ impl CopyVoteAccountEntry {
             &[ValidatorHistory::SEED, &vote_account.to_bytes()],
             program_id,
         );
-        let (config_address, _) =
-            Pubkey::find_program_address(&[Config::SEED], program_id);
+        let (config_address, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
         Self {
             vote_account: *vote_account,
             validator_history_account,

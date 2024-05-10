@@ -6,6 +6,5 @@ members = [
   "utils/*"
 ]
 
-
 [profile.release]
 overflow-checks = true

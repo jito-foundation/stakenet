@@ -1,6 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::{errors::ValidatorHistoryError, utils::cast_epoch, state::{ClusterHistory, Config}};
+use crate::{
+    errors::ValidatorHistoryError,
+    state::{ClusterHistory, Config},
+    utils::cast_epoch,
+};
 
 #[derive(Accounts)]
 pub struct BackfillTotalBlocks<'info> {
