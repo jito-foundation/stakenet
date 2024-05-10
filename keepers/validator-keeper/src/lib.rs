@@ -208,8 +208,7 @@ pub async fn emit_validator_history_metrics(
     let vote_program_id = get_vote_program_id();
     let live_validator_histories_count =
         get_multiple_accounts_batched(&all_history_vote_accounts, client)
-            .await
-            .expect("Cannot fetch validator history vote accounts")
+            .await?
             .iter()
             .filter(|&account| {
                 account
