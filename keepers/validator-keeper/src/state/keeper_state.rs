@@ -11,10 +11,10 @@ pub struct KeeperState {
 
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
     pub errors_for_epoch: [u64; KeeperOperations::LEN],
-    // submit_stats: [SubmitStats; KeeperOperations::LEN],
     pub closed_vote_accounts: HashSet<Pubkey>,
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
     pub validator_history_map: HashMap<Pubkey, ValidatorHistory>,
+
     pub keeper_balance: u64,
 }
 impl KeeperState {
@@ -51,6 +51,16 @@ impl KeeperState {
             self.runs_for_epoch[index].clone(),
             self.errors_for_epoch[index].clone(),
         )
+    }
+
+    pub fn increment_update_run_for_epoch(&mut self) {
+        let index = KeeperOperations::UpdateState as usize;
+        self.runs_for_epoch[index] += 1;
+    }
+
+    pub fn increment_update_error_for_epoch(&mut self) {
+        let index = KeeperOperations::UpdateState as usize;
+        self.errors_for_epoch[index] += 1;
     }
 
     pub fn set_runs_and_errors_for_epoch(

@@ -1,7 +1,6 @@
 #[derive(Clone)]
 pub enum KeeperOperations {
-    UpdateEpoch,
-    CreateValidatorHistory,
+    UpdateState,
     ClusterHistory,
     GossipUpload,
     StakeUpload,
@@ -11,5 +10,5 @@ pub enum KeeperOperations {
     EmitMetrics,
 }
 impl KeeperOperations {
-    pub const LEN: usize = 9;
+    pub const LEN: usize = 8;
 }

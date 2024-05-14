@@ -16,7 +16,7 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
     operations::{self, keeper_operations::KeeperOperations},
-    state::{self, keeper_state::KeeperState},
+    state::{self, keeper_state::KeeperState, update_state::update_state},
 };
 
 #[derive(Parser, Debug)]
@@ -51,12 +51,37 @@ struct Args {
     #[arg(short, long, env)]
     tip_distribution_program_id: Pubkey,
 
-    // Loop interval time (default 300 sec)
+    // DEPRECIATED: Use validator_history_interval instead
     #[arg(short, long, env, default_value = "300")]
     interval: u64,
 
+    // Interval to update Validator History Accounts (default 300 sec)
+    #[arg(short, long, env, default_value = "300")]
+    validator_history_interval: u64,
+
+    // Interval to emit metrics (default 60 sec)
+    #[arg(short, long, env, default_value = "60")]
+    metrics_interval: u64,
+
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
     cluster: Cluster,
+}
+
+fn should_update(tick: u64, intervals: &Vec<u64>) -> bool {
+    intervals.iter().any(|interval| tick % interval == 0)
+}
+
+fn should_fire(tick: u64, interval: u64) -> bool {
+    tick % interval == 0
+}
+
+fn advance_tick(tick: &mut u64) -> bool {
+    tick += 1;
+}
+
+async fn sleep_and_tick(tick: &mut u64) {
+    sleep(Duration::from_secs(seconds)).await;
+    advance_tick(tick);
 }
 
 async fn run_loop(
@@ -66,55 +91,34 @@ async fn run_loop(
     tip_distribution_program_id: Pubkey,
     oracle_authority_keypair: Option<Arc<Keypair>>,
     gossip_entrypoint: Option<SocketAddr>,
+    validator_history_interval: u64,
+    metrics_interval: u64,
 ) {
+    let intervals = vec![validator_history_interval, metrics_interval];
+
     // Stateful data
     let mut keeper_state = KeeperState::new();
-
     let mut tick: u64 = 0; // 1 second ticks
 
     loop {
-        // ---------- SLEEP ----------
-        sleep(Duration::from_secs(1)).await;
-        tick += 1;
-
-        if tick % 10 == 0 {
-            // ---------------------- FETCH -----------------------------------
-            // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
-            // These functions will update the keeper_state. If anything fails, no operations will be ran.
-            match state::update_epoch::update_epoch(&client, &mut keeper_state).await {
-                Ok(_) => {
-                    *keeper_state.get_mut_runs_for_epoch(KeeperOperations::UpdateEpoch) += 1;
-                }
+        // ---------------------- FETCH -----------------------------------
+        // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
+        // These functions will update the keeper_state. If anything fails, no operations will be ran.
+        if should_update(tick, &intervals) {
+            match update_state(&client, &keypair, &program_id, &mut keeper_state).await {
+                Ok(_) => (keeper_state.increment_update_run_for_epoch()),
                 Err(e) => {
-                    error!("Failed to update epoch: {}", e);
-                    *keeper_state.get_mut_errors_for_epoch(KeeperOperations::UpdateEpoch) += 1;
+                    error!("Failed to update state: {:?}", e);
+                    keeper_state.increment_update_error_for_epoch();
+                    advance_tick(&mut tick);
                     continue;
                 }
             }
+        }
 
-            match state::update_accounts::update_validator_history_map(
-                &client,
-                &keypair,
-                &program_id,
-                &mut keeper_state,
-            )
-            .await
-            {
-                Ok(_) => {
-                    *keeper_state
-                        .get_mut_runs_for_epoch(KeeperOperations::CreateValidatorHistory) += 1;
-                }
-                Err(e) => {
-                    error!("Failed to update validator history map: {}", e);
-                    *keeper_state
-                        .get_mut_errors_for_epoch(KeeperOperations::CreateValidatorHistory) += 1;
-                    continue;
-                }
-            }
-
-            // ---------------------- FIRE -----------------------------------
-            // The fire functions will run the operations on the blockchain
-
+        // ---------------------- FIRE -----------------------------------
+        // The fire functions will run the operations on the blockchain
+        if should_fire(tick, validator_history_interval) {
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::cluster_history::fire_and_emit(
                     &client,
@@ -186,7 +190,7 @@ async fn run_loop(
         }
 
         // ---------------------- EMIT METRICS -----------------------------------
-        if tick % 60 == 0 {
+        if should_fire(tick, metrics_interval) {
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::metrics_emit::fire_and_emit(
                     &client,
@@ -197,6 +201,9 @@ async fn run_loop(
                 .await,
             );
         }
+
+        // ---------- SLEEP ----------
+        sleep_and_tick(&mut tick).await;
     }
 }
 
@@ -243,6 +250,8 @@ async fn main() {
         args.tip_distribution_program_id,
         oracle_authority_keypair,
         gossip_entrypoint,
+        args.validator_history_interval,
+        args.metrics_interval,
     )
     .await;
 }

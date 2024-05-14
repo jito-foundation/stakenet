@@ -12,7 +12,7 @@ use crate::{derive_validator_history_address, get_create_validator_history_instr
 
 use super::keeper_state::KeeperState;
 
-pub async fn update_validator_history_map(
+pub async fn create_history_accounts(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
