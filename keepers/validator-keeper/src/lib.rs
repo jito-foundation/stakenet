@@ -3,7 +3,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
-use anchor_lang::{ToAccountMetas, InstructionData, AccountDeserialize, Discriminator};
+use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use keeper_core::{
     get_vote_accounts_with_retry, CreateUpdateStats, MultipleAccountsError, SubmitStats,
     TransactionExecutionError,
@@ -23,24 +23,25 @@ use solana_gossip::{
 use solana_metrics::datapoint_info;
 use solana_net_utils::bind_in_range;
 use solana_sdk::{
-    feature_set::full_inflation::mainnet::certusone::vote, instruction::Instruction, pubkey::Pubkey, signature::{Keypair, Signer}
+    feature_set::full_inflation::mainnet::certusone::vote,
+    instruction::Instruction,
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
 };
 use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
 use thiserror::Error as ThisError;
 use validator_history::{
-    constants::{MIN_VOTE_EPOCHS, MAX_ALLOC_BYTES}, 
-    Config, 
-    ClusterHistory, 
-    ValidatorHistory, 
-    ValidatorHistoryEntry,
+    constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
+    ClusterHistory, Config, ValidatorHistory, ValidatorHistoryEntry,
 };
-
 pub mod cluster_info;
 pub mod gossip;
 pub mod mev_commission;
+pub mod operations;
 pub mod stake;
+pub mod state;
 pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
@@ -232,10 +233,12 @@ pub async fn emit_validator_history_metrics(
     Ok(())
 }
 
-pub fn get_validator_history_address(
-    vote_account: &Pubkey,
-    program_id: &Pubkey,
-) -> Pubkey {
+pub fn derive_cluster_history_address(program_id: &Pubkey) -> Pubkey {
+    let (address, _) = Pubkey::find_program_address(&[ClusterHistory::SEED], program_id);
+    address
+}
+
+pub fn derive_validator_history_address(vote_account: &Pubkey, program_id: &Pubkey) -> Pubkey {
     let (address, _) = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, &vote_account.to_bytes()],
         program_id,
@@ -244,22 +247,19 @@ pub fn get_validator_history_address(
     address
 }
 
-pub fn get_validator_history_config_address(
-    program_id: &Pubkey,
-) -> Pubkey {
-    let (config, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
+pub fn derive_validator_history_config_address(program_id: &Pubkey) -> Pubkey {
+    let (address, _) = Pubkey::find_program_address(&[Config::SEED], program_id);
 
-    config
+    address
 }
 
-pub fn get_create_validator_history_instructions (
+pub fn get_create_validator_history_instructions(
     vote_account: &Pubkey,
     program_id: &Pubkey,
     signer: &Keypair,
 ) -> Vec<Instruction> {
-
-    let validator_history_account = get_validator_history_address(vote_account, program_id);
-    let config_account = get_validator_history_config_address(program_id);
+    let validator_history_account = derive_validator_history_address(vote_account, program_id);
+    let config_account = derive_validator_history_config_address(program_id);
 
     let mut ixs = vec![Instruction {
         program_id: program_id.clone(),
