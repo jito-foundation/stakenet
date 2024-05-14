@@ -1,10 +1,20 @@
-use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    str::FromStr,
+    sync::Arc,
+};
 
 use keeper_core::{
     get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
 };
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
-use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Keypair};
+use solana_sdk::{
+    instruction::Instruction,
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+    vote,
+};
 use validator_history::{constants::MIN_VOTE_EPOCHS, ValidatorHistory};
 
 use crate::{
@@ -74,7 +84,7 @@ pub async fn update_state(
             keeper_state.keeper_balance = keeper_balance;
         }
         Err(e) => {
-            return Err(e);
+            return Err(Box::new(e));
         }
     }
 
@@ -111,7 +121,7 @@ async fn get_closed_vote_accounts(
         .map(|validator_history| validator_history.vote_account)
         .collect::<Vec<_>>();
 
-    let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, &rpc_client).await?;
+    let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, client).await?;
     let closed_vote_accounts: HashSet<Pubkey> = vote_accounts
         .iter()
         .enumerate()

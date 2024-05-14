@@ -15,8 +15,8 @@ use solana_sdk::{
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
-    operations::{self, keeper_operations::KeeperOperations},
-    state::{self, keeper_state::KeeperState, update_state::update_state},
+    operations::{self},
+    state::{keeper_state::KeeperState, update_state::update_state},
 };
 
 #[derive(Parser, Debug)]
@@ -75,12 +75,12 @@ fn should_fire(tick: u64, interval: u64) -> bool {
     tick % interval == 0
 }
 
-fn advance_tick(tick: &mut u64) -> bool {
-    tick += 1;
+fn advance_tick(tick: &mut u64) {
+    *tick += 1;
 }
 
 async fn sleep_and_tick(tick: &mut u64) {
-    sleep(Duration::from_secs(seconds)).await;
+    sleep(Duration::from_secs(1)).await;
     advance_tick(tick);
 }
 
@@ -106,7 +106,7 @@ async fn run_loop(
         // These functions will update the keeper_state. If anything fails, no operations will be ran.
         if should_update(tick, &intervals) {
             match update_state(&client, &keypair, &program_id, &mut keeper_state).await {
-                Ok(_) => (keeper_state.increment_update_run_for_epoch()),
+                Ok(_) => keeper_state.increment_update_run_for_epoch(),
                 Err(e) => {
                     error!("Failed to update state: {:?}", e);
                     keeper_state.increment_update_error_for_epoch();
