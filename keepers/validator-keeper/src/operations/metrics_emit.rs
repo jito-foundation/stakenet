@@ -1,56 +1,20 @@
+use std::sync::Arc;
+
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::state::keeper_state::{self, KeeperState};
-use crate::{
-    derive_cluster_history_address, derive_validator_history_config_address,
-    get_balance_with_retry, start_spy_server, KeeperError, PRIORITY_FEE,
-};
-use anchor_lang::{AccountDeserialize, Discriminator};
-use anchor_lang::{InstructionData, ToAccountMetas};
-use bytemuck::{bytes_of, Pod, Zeroable};
-use clap::{arg, command, Parser};
-use jito_tip_distribution::sdk::{
-    derive_config_account_address, derive_tip_distribution_account_address,
-};
-use jito_tip_distribution::state::TipDistributionAccount;
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Address, Cluster, CreateTransaction, CreateUpdateStats,
-    MultipleAccountsError, SubmitStats, TransactionExecutionError, UpdateInstruction,
-};
+use crate::state::keeper_state::KeeperState;
+use crate::{derive_cluster_history_address, get_balance_with_retry};
+use anchor_lang::AccountDeserialize;
 use log::*;
-use solana_clap_utils::keypair;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-use solana_client::rpc_filter::{Memcmp, RpcFilterType};
-use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_gossip::crds::Crds;
-use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
 use solana_metrics::datapoint_info;
-use solana_metrics::{datapoint_error, set_host_id};
-use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
-use solana_sdk::signature::Signable;
-use solana_sdk::signature::Signature;
 use solana_sdk::{
-    compute_budget,
-    epoch_info::{self, EpochInfo},
-    instruction::Instruction,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{Keypair, Signer},
 };
-use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLockReadGuard;
-use std::{
-    collections::HashMap, default, error::Error, fmt, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc, time::Duration,
-};
-use tokio::time::sleep;
-use validator_history::{constants::MIN_VOTE_EPOCHS, errors, ValidatorHistory};
 use validator_history::{ClusterHistory, ValidatorHistoryEntry};
 
 use super::keeper_operations::KeeperOperations;
@@ -113,6 +77,7 @@ pub async fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
+    let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_histories = &keeper_state
         .validator_history_map
         .values()
@@ -173,9 +138,7 @@ pub async fn emit_validator_history_metrics(
         }
     }
 
-    let get_vote_accounts_count = get_vote_accounts_with_retry(client, MIN_VOTE_EPOCHS, None)
-        .await?
-        .len();
+    let get_vote_accounts_count = vote_accounts.len();
 
     let keeper_balance = get_balance_with_retry(client, keeper_address.clone()).await?;
 

@@ -3,51 +3,33 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::state::keeper_state::{self, KeeperState};
-use crate::{
-    derive_cluster_history_address, derive_validator_history_config_address, start_spy_server,
-    KeeperError, PRIORITY_FEE,
-};
-use anchor_lang::AccountDeserialize;
+use crate::state::keeper_state::KeeperState;
+use crate::{derive_validator_history_config_address, start_spy_server, PRIORITY_FEE};
 use anchor_lang::{InstructionData, ToAccountMetas};
 use bytemuck::{bytes_of, Pod, Zeroable};
-use clap::{arg, command, Parser};
-use jito_tip_distribution::sdk::{
-    derive_config_account_address, derive_tip_distribution_account_address,
-};
-use jito_tip_distribution::state::TipDistributionAccount;
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Address, Cluster, CreateTransaction, CreateUpdateStats,
-    MultipleAccountsError, SubmitStats, TransactionExecutionError, UpdateInstruction,
-};
+use keeper_core::{submit_transactions, Address, SubmitStats, TransactionExecutionError};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
 use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
-use solana_metrics::datapoint_info;
-use solana_metrics::{datapoint_error, set_host_id};
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::signature::Signable;
 use solana_sdk::signature::Signature;
 use solana_sdk::{
-    compute_budget,
-    epoch_info::{self, EpochInfo},
+    epoch_info::EpochInfo,
     instruction::Instruction,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{Keypair, Signer},
 };
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLockReadGuard;
-use std::{
-    collections::HashMap, default, error::Error, fmt, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc, time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::sleep;
+use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
-use validator_history::{constants::MIN_VOTE_EPOCHS, errors, ValidatorHistory};
 
 use super::keeper_operations::KeeperOperations;
 
@@ -395,7 +377,7 @@ pub async fn upload_gossip_values(
     submit_result.map_err(|e| e.into())
 }
 
-fn gossip_data_uploaded(
+fn _gossip_data_uploaded(
     validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
     vote_account: Pubkey,
     epoch: u64,

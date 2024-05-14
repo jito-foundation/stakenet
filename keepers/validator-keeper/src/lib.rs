@@ -23,7 +23,6 @@ use solana_gossip::{
 use solana_metrics::datapoint_info;
 use solana_net_utils::bind_in_range;
 use solana_sdk::{
-    feature_set::full_inflation::mainnet::certusone::vote,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},

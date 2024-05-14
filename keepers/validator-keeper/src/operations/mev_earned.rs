@@ -4,45 +4,31 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::state::keeper_state::{self, KeeperState};
-use crate::{
-    derive_cluster_history_address, derive_validator_history_config_address, KeeperError,
-    PRIORITY_FEE,
-};
+use crate::state::keeper_state::KeeperState;
+use crate::{derive_validator_history_config_address, KeeperError, PRIORITY_FEE};
 use anchor_lang::AccountDeserialize;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser};
-use jito_tip_distribution::sdk::{
-    derive_config_account_address, derive_tip_distribution_account_address,
-};
+use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Address, Cluster, CreateUpdateStats, MultipleAccountsError, SubmitStats,
-    TransactionExecutionError, UpdateInstruction,
+    get_multiple_accounts_batched, submit_instructions, Address, MultipleAccountsError,
+    SubmitStats, TransactionExecutionError, UpdateInstruction,
 };
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
+use solana_metrics::datapoint_error;
 use solana_metrics::datapoint_info;
-use solana_metrics::{datapoint_error, set_host_id};
 use solana_sdk::{
-    compute_budget,
-    epoch_info::{self, EpochInfo},
     instruction::Instruction,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{Keypair, Signer},
 };
-use std::{
-    collections::HashMap, default, error::Error, fmt, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc, time::Duration,
-};
-use tokio::time::sleep;
+use std::{collections::HashMap, str::FromStr, sync::Arc};
+use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
-use validator_history::{constants::MIN_VOTE_EPOCHS, errors, ValidatorHistory};
 
 use super::keeper_operations::KeeperOperations;
-use super::vote_account;
 
 fn _get_operation() -> KeeperOperations {
     return KeeperOperations::MevEarned;
@@ -251,32 +237,6 @@ pub async fn update_mev_earned(
     submit_result.map_err(|e| e.into())
 }
 
-async fn get_existing_entries(
-    client: Arc<RpcClient>,
-    entries: &[ValidatorMevCommissionEntry],
-) -> Result<Vec<ValidatorMevCommissionEntry>, MultipleAccountsError> {
-    /* Filters tip distribution tuples to the addresses, then fetches accounts to see which ones exist */
-    let tip_distribution_addresses = entries
-        .iter()
-        .map(|entry| entry.tip_distribution_account)
-        .collect::<Vec<Pubkey>>();
-
-    let accounts = get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
-    let result = accounts
-        .iter()
-        .enumerate()
-        .filter_map(|(i, account_data)| {
-            if account_data.is_some() {
-                Some(entries[i].clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<ValidatorMevCommissionEntry>>();
-    // Fetch existing tip distribution accounts for this epoch
-    Ok(result)
-}
-
 async fn get_entries_with_uploaded_merkleroot(
     client: &Arc<RpcClient>,
     entries: &[ValidatorMevCommissionEntry],
@@ -305,20 +265,6 @@ async fn get_entries_with_uploaded_merkleroot(
         .collect::<Vec<ValidatorMevCommissionEntry>>();
     // Fetch tip distribution accounts with uploaded merkle roots for this epoch
     Ok(result)
-}
-
-fn mev_commission_uploaded(
-    validator_history_map: &HashMap<Pubkey, &ValidatorHistory>,
-    vote_account: Pubkey,
-    epoch: u64,
-) -> bool {
-    if let Some(validator_history) = validator_history_map.get(&vote_account) {
-        if let Some(latest_entry) = validator_history.history.last() {
-            return latest_entry.epoch == epoch as u16
-                && latest_entry.mev_commission != ValidatorHistoryEntry::default().mev_commission;
-        }
-    }
-    false
 }
 
 fn mev_earned_uploaded(

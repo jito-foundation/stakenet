@@ -6,30 +6,18 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 
 use crate::state::keeper_state::KeeperState;
 use crate::{derive_cluster_history_address, PRIORITY_FEE};
-use anchor_lang::AccountDeserialize;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser};
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError,
-};
-use log::*;
+use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_metrics::datapoint_info;
-use solana_metrics::{datapoint_error, set_host_id};
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
     compute_budget,
-    epoch_info::{self, EpochInfo},
+    epoch_info::EpochInfo,
     instruction::Instruction,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{Keypair, Signer},
 };
-use std::{
-    collections::HashMap, default, error::Error, fmt, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc, time::Duration,
-};
-use tokio::time::sleep;
-use validator_history::{constants::MIN_VOTE_EPOCHS, errors, ValidatorHistory};
+use std::sync::Arc;
 
 use super::keeper_operations::KeeperOperations;
 

@@ -3,41 +3,20 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-
-use std::{
-    collections::HashMap, default, error::Error, fmt, net::SocketAddr, path::PathBuf, str::FromStr,
-    sync::Arc, time::Duration,
-};
-
-use anchor_lang::AccountDeserialize;
 use clap::{arg, command, Parser};
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError,
-};
+use keeper_core::Cluster;
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_metrics::{datapoint_error, set_host_id};
+use solana_metrics::set_host_id;
 use solana_sdk::{
-    epoch_info::{self, EpochInfo},
-    instruction::Instruction,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{read_keypair_file, Keypair},
 };
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
-use validator_history::{constants::MIN_VOTE_EPOCHS, ValidatorHistory};
 use validator_keeper::{
-    cluster_info::update_cluster_info,
-    derive_validator_history_address, emit_cluster_history_datapoint,
-    emit_mev_commission_datapoint, emit_mev_earned_datapoint, emit_validator_commission_datapoint,
-    emit_validator_history_metrics, get_create_validator_history_instructions,
-    gossip::{emit_gossip_datapoint, upload_gossip_values},
-    mev_commission::{update_mev_commission, update_mev_earned},
     operations::{self, keeper_operations::KeeperOperations},
-    stake::{emit_stake_history_datapoint, update_stake_history},
     state::{self, keeper_state::KeeperState},
-    vote_account::update_vote_accounts,
-    KeeperError,
 };
 
 #[derive(Parser, Debug)]

@@ -1,39 +1,8 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
+use std::collections::{HashMap, HashSet};
 
-use std::{
-    collections::{HashMap, HashSet},
-    default,
-    error::Error,
-    fmt,
-    net::SocketAddr,
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-    time::Duration,
-};
-
-use anchor_lang::AccountDeserialize;
-use clap::{arg, command, Parser};
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-    submit_transactions, Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError,
-};
-use log::*;
-use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
-use solana_metrics::{datapoint_error, set_host_id};
-use solana_sdk::{
-    blake3::Hash,
-    epoch_info::{self, EpochInfo},
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
-};
-use tokio::time::sleep;
-use validator_history::{constants::MIN_VOTE_EPOCHS, ValidatorHistory};
+use solana_client::rpc_response::RpcVoteAccountInfo;
+use solana_sdk::{epoch_info::EpochInfo, pubkey::Pubkey};
+use validator_history::ValidatorHistory;
 
 use crate::operations::keeper_operations::KeeperOperations;
 
@@ -46,6 +15,7 @@ pub struct KeeperState {
     pub closed_vote_accounts: HashSet<Pubkey>,
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
     pub validator_history_map: HashMap<Pubkey, ValidatorHistory>,
+    pub keeper_balance: u64,
 }
 impl KeeperState {
     pub fn new() -> Self {
@@ -60,10 +30,10 @@ impl KeeperState {
             },
             runs_for_epoch: [0; KeeperOperations::LEN],
             errors_for_epoch: [0; KeeperOperations::LEN],
-            // submit_stats: [SubmitStats::default(); KeeperOperations::LEN],
             closed_vote_accounts: HashSet::new(),
             vote_account_map: HashMap::new(),
             validator_history_map: HashMap::new(),
+            keeper_balance: 0,
         }
     }
 

@@ -6,7 +6,6 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     compute_budget, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
-use validator_history::state::ClusterHistory;
 
 use crate::{derive_cluster_history_address, PRIORITY_FEE};
 
@@ -45,14 +44,8 @@ pub async fn update_cluster_info(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
 ) -> Result<SubmitStats, TransactionExecutionError> {
-
     let ixs = get_update_cluster_info_instructions(program_id, &keypair.pubkey());
 
     //TODO why not use submit_instructions?
-    submit_transactions(
-        client,
-        vec![ixs],
-        keypair,
-    )
-    .await
+    submit_transactions(client, vec![ixs], keypair).await
 }
