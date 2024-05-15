@@ -10,7 +10,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{read_keypair_file, Keypair},
 };
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
@@ -103,13 +103,12 @@ async fn run_loop(
     let mut keeper_state = KeeperState::new();
     let mut tick: u64 = 0; // 1 second ticks
 
-    let balance_before = client.get_balance(&keypair.pubkey()).await.unwrap();
-
     loop {
         // ---------------------- FETCH -----------------------------------
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
+            info!("Pre-fetching data for update...");
             match pre_create_update(&client, &keypair, &program_id, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -123,6 +122,7 @@ async fn run_loop(
                 }
             }
 
+            info!("Creating missing accounts...");
             match create_missing_accounts(&client, &keypair, &program_id, &keeper_state).await {
                 Ok(_) => {
                     keeper_state
@@ -137,6 +137,7 @@ async fn run_loop(
                 }
             }
 
+            info!("Post-fetching data for update...");
             match post_create_update(
                 &client,
                 &program_id,
@@ -159,8 +160,10 @@ async fn run_loop(
         }
 
         // ---------------------- FIRE -----------------------------------
-        // The fire functions will run the operations on the blockchain
         if should_fire(tick, validator_history_interval) {
+            info!("Firing operations...");
+
+            info!("Updating cluster history...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::cluster_history::fire_and_emit(
                     &client,
@@ -171,6 +174,7 @@ async fn run_loop(
                 .await,
             );
 
+            info!("Updating copy vote accounts...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::vote_account::fire_and_emit(
                     &client,
@@ -181,6 +185,7 @@ async fn run_loop(
                 .await,
             );
 
+            info!("Updating mev commission...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::mev_commission::fire_and_emit(
                     &client,
@@ -192,6 +197,7 @@ async fn run_loop(
                 .await,
             );
 
+            info!("Updating mev earned...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::mev_earned::fire_and_emit(
                     &client,
@@ -204,6 +210,7 @@ async fn run_loop(
             );
 
             if let Some(oracle_authority_keypair) = &oracle_authority_keypair {
+                info!("Updating stake accounts...");
                 keeper_state.set_runs_and_errors_for_epoch(
                     operations::stake_upload::fire_and_emit(
                         &client,
@@ -218,6 +225,7 @@ async fn run_loop(
             if let (Some(gossip_entrypoint), Some(oracle_authority_keypair)) =
                 (gossip_entrypoint, &oracle_authority_keypair)
             {
+                info!("Updating gossip accounts...");
                 keeper_state.set_runs_and_errors_for_epoch(
                     operations::gossip_upload::fire_and_emit(
                         &client,
@@ -234,6 +242,7 @@ async fn run_loop(
         // ---------------------- EMIT METRICS -----------------------------------
 
         if should_fire(tick, metrics_interval) {
+            info!("Emitting metrics...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::metrics_emit::fire_and_emit(&keeper_state).await,
             );
@@ -241,14 +250,7 @@ async fn run_loop(
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
-
-        break;
     }
-
-    let balance_after = client.get_balance(&keypair.pubkey()).await.unwrap();
-
-    println!("Balance before: {}", balance_before);
-    println!("Balance after: {}", balance_after);
 }
 
 #[tokio::main]

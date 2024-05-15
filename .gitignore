@@ -11,3 +11,4 @@ test-ledger
 .idea/
 **/targets
 **/credentials
+**/config
