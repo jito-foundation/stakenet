@@ -51,13 +51,13 @@ impl KeeperState {
         }
     }
 
-    pub fn increment_update_run_for_epoch(&mut self) {
-        let index = KeeperOperations::UpdateState as usize;
+    pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
+        let index = operation as usize;
         self.runs_for_epoch[index] += 1;
     }
 
-    pub fn increment_update_error_for_epoch(&mut self) {
-        let index = KeeperOperations::UpdateState as usize;
+    pub fn increment_update_error_for_epoch(&mut self, operation: KeeperOperations) {
+        let index = operation as usize;
         self.errors_for_epoch[index] += 1;
     }
 

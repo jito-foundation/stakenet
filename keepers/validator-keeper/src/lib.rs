@@ -35,13 +35,9 @@ use validator_history::{
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
     ClusterHistory, Config, ValidatorHistory, ValidatorHistoryEntry,
 };
-pub mod cluster_info;
-pub mod gossip;
-pub mod mev_commission;
+pub mod entries;
 pub mod operations;
-pub mod stake;
 pub mod state;
-pub mod vote_account;
 
 pub type Error = Box<dyn std::error::Error>;
 

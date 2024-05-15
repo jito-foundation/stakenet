@@ -4,19 +4,13 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
+use crate::entries::mev_commission_entry::ValidatorMevCommissionEntry;
 use crate::state::keeper_state::KeeperState;
-use crate::{
-    derive_validator_history_address, derive_validator_history_config_address, KeeperError,
-    PRIORITY_FEE,
-};
-use anchor_lang::{InstructionData, ToAccountMetas};
-use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
-use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError};
+use crate::{KeeperError, PRIORITY_FEE};
+use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_metrics::datapoint_error;
-use solana_metrics::datapoint_info;
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
-    instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
@@ -113,33 +107,6 @@ pub async fn fire_and_emit(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
-fn create_update_instruction(
-    program_id: &Pubkey,
-    keypair: &Pubkey,
-    vote_account: &Pubkey,
-    tip_distribution_program_id: &Pubkey,
-    epoch: u64,
-) -> Instruction {
-    let validator_history_account = derive_validator_history_address(program_id, vote_account);
-    let (tip_distribution_account, _) =
-        derive_tip_distribution_account_address(tip_distribution_program_id, vote_account, epoch);
-
-    let config = derive_validator_history_config_address(program_id);
-
-    Instruction {
-        program_id: program_id.clone(),
-        accounts: validator_history::accounts::CopyTipDistributionAccount {
-            validator_history_account: validator_history_account,
-            vote_account: vote_account.clone(),
-            tip_distribution_account: tip_distribution_account,
-            config: config,
-            signer: keypair.clone(),
-        }
-        .to_account_metas(None),
-        data: validator_history::instruction::CopyTipDistributionAccount { epoch: epoch }.data(),
-    }
-}
-
 pub async fn update_mev_commission(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -166,14 +133,15 @@ pub async fn update_mev_commission(
 
     let update_instructions = entries_to_update
         .iter()
-        .map(|entry| {
-            create_update_instruction(
-                program_id,
-                &keypair.pubkey(),
-                entry,
-                tip_distribution_program_id,
+        .map(|vote_account| {
+            ValidatorMevCommissionEntry::new(
+                vote_account,
                 epoch_info.epoch,
+                program_id,
+                tip_distribution_program_id,
+                &keypair.pubkey(),
             )
+            .update_instruction()
         })
         .collect::<Vec<_>>();
 

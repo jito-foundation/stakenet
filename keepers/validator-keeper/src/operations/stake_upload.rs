@@ -1,21 +1,18 @@
+use crate::entries::stake_history_entry::StakeHistoryEntry;
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use crate::state::keeper_state::KeeperState;
-use crate::{derive_validator_history_config_address, KeeperError, PRIORITY_FEE};
-use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{
-    submit_instructions, Address, SubmitStats, TransactionExecutionError, UpdateInstruction,
-};
+use crate::{KeeperError, PRIORITY_FEE};
+use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
     epoch_info::EpochInfo,
-    instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
@@ -106,115 +103,6 @@ pub async fn fire_and_emit(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
-pub struct StakeHistoryEntry {
-    pub stake: u64,
-    pub rank: u32,
-    pub is_superminority: bool,
-    pub vote_account: Pubkey,
-    pub address: Pubkey,
-    pub config: Pubkey,
-    pub signer: Pubkey,
-    pub program_id: Pubkey,
-    pub epoch: u64,
-}
-
-impl StakeHistoryEntry {
-    pub fn new(
-        vote_account: &RpcVoteAccountInfo,
-        program_id: &Pubkey,
-        signer: &Pubkey,
-        epoch: u64,
-        rank: u32,
-        is_superminority: bool,
-    ) -> StakeHistoryEntry {
-        let vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey)
-            .map_err(|e| {
-                error!("Invalid vote account pubkey");
-                e
-            })
-            .expect("Invalid vote account pubkey");
-        let (address, _) = Pubkey::find_program_address(
-            &[ValidatorHistory::SEED, &vote_pubkey.to_bytes()],
-            program_id,
-        );
-        let config = derive_validator_history_config_address(program_id);
-
-        StakeHistoryEntry {
-            stake: vote_account.activated_stake,
-            rank,
-            is_superminority,
-            vote_account: vote_pubkey,
-            address,
-            config,
-            signer: *signer,
-            program_id: *program_id,
-            epoch,
-        }
-    }
-}
-
-impl Address for StakeHistoryEntry {
-    fn address(&self) -> Pubkey {
-        self.address
-    }
-}
-
-impl UpdateInstruction for StakeHistoryEntry {
-    fn update_instruction(&self) -> Instruction {
-        Instruction {
-            program_id: self.program_id,
-            accounts: validator_history::accounts::UpdateStakeHistory {
-                validator_history_account: self.address,
-                vote_account: self.vote_account,
-                config: self.config,
-                oracle_authority: self.signer,
-            }
-            .to_account_metas(None),
-            data: validator_history::instruction::UpdateStakeHistory {
-                lamports: self.stake,
-                epoch: self.epoch,
-                rank: self.rank,
-                is_superminority: self.is_superminority,
-            }
-            .data(),
-        }
-    }
-}
-
-/*
-Calculates ordering of validators by stake, assigning a 0..N rank (validator 0 has the most stake),
-and returns the index at which all validators before are in the superminority. 0-indexed.
-*/
-fn get_stake_rank_map_and_superminority_count(
-    vote_accounts: &Vec<&RpcVoteAccountInfo>,
-) -> (HashMap<String, u32>, u32) {
-    let mut stake_vec = vote_accounts
-        .iter()
-        .map(|va| (va.vote_pubkey.clone(), va.activated_stake))
-        .collect::<Vec<_>>();
-
-    let total_stake = stake_vec.iter().map(|(_, stake)| *stake).sum::<u64>();
-    stake_vec.sort_by(|a, b| b.1.cmp(&a.1));
-
-    let mut cumulative_stake = 0;
-    let mut superminority_threshold = 0;
-    for (i, (_, stake)) in stake_vec.iter().enumerate() {
-        cumulative_stake += stake;
-        if cumulative_stake > total_stake / 3 {
-            superminority_threshold = i as u32;
-            break;
-        }
-    }
-    let stake_rank_map = HashMap::from_iter(
-        stake_vec
-            .into_iter()
-            .enumerate()
-            .map(|(i, (vote_pubkey, _))| (vote_pubkey, i as u32)),
-    );
-
-    (stake_rank_map, superminority_threshold)
-}
-
 pub async fn update_stake_history(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -296,6 +184,40 @@ fn stake_entry_uploaded(
         }
     }
     false
+}
+
+/*
+Calculates ordering of validators by stake, assigning a 0..N rank (validator 0 has the most stake),
+and returns the index at which all validators before are in the superminority. 0-indexed.
+*/
+fn get_stake_rank_map_and_superminority_count(
+    vote_accounts: &Vec<&RpcVoteAccountInfo>,
+) -> (HashMap<String, u32>, u32) {
+    let mut stake_vec = vote_accounts
+        .iter()
+        .map(|va| (va.vote_pubkey.clone(), va.activated_stake))
+        .collect::<Vec<_>>();
+
+    let total_stake = stake_vec.iter().map(|(_, stake)| *stake).sum::<u64>();
+    stake_vec.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut cumulative_stake = 0;
+    let mut superminority_threshold = 0;
+    for (i, (_, stake)) in stake_vec.iter().enumerate() {
+        cumulative_stake += stake;
+        if cumulative_stake > total_stake / 3 {
+            superminority_threshold = i as u32;
+            break;
+        }
+    }
+    let stake_rank_map = HashMap::from_iter(
+        stake_vec
+            .into_iter()
+            .enumerate()
+            .map(|(i, (vote_pubkey, _))| (vote_pubkey, i as u32)),
+    );
+
+    (stake_rank_map, superminority_threshold)
 }
 
 // /*

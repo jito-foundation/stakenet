@@ -1,22 +1,20 @@
+use crate::entries::gossip_entry::GossipEntry;
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use crate::state::keeper_state::KeeperState;
-use crate::{derive_validator_history_config_address, start_spy_server, PRIORITY_FEE};
-use anchor_lang::{InstructionData, ToAccountMetas};
+use crate::{start_spy_server, PRIORITY_FEE};
 use bytemuck::{bytes_of, Pod, Zeroable};
-use keeper_core::{submit_transactions, Address, SubmitStats, TransactionExecutionError};
+use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
 use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
 use solana_metrics::{datapoint_error, datapoint_info};
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::signature::Signable;
-use solana_sdk::signature::Signature;
 use solana_sdk::{
     epoch_info::EpochInfo,
     instruction::Instruction,
@@ -115,78 +113,6 @@ pub async fn fire_and_emit(
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
-#[derive(Clone, Debug)]
-pub struct GossipEntry {
-    pub vote_account: Pubkey,
-    pub validator_history_account: Pubkey,
-    pub config: Pubkey,
-    pub signature: Signature,
-    pub message: Vec<u8>,
-    pub program_id: Pubkey,
-    pub identity: Pubkey,
-    pub signer: Pubkey,
-}
-
-impl GossipEntry {
-    pub fn new(
-        vote_account: &Pubkey,
-        signature: &Signature,
-        message: &[u8],
-        program_id: &Pubkey,
-        identity: &Pubkey,
-        signer: &Pubkey,
-    ) -> Self {
-        let (validator_history_account, _) = Pubkey::find_program_address(
-            &[ValidatorHistory::SEED, &vote_account.to_bytes()],
-            program_id,
-        );
-        let config = derive_validator_history_config_address(program_id);
-        Self {
-            vote_account: *vote_account,
-            validator_history_account,
-            config,
-            signature: *signature,
-            message: message.to_vec(),
-            program_id: *program_id,
-            identity: *identity,
-            signer: *signer,
-        }
-    }
-}
-
-impl Address for GossipEntry {
-    fn address(&self) -> Pubkey {
-        self.validator_history_account
-    }
-}
-
-impl GossipEntry {
-    pub fn build_update_tx(&self, priority_fee: u64) -> Vec<Instruction> {
-        let mut ixs = vec![
-            ComputeBudgetInstruction::set_compute_unit_limit(100_000),
-            ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
-            build_verify_signature_ix(
-                self.signature.as_ref(),
-                self.identity.to_bytes(),
-                &self.message,
-            ),
-        ];
-
-        ixs.push(Instruction {
-            program_id: self.program_id,
-            accounts: validator_history::accounts::CopyGossipContactInfo {
-                validator_history_account: self.validator_history_account,
-                vote_account: self.vote_account,
-                instructions: solana_program::sysvar::instructions::id(),
-                config: self.config,
-                oracle_authority: self.signer,
-            }
-            .to_account_metas(None),
-            data: validator_history::instruction::CopyGossipContactInfo {}.data(),
-        });
-        ixs
-    }
-}
 
 fn check_entry_valid(
     entry: &CrdsValue,

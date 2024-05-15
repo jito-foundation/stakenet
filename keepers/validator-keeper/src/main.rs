@@ -15,7 +15,7 @@ use solana_sdk::{
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
-    operations,
+    operations::{self, keeper_operations::KeeperOperations},
     state::{
         keeper_state::KeeperState,
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
@@ -110,24 +110,29 @@ async fn run_loop(
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            println!("Updating");
-
             match pre_create_update(&client, &keypair, &program_id, &mut keeper_state).await {
-                Ok(_) => (),
+                Ok(_) => {
+                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
+                }
                 Err(e) => {
                     error!("Failed to pre create update: {:?}", e);
                     advance_tick(&mut tick);
-                    keeper_state.increment_update_error_for_epoch();
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::PreCreateUpdate);
                     continue;
                 }
             }
 
             match create_missing_accounts(&client, &keypair, &program_id, &keeper_state).await {
-                Ok(_) => (),
+                Ok(_) => {
+                    keeper_state
+                        .increment_update_run_for_epoch(KeeperOperations::CreateMissingAccounts);
+                }
                 Err(e) => {
                     error!("Failed to create missing accounts: {:?}", e);
                     advance_tick(&mut tick);
-                    keeper_state.increment_update_error_for_epoch();
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::CreateMissingAccounts);
                     continue;
                 }
             }
@@ -141,55 +146,41 @@ async fn run_loop(
             .await
             {
                 Ok(_) => {
-                    keeper_state.increment_update_run_for_epoch();
+                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
                 }
                 Err(e) => {
                     error!("Failed to post create update: {:?}", e);
                     advance_tick(&mut tick);
-                    keeper_state.increment_update_error_for_epoch();
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
                     continue;
                 }
             }
-
-            println!("State: {:?}", keeper_state);
         }
 
         // ---------------------- FIRE -----------------------------------
         // The fire functions will run the operations on the blockchain
         if should_fire(tick, validator_history_interval) {
-            // println!("Firing cluster history");
-            // keeper_state.set_runs_and_errors_for_epoch(
-            //     operations::cluster_history::fire_and_emit(
-            //         &client,
-            //         &keypair,
-            //         &program_id,
-            //         &keeper_state,
-            //     )
-            //     .await,
-            // );
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::cluster_history::fire_and_emit(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    &keeper_state,
+                )
+                .await,
+            );
 
-            // println!(
-            //     "{:?}\n{:?}",
-            //     keeper_state.runs_for_epoch, keeper_state.errors_for_epoch
-            // );
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::vote_account::fire_and_emit(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    &keeper_state,
+                )
+                .await,
+            );
 
-            // println!("Firing vote account");
-            // keeper_state.set_runs_and_errors_for_epoch(
-            //     operations::vote_account::fire_and_emit(
-            //         &client,
-            //         &keypair,
-            //         &program_id,
-            //         &keeper_state,
-            //     )
-            //     .await,
-            // );
-
-            // println!(
-            //     "{:?}\n{:?}",
-            //     keeper_state.runs_for_epoch, keeper_state.errors_for_epoch
-            // );
-
-            println!("Firing mev commission");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::mev_commission::fire_and_emit(
                     &client,
@@ -201,12 +192,6 @@ async fn run_loop(
                 .await,
             );
 
-            println!(
-                "{:?}\n{:?}",
-                keeper_state.runs_for_epoch, keeper_state.errors_for_epoch
-            );
-
-            println!("Firing mev earned");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::mev_earned::fire_and_emit(
                     &client,
@@ -216,11 +201,6 @@ async fn run_loop(
                     &keeper_state,
                 )
                 .await,
-            );
-
-            println!(
-                "{:?}\n{:?}",
-                keeper_state.runs_for_epoch, keeper_state.errors_for_epoch
             );
 
             if let Some(oracle_authority_keypair) = &oracle_authority_keypair {
@@ -254,19 +234,10 @@ async fn run_loop(
         // ---------------------- EMIT METRICS -----------------------------------
 
         if should_fire(tick, metrics_interval) {
-            println!("Firing metrics");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::metrics_emit::fire_and_emit(&keeper_state).await,
             );
-
-            println!(
-                "{:?}\n{:?}",
-                keeper_state.runs_for_epoch, keeper_state.errors_for_epoch
-            );
         }
-
-        println!("Tick: {}", tick);
-        println!("State: {:?}", keeper_state);
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
@@ -290,8 +261,6 @@ async fn main() {
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
     ));
-
-    println!("Keypair path: {:?}", args.keypair);
 
     let keypair = Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
 
@@ -318,7 +287,6 @@ async fn main() {
     };
 
     info!("Starting validator history keeper...");
-    println!("Starting validator history keeper...");
 
     run_loop(
         client,
