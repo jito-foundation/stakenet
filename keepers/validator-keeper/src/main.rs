@@ -15,8 +15,11 @@ use solana_sdk::{
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
-    operations::{self},
-    state::{keeper_state::KeeperState, update_state::update_state},
+    operations,
+    state::{
+        keeper_state::KeeperState,
+        update_state::{create_missing_accounts, post_create_update, pre_create_update},
+    },
 };
 
 #[derive(Parser, Debug)]
@@ -103,13 +106,30 @@ async fn run_loop(
     loop {
         // ---------------------- FETCH -----------------------------------
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
-        // These functions will update the keeper_state. If anything fails, no operations will be ran.
+        // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            match update_state(&client, &keypair, &program_id, &mut keeper_state).await {
-                Ok(_) => keeper_state.increment_update_run_for_epoch(),
+            match pre_create_update(&client, &keypair, &program_id, &mut keeper_state).await {
+                Ok(_) => (),
                 Err(e) => {
-                    error!("Failed to update state: {:?}", e);
-                    keeper_state.increment_update_error_for_epoch();
+                    error!("Failed to pre create update: {:?}", e);
+                    advance_tick(&mut tick);
+                    continue;
+                }
+            }
+
+            match create_missing_accounts(&client, &keypair, &program_id, &keeper_state).await {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("Failed to create missing accounts: {:?}", e);
+                    advance_tick(&mut tick);
+                    continue;
+                }
+            }
+
+            match post_create_update(&client, &program_id, &mut keeper_state).await {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("Failed to post create update: {:?}", e);
                     advance_tick(&mut tick);
                     continue;
                 }
@@ -192,13 +212,7 @@ async fn run_loop(
         // ---------------------- EMIT METRICS -----------------------------------
         if should_fire(tick, metrics_interval) {
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::metrics_emit::fire_and_emit(
-                    &client,
-                    &keypair,
-                    &program_id,
-                    &keeper_state,
-                )
-                .await,
+                operations::metrics_emit::fire_and_emit(&keeper_state).await,
             );
         }
 

@@ -5,27 +5,29 @@ use std::{
     sync::Arc,
 };
 
+use anchor_lang::AccountDeserialize;
 use keeper_core::{
     get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
 };
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
+    account::Account,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     vote,
 };
-use validator_history::{constants::MIN_VOTE_EPOCHS, ValidatorHistory};
+use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
 use crate::{
-    derive_validator_history_address, get_balance_with_retry,
+    derive_cluster_history_address, derive_validator_history_address, get_balance_with_retry,
     get_create_validator_history_instructions, get_validator_history_accounts_with_retry,
     operations::keeper_operations::KeeperOperations,
 };
 
 use super::keeper_state::KeeperState;
 
-pub async fn update_state(
+pub async fn pre_create_update(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
@@ -55,23 +57,20 @@ pub async fn update_state(
         }
     }
 
-    // Set Closed Vote Accounts
-    match get_closed_vote_accounts(client, keeper_state).await {
-        Ok(closed_vote_accounts) => {
-            keeper_state.closed_vote_accounts = closed_vote_accounts;
+    // Get all get vote accounts
+    match get_all_get_vote_account_map(client, keeper_state).await {
+        Ok(all_get_vote_account_map) => {
+            keeper_state.all_get_vote_account_map = all_get_vote_account_map;
         }
         Err(e) => {
             return Err(e);
         }
     }
 
-    // Create Missing Accounts
-    create_missing_validator_history_accounts(client, keypair, program_id, &keeper_state).await?;
-
-    // Fetch Validator History Accounts
-    match get_validator_history_map(client, program_id).await {
-        Ok(validator_history_map) => {
-            keeper_state.validator_history_map = validator_history_map;
+    // Update Cluster History
+    match get_cluster_history(client, program_id).await {
+        Ok(cluster_history) => {
+            keeper_state.cluster_history = cluster_history;
         }
         Err(e) => {
             return Err(e);
@@ -85,6 +84,47 @@ pub async fn update_state(
         }
         Err(e) => {
             return Err(Box::new(e));
+        }
+    }
+
+    Ok(())
+}
+
+// Should be called after `pre_create_update`
+pub async fn create_missing_accounts(
+    client: &Arc<RpcClient>,
+    keypair: &Arc<Keypair>,
+    program_id: &Pubkey,
+    keeper_state: &KeeperState,
+) -> Result<(), Box<dyn Error>> {
+    // Create Missing Accounts
+    create_missing_validator_history_accounts(client, keypair, program_id, &keeper_state).await?;
+
+    Ok(())
+}
+
+pub async fn post_create_update(
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+    keeper_state: &mut KeeperState,
+) -> Result<(), Box<dyn Error>> {
+    // Update Validator History Accounts
+    match get_validator_history_map(client, program_id).await {
+        Ok(validator_history_map) => {
+            keeper_state.validator_history_map = validator_history_map;
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    // Get all history vote accounts
+    match get_all_history_vote_account_map(client, keeper_state).await {
+        Ok(all_history_vote_account_map) => {
+            keeper_state.all_history_vote_account_map = all_history_vote_account_map;
+        }
+        Err(e) => {
+            return Err(e);
         }
     }
 
@@ -140,6 +180,18 @@ async fn get_closed_vote_accounts(
     Ok(closed_vote_accounts)
 }
 
+async fn get_cluster_history(
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+) -> Result<ClusterHistory, Box<dyn Error>> {
+    let cluster_history_address = derive_cluster_history_address(&program_id);
+    let cluster_history_account = client.get_account(&cluster_history_address).await?;
+    let cluster_history =
+        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
+
+    Ok(cluster_history)
+}
+
 async fn get_validator_history_map(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -154,6 +206,46 @@ async fn get_validator_history_map(
     );
 
     Ok(validator_history_map)
+}
+
+async fn get_all_history_vote_account_map(
+    client: &Arc<RpcClient>,
+    keeper_state: &KeeperState,
+) -> Result<HashMap<Pubkey, Option<Account>>, Box<dyn Error>> {
+    let validator_history_map = &keeper_state.validator_history_map;
+
+    let all_history_vote_account_pubkeys: Vec<Pubkey> =
+        validator_history_map.keys().cloned().collect();
+
+    let all_history_vote_accounts =
+        get_multiple_accounts_batched(all_history_vote_account_pubkeys.as_slice(), client).await?;
+
+    let history_vote_accounts_map = all_history_vote_account_pubkeys
+        .into_iter()
+        .zip(all_history_vote_accounts)
+        .collect::<HashMap<Pubkey, Option<Account>>>();
+
+    Ok(history_vote_accounts_map)
+}
+
+async fn get_all_get_vote_account_map(
+    client: &Arc<RpcClient>,
+    keeper_state: &KeeperState,
+) -> Result<HashMap<Pubkey, Option<Account>>, Box<dyn Error>> {
+    let vote_account_map = &keeper_state.vote_account_map;
+
+    // Convert the keys to a vector of Pubkey values
+    let all_get_vote_account_pubkeys: Vec<Pubkey> = vote_account_map.keys().cloned().collect();
+
+    let all_get_vote_accounts =
+        get_multiple_accounts_batched(all_get_vote_account_pubkeys.as_slice(), client).await?;
+
+    let get_vote_accounts_map = all_get_vote_account_pubkeys
+        .into_iter()
+        .zip(all_get_vote_accounts)
+        .collect::<HashMap<Pubkey, Option<Account>>>();
+
+    Ok(get_vote_accounts_map)
 }
 
 async fn create_missing_validator_history_accounts(

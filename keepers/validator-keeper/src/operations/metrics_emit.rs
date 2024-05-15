@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::operations::cluster_history;
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
@@ -14,6 +15,7 @@ use solana_metrics::datapoint_info;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
+    vote::program::id as get_vote_program_id,
 };
 use validator_history::{ClusterHistory, ValidatorHistoryEntry};
 
@@ -27,13 +29,8 @@ fn _should_run() -> bool {
     true
 }
 
-async fn _process(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    keeper_state: &KeeperState,
-) -> Result<(), Box<dyn std::error::Error>> {
-    emit_validator_history_metrics(client, program_id, &keypair.pubkey(), keeper_state).await
+async fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+    emit_validator_history_metrics(keeper_state).await
 }
 
 fn _emit(runs_for_epoch: i64, errors_for_epoch: i64) {
@@ -44,17 +41,12 @@ fn _emit(runs_for_epoch: i64, errors_for_epoch: i64) {
     );
 }
 
-pub async fn fire_and_emit(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64) {
+pub async fn fire_and_emit(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch) =
         keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
 
-    match _process(client, keypair, program_id, keeper_state).await {
+    match _process(keeper_state).await {
         Ok(_) => {
             runs_for_epoch += 1;
         }
@@ -71,17 +63,16 @@ pub async fn fire_and_emit(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 pub async fn emit_validator_history_metrics(
-    client: &RpcClient,
-    program_id: &Pubkey,
-    keeper_address: &Pubkey,
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
-    let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
+    let keeper_balance = keeper_state.keeper_balance;
+    let get_vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_histories = &keeper_state
         .validator_history_map
         .values()
         .collect::<Vec<_>>();
+    let cluster_history = &keeper_state.cluster_history;
 
     let mut ips = 0;
     let mut versions = 0;
@@ -92,6 +83,8 @@ pub async fn emit_validator_history_metrics(
     let mut stakes = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
+
+    let mut all_history_vote_accounts = Vec::new();
     for validator_history in validator_histories {
         if let Some(entry) = validator_history.history.last() {
             if entry.epoch as u64 != epoch_info.epoch {
@@ -122,30 +115,39 @@ pub async fn emit_validator_history_metrics(
                 stakes += 1;
             }
         }
-    }
 
-    let cluster_history_address = derive_cluster_history_address(program_id);
-    let cluster_history_account = client.get_account(&cluster_history_address).await?;
-    let cluster_history =
-        ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
+        all_history_vote_accounts.push(validator_history.vote_account);
+    }
 
     let mut cluster_history_blocks: i64 = 0;
     let cluster_history_entry = cluster_history.history.last();
     if let Some(cluster_history) = cluster_history_entry {
         // Looking for previous epoch to be updated
-        if cluster_history.epoch as u64 == epoch_info.epoch.saturating_sub(1) {
+        if cluster_history.epoch as u64 == epoch_info.epoch - 1 {
             cluster_history_blocks = 1;
         }
     }
 
-    let get_vote_accounts_count = vote_accounts.len();
+    let get_vote_accounts_count = get_vote_accounts.len() as i64;
 
-    let keeper_balance = get_balance_with_retry(client, keeper_address.clone()).await?;
+    let live_validator_histories_count = keeper_state.get_live_vote_accounts().len();
 
-    //TODO update with newest metrics
+    let get_vote_accounts_voting = get_vote_accounts
+        .iter()
+        .filter(|x| {
+            // Check if the last epoch credit ( most recent ) is the current epoch
+            x.epoch_credits.last().unwrap().0 == epoch_info.epoch
+        })
+        .count();
+
     datapoint_info!(
         "validator-history-stats",
         ("num_validator_histories", num_validators, i64),
+        (
+            "num_live_validator_histories",
+            live_validator_histories_count,
+            i64
+        ),
         ("num_ips", ips, i64),
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
@@ -158,6 +160,11 @@ pub async fn emit_validator_history_metrics(
         (
             "num_get_vote_accounts_responses",
             get_vote_accounts_count,
+            i64
+        ),
+        (
+            "num_get_vote_accounts_voting",
+            get_vote_accounts_voting,
             i64
         ),
     );

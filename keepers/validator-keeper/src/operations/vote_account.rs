@@ -163,7 +163,7 @@ pub async fn update_vote_accounts(
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     let validator_history_map = &keeper_state.validator_history_map;
-    let closed_vote_accounts = &keeper_state.closed_vote_accounts;
+    let closed_vote_accounts = &keeper_state.get_closed_vote_accounts();
     let epoch_info = &keeper_state.epoch_info;
 
     // Remove closed vote accounts from all vote accounts
