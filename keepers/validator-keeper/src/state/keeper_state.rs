@@ -29,26 +29,7 @@ pub struct KeeperState {
 }
 impl KeeperState {
     pub fn new() -> Self {
-        Self {
-            epoch_info: EpochInfo {
-                epoch: 0,
-                slot_index: 0,
-                slots_in_epoch: 0,
-                absolute_slot: 0,
-                block_height: 0,
-                transaction_count: None,
-            },
-            runs_for_epoch: [0; KeeperOperations::LEN],
-            errors_for_epoch: [0; KeeperOperations::LEN],
-            vote_account_map: HashMap::new(),
-            validator_history_map: HashMap::new(),
-            all_history_vote_account_map: HashMap::new(),
-            all_get_vote_account_map: HashMap::new(),
-            previous_epoch_tip_distribution_map: HashMap::new(),
-            current_epoch_tip_distribution_map: HashMap::new(),
-            cluster_history: ClusterHistory::zeroed(),
-            keeper_balance: 0,
-        }
+        Self::default()
     }
 
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
@@ -63,10 +44,7 @@ impl KeeperState {
 
     pub fn copy_runs_and_errors_for_epoch(&self, operation: KeeperOperations) -> (u64, u64) {
         let index = operation as usize;
-        (
-            self.runs_for_epoch[index].clone(),
-            self.errors_for_epoch[index].clone(),
-        )
+        (self.runs_for_epoch[index], self.errors_for_epoch[index])
     }
 
     pub fn set_runs_and_errors_for_epoch(
@@ -81,7 +59,6 @@ impl KeeperState {
     pub fn get_history_pubkeys(&self, program_id: &Pubkey) -> HashSet<Pubkey> {
         self.all_history_vote_account_map
             .keys()
-            .into_iter()
             .map(|vote_account| derive_validator_history_address(vote_account, program_id))
             .collect()
     }
@@ -112,6 +89,31 @@ impl KeeperState {
             })
             .map(|(pubkey, _)| pubkey)
             .collect()
+    }
+}
+
+impl Default for KeeperState {
+    fn default() -> Self {
+        Self {
+            epoch_info: EpochInfo {
+                epoch: 0,
+                slot_index: 0,
+                slots_in_epoch: 0,
+                absolute_slot: 0,
+                block_height: 0,
+                transaction_count: None,
+            },
+            runs_for_epoch: [0; KeeperOperations::LEN],
+            errors_for_epoch: [0; KeeperOperations::LEN],
+            vote_account_map: HashMap::new(),
+            validator_history_map: HashMap::new(),
+            all_history_vote_account_map: HashMap::new(),
+            all_get_vote_account_map: HashMap::new(),
+            previous_epoch_tip_distribution_map: HashMap::new(),
+            current_epoch_tip_distribution_map: HashMap::new(),
+            cluster_history: ClusterHistory::zeroed(),
+            keeper_balance: 0,
+        }
     }
 }
 

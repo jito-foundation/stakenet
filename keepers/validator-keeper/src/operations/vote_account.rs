@@ -22,17 +22,14 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::VoteAccount;
+    KeeperOperations::VoteAccount
 }
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 10%, 50% and 90% completion of epoch
-    let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-        && runs_for_epoch < 1)
+    (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000 && runs_for_epoch < 1)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-
-    should_run
+        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
 async fn _process(
@@ -65,7 +62,7 @@ pub async fn fire_and_emit(
     let (mut runs_for_epoch, mut errors_for_epoch) =
         keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
 
-    let should_run = _should_run(epoch_info, runs_for_epoch.clone());
+    let should_run = _should_run(epoch_info, runs_for_epoch);
 
     let mut stats = SubmitStats::default();
     if should_run {
@@ -97,11 +94,7 @@ pub async fn fire_and_emit(
         };
     }
 
-    _emit(
-        &stats,
-        runs_for_epoch.clone() as i64,
-        errors_for_epoch.clone() as i64,
-    );
+    _emit(&stats, runs_for_epoch as i64, errors_for_epoch as i64);
 
     (operation, runs_for_epoch, errors_for_epoch)
 }
@@ -124,7 +117,7 @@ pub async fn update_vote_accounts(
     vote_accounts_to_update.retain(|vote_account| {
         !closed_vote_accounts.contains(vote_account)
             && !vote_account_uploaded_recently(
-                &validator_history_map,
+                validator_history_map,
                 vote_account,
                 epoch_info.epoch,
                 epoch_info.absolute_slot,

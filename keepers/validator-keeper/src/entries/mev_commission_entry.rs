@@ -33,12 +33,12 @@ impl ValidatorMevCommissionEntry {
         let config = derive_validator_history_config_address(program_id);
 
         Self {
-            vote_account: vote_account.clone(),
+            vote_account: *vote_account,
             tip_distribution_account,
             validator_history_account,
             config,
-            program_id: program_id.clone(),
-            signer: signer.clone(),
+            program_id: *program_id,
+            signer: *signer,
             epoch,
         }
     }

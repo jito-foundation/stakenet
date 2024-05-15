@@ -32,16 +32,14 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::GossipUpload;
+    KeeperOperations::GossipUpload
 }
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 0%, 50% and 90% completion of epoch
-    let should_run = runs_for_epoch < 1
+    runs_for_epoch < 1
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-
-    should_run
+        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
 async fn _process(
@@ -255,13 +253,8 @@ pub async fn upload_gossip_values(
         gossip_port,
     );
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-    let (_gossip_service, cluster_info) = start_spy_server(
-        entrypoint.clone(),
-        gossip_port,
-        spy_socket_addr,
-        &keypair,
-        &exit,
-    );
+    let (_gossip_service, cluster_info) =
+        start_spy_server(*entrypoint, gossip_port, spy_socket_addr, keypair, &exit);
 
     // Wait for all active validators to be received
     sleep(Duration::from_secs(150)).await;
@@ -284,7 +277,7 @@ pub async fn upload_gossip_values(
                     validator_history_account,
                     &crds,
                     *program_id,
-                    &keypair,
+                    keypair,
                 )
             })
             .flatten()

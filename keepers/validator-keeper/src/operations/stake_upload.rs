@@ -22,17 +22,14 @@ use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::StakeUpload;
+    KeeperOperations::StakeUpload
 }
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 0.1%, 50% and 90% completion of epoch
-    let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-        && runs_for_epoch < 1)
+    (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000 && runs_for_epoch < 1)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-
-    should_run
+        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
 async fn _process(
@@ -136,7 +133,7 @@ pub async fn update_stake_history(
             let rank = stake_rank_map[&vote_account.vote_pubkey.clone()];
             let is_superminority = rank <= superminority_threshold;
 
-            if stake_entry_uploaded(&validator_history_map, vote_account, epoch_info.epoch) {
+            if stake_entry_uploaded(validator_history_map, vote_account, epoch_info.epoch) {
                 return None;
             }
 
@@ -191,7 +188,7 @@ Calculates ordering of validators by stake, assigning a 0..N rank (validator 0 h
 and returns the index at which all validators before are in the superminority. 0-indexed.
 */
 fn get_stake_rank_map_and_superminority_count(
-    vote_accounts: &Vec<&RpcVoteAccountInfo>,
+    vote_accounts: &[&RpcVoteAccountInfo],
 ) -> (HashMap<String, u32>, u32) {
     let mut stake_vec = vote_accounts
         .iter()

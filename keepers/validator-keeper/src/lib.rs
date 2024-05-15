@@ -257,10 +257,10 @@ pub fn get_create_validator_history_instructions(
     let config_account = derive_validator_history_config_address(program_id);
 
     let mut ixs = vec![Instruction {
-        program_id: program_id.clone(),
+        program_id: *program_id,
         accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
             validator_history_account,
-            vote_account: vote_account.clone(),
+            vote_account: *vote_account,
             system_program: solana_program::system_program::id(),
             signer: signer.pubkey(),
         }
@@ -271,10 +271,10 @@ pub fn get_create_validator_history_instructions(
     let num_reallocs = (ValidatorHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
     ixs.extend(vec![
         Instruction {
-            program_id: program_id.clone(),
+            program_id: *program_id,
             accounts: validator_history::accounts::ReallocValidatorHistoryAccount {
-                validator_history_account: validator_history_account,
-                vote_account: vote_account.clone(),
+                validator_history_account,
+                vote_account: *vote_account,
                 config: config_account,
                 system_program: solana_program::system_program::id(),
                 signer: signer.pubkey(),

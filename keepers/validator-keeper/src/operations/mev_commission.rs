@@ -21,7 +21,7 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::MevCommission;
+    KeeperOperations::MevCommission
 }
 
 fn _should_run() -> bool {
@@ -120,15 +120,12 @@ pub async fn update_mev_commission(
 
     let existing_entries = current_epoch_tip_distribution_map
         .iter()
-        .filter_map(|(pubkey, account)| match account {
-            Some(_) => Some(pubkey.clone()),
-            None => None,
-        })
+        .filter_map(|(pubkey, account)| account.as_ref().map(|_| *pubkey))
         .collect::<Vec<_>>();
 
     let entries_to_update = existing_entries
         .into_iter()
-        .filter(|entry| !mev_commission_uploaded(&validator_history_map, entry, epoch_info.epoch))
+        .filter(|entry| !mev_commission_uploaded(validator_history_map, entry, epoch_info.epoch))
         .collect::<Vec<Pubkey>>();
 
     let update_instructions = entries_to_update

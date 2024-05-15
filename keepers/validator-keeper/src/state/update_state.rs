@@ -93,7 +93,7 @@ pub async fn create_missing_accounts(
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     // Create Missing Accounts
-    create_missing_validator_history_accounts(client, keypair, program_id, &keeper_state).await?;
+    create_missing_validator_history_accounts(client, keypair, program_id, keeper_state).await?;
 
     Ok(())
 }
@@ -182,7 +182,7 @@ async fn get_cluster_history(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
 ) -> Result<ClusterHistory, Box<dyn Error>> {
-    let cluster_history_address = derive_cluster_history_address(&program_id);
+    let cluster_history_address = derive_cluster_history_address(program_id);
     let cluster_history_account = client.get_account(&cluster_history_address).await?;
     let cluster_history =
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
@@ -195,12 +195,12 @@ async fn get_validator_history_map(
     program_id: &Pubkey,
 ) -> Result<HashMap<Pubkey, ValidatorHistory>, Box<dyn Error>> {
     let validator_histories =
-        get_validator_history_accounts_with_retry(&client, program_id.clone()).await?;
+        get_validator_history_accounts_with_retry(client, *program_id).await?;
 
     let validator_history_map = HashMap::from_iter(
         validator_histories
             .iter()
-            .map(|vote_history| (vote_history.vote_account, vote_history.clone())),
+            .map(|vote_history| (vote_history.vote_account, *vote_history)),
     );
 
     Ok(validator_history_map)
@@ -271,12 +271,12 @@ async fn get_tip_distribution_accounts(
         .collect::<Vec<Pubkey>>();
 
     let tip_distribution_accounts =
-        get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
+        get_multiple_accounts_batched(&tip_distribution_addresses, client).await?;
 
     let result = vote_accounts
         .into_iter()
         .zip(tip_distribution_accounts)
-        .map(|(vote_pubkey, account)| (vote_pubkey.clone(), account)) // Dereference vote_pubkey here
+        .map(|(vote_pubkey, account)| (*vote_pubkey, account)) // Dereference vote_pubkey here
         .collect::<HashMap<Pubkey, Option<Account>>>();
 
     Ok(result)
@@ -298,7 +298,7 @@ async fn create_missing_validator_history_accounts(
         .map(|vote_pubkey| derive_validator_history_address(vote_pubkey, program_id))
         .collect::<Vec<Pubkey>>();
 
-    let history_accounts = get_multiple_accounts_batched(&all_history_addresses, client).await?;
+    let history_accounts = get_multiple_accounts_batched(all_history_addresses, client).await?;
 
     assert!(vote_accounts.len() == history_accounts.len());
 

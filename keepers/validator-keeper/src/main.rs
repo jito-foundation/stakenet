@@ -70,7 +70,7 @@ struct Args {
     cluster: Cluster,
 }
 
-fn should_update(tick: u64, intervals: &Vec<u64>) -> bool {
+fn should_update(tick: u64, intervals: &[u64]) -> bool {
     intervals.iter().any(|interval| tick % interval == 0)
 }
 
@@ -87,7 +87,7 @@ async fn sleep_and_tick(tick: &mut u64) {
     advance_tick(tick);
 }
 
-async fn run_loop(
+struct RunLoopConfig {
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: Pubkey,
@@ -96,7 +96,19 @@ async fn run_loop(
     gossip_entrypoint: Option<SocketAddr>,
     validator_history_interval: u64,
     metrics_interval: u64,
-) {
+}
+
+async fn run_loop(config: RunLoopConfig) {
+    let RunLoopConfig {
+        client,
+        keypair,
+        program_id,
+        tip_distribution_program_id,
+        oracle_authority_keypair,
+        gossip_entrypoint,
+        validator_history_interval,
+        metrics_interval,
+    } = config;
     let intervals = vec![validator_history_interval, metrics_interval];
 
     // Stateful data
@@ -214,7 +226,7 @@ async fn run_loop(
                 keeper_state.set_runs_and_errors_for_epoch(
                     operations::stake_upload::fire_and_emit(
                         &client,
-                        &oracle_authority_keypair,
+                        oracle_authority_keypair,
                         &program_id,
                         &keeper_state,
                     )
@@ -229,7 +241,7 @@ async fn run_loop(
                 keeper_state.set_runs_and_errors_for_epoch(
                     operations::gossip_upload::fire_and_emit(
                         &client,
-                        &oracle_authority_keypair,
+                        oracle_authority_keypair,
                         &program_id,
                         &gossip_entrypoint,
                         &keeper_state,
@@ -266,39 +278,32 @@ async fn main() {
 
     let keypair = Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
 
-    let oracle_authority_keypair = {
-        if let Some(oracle_authority_keypair) = args.oracle_authority_keypair {
-            Some(Arc::new(
+    let oracle_authority_keypair = args
+        .oracle_authority_keypair
+        .map(|oracle_authority_keypair| {
+            Arc::new(
                 read_keypair_file(oracle_authority_keypair)
                     .expect("Failed reading stake keypair file"),
-            ))
-        } else {
-            None
-        }
-    };
-
-    let gossip_entrypoint = {
-        if let Some(gossip_entrypoint) = args.gossip_entrypoint {
-            Some(
-                solana_net_utils::parse_host_port(&gossip_entrypoint)
-                    .expect("Failed to parse host and port from gossip entrypoint"),
             )
-        } else {
-            None
-        }
-    };
+        });
+
+    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
+        solana_net_utils::parse_host_port(&gossip_entrypoint)
+            .expect("Failed to parse host and port from gossip entrypoint")
+    });
 
     info!("Starting validator history keeper...");
 
-    run_loop(
+    let config = RunLoopConfig {
         client,
         keypair,
-        args.program_id,
-        args.tip_distribution_program_id,
+        program_id: args.program_id,
+        tip_distribution_program_id: args.tip_distribution_program_id,
         oracle_authority_keypair,
         gossip_entrypoint,
-        args.validator_history_interval,
-        args.metrics_interval,
-    )
-    .await;
+        validator_history_interval: args.validator_history_interval,
+        metrics_interval: args.metrics_interval,
+    };
+
+    run_loop(config).await;
 }

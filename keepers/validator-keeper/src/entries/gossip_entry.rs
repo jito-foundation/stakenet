@@ -33,14 +33,14 @@ impl GossipEntry {
         let validator_history_account = derive_validator_history_address(vote_account, program_id);
         let config = derive_validator_history_config_address(program_id);
         Self {
-            vote_account: vote_account.clone(),
+            vote_account: *vote_account,
             validator_history_account,
             config,
-            signature: signature.clone(),
+            signature: *signature,
             message: message.to_vec(),
-            program_id: program_id.clone(),
-            identity: identity.clone(),
-            signer: signer.clone(),
+            program_id: *program_id,
+            identity: *identity,
+            signer: *signer,
         }
     }
 }

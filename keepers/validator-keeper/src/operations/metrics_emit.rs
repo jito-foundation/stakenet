@@ -11,7 +11,7 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::EmitMetrics;
+    KeeperOperations::EmitMetrics
 }
 
 fn _should_run() -> bool {

@@ -22,17 +22,14 @@ use std::sync::Arc;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::ClusterHistory;
+    KeeperOperations::ClusterHistory
 }
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 0.1%, 50% and 90% completion of epoch
-    let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-        && runs_for_epoch < 1)
+    (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000 && runs_for_epoch < 1)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-
-    should_run
+        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
 async fn _process(
@@ -65,7 +62,7 @@ pub async fn fire_and_emit(
     let (mut runs_for_epoch, mut errors_for_epoch) =
         keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
 
-    let should_run = _should_run(&epoch_info, runs_for_epoch.clone());
+    let should_run = _should_run(epoch_info, runs_for_epoch);
 
     let mut stats = SubmitStats::default();
     if should_run {
@@ -117,7 +114,7 @@ pub fn get_update_cluster_info_instructions(
         accounts: validator_history::accounts::CopyClusterInfo {
             cluster_history_account,
             slot_history: solana_program::sysvar::slot_history::id(),
-            signer: keypair.clone(),
+            signer: *keypair,
         }
         .to_account_metas(None),
         data: validator_history::instruction::CopyClusterInfo {}.data(),

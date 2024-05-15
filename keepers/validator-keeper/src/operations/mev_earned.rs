@@ -23,7 +23,7 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::KeeperOperations;
 
 fn _get_operation() -> KeeperOperations {
-    return KeeperOperations::MevEarned;
+    KeeperOperations::MevEarned
 }
 
 fn _should_run() -> bool {
@@ -129,7 +129,7 @@ pub async fn update_mev_earned(
             let mut data: &[u8] = &account_data.data;
             let tda = TipDistributionAccount::try_deserialize(&mut data).ok()?;
             if tda.merkle_root.is_some() {
-                Some(address.clone())
+                Some(*address)
             } else {
                 None
             }
