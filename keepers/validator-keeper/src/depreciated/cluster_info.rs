@@ -46,6 +46,5 @@ pub async fn update_cluster_info(
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let ixs = get_update_cluster_info_instructions(program_id, &keypair.pubkey());
 
-    //TODO why not use submit_instructions?
     submit_transactions(client, vec![ixs], keypair).await
 }

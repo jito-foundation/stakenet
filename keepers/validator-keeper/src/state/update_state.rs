@@ -1,9 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
@@ -16,7 +11,6 @@ use solana_sdk::{
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
-    vote,
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
@@ -182,37 +176,6 @@ async fn get_vote_account_map(
     );
 
     Ok(active_vote_accounts)
-}
-
-//TODO remove
-async fn _get_closed_vote_accounts(
-    client: &Arc<RpcClient>,
-    keeper_state: &KeeperState,
-) -> Result<HashSet<Pubkey>, Box<dyn Error>> {
-    let vote_account_pubkeys = &keeper_state
-        .validator_history_map
-        .clone()
-        .into_values()
-        .map(|validator_history| validator_history.vote_account)
-        .collect::<Vec<_>>();
-
-    let vote_accounts = get_multiple_accounts_batched(&vote_account_pubkeys, client).await?;
-    let closed_vote_accounts: HashSet<Pubkey> = vote_accounts
-        .iter()
-        .enumerate()
-        .filter_map(|(i, account)| match account {
-            Some(account) => {
-                if account.owner != vote::program::id() {
-                    Some(vote_account_pubkeys[i])
-                } else {
-                    None
-                }
-            }
-            None => Some(vote_account_pubkeys[i]),
-        })
-        .collect();
-
-    Ok(closed_vote_accounts)
 }
 
 async fn get_cluster_history(

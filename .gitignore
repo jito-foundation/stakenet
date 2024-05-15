@@ -12,3 +12,4 @@ test-ledger
 **/targets
 **/credentials
 **/config
+**/*.env

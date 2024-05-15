@@ -477,8 +477,8 @@ pub async fn submit_instructions(
     microlamports: u64,
 ) -> Result<SubmitStats, TransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    //TODO change back
-    match parallel_execute_instructions(client, &instructions, keypair, 1, 20, microlamports).await
+    match parallel_execute_instructions(client, &instructions, keypair, 100, 20, microlamports)
+        .await
     {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
