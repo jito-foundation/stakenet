@@ -21,6 +21,9 @@ pub struct KeeperState {
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
     pub all_get_vote_account_map: HashMap<Pubkey, Option<Account>>,
 
+    pub previous_epoch_tip_distribution_map: HashMap<Pubkey, Option<Account>>,
+    pub current_epoch_tip_distribution_map: HashMap<Pubkey, Option<Account>>,
+
     pub cluster_history: ClusterHistory,
     pub keeper_balance: u64,
 }
@@ -41,6 +44,8 @@ impl KeeperState {
             validator_history_map: HashMap::new(),
             all_history_vote_account_map: HashMap::new(),
             all_get_vote_account_map: HashMap::new(),
+            previous_epoch_tip_distribution_map: HashMap::new(),
+            current_epoch_tip_distribution_map: HashMap::new(),
             cluster_history: ClusterHistory::zeroed(),
             keeper_balance: 0,
         }
@@ -107,5 +112,38 @@ impl KeeperState {
             })
             .map(|(pubkey, _)| pubkey)
             .collect()
+    }
+}
+
+impl std::fmt::Debug for KeeperState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeeperState")
+            .field("epoch_info", &self.epoch_info)
+            .field("runs_for_epoch", &self.runs_for_epoch)
+            .field("errors_for_epoch", &self.errors_for_epoch)
+            .field("vote_account_map_count", &self.vote_account_map.len())
+            .field(
+                "validator_history_map_count",
+                &self.validator_history_map.len(),
+            )
+            .field(
+                "all_history_vote_account_map_count",
+                &self.all_history_vote_account_map.len(),
+            )
+            .field(
+                "all_get_vote_account_map_count",
+                &self.all_get_vote_account_map.len(),
+            )
+            .field(
+                "previous_epoch_tip_distribution_map_count",
+                &self.previous_epoch_tip_distribution_map.len(),
+            )
+            .field(
+                "current_epoch_tip_distribution_map_count",
+                &self.current_epoch_tip_distribution_map.len(),
+            )
+            // .field("cluster_history", &self.cluster_history)
+            .field("keeper_balance", &self.keeper_balance)
+            .finish()
     }
 }

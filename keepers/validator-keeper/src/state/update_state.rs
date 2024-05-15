@@ -6,6 +6,7 @@ use std::{
 };
 
 use anchor_lang::AccountDeserialize;
+use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use keeper_core::{
     get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
 };
@@ -106,6 +107,7 @@ pub async fn create_missing_accounts(
 pub async fn post_create_update(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
+    tip_distribution_program_id: &Pubkey,
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     // Update Validator History Accounts
@@ -122,6 +124,38 @@ pub async fn post_create_update(
     match get_all_history_vote_account_map(client, keeper_state).await {
         Ok(all_history_vote_account_map) => {
             keeper_state.all_history_vote_account_map = all_history_vote_account_map;
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    match get_tip_distribution_accounts(
+        client,
+        tip_distribution_program_id,
+        keeper_state,
+        keeper_state.epoch_info.epoch.saturating_sub(1),
+    )
+    .await
+    {
+        Ok(tip_distribution_accounts) => {
+            keeper_state.previous_epoch_tip_distribution_map = tip_distribution_accounts;
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    match get_tip_distribution_accounts(
+        client,
+        tip_distribution_program_id,
+        keeper_state,
+        keeper_state.epoch_info.epoch,
+    )
+    .await
+    {
+        Ok(tip_distribution_accounts) => {
+            keeper_state.current_epoch_tip_distribution_map = tip_distribution_accounts;
         }
         Err(e) => {
             return Err(e);
@@ -150,7 +184,8 @@ async fn get_vote_account_map(
     Ok(active_vote_accounts)
 }
 
-async fn get_closed_vote_accounts(
+//TODO remove
+async fn _get_closed_vote_accounts(
     client: &Arc<RpcClient>,
     keeper_state: &KeeperState,
 ) -> Result<HashSet<Pubkey>, Box<dyn Error>> {
@@ -246,6 +281,42 @@ async fn get_all_get_vote_account_map(
         .collect::<HashMap<Pubkey, Option<Account>>>();
 
     Ok(get_vote_accounts_map)
+}
+
+async fn get_tip_distribution_accounts(
+    client: &Arc<RpcClient>,
+    tip_distribution_program_id: &Pubkey,
+    keeper_state: &KeeperState,
+    epoch: u64,
+) -> Result<HashMap<Pubkey, Option<Account>>, Box<dyn Error>> {
+    let vote_accounts = keeper_state
+        .all_history_vote_account_map
+        .keys()
+        .collect::<Vec<_>>();
+
+    /* Filters tip distribution tuples to the addresses, then fetches accounts to see which ones exist */
+    let tip_distribution_addresses = vote_accounts
+        .iter()
+        .map(|vote_pubkey| {
+            let (pubkey, _) = derive_tip_distribution_account_address(
+                tip_distribution_program_id,
+                vote_pubkey,
+                epoch,
+            );
+            pubkey
+        })
+        .collect::<Vec<Pubkey>>();
+
+    let tip_distribution_accounts =
+        get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
+
+    let result = vote_accounts
+        .into_iter()
+        .zip(tip_distribution_accounts)
+        .map(|(vote_pubkey, account)| (vote_pubkey.clone(), account)) // Dereference vote_pubkey here
+        .collect::<HashMap<Pubkey, Option<Account>>>();
+
+    Ok(result)
 }
 
 async fn create_missing_validator_history_accounts(

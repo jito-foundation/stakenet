@@ -10,3 +10,4 @@ test-ledger
 */test-ledger
 .idea/
 **/targets
+**/credentials

@@ -5,16 +5,14 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 
 use crate::state::keeper_state::KeeperState;
-use crate::{derive_validator_history_config_address, KeeperError, PRIORITY_FEE};
+use crate::{
+    derive_validator_history_address, derive_validator_history_config_address, KeeperError,
+    PRIORITY_FEE,
+};
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
-use keeper_core::{
-    get_multiple_accounts_batched, submit_instructions, Address, MultipleAccountsError,
-    SubmitStats, TransactionExecutionError, UpdateInstruction,
-};
-use log::*;
+use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_metrics::datapoint_error;
 use solana_metrics::datapoint_info;
 use solana_sdk::{
@@ -22,7 +20,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
@@ -87,6 +85,7 @@ pub async fn fire_and_emit(
             for message in stats.results.iter().chain(stats.results.iter()) {
                 if let Err(e) = message {
                     datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    errors_for_epoch += 1;
                 }
             }
             runs_for_epoch += 1;
@@ -114,114 +113,68 @@ pub async fn fire_and_emit(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
-//TODO Move this to keeper_core?
-#[derive(Clone)]
-pub struct ValidatorMevCommissionEntry {
-    pub vote_account: Pubkey,
-    pub tip_distribution_account: Pubkey,
-    pub validator_history_account: Pubkey,
-    pub config: Pubkey,
-    pub program_id: Pubkey,
-    pub signer: Pubkey,
-    pub epoch: u64,
-}
+fn create_update_instruction(
+    program_id: &Pubkey,
+    keypair: &Pubkey,
+    vote_account: &Pubkey,
+    tip_distribution_program_id: &Pubkey,
+    epoch: u64,
+) -> Instruction {
+    let validator_history_account = derive_validator_history_address(program_id, vote_account);
+    let (tip_distribution_account, _) =
+        derive_tip_distribution_account_address(tip_distribution_program_id, vote_account, epoch);
 
-impl ValidatorMevCommissionEntry {
-    pub fn new(
-        vote_account: &RpcVoteAccountInfo,
-        epoch: u64,
-        program_id: &Pubkey,
-        tip_distribution_program_id: &Pubkey,
-        signer: &Pubkey,
-    ) -> Self {
-        let vote_account = Pubkey::from_str(&vote_account.vote_pubkey)
-            .map_err(|e| {
-                error!("Invalid vote account pubkey");
-                e
-            })
-            .expect("Invalid vote account pubkey");
-        let (validator_history_account, _) = Pubkey::find_program_address(
-            &[ValidatorHistory::SEED, &vote_account.to_bytes()],
-            program_id,
-        );
-        let (tip_distribution_account, _) = derive_tip_distribution_account_address(
-            tip_distribution_program_id,
-            &vote_account,
-            epoch,
-        );
-        let config = derive_validator_history_config_address(program_id);
-        Self {
-            vote_account,
-            tip_distribution_account,
-            validator_history_account,
-            config,
-            program_id: *program_id,
-            signer: *signer,
-            epoch,
+    let config = derive_validator_history_config_address(program_id);
+
+    Instruction {
+        program_id: program_id.clone(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
+            validator_history_account: validator_history_account,
+            vote_account: vote_account.clone(),
+            tip_distribution_account: tip_distribution_account,
+            config: config,
+            signer: keypair.clone(),
         }
-    }
-}
-
-impl Address for ValidatorMevCommissionEntry {
-    fn address(&self) -> Pubkey {
-        self.validator_history_account
-    }
-}
-
-impl UpdateInstruction for ValidatorMevCommissionEntry {
-    fn update_instruction(&self) -> Instruction {
-        Instruction {
-            program_id: self.program_id,
-            accounts: validator_history::accounts::CopyTipDistributionAccount {
-                validator_history_account: self.validator_history_account,
-                vote_account: self.vote_account,
-                tip_distribution_account: self.tip_distribution_account,
-                config: self.config,
-                signer: self.signer,
-            }
-            .to_account_metas(None),
-            data: validator_history::instruction::CopyTipDistributionAccount { epoch: self.epoch }
-                .data(),
-        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch: epoch }.data(),
     }
 }
 
 pub async fn update_mev_commission(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
-    validator_history_program_id: &Pubkey,
+    program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     let epoch_info = &keeper_state.epoch_info;
-    let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
+    let current_epoch_tip_distribution_map = &keeper_state.current_epoch_tip_distribution_map;
 
-    let entries = vote_accounts
+    let existing_entries = current_epoch_tip_distribution_map
         .iter()
-        .map(|vote_account| {
-            ValidatorMevCommissionEntry::new(
-                vote_account,
-                epoch_info.epoch,
-                validator_history_program_id,
-                tip_distribution_program_id,
-                &keypair.pubkey(),
-            )
+        .filter_map(|(pubkey, account)| match account {
+            Some(_) => Some(pubkey.clone()),
+            None => None,
         })
-        .collect::<Vec<ValidatorMevCommissionEntry>>();
-
-    let existing_entries = get_existing_entries(client.clone(), &entries).await?;
+        .collect::<Vec<_>>();
 
     let entries_to_update = existing_entries
         .into_iter()
-        .filter(|entry| {
-            !mev_commission_uploaded(&validator_history_map, entry.address(), epoch_info.epoch)
-        })
-        .collect::<Vec<ValidatorMevCommissionEntry>>();
+        .filter(|entry| !mev_commission_uploaded(&validator_history_map, entry, epoch_info.epoch))
+        .collect::<Vec<Pubkey>>();
 
     let update_instructions = entries_to_update
         .iter()
-        .map(|validator_mev_commission_entry| validator_mev_commission_entry.update_instruction())
+        .map(|entry| {
+            create_update_instruction(
+                program_id,
+                &keypair.pubkey(),
+                entry,
+                tip_distribution_program_id,
+                epoch_info.epoch,
+            )
+        })
         .collect::<Vec<_>>();
 
     let submit_result =
@@ -230,38 +183,12 @@ pub async fn update_mev_commission(
     submit_result.map_err(|e| e.into())
 }
 
-async fn get_existing_entries(
-    client: Arc<RpcClient>,
-    entries: &[ValidatorMevCommissionEntry],
-) -> Result<Vec<ValidatorMevCommissionEntry>, MultipleAccountsError> {
-    /* Filters tip distribution tuples to the addresses, then fetches accounts to see which ones exist */
-    let tip_distribution_addresses = entries
-        .iter()
-        .map(|entry| entry.tip_distribution_account)
-        .collect::<Vec<Pubkey>>();
-
-    let accounts = get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
-    let result = accounts
-        .iter()
-        .enumerate()
-        .filter_map(|(i, account_data)| {
-            if account_data.is_some() {
-                Some(entries[i].clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<ValidatorMevCommissionEntry>>();
-    // Fetch existing tip distribution accounts for this epoch
-    Ok(result)
-}
-
 fn mev_commission_uploaded(
     validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-    vote_account: Pubkey,
+    vote_account: &Pubkey,
     epoch: u64,
 ) -> bool {
-    if let Some(validator_history) = validator_history_map.get(&vote_account) {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
         if let Some(latest_entry) = validator_history.history.last() {
             return latest_entry.epoch == epoch as u16
                 && latest_entry.mev_commission != ValidatorHistoryEntry::default().mev_commission;
