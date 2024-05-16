@@ -43,44 +43,17 @@ pub async fn pre_create_update(
     }
 
     // Fetch Vote Accounts
-    match get_vote_account_map(client).await {
-        Ok(vote_account_map) => {
-            keeper_state.vote_account_map = vote_account_map;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    keeper_state.vote_account_map = get_vote_account_map(client).await?;
 
     // Get all get vote accounts
-    match get_all_get_vote_account_map(client, keeper_state).await {
-        Ok(all_get_vote_account_map) => {
-            keeper_state.all_get_vote_account_map = all_get_vote_account_map;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    keeper_state.all_get_vote_account_map =
+        get_all_get_vote_account_map(client, keeper_state).await?;
 
     // Update Cluster History
-    match get_cluster_history(client, program_id).await {
-        Ok(cluster_history) => {
-            keeper_state.cluster_history = cluster_history;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    keeper_state.cluster_history = get_cluster_history(client, program_id).await?;
 
     // Update Keeper Balance
-    match get_balance_with_retry(client, keypair.pubkey()).await {
-        Ok(keeper_balance) => {
-            keeper_state.keeper_balance = keeper_balance;
-        }
-        Err(e) => {
-            return Err(Box::new(e));
-        }
-    }
+    keeper_state.keeper_balance = get_balance_with_retry(client, keypair.pubkey()).await?;
 
     Ok(())
 }
@@ -105,56 +78,29 @@ pub async fn post_create_update(
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     // Update Validator History Accounts
-    match get_validator_history_map(client, program_id).await {
-        Ok(validator_history_map) => {
-            keeper_state.validator_history_map = validator_history_map;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    keeper_state.validator_history_map = get_validator_history_map(client, program_id).await?;
 
     // Get all history vote accounts
-    match get_all_history_vote_account_map(client, keeper_state).await {
-        Ok(all_history_vote_account_map) => {
-            keeper_state.all_history_vote_account_map = all_history_vote_account_map;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    keeper_state.all_history_vote_account_map =
+        get_all_history_vote_account_map(client, keeper_state).await?;
 
-    match get_tip_distribution_accounts(
+    // Update previous tip distribution map
+    keeper_state.previous_epoch_tip_distribution_map = get_tip_distribution_accounts(
         client,
         tip_distribution_program_id,
         keeper_state,
         keeper_state.epoch_info.epoch.saturating_sub(1),
     )
-    .await
-    {
-        Ok(tip_distribution_accounts) => {
-            keeper_state.previous_epoch_tip_distribution_map = tip_distribution_accounts;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    .await?;
 
-    match get_tip_distribution_accounts(
+    // Update current tip distribution map
+    keeper_state.current_epoch_tip_distribution_map = get_tip_distribution_accounts(
         client,
         tip_distribution_program_id,
         keeper_state,
         keeper_state.epoch_info.epoch,
     )
-    .await
-    {
-        Ok(tip_distribution_accounts) => {
-            keeper_state.current_epoch_tip_distribution_map = tip_distribution_accounts;
-        }
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    .await?;
 
     Ok(())
 }

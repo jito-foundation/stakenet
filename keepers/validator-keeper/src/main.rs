@@ -54,10 +54,6 @@ struct Args {
     #[arg(short, long, env)]
     tip_distribution_program_id: Pubkey,
 
-    // DEPRECIATED: Use validator_history_interval instead
-    #[arg(short, long, env, default_value = "300")]
-    interval: u64,
-
     // Interval to update Validator History Accounts (default 300 sec)
     #[arg(short, long, env, default_value = "300")]
     validator_history_interval: u64,

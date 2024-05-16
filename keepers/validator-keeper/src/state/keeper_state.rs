@@ -13,15 +13,23 @@ use crate::{derive_validator_history_address, operations::keeper_operations::Kee
 pub struct KeeperState {
     pub epoch_info: EpochInfo,
 
+    // Tally array of runs and errors indexed by their respective KeeperOperations
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
     pub errors_for_epoch: [u64; KeeperOperations::LEN],
+
+    // All vote account info fetched with get_vote_accounts - key'd by their pubkey
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
+    // All validator history entries fetched by get_validator_history_accounts - key'd by their vote_account pubkey
     pub validator_history_map: HashMap<Pubkey, ValidatorHistory>,
 
+    // All vote accounts mapped and fetched from validator_history_map - key'd by their vote_account pubkey
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
+    // All vote accounts mapped and fetched from vote_account_map - key'd by their pubkey
     pub all_get_vote_account_map: HashMap<Pubkey, Option<Account>>,
 
+    // All tip distribution accounts fetched from the last epoch ( current_epoch - 1 ) - key'd by their vote_account pubkey
     pub previous_epoch_tip_distribution_map: HashMap<Pubkey, Option<Account>>,
+    // All tip distribution accounts fetched from the current epoch - key'd by their vote_account pubkey
     pub current_epoch_tip_distribution_map: HashMap<Pubkey, Option<Account>>,
 
     pub cluster_history: ClusterHistory,
