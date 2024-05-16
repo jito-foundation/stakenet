@@ -85,8 +85,9 @@ pub async fn fire_and_emit(
                     errors_for_epoch += 1;
                 }
             }
-
-            runs_for_epoch += 1;
+            if stats.errors == 0 {
+                runs_for_epoch += 1;
+            }
             stats
         }
         Err(e) => {

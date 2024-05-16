@@ -67,16 +67,16 @@ pub async fn fire_and_emit(
     let mut stats = SubmitStats::default();
     if should_run {
         stats = match _process(client, keypair, program_id).await {
-            Ok(run_stats) => {
-                for message in run_stats.results.iter() {
+            Ok(stats) => {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
                     }
                 }
-                if run_stats.errors == 0 {
+                if stats.errors == 0 {
                     runs_for_epoch += 1;
                 }
-                run_stats
+                stats
             }
             Err(e) => {
                 let mut stats = SubmitStats::default();
