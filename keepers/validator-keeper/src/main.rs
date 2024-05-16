@@ -62,8 +62,16 @@ struct Args {
     #[arg(short, long, env, default_value = "60")]
     metrics_interval: u64,
 
+    // Priority Fees (mLamports)
+    #[arg(short, long, env, default_value = "50_000")]
+    priority_fees: u64,
+
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
     cluster: Cluster,
+}
+
+fn should_emit(tick: u64, intervals: &[u64]) -> bool {
+    intervals.iter().any(|interval| (tick + 1) % interval == 0)
 }
 
 fn should_update(tick: u64, intervals: &[u64]) -> bool {
@@ -92,6 +100,7 @@ struct RunLoopConfig {
     gossip_entrypoint: Option<SocketAddr>,
     validator_history_interval: u64,
     metrics_interval: u64,
+    priority_fees: u64,
 }
 
 async fn run_loop(config: RunLoopConfig) {
@@ -104,6 +113,7 @@ async fn run_loop(config: RunLoopConfig) {
         gossip_entrypoint,
         validator_history_interval,
         metrics_interval,
+        priority_fees,
     } = config;
     let intervals = vec![validator_history_interval, metrics_interval];
 
@@ -256,6 +266,11 @@ async fn run_loop(config: RunLoopConfig) {
             );
         }
 
+        // ---------------------- EMIT ---------------------------------
+        if should_emit(tick, &intervals) {
+            KeeperOperations::emit(&keeper_state.runs_for_epoch, &keeper_state.errors_for_epoch)
+        }
+
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
     }
@@ -299,6 +314,7 @@ async fn main() {
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
+        priority_fees: args.priority_fees,
     };
 
     run_loop(config).await;

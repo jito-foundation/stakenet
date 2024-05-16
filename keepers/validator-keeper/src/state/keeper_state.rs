@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use bytemuck::Zeroable;
 use solana_client::rpc_response::RpcVoteAccountInfo;
+use solana_metrics::datapoint_info;
 use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
