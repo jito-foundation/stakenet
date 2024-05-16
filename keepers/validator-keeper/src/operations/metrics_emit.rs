@@ -22,30 +22,24 @@ async fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::
     emit_validator_history_metrics(keeper_state).await
 }
 
-fn _emit(runs_for_epoch: i64, errors_for_epoch: i64) {
-    datapoint_info!(
-        "emit-metrics-stats",
-        ("runs_for_epoch", runs_for_epoch, i64),
-        ("errors_for_epoch", errors_for_epoch, i64),
-    );
-}
-
-pub async fn fire_and_emit(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64) {
+pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch) =
         keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
 
-    match _process(keeper_state).await {
-        Ok(_) => {
-            runs_for_epoch += 1;
-        }
-        Err(e) => {
-            errors_for_epoch += 1;
-            error!("Failed to emit validator history metrics: {}", e);
+    let should_run = _should_run();
+
+    if should_run {
+        match _process(keeper_state).await {
+            Ok(_) => {
+                runs_for_epoch += 1;
+            }
+            Err(e) => {
+                errors_for_epoch += 1;
+                error!("Failed to emit validator history metrics: {}", e);
+            }
         }
     }
-
-    _emit(runs_for_epoch as i64, errors_for_epoch as i64);
 
     (operation, runs_for_epoch, errors_for_epoch)
 }

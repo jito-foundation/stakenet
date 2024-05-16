@@ -62,16 +62,12 @@ struct Args {
     #[arg(short, long, env, default_value = "60")]
     metrics_interval: u64,
 
-    // Priority Fees (mLamports)
-    #[arg(short, long, env, default_value = "50_000")]
-    priority_fees: u64,
-
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
     cluster: Cluster,
 }
 
 fn should_emit(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| (tick + 1) % interval == 0)
+    intervals.iter().any(|interval| tick % (interval + 1) == 0)
 }
 
 fn should_update(tick: u64, intervals: &[u64]) -> bool {
@@ -100,7 +96,6 @@ struct RunLoopConfig {
     gossip_entrypoint: Option<SocketAddr>,
     validator_history_interval: u64,
     metrics_interval: u64,
-    priority_fees: u64,
 }
 
 async fn run_loop(config: RunLoopConfig) {
@@ -113,7 +108,6 @@ async fn run_loop(config: RunLoopConfig) {
         gossip_entrypoint,
         validator_history_interval,
         metrics_interval,
-        priority_fees,
     } = config;
     let intervals = vec![validator_history_interval, metrics_interval];
 
@@ -183,29 +177,18 @@ async fn run_loop(config: RunLoopConfig) {
 
             info!("Updating cluster history...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::cluster_history::fire_and_emit(
-                    &client,
-                    &keypair,
-                    &program_id,
-                    &keeper_state,
-                )
-                .await,
+                operations::cluster_history::fire(&client, &keypair, &program_id, &keeper_state)
+                    .await,
             );
 
             info!("Updating copy vote accounts...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::vote_account::fire_and_emit(
-                    &client,
-                    &keypair,
-                    &program_id,
-                    &keeper_state,
-                )
-                .await,
+                operations::vote_account::fire(&client, &keypair, &program_id, &keeper_state).await,
             );
 
             info!("Updating mev commission...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::mev_commission::fire_and_emit(
+                operations::mev_commission::fire(
                     &client,
                     &keypair,
                     &program_id,
@@ -217,7 +200,7 @@ async fn run_loop(config: RunLoopConfig) {
 
             info!("Updating mev earned...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::mev_earned::fire_and_emit(
+                operations::mev_earned::fire(
                     &client,
                     &keypair,
                     &program_id,
@@ -230,7 +213,7 @@ async fn run_loop(config: RunLoopConfig) {
             if let Some(oracle_authority_keypair) = &oracle_authority_keypair {
                 info!("Updating stake accounts...");
                 keeper_state.set_runs_and_errors_for_epoch(
-                    operations::stake_upload::fire_and_emit(
+                    operations::stake_upload::fire(
                         &client,
                         oracle_authority_keypair,
                         &program_id,
@@ -245,7 +228,7 @@ async fn run_loop(config: RunLoopConfig) {
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_and_errors_for_epoch(
-                    operations::gossip_upload::fire_and_emit(
+                    operations::gossip_upload::fire(
                         &client,
                         oracle_authority_keypair,
                         &program_id,
@@ -261,9 +244,8 @@ async fn run_loop(config: RunLoopConfig) {
 
         if should_fire(tick, metrics_interval) {
             info!("Emitting metrics...");
-            keeper_state.set_runs_and_errors_for_epoch(
-                operations::metrics_emit::fire_and_emit(&keeper_state).await,
-            );
+            keeper_state
+                .set_runs_and_errors_for_epoch(operations::metrics_emit::fire(&keeper_state).await);
         }
 
         // ---------------------- EMIT ---------------------------------
@@ -314,7 +296,6 @@ async fn main() {
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
-        priority_fees: args.priority_fees,
     };
 
     run_loop(config).await;

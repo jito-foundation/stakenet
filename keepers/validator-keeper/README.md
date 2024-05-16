@@ -12,11 +12,12 @@ Note: All maps are key'd by the `vote_account`
 Gather all needed arguments, and initialize the global `KeeperState`. 
 
 ### Loop
-The forever loop consists of two parts: **Fetch** and **Fire**. There is only ever one **Fetch** section, and there can be several **Fire** sections. 
+The forever loop consists of three parts: **Fetch**, **Fire** and **Emit**. There is only ever one **Fetch** and **Emit** section, and there can be several **Fire** sections. 
 
 The **Fire** sections can run on independent cadences - say we want the Validator History functions to run every 300sec and we want to emit metrics every 60sec.
 
 The **Fetch** section is run _before_ and **Fire** section. 
+The **Emit** section is *one tick* after any **Fire** section.
 
 #### Fetch
 The **Fetch** section is in charge of three operations:
@@ -38,14 +39,15 @@ Notes:
 #### Fire
 There are several **Fire** sections running at their own cadence. Before any **Fire** section is run, the **Fetch** section will be called.
 
-Each **Fire** is a call to `operations::operation_name::fire_and_emit` which will fire off the operation, emit the data points and return the new count of runs and errors for that operation to be saved in the `KeeperState`
+Each **Fire** is a call to `operations::operation_name::fire` which will fire off the operation and return the new count of runs and errors for that operation to be saved in the `KeeperState`
 
 Notes: 
 - Each **Fire** is self contained, one should not be dependant on another.
 - No **Fire* will fetch any accounts, if there are needs for them, they should be added to the `KeeperState`
 
 
-
+#### Emit
+This section emits the state of the Keeper one tick after any operation has been called. This is because we want to emit a failure of any **Fetch** operation, which on failure advances the tick.
 
 
 

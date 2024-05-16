@@ -7,9 +7,9 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use crate::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use crate::state::keeper_state::KeeperState;
 use crate::{KeeperError, PRIORITY_FEE};
-use keeper_core::{submit_instructions, SubmitStats, TransactionExecutionError, UpdateInstruction};
+use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_metrics::{datapoint_error, datapoint_info};
+use solana_metrics::datapoint_error;
 use solana_sdk::{
     epoch_info::EpochInfo,
     pubkey::Pubkey,
@@ -41,17 +41,7 @@ async fn _process(
     update_vote_accounts(client, keypair, program_id, keeper_state).await
 }
 
-fn _emit(stats: &SubmitStats, runs_for_epoch: i64, errors_for_epoch: i64) {
-    datapoint_info!(
-        "vote-account-stats",
-        ("num_updates_success", stats.successes, i64),
-        ("num_updates_error", stats.errors, i64),
-        ("runs_for_epoch", runs_for_epoch, i64),
-        ("errors_for_epoch", errors_for_epoch, i64)
-    );
-}
-
-pub async fn fire_and_emit(
+pub async fn fire(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
@@ -64,9 +54,8 @@ pub async fn fire_and_emit(
 
     let should_run = _should_run(epoch_info, runs_for_epoch);
 
-    let mut stats = SubmitStats::default();
     if should_run {
-        stats = match _process(client, keypair, program_id, keeper_state).await {
+        match _process(client, keypair, program_id, keeper_state).await {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
@@ -76,25 +65,13 @@ pub async fn fire_and_emit(
                 if stats.errors == 0 {
                     runs_for_epoch += 1;
                 }
-                stats
             }
             Err(e) => {
-                let mut stats = SubmitStats::default();
-                if let KeeperError::TransactionExecutionError(
-                    TransactionExecutionError::TransactionClientError(_, results),
-                ) = &e
-                {
-                    stats.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
-                    stats.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                }
                 datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
                 errors_for_epoch += 1;
-                stats
             }
         };
     }
-
-    _emit(&stats, runs_for_epoch as i64, errors_for_epoch as i64);
 
     (operation, runs_for_epoch, errors_for_epoch)
 }
