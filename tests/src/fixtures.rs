@@ -18,10 +18,7 @@ use {
         signature::Keypair, signer::Signer, transaction::Transaction,
     },
     std::{cell::RefCell, rc::Rc},
-    validator_history::{
-        self, constants::MAX_ALLOC_BYTES, 
-        ClusterHistory, ValidatorHistory,
-    },
+    validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory},
 };
 
 pub struct TestFixture {
@@ -242,9 +239,13 @@ impl TestFixture {
             .get_sysvar()
             .await
             .expect("Failed getting clock");
-        let epoch_schedule: EpochSchedule = self.ctx.borrow().genesis_config().epoch_schedule;
         let target_epoch = clock.epoch + num_epochs;
-        let target_slot = epoch_schedule.get_first_slot_in_epoch(target_epoch);
+        let target_slot = self
+            .ctx
+            .borrow()
+            .genesis_config()
+            .epoch_schedule
+            .get_first_slot_in_epoch(target_epoch);
 
         self.ctx
             .borrow_mut()
@@ -261,9 +262,14 @@ impl TestFixture {
             .await
             .expect("Failed getting clock");
 
-        let epoch_schedule: EpochSchedule = self.ctx.borrow().genesis_config().epoch_schedule;
         let target_epoch = clock.epoch + num_epochs;
-        let dif_slots = epoch_schedule.get_first_slot_in_epoch(target_epoch) - clock.slot;
+        let target_slot = self
+            .ctx
+            .borrow()
+            .genesis_config()
+            .epoch_schedule
+            .get_first_slot_in_epoch(target_epoch);
+        let dif_slots = target_slot - clock.slot;
 
         clock.epoch_start_timestamp += (dif_slots * ms_per_slot) as i64;
         clock.unix_timestamp += (dif_slots * ms_per_slot) as i64;

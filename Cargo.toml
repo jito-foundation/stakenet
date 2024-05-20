@@ -2,7 +2,7 @@
 members = [
   "keepers/*",
   "programs/*",
-  # "tests",
+  "tests",
   "utils/*"
 ]
 
