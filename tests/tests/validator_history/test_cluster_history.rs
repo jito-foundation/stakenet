@@ -10,7 +10,7 @@ use {
         clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
         signer::Signer, transaction::Transaction,
     },
-    tests::fixtures::TestFixture,
+    tests::validator_history_fixtures::TestFixture,
     validator_history::{confirmed_blocks_in_epoch, ClusterHistory},
 };
 

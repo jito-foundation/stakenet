@@ -3,7 +3,7 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
-use tests::fixtures::{new_tip_distribution_account, TestFixture};
+use tests::validator_history_fixtures::{new_tip_distribution_account, TestFixture};
 use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
 
 #[tokio::test]

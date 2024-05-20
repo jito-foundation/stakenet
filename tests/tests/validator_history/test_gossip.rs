@@ -20,7 +20,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
-use tests::fixtures::TestFixture;
+use tests::validator_history_fixtures::TestFixture;
 use validator_history::{
     crds_value::{CrdsData as ValidatorHistoryCrdsData, LegacyVersion, LegacyVersion1},
     Ed25519SignatureOffsets, ValidatorHistory,

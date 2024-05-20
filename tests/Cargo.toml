@@ -14,6 +14,7 @@ bytemuck = { version = "1.13.1", features = ["derive", "min_const_generics"] }
 cfg-if = "1.0.0"
 ed25519-dalek = "1.0.1"
 futures = "0.3.25"
+jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
 jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
 matches = "0.1.10"
 rand = "0.7.3"
@@ -22,8 +23,12 @@ semver = "1.0.17"
 serde = "1.0.183"
 serde_derive = "1.0.183"
 solana-gossip = "1.18"
+solana-program = "1.18"
 solana-program-test = "1.18"
 solana-sdk = "1.18"
 solana-version = "1.18"
+spl-associated-token-account = "2.1"
+spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
+spl-token = "4.0"
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
 validator-history-vote-state = { path = "../utils/vote-state" }
