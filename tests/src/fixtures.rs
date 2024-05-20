@@ -8,10 +8,10 @@ use {
         },
         AccountSerialize, InstructionData, ToAccountMetas,
     },
-    // jito_tip_distribution::{
-    //     sdk::derive_tip_distribution_account_address,
-    //     state::{MerkleRoot, TipDistributionAccount},
-    // },
+    jito_tip_distribution::{
+        sdk::derive_tip_distribution_account_address,
+        state::{MerkleRoot, TipDistributionAccount},
+    },
     solana_program_test::*,
     solana_sdk::{
         account::Account, epoch_schedule::EpochSchedule, instruction::Instruction,
@@ -19,7 +19,7 @@ use {
     },
     std::{cell::RefCell, rc::Rc},
     validator_history::{
-        self, constants::MAX_ALLOC_BYTES, utils::derive_tip_distribution_account_address,
+        self, constants::MAX_ALLOC_BYTES, 
         ClusterHistory, ValidatorHistory,
     },
 };

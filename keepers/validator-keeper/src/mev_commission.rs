@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
+use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{
     build_create_and_update_instructions, get_multiple_accounts_batched,
@@ -14,7 +15,6 @@ use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use solana_sdk::{signature::Keypair, signer::Signer};
 use validator_history::{
     constants::{MAX_ALLOC_BYTES, MIN_VOTE_EPOCHS},
-    utils::derive_tip_distribution_account_address,
     Config, ValidatorHistory,
 };
 

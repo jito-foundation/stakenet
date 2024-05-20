@@ -1,10 +1,10 @@
 use anchor_lang::{
     prelude::{AccountInfo, Pubkey, Result},
     require,
-    solana_program::{clock::Epoch, native_token::lamports_to_sol},
+    solana_program::native_token::lamports_to_sol,
 };
 
-use crate::{constants::TIP_DISTRIBUTION_ACCOUNT_SEED, errors::ValidatorHistoryError};
+use crate::errors::ValidatorHistoryError;
 
 pub fn cast_epoch(epoch: u64) -> Result<u16> {
     require!(
@@ -34,21 +34,6 @@ pub fn get_vote_account(validator_history_account_info: &AccountInfo) -> Pubkey 
     let mut data = [0; 32];
     data.copy_from_slice(pubkey_bytes);
     Pubkey::from(data)
-}
-
-pub fn derive_tip_distribution_account_address(
-    tip_distribution_program_id: &Pubkey,
-    vote_pubkey: &Pubkey,
-    epoch: Epoch,
-) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[
-            TIP_DISTRIBUTION_ACCOUNT_SEED,
-            vote_pubkey.to_bytes().as_ref(),
-            epoch.to_le_bytes().as_ref(),
-        ],
-        tip_distribution_program_id,
-    )
 }
 
 #[cfg(test)]
