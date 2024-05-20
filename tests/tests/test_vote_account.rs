@@ -1,9 +1,12 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use solana_program_test::*;
-use solana_sdk::{clock::Clock, signer::Signer, transaction::Transaction};
+use solana_sdk::{
+    clock::Clock, compute_budget::ComputeBudgetInstruction, signer::Signer,
+    transaction::Transaction,
+};
 use tests::fixtures::{new_vote_account, TestFixture};
-use validator_history::ValidatorHistory;
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 #[tokio::test]
 async fn test_copy_vote_account() {
@@ -109,4 +112,164 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[1].commission == 8);
     assert!(account.history.arr[1].epoch_credits == 12);
     assert!(account.history.arr[0].epoch_credits == 12);
+}
+
+#[tokio::test]
+async fn test_insert_missing_entries() {
+    // We can insert missing entries in the middle of the history array if epoch credits exist for them
+
+    // Initialize a ValidatorHistoryAccount with one entry for epoch 0, one entry for epoch 100, and a vote account with 64 epochs of credits in between
+
+    // Expect that all 64 epochs of credits are copied over to the ValidatorHistoryAccount
+
+    // Make sure we are within compute budget
+
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+    let initial_epoch_credits = vec![(0, 10, 0)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            9,
+            Some(initial_epoch_credits),
+        )
+        .into(),
+    );
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            instruction,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+    println!("Submitted first instruction");
+    fixture.advance_num_epochs(1000).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    for i in 0..15 {
+        println!("{:?}", account.history.arr[i].epoch);
+    }
+
+    let initial_epoch_credits = vec![(1000, 10, 0)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            9,
+            Some(initial_epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            instruction,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+    println!("Submitted second instruction");
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    for i in 0..15 {
+        println!("{:?}", account.history.arr[i].epoch);
+    }
+
+    // Fake scenario: lots of new entries that were never picked up initially
+    // Extreme case: validator votes once every 10 epochs
+    let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
+    for (i, epoch) in (1..65).enumerate() {
+        let i = i as u64;
+        epoch_credits.push((epoch * 10, (i + 1) * 10, i * 10));
+    }
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            9,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            instruction,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    // Check that all 64 epochs of credits were copied over
+    println!("{:?}", account.history.idx);
+    for i in 0..64 {
+        println!("{:?}", account.history.arr[i].epoch);
+    }
+
+    assert!(account.history.idx == 65);
+    for i in 0..64 {
+        assert!(account.history.arr[i].epoch == 10 * i as u16);
+        assert!(account.history.arr[i].epoch_credits == 10);
+    }
+    assert!(account.history.arr[65].epoch == 1000);
+    assert!(account.history.arr[65].epoch_credits == 10);
+
+    drop(fixture);
 }
