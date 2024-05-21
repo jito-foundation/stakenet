@@ -6,7 +6,12 @@ use {
     },
     anchor_lang::{prelude::*, solana_program::log::sol_log_compute_units},
     borsh::{BorshDeserialize, BorshSerialize},
-    std::{cmp::Ordering, collections::HashMap, mem::size_of, net::IpAddr},
+    std::{
+        cmp::Ordering,
+        collections::{BTreeMap, HashMap},
+        mem::size_of,
+        net::IpAddr,
+    },
     type_layout::TypeLayout,
 };
 
@@ -195,14 +200,15 @@ impl CircBuf {
         }
 
         // Find the lowest epoch in the buffer to ensure the new epoch is valid
-        let mut min_epoch = u16::MAX;
-        for i in 0..self.arr.len() {
-            if self.arr[i].epoch != ValidatorHistoryEntry::default().epoch
-                && self.arr[i].epoch < min_epoch
-            {
-                min_epoch = self.arr[i].epoch;
+        // Min epoch is 0 if idx + 1 is default epoch, otherwise it's idx + 1
+        let min_epoch = {
+            let next_i = (self.idx as usize + 1) % self.arr.len();
+            if self.arr[next_i].epoch == ValidatorHistoryEntry::default().epoch {
+                0
+            } else {
+                self.arr[next_i].epoch
             }
-        }
+        };
 
         // Panic if the new epoch is less than the minimum epoch in the buffer
         if epoch < min_epoch {
@@ -217,19 +223,21 @@ impl CircBuf {
 
         // Find the correct position to insert the new entry where the epoch is greater than the previous entry and less than the next entry
         // if none found, exit
-        let mut insert_pos = None;
-        for i in 0..self.arr.len() {
-            let idx = (self.idx + i as u64) % self.arr.len() as u64;
-            let next_idx = (idx + 1) % self.arr.len() as u64;
-            if self.arr[idx as usize].epoch < epoch && self.arr[next_idx as usize].epoch > epoch {
-                insert_pos = Some(next_idx as usize);
-                break;
+        let len = self.arr.len();
+        let mut left = 0;
+        let mut right = len;
+        while left < right {
+            let mid = (left + right) / 2;
+            let mid_idx = (self.idx as usize + mid) % len;
+            if self.arr[mid_idx].epoch <= epoch
+                || self.arr[mid_idx].epoch == ValidatorHistoryEntry::default().epoch
+            {
+                left = mid + 1;
+            } else {
+                right = mid;
             }
         }
-        println!("insert_pos: {:?}", insert_pos);
-
-        let insert_pos =
-            insert_pos.expect("Could not find a valid position to insert the new entry");
+        let insert_pos = (self.idx as usize + left) % len;
 
         let end_index = if insert_pos <= self.idx as usize {
             self.idx as usize
@@ -432,7 +440,6 @@ impl ValidatorHistory {
     }
 
     // Change to get_missing_entries_in_range
-    // TODO weird scenario where we have a really sparse epoch credits list? that goes beyond 512 epochs?
     pub fn insert_missing_entries(
         &mut self,
         epoch_credits: &[(
@@ -458,9 +465,6 @@ impl ValidatorHistory {
                 .0,
         )?;
 
-        msg!("1");
-        sol_log_compute_units();
-
         // get epoch range
         let entries = self
             .history
@@ -468,12 +472,10 @@ impl ValidatorHistory {
             .iter()
             .map(|entry| entry.is_some())
             .collect::<Vec<bool>>();
-        msg!("2");
-        sol_log_compute_units();
 
         // create epoch credits map
-        let epoch_credits_map: HashMap<u16, u32> =
-            HashMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
+        let epoch_credits_map: BTreeMap<u16, u32> =
+            BTreeMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
                 (
                     cast_epoch(*epoch).unwrap(), // all epochs in list will be valid if current epoch is valid
                     (cur.checked_sub(*prev)
@@ -481,13 +483,10 @@ impl ValidatorHistory {
                         .unwrap() as u32),
                 )
             }));
-        msg!("3");
 
         for (entry_is_some, epoch) in entries.iter().zip(start_epoch as u16..=end_epoch) {
             if !*entry_is_some && epoch_credits_map.get(&epoch).is_some() {
-                msg!("Inserting missing entry for epoch: {}", epoch);
-                sol_log_compute_units();
-                // insert a new blank entry
+                // Insert a new blank entry
                 let entry = ValidatorHistoryEntry {
                     epoch,
                     ..ValidatorHistoryEntry::default()
@@ -496,7 +495,6 @@ impl ValidatorHistory {
                 self.history.insert(entry, epoch).unwrap_or_default();
             }
         }
-        msg!("3");
 
         // for each epoch in the range, if it doesn't exist, insert a new blank entry
 
@@ -531,8 +529,6 @@ impl ValidatorHistory {
             .min()
             .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
 
-        msg!("Start copying credits");
-        sol_log_compute_units();
         // Traverses entries in reverse order, breaking once we hit the lowest epoch in epoch_credits
         let len = self.history.arr.len();
         for i in 0..len {
@@ -545,8 +541,6 @@ impl ValidatorHistory {
                 break;
             }
         }
-        msg!("Done copying credits");
-        sol_log_compute_units();
 
         Ok(())
     }
@@ -1234,7 +1228,6 @@ mod tests {
             println!("{}", i.epoch);
         }
         let range = circ_buf.epoch_range(MAX_ITEMS as u16 + 1, 2 * MAX_ITEMS as u16);
-        assert!(false);
 
         assert!(range.iter().all(|maybe_e| maybe_e.is_some()));
     }
