@@ -4,7 +4,7 @@ use anchor_lang::{
     solana_program::native_token::lamports_to_sol,
 };
 
-use crate::errors::ValidatorHistoryError;
+use crate::{errors::ValidatorHistoryError, ValidatorHistoryEntry};
 
 pub fn cast_epoch(epoch: u64) -> Result<u16> {
     require!(
@@ -36,6 +36,60 @@ pub fn get_vote_account(validator_history_account_info: &AccountInfo) -> Pubkey 
     Pubkey::from(data)
 }
 
+/// Finds the position to insert a new entry with the given epoch, where the epoch is greater than the previous entry and less than the next entry
+pub fn insert_position(arr: &[ValidatorHistoryEntry], idx: usize, epoch: u16) -> Option<usize> {
+    // Pseudo-binary search to find position
+    let len = arr.len();
+    if len == 0 {
+        return None;
+    }
+
+    // If the circ buf still has default values in it, there is no wraparound needed and we can do a normal binary search
+    let compute_without_wraparound =
+        idx != len - 1 && arr[idx + 1].epoch == ValidatorHistoryEntry::default().epoch;
+
+    if compute_without_wraparound {
+        let len = idx + 1;
+        let mut left = 0;
+        let mut right = len;
+        while left < right {
+            let mid = (left + right) / 2;
+            if arr[mid].epoch == epoch {
+                return None;
+            } else if arr[mid].epoch < epoch {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        let insert_pos = left % arr.len();
+        if arr[insert_pos].epoch == epoch {
+            return None;
+        }
+        return Some(insert_pos);
+    }
+
+    // Binary search with wraparound
+    let mut left = 0;
+    let mut right = len;
+    while left < right {
+        let mid = (left + right) / 2;
+        let mid_idx = ((idx + 1) + mid) % len;
+        if arr[mid_idx].epoch == epoch {
+            return None;
+        } else if arr[mid_idx].epoch < epoch {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    let insert_pos = ((idx + 1) + left) % len;
+    if arr[insert_pos].epoch == epoch {
+        return None;
+    }
+    Some(insert_pos)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,5 +100,81 @@ mod tests {
         assert_eq!(fixed_point_sol(4_294_967_295_000_000_000), 4294967295);
 
         assert_eq!(fixed_point_sol(429_496_729_600_000_000), 4294967295)
+    }
+
+    #[test]
+    fn test_find_insert_position() {
+        // Test empty
+        let arr = vec![];
+        assert_eq!(insert_position(&arr, 0, 5), None);
+
+        // Test single element
+        let arr = vec![ValidatorHistoryEntry {
+            epoch: 10,
+            ..Default::default()
+        }];
+        assert_eq!(insert_position(&arr, 0, 5), Some(0));
+        assert_eq!(insert_position(&arr, 0, 15), Some(0));
+
+        // Test multiple elements
+        let arr = vec![
+            ValidatorHistoryEntry {
+                epoch: 5,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 10,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 15,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 20,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry::default(),
+            ValidatorHistoryEntry::default(),
+            ValidatorHistoryEntry::default(),
+        ];
+
+        let idx = 3;
+        assert_eq!(insert_position(&arr, idx, 0), Some(0));
+        assert_eq!(insert_position(&arr, idx, 12), Some(2));
+        assert_eq!(insert_position(&arr, idx, 25), Some(4));
+
+        // Test wraparound
+        let arr = vec![
+            ValidatorHistoryEntry {
+                epoch: 15,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 20,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 25,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 5,
+                ..Default::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 10,
+                ..Default::default()
+            },
+        ];
+
+        let idx = 2;
+        assert_eq!(insert_position(&arr, idx, 0), Some(3));
+        assert_eq!(insert_position(&arr, idx, 12), Some(0));
+        assert_eq!(insert_position(&arr, idx, 17), Some(1));
+        assert_eq!(insert_position(&arr, idx, 22), Some(2));
+
+        // Test duplicate
+        assert_eq!(insert_position(&arr, idx, 10), None);
     }
 }

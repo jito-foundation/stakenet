@@ -2,7 +2,7 @@ use {
     crate::{
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
-        utils::cast_epoch,
+        utils::{cast_epoch, insert_position},
     },
     anchor_lang::prelude::*,
     borsh::{BorshDeserialize, BorshSerialize},
@@ -42,7 +42,7 @@ impl Config {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 
-#[derive(AnchorSerialize, TypeLayout, Debug)]
+#[derive(AnchorSerialize, TypeLayout)]
 #[zero_copy]
 pub struct ValidatorHistoryEntry {
     pub activated_stake_lamports: u64,
@@ -98,7 +98,7 @@ impl Default for ValidatorHistoryEntry {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[zero_copy]
 pub struct ClientVersion {
     pub major: u8,
@@ -190,7 +190,7 @@ impl CircBuf {
     }
 
     /// Given a new entry and epoch, inserts the entry into the buffer in sorted order
-    /// Will not insert if
+    /// Will not insert if the epoch is out of range or already exists in the buffer
     fn insert(&mut self, entry: ValidatorHistoryEntry, epoch: u16) -> Result<()> {
         if self.is_empty() {
             self.arr[0] = entry;
@@ -200,7 +200,6 @@ impl CircBuf {
         }
 
         // Find the lowest epoch in the buffer to ensure the new epoch is valid
-        // Min epoch is 0 if idx + 1 is default epoch, otherwise it's idx + 1
         let min_epoch = {
             let next_i = (self.idx as usize + 1) % self.arr.len();
             if self.arr[next_i].epoch == ValidatorHistoryEntry::default().epoch {
@@ -215,8 +214,7 @@ impl CircBuf {
             return Err(ValidatorHistoryError::EpochOutOfRange.into());
         }
 
-        let insert_pos = self
-            .insert_position(epoch)
+        let insert_pos = insert_position(&self.arr, self.idx as usize, epoch)
             .ok_or(ValidatorHistoryError::DuplicateEpoch)?;
 
         // If idx < insert_pos, the shifting needs to wrap around
@@ -237,30 +235,6 @@ impl CircBuf {
 
         self.idx = (self.idx + 1) % self.arr.len() as u64;
         return Ok(());
-    }
-
-    /// Finds the position to insert a new entry with the given epoch, where the epoch is greater than the previous entry and less than the next entry
-    fn insert_position(&self, epoch: u16) -> Option<usize> {
-        // Pseudo-binary search to find position
-        let len = self.arr.len();
-        let mut left = 0;
-        let mut right = len;
-        while left < right {
-            let mid = (left + right) / 2;
-            let mid_idx = (self.idx as usize + mid) % len;
-            if self.arr[mid_idx].epoch <= epoch
-                || self.arr[mid_idx].epoch == ValidatorHistoryEntry::default().epoch
-            {
-                left = mid + 1;
-            } else {
-                right = mid;
-            }
-        }
-        let insert_pos = (self.idx as usize + left) % len;
-        if self.arr[insert_pos].epoch == epoch {
-            return None;
-        }
-        Some(insert_pos)
     }
 
     /// Returns &ValidatorHistoryEntry for each existing entry in range [start_epoch, end_epoch] inclusive, factoring for wraparound
@@ -525,7 +499,7 @@ impl ValidatorHistory {
                 )
             }));
 
-        let epoch_credits_min = epoch_credits_map
+        let epoch_min = epoch_credits_map
             .keys()
             .min()
             .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
@@ -538,7 +512,7 @@ impl ValidatorHistory {
             if let Some(&epoch_credits) = epoch_credits_map.get(&entry.epoch) {
                 entry.epoch_credits = epoch_credits;
             }
-            if entry.epoch == *epoch_credits_min {
+            if entry.epoch == *epoch_min {
                 break;
             }
         }
