@@ -189,10 +189,10 @@ impl CircBuf {
         &mut self.arr
     }
 
+    /// Given a new entry and epoch, inserts the entry into the buffer in sorted order
+    /// Will not insert if
     fn insert(&mut self, entry: ValidatorHistoryEntry, epoch: u16) -> Result<()> {
-        // Handle the case where the buffer is empty
         if self.is_empty() {
-            // Insert the first entry into the buffer
             self.arr[0] = entry;
             self.idx = 0;
             self.is_empty = 0;
@@ -215,31 +215,32 @@ impl CircBuf {
             return Err(ValidatorHistoryError::EpochOutOfRange.into());
         }
 
-        let insert_pos = self.insert_position(epoch);
+        let insert_pos = self
+            .insert_position(epoch)
+            .ok_or(ValidatorHistoryError::DuplicateEpoch)?;
 
-        let end_index = if insert_pos <= self.idx as usize {
-            self.idx as usize
-        } else {
+        // If idx < insert_pos, the shifting needs to wrap around
+        let end_index = if self.idx < insert_pos as u64 {
             self.idx as usize + self.arr.len()
+        } else {
+            self.idx as usize
         };
 
-        // Shift elements to the right to make space for the new entry, accounting for wraparound
+        // Shift all elements to the right to make space for the new entry, starting with current idx
         for i in (insert_pos..=end_index).rev() {
             let i = i % self.arr.len();
             let next_i = (i + 1) % self.arr.len();
             self.arr[next_i] = self.arr[i];
         }
 
-        // Insert the new entry at the identified position
         self.arr[insert_pos] = entry;
 
-        // Update the index to point to the last inserted element
         self.idx = (self.idx + 1) % self.arr.len() as u64;
         return Ok(());
     }
 
     /// Finds the position to insert a new entry with the given epoch, where the epoch is greater than the previous entry and less than the next entry
-    pub fn insert_position(&self, epoch: u16) -> usize {
+    fn insert_position(&self, epoch: u16) -> Option<usize> {
         // Pseudo-binary search to find position
         let len = self.arr.len();
         let mut left = 0;
@@ -256,7 +257,10 @@ impl CircBuf {
             }
         }
         let insert_pos = (self.idx as usize + left) % len;
-        insert_pos
+        if self.arr[insert_pos].epoch == epoch {
+            return None;
+        }
+        Some(insert_pos)
     }
 
     /// Returns &ValidatorHistoryEntry for each existing entry in range [start_epoch, end_epoch] inclusive, factoring for wraparound

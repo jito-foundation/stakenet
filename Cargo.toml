@@ -5,6 +5,3 @@ members = [
   "tests",
   "utils/*"
 ]
-
-[profile.release]
-overflow-checks = true

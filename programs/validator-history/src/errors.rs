@@ -28,4 +28,6 @@ pub enum ValidatorHistoryError {
     SlotHistoryOutOfDate,
     #[msg("Epoch larger than 65535, cannot be stored")]
     EpochTooLarge,
+    #[msg("Inserting duplicate epoch")]
+    DuplicateEpoch,
 }
