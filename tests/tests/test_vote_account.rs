@@ -67,9 +67,9 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[0].epoch_credits == 10);
     assert!(account.history.arr[0].commission == 9);
 
+    // Skips epoch
     fixture.advance_num_epochs(2).await;
-
-    let epoch_credits = vec![(0, 22, 10), (1, 34, 22), (2, 46, 34)];
+    let epoch_credits = vec![(0, 22, 10), (1, 35, 22), (2, 49, 35)];
 
     ctx.borrow_mut().set_account(
         &fixture.vote_account,
@@ -106,22 +106,24 @@ async fn test_copy_vote_account() {
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
 
-    // check new epoch 0 values get copied over, but epoch 1 should be skipped
-    assert!(account.history.idx == 1);
-    assert!(account.history.arr[1].epoch == 2);
-    assert!(account.history.arr[1].commission == 8);
-    assert!(account.history.arr[1].epoch_credits == 12);
+    // Check that skipped epoch and new epoch entries + credits are added
+    // But skipped epoch commission not added
+    assert!(account.history.idx == 2);
+    assert!(account.history.arr[2].epoch == 2);
+    assert!(account.history.arr[1].epoch == 1);
+    assert!(account.history.arr[0].epoch == 0);
+    assert!(account.history.arr[2].commission == 8);
+    assert!(account.history.arr[1].commission == ValidatorHistoryEntry::default().commission);
+    assert!(account.history.arr[0].commission == 9);
+    assert!(account.history.arr[2].epoch_credits == 14);
+    assert!(account.history.arr[1].epoch_credits == 13);
     assert!(account.history.arr[0].epoch_credits == 12);
 }
 
 #[tokio::test]
-async fn test_insert_missing_entries() {
-    // We can insert missing entries in the middle of the history array if epoch credits exist for them
-
-    // Initialize a ValidatorHistoryAccount with one entry for epoch 0, one entry for epoch 100, and a vote account with 64 epochs of credits in between
-
+async fn test_insert_missing_entries_compute() {
+    // Initialize a ValidatorHistoryAccount with one entry for epoch 0, one entry for epoch 1000, and a vote account with 64 epochs of sparse credits in between
     // Expect that all 64 epochs of credits are copied over to the ValidatorHistoryAccount
-
     // Make sure we are within compute budget
 
     let fixture = TestFixture::new().await;
@@ -160,18 +162,9 @@ async fn test_insert_missing_entries() {
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(transaction).await;
-    println!("Submitted first instruction");
     fixture.advance_num_epochs(1000).await;
 
-    let account: ValidatorHistory = fixture
-        .load_and_deserialize(&fixture.validator_history_account)
-        .await;
-
-    for i in 0..15 {
-        println!("{:?}", account.history.arr[i].epoch);
-    }
-
-    let initial_epoch_credits = vec![(1000, 10, 0)];
+    let initial_epoch_credits = vec![(0, 10, 0), (1000, 10, 0)];
     ctx.borrow_mut().set_account(
         &fixture.vote_account,
         &new_vote_account(
@@ -204,15 +197,6 @@ async fn test_insert_missing_entries() {
         blockhash,
     );
     fixture.submit_transaction_assert_success(transaction).await;
-    println!("Submitted second instruction");
-
-    let account: ValidatorHistory = fixture
-        .load_and_deserialize(&fixture.validator_history_account)
-        .await;
-
-    for i in 0..15 {
-        println!("{:?}", account.history.arr[i].epoch);
-    }
 
     // Fake scenario: lots of new entries that were never picked up initially
     // Extreme case: validator votes once every 10 epochs
@@ -257,19 +241,20 @@ async fn test_insert_missing_entries() {
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    // Check that all 64 epochs of credits were copied over
-    println!("{:?}", account.history.idx);
-    for i in 0..64 {
-        println!("{:?}", account.history.arr[i].epoch);
-    }
 
+    // Check that all 64 epochs of credits were copied over and original entries were preserved
     assert!(account.history.idx == 65);
-    for i in 0..64 {
-        assert!(account.history.arr[i].epoch == 10 * i as u16);
-        assert!(account.history.arr[i].epoch_credits == 10);
-    }
     assert!(account.history.arr[65].epoch == 1000);
     assert!(account.history.arr[65].epoch_credits == 10);
+    assert!(account.history.arr[65].commission == 9);
+    for i in 1..65 {
+        assert!(account.history.arr[i].epoch == 10 * i as u16);
+        assert!(account.history.arr[i].epoch_credits == 10);
+        assert!(account.history.arr[i].commission == ValidatorHistoryEntry::default().commission);
+    }
+    assert!(account.history.arr[0].epoch == 0);
+    assert!(account.history.arr[0].epoch_credits == 10);
+    assert!(account.history.arr[0].commission == 9);
 
     drop(fixture);
 }
