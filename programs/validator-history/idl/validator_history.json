@@ -954,6 +954,11 @@
       "code": 6011,
       "name": "EpochTooLarge",
       "msg": "Epoch larger than 65535, cannot be stored"
+    },
+    {
+      "code": 6012,
+      "name": "DuplicateEpoch",
+      "msg": "Inserting duplicate epoch"
     }
   ]
 }
