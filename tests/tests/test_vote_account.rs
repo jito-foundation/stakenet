@@ -1,9 +1,10 @@
 #![allow(clippy::await_holding_refcell_ref)]
+
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use solana_program_test::*;
 use solana_sdk::{
     clock::Clock, compute_budget::ComputeBudgetInstruction, signer::Signer,
-    transaction::Transaction,
+    transaction::Transaction, vote::state::MAX_EPOCH_CREDITS_HISTORY,
 };
 use tests::fixtures::{new_vote_account, TestFixture};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
@@ -201,8 +202,9 @@ async fn test_insert_missing_entries_compute() {
     // Fake scenario: lots of new entries that were never picked up initially
     // Extreme case: validator votes once every 10 epochs
     let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
-    for (i, epoch) in (1..65).enumerate() {
+    for (i, epoch) in (1..MAX_EPOCH_CREDITS_HISTORY + 1).enumerate() {
         let i = i as u64;
+        let epoch = epoch as u64;
         epoch_credits.push((epoch * 10, (i + 1) * 10, i * 10));
     }
     ctx.borrow_mut().set_account(
@@ -229,7 +231,8 @@ async fn test_insert_missing_entries_compute() {
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
         &[
-            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            // Inserting 64 entries uses ~230k compute units, slightly above default
+            ComputeBudgetInstruction::set_compute_unit_limit(300_000),
             instruction,
         ],
         Some(&fixture.keypair.pubkey()),
@@ -243,11 +246,9 @@ async fn test_insert_missing_entries_compute() {
         .await;
 
     // Check that all 64 epochs of credits were copied over and original entries were preserved
-    assert!(account.history.idx == 65);
-    assert!(account.history.arr[65].epoch == 1000);
-    assert!(account.history.arr[65].epoch_credits == 10);
-    assert!(account.history.arr[65].commission == 9);
-    for i in 1..65 {
+    let end_idx = MAX_EPOCH_CREDITS_HISTORY + 1;
+    assert!(account.history.idx == end_idx as u64);
+    for i in 1..end_idx {
         assert!(account.history.arr[i].epoch == 10 * i as u16);
         assert!(account.history.arr[i].epoch_credits == 10);
         assert!(account.history.arr[i].commission == ValidatorHistoryEntry::default().commission);
@@ -255,6 +256,16 @@ async fn test_insert_missing_entries_compute() {
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].epoch_credits == 10);
     assert!(account.history.arr[0].commission == 9);
+    assert!(account.history.arr[end_idx].epoch == 1000);
+    assert!(account.history.arr[end_idx].epoch_credits == 10);
+    assert!(account.history.arr[end_idx].commission == 9);
+    for i in end_idx + 1..ValidatorHistory::MAX_ITEMS {
+        assert!(account.history.arr[i].epoch == ValidatorHistoryEntry::default().epoch);
+        assert!(
+            account.history.arr[i].epoch_credits == ValidatorHistoryEntry::default().epoch_credits
+        );
+        assert!(account.history.arr[i].commission == ValidatorHistoryEntry::default().commission);
+    }
 
     drop(fixture);
 }

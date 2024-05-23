@@ -36,54 +36,54 @@ pub fn get_vote_account(validator_history_account_info: &AccountInfo) -> Pubkey 
     Pubkey::from(data)
 }
 
-/// Finds the position to insert a new entry with the given epoch, where the epoch is greater than the previous entry and less than the next entry
-pub fn insert_position(arr: &[ValidatorHistoryEntry], idx: usize, epoch: u16) -> Option<usize> {
+/// Finds the position to insert a new entry with the given epoch, where the epoch is greater than the previous entry and less than the next entry.
+/// Assumes entries are in sorted order (according to CircBuf ordering), and there are no duplicate epochs.
+pub fn find_insert_position(
+    arr: &[ValidatorHistoryEntry],
+    idx: usize,
+    epoch: u16,
+) -> Option<usize> {
     // Pseudo-binary search to find position
     let len = arr.len();
     if len == 0 {
         return None;
     }
 
-    // If the circ buf still has default values in it, there is no wraparound needed and we can do a normal binary search
-    let compute_without_wraparound =
-        idx != len - 1 && arr[idx + 1].epoch == ValidatorHistoryEntry::default().epoch;
-
-    if compute_without_wraparound {
-        let len = idx + 1;
-        let mut left = 0;
-        let mut right = len;
-        while left < right {
-            let mid = (left + right) / 2;
-            if arr[mid].epoch == epoch {
-                return None;
-            } else if arr[mid].epoch < epoch {
-                left = mid + 1;
-            } else {
-                right = mid;
+    let insert_pos =
+        if idx != len - 1 && arr[idx + 1].epoch == ValidatorHistoryEntry::default().epoch {
+            // If the circ buf still has default values in it, we do a normal binary search without factoring for wraparound.
+            let len = idx + 1;
+            let mut left = 0;
+            let mut right = len;
+            while left < right {
+                let mid = (left + right) / 2;
+                if arr[mid].epoch == epoch {
+                    return None;
+                } else if arr[mid].epoch < epoch {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
             }
-        }
-        let insert_pos = left % arr.len();
-        if arr[insert_pos].epoch == epoch {
-            return None;
-        }
-        return Some(insert_pos);
-    }
-
-    // Binary search with wraparound
-    let mut left = 0;
-    let mut right = len;
-    while left < right {
-        let mid = (left + right) / 2;
-        let mid_idx = ((idx + 1) + mid) % len;
-        if arr[mid_idx].epoch == epoch {
-            return None;
-        } else if arr[mid_idx].epoch < epoch {
-            left = mid + 1;
+            left % arr.len()
         } else {
-            right = mid;
-        }
-    }
-    let insert_pos = ((idx + 1) + left) % len;
+            // Binary search with wraparound
+            let mut left = 0;
+            let mut right = len;
+            while left < right {
+                let mid = (left + right) / 2;
+                // idx + 1 is the index of the smallest epoch in the array
+                let mid_idx = ((idx + 1) + mid) % len;
+                if arr[mid_idx].epoch == epoch {
+                    return None;
+                } else if arr[mid_idx].epoch < epoch {
+                    left = mid + 1;
+                } else {
+                    right = mid;
+                }
+            }
+            ((idx + 1) + left) % len
+        };
     if arr[insert_pos].epoch == epoch {
         return None;
     }
@@ -106,15 +106,15 @@ mod tests {
     fn test_find_insert_position() {
         // Test empty
         let arr = vec![];
-        assert_eq!(insert_position(&arr, 0, 5), None);
+        assert_eq!(find_insert_position(&arr, 0, 5), None);
 
         // Test single element
         let arr = vec![ValidatorHistoryEntry {
             epoch: 10,
             ..Default::default()
         }];
-        assert_eq!(insert_position(&arr, 0, 5), Some(0));
-        assert_eq!(insert_position(&arr, 0, 15), Some(0));
+        assert_eq!(find_insert_position(&arr, 0, 5), Some(0));
+        assert_eq!(find_insert_position(&arr, 0, 15), Some(0));
 
         // Test multiple elements
         let arr = vec![
@@ -140,9 +140,9 @@ mod tests {
         ];
 
         let idx = 3;
-        assert_eq!(insert_position(&arr, idx, 0), Some(0));
-        assert_eq!(insert_position(&arr, idx, 12), Some(2));
-        assert_eq!(insert_position(&arr, idx, 25), Some(4));
+        assert_eq!(find_insert_position(&arr, idx, 0), Some(0));
+        assert_eq!(find_insert_position(&arr, idx, 12), Some(2));
+        assert_eq!(find_insert_position(&arr, idx, 25), Some(4));
 
         // Test wraparound
         let arr = vec![
@@ -169,12 +169,12 @@ mod tests {
         ];
 
         let idx = 2;
-        assert_eq!(insert_position(&arr, idx, 0), Some(3));
-        assert_eq!(insert_position(&arr, idx, 12), Some(0));
-        assert_eq!(insert_position(&arr, idx, 17), Some(1));
-        assert_eq!(insert_position(&arr, idx, 22), Some(2));
+        assert_eq!(find_insert_position(&arr, idx, 0), Some(3));
+        assert_eq!(find_insert_position(&arr, idx, 12), Some(0));
+        assert_eq!(find_insert_position(&arr, idx, 17), Some(1));
+        assert_eq!(find_insert_position(&arr, idx, 22), Some(2));
 
         // Test duplicate
-        assert_eq!(insert_position(&arr, idx, 10), None);
+        assert_eq!(find_insert_position(&arr, idx, 10), None);
     }
 }

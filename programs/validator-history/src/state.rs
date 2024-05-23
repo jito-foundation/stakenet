@@ -2,16 +2,11 @@ use {
     crate::{
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
-        utils::{cast_epoch, insert_position},
+        utils::{cast_epoch, find_insert_position},
     },
     anchor_lang::prelude::*,
     borsh::{BorshDeserialize, BorshSerialize},
-    std::{
-        cmp::Ordering,
-        collections::{BTreeMap, HashMap},
-        mem::size_of,
-        net::IpAddr,
-    },
+    std::{cmp::Ordering, collections::HashMap, mem::size_of, net::IpAddr},
     type_layout::TypeLayout,
 };
 
@@ -193,10 +188,7 @@ impl CircBuf {
     /// Will not insert if the epoch is out of range or already exists in the buffer
     fn insert(&mut self, entry: ValidatorHistoryEntry, epoch: u16) -> Result<()> {
         if self.is_empty() {
-            self.arr[0] = entry;
-            self.idx = 0;
-            self.is_empty = 0;
-            return Ok(());
+            return Err(ValidatorHistoryError::EpochOutOfRange.into());
         }
 
         // Find the lowest epoch in the buffer to ensure the new epoch is valid
@@ -214,7 +206,7 @@ impl CircBuf {
             return Err(ValidatorHistoryError::EpochOutOfRange.into());
         }
 
-        let insert_pos = insert_position(&self.arr, self.idx as usize, epoch)
+        let insert_pos = find_insert_position(&self.arr, self.idx as usize, epoch)
             .ok_or(ValidatorHistoryError::DuplicateEpoch)?;
 
         // If idx < insert_pos, the shifting needs to wrap around
@@ -452,8 +444,8 @@ impl ValidatorHistory {
             .map(|entry| entry.is_some())
             .collect::<Vec<bool>>();
 
-        let epoch_credits_map: BTreeMap<u16, u32> =
-            BTreeMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
+        let epoch_credits_map: HashMap<u16, u32> =
+            HashMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
                 (
                     cast_epoch(*epoch).unwrap(), // all epochs in list will be valid if current epoch is valid
                     (cur.checked_sub(*prev)
@@ -1205,7 +1197,8 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_into_empty_buffer() {
+    fn test_insert_errors() {
+        // test insert empty
         let mut circ_buf = CircBuf {
             idx: 0,
             is_empty: 1,
@@ -1218,43 +1211,10 @@ mod tests {
             ..ValidatorHistoryEntry::default()
         };
 
-        circ_buf.insert(entry, 10).unwrap();
+        assert!(
+            circ_buf.insert(entry, 10) == Err(Error::from(ValidatorHistoryError::EpochOutOfRange))
+        );
 
-        let inserted_entry = circ_buf.last().unwrap();
-        assert_eq!(inserted_entry.epoch, 10);
-        assert!(!circ_buf.is_empty());
-    }
-
-    #[test]
-    fn test_insert_middle() {
-        let mut circ_buf = CircBuf {
-            idx: 4,
-            is_empty: 0,
-            padding: [0; 7],
-            arr: [ValidatorHistoryEntry::default(); MAX_ITEMS],
-        };
-
-        for i in 0..5 {
-            circ_buf.arr[i] = ValidatorHistoryEntry {
-                epoch: (i * 10) as u16,
-                ..ValidatorHistoryEntry::default()
-            };
-        }
-
-        let entry = ValidatorHistoryEntry {
-            epoch: 25,
-            ..ValidatorHistoryEntry::default()
-        };
-
-        circ_buf.insert(entry, 25).unwrap();
-
-        let expected_epochs = vec![0, 10, 20, 25, 30, 40];
-        let actual_epochs = (0..6).map(|i| circ_buf.arr[i].epoch).collect::<Vec<u16>>();
-        assert_eq!(expected_epochs, actual_epochs);
-    }
-
-    #[test]
-    fn test_insert_errors() {
         let mut circ_buf = CircBuf {
             idx: 4,
             is_empty: 0,
@@ -1301,7 +1261,4 @@ mod tests {
             circ_buf.insert(entry, 50) == Err(Error::from(ValidatorHistoryError::EpochOutOfRange))
         );
     }
-
-    #[test]
-    fn test_find_insert_position() {}
 }
