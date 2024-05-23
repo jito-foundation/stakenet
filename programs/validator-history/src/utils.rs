@@ -43,7 +43,6 @@ pub fn find_insert_position(
     idx: usize,
     epoch: u16,
 ) -> Option<usize> {
-    // Pseudo-binary search to find position
     let len = arr.len();
     if len == 0 {
         return None;
