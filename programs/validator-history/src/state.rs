@@ -226,7 +226,7 @@ impl CircBuf {
         self.arr[insert_pos] = entry;
 
         self.idx = (self.idx + 1) % self.arr.len() as u64;
-        return Ok(());
+        Ok(())
     }
 
     /// Returns &ValidatorHistoryEntry for each existing entry in range [start_epoch, end_epoch] inclusive, factoring for wraparound
@@ -1081,8 +1081,10 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut default_circ_buf = CircBuf::default();
-        default_circ_buf.idx = MAX_ITEMS as u64 - 1;
+        let mut default_circ_buf = CircBuf {
+            idx: MAX_ITEMS as u64 - 1,
+            ..Default::default()
+        };
         for _ in 0..MAX_ITEMS {
             let entry = ValidatorHistoryEntry {
                 ..ValidatorHistoryEntry::default()
@@ -1092,7 +1094,7 @@ mod tests {
         default_circ_buf.is_empty = 1;
 
         // Test partially full CircBuf
-        let mut circ_buf = default_circ_buf.clone();
+        let mut circ_buf = default_circ_buf;
         for i in 0..MAX_ITEMS / 2 {
             let entry = ValidatorHistoryEntry {
                 epoch: i as u16,
@@ -1120,13 +1122,13 @@ mod tests {
         assert_eq!(epochs, vec![99, 100, 101]);
 
         // Test full CircBuf with wraparound. Will contain epochs 512-1023, skipping 600 - 610
-        let mut circ_buf = default_circ_buf.clone();
+        let mut circ_buf = default_circ_buf;
         for i in 0..MAX_ITEMS * 2 {
             let entry = ValidatorHistoryEntry {
                 epoch: i as u16,
                 ..ValidatorHistoryEntry::default()
             };
-            if i < 600 || i > 610 {
+            if !(600..=610).contains(&i) {
                 circ_buf.push(entry);
             }
         }
@@ -1146,7 +1148,7 @@ mod tests {
         assert_eq!(epochs, vec![599, 600]);
 
         // Insert an entry where insertion position > idx
-        let mut circ_buf = default_circ_buf.clone();
+        let mut circ_buf = default_circ_buf;
         for i in 0..MAX_ITEMS * 3 / 2 {
             let entry = ValidatorHistoryEntry {
                 epoch: i as u16,
@@ -1169,7 +1171,7 @@ mod tests {
         assert!(range.iter().all(|maybe_e| maybe_e.is_some()));
 
         // Test wraparound correctly when inserting at the end
-        let mut circ_buf = default_circ_buf.clone();
+        let mut circ_buf = default_circ_buf;
         for i in 0..2 * MAX_ITEMS - 1 {
             let entry = ValidatorHistoryEntry {
                 epoch: i as u16,

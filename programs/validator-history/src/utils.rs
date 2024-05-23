@@ -57,12 +57,10 @@ pub fn find_insert_position(
             let mut right = len;
             while left < right {
                 let mid = (left + right) / 2;
-                if arr[mid].epoch == epoch {
-                    return None;
-                } else if arr[mid].epoch < epoch {
-                    left = mid + 1;
-                } else {
-                    right = mid;
+                match arr[mid].epoch.cmp(&epoch) {
+                    std::cmp::Ordering::Equal => return None,
+                    std::cmp::Ordering::Less => left = mid + 1,
+                    std::cmp::Ordering::Greater => right = mid,
                 }
             }
             left % arr.len()
@@ -74,12 +72,10 @@ pub fn find_insert_position(
                 let mid = (left + right) / 2;
                 // idx + 1 is the index of the smallest epoch in the array
                 let mid_idx = ((idx + 1) + mid) % len;
-                if arr[mid_idx].epoch == epoch {
-                    return None;
-                } else if arr[mid_idx].epoch < epoch {
-                    left = mid + 1;
-                } else {
-                    right = mid;
+                match arr[mid_idx].epoch.cmp(&epoch) {
+                    std::cmp::Ordering::Equal => return None,
+                    std::cmp::Ordering::Less => left = mid + 1,
+                    std::cmp::Ordering::Greater => right = mid,
                 }
             }
             ((idx + 1) + left) % len
