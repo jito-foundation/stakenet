@@ -2,7 +2,7 @@ use {
     crate::{
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
-        utils::{cast_epoch, find_insert_position},
+        utils::{cast_epoch, find_insert_position, get_max_epoch, get_min_epoch},
     },
     anchor_lang::prelude::*,
     borsh::{BorshDeserialize, BorshSerialize},
@@ -421,21 +421,8 @@ impl ValidatorHistory {
         )],
     ) -> Result<()> {
         // For each epoch in the list, insert a new entry if it doesn't exist
-        let start_epoch = cast_epoch(
-            epoch_credits
-                .iter()
-                .min_by_key(|(epoch, _, _)| *epoch)
-                .unwrap()
-                .0,
-        )?;
-
-        let end_epoch = cast_epoch(
-            epoch_credits
-                .iter()
-                .max_by_key(|(epoch, _, _)| *epoch)
-                .unwrap()
-                .0,
-        )?;
+        let start_epoch = get_min_epoch(epoch_credits)?;
+        let end_epoch = get_max_epoch(epoch_credits)?;
 
         let entries = self
             .history
@@ -491,10 +478,7 @@ impl ValidatorHistory {
                 )
             }));
 
-        let epoch_min = epoch_credits_map
-            .keys()
-            .min()
-            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
+        let min_epoch = get_min_epoch(epoch_credits)?;
 
         // Traverses entries in reverse order, breaking once we hit the lowest epoch in epoch_credits
         let len = self.history.arr.len();
@@ -504,7 +488,7 @@ impl ValidatorHistory {
             if let Some(&epoch_credits) = epoch_credits_map.get(&entry.epoch) {
                 entry.epoch_credits = epoch_credits;
             }
-            if entry.epoch == *epoch_min {
+            if entry.epoch == min_epoch {
                 break;
             }
         }

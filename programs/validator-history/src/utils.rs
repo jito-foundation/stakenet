@@ -15,6 +15,38 @@ pub fn cast_epoch(epoch: u64) -> Result<u16> {
     Ok(epoch_u16)
 }
 
+pub fn get_min_epoch(
+    epoch_credits: &[(
+        u64, /* epoch */
+        u64, /* epoch cumulative votes */
+        u64, /* prev epoch cumulative votes */
+    )],
+) -> Result<u16> {
+    cast_epoch(
+        epoch_credits
+            .iter()
+            .min_by_key(|(epoch, _, _)| *epoch)
+            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?
+            .0,
+    )
+}
+
+pub fn get_max_epoch(
+    epoch_credits: &[(
+        u64, /* epoch */
+        u64, /* epoch cumulative votes */
+        u64, /* prev epoch cumulative votes */
+    )],
+) -> Result<u16> {
+    cast_epoch(
+        epoch_credits
+            .iter()
+            .max_by_key(|(epoch, _, _)| *epoch)
+            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?
+            .0,
+    )
+}
+
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
     start_timestamp.try_into().unwrap()
 }
