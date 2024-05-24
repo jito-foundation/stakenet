@@ -3,28 +3,23 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-
 use clap::{arg, command, Parser};
-use keeper_core::{Cluster, CreateUpdateStats, SubmitStats, TransactionExecutionError};
+use keeper_core::Cluster;
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_metrics::{datapoint_error, set_host_id};
+use solana_metrics::set_host_id;
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair, Signer},
+    signature::{read_keypair_file, Keypair},
 };
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
-    cluster_info::update_cluster_info,
-    emit_cluster_history_datapoint, emit_mev_commission_datapoint, emit_mev_earned_datapoint,
-    emit_validator_commission_datapoint, emit_validator_history_metrics,
-    gossip::{emit_gossip_datapoint, upload_gossip_values},
-    mev_commission::{update_mev_commission, update_mev_earned},
-    stake::{emit_stake_history_datapoint, update_stake_history},
-    vote_account::update_vote_accounts,
-    KeeperError,
+    operations::{self, keeper_operations::KeeperOperations},
+    state::{
+        keeper_state::KeeperState,
+        update_state::{create_missing_accounts, post_create_update, pre_create_update},
+    },
 };
 
 #[derive(Parser, Debug)]
@@ -44,7 +39,7 @@ struct Args {
     gossip_entrypoint: Option<String>,
 
     /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    #[arg(short, long, env, default_value = "./credentials/keypair.json")]
     keypair: PathBuf,
 
     /// Path to keypair used specifically for submitting permissioned transactions
@@ -59,413 +54,207 @@ struct Args {
     #[arg(short, long, env)]
     tip_distribution_program_id: Pubkey,
 
-    // Loop interval time (default 300 sec)
+    // Interval to update Validator History Accounts (default 300 sec)
     #[arg(short, long, env, default_value = "300")]
-    interval: u64,
+    validator_history_interval: u64,
+
+    // Interval to emit metrics (default 60 sec)
+    #[arg(short, long, env, default_value = "60")]
+    metrics_interval: u64,
 
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
     cluster: Cluster,
 }
 
-async fn monitoring_loop(
-    client: Arc<RpcClient>,
-    program_id: Pubkey,
-    keeper_address: Pubkey,
-    interval: u64,
-) {
-    loop {
-        match emit_validator_history_metrics(&client, program_id, keeper_address).await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Failed to emit validator history metrics: {}", e);
-            }
-        }
-        sleep(Duration::from_secs(interval)).await;
-    }
+fn should_emit(tick: u64, intervals: &[u64]) -> bool {
+    intervals.iter().any(|interval| tick % (interval + 1) == 0)
 }
 
-async fn mev_commission_loop(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    commission_history_program_id: Pubkey,
-    tip_distribution_program_id: Pubkey,
-    interval: u64,
-) {
-    loop {
-        // Continuously runs throughout an epoch, polling for new tip distribution accounts
-        // and submitting update txs when new accounts are detected
-        let stats = match update_mev_commission(
-            client.clone(),
-            keypair.clone(),
-            &commission_history_program_id,
-            &tip_distribution_program_id,
-        )
-        .await
-        {
-            Ok(stats) => {
-                for message in stats
-                    .creates
-                    .results
-                    .iter()
-                    .chain(stats.updates.results.iter())
-                {
-                    if let Err(e) = message {
-                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                    }
-                }
-                stats
-            }
-            Err(e) => {
-                let mut stats = CreateUpdateStats::default();
-                if let KeeperError::TransactionExecutionError(
-                    TransactionExecutionError::TransactionClientError(_, results),
-                ) = &e
-                {
-                    stats.updates.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
-                    stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                }
-                datapoint_error!("mev-commission-error", ("error", e.to_string(), String),);
-                stats
-            }
-        };
-        emit_mev_commission_datapoint(stats);
-        sleep(Duration::from_secs(interval)).await;
-    }
+fn should_update(tick: u64, intervals: &[u64]) -> bool {
+    intervals.iter().any(|interval| tick % interval == 0)
 }
 
-async fn mev_earned_loop(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    commission_history_program_id: Pubkey,
-    tip_distribution_program_id: Pubkey,
-    interval: u64,
-) {
-    loop {
-        // Continuously runs throughout an epoch, polling for tip distribution accounts from the prev epoch with uploaded merkle roots
-        // and submitting update_mev_earned (technically update_mev_comission) txs when the uploaded merkle roots are detected
-        let stats = match update_mev_earned(
-            &client,
-            &keypair,
-            &commission_history_program_id,
-            &tip_distribution_program_id,
-        )
-        .await
-        {
-            Ok(stats) => {
-                for message in stats
-                    .creates
-                    .results
-                    .iter()
-                    .chain(stats.updates.results.iter())
-                {
-                    if let Err(e) = message {
-                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                    }
-                }
-                stats
-            }
-            Err(e) => {
-                let mut stats = CreateUpdateStats::default();
-                if let KeeperError::TransactionExecutionError(
-                    TransactionExecutionError::TransactionClientError(_, results),
-                ) = &e
-                {
-                    stats.updates.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
-                    stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                }
-                datapoint_error!("mev-earned-error", ("error", e.to_string(), String),);
-                stats
-            }
-        };
-        emit_mev_earned_datapoint(stats);
-        sleep(Duration::from_secs(interval)).await;
-    }
+fn should_fire(tick: u64, interval: u64) -> bool {
+    tick % interval == 0
 }
 
-async fn vote_account_loop(
-    rpc_client: Arc<RpcClient>,
+fn advance_tick(tick: &mut u64) {
+    *tick += 1;
+}
+
+async fn sleep_and_tick(tick: &mut u64) {
+    sleep(Duration::from_secs(1)).await;
+    advance_tick(tick);
+}
+
+struct RunLoopConfig {
+    client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: Pubkey,
-    interval: u64,
-) {
-    let mut runs_for_epoch = 0;
-    let mut current_epoch = 0;
-    let mut stats = CreateUpdateStats::default();
-    loop {
-        let epoch_info = match rpc_client.get_epoch_info().await {
-            Ok(epoch_info) => epoch_info,
-            Err(e) => {
-                error!("Failed to get epoch info: {}", e);
-                sleep(Duration::from_secs(5)).await;
-                continue;
-            }
-        };
-        if current_epoch != epoch_info.epoch {
-            runs_for_epoch = 0;
-        }
-        // Run at 10%, 50% and 90% completion of epoch
-        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-            && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
+    tip_distribution_program_id: Pubkey,
+    oracle_authority_keypair: Option<Arc<Keypair>>,
+    gossip_entrypoint: Option<SocketAddr>,
+    validator_history_interval: u64,
+    metrics_interval: u64,
+}
 
-        if should_run {
-            stats = match update_vote_accounts(rpc_client.clone(), keypair.clone(), program_id)
-                .await
-            {
-                Ok(stats) => {
-                    for message in stats
-                        .creates
-                        .results
-                        .iter()
-                        .chain(stats.updates.results.iter())
-                    {
-                        if let Err(e) = message {
-                            datapoint_error!(
-                                "vote-account-error",
-                                ("error", e.to_string(), String),
-                            );
-                        }
-                    }
-                    if stats.updates.errors == 0 && stats.creates.errors == 0 {
-                        runs_for_epoch += 1;
-                    }
-                    sleep(Duration::from_secs(interval)).await;
-                    stats
+async fn run_loop(config: RunLoopConfig) {
+    let RunLoopConfig {
+        client,
+        keypair,
+        program_id,
+        tip_distribution_program_id,
+        oracle_authority_keypair,
+        gossip_entrypoint,
+        validator_history_interval,
+        metrics_interval,
+    } = config;
+    let intervals = vec![validator_history_interval, metrics_interval];
+
+    // Stateful data
+    let mut keeper_state = KeeperState::new();
+    let mut tick: u64 = 0; // 1 second ticks
+
+    loop {
+        // ---------------------- FETCH -----------------------------------
+        // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
+        // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
+        if should_update(tick, &intervals) {
+            info!("Pre-fetching data for update...");
+            match pre_create_update(&client, &keypair, &program_id, &mut keeper_state).await {
+                Ok(_) => {
+                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
                 }
                 Err(e) => {
-                    let mut stats = CreateUpdateStats::default();
-                    if let KeeperError::TransactionExecutionError(
-                        TransactionExecutionError::TransactionClientError(_, results),
-                    ) = &e
-                    {
-                        stats.updates.successes =
-                            results.iter().filter(|r| r.is_ok()).count() as u64;
-                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                    }
-                    datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
-                    stats
+                    error!("Failed to pre create update: {:?}", e);
+                    advance_tick(&mut tick);
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::PreCreateUpdate);
+                    continue;
                 }
-            };
-        }
-        current_epoch = epoch_info.epoch;
-        emit_validator_commission_datapoint(stats.clone(), runs_for_epoch);
-        sleep(Duration::from_secs(interval)).await;
-    }
-}
-
-async fn stake_upload_loop(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    program_id: Pubkey,
-    interval: u64,
-) {
-    let mut runs_for_epoch = 0;
-    let mut current_epoch = 0;
-
-    loop {
-        let epoch_info = match client.get_epoch_info().await {
-            Ok(epoch_info) => epoch_info,
-            Err(e) => {
-                error!("Failed to get epoch info: {}", e);
-                sleep(Duration::from_secs(5)).await;
-                continue;
             }
-        };
-        let epoch = epoch_info.epoch;
-        let mut stats = CreateUpdateStats::default();
 
-        if current_epoch != epoch {
-            runs_for_epoch = 0;
-        }
-        // Run at 0.1%, 50% and 90% completion of epoch
-        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-            && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-        if should_run {
-            stats = match update_stake_history(client.clone(), keypair.clone(), &program_id).await {
-                Ok(run_stats) => {
-                    for message in stats
-                        .creates
-                        .results
-                        .iter()
-                        .chain(stats.updates.results.iter())
-                    {
-                        if let Err(e) = message {
-                            datapoint_error!(
-                                "stake-history-error",
-                                ("error", e.to_string(), String),
-                            );
-                        }
-                    }
-
-                    if stats.creates.errors == 0 && stats.updates.errors == 0 {
-                        runs_for_epoch += 1;
-                    }
-                    run_stats
+            info!("Creating missing accounts...");
+            match create_missing_accounts(&client, &keypair, &program_id, &keeper_state).await {
+                Ok(_) => {
+                    keeper_state
+                        .increment_update_run_for_epoch(KeeperOperations::CreateMissingAccounts);
                 }
                 Err(e) => {
-                    let mut stats = CreateUpdateStats::default();
-                    if let KeeperError::TransactionExecutionError(
-                        TransactionExecutionError::TransactionClientError(_, results),
-                    ) = &e
-                    {
-                        stats.updates.successes =
-                            results.iter().filter(|r| r.is_ok()).count() as u64;
-                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                    }
-                    datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
-                    stats
+                    error!("Failed to create missing accounts: {:?}", e);
+                    advance_tick(&mut tick);
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::CreateMissingAccounts);
+                    continue;
                 }
-            };
-        }
-
-        current_epoch = epoch;
-        emit_stake_history_datapoint(stats, runs_for_epoch);
-        sleep(Duration::from_secs(interval)).await;
-    }
-}
-
-async fn gossip_upload_loop(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    program_id: Pubkey,
-    entrypoint: SocketAddr,
-    interval: u64,
-) {
-    let mut runs_for_epoch = 0;
-    let mut current_epoch = 0;
-    loop {
-        let epoch_info = match client.get_epoch_info().await {
-            Ok(epoch_info) => epoch_info,
-            Err(e) => {
-                error!("Failed to get epoch info: {}", e);
-                sleep(Duration::from_secs(5)).await;
-                continue;
             }
-        };
-        let epoch = epoch_info.epoch;
-        if current_epoch != epoch {
-            runs_for_epoch = 0;
-        }
-        // Run at 0%, 50% and 90% completion of epoch
-        let should_run = runs_for_epoch < 1
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
 
-        let mut stats = CreateUpdateStats::default();
-        if should_run {
-            stats = match upload_gossip_values(
-                client.clone(),
-                keypair.clone(),
-                entrypoint,
+            info!("Post-fetching data for update...");
+            match post_create_update(
+                &client,
                 &program_id,
+                &tip_distribution_program_id,
+                &mut keeper_state,
             )
             .await
             {
-                Ok(stats) => {
-                    for message in stats
-                        .creates
-                        .results
-                        .iter()
-                        .chain(stats.updates.results.iter())
-                    {
-                        if let Err(e) = message {
-                            datapoint_error!(
-                                "gossip-upload-error",
-                                ("error", e.to_string(), String),
-                            );
-                        }
-                    }
-                    if stats.creates.errors == 0 && stats.updates.errors == 0 {
-                        runs_for_epoch += 1;
-                    }
-                    stats
+                Ok(_) => {
+                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
                 }
                 Err(e) => {
-                    let mut stats = CreateUpdateStats::default();
-                    if let Some(TransactionExecutionError::TransactionClientError(_, results)) =
-                        e.downcast_ref::<TransactionExecutionError>()
-                    {
-                        stats.updates.successes =
-                            results.iter().filter(|r| r.is_ok()).count() as u64;
-                        stats.updates.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                    }
-
-                    datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
-                    stats
+                    error!("Failed to post create update: {:?}", e);
+                    advance_tick(&mut tick);
+                    keeper_state
+                        .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
+                    continue;
                 }
-            };
-        }
-        current_epoch = epoch;
-        emit_gossip_datapoint(stats, runs_for_epoch);
-        sleep(Duration::from_secs(interval)).await;
-    }
-}
-
-async fn cluster_history_loop(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    program_id: Pubkey,
-    interval: u64,
-) {
-    let mut runs_for_epoch = 0;
-    let mut current_epoch = 0;
-
-    loop {
-        let epoch_info = match client.get_epoch_info().await {
-            Ok(epoch_info) => epoch_info,
-            Err(e) => {
-                error!("Failed to get epoch info: {}", e);
-                sleep(Duration::from_secs(5)).await;
-                continue;
             }
-        };
-        let epoch = epoch_info.epoch;
-
-        let mut stats = SubmitStats::default();
-
-        if current_epoch != epoch {
-            runs_for_epoch = 0;
         }
 
-        // Run at 0.1%, 50% and 90% completion of epoch
-        let should_run = (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000
-            && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3);
-        if should_run {
-            stats = match update_cluster_info(client.clone(), keypair.clone(), &program_id).await {
-                Ok(run_stats) => {
-                    for message in run_stats.results.iter() {
-                        if let Err(e) = message {
-                            datapoint_error!(
-                                "cluster-history-error",
-                                ("error", e.to_string(), String),
-                            );
-                        }
-                    }
-                    if run_stats.errors == 0 {
-                        runs_for_epoch += 1;
-                    }
-                    run_stats
-                }
-                Err(e) => {
-                    let mut stats = SubmitStats::default();
-                    if let TransactionExecutionError::TransactionClientError(_, results) = &e {
-                        stats.successes = results.iter().filter(|r| r.is_ok()).count() as u64;
-                        stats.errors = results.iter().filter(|r| r.is_err()).count() as u64;
-                    }
-                    datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
-                    stats
-                }
-            };
+        // ---------------------- FIRE -----------------------------------
+        if should_fire(tick, validator_history_interval) {
+            info!("Firing operations...");
+
+            info!("Updating cluster history...");
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::cluster_history::fire(&client, &keypair, &program_id, &keeper_state)
+                    .await,
+            );
+
+            info!("Updating copy vote accounts...");
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::vote_account::fire(&client, &keypair, &program_id, &keeper_state).await,
+            );
+
+            info!("Updating mev commission...");
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::mev_commission::fire(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    &tip_distribution_program_id,
+                    &keeper_state,
+                )
+                .await,
+            );
+
+            info!("Updating mev earned...");
+            keeper_state.set_runs_and_errors_for_epoch(
+                operations::mev_earned::fire(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    &tip_distribution_program_id,
+                    &keeper_state,
+                )
+                .await,
+            );
+
+            if let Some(oracle_authority_keypair) = &oracle_authority_keypair {
+                info!("Updating stake accounts...");
+                keeper_state.set_runs_and_errors_for_epoch(
+                    operations::stake_upload::fire(
+                        &client,
+                        oracle_authority_keypair,
+                        &program_id,
+                        &keeper_state,
+                    )
+                    .await,
+                );
+            }
+
+            if let (Some(gossip_entrypoint), Some(oracle_authority_keypair)) =
+                (gossip_entrypoint, &oracle_authority_keypair)
+            {
+                info!("Updating gossip accounts...");
+                keeper_state.set_runs_and_errors_for_epoch(
+                    operations::gossip_upload::fire(
+                        &client,
+                        oracle_authority_keypair,
+                        &program_id,
+                        &gossip_entrypoint,
+                        &keeper_state,
+                    )
+                    .await,
+                );
+            }
         }
 
-        current_epoch = epoch;
-        emit_cluster_history_datapoint(stats, runs_for_epoch);
-        sleep(Duration::from_secs(interval)).await;
+        // ---------------------- EMIT METRICS -----------------------------------
+
+        if should_fire(tick, metrics_interval) {
+            info!("Emitting metrics...");
+            keeper_state
+                .set_runs_and_errors_for_epoch(operations::metrics_emit::fire(&keeper_state).await);
+        }
+
+        // ---------------------- EMIT ---------------------------------
+        if should_emit(tick, &intervals) {
+            KeeperOperations::emit(&keeper_state.runs_for_epoch, &keeper_state.errors_for_epoch)
+        }
+
+        // ---------- SLEEP ----------
+        sleep_and_tick(&mut tick).await;
     }
 }
 
@@ -479,74 +268,35 @@ async fn main() {
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
     ));
+
     let keypair = Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
+
+    let oracle_authority_keypair = args
+        .oracle_authority_keypair
+        .map(|oracle_authority_keypair| {
+            Arc::new(
+                read_keypair_file(oracle_authority_keypair)
+                    .expect("Failed reading stake keypair file"),
+            )
+        });
+
+    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
+        solana_net_utils::parse_host_port(&gossip_entrypoint)
+            .expect("Failed to parse host and port from gossip entrypoint")
+    });
 
     info!("Starting validator history keeper...");
 
-    tokio::spawn(monitoring_loop(
-        Arc::clone(&client),
-        args.program_id,
-        keypair.pubkey(),
-        args.interval,
-    ));
+    let config = RunLoopConfig {
+        client,
+        keypair,
+        program_id: args.program_id,
+        tip_distribution_program_id: args.tip_distribution_program_id,
+        oracle_authority_keypair,
+        gossip_entrypoint,
+        validator_history_interval: args.validator_history_interval,
+        metrics_interval: args.metrics_interval,
+    };
 
-    tokio::spawn(cluster_history_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
-        args.program_id,
-        args.interval,
-    ));
-
-    tokio::spawn(vote_account_loop(
-        Arc::clone(&client),
-        Arc::clone(&keypair),
-        args.program_id,
-        args.interval,
-    ));
-
-    tokio::spawn(mev_commission_loop(
-        client.clone(),
-        keypair.clone(),
-        args.program_id,
-        args.tip_distribution_program_id,
-        args.interval,
-    ));
-
-    tokio::spawn(mev_earned_loop(
-        client.clone(),
-        keypair.clone(),
-        args.program_id,
-        args.tip_distribution_program_id,
-        args.interval,
-    ));
-
-    if let Some(oracle_authority_keypair) = args.oracle_authority_keypair {
-        let oracle_authority_keypair = Arc::new(
-            read_keypair_file(oracle_authority_keypair).expect("Failed reading stake keypair file"),
-        );
-        tokio::spawn(stake_upload_loop(
-            Arc::clone(&client),
-            Arc::clone(&oracle_authority_keypair),
-            args.program_id,
-            args.interval,
-        ));
-
-        if let Some(gossip_entrypoint) = args.gossip_entrypoint {
-            let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
-                .expect("Failed to parse host and port from gossip entrypoint");
-            // Cannot be sent to thread because there's a Box<dyn Error> inside
-            gossip_upload_loop(
-                client.clone(),
-                oracle_authority_keypair,
-                args.program_id,
-                entrypoint,
-                args.interval,
-            )
-            .await;
-        }
-    }
-    // Need final infinite loop to keep all threads alive
-    loop {
-        sleep(Duration::from_secs(60)).await;
-    }
+    run_loop(config).await;
 }

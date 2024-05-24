@@ -10,3 +10,6 @@ test-ledger
 */test-ledger
 .idea/
 **/targets
+**/credentials
+**/config
+**/*.env
