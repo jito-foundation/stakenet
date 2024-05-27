@@ -5,7 +5,7 @@ pub enum ValidatorHistoryError {
     #[msg("Account already reached proper size, no more allocations allowed")]
     AccountFullySized,
     #[msg(
-        "Invalid epoch credits, credits exist and each value must be greater than previous credits"
+        "Invalid epoch credits, credits must exist and each value must be greater than previous credits"
     )]
     InvalidEpochCredits,
     #[msg("Epoch is out of range of history")]

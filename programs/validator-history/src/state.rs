@@ -442,12 +442,13 @@ impl ValidatorHistory {
             }));
 
         for (entry_is_some, epoch) in entries.iter().zip(start_epoch as u16..=end_epoch) {
-            if !*entry_is_some && epoch_credits_map.get(&epoch).is_some() {
+            if !*entry_is_some && epoch_credits_map.contains_key(&epoch) {
+                // Inserts blank entry that will have credits copied to it later
                 let entry = ValidatorHistoryEntry {
                     epoch,
                     ..ValidatorHistoryEntry::default()
                 };
-                // If entry cannot be inserted, skips
+                // Skips if epoch is out of range or duplicate
                 self.history.insert(entry, epoch).unwrap_or_default();
             }
         }

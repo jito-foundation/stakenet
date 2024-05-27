@@ -903,7 +903,7 @@
     {
       "code": 6001,
       "name": "InvalidEpochCredits",
-      "msg": "Invalid epoch credits, credits must be greater than previous credits"
+      "msg": "Invalid epoch credits, credits must exist and each value must be greater than previous credits"
     },
     {
       "code": 6002,
@@ -928,7 +928,7 @@
     {
       "code": 6006,
       "name": "NotEnoughVotingHistory",
-      "msg": "Not enough voting history to create account. Minimum 10 epochs required"
+      "msg": "Not enough voting history to create account. Minimum 5 epochs required"
     },
     {
       "code": 6007,
