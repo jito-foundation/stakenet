@@ -46,4 +46,8 @@ pub enum StewardError {
     ArithmeticError,
     #[msg("Validator not eligible for removal. Must be delinquent or have closed vote account")]
     ValidatorNotRemovable,
+    #[msg("Max validators reached")]
+    MaxValidatorsReached,
+    #[msg("Validator history account does not match vote account")]
+    ValidatorHistoryMismatch,
 }
