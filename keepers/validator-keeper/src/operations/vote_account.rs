@@ -27,8 +27,8 @@ fn _get_operation() -> KeeperOperations {
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 10%, 50% and 90% completion of epoch
-    (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000 && runs_for_epoch < 1)
-        || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
+    (epoch_info.slot_index > epoch_info.slots_in_epoch * 1 / 10 && runs_for_epoch < 1)
+        || (epoch_info.slot_index > epoch_info.slots_in_epoch * 5 / 10 && runs_for_epoch < 2)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
@@ -84,21 +84,19 @@ pub async fn update_vote_accounts(
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     let validator_history_map = &keeper_state.validator_history_map;
-    let closed_vote_accounts = &keeper_state.get_closed_vote_accounts();
     let epoch_info = &keeper_state.epoch_info;
 
-    // Remove closed vote accounts from all vote accounts
-    // Remove vote accounts for which this instruction has been called within 50,000 slots
-    let mut vote_accounts_to_update = keeper_state.vote_account_map.keys().collect::<Vec<_>>();
-
+    // Update all vote accounts, less they are closed
+    let mut vote_accounts_to_update = keeper_state.get_all_open_vote_accounts();
     vote_accounts_to_update.retain(|vote_account| {
-        !closed_vote_accounts.contains(vote_account)
-            && !vote_account_uploaded_recently(
-                validator_history_map,
-                vote_account,
-                epoch_info.epoch,
-                epoch_info.absolute_slot,
-            )
+        let should_update = !vote_account_uploaded_recently(
+            validator_history_map,
+            vote_account,
+            epoch_info.epoch,
+            epoch_info.absolute_slot,
+        );
+
+        should_update
     });
 
     let entries = vote_accounts_to_update

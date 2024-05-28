@@ -74,14 +74,35 @@ impl KeeperState {
     pub fn get_closed_vote_accounts(&self) -> HashSet<&Pubkey> {
         self.all_history_vote_account_map
             .iter()
-            .filter(|(_, vote_account)| {
-                if let Some(account) = vote_account {
-                    account.owner != get_vote_program_id()
-                } else {
-                    true
+            .filter_map(|(vote_address, vote_account)| match vote_account {
+                Some(account) => {
+                    if account.owner != get_vote_program_id() {
+                        Some(vote_address)
+                    } else {
+                        None
+                    }
+                }
+                _ => {
+                    // If the account is not found, it is considered closed
+                    Some(vote_address)
                 }
             })
-            .map(|(pubkey, _)| pubkey)
+            .collect()
+    }
+
+    pub fn get_all_open_vote_accounts(&self) -> HashSet<&Pubkey> {
+        self.all_history_vote_account_map
+            .iter()
+            .filter_map(|(vote_address, vote_account)| match vote_account {
+                Some(account) => {
+                    if account.owner == get_vote_program_id() {
+                        Some(vote_address)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
             .collect()
     }
 
