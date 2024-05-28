@@ -19,6 +19,7 @@ use bytemuck::{Pod, Zeroable};
 use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
+// Tests will fail here - comment out msg! to pass
 fn invalid_state_error(expected: String, actual: String) -> Error {
     msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
