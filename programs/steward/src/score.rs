@@ -18,13 +18,13 @@ pub struct ScoreComponents {
     /// vote_credits_ratio * (1 - commission)
     pub yield_score: f64,
 
-    /// If max mev commission in mev_commission_range epoch is less than threshold, score is 1.0, else 0
+    /// If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0
     pub mev_commission_score: f64,
 
     /// If validator is blacklisted, score is 0.0, else 1.0
     pub blacklisted_score: f64,
 
-    /// If validator is not superminority, score is 1.0, else 0.0
+    /// If validator is not in the superminority, score is 1.0, else 0.0
     pub superminority_score: f64,
 
     /// If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
@@ -182,18 +182,19 @@ pub fn validator_score(
 
     /////// Formula ///////
 
+    let yield_score = (average_vote_credits / average_blocks) * (1. - commission);
+
     let score = mev_commission_score
         * commission_score
         * blacklisted_score
         * superminority_score
         * delinquency_score
         * running_jito_score
-        * (average_vote_credits / average_blocks)
-        * (1. - commission);
+        * yield_score;
 
     Ok(ScoreComponents {
         score,
-        yield_score: (average_vote_credits / average_blocks) * (1. - commission),
+        yield_score,
         mev_commission_score,
         blacklisted_score,
         superminority_score,

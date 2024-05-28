@@ -1,10 +1,11 @@
-use crate::constants::STAKE_POOL_WITHDRAW_SEED;
+use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{get_stake_pool, StakePool};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
+use spl_stake_pool::state::ValidatorListHeader;
 use validator_history::state::ValidatorHistory;
 
 #[derive(Accounts)]
@@ -103,6 +104,15 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
     let config = ctx.accounts.config.load()?;
     let validator_history = ctx.accounts.validator_history_account.load()?;
     let epoch = Clock::get()?.epoch;
+
+    {
+        let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
+        let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
+
+        if validator_list.len().checked_add(1).unwrap() > MAX_VALIDATORS as u32 {
+            return Err(StewardError::MaxValidatorsReached.into());
+        }
+    }
 
     let start_epoch =
         epoch.saturating_sub(config.parameters.minimum_voting_epochs.saturating_sub(1));
