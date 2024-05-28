@@ -27,7 +27,7 @@ fn _get_operation() -> KeeperOperations {
 
 fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
     // Run at 0.1%, 50% and 90% completion of epoch
-    (epoch_info.slot_index > epoch_info.slots_in_epoch * 1 / 1000 && runs_for_epoch < 1)
+    (epoch_info.slot_index > epoch_info.slots_in_epoch / 1000 && runs_for_epoch < 1)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 5 / 10 && runs_for_epoch < 2)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
