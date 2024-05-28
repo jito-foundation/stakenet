@@ -44,7 +44,34 @@ The state machine represents the progress throughout a cycle (10-epoch period fo
 ### Compute Scores
 At the start of a 10 epoch cycle (“the cycle”), all validators are scored. We save the overall score, which combines yield performance as well as binary criteria for eligibility, and we also save the yield-only score.
 
-[compute_score.rs](./src/instructions/compute_score.rs)
+The `score` is for determining eligibility to be staked in the pool, the `yield_score` determines the unstaking order (who gets unstaked first, lowest to highest).
+
+The following metrics are used to calculate the `score` and `yield_score`:
+
+- `mev_commission_score`: If max mev commission in `mev_commission_range` epochs is less than threshold, score is 1.0, else 0
+- `commission_score`: If any commission within the individual's validator history exceeds the threshold, score it 0.0, else 1.0. This effectively blacklists all validators who have rugged their commission.
+- `blacklisted_score`: If validator is blacklisted, score is 0.0, else 1.0
+- `superminority_score`: If validator is not in the superminority, score is 1.0, else 0.0
+- `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
+- `running_jito_score`: If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
+
+> Note: All data comes from the `ValidatorHistory` account for each validator.
+
+To formula to calculate the `score` and `yield_score`:
+```rust
+let yield_score = (average_vote_credits / average_blocks)
+    * (1. - commission);
+
+let score = mev_commission_score
+    * commission_score
+    * blacklisted_score
+    * superminority_score
+    * delinquency_score
+    * running_jito_score
+    * yield_score
+```
+
+Take a look at the implementation in [score.rs](./src/score.rs#L14)
 
 ### Compute Delegations
 Once all the validators are scored, we need to calculate the stake distribution we will be aiming for during this cycle.
@@ -59,7 +86,20 @@ Once the delegation amounts are set, the Steward waits until we’ve reached the
 ### Compute Instant Unstake
 All validators are checked for a set of Instant Unstaking criteria, like commission rugs, delinquency, etc. If they hit the criteria, they are marked for the rest of the cycle.
 
-[compute_instant_unstake.rs](./src/instructions/compute_instant_unstake.rs)
+The following criteria are used to determine if a validator should be instantly unstaked:
+
+- `delinquency_check`: Checks if validator has missed > `instant_unstake_delinquency_threshold_ratio` of votes this epoch
+- `commission_check`: Checks if validator has increased commission > `commission_threshold`
+- `mev_commission_check`: Checks if validator has increased MEV commission > `mev_commission_bps_threshold`
+- `is_blacklisted`: Checks if validator was added to blacklist blacklisted
+
+If any of these criteria are true, we mark the validator for instant unstaking:
+```rust
+let instant_unstake =
+    delinquency_check || commission_check || mev_commission_check || is_blacklisted;
+```
+
+Take a look at the implementation in [score.rs](./src/score.rs#L212)
 
 ### Rebalance
 
