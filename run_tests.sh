@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Build programs
+cargo build-sbf --manifest-path programs/steward/Cargo.toml;
+cargo build-sbf --manifest-path programs/validator-history/Cargo.toml;
+
 # Run all tests except the specified one
 SBF_OUT_DIR=$(pwd)/target/deploy RUST_MIN_STACK=5000000 cargo test -- --skip steward::test_state_methods
 
