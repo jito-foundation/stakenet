@@ -30,12 +30,14 @@ pub async fn pre_create_update(
 ) -> Result<(), Box<dyn Error>> {
     // Update Epoch
     match client.get_epoch_info().await {
-        Ok(current_epoch) => {
-            if current_epoch.epoch != keeper_state.epoch_info.epoch {
+        Ok(latest_epoch) => {
+            if latest_epoch.epoch != keeper_state.epoch_info.epoch {
                 keeper_state.runs_for_epoch = [0; KeeperOperations::LEN];
                 keeper_state.errors_for_epoch = [0; KeeperOperations::LEN];
-                keeper_state.epoch_info = current_epoch.clone();
             }
+
+            // Always update the epoch info
+            keeper_state.epoch_info = latest_epoch.clone();
         }
         Err(e) => {
             return Err(Box::new(e));
