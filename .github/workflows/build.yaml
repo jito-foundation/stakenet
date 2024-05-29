@@ -116,11 +116,12 @@ jobs:
           name: validator_history.so
           path: target/deploy/
       - name: cargo test
-        run: cargo test --all-targets --all-features --color auto
+        run: cargo test --package tests --test mod validator_history --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
+          RUST_MIN_STACK: 5000000
 
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality

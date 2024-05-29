@@ -42,6 +42,7 @@ The Steward Program's main functions include:
 The state machine represents the progress throughout a cycle (10-epoch period for scoring and delegations).
 
 ### Compute Scores
+
 At the start of a 10 epoch cycle (“the cycle”), all validators are scored. We save the overall score, which combines yield performance as well as binary criteria for eligibility, and we also save the yield-only score.
 
 The `score` is for determining eligibility to be staked in the pool, the `yield_score` determines the unstaking order (who gets unstaked first, lowest to highest).
@@ -49,7 +50,7 @@ The `score` is for determining eligibility to be staked in the pool, the `yield_
 The following metrics are used to calculate the `score` and `yield_score`:
 
 - `mev_commission_score`: If max mev commission in `mev_commission_range` epochs is less than threshold, score is 1.0, else 0
-- `commission_score`: If any commission within the individual's validator history exceeds the threshold, score it 0.0, else 1.0. This effectively blacklists all validators who have rugged their commission.
+- `commission_score`: If any commission within the individual's validator history exceeds the historical_commission_threshold, score it 0.0, else 1.0. This effectively bans validators who have performed commission manipulation.
 - `blacklisted_score`: If validator is blacklisted, score is 0.0, else 1.0
 - `superminority_score`: If validator is not in the superminority, score is 1.0, else 0.0
 - `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
@@ -58,6 +59,7 @@ The following metrics are used to calculate the `score` and `yield_score`:
 > Note: All data comes from the `ValidatorHistory` account for each validator.
 
 To formula to calculate the `score` and `yield_score`:
+
 ```rust
 let yield_score = (average_vote_credits / average_blocks)
     * (1. - commission);
@@ -74,6 +76,7 @@ let score = mev_commission_score
 Take a look at the implementation in [score.rs](./src/score.rs#L14)
 
 ### Compute Delegations
+
 Once all the validators are scored, we need to calculate the stake distribution we will be aiming for during this cycle.
 
 The top 200 of these validators by overall score will become our validator set, with each receiving 1/200th of the share of the pool. If there are fewer than 200 validators eligible (having a non-zero score), the “ideal” validators are all of the eligible validators.
@@ -81,9 +84,11 @@ The top 200 of these validators by overall score will become our validator set, 
 At the end of this step, we have a list of target delegations, representing proportions of the share of the pool, not fixed lamport amounts.
 
 ### Idle
+
 Once the delegation amounts are set, the Steward waits until we’ve reached the 95% point of the epoch to run the next step.
 
 ### Compute Instant Unstake
+
 All validators are checked for a set of Instant Unstaking criteria, like commission rugs, delinquency, etc. If they hit the criteria, they are marked for the rest of the cycle.
 
 The following criteria are used to determine if a validator should be instantly unstaked:
@@ -94,6 +99,7 @@ The following criteria are used to determine if a validator should be instantly 
 - `is_blacklisted`: Checks if validator was added to blacklist blacklisted
 
 If any of these criteria are true, we mark the validator for instant unstaking:
+
 ```rust
 let instant_unstake =
     delinquency_check || commission_check || mev_commission_check || is_blacklisted;
@@ -111,6 +117,7 @@ If the target is less, we attempt to undelegate stake:
 
 When undelegating stake, we want to protect against massive unstaking events due to bugs or network anomalies, to preserve yield. There are two considerations with this:
 There are 3 main reasons we may want to unstake. We want to identify when each of these cases happen, and let some amount of unstaking happen for each case throughout a cycle.
+
 - the pool is out of line with the ideal top 200 validators and should be rebalanced,
 - a validator is marked for instant unstake, or
 - a validator gets a stake deposit putting it far above the target delegation.
@@ -140,6 +147,7 @@ Progress is marked so this validator won’t be adjusted again this epoch. After
 ### Rest of the cycle
 
 After unstaking is done, the state machine moves back into Idle. In next epoch and in the rest of the epochs for the cycle, it repeats these steps:
+
 - Compute Instant Unstake
 - Rebalance
 - Idle
@@ -181,25 +189,26 @@ Administrators can:
 
 ## Parameters
 
-| Parameter                             | Value              | Description                                                                                                                                      |
-|---------------------------------------|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
-| `mev_commission_range`                | 10                 | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                            |
-| `epoch_credits_range`                 | 30                 | Number of recent epochs used to evaluate yield                                                                                                   |
-| `commission_range`                    | 30                 | Number of recent epochs used to evaluate commissions for scoring                                                                                 |
-| `mev_commission_bps_threshold`        | 1000               | Maximum allowable MEV commission in mev_commission_range (stored in basis points)                                                                |
-| `commission_threshold`                | 5                  | Maximum allowable validator commission in commission_range (stored in percent)                                                                   |
-| `scoring_delinquency_threshold_ratio` | 0.85               | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
-| `instant_unstake_delinquency_threshold_ratio` | 0.70          | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                             |
-| `num_delegation_validators`           | 200                | Number of validators who are eligible for stake (validator set size)                                                                             |
-| `scoring_unstake_cap_bps`             | 750                | Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)                                                  |
-| `instant_unstake_cap_bps`             | 0.10               | Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)                                                   |
-| `stake_deposit_unstake_cap_bps`       | 0.10               | Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)                                |
-| `compute_score_slot_range`            | 1000               | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                     |
-| `instant_unstake_epoch_progress`      | 0.90               | Point in epoch progress before instant unstake can be computed                                                                                   |
-| `instant_unstake_inputs_epoch_progress` | 0.50             | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                         |
-| `num_epochs_between_scoring`          | 10                 | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                               |
-| `minimum_stake_lamports`              | 5,000,000,000      | Minimum number of stake lamports for a validator to be considered for the pool                                                                   |
-| `minimum_voting_epochs`               | 5                  | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                            |
+| Parameter                                     | Value         | Description                                                                                                                                                                                             |
+| --------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mev_commission_range`                        | 10            | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                                                                                   |
+| `epoch_credits_range`                         | 30            | Number of recent epochs used to evaluate yield                                                                                                                                                          |
+| `commission_range`                            | 30            | Number of recent epochs used to evaluate commissions for scoring                                                                                                                                        |
+| `mev_commission_bps_threshold`                | 1000          | Maximum allowable MEV commission in mev_commission_range (stored in basis points)                                                                                                                       |
+| `commission_threshold`                        | 5             | Maximum allowable validator commission in commission_range (stored in percent)                                                                                                                          |
+| `historical_commission_threshold`             | 50            | Maximum allowable validator commission in all history (stored in percent)                                                                                                                               |
+| `scoring_delinquency_threshold_ratio`         | 0.85          | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
+| `instant_unstake_delinquency_threshold_ratio` | 0.70          | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
+| `num_delegation_validators`                   | 200           | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
+| `scoring_unstake_cap_bps`                     | 750           | Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)                                                                                                         |
+| `instant_unstake_cap_bps`                     | 0.10          | Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)                                                                                                          |
+| `stake_deposit_unstake_cap_bps`               | 0.10          | Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)                                                                                       |
+| `compute_score_slot_range`                    | 1000          | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                                                                            |
+| `instant_unstake_epoch_progress`              | 0.90          | Point in epoch progress before instant unstake can be computed                                                                                                                                          |
+| `instant_unstake_inputs_epoch_progress`       | 0.50          | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                                                                                |
+| `num_epochs_between_scoring`                  | 10            | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                                                                                      |
+| `minimum_stake_lamports`                      | 5,000,000,000 | Minimum number of stake lamports for a validator to be considered for the pool                                                                                                                          |
+| `minimum_voting_epochs`                       | 5             | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                                                                                   |
 
 ## Code and Tests
 

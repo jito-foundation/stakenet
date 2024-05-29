@@ -2764,12 +2764,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "matches"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2532096657941c2fea9c289d370a250971c689d4f143798ff67113ec042024a5"
-
-[[package]]
 name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6333,7 +6327,6 @@ dependencies = [
  "futures",
  "jito-steward",
  "jito-tip-distribution",
- "matches",
  "rand 0.7.3",
  "rand_chacha 0.3.1",
  "semver",
