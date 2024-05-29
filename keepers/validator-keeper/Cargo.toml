@@ -5,24 +5,24 @@ edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
 [dependencies]
-anchor-lang = "0.28.0"
+anchor-lang = "0.30.0"
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"] }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
-jito-tip-distribution = { git = "https://github.com/jito-foundation/jito-programs", rev = "b8f8d315306d6ac32450bd1aa23b7c1322a83bc7" }
+jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
 keeper-core = { path = "../keeper-core" }
 log = "0.4.18"
-solana-account-decoder = "1.16"
-solana-clap-utils = "1.16"
-solana-client = "1.16"
-solana-gossip = "1.16"
-solana-metrics = "1.16"
-solana-net-utils = "1.16"
-solana-program = "1.16"
-solana-sdk = "1.16"
-solana-streamer = "1.16"
+solana-account-decoder = "1.18"
+solana-clap-utils = "1.18"
+solana-client = "1.18"
+solana-gossip = "1.18"
+solana-metrics = "1.18"
+solana-net-utils = "1.18"
+solana-program = "1.18"
+solana-sdk = "1.18"
+solana-streamer = "1.18"
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }

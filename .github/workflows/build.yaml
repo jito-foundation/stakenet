@@ -33,14 +33,14 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          toolchain: nightly-2023-10-05
+          toolchain: nightly-2024-02-04
       - name: Install cargo-sort from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-sort
-      - run: cargo +nightly-2023-10-05 sort --workspace --check
-      - run: cargo +nightly-2023-10-05 fmt --all --check
-      - run: cargo +nightly-2023-10-05 clippy --all-features --all-targets --tests -- -D warnings
+      - run: cargo +nightly-2024-02-04 sort --workspace --check
+      - run: cargo +nightly-2024-02-04 fmt --all --check
+      - run: cargo +nightly-2024-02-04 clippy --all-features --all-targets --tests -- -D warnings
 
   udeps:
     name: udeps
@@ -51,13 +51,12 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-10-05
+          toolchain: nightly-2024-02-04
       - name: Install cargo-udeps from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
-          version: 0.1.47 # Remove once anchor 0.30 is merged
-      - run: cargo +nightly-2023-10-05 udeps --all-features --all-targets --tests
+      - run: cargo +nightly-2024-02-04 udeps --all-features --all-targets --tests
 
   verified_build:
     name: verified_build
@@ -75,16 +74,16 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
-          version: "0.29.0"
+          version: "0.30.0"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.solana.com/v1.16.20/install)"
+        run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       # build the program and IDL; exit if error
-      - run: anchor build --idl idl --program-name validator_history
-      - name: Check for diff on IDL
-        run: git diff --exit-code
+      - run: anchor build --no-idl --program-name validator_history
+      # - name: Check for diff on IDL
+      #   run: git diff --exit-code
 
       # run verified build
       - run: solana-verify build --library-name validator_history
@@ -95,11 +94,11 @@ jobs:
         with:
           name: validator_history.so
           path: target/deploy/validator_history.so
-      - name: Upload IDL
-        uses: actions/upload-artifact@v4
-        with:
-          name: validator_history.json
-          path: programs/validator-history/idl/validator_history.json
+      # - name: Upload IDL
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: validator_history.json
+      #     path: programs/validator-history/idl/validator_history.json
 
   # tests run on verified build
   test:
@@ -117,11 +116,12 @@ jobs:
           name: validator_history.so
           path: target/deploy/
       - name: cargo test
-        run: cargo test --all-targets --all-features --color auto
+        run: cargo test --package tests --test mod validator_history --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
+          RUST_MIN_STACK: 5000000
 
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality

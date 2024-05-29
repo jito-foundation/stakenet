@@ -4,7 +4,7 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 use bincode::serialize;
 use bytemuck::bytes_of;
 use ed25519_dalek::Signer as Ed25519Signer;
-use rand::thread_rng;
+use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use solana_gossip::{
     contact_info::ContactInfo,
     crds_value::{CrdsData, NodeInstance, Version},
@@ -20,7 +20,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use solana_version::LegacyVersion2;
-use tests::fixtures::TestFixture;
+use tests::validator_history_fixtures::TestFixture;
 use validator_history::{
     crds_value::{CrdsData as ValidatorHistoryCrdsData, LegacyVersion, LegacyVersion1},
     Ed25519SignatureOffsets, ValidatorHistory,
@@ -61,11 +61,10 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
+    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
     // create legacycontactinfo as signed crdsdata struct
-    let mut legacy_contact_info = LegacyContactInfo::new_rand(
-        &mut rand::thread_rng(),
-        Some(fixture.identity_keypair.pubkey()),
-    );
+    let mut legacy_contact_info =
+        LegacyContactInfo::new_rand(&mut rng, Some(fixture.identity_keypair.pubkey()));
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
@@ -321,7 +320,8 @@ async fn test_gossip_wrong_message() {
     fixture.initialize_validator_history_account().await;
 
     // Not a crdsdata that we're expecting
-    let node_instance = NodeInstance::new(&mut thread_rng(), fixture.identity_keypair.pubkey(), 0);
+    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
+    let node_instance = NodeInstance::new(&mut rng, fixture.identity_keypair.pubkey(), 0);
     let crds_data = CrdsData::NodeInstance(node_instance);
 
     let transaction = create_gossip_tx(&fixture, &crds_data);
@@ -372,11 +372,10 @@ async fn test_gossip_timestamps() {
     assert!(account.last_ip_timestamp == wallclock + 1);
     assert!(account.last_version_timestamp == wallclock + 1);
 
+    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
     // LegacyContactInfo with old wallclock
-    let mut legacy_contact_info = LegacyContactInfo::new_rand(
-        &mut rand::thread_rng(),
-        Some(fixture.identity_keypair.pubkey()),
-    );
+    let mut legacy_contact_info =
+        LegacyContactInfo::new_rand(&mut rng, Some(fixture.identity_keypair.pubkey()));
     legacy_contact_info.set_wallclock(wallclock);
 
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info);

@@ -1,6 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::{errors::ValidatorHistoryError, utils::cast_epoch, ClusterHistory, Config};
+use crate::{
+    errors::ValidatorHistoryError,
+    state::{ClusterHistory, Config},
+    utils::cast_epoch,
+};
 
 #[derive(Accounts)]
 pub struct BackfillTotalBlocks<'info> {
@@ -10,9 +14,12 @@ pub struct BackfillTotalBlocks<'info> {
         bump,
     )]
     pub cluster_history_account: AccountLoader<'info, ClusterHistory>,
+    #[account(
+        has_one = oracle_authority
+    )]
     pub config: Account<'info, Config>,
-    #[account(mut, address = config.oracle_authority )]
-    pub signer: Signer<'info>,
+    #[account(mut)]
+    pub oracle_authority: Signer<'info>,
 }
 
 pub fn handle_backfill_total_blocks(

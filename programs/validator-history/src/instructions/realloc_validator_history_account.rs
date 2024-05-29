@@ -58,7 +58,7 @@ pub fn handle_realloc_validator_history_account(
 
         validator_history_account.index = ctx.accounts.config.counter;
         ctx.accounts.config.counter += 1;
-        validator_history_account.bump = *ctx.bumps.get("validator_history_account").unwrap();
+        validator_history_account.bump = ctx.bumps.validator_history_account;
         validator_history_account.vote_account = *ctx.accounts.vote_account.key;
         validator_history_account.struct_version = ValidatorHistoryVersion::V0 as u32;
         validator_history_account.history.idx =

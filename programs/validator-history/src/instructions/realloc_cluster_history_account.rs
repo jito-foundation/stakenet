@@ -48,7 +48,7 @@ pub fn handle_realloc_cluster_history_account(
         // Can actually initialize values now that the account is proper size
         let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
 
-        cluster_history_account.bump = *ctx.bumps.get("cluster_history_account").unwrap();
+        cluster_history_account.bump = ctx.bumps.cluster_history_account;
         cluster_history_account.struct_version = 0;
         cluster_history_account.history.idx =
             (cluster_history_account.history.arr.len() - 1) as u64;

@@ -230,8 +230,13 @@ pub async fn upload_gossip_values(
         gossip_port,
     );
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-    let (_gossip_service, cluster_info) =
-        start_spy_server(*entrypoint, gossip_port, spy_socket_addr, keypair, &exit);
+    let (_gossip_service, cluster_info) = start_spy_server(
+        *entrypoint,
+        gossip_port,
+        spy_socket_addr,
+        keypair,
+        exit.clone(),
+    );
 
     // Wait for all active validators to be received
     sleep(Duration::from_secs(150)).await;

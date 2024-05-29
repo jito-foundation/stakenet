@@ -207,7 +207,7 @@ pub fn start_spy_server(
     gossip_port: u16,
     spy_socket_addr: SocketAddr,
     keypair: &Arc<Keypair>,
-    exit: &Arc<AtomicBool>,
+    exit: Arc<AtomicBool>,
 ) -> (GossipService, Arc<ClusterInfo>) {
     // bind socket to expected port
     let (_, gossip_socket) = bind_in_range(

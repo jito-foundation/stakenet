@@ -37,7 +37,7 @@ impl Config {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 
-#[derive(AnchorSerialize, TypeLayout)]
+#[derive(BorshSerialize, TypeLayout)]
 #[zero_copy]
 pub struct ValidatorHistoryEntry {
     pub activated_stake_lamports: u64,
@@ -103,7 +103,7 @@ pub struct ClientVersion {
 
 const MAX_ITEMS: usize = 512;
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct CircBuf {
     pub idx: u64,
@@ -289,6 +289,21 @@ impl CircBuf {
         None
     }
 
+    pub fn superminority_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u8>> {
+        field_range!(self, start_epoch, end_epoch, is_superminority, u8)
+            .into_iter()
+            .map(|maybe_value| {
+                maybe_value.and_then(|value| {
+                    if value == 0 || value == 1 {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+
     pub fn vote_account_last_update_slot_latest(&self) -> Option<u64> {
         field_latest!(self, vote_account_last_update_slot)
     }
@@ -300,7 +315,7 @@ pub enum ValidatorHistoryVersion {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistory>(), 65848);
 
-#[derive(AnchorSerialize)]
+#[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct ValidatorHistory {
     // Cannot be enum due to Pod and Zeroable trait limitations
@@ -732,6 +747,7 @@ impl ValidatorHistory {
     }
 }
 
+#[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct ClusterHistory {
     pub struct_version: u64,
@@ -742,6 +758,7 @@ pub struct ClusterHistory {
     pub history: CircBufCluster,
 }
 
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct ClusterHistoryEntry {
     pub total_blocks: u32,
@@ -763,6 +780,7 @@ impl Default for ClusterHistoryEntry {
     }
 }
 
+#[derive(BorshSerialize)]
 #[zero_copy]
 pub struct CircBufCluster {
     pub idx: u64,

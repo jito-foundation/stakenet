@@ -2,7 +2,7 @@
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
-use tests::fixtures::{new_vote_account, TestFixture};
+use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
 
 #[tokio::test]

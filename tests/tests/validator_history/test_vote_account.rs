@@ -8,7 +8,7 @@ use solana_sdk::{
     account::Account, clock::Clock, compute_budget::ComputeBudgetInstruction, signer::Signer,
     transaction::Transaction, vote::state::MAX_EPOCH_CREDITS_HISTORY,
 };
-use tests::fixtures::{new_vote_account, TestFixture};
+use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 #[tokio::test]

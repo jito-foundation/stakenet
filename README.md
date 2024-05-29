@@ -26,10 +26,9 @@ Note that this is a `zero_copy` account, which allows us to initialize a lot of 
 
 Tests are in `tests/` written with solana-program-test.
 
-One should run their tests in the SBF interpreter. That can be done with the following:
-
+All tests can be run by running:
 ```shell
-$ anchor build && SBF_OUT_DIR=$(pwd)/target/deploy cargo test
+./run_tests.sh
 ```
 
 ## Build
