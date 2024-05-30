@@ -11,7 +11,6 @@ use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClien
 use solana_program::hash::Hash;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::packet::PACKET_DATA_SIZE;
-use solana_sdk::sysvar::instructions;
 use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
     account::Account, commitment_config::CommitmentConfig, instruction::AccountMeta,
@@ -21,6 +20,8 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 use tokio::task::{self, JoinError};
 use tokio::time::sleep;
+
+const DEFAULT_COMPUTE_LIMIT: usize = 200_000;
 
 #[derive(Debug, Default, Clone)]
 pub struct SubmitStats {
@@ -230,12 +231,10 @@ pub async fn get_vote_accounts_with_retry(
     }
 }
 
-const DEFAULT_COMPUTE_LIMIT: usize = 200_000;
-
 async fn find_ix_per_tx(
-    client: &RpcClient,
-    instruction: &Instruction,
-    signer: &Keypair,
+    client: &Arc<RpcClient>,
+    instruction: Instruction,
+    signer: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
 ) -> Result<usize, ClientError> {
@@ -249,7 +248,7 @@ async fn find_ix_per_tx(
 
     let response = simulate_instruction_with_retry(
         client,
-        instruction,
+        &instruction,
         signer,
         priority_fee_in_microlamports,
         max_cu_per_tx,
@@ -275,41 +274,6 @@ async fn find_ix_per_tx(
     let size = size_max.min(compute_max);
 
     Ok(size)
-}
-
-async fn calculate_instructions_per_tx(
-    client: &RpcClient,
-    instructions: &[Instruction],
-    signer: &Keypair,
-    priority_fee_in_microlamports: u64,
-    max_cu_per_tx: u32,
-) -> Result<usize, ClientError> {
-    let blockhash = get_latest_blockhash_with_retry(client).await?;
-    let test_tx = Transaction::new_signed_with_payer(
-        &[instructions[0].to_owned()],
-        Some(&signer.pubkey()),
-        &[signer],
-        blockhash,
-    );
-    let response = client.simulate_transaction(&test_tx).await?;
-    if let Some(err) = response.value.clone().err {
-        debug!("Simulation error: {:?}", response.value);
-        return Err(err.into());
-    }
-    let compute = response
-        .value
-        .units_consumed
-        .unwrap_or(DEFAULT_COMPUTE_LIMIT as u64);
-
-    let serialized_size = Packet::from_data(None, &test_tx).unwrap().meta().size;
-    // additional size per ix
-    let size_per_ix =
-        instructions[0].accounts.len() * size_of::<AccountMeta>() + instructions[0].data.len();
-    let size_max = (PACKET_DATA_SIZE - serialized_size + size_per_ix) / size_per_ix;
-
-    let compute_max = DEFAULT_COMPUTE_LIMIT / compute as usize;
-
-    Ok(size_max.min(compute_max))
 }
 
 async fn parallel_confirm_transactions(
@@ -473,20 +437,42 @@ pub async fn pack_instructions(
     signer: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
-) -> Vec<Vec<Instruction>> {
-    let mut instructions_with_grouping: Vec<(&Instruction, usize)> = Vec::new();
+) -> Result<Vec<Vec<Instruction>>, Box<dyn std::error::Error>> {
+    let tasks: Vec<_> = instructions
+        .iter()
+        .map(|instruction| {
+            let client = Arc::clone(client);
+            let signer = Arc::clone(signer);
+            let instruction = instruction.clone();
+            task::spawn(async move {
+                find_ix_per_tx(
+                    &client,
+                    instruction,
+                    &signer,
+                    priority_fee_in_microlamports,
+                    max_cu_per_tx,
+                )
+                .await
+            })
+        })
+        .collect();
 
-    for instruction in instructions {
-        let ix_per_tx = find_ix_per_tx(
-            client,
-            instruction,
-            signer,
-            priority_fee_in_microlamports,
-            max_cu_per_tx,
-        )
-        .await
-        .unwrap_or(1);
-        instructions_with_grouping.push((instruction, ix_per_tx));
+    // Await all tasks to complete
+    let results = futures::future::join_all(tasks).await;
+
+    let mut instructions_with_grouping = Vec::new();
+    for (i, result) in results.into_iter().enumerate() {
+        match result {
+            Ok(Ok(ix_per_tx)) => {
+                instructions_with_grouping.push((&instructions[i], ix_per_tx));
+            }
+            Ok(Err(e)) => {
+                return Err(Box::new(e));
+            }
+            Err(e) => {
+                return Err(Box::new(e));
+            }
+        }
     }
 
     // Group instructions by their grouping size
@@ -508,9 +494,16 @@ pub async fn pack_instructions(
             }
             result.push(tx_instructions);
         }
+
+        info!(
+            "{}: Grouped {} instructions into {} transactions",
+            group_number,
+            group.len(),
+            result.len(),
+        );
     }
 
-    result
+    Ok(result)
 }
 
 pub async fn parallel_execute_instructions(
@@ -557,7 +550,9 @@ pub async fn parallel_execute_instructions(
         priority_fee_in_microlamports,
         max_cu_per_tx,
     )
-    .await;
+    .await
+    .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+
     for tx in transactions.iter_mut() {
         tx.insert(
             0,
