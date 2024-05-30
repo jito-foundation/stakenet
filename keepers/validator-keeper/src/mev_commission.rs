@@ -129,6 +129,7 @@ pub async fn update_mev_commission(
     keypair: Arc<Keypair>,
     validator_history_program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     prev_epoch: &mut u64,
 ) -> Result<CreateUpdateStats, KeeperError> {
@@ -167,7 +168,7 @@ pub async fn update_mev_commission(
         create_transactions,
         update_instructions,
         &keypair,
-        PRIORITY_FEE,
+        priority_fee_in_microlamports,
     )
     .await
     {
@@ -193,6 +194,7 @@ pub async fn update_mev_earned(
     keypair: &Arc<Keypair>,
     validator_history_program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     validators_updated: &mut HashMap<Pubkey, Pubkey>,
     curr_epoch: &mut u64,
 ) -> Result<CreateUpdateStats, KeeperError> {
@@ -235,7 +237,7 @@ pub async fn update_mev_earned(
         create_transactions,
         update_instructions,
         keypair,
-        PRIORITY_FEE,
+        priority_fee_in_microlamports,
     )
     .await;
     match submit_result {

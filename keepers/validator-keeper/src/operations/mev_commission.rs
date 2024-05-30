@@ -6,7 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 
 use crate::entries::mev_commission_entry::ValidatorMevCommissionEntry;
 use crate::state::keeper_state::KeeperState;
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::KeeperError;
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
@@ -34,6 +34,7 @@ async fn _process(
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    priority_fee_in_microlamports: u64,
 ) -> Result<SubmitStats, KeeperError> {
     update_mev_commission(
         client,
@@ -41,6 +42,7 @@ async fn _process(
         program_id,
         tip_distribution_program_id,
         keeper_state,
+        priority_fee_in_microlamports,
     )
     .await
 }
@@ -51,6 +53,7 @@ pub async fn fire(
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    priority_fee_in_microlamports: u64,
 ) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch) =
@@ -65,6 +68,7 @@ pub async fn fire(
             program_id,
             tip_distribution_program_id,
             keeper_state,
+            priority_fee_in_microlamports,
         )
         .await
         {
@@ -97,6 +101,7 @@ pub async fn update_mev_commission(
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    priority_fee_in_microlamports: u64,
 ) -> Result<SubmitStats, KeeperError> {
     let epoch_info = &keeper_state.epoch_info;
     let validator_history_map = &keeper_state.validator_history_map;
@@ -126,8 +131,14 @@ pub async fn update_mev_commission(
         })
         .collect::<Vec<_>>();
 
-    let submit_result =
-        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE, None).await;
+    let submit_result = submit_instructions(
+        client,
+        update_instructions,
+        keypair,
+        priority_fee_in_microlamports,
+        None,
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

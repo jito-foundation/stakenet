@@ -5,7 +5,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use crate::state::keeper_state::KeeperState;
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::KeeperError;
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -36,15 +36,24 @@ async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
-    update_stake_history(client, keypair, program_id, keeper_state).await
+    update_stake_history(
+        client,
+        keypair,
+        program_id,
+        priority_fee_in_microlamports,
+        keeper_state,
+    )
+    .await
 }
 
 pub async fn fire(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
@@ -54,7 +63,15 @@ pub async fn fire(
     let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch);
 
     if should_run {
-        match _process(client, keypair, program_id, keeper_state).await {
+        match _process(
+            client,
+            keypair,
+            program_id,
+            priority_fee_in_microlamports,
+            keeper_state,
+        )
+        .await
+        {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
@@ -82,6 +99,7 @@ pub async fn update_stake_history(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
@@ -131,8 +149,14 @@ pub async fn update_stake_history(
         .map(|stake_history_entry| stake_history_entry.update_instruction())
         .collect::<Vec<_>>();
 
-    let submit_result =
-        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE, None).await;
+    let submit_result = submit_instructions(
+        client,
+        update_instructions,
+        keypair,
+        priority_fee_in_microlamports,
+        None,
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

@@ -6,7 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 
 use crate::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use crate::state::keeper_state::KeeperState;
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::KeeperError;
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -37,15 +37,24 @@ async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
-    update_vote_accounts(client, keypair, program_id, keeper_state).await
+    update_vote_accounts(
+        client,
+        keypair,
+        program_id,
+        priority_fee_in_microlamports,
+        keeper_state,
+    )
+    .await
 }
 
 pub async fn fire(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
@@ -56,7 +65,15 @@ pub async fn fire(
     let should_run = _should_run(epoch_info, runs_for_epoch);
 
     if should_run {
-        match _process(client, keypair, program_id, keeper_state).await {
+        match _process(
+            client,
+            keypair,
+            program_id,
+            priority_fee_in_microlamports,
+            keeper_state,
+        )
+        .await
+        {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
@@ -87,6 +104,7 @@ pub async fn update_vote_accounts(
     rpc_client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     let validator_history_map = &keeper_state.validator_history_map;
@@ -117,7 +135,7 @@ pub async fn update_vote_accounts(
         rpc_client,
         update_instructions,
         keypair,
-        PRIORITY_FEE,
+        priority_fee_in_microlamports,
         Some(300_000),
     )
     .await;

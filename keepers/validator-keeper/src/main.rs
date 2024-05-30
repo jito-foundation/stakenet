@@ -62,6 +62,10 @@ struct Args {
     #[arg(short, long, env, default_value = "60")]
     metrics_interval: u64,
 
+    // Priority Fees in microlamports
+    #[arg(short, long, env, default_value = "200_000")]
+    priority_fees: u64,
+
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
     cluster: Cluster,
 }
@@ -92,6 +96,7 @@ struct RunLoopConfig {
     keypair: Arc<Keypair>,
     program_id: Pubkey,
     tip_distribution_program_id: Pubkey,
+    priority_fee_in_microlamports: u64,
     oracle_authority_keypair: Option<Arc<Keypair>>,
     gossip_entrypoint: Option<SocketAddr>,
     validator_history_interval: u64,
@@ -104,6 +109,7 @@ async fn run_loop(config: RunLoopConfig) {
         keypair,
         program_id,
         tip_distribution_program_id,
+        priority_fee_in_microlamports,
         oracle_authority_keypair,
         gossip_entrypoint,
         validator_history_interval,
@@ -177,13 +183,26 @@ async fn run_loop(config: RunLoopConfig) {
 
             info!("Updating cluster history...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::cluster_history::fire(&client, &keypair, &program_id, &keeper_state)
-                    .await,
+                operations::cluster_history::fire(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    priority_fee_in_microlamports,
+                    &keeper_state,
+                )
+                .await,
             );
 
             info!("Updating copy vote accounts...");
             keeper_state.set_runs_and_errors_for_epoch(
-                operations::vote_account::fire(&client, &keypair, &program_id, &keeper_state).await,
+                operations::vote_account::fire(
+                    &client,
+                    &keypair,
+                    &program_id,
+                    priority_fee_in_microlamports,
+                    &keeper_state,
+                )
+                .await,
             );
 
             info!("Updating mev commission...");
@@ -194,6 +213,7 @@ async fn run_loop(config: RunLoopConfig) {
                     &program_id,
                     &tip_distribution_program_id,
                     &keeper_state,
+                    priority_fee_in_microlamports,
                 )
                 .await,
             );
@@ -205,6 +225,7 @@ async fn run_loop(config: RunLoopConfig) {
                     &keypair,
                     &program_id,
                     &tip_distribution_program_id,
+                    priority_fee_in_microlamports,
                     &keeper_state,
                 )
                 .await,
@@ -217,6 +238,7 @@ async fn run_loop(config: RunLoopConfig) {
                         &client,
                         oracle_authority_keypair,
                         &program_id,
+                        priority_fee_in_microlamports,
                         &keeper_state,
                     )
                     .await,
@@ -232,6 +254,7 @@ async fn run_loop(config: RunLoopConfig) {
                         &client,
                         oracle_authority_keypair,
                         &program_id,
+                        priority_fee_in_microlamports,
                         &gossip_entrypoint,
                         &keeper_state,
                     )
@@ -292,6 +315,7 @@ async fn main() {
         keypair,
         program_id: args.program_id,
         tip_distribution_program_id: args.tip_distribution_program_id,
+        priority_fee_in_microlamports: args.priority_fees,
         oracle_authority_keypair,
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,

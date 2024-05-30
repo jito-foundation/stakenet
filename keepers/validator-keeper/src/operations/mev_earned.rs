@@ -6,7 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 
 use crate::entries::mev_commission_entry::ValidatorMevCommissionEntry;
 use crate::state::keeper_state::KeeperState;
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::KeeperError;
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
@@ -35,12 +35,14 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     update_mev_earned(
         client,
         keypair,
         program_id,
+        priority_fee_in_microlamports,
         tip_distribution_program_id,
         keeper_state,
     )
@@ -52,6 +54,7 @@ pub async fn fire(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
     let operation = _get_operation();
@@ -67,6 +70,7 @@ pub async fn fire(
             keypair,
             program_id,
             tip_distribution_program_id,
+            priority_fee_in_microlamports,
             keeper_state,
         )
         .await
@@ -98,6 +102,7 @@ pub async fn update_mev_earned(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
@@ -144,8 +149,14 @@ pub async fn update_mev_earned(
         })
         .collect::<Vec<_>>();
 
-    let submit_result =
-        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE, None).await;
+    let submit_result = submit_instructions(
+        client,
+        update_instructions,
+        keypair,
+        priority_fee_in_microlamports,
+        None,
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

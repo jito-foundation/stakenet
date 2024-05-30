@@ -4,8 +4,8 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
+use crate::start_spy_server;
 use crate::state::keeper_state::KeeperState;
-use crate::{start_spy_server, PRIORITY_FEE};
 use bytemuck::{bytes_of, Pod, Zeroable};
 use keeper_core::{submit_transactions, SubmitStats};
 use log::*;
@@ -46,16 +46,26 @@ async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
-    upload_gossip_values(client, keypair, program_id, entrypoint, keeper_state).await
+    upload_gossip_values(
+        client,
+        keypair,
+        program_id,
+        priority_fee_in_microlamports,
+        entrypoint,
+        keeper_state,
+    )
+    .await
 }
 
 pub async fn fire(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
@@ -66,7 +76,16 @@ pub async fn fire(
     let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch);
 
     if should_run {
-        match _process(client, keypair, program_id, entrypoint, keeper_state).await {
+        match _process(
+            client,
+            keypair,
+            program_id,
+            priority_fee_in_microlamports,
+            entrypoint,
+            keeper_state,
+        )
+        .await
+        {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
@@ -217,6 +236,7 @@ pub async fn upload_gossip_values(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
@@ -270,7 +290,7 @@ pub async fn upload_gossip_values(
 
     let update_transactions = gossip_entries
         .iter()
-        .map(|entry| entry.build_update_tx(PRIORITY_FEE))
+        .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
         .collect::<Vec<_>>();
 
     let submit_result = submit_transactions(client, update_transactions, keypair).await;
