@@ -145,7 +145,7 @@ pub async fn update_mev_earned(
         .collect::<Vec<_>>();
 
     let submit_result =
-        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE).await;
+        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE, None).await;
 
     submit_result.map_err(|e| e.into())
 }

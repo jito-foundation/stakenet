@@ -131,8 +131,14 @@ pub async fn update_stake_history(
         .map(|stake_history_entry| stake_history_entry.update_instruction())
         .collect::<Vec<_>>();
 
-    let submit_result =
-        submit_instructions(client, update_instructions, keypair, PRIORITY_FEE).await;
+    let submit_result = submit_instructions(
+        client,
+        update_instructions,
+        keypair,
+        PRIORITY_FEE,
+        Some(300_000),
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

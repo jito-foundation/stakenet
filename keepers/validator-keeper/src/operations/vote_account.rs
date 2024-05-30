@@ -8,6 +8,7 @@ use crate::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use crate::state::keeper_state::KeeperState;
 use crate::{KeeperError, PRIORITY_FEE};
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
+use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -73,6 +74,11 @@ pub async fn fire(
         };
     }
 
+    info!(
+        "Vote account, runs: {}, errors: {}",
+        runs_for_epoch, errors_for_epoch
+    );
+
     (operation, runs_for_epoch, errors_for_epoch)
 }
 
@@ -111,8 +117,15 @@ pub async fn update_vote_accounts(
         .map(|copy_vote_account_entry| copy_vote_account_entry.update_instruction())
         .collect::<Vec<_>>();
 
+    info!(
+        "Running vote account update for {} vote accounts",
+        update_instructions.len()
+    );
+
     let submit_result =
-        submit_instructions(rpc_client, update_instructions, keypair, PRIORITY_FEE).await;
+        submit_instructions(rpc_client, update_instructions, keypair, PRIORITY_FEE, None).await;
+
+    info!("Vote account update result: {:?}", submit_result);
 
     submit_result.map_err(|e| e.into())
 }

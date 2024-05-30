@@ -175,16 +175,18 @@ async fn run_loop(config: RunLoopConfig) {
         if should_fire(tick, validator_history_interval) {
             info!("Firing operations...");
 
-            info!("Updating cluster history...");
-            keeper_state.set_runs_and_errors_for_epoch(
-                operations::cluster_history::fire(&client, &keypair, &program_id, &keeper_state)
-                    .await,
-            );
+            // info!("Updating cluster history...");
+            // keeper_state.set_runs_and_errors_for_epoch(
+            //     operations::cluster_history::fire(&client, &keypair, &program_id, &keeper_state)
+            //         .await,
+            // );
 
             info!("Updating copy vote accounts...");
             keeper_state.set_runs_and_errors_for_epoch(
                 operations::vote_account::fire(&client, &keypair, &program_id, &keeper_state).await,
             );
+
+            info!("Done waiting for vote accounts to update...");
 
             info!("Updating mev commission...");
             keeper_state.set_runs_and_errors_for_epoch(
