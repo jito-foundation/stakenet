@@ -8,6 +8,7 @@ use clap::ValueEnum;
 use log::*;
 use solana_client::rpc_response::{Response, RpcSimulateTransactionResult, RpcVoteAccountInfo};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
+use solana_metrics::datapoint_error;
 use solana_program::hash::Hash;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::packet::PACKET_DATA_SIZE;
@@ -233,7 +234,7 @@ pub async fn get_vote_accounts_with_retry(
 
 async fn find_ix_per_tx(
     client: &Arc<RpcClient>,
-    instruction: Instruction,
+    instruction: &Instruction,
     signer: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
@@ -248,20 +249,35 @@ async fn find_ix_per_tx(
 
     let response = simulate_instruction_with_retry(
         client,
-        &instruction,
+        instruction,
         signer,
         priority_fee_in_microlamports,
         max_cu_per_tx,
     )
     .await?;
     if let Some(err) = response.value.clone().err {
-        debug!("Simulation error: {:?}", response.value);
+        error!("Simulation error: {} {:?}", max_cu_per_tx, response.value);
+
+        datapoint_error!(
+            "simulation-error",
+            ("error", err.to_string(), String),
+            ("instruction", format!("{:?}", instruction), String)
+        );
+
         return Err(err.into()); // Return the error immediately, stopping further execution
     }
     let compute = response
         .value
         .units_consumed
         .unwrap_or(DEFAULT_COMPUTE_LIMIT as u64);
+
+    // if compute > 200_000 {
+
+    //     error!(
+    //         "Vote above 200k cu: {} {:?}",
+    //         compute, instruction.accounts[1]
+    //     );
+    // }
 
     let serialized_size = Packet::from_data(None, &test_tx).unwrap().meta().size;
     // additional size per ix
@@ -280,7 +296,7 @@ async fn parallel_confirm_transactions(
     client: &RpcClient,
     submitted_signatures: HashSet<Signature>,
 ) -> HashSet<Signature> {
-    // Confirmes TXs in batches of 256 (max allowed by RPC method). Returns confirmed signatures
+    // Confirms TXs in batches of 256 (max allowed by RPC method). Returns confirmed signatures
     const SIG_STATUS_BATCH_SIZE: usize = 256;
     let num_transactions_submitted = submitted_signatures.len();
     let signatures_to_confirm = submitted_signatures.into_iter().collect::<Vec<_>>();
@@ -438,39 +454,26 @@ pub async fn pack_instructions(
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
 ) -> Result<Vec<Vec<Instruction>>, Box<dyn std::error::Error>> {
-    let tasks: Vec<_> = instructions
-        .iter()
-        .map(|instruction| {
-            let client = Arc::clone(client);
-            let signer = Arc::clone(signer);
-            let instruction = instruction.clone();
-            task::spawn(async move {
-                find_ix_per_tx(
-                    &client,
-                    instruction,
-                    &signer,
-                    priority_fee_in_microlamports,
-                    max_cu_per_tx,
-                )
-                .await
-            })
-        })
-        .collect();
+    let mut instructions_with_grouping: Vec<(&Instruction, usize)> = Vec::new();
 
-    // Await all tasks to complete
-    let results = futures::future::join_all(tasks).await;
+    for i in 0..instructions.len() {
+        let result = find_ix_per_tx(
+            client,
+            &instructions[i],
+            signer,
+            priority_fee_in_microlamports,
+            max_cu_per_tx,
+        )
+        .await;
 
-    let mut instructions_with_grouping = Vec::new();
-    for (i, result) in results.into_iter().enumerate() {
         match result {
-            Ok(Ok(ix_per_tx)) => {
+            Ok(ix_per_tx) => {
                 instructions_with_grouping.push((&instructions[i], ix_per_tx));
             }
-            Ok(Err(e)) => {
-                return Err(Box::new(e));
-            }
             Err(e) => {
-                return Err(Box::new(e));
+                error!("Could not simulate instruction: {:?}", e);
+                // Skip this instruction if there is an error
+                continue;
             }
         }
     }
@@ -494,13 +497,6 @@ pub async fn pack_instructions(
             }
             result.push(tx_instructions);
         }
-
-        info!(
-            "{}: Grouped {} instructions into {} transactions",
-            group_number,
-            group.len(),
-            result.len(),
-        );
     }
 
     Ok(result)
