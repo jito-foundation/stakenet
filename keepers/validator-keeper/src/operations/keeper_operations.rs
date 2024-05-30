@@ -21,8 +21,13 @@ impl KeeperOperations {
         runs_for_epoch: &[u64; KeeperOperations::LEN],
         errors_for_epoch: &[u64; KeeperOperations::LEN],
     ) {
+        let aggregate_actions = runs_for_epoch.iter().sum::<u64>();
+        let aggregate_errors = errors_for_epoch.iter().sum::<u64>();
+
         datapoint_info!(
             "keeper-operation-stats",
+            ("num-aggregate-actions", aggregate_actions, i64),
+            ("num-aggregate-errors", aggregate_errors, i64),
             (
                 "num-pre-create-update-runs",
                 runs_for_epoch[KeeperOperations::PreCreateUpdate as usize],
