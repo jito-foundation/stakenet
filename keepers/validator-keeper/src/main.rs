@@ -63,7 +63,7 @@ struct Args {
     metrics_interval: u64,
 
     // Priority Fees in microlamports
-    #[arg(short, long, env, default_value = "200000")]
+    #[arg(long, env, default_value = "200000")]
     priority_fees: u64,
 
     #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
