@@ -271,15 +271,8 @@ async fn find_ix_per_tx(
         .units_consumed
         .unwrap_or(DEFAULT_COMPUTE_LIMIT as u64);
 
-    // if compute > 200_000 {
-
-    //     error!(
-    //         "Vote above 200k cu: {} {:?}",
-    //         compute, instruction.accounts[1]
-    //     );
-    // }
-
     let serialized_size = Packet::from_data(None, &test_tx).unwrap().meta().size;
+
     // additional size per ix
     let size_per_ix =
         instruction.accounts.len() * size_of::<AccountMeta>() + instruction.data.len();

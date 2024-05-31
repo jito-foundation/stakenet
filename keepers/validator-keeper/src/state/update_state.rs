@@ -7,10 +7,7 @@ use keeper_core::{
 };
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
-    account::Account,
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
@@ -20,14 +17,16 @@ use crate::{
     operations::keeper_operations::KeeperOperations,
 };
 
-use super::keeper_state::KeeperState;
+use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 
 pub async fn pre_create_update(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let keypair = &keeper_config.keypair;
+
     // Update Epoch
     match client.get_epoch_info().await {
         Ok(latest_epoch) => {
@@ -62,11 +61,13 @@ pub async fn pre_create_update(
 
 // Should be called after `pre_create_update`
 pub async fn create_missing_accounts(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let keypair = &keeper_config.keypair;
+
     // Create Missing Accounts
     create_missing_validator_history_accounts(client, keypair, program_id, keeper_state).await?;
 
@@ -74,11 +75,13 @@ pub async fn create_missing_accounts(
 }
 
 pub async fn post_create_update(
-    client: &Arc<RpcClient>,
-    program_id: &Pubkey,
-    tip_distribution_program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
+
     // Update Validator History Accounts
     keeper_state.validator_history_map = get_validator_history_map(client, program_id).await?;
 

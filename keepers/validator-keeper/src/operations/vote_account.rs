@@ -4,9 +4,11 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use crate::state::keeper_state::KeeperState;
 use crate::KeeperError;
+use crate::{
+    entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
+};
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -51,12 +53,14 @@ async fn _process(
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    priority_fee_in_microlamports: u64,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
     let (mut runs_for_epoch, mut errors_for_epoch) =

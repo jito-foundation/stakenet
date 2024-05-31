@@ -1,4 +1,4 @@
-use crate::entries::stake_history_entry::StakeHistoryEntry;
+use crate::{entries::stake_history_entry::StakeHistoryEntry, state::keeper_config::KeeperConfig};
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
@@ -50,12 +50,14 @@ async fn _process(
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    priority_fee_in_microlamports: u64,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch) =
         keeper_state.copy_runs_and_errors_for_epoch(operation.clone());

@@ -4,9 +4,11 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::entries::mev_commission_entry::ValidatorMevCommissionEntry;
 use crate::state::keeper_state::KeeperState;
 use crate::KeeperError;
+use crate::{
+    entries::mev_commission_entry::ValidatorMevCommissionEntry, state::keeper_config::KeeperConfig,
+};
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::state::TipDistributionAccount;
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
@@ -50,13 +52,14 @@ async fn _process(
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    tip_distribution_program_id: &Pubkey,
-    priority_fee_in_microlamports: u64,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let operation = _get_operation();
 
     let (mut runs_for_epoch, mut errors_for_epoch) =

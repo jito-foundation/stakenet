@@ -5,6 +5,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 
 use crate::derive_cluster_history_address;
+use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
@@ -42,12 +43,14 @@ async fn _process(
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
-    priority_fee_in_microlamports: u64,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
 
