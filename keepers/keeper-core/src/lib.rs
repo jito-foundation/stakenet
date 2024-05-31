@@ -147,7 +147,7 @@ async fn simulate_instruction_with_retry(
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
 ) -> Result<Response<RpcSimulateTransactionResult>, ClientError> {
-    for _ in 0..2 {
+    for _ in 0..5 {
         match simulate_instruction(
             client,
             instruction,
@@ -157,8 +157,19 @@ async fn simulate_instruction_with_retry(
         )
         .await
         {
-            Ok(response) if response.value.err.is_none() => return Ok(response),
-            _ => continue,
+            Ok(response) => match response.value.err {
+                Some(e) => {
+                    if e == TransactionError::BlockhashNotFound {
+                        sleep(Duration::from_secs(3)).await;
+                    } else {
+                        return Err(e.into());
+                    }
+                }
+                None => return Ok(response),
+            },
+            Err(e) => {
+                return Err(e);
+            }
         }
     }
 
