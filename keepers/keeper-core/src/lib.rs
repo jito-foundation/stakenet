@@ -167,9 +167,7 @@ async fn simulate_instruction_with_retry(
                 }
                 None => return Ok(response),
             },
-            Err(e) => {
-                return Err(e);
-            }
+            Err(e) => return Err(e),
         }
     }
 
