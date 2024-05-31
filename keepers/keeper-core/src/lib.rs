@@ -449,10 +449,10 @@ pub async fn pack_instructions(
 ) -> Result<Vec<Vec<Instruction>>, Box<dyn std::error::Error>> {
     let mut instructions_with_grouping: Vec<(&Instruction, usize)> = Vec::new();
 
-    for i in 0..instructions.len() {
+    for instruction in instructions.iter() {
         let result = find_ix_per_tx(
             client,
-            &instructions[i],
+            instruction,
             signer,
             priority_fee_in_microlamports,
             max_cu_per_tx,
@@ -461,7 +461,7 @@ pub async fn pack_instructions(
 
         match result {
             Ok(ix_per_tx) => {
-                instructions_with_grouping.push((&instructions[i], ix_per_tx));
+                instructions_with_grouping.push((instruction, ix_per_tx));
             }
             Err(e) => {
                 error!("Could not simulate instruction: {:?}", e);
@@ -476,7 +476,7 @@ pub async fn pack_instructions(
     for (instruction, group_size) in instructions_with_grouping {
         grouped_instructions
             .entry(group_size)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(instruction);
     }
 
