@@ -10,7 +10,6 @@ use crate::{
     entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
 };
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
-use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -55,7 +54,7 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.program_id;
@@ -63,8 +62,8 @@ pub async fn fire(
 
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
-    let (mut runs_for_epoch, mut errors_for_epoch) =
-        keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
+    let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run(epoch_info, runs_for_epoch);
 
@@ -82,6 +81,8 @@ pub async fn fire(
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
                         datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    } else {
+                        txs_for_epoch += 1;
                     }
                 }
                 if stats.errors == 0 {
@@ -95,12 +96,7 @@ pub async fn fire(
         };
     }
 
-    info!(
-        "Vote account, runs: {}, errors: {}",
-        runs_for_epoch, errors_for_epoch
-    );
-
-    (operation, runs_for_epoch, errors_for_epoch)
+    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
 // SPECIFIC TO THIS OPERATION

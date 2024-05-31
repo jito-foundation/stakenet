@@ -54,7 +54,7 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.program_id;
@@ -62,8 +62,8 @@ pub async fn fire(
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let operation = _get_operation();
 
-    let (mut runs_for_epoch, mut errors_for_epoch) =
-        keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
+    let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run();
 
@@ -83,6 +83,8 @@ pub async fn fire(
                     if let Err(e) = message {
                         datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
                         errors_for_epoch += 1;
+                    } else {
+                        txs_for_epoch += 1;
                     }
                 }
                 if stats.errors == 0 {
@@ -96,7 +98,7 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch)
+    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------

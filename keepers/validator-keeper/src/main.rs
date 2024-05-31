@@ -15,7 +15,7 @@ use validator_keeper::{
     state::{
         keeper_config::{Args, KeeperConfig},
         keeper_state::KeeperState,
-        update_state::{create_missing_accounts, post_create_update, pre_create_update},
+        update_state::{create_missing_accounts_and_emit, post_create_update, pre_create_update},
     },
 };
 
@@ -40,7 +40,7 @@ async fn sleep_and_tick(tick: &mut u64) {
     advance_tick(tick);
 }
 
-async fn run_loop(keeper_config: KeeperConfig) {
+async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
@@ -63,24 +63,33 @@ async fn run_loop(keeper_config: KeeperConfig) {
                 }
                 Err(e) => {
                     error!("Failed to pre create update: {:?}", e);
-                    advance_tick(&mut tick);
+
                     keeper_state
                         .increment_update_error_for_epoch(KeeperOperations::PreCreateUpdate);
+
+                    advance_tick(&mut tick);
                     continue;
                 }
             }
 
             info!("Creating missing accounts...");
-            match create_missing_accounts(&keeper_config, &keeper_state).await {
-                Ok(_) => {
+            match create_missing_accounts_and_emit(&keeper_config, &keeper_state).await {
+                Ok(new_accounts_created) => {
                     keeper_state
                         .increment_update_run_for_epoch(KeeperOperations::CreateMissingAccounts);
+
+                    keeper_state.increment_update_txs_for_epoch(
+                        KeeperOperations::CreateMissingAccounts,
+                        new_accounts_created as u64,
+                    );
                 }
                 Err(e) => {
                     error!("Failed to create missing accounts: {:?}", e);
-                    advance_tick(&mut tick);
+
                     keeper_state
                         .increment_update_error_for_epoch(KeeperOperations::CreateMissingAccounts);
+
+                    advance_tick(&mut tick);
                     continue;
                 }
             }
@@ -92,9 +101,11 @@ async fn run_loop(keeper_config: KeeperConfig) {
                 }
                 Err(e) => {
                     error!("Failed to post create update: {:?}", e);
-                    advance_tick(&mut tick);
+
                     keeper_state
                         .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
+
+                    advance_tick(&mut tick);
                     continue;
                 }
             }
@@ -107,28 +118,28 @@ async fn run_loop(keeper_config: KeeperConfig) {
             info!("Firing operations...");
 
             info!("Updating cluster history...");
-            keeper_state.set_runs_and_errors_for_epoch(
+            keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::cluster_history::fire(&keeper_config, &keeper_state).await,
             );
 
             info!("Updating copy vote accounts...");
-            keeper_state.set_runs_and_errors_for_epoch(
+            keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::vote_account::fire(&keeper_config, &keeper_state).await,
             );
 
             info!("Updating mev commission...");
-            keeper_state.set_runs_and_errors_for_epoch(
+            keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::mev_commission::fire(&keeper_config, &keeper_state).await,
             );
 
             info!("Updating mev earned...");
-            keeper_state.set_runs_and_errors_for_epoch(
+            keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::mev_earned::fire(&keeper_config, &keeper_state).await,
             );
 
             if keeper_config.oracle_authority_keypair.is_some() {
                 info!("Updating stake accounts...");
-                keeper_state.set_runs_and_errors_for_epoch(
+                keeper_state.set_runs_errors_and_txs_for_epoch(
                     operations::stake_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
@@ -137,7 +148,7 @@ async fn run_loop(keeper_config: KeeperConfig) {
                 && keeper_config.gossip_entrypoint.is_some()
             {
                 info!("Updating gossip accounts...");
-                keeper_state.set_runs_and_errors_for_epoch(
+                keeper_state.set_runs_errors_and_txs_for_epoch(
                     operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
@@ -146,13 +157,20 @@ async fn run_loop(keeper_config: KeeperConfig) {
         // ON-CHAIN METRICS
         if should_fire(tick, metrics_interval) {
             info!("Emitting metrics...");
-            keeper_state
-                .set_runs_and_errors_for_epoch(operations::metrics_emit::fire(&keeper_state).await);
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::metrics_emit::fire(&keeper_state).await,
+            );
         }
 
         // ---------------------- EMIT ---------------------------------
         if should_emit(tick, &intervals) {
-            KeeperOperations::emit(&keeper_state.runs_for_epoch, &keeper_state.errors_for_epoch)
+            keeper_state.emit();
+
+            KeeperOperations::emit(
+                &keeper_state.runs_for_epoch,
+                &keeper_state.errors_for_epoch,
+                &keeper_state.txs_for_epoch,
+            );
         }
 
         // ---------- SLEEP ----------
@@ -202,5 +220,5 @@ async fn main() {
         metrics_interval: args.metrics_interval,
     };
 
-    run_loop(config).await;
+    run_keeper(config).await;
 }
