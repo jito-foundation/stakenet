@@ -579,6 +579,15 @@ pub fn new_vote_account(
     }
 }
 
+pub fn closed_vote_account() -> Account {
+    Account {
+        lamports: 0,
+        data: vec![0; VoteState::size_of()],
+        owner: anchor_lang::system_program::ID, // Close the account
+        ..Account::default()
+    }
+}
+
 // TODO write a function to serialize any account with T: AnchorSerialize
 pub fn serialized_validator_list_account(
     validator_list: ValidatorList,
