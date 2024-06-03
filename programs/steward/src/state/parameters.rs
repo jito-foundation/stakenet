@@ -57,9 +57,10 @@ pub struct Parameters {
     /// Proportion of delinquent slots to total slots to trigger instant unstake
     pub instant_unstake_delinquency_threshold_ratio: f64,
 
-    /// Highest commission rate allowed in percent
+    /// Highest commission rate allowed in commission_range epochs, in percent
     pub commission_threshold: u8,
 
+    /// Highest commission rate allowed in tracked history
     pub historical_commission_threshold: u8,
 
     /// Required so that the struct is 8-byte aligned
