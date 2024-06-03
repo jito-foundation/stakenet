@@ -9,7 +9,10 @@ use solana_sdk::{
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-use crate::{derive_validator_history_address, operations::keeper_operations::KeeperOperations};
+use crate::{
+    derive_validator_history_address,
+    operations::keeper_operations::{KeeperCreates, KeeperOperations},
+};
 
 pub struct KeeperState {
     pub epoch_info: EpochInfo,
@@ -18,6 +21,9 @@ pub struct KeeperState {
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
     pub errors_for_epoch: [u64; KeeperOperations::LEN],
     pub txs_for_epoch: [u64; KeeperOperations::LEN],
+
+    // Tally for creates
+    pub created_accounts_for_epoch: [u64; KeeperCreates::LEN],
 
     // All vote account info fetched with get_vote_accounts - key'd by their pubkey
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
@@ -82,6 +88,14 @@ impl KeeperState {
         self.runs_for_epoch[index] = runs_for_epoch;
         self.errors_for_epoch[index] = errors_for_epoch;
         self.txs_for_epoch[index] = txs_for_epoch;
+    }
+
+    pub fn increment_creations_for_epoch(
+        &mut self,
+        (operation, created_accounts_for_epoch): (KeeperCreates, u64),
+    ) {
+        let index = operation as usize;
+        self.created_accounts_for_epoch[index] += created_accounts_for_epoch;
     }
 
     pub fn get_history_pubkeys(&self, program_id: &Pubkey) -> HashSet<Pubkey> {
@@ -199,6 +213,7 @@ impl Default for KeeperState {
             runs_for_epoch: [0; KeeperOperations::LEN],
             errors_for_epoch: [0; KeeperOperations::LEN],
             txs_for_epoch: [0; KeeperOperations::LEN],
+            created_accounts_for_epoch: [0; KeeperCreates::LEN],
             vote_account_map: HashMap::new(),
             validator_history_map: HashMap::new(),
             all_history_vote_account_map: HashMap::new(),

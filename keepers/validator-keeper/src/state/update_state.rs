@@ -6,7 +6,6 @@ use keeper_core::{
     get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
 };
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
-use solana_metrics::datapoint_info;
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
@@ -15,7 +14,7 @@ use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHis
 use crate::{
     derive_cluster_history_address, derive_validator_history_address, get_balance_with_retry,
     get_create_validator_history_instructions, get_validator_history_accounts_with_retry,
-    operations::keeper_operations::KeeperOperations,
+    operations::keeper_operations::{KeeperCreates, KeeperOperations},
 };
 
 use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
@@ -35,6 +34,8 @@ pub async fn pre_create_update(
                 keeper_state.runs_for_epoch = [0; KeeperOperations::LEN];
                 keeper_state.errors_for_epoch = [0; KeeperOperations::LEN];
                 keeper_state.txs_for_epoch = [0; KeeperOperations::LEN];
+
+                keeper_state.created_accounts_for_epoch = [0; KeeperCreates::LEN];
             }
 
             // Always update the epoch info
@@ -62,29 +63,26 @@ pub async fn pre_create_update(
 }
 
 // Should be called after `pre_create_update`
-pub async fn create_missing_accounts_and_emit(
+pub async fn create_missing_accounts(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<Vec<(KeeperCreates, usize)>, Box<dyn Error>> {
     let client = &keeper_config.client;
     let program_id = &keeper_config.program_id;
     let keypair = &keeper_config.keypair;
+
+    let mut created_accounts_for_epoch = vec![];
 
     // Create Missing Accounts
     let new_validator_history_accounts =
         create_missing_validator_history_accounts(client, keypair, program_id, keeper_state)
             .await?;
+    created_accounts_for_epoch.push((
+        KeeperCreates::CreateValidatorHistory,
+        new_validator_history_accounts,
+    ));
 
-    datapoint_info!(
-        "keeper-create-missing-accounts",
-        (
-            "num_new_validator_history_accounts",
-            new_validator_history_accounts,
-            i64
-        ),
-    );
-
-    Ok(new_validator_history_accounts)
+    Ok(created_accounts_for_epoch)
 }
 
 pub async fn post_create_update(

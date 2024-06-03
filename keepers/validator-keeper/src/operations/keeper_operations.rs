@@ -1,6 +1,31 @@
 use solana_metrics::datapoint_info;
 
 #[derive(Clone)]
+pub enum KeeperCreates {
+    CreateValidatorHistory,
+}
+
+impl KeeperCreates {
+    pub const LEN: usize = 1;
+
+    pub fn emit(created_accounts_for_epoch: &[u64; KeeperCreates::LEN]) {
+        let aggregate_creates = created_accounts_for_epoch.iter().sum::<u64>();
+
+        datapoint_info!(
+            "keeper-create-stats",
+            // AGGREGATE
+            ("num-aggregate-creates", aggregate_creates, i64),
+            // CREATE VALIDATOR HISTORY
+            (
+                "num-validator-history-creates",
+                created_accounts_for_epoch[KeeperCreates::CreateValidatorHistory as usize],
+                i64
+            ),
+        );
+    }
+}
+
+#[derive(Clone)]
 pub enum KeeperOperations {
     PreCreateUpdate,
     CreateMissingAccounts,

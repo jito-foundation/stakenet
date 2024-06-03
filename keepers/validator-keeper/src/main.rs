@@ -11,11 +11,14 @@ use solana_sdk::signature::read_keypair_file;
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
 use validator_keeper::{
-    operations::{self, keeper_operations::KeeperOperations},
+    operations::{
+        self,
+        keeper_operations::{KeeperCreates, KeeperOperations},
+    },
     state::{
         keeper_config::{Args, KeeperConfig},
         keeper_state::KeeperState,
-        update_state::{create_missing_accounts_and_emit, post_create_update, pre_create_update},
+        update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
 
@@ -73,15 +76,25 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             info!("Creating missing accounts...");
-            match create_missing_accounts_and_emit(&keeper_config, &keeper_state).await {
+            match create_missing_accounts(&keeper_config, &keeper_state).await {
                 Ok(new_accounts_created) => {
                     keeper_state
                         .increment_update_run_for_epoch(KeeperOperations::CreateMissingAccounts);
 
+                    let total_txs: usize = new_accounts_created.iter().map(|(_, txs)| txs).sum();
                     keeper_state.increment_update_txs_for_epoch(
                         KeeperOperations::CreateMissingAccounts,
-                        new_accounts_created as u64,
+                        total_txs as u64,
                     );
+
+                    new_accounts_created
+                        .iter()
+                        .for_each(|(operation, created_accounts)| {
+                            keeper_state.increment_creations_for_epoch((
+                                operation.clone(),
+                                *created_accounts as u64,
+                            ));
+                        });
                 }
                 Err(e) => {
                     error!("Failed to create missing accounts: {:?}", e);
@@ -171,6 +184,8 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
             );
+
+            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
         }
 
         // ---------- SLEEP ----------
