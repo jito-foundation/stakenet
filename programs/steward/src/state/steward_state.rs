@@ -21,7 +21,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
 fn invalid_state_error(expected: String, actual: String) -> Error {
-    msg!("Invalid state. Expected {}, Actual {}", expected, actual);
+    // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
 }
 
@@ -636,7 +636,7 @@ impl StewardState {
                 clock.epoch as u16,
             )?;
             emit!(instant_unstake_result);
-            if self.delegations[index].numerator > 0 && instant_unstake_result.instant_unstake {
+            if instant_unstake_result.instant_unstake {
                 self.instant_unstake.set(index, true)?;
             }
             self.progress.set(index, true)?;
