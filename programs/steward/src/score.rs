@@ -147,7 +147,10 @@ pub fn validator_score(
 
     let historical_commission_max = validator
         .history
-        .commission_range(0 as u16, current_epoch as u16) // TODO SOLUTION FOR FIRST_RELIABLE_EPOCH
+        .commission_range(
+            VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16,
+            current_epoch as u16,
+        )
         .iter()
         .filter_map(|&i| i)
         .max()
