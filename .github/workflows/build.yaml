@@ -121,6 +121,10 @@ jobs:
         with:
           name: validator_history.so
           path: target/deploy/
+      - uses: actions/download-artifact@v4
+        with:
+          name: jito_steward.so
+          path: target/deploy/
       - name: cargo test
         run: cargo test --package tests --all-features --color auto -- --skip steward::test_state_methods
         shell: bash
