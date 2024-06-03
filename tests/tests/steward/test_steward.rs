@@ -148,11 +148,11 @@ async fn test_auto_remove() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            withdraw_authority: withdraw_authority,
+            withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_account: stake_account_address,
             transient_stake_account: transient_stake_account_address,
-            vote_account: vote_account,
+            vote_account,
             rent: sysvar::rent::id(),
             clock: sysvar::clock::id(),
             stake_history: sysvar::stake_history::id(),
@@ -181,18 +181,11 @@ async fn test_auto_remove() {
         &serialized_steward_state_account(steward_state_account).into(),
     );
 
-    let latest_blockhash = fixture
-        .ctx
-        .borrow_mut()
-        .get_new_latest_blockhash()
-        .await
-        .expect("Could not get latest blockhash");
-
     let tx = Transaction::new_signed_with_payer(
         &[auto_remove_validator_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        latest_blockhash,
+        fixture.ctx.borrow().last_blockhash,
     );
 
     fixture
