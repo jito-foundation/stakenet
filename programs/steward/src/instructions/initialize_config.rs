@@ -1,6 +1,6 @@
 use anchor_lang::{prelude::*, solana_program::program::invoke};
 
-use crate::{utils::StakePool, Config, Staker};
+use crate::{utils::StakePool, Config, Staker, UpdateParametersArgs};
 
 #[derive(Accounts)]
 pub struct InitializeConfig<'info> {
@@ -39,11 +39,23 @@ pub struct InitializeConfig<'info> {
     pub signer: Signer<'info>,
 }
 
-pub fn handler(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
+pub fn handler(
+    ctx: Context<InitializeConfig>,
+    authority: Pubkey,
+    update_parameters_args: &UpdateParametersArgs,
+) -> Result<()> {
     let mut config = ctx.accounts.config.load_init()?;
     config.stake_pool = ctx.accounts.stake_pool.key();
     config.authority = authority;
 
+    // Set Initial Parameters
+    let max_slots_in_epoch = EpochSchedule::get()?.slots_per_epoch;
+    let current_epoch = Clock::get()?.epoch;
+    config
+        .parameters
+        .update(update_parameters_args, current_epoch, max_slots_in_epoch)?;
+
+    // Set the staker account
     ctx.accounts.staker.bump = ctx.bumps.staker;
     invoke(
         &spl_stake_pool::instruction::set_staker(

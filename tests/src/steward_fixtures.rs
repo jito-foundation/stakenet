@@ -15,6 +15,7 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
     Config, Delegation, Parameters, Staker, StewardState, StewardStateAccount, StewardStateEnum,
+    UpdateParametersArgs,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -231,7 +232,28 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_config(&self) {
+    pub async fn initialize_config(&self, parameters: Option<UpdateParametersArgs>) {
+        // Default parameters from JIP
+        let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
+            mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
+            epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
+            commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
+            scoring_delinquency_threshold_ratio: Some(0.85),
+            instant_unstake_delinquency_threshold_ratio: Some(0.70),
+            mev_commission_bps_threshold: Some(1000),
+            commission_threshold: Some(5),
+            num_delegation_validators: Some(200),
+            scoring_unstake_cap_bps: Some(750),
+            instant_unstake_cap_bps: Some(10),
+            stake_deposit_unstake_cap_bps: Some(10),
+            instant_unstake_epoch_progress: Some(0.90),
+            compute_score_slot_range: Some(1000),
+            instant_unstake_inputs_epoch_progress: Some(0.50),
+            num_epochs_between_scoring: Some(10),
+            minimum_stake_lamports: Some(5_000_000_000),
+            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+        });
+
         let instruction = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::InitializeConfig {
@@ -245,6 +267,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: jito_steward::instruction::InitializeConfig {
                 authority: self.keypair.pubkey(),
+                update_parameters_args,
             }
             .data(),
         };

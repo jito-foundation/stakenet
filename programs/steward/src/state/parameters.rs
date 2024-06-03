@@ -10,7 +10,7 @@ use crate::{
     errors::StewardError,
 };
 
-#[derive(BorshSerialize, BorshDeserialize, Debug, Default)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
 pub struct UpdateParametersArgs {
     // Scoring parameters
     pub mev_commission_range: Option<u16>,

@@ -14,9 +14,11 @@ pub fn handler(
     ctx: Context<UpdateParameters>,
     update_parameters_args: &UpdateParametersArgs,
 ) -> Result<()> {
-    let mut parameters = ctx.accounts.config.load_mut()?.parameters;
+    let mut config = ctx.accounts.config.load_mut()?;
     let max_slots_in_epoch = EpochSchedule::get()?.slots_per_epoch;
     let current_epoch = Clock::get()?.epoch;
-    parameters.update(update_parameters_args, current_epoch, max_slots_in_epoch)?;
+    config
+        .parameters
+        .update(update_parameters_args, current_epoch, max_slots_in_epoch)?;
     Ok(())
 }
