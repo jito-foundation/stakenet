@@ -636,9 +636,8 @@ impl StewardState {
                 clock.epoch as u16,
             )?;
             emit!(instant_unstake_result);
-            if self.delegations[index].numerator > 0 && instant_unstake_result.instant_unstake {
-                self.instant_unstake.set(index, true)?;
-            }
+            self.instant_unstake
+                .set(index, instant_unstake_result.instant_unstake)?;
             self.progress.set(index, true)?;
             return Ok(());
         }

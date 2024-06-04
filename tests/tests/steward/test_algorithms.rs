@@ -54,6 +54,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -83,6 +84,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -110,6 +112,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -136,6 +139,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -167,6 +171,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -196,6 +201,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -226,6 +232,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -257,6 +264,7 @@ fn test_compute_score() {
             running_jito_score: 0.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -285,6 +293,71 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 0.0,
+            historical_commission_score: 0.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16
+        }
+    );
+
+    //// historical commission ////
+    let mut validator = good_validator;
+    let mut config = default_fixture.config;
+
+    config.parameters.historical_commission_threshold = 15;
+    config.parameters.commission_threshold = 10;
+    config.parameters.commission_range = 10;
+
+    // commission above regular threshold, below historical threshold, outside of regular threshold window
+    validator.history.arr[0].commission = 14;
+
+    let components = validator_score(
+        &validator,
+        validator.index as usize,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponents {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16
+        }
+    );
+
+    validator.history.arr[0].commission = 16;
+    let components = validator_score(
+        &validator,
+        validator.index as usize,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponents {
+            score: 0.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 0.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -318,6 +391,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 0.88,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -346,6 +420,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 0.95,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -379,6 +454,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 0.9,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -410,6 +486,7 @@ fn test_compute_score() {
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
+            historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }

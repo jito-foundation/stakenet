@@ -304,7 +304,8 @@ async fn test_compute_scores() {
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
@@ -349,7 +350,8 @@ async fn test_compute_scores() {
 
     let tx = Transaction::new_signed_with_payer(
         &[
-            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
@@ -377,7 +379,8 @@ async fn test_compute_scores() {
     let blockhash = fixture.get_latest_blockhash().await;
     let tx = Transaction::new_signed_with_payer(
         &[
-            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),

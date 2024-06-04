@@ -4,7 +4,7 @@ use anchor_lang::{
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 use crate::{
-    constants::{BASIS_POINTS_MAX, COMMISSION_MAX},
+    constants::{BASIS_POINTS_MAX, COMMISSION_MAX, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH},
     errors::StewardError::{self, ArithmeticError},
     Config,
 };
@@ -33,8 +33,11 @@ pub struct ScoreComponents {
     /// If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
     pub running_jito_score: f64,
 
-    /// If max commission in commission_range epochs is less than threshold, score is 1.0, else 0.0
+    /// If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0
     pub commission_score: f64,
+
+    /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
+    pub historical_commission_score: f64,
 
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
@@ -140,6 +143,23 @@ pub fn validator_score(
     };
     let commission = commission_u8 as f64 / COMMISSION_MAX as f64;
 
+    /////// Historical Commission ///////
+
+    let historical_commission_max = validator
+        .history
+        .commission_range(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16, current_epoch)
+        .iter()
+        .filter_map(|&i| i)
+        .max()
+        .unwrap_or(0);
+
+    let historical_commission_score: f64 =
+        if historical_commission_max <= params.historical_commission_threshold {
+            1.0
+        } else {
+            0.0
+        };
+
     /////// Superminority ///////
     /*
         If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
@@ -186,6 +206,7 @@ pub fn validator_score(
 
     let score = mev_commission_score
         * commission_score
+        * historical_commission_score
         * blacklisted_score
         * superminority_score
         * delinquency_score
@@ -201,6 +222,7 @@ pub fn validator_score(
         delinquency_score,
         running_jito_score,
         commission_score,
+        historical_commission_score,
         vote_credits_ratio: average_vote_credits / average_blocks,
         vote_account: validator.vote_account,
         epoch: current_epoch,
