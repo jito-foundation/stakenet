@@ -81,7 +81,7 @@ jobs:
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       # build the program and IDL; exit if error
-      - run: anchor build --no-idl --program-name validator_history
+      - run: anchor build --no-idl
       # - name: Check for diff on IDL
       #   run: git diff --exit-code
 
@@ -94,6 +94,12 @@ jobs:
         with:
           name: validator_history.so
           path: target/deploy/validator_history.so
+
+      - name: Upload jito_steward.so
+        uses: actions/upload-artifact@v4
+        with:
+          name: jito_steward.so
+          path: target/deploy/jito_steward.so
       # - name: Upload IDL
       #   uses: actions/upload-artifact@v4
       #   with:
@@ -115,12 +121,22 @@ jobs:
         with:
           name: validator_history.so
           path: target/deploy/
+      - uses: actions/download-artifact@v4
+        with:
+          name: jito_steward.so
+          path: target/deploy/
       - name: cargo test
-        run: cargo test --package tests --test mod validator_history --all-features --color auto
+        run: cargo test --package tests --all-features --color auto -- --skip steward::test_state_methods
         shell: bash
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
+          RUST_MIN_STACK: 5000000
+      - name: cargo test steward::test_state_methods
+        run: cargo test --package tests --test mod steward::test_state_methods
+        shell: bash
+        env:
+          RUST_LOG: trace
           RUST_MIN_STACK: 5000000
 
   # release only runs on tagged commits

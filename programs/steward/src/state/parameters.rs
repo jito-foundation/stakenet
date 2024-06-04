@@ -20,6 +20,7 @@ pub struct UpdateParametersArgs {
     pub instant_unstake_delinquency_threshold_ratio: Option<f64>,
     pub mev_commission_bps_threshold: Option<u16>,
     pub commission_threshold: Option<u8>,
+    pub historical_commission_threshold: Option<u8>,
     // Delegation parameters
     pub num_delegation_validators: Option<u32>,
     pub scoring_unstake_cap_bps: Option<u32>,
@@ -56,12 +57,15 @@ pub struct Parameters {
     /// Proportion of delinquent slots to total slots to trigger instant unstake
     pub instant_unstake_delinquency_threshold_ratio: f64,
 
-    /// Highest commission rate allowed in percent
+    /// Highest commission rate allowed in commission_range epochs, in percent
     pub commission_threshold: u8,
+
+    /// Highest commission rate allowed in tracked history
+    pub historical_commission_threshold: u8,
 
     /// Required so that the struct is 8-byte aligned
     /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
-    pub padding0: [u8; 7],
+    pub padding0: [u8; 6],
 
     /////// Delegation parameters ///////
     /// Number of validators to delegate to
@@ -113,6 +117,7 @@ impl Parameters {
             instant_unstake_delinquency_threshold_ratio,
             mev_commission_bps_threshold,
             commission_threshold,
+            historical_commission_threshold,
             num_delegation_validators,
             scoring_unstake_cap_bps,
             instant_unstake_cap_bps,
@@ -157,6 +162,10 @@ impl Parameters {
 
         if let Some(commission_threshold) = commission_threshold {
             new_parameters.commission_threshold = commission_threshold;
+        }
+
+        if let Some(historical_commission_threshold) = historical_commission_threshold {
+            new_parameters.historical_commission_threshold = historical_commission_threshold;
         }
 
         if let Some(num_delegation_validators) = num_delegation_validators {
@@ -242,6 +251,10 @@ impl Parameters {
         }
 
         if self.commission_threshold > COMMISSION_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.historical_commission_threshold > COMMISSION_MAX {
             return Err(StewardError::InvalidParameterValue.into());
         }
 

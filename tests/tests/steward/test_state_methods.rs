@@ -447,6 +447,23 @@ fn test_compute_instant_unstake_success() {
         .instant_unstake
         .get(validators[0].index as usize)
         .unwrap());
+
+    // Instant unstakeable validator with no delegation amount
+    state.delegations[validators[0].index as usize] = Delegation::new(0, 1);
+    state.instant_unstake.reset();
+    let res = state.compute_instant_unstake(
+        clock,
+        epoch_schedule,
+        &validators[0],
+        validators[0].index as usize,
+        cluster_history,
+        config,
+    );
+    assert!(res.is_ok());
+    assert!(state
+        .instant_unstake
+        .get(validators[0].index as usize)
+        .unwrap());
 }
 
 #[test]
@@ -548,6 +565,60 @@ fn test_rebalance() {
                         Delegation::new(1, 1),
                         Delegation::new(0, 1),
                         Delegation::new(0, 1)
+                    ]
+            );
+        }
+        _ => panic!("Expected RebalanceType::Decrease"),
+    }
+
+    // Instant unstake validator, but no delegation, so other delegations are not affected
+    // Same scenario as above but out-of-band validator
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 2),
+        Delegation::new(0, 1),
+        Delegation::new(1, 2),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    // Second validator is instant unstakeable
+    state.instant_unstake.set(1, true).unwrap();
+    state.validator_lamport_balances[1] = 1000 * LAMPORTS_PER_SOL;
+
+    // Validator index 0: 1000 SOL, 1 score, 1 delegation -> Keeps its stake
+    // Validator index 1: 1000 SOL, 0.5 score, 0 delegation, -> Decrease stake, from "instant unstake" category, and set delegation to 0
+    // Validator index 2: 1000 SOL, 0 score, 0 delegation -> Decrease stake, from "regular unstake" category
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        1,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        1000 * LAMPORTS_PER_SOL,
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Decrease(decrease_components) => {
+            assert_eq!(
+                decrease_components.total_unstake_lamports,
+                1000 * LAMPORTS_PER_SOL
+            );
+            assert_eq!(
+                decrease_components.instant_unstake_lamports,
+                1000 * LAMPORTS_PER_SOL
+            );
+            assert_eq!(decrease_components.scoring_unstake_lamports, 0);
+            assert_eq!(decrease_components.stake_deposit_unstake_lamports, 0);
+
+            assert!(
+                state.delegations[0..3]
+                    == [
+                        Delegation::new(1, 2),
+                        Delegation::new(0, 1),
+                        Delegation::new(1, 2)
                     ]
             );
         }
