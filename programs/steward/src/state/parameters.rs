@@ -97,13 +97,13 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Update parameters that are present in the args struct and validates them
-    pub fn update(
-        &mut self,
+    /// Merges the updated parameters with the current parameters and validates them
+    pub fn get_updated_parameters(
+        self,
         args: &UpdateParametersArgs,
         current_epoch: u64,
         slots_per_epoch: u64,
-    ) -> Result<()> {
+    ) -> Result<Parameters> {
         // Updates parameters and validates them
         let UpdateParametersArgs {
             mev_commission_range,
@@ -125,7 +125,7 @@ impl Parameters {
             minimum_voting_epochs,
         } = *args;
 
-        let mut new_parameters = *self;
+        let mut new_parameters = self.clone();
 
         if let Some(mev_commission_range) = mev_commission_range {
             new_parameters.mev_commission_range = mev_commission_range;
@@ -200,9 +200,10 @@ impl Parameters {
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
         }
 
+        // Validation will throw an error if any of the parameters are invalid
         new_parameters.validate(current_epoch, slots_per_epoch)?;
-        *self = new_parameters;
-        Ok(())
+
+        Ok(new_parameters)
     }
 
     /// Validate reasonable bounds on parameters

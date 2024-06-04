@@ -51,9 +51,14 @@ pub fn handler(
     // Set Initial Parameters
     let max_slots_in_epoch = EpochSchedule::get()?.slots_per_epoch;
     let current_epoch = Clock::get()?.epoch;
-    config
-        .parameters
-        .update(update_parameters_args, current_epoch, max_slots_in_epoch)?;
+
+    let initial_parameters = config.parameters.get_updated_parameters(
+        update_parameters_args,
+        current_epoch,
+        max_slots_in_epoch,
+    )?;
+
+    config.parameters = initial_parameters;
 
     // Set the staker account
     ctx.accounts.staker.bump = ctx.bumps.staker;
