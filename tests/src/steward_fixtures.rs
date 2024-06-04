@@ -242,6 +242,7 @@ impl TestFixture {
             instant_unstake_delinquency_threshold_ratio: Some(0.70),
             mev_commission_bps_threshold: Some(1000),
             commission_threshold: Some(5),
+            historical_commission_threshold: Some(50),
             num_delegation_validators: Some(200),
             scoring_unstake_cap_bps: Some(750),
             instant_unstake_cap_bps: Some(10),

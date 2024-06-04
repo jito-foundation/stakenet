@@ -197,6 +197,7 @@ async fn test_update_parameters() {
             instant_unstake_delinquency_threshold_ratio: Some(0.1),
             mev_commission_bps_threshold: Some(999),
             commission_threshold: Some(10),
+            historical_commission_threshold: Some(34),
             num_delegation_validators: Some(3),
             scoring_unstake_cap_bps: Some(1000),
             instant_unstake_cap_bps: Some(1000),
@@ -230,6 +231,7 @@ fn _test_parameter(
         instant_unstake_delinquency_threshold_ratio: 0.7,
         mev_commission_bps_threshold: 1000,
         commission_threshold: 5,
+        historical_commission_threshold: 50,
         num_delegation_validators: 200,
         scoring_unstake_cap_bps: 10,
         instant_unstake_cap_bps: 10,
@@ -240,7 +242,7 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
-        padding0: [0; 7],
+        padding0: [0; 6],
     });
 
     // First Valid Epoch
@@ -513,6 +515,32 @@ fn test_commission_threshold() {
         let result = _test_parameter(&update_parameters, None, None, None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().commission_threshold, new_value);
+    }
+}
+
+#[test]
+fn test_historical_commission_threshold() {
+    {
+        // Out of range
+        let new_value = COMMISSION_MAX + 1;
+        let update_parameters = UpdateParametersArgs {
+            historical_commission_threshold: Some(new_value),
+            ..UpdateParametersArgs::default()
+        };
+        let result = _test_parameter(&update_parameters, None, None, None);
+        assert!(result.is_err());
+    }
+
+    {
+        // In range
+        let new_value = 0;
+        let update_parameters = UpdateParametersArgs {
+            historical_commission_threshold: Some(new_value),
+            ..UpdateParametersArgs::default()
+        };
+        let result = _test_parameter(&update_parameters, None, None, None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().historical_commission_threshold, new_value);
     }
 }
 
