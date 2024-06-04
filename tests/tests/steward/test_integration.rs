@@ -8,7 +8,7 @@ use anchor_lang::{
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     utils::{StakePool, ValidatorList},
-    Config, Delegation, StewardStateAccount, StewardStateEnum,
+    Config, Delegation, StewardStateAccount, StewardStateEnum, UpdateParametersArgs,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -36,7 +36,7 @@ async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
@@ -173,7 +173,7 @@ async fn test_compute_scores() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -422,7 +422,28 @@ async fn test_compute_instant_unstake() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture
+        .initialize_config(Some(UpdateParametersArgs {
+            mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
+            epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
+            commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
+            scoring_delinquency_threshold_ratio: Some(0.85),
+            instant_unstake_delinquency_threshold_ratio: Some(0.70),
+            mev_commission_bps_threshold: Some(1000),
+            commission_threshold: Some(5),
+            historical_commission_threshold: Some(50),
+            num_delegation_validators: Some(200),
+            scoring_unstake_cap_bps: Some(750),
+            instant_unstake_cap_bps: Some(10),
+            stake_deposit_unstake_cap_bps: Some(10),
+            instant_unstake_epoch_progress: Some(0.0), // So that we don't have to increase the slots
+            compute_score_slot_range: Some(1000),
+            instant_unstake_inputs_epoch_progress: Some(0.50),
+            num_epochs_between_scoring: Some(10),
+            minimum_stake_lamports: Some(5_000_000_000),
+            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+        }))
+        .await;
     fixture.initialize_steward_state().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -435,6 +456,7 @@ async fn test_compute_instant_unstake() {
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
+
     fixture.ctx.borrow_mut().set_account(
         &vote_account,
         &new_vote_account(Pubkey::new_unique(), vote_account, 100, Some(epoch_credits)).into(),
@@ -635,7 +657,7 @@ async fn test_idle() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
@@ -771,7 +793,7 @@ async fn test_rebalance_increase() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let mut steward_config: Config = fixture
@@ -1009,7 +1031,7 @@ async fn test_rebalance_decrease() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let mut steward_config: Config = fixture
@@ -1311,7 +1333,7 @@ async fn test_rebalance_other_cases() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
     let mut steward_config: Config = fixture

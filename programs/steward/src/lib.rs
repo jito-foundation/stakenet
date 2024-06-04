@@ -57,8 +57,12 @@ pub mod steward {
 
     // Initializes Config and Staker accounts. Must be called before any other instruction
     // Requires Pool to be initialized
-    pub fn initialize_config(ctx: Context<InitializeConfig>, authority: Pubkey) -> Result<()> {
-        instructions::initialize_config::handler(ctx, authority)
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        authority: Pubkey,
+        update_parameters_args: UpdateParametersArgs,
+    ) -> Result<()> {
+        instructions::initialize_config::handler(ctx, authority, &update_parameters_args)
     }
 
     /// Creates state account
