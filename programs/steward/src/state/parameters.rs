@@ -125,7 +125,7 @@ impl Parameters {
             minimum_voting_epochs,
         } = *args;
 
-        let mut new_parameters = self.clone();
+        let mut new_parameters = self;
 
         if let Some(mev_commission_range) = mev_commission_range {
             new_parameters.mev_commission_range = mev_commission_range;

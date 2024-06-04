@@ -5,10 +5,10 @@ use jito_steward::{
         BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN, EPOCH_PROGRESS_MAX,
         MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX,
     },
-    parameters, Config, Parameters, UpdateParametersArgs,
+    Config, Parameters, UpdateParametersArgs,
 };
 use solana_program_test::*;
-use solana_sdk::{epoch_schedule::EpochSchedule, signer::Signer, transaction::Transaction};
+use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::TestFixture;
 
 // ---------- INTEGRATION TESTS ----------
@@ -247,11 +247,7 @@ fn _test_parameter(
     let current_epoch = current_epoch.unwrap_or(512);
     let slots_per_epoch = slots_per_epoch.unwrap_or(432_000);
 
-    return valid_parameters.get_updated_parameters(
-        update_parameters,
-        current_epoch,
-        slots_per_epoch,
-    );
+    valid_parameters.get_updated_parameters(update_parameters, current_epoch, slots_per_epoch)
 }
 
 #[test]
@@ -266,14 +262,14 @@ fn test_mev_commission_range() {
         // Out of range
         let not_okay_epoch = 0;
         let result = _test_parameter(&update_parameters, Some(not_okay_epoch), None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
         // In range
         let okay_epoch = 512;
         let result = _test_parameter(&update_parameters, Some(okay_epoch), None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().mev_commission_range, new_value);
     }
 }
@@ -290,14 +286,14 @@ fn test_epoch_credits_range() {
         // Out of range
         let not_okay_epoch = 0;
         let result = _test_parameter(&update_parameters, Some(not_okay_epoch), None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
         // In range
         let okay_epoch = 512;
         let result = _test_parameter(&update_parameters, Some(okay_epoch), None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().epoch_credits_range, new_value);
     }
 }
@@ -314,14 +310,14 @@ fn test_commission_range() {
         // Out of range
         let not_okay_epoch = 0;
         let result = _test_parameter(&update_parameters, Some(not_okay_epoch), None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
         // In range
         let okay_epoch = 512;
         let result = _test_parameter(&update_parameters, Some(okay_epoch), None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().commission_range, new_value);
     }
 }
@@ -336,7 +332,7 @@ fn test_scoring_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -347,7 +343,7 @@ fn test_scoring_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -359,7 +355,7 @@ fn test_scoring_delinquency_threshold_ratio() {
         };
 
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().scoring_delinquency_threshold_ratio,
             new_value
@@ -374,7 +370,7 @@ fn test_scoring_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().scoring_delinquency_threshold_ratio,
             new_value
@@ -389,7 +385,7 @@ fn test_scoring_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().scoring_delinquency_threshold_ratio,
             new_value
@@ -407,7 +403,7 @@ fn test_instant_unstake_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -418,7 +414,7 @@ fn test_instant_unstake_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -430,7 +426,7 @@ fn test_instant_unstake_delinquency_threshold_ratio() {
         };
 
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_delinquency_threshold_ratio,
             new_value
@@ -445,7 +441,7 @@ fn test_instant_unstake_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_delinquency_threshold_ratio,
             new_value
@@ -460,7 +456,7 @@ fn test_instant_unstake_delinquency_threshold_ratio() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_delinquency_threshold_ratio,
             new_value
@@ -478,7 +474,7 @@ fn test_mev_commission_bps_threshold() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -489,7 +485,7 @@ fn test_mev_commission_bps_threshold() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().mev_commission_bps_threshold, new_value);
     }
 }
@@ -504,7 +500,7 @@ fn test_commission_threshold() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -515,7 +511,7 @@ fn test_commission_threshold() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().commission_threshold, new_value);
     }
 }
@@ -530,7 +526,7 @@ fn test_num_delegation_validators() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -541,7 +537,7 @@ fn test_num_delegation_validators() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -552,7 +548,7 @@ fn test_num_delegation_validators() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().num_delegation_validators, new_value);
     }
 }
@@ -567,18 +563,18 @@ fn test_scoring_unstake_cap_bps() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
         // In range
         let new_value = 0;
         let update_parameters = UpdateParametersArgs {
-            scoring_unstake_cap_bps: Some(new_value as u32),
+            scoring_unstake_cap_bps: Some(new_value),
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().scoring_unstake_cap_bps, new_value);
     }
 }
@@ -593,7 +589,7 @@ fn test_instant_unstake_cap_bps() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -604,7 +600,7 @@ fn test_instant_unstake_cap_bps() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().instant_unstake_cap_bps, new_value);
     }
 }
@@ -619,7 +615,7 @@ fn test_stake_deposit_unstake_cap_bps() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -630,7 +626,7 @@ fn test_stake_deposit_unstake_cap_bps() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().stake_deposit_unstake_cap_bps, new_value);
     }
 }
@@ -645,7 +641,7 @@ fn test_instant_unstake_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -656,7 +652,7 @@ fn test_instant_unstake_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -668,7 +664,7 @@ fn test_instant_unstake_epoch_progress() {
         };
 
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().instant_unstake_epoch_progress, new_value);
     }
 
@@ -680,7 +676,7 @@ fn test_instant_unstake_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().instant_unstake_epoch_progress, new_value);
     }
 
@@ -692,7 +688,7 @@ fn test_instant_unstake_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().instant_unstake_epoch_progress, new_value);
     }
 }
@@ -707,7 +703,7 @@ fn test_instant_inputs_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -718,7 +714,7 @@ fn test_instant_inputs_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_bad_arg, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -730,7 +726,7 @@ fn test_instant_inputs_epoch_progress() {
         };
 
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_inputs_epoch_progress,
             new_value
@@ -745,7 +741,7 @@ fn test_instant_inputs_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_inputs_epoch_progress,
             new_value
@@ -760,7 +756,7 @@ fn test_instant_inputs_epoch_progress() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&okay_arg, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(
             result.unwrap().instant_unstake_inputs_epoch_progress,
             new_value
@@ -780,14 +776,14 @@ fn test_minimum_voting_epochs() {
         // Out of range
         let not_okay_epoch = 0;
         let result = _test_parameter(&update_parameters, Some(not_okay_epoch), None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
         // In range
         let okay_epoch = 512;
         let result = _test_parameter(&update_parameters, Some(okay_epoch), None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().minimum_voting_epochs, new_value);
     }
 }
@@ -805,7 +801,7 @@ fn test_compute_score_slot_range() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, Some(slots_per_epoch), None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -816,7 +812,7 @@ fn test_compute_score_slot_range() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, Some(slots_per_epoch), None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -827,7 +823,7 @@ fn test_compute_score_slot_range() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, Some(slots_per_epoch), None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().compute_score_slot_range, new_value);
     }
 }
@@ -842,7 +838,7 @@ fn test_num_epochs_between_scoring() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -853,7 +849,7 @@ fn test_num_epochs_between_scoring() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     {
@@ -864,7 +860,7 @@ fn test_num_epochs_between_scoring() {
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, None, None);
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
         assert_eq!(result.unwrap().num_epochs_between_scoring, new_value);
     }
 }
