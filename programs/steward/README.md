@@ -207,7 +207,7 @@ Administrators can:
 | `instant_unstake_epoch_progress`              | 0.90          | Point in epoch progress before instant unstake can be computed                                                                                                                                          |
 | `instant_unstake_inputs_epoch_progress`       | 0.50          | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                                                                                |
 | `num_epochs_between_scoring`                  | 10            | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                                                                                      |
-| `minimum_stake_lamports`                      | 5,000,000,000 | Minimum number of stake lamports for a validator to be considered for the pool                                                                                                                          |
+| `minimum_stake_lamports`                      | 5,000,000,000,000 (5000 SOL) | Minimum number of stake lamports for a validator to be considered for the pool                                                                                                                          |
 | `minimum_voting_epochs`                       | 5             | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                                                                                   |
 
 ## Code and Tests
