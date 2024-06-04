@@ -18,7 +18,7 @@ pub fn handler(
     let max_slots_in_epoch = EpochSchedule::get()?.slots_per_epoch;
     let current_epoch = Clock::get()?.epoch;
 
-    let new_parameters = config.parameters.get_updated_parameters(
+    let new_parameters = config.parameters.get_valid_updated_parameters(
         update_parameters_args,
         current_epoch,
         max_slots_in_epoch,

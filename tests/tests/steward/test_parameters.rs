@@ -249,7 +249,7 @@ fn _test_parameter(
     let current_epoch = current_epoch.unwrap_or(512);
     let slots_per_epoch = slots_per_epoch.unwrap_or(432_000);
 
-    valid_parameters.get_updated_parameters(update_parameters, current_epoch, slots_per_epoch)
+    valid_parameters.get_valid_updated_parameters(update_parameters, current_epoch, slots_per_epoch)
 }
 
 #[test]

@@ -102,7 +102,7 @@ pub struct Parameters {
 
 impl Parameters {
     /// Merges the updated parameters with the current parameters and validates them
-    pub fn get_updated_parameters(
+    pub fn get_valid_updated_parameters(
         self,
         args: &UpdateParametersArgs,
         current_epoch: u64,
