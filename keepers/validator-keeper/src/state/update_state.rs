@@ -7,33 +7,35 @@ use keeper_core::{
 };
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
-    account::Account,
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
 use crate::{
     derive_cluster_history_address, derive_validator_history_address, get_balance_with_retry,
     get_create_validator_history_instructions, get_validator_history_accounts_with_retry,
-    operations::keeper_operations::KeeperOperations,
+    operations::keeper_operations::{KeeperCreates, KeeperOperations},
 };
 
-use super::keeper_state::KeeperState;
+use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 
 pub async fn pre_create_update(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let keypair = &keeper_config.keypair;
+
     // Update Epoch
     match client.get_epoch_info().await {
         Ok(latest_epoch) => {
             if latest_epoch.epoch != keeper_state.epoch_info.epoch {
                 keeper_state.runs_for_epoch = [0; KeeperOperations::LEN];
                 keeper_state.errors_for_epoch = [0; KeeperOperations::LEN];
+                keeper_state.txs_for_epoch = [0; KeeperOperations::LEN];
+
+                keeper_state.created_accounts_for_epoch = [0; KeeperCreates::LEN];
             }
 
             // Always update the epoch info
@@ -62,23 +64,35 @@ pub async fn pre_create_update(
 
 // Should be called after `pre_create_update`
 pub async fn create_missing_accounts(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> Result<(), Box<dyn Error>> {
-    // Create Missing Accounts
-    create_missing_validator_history_accounts(client, keypair, program_id, keeper_state).await?;
+) -> Result<Vec<(KeeperCreates, usize)>, Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let keypair = &keeper_config.keypair;
 
-    Ok(())
+    let mut created_accounts_for_epoch = vec![];
+
+    // Create Missing Accounts
+    let new_validator_history_accounts =
+        create_missing_validator_history_accounts(client, keypair, program_id, keeper_state)
+            .await?;
+    created_accounts_for_epoch.push((
+        KeeperCreates::CreateValidatorHistory,
+        new_validator_history_accounts,
+    ));
+
+    Ok(created_accounts_for_epoch)
 }
 
 pub async fn post_create_update(
-    client: &Arc<RpcClient>,
-    program_id: &Pubkey,
-    tip_distribution_program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
+    let client = &keeper_config.client;
+    let program_id = &keeper_config.program_id;
+    let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
+
     // Update Validator History Accounts
     keeper_state.validator_history_map = get_validator_history_map(client, program_id).await?;
 
@@ -235,7 +249,7 @@ async fn create_missing_validator_history_accounts(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     keeper_state: &KeeperState,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<usize, Box<dyn Error>> {
     let vote_accounts = &keeper_state
         .vote_account_map
         .keys()
@@ -266,7 +280,9 @@ async fn create_missing_validator_history_accounts(
         })
         .collect::<Vec<Vec<Instruction>>>();
 
+    let accounts_created = create_transactions.len();
+
     submit_transactions(client, create_transactions, keypair).await?;
 
-    Ok(())
+    Ok(accounts_created)
 }
