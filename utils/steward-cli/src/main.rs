@@ -5,6 +5,7 @@ use commands::{
     init_state::command_init_state,
     update_config::command_update_config,
     view_config::command_view_config,
+    view_state::command_view_state,
 };
 use solana_client::rpc_client::RpcClient;
 use std::time::Duration;
@@ -19,5 +20,6 @@ fn main() {
         Commands::UpdateConfig(args) => command_update_config(args, client),
         Commands::ViewConfig(args) => command_view_config(args, client),
         Commands::InitState(args) => command_init_state(args, client),
+        Commands::ViewState(args) => command_view_state(args, client),
     };
 }

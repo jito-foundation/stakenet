@@ -26,6 +26,7 @@ pub enum Commands {
     UpdateConfig(UpdateConfig),
 
     InitState(InitState),
+    ViewState(ViewState),
 }
 
 #[derive(Parser)]
@@ -43,6 +44,15 @@ pub struct InitState {
     #[arg(long, env)]
     pub steward_config: Pubkey,
 }
+
+#[derive(Parser)]
+#[command(about = "View the current config account parameters")]
+pub struct ViewState {
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+}
+
 #[derive(Parser)]
 #[command(about = "Initialize config account")]
 pub struct InitConfig {

@@ -1,103 +1,127 @@
 use anchor_lang::AccountDeserialize;
-use jito_steward::Config;
+use jito_steward::{Config, StewardStateAccount};
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::pubkey::Pubkey;
 
 use super::commands::ViewConfig;
 
 pub fn command_view_config(args: ViewConfig, client: RpcClient) {
+    let steward_config = args.steward_config;
+
     let config_raw_account = client
-        .get_account(&args.steward_config)
+        .get_account(&steward_config)
         .expect("Cannot find config account");
 
     let config_account: Config = Config::try_deserialize(&mut config_raw_account.data.as_slice())
         .expect("Cannot deserialize config account");
 
-    println!("------- Config -------");
-    println!("📚 Accounts 📚");
-    println!("Config:      {}", args.steward_config);
-    println!("Authority:   {}", config_account.authority);
-    println!("Stake Pool:  {}", config_account.stake_pool);
-    println!("\n↺ State ↺");
-    println!("Is Paused:   {:?}", config_account.paused);
-    println!("Blacklisted: {:?}", config_account.blacklist.count());
-    println!("\n⚙️ Parameters ⚙️");
-    println!(
-        "Commission Range:  {:?}",
+    let (steward_state, _) = Pubkey::find_program_address(
+        &[StewardStateAccount::SEED, steward_config.as_ref()],
+        &jito_steward::id(),
+    );
+
+    let mut output = String::new(); // Initialize the string directly
+    output = _print_default_config(&steward_config, &steward_state, &config_account).to_string();
+
+    println!("{}", output);
+}
+
+fn _print_default_config(
+    steward_config: &Pubkey,
+    steward_state: &Pubkey,
+    config_account: &Config,
+) -> String {
+    let mut formatted_string = String::new();
+
+    formatted_string += "------- Config -------\n";
+    formatted_string += "📚 Accounts 📚\n";
+    formatted_string += &format!("Config:      {}\n", steward_config);
+    formatted_string += &format!("Authority:   {}\n", config_account.authority);
+    formatted_string += &format!("State:       {}\n", steward_state);
+    formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
+    formatted_string += "\n↺ State ↺\n";
+    formatted_string += &format!("Is Paused:   {:?}\n", config_account.paused);
+    formatted_string += &format!("Blacklisted: {:?}\n", config_account.blacklist.count());
+    formatted_string += "\n⚙️ Parameters ⚙️\n";
+    formatted_string += &format!(
+        "Commission Range:  {:?}\n",
         config_account.parameters.commission_range
     );
-    println!(
-        "MEV Commission Range:  {:?}",
+    formatted_string += &format!(
+        "MEV Commission Range:  {:?}\n",
         config_account.parameters.mev_commission_range
     );
-    println!(
-        "Epoch Credits Range:  {:?}",
+    formatted_string += &format!(
+        "Epoch Credits Range:  {:?}\n",
         config_account.parameters.epoch_credits_range
     );
-    println!(
-        "MEV Commission BPS Threshold:  {:?}",
+    formatted_string += &format!(
+        "MEV Commission BPS Threshold:  {:?}\n",
         config_account.parameters.mev_commission_bps_threshold
     );
-    println!(
-        "Scoring Delinquency Threshold Ratio:  {:?}",
+    formatted_string += &format!(
+        "Scoring Delinquency Threshold Ratio:  {:?}\n",
         config_account
             .parameters
             .scoring_delinquency_threshold_ratio
     );
-    println!(
-        "Instant Unstake Delinquency Threshold Ratio:  {:?}",
+    formatted_string += &format!(
+        "Instant Unstake Delinquency Threshold Ratio:  {:?}\n",
         config_account
             .parameters
             .instant_unstake_delinquency_threshold_ratio
     );
-    println!(
-        "Commission Threshold:  {:?}",
+    formatted_string += &format!(
+        "Commission Threshold:  {:?}\n",
         config_account.parameters.commission_threshold
     );
-    println!(
-        "Historical Commission Threshold:  {:?}",
+    formatted_string += &format!(
+        "Historical Commission Threshold:  {:?}\n",
         config_account.parameters.historical_commission_threshold
     );
-    println!(
-        "Number of Delegation Validators:  {:?}",
+    formatted_string += &format!(
+        "Number of Delegation Validators:  {:?}\n",
         config_account.parameters.num_delegation_validators
     );
-    println!(
-        "Scoring Unstake Cap BPS:  {:?}",
+    formatted_string += &format!(
+        "Scoring Unstake Cap BPS:  {:?}\n",
         config_account.parameters.scoring_unstake_cap_bps
     );
-    println!(
-        "Instant Unstake Cap BPS:  {:?}",
+    formatted_string += &format!(
+        "Instant Unstake Cap BPS:  {:?}\n",
         config_account.parameters.instant_unstake_cap_bps
     );
-    println!(
-        "Stake Deposit Unstake Cap BPS:  {:?}",
+    formatted_string += &format!(
+        "Stake Deposit Unstake Cap BPS:  {:?}\n",
         config_account.parameters.stake_deposit_unstake_cap_bps
     );
-    println!(
-        "Compute Score Slot Range:  {:?}",
+    formatted_string += &format!(
+        "Compute Score Slot Range:  {:?}\n",
         config_account.parameters.compute_score_slot_range
     );
-    println!(
-        "Instant Unstake Epoch Progress:  {:?}",
+    formatted_string += &format!(
+        "Instant Unstake Epoch Progress:  {:?}\n",
         config_account.parameters.instant_unstake_epoch_progress
     );
-    println!(
-        "Instant Unstake Inputs Epoch Progress:  {:?}",
+    formatted_string += &format!(
+        "Instant Unstake Inputs Epoch Progress:  {:?}\n",
         config_account
             .parameters
             .instant_unstake_inputs_epoch_progress
     );
-    println!(
-        "Number of Epochs Between Scoring:  {:?}",
+    formatted_string += &format!(
+        "Number of Epochs Between Scoring:  {:?}\n",
         config_account.parameters.num_epochs_between_scoring
     );
-    println!(
-        "Minimum Stake Lamports:  {:?}",
+    formatted_string += &format!(
+        "Minimum Stake Lamports:  {:?}\n",
         config_account.parameters.minimum_stake_lamports
     );
-    println!(
-        "Minimum Voting Epochs:  {:?}",
+    formatted_string += &format!(
+        "Minimum Voting Epochs:  {:?}\n",
         config_account.parameters.minimum_voting_epochs
     );
-    print!("---------------------")
+    formatted_string += "---------------------";
+
+    formatted_string
 }

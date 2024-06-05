@@ -13,80 +13,6 @@ use super::commands::InitState;
 
 const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 
-fn _create_state(
-    client: &RpcClient,
-    authority: &Keypair,
-    steward_state: &Pubkey,
-    steward_config: &Pubkey,
-) -> Signature {
-    let init_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::InitializeState {
-            state_account: *steward_state,
-            config: *steward_config,
-            system_program: anchor_lang::solana_program::system_program::id(),
-            signer: authority.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::InitializeState {}.data(),
-    };
-
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get recent blockhash");
-
-    let transaction = Transaction::new_signed_with_payer(
-        &[init_ix],
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
-
-    client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .expect("Failed to send transaction")
-}
-
-fn _realloc_x_times(
-    client: &RpcClient,
-    authority: &Keypair,
-    steward_state: &Pubkey,
-    steward_config: &Pubkey,
-    validator_list: &Pubkey,
-    count: usize,
-) -> Signature {
-    let ixs = vec![
-        Instruction {
-            program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::ReallocState {
-                state_account: *steward_state,
-                config: *steward_config,
-                validator_list: *validator_list,
-                system_program: anchor_lang::solana_program::system_program::id(),
-                signer: authority.pubkey(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::ReallocState {}.data(),
-        };
-        count
-    ];
-
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get recent blockhash");
-
-    let transaction = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
-
-    client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .expect("Failed to send transaction")
-}
-
 pub fn command_init_state(args: InitState, client: RpcClient) {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
@@ -163,4 +89,78 @@ pub fn command_init_state(args: InitState, client: RpcClient) {
             reallocs_ran, reallocs_to_run, signature
         );
     }
+}
+
+fn _create_state(
+    client: &RpcClient,
+    authority: &Keypair,
+    steward_state: &Pubkey,
+    steward_config: &Pubkey,
+) -> Signature {
+    let init_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::InitializeState {
+            state_account: *steward_state,
+            config: *steward_config,
+            system_program: anchor_lang::solana_program::system_program::id(),
+            signer: authority.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::InitializeState {}.data(),
+    };
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[init_ix],
+        Some(&authority.pubkey()),
+        &[&authority],
+        blockhash,
+    );
+
+    client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction")
+}
+
+fn _realloc_x_times(
+    client: &RpcClient,
+    authority: &Keypair,
+    steward_state: &Pubkey,
+    steward_config: &Pubkey,
+    validator_list: &Pubkey,
+    count: usize,
+) -> Signature {
+    let ixs = vec![
+        Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::ReallocState {
+                state_account: *steward_state,
+                config: *steward_config,
+                validator_list: *validator_list,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: authority.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::ReallocState {}.data(),
+        };
+        count
+    ];
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+
+    let transaction = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&authority.pubkey()),
+        &[&authority],
+        blockhash,
+    );
+
+    client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction")
 }
