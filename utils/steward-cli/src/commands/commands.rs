@@ -1,7 +1,6 @@
-use std::path::PathBuf;
-
 use clap::{arg, command, Parser, Subcommand};
-use solana_sdk::pubkey::Pubkey;
+use jito_steward::UpdateParametersArgs;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(about = "CLI for validator history program")]
@@ -22,6 +21,7 @@ pub struct Args {
 #[derive(Subcommand)]
 pub enum Commands {
     InitConfig(InitConfig),
+    UpdateParameters(UpdateParameters),
 }
 
 #[derive(Parser)]
@@ -39,19 +39,122 @@ pub struct InitConfig {
     #[arg(long, env, default_value = "~/.config/solana/stake_pool.json")]
     pub stake_pool_keypair_path: PathBuf,
 
-    /// Tip distribution program ID (Pubkey as base58 string)
-    #[arg(short, long, env)]
-    pub tip_distribution_program_id: Pubkey,
+    #[command(flatten)]
+    pub config_parameters: ConfigParameters,
+}
 
-    /// New tip distribution authority (Pubkey as base58 string)
-    ///
-    /// If not provided, the initial keypair will be the authority
-    #[arg(short, long, env, required(false))]
-    pub tip_distribution_authority: Option<Pubkey>,
+#[derive(Parser)]
+#[command(about = "Updates Config account parameters")]
+pub struct UpdateParameters {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub keypair_path: PathBuf,
 
-    // New stake authority (Pubkey as base58 string)
-    ///
-    /// If not provided, the initial keypair will be the authority
-    #[arg(short, long, env, required(false))]
-    pub stake_authority: Option<Pubkey>,
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(long, env, default_value = "~/.config/solana/steward_config.json")]
+    pub steward_config_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+pub struct ConfigParameters {
+    /// Number of recent epochs used to evaluate MEV commissions and running Jito for scoring
+    #[arg(long, env)]
+    pub mev_commission_range: Option<u16>,
+
+    /// Number of recent epochs used to evaluate yield
+    #[arg(long, env)]
+    pub epoch_credits_range: Option<u16>,
+
+    /// Number of recent epochs used to evaluate commissions for scoring
+    #[arg(long, env)]
+    pub commission_range: Option<u16>,
+
+    /// Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced
+    #[arg(long, env)]
+    pub scoring_delinquency_threshold_ratio: Option<f64>,
+
+    /// Same as scoring_delinquency_threshold_ratio but evaluated every epoch
+    #[arg(long, env)]
+    pub instant_unstake_delinquency_threshold_ratio: Option<f64>,
+
+    /// Maximum allowable MEV commission in mev_commission_range (stored in basis points)
+    #[arg(long, env)]
+    pub mev_commission_bps_threshold: Option<u16>,
+
+    /// Maximum allowable validator commission in commission_range (stored in percent)
+    #[arg(long, env)]
+    pub commission_threshold: Option<u8>,
+
+    /// Maximum allowable validator commission in all history (stored in percent)
+    #[arg(long, env)]
+    pub historical_commission_threshold: Option<u8>,
+
+    /// Number of validators who are eligible for stake (validator set size)
+    #[arg(long, env)]
+    pub num_delegation_validators: Option<u32>,
+
+    /// Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)
+    #[arg(long, env)]
+    pub scoring_unstake_cap_bps: Option<u32>,
+
+    /// Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)
+    #[arg(long, env)]
+    pub instant_unstake_cap_bps: Option<u32>,
+
+    /// Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)
+    #[arg(long, env)]
+    pub stake_deposit_unstake_cap_bps: Option<u32>,
+
+    /// Scoring window such that the validators are all scored within a similar timeframe (in slots)
+    #[arg(long, env)]
+    pub compute_score_slot_range: Option<usize>,
+
+    /// Point in epoch progress before instant unstake can be computed
+    #[arg(long, env)]
+    pub instant_unstake_epoch_progress: Option<f64>,
+
+    /// Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress
+    #[arg(long, env)]
+    pub instant_unstake_inputs_epoch_progress: Option<f64>,
+
+    /// Cycle length - Number of epochs to run the Monitor->Rebalance loop
+    #[arg(long, env)]
+    pub num_epochs_between_scoring: Option<u64>,
+
+    /// Minimum number of stake lamports for a validator to be considered for the pool
+    #[arg(long, env)]
+    pub minimum_stake_lamports: Option<u64>,
+
+    /// Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool
+    #[arg(long, env)]
+    pub minimum_voting_epochs: Option<u64>,
+}
+
+impl ConfigParameters {
+    pub fn to_update_parameters_args(&self) -> UpdateParametersArgs {
+        UpdateParametersArgs {
+            mev_commission_range: self.mev_commission_range,
+            epoch_credits_range: self.epoch_credits_range,
+            commission_range: self.commission_range,
+            scoring_delinquency_threshold_ratio: self.scoring_delinquency_threshold_ratio,
+            instant_unstake_delinquency_threshold_ratio: self
+                .instant_unstake_delinquency_threshold_ratio,
+            mev_commission_bps_threshold: self.mev_commission_bps_threshold,
+            commission_threshold: self.commission_threshold,
+            historical_commission_threshold: self.historical_commission_threshold,
+            num_delegation_validators: self.num_delegation_validators,
+            scoring_unstake_cap_bps: self.scoring_unstake_cap_bps,
+            instant_unstake_cap_bps: self.instant_unstake_cap_bps,
+            stake_deposit_unstake_cap_bps: self.stake_deposit_unstake_cap_bps,
+            compute_score_slot_range: self.compute_score_slot_range,
+            instant_unstake_epoch_progress: self.instant_unstake_epoch_progress,
+            instant_unstake_inputs_epoch_progress: self.instant_unstake_inputs_epoch_progress,
+            num_epochs_between_scoring: self.num_epochs_between_scoring,
+            minimum_stake_lamports: self.minimum_stake_lamports,
+            minimum_voting_epochs: self.minimum_voting_epochs,
+        }
+    }
 }

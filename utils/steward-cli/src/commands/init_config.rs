@@ -23,39 +23,10 @@ pub fn command_init_config(args: InitConfig, client: RpcClient) {
         &[Staker::SEED, steward_config.pubkey().as_ref()],
         &jito_steward::id(),
     );
-    // let (steward_state, _) = Pubkey::find_program_address(
-    //     &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
-    //     &jito_steward::id(),
-    // );
-    // let (cluster_history_account, _) =
-    //     Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id());
-
-    // let (validator_history_config, vhc_bump) = Pubkey::find_program_address(
-    //     &[validator_history::state::Config::SEED],
-    //     &validator_history::id(),
-    // );
 
     // Default parameters from JIP
-    let update_parameters_args = UpdateParametersArgs {
-        mev_commission_range: Some(20),
-        epoch_credits_range: Some(30),
-        commission_range: Some(30),
-        scoring_delinquency_threshold_ratio: Some(0.85),
-        instant_unstake_delinquency_threshold_ratio: Some(0.70),
-        mev_commission_bps_threshold: Some(1000),
-        commission_threshold: Some(5),
-        historical_commission_threshold: Some(50),
-        num_delegation_validators: Some(200),
-        scoring_unstake_cap_bps: Some(750),
-        instant_unstake_cap_bps: Some(10),
-        stake_deposit_unstake_cap_bps: Some(10),
-        instant_unstake_epoch_progress: Some(0.90),
-        compute_score_slot_range: Some(1000),
-        instant_unstake_inputs_epoch_progress: Some(0.50),
-        num_epochs_between_scoring: Some(10),
-        minimum_stake_lamports: Some(5_000_000_000),
-        minimum_voting_epochs: Some(5),
-    };
+    let update_parameters_args: UpdateParametersArgs =
+        args.config_parameters.to_update_parameters_args();
 
     let init_ix = Instruction {
         program_id: jito_steward::id(),
