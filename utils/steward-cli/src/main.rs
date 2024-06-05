@@ -7,12 +7,14 @@ use commands::{
     view_config::command_view_config,
     view_state::command_view_state,
 };
+use dotenv::dotenv;
 use solana_client::rpc_client::RpcClient;
 use std::time::Duration;
 
 pub mod commands;
 
 fn main() {
+    dotenv().ok(); // Loads in .env file
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     let program_id = args.program_id;

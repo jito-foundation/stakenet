@@ -1,4 +1,21 @@
 
+# Accounts
+
+**Authority** 
+`aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8`
+
+**Steward Config**   
+`BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S`
+
+**Stake Pool**
+`3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j`
+
+**Staker**
+`Eo3dSDhQi11AJbsoK19i1kBRLzpBiFLkWBq7pdVkfucG`
+
+**State**
+`7iZSeAiJNpW86VtUceL3a49xkTShcwgG1UwaMuXssxXN`
+
 # Initial Commands
 
 ## Create Config
@@ -41,23 +58,24 @@ cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT
 
 # Initial Parameters
 
-```txt
-mev_commission_range: 10
-epoch_credits_range: 30
-commission_range: 30
-mev_commission_bps_threshold: 1000
-commission_threshold: 5
-historical_commission_threshold: 50
-scoring_delinquency_threshold_ratio: 0.85
-instant_unstake_delinquency_threshold_ratio: 0.70
-num_delegation_validators: 200
-scoring_unstake_cap_bps: 750
-instant_unstake_cap_bps: 1000
-stake_deposit_unstake_cap_bps: 1000
-compute_score_slot_range: 1000
-instant_unstake_epoch_progress: 0.50
-instant_unstake_inputs_epoch_progress: 0.50
-num_epochs_between_scoring: 3
-minimum_stake_lamports: 100_000_000_000
-minimum_voting_epochs: 5
+```env
+# Note - Do not use this .env when updating the parameters - this will update them all
+MEV_COMMISSION_RANGE=10
+EPOCH_CREDITS_RANGE=30
+COMMISSION_RANGE=30
+MEV_COMMISSION_BPS_THRESHOLD=1000
+COMMISSION_THRESHOLD=5
+HISTORICAL_COMMISSION_THRESHOLD=50
+SCORING_DELINQUENCY_THRESHOLD_RATIO=0.85
+INSTANT_UNSTAKE_DELINQUENCY_THRESHOLD_RATIO=0.70
+NUM_DELEGATION_VALIDATORS=200
+SCORING_UNSTAKE_CAP_BPS=750
+INSTANT_UNSTAKE_CAP_BPS=1000
+STAKE_DEPOSIT_UNSTAKE_CAP_BPS=1000
+COMPUTE_SCORE_SLOT_RANGE=1000
+INSTANT_UNSTAKE_EPOCH_PROGRESS=0.50
+INSTANT_UNSTAKE_INPUTS_EPOCH_PROGRESS=0.50
+NUM_EPOCHS_BETWEEN_SCORING=3
+MINIMUM_STAKE_LAMPORTS=100000000000
+MINIMUM_VOTING_EPOCHS=5
 ```

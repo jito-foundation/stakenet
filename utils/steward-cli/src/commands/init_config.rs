@@ -85,4 +85,5 @@ pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubk
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
     println!("Signature: {}", signature);
+    println!("Steward Config: {}", steward_config.pubkey());
 }

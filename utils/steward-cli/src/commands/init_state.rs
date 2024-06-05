@@ -103,6 +103,8 @@ pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey
             reallocs_ran, reallocs_to_run, signature
         );
     }
+
+    println!("Steward State: {}", steward_state);
 }
 
 fn _create_state(
