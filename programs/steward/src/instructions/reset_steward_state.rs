@@ -19,8 +19,6 @@ pub struct ResetStewardState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
-    pub system_program: Program<'info, System>,
-
     #[account(address = get_stake_pool(&config)?)]
     pub stake_pool: Account<'info, StakePool>,
 
