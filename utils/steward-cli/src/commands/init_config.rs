@@ -13,34 +13,58 @@ use super::commands::InitConfig;
 
 pub fn command_init_config(args: InitConfig, client: RpcClient) {
     // Creates config account
-    let keypair =
-        read_keypair_file(args.keypair_path).expect("Failed reading keypair file ( Keypair )");
-    let steward_config =
-        read_keypair_file(args.steward_config_keypair_path).unwrap_or(Keypair::new());
-    let stake_pool = read_keypair_file(args.stake_pool_keypair_path).unwrap_or(Keypair::new());
+    let authority = read_keypair_file(args.authority_keypair_path)
+        .expect("Failed reading keypair file ( Authority )");
 
-    let (staker, _) = Pubkey::find_program_address(
+    let staker_keypair = {
+        if let Some(staker_keypair_path) = args.staker_keypair_path {
+            read_keypair_file(staker_keypair_path).expect("Failed reading keypair file ( Staker )")
+        } else {
+            authority.insecure_clone()
+        }
+    };
+
+    let steward_config = {
+        if let Some(steward_config_keypair_path) = args.steward_config_keypair_path {
+            read_keypair_file(steward_config_keypair_path)
+                .expect("Failed reading keypair file ( Steward Config )")
+        } else {
+            Keypair::new()
+        }
+    };
+
+    let (steward_staker, _) = Pubkey::find_program_address(
         &[Staker::SEED, steward_config.pubkey().as_ref()],
         &jito_steward::id(),
     );
 
-    // Default parameters from JIP
     let update_parameters_args: UpdateParametersArgs =
         args.config_parameters.to_update_parameters_args();
+
+    // Check if already created
+    match client.get_account(&steward_config.pubkey()) {
+        Ok(config_account) => {
+            if config_account.owner == jito_steward::id() {
+                println!("Config account already exists");
+                return;
+            }
+        }
+        Err(_) => { /* Account does not exist, continue */ }
+    }
 
     let init_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::InitializeConfig {
             config: steward_config.pubkey(),
-            stake_pool: stake_pool.pubkey(),
-            staker: staker,
+            stake_pool: args.stake_pool,
+            staker: steward_staker,
             stake_pool_program: spl_stake_pool::id(),
             system_program: anchor_lang::solana_program::system_program::id(),
-            signer: keypair.pubkey(),
+            signer: staker_keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InitializeConfig {
-            authority: keypair.pubkey(),
+            authority: authority.pubkey(),
             update_parameters_args,
         }
         .data(),
@@ -52,8 +76,8 @@ pub fn command_init_config(args: InitConfig, client: RpcClient) {
 
     let transaction = Transaction::new_signed_with_payer(
         &[init_ix],
-        Some(&keypair.pubkey()),
-        &[&keypair, &steward_config],
+        Some(&authority.pubkey()),
+        &[&authority, &steward_config, &staker_keypair],
         blockhash,
     );
 

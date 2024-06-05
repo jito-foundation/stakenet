@@ -1,5 +1,6 @@
 use clap::{arg, command, Parser, Subcommand};
 use jito_steward::UpdateParametersArgs;
+use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -21,23 +22,45 @@ pub struct Args {
 #[derive(Subcommand)]
 pub enum Commands {
     InitConfig(InitConfig),
-    UpdateParameters(UpdateParameters),
+    ViewConfig(ViewConfig),
+    UpdateConfig(UpdateConfig),
+
+    InitState(InitState),
 }
 
+#[derive(Parser)]
+#[command(about = "Initialize config account")]
+pub struct InitState {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    /// Stake pool pubkey
+    #[arg(long, env)]
+    pub stake_pool: Pubkey,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+}
 #[derive(Parser)]
 #[command(about = "Initialize config account")]
 pub struct InitConfig {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub keypair_path: PathBuf,
+    pub authority_keypair_path: PathBuf,
 
-    /// Path to keypair used to pay for account creation and execute transactions
+    /// Defaults to authority keypair
+    #[arg(short, long, env)]
+    pub staker_keypair_path: Option<PathBuf>,
+
+    /// Optional path to Steward Config keypair
     #[arg(long, env, default_value = "~/.config/solana/steward_config.json")]
-    pub steward_config_keypair_path: PathBuf,
+    pub steward_config_keypair_path: Option<PathBuf>,
 
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(long, env, default_value = "~/.config/solana/stake_pool.json")]
-    pub stake_pool_keypair_path: PathBuf,
+    /// Stake pool pubkey
+    #[arg(long, env)]
+    pub stake_pool: Pubkey,
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
@@ -45,17 +68,25 @@ pub struct InitConfig {
 
 #[derive(Parser)]
 #[command(about = "Updates Config account parameters")]
-pub struct UpdateParameters {
+pub struct UpdateConfig {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub keypair_path: PathBuf,
+    pub authority_keypair_path: PathBuf,
 
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(long, env, default_value = "~/.config/solana/steward_config.json")]
-    pub steward_config_keypair_path: PathBuf,
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View the current config account parameters")]
+pub struct ViewConfig {
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
 }
 
 #[derive(Parser)]
