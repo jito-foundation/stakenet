@@ -15,6 +15,14 @@ pub struct Args {
     )]
     pub json_rpc_url: String,
 
+    /// Steward Program ID
+    #[arg(
+        long,
+        env,
+        default_value_t = jito_steward::id()
+    )]
+    pub program_id: Pubkey,
+
     #[command(subcommand)]
     pub commands: Commands,
 }

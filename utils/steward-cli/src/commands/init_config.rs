@@ -11,7 +11,7 @@ use solana_sdk::{
 
 use super::commands::InitConfig;
 
-pub fn command_init_config(args: InitConfig, client: RpcClient) {
+pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubkey) {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -35,7 +35,7 @@ pub fn command_init_config(args: InitConfig, client: RpcClient) {
 
     let (steward_staker, _) = Pubkey::find_program_address(
         &[Staker::SEED, steward_config.pubkey().as_ref()],
-        &jito_steward::id(),
+        &program_id,
     );
 
     let update_parameters_args: UpdateParametersArgs =
@@ -44,7 +44,7 @@ pub fn command_init_config(args: InitConfig, client: RpcClient) {
     // Check if already created
     match client.get_account(&steward_config.pubkey()) {
         Ok(config_account) => {
-            if config_account.owner == jito_steward::id() {
+            if config_account.owner == program_id {
                 println!("Config account already exists");
                 return;
             }
@@ -53,7 +53,7 @@ pub fn command_init_config(args: InitConfig, client: RpcClient) {
     }
 
     let init_ix = Instruction {
-        program_id: jito_steward::id(),
+        program_id: program_id,
         accounts: jito_steward::accounts::InitializeConfig {
             config: steward_config.pubkey(),
             stake_pool: args.stake_pool,

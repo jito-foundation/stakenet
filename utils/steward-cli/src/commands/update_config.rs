@@ -2,11 +2,13 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::UpdateParametersArgs;
 use solana_client::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use solana_sdk::{signature::read_keypair_file, signer::Signer, transaction::Transaction};
+use solana_sdk::{
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+};
 
 use super::commands::UpdateConfig;
 
-pub fn command_update_config(args: UpdateConfig, client: RpcClient) {
+pub fn command_update_config(args: UpdateConfig, client: RpcClient, program_id: Pubkey) {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -17,7 +19,7 @@ pub fn command_update_config(args: UpdateConfig, client: RpcClient) {
         args.config_parameters.to_update_parameters_args();
 
     let update_ix = Instruction {
-        program_id: jito_steward::id(),
+        program_id,
         accounts: jito_steward::accounts::UpdateParameters {
             config: steward_config,
             authority: authority.pubkey(),

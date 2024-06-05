@@ -12,8 +12,9 @@ use solana_sdk::{
 use super::commands::InitState;
 
 const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+const REALLOCS_PER_TX: usize = 10;
 
-pub fn command_init_state(args: InitState, client: RpcClient) {
+pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey) {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -40,28 +41,40 @@ pub fn command_init_state(args: InitState, client: RpcClient) {
 
     match client.get_account(&steward_state) {
         Ok(steward_state_account_raw) => {
-            let steward_state_account = StewardStateAccount::try_deserialize(
-                &mut steward_state_account_raw.data.as_slice(),
-            )
-            .expect("Could not deserialize steward state account");
-
-            if steward_state_account.is_initialized.into() {
-                println!("State account already exists");
-                return;
+            if steward_state_account_raw.data.len() == StewardStateAccount::SIZE {
+                match StewardStateAccount::try_deserialize(
+                    &mut steward_state_account_raw.data.as_slice(),
+                ) {
+                    Ok(steward_state_account) => {
+                        if steward_state_account.is_initialized.into() {
+                            println!("State account already exists");
+                            return;
+                        }
+                    }
+                    Err(_) => { /* Account is not initialized, continue */ }
+                };
             }
 
             // if it already exists, we don't need to create it
             should_create = false;
 
             let data_length = steward_state_account_raw.data.len();
+            let whats_left = StewardStateAccount::SIZE - data_length.min(StewardStateAccount::SIZE);
+
             reallocs_left_to_run =
-                (StewardStateAccount::SIZE - data_length - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+                (whats_left.max(MAX_ALLOC_BYTES) - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         }
         Err(_) => { /* Account does not exist, continue */ }
     }
 
     if should_create {
-        let signature = _create_state(&client, &authority, &steward_state, &steward_config);
+        let signature = _create_state(
+            &client,
+            &program_id,
+            &authority,
+            &steward_state,
+            &steward_config,
+        );
 
         println!("Created Steward State: {}", signature);
     }
@@ -70,10 +83,11 @@ pub fn command_init_state(args: InitState, client: RpcClient) {
     let mut reallocs_ran = 0;
 
     while reallocs_left_to_run > 0 {
-        let reallocs_per_transaction = reallocs_left_to_run.min(10);
+        let reallocs_per_transaction = reallocs_left_to_run.min(REALLOCS_PER_TX);
 
         let signature = _realloc_x_times(
             &client,
+            &program_id,
             &authority,
             &steward_state,
             &steward_config,
@@ -93,12 +107,13 @@ pub fn command_init_state(args: InitState, client: RpcClient) {
 
 fn _create_state(
     client: &RpcClient,
+    program_id: &Pubkey,
     authority: &Keypair,
     steward_state: &Pubkey,
     steward_config: &Pubkey,
 ) -> Signature {
     let init_ix = Instruction {
-        program_id: jito_steward::id(),
+        program_id: *program_id,
         accounts: jito_steward::accounts::InitializeState {
             state_account: *steward_state,
             config: *steward_config,
@@ -127,6 +142,7 @@ fn _create_state(
 
 fn _realloc_x_times(
     client: &RpcClient,
+    program_id: &Pubkey,
     authority: &Keypair,
     steward_state: &Pubkey,
     steward_config: &Pubkey,
@@ -135,7 +151,7 @@ fn _realloc_x_times(
 ) -> Signature {
     let ixs = vec![
         Instruction {
-            program_id: jito_steward::id(),
+            program_id: *program_id,
             accounts: jito_steward::accounts::ReallocState {
                 state_account: *steward_state,
                 config: *steward_config,

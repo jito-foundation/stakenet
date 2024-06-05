@@ -15,11 +15,12 @@ pub mod commands;
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
+    let program_id = args.program_id;
     match args.commands {
-        Commands::InitConfig(args) => command_init_config(args, client),
-        Commands::UpdateConfig(args) => command_update_config(args, client),
-        Commands::ViewConfig(args) => command_view_config(args, client),
-        Commands::InitState(args) => command_init_state(args, client),
-        Commands::ViewState(args) => command_view_state(args, client),
+        Commands::InitConfig(args) => command_init_config(args, client, program_id),
+        Commands::UpdateConfig(args) => command_update_config(args, client, program_id),
+        Commands::ViewConfig(args) => command_view_config(args, client, program_id),
+        Commands::InitState(args) => command_init_state(args, client, program_id),
+        Commands::ViewState(args) => command_view_state(args, client, program_id),
     };
 }

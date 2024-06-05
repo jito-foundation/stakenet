@@ -1,11 +1,11 @@
 use anchor_lang::AccountDeserialize;
-use jito_steward::{Config, StewardStateAccount};
+use jito_steward::{Config, Staker, StewardStateAccount};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 use super::commands::ViewConfig;
 
-pub fn command_view_config(args: ViewConfig, client: RpcClient) {
+pub fn command_view_config(args: ViewConfig, client: RpcClient, program_id: Pubkey) {
     let steward_config = args.steward_config;
 
     let config_raw_account = client
@@ -17,11 +17,20 @@ pub fn command_view_config(args: ViewConfig, client: RpcClient) {
 
     let (steward_state, _) = Pubkey::find_program_address(
         &[StewardStateAccount::SEED, steward_config.as_ref()],
-        &jito_steward::id(),
+        &program_id,
     );
 
-    let mut output = String::new(); // Initialize the string directly
-    output = _print_default_config(&steward_config, &steward_state, &config_account).to_string();
+    let (steward_staker, _) =
+        Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);
+
+    // let mut output = String::new(); // Initialize the string directly
+    let output = _print_default_config(
+        &steward_config,
+        &steward_state,
+        &steward_staker,
+        &config_account,
+    )
+    .to_string();
 
     println!("{}", output);
 }
@@ -29,6 +38,7 @@ pub fn command_view_config(args: ViewConfig, client: RpcClient) {
 fn _print_default_config(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
+    steward_staker: &Pubkey,
     config_account: &Config,
 ) -> String {
     let mut formatted_string = String::new();
@@ -37,6 +47,7 @@ fn _print_default_config(
     formatted_string += "📚 Accounts 📚\n";
     formatted_string += &format!("Config:      {}\n", steward_config);
     formatted_string += &format!("Authority:   {}\n", config_account.authority);
+    formatted_string += &format!("Staker:      {}\n", steward_staker);
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
     formatted_string += "\n↺ State ↺\n";
