@@ -65,7 +65,7 @@ pub struct InitConfig {
     pub staker_keypair_path: Option<PathBuf>,
 
     /// Optional path to Steward Config keypair
-    #[arg(long, env, default_value = "~/.config/solana/steward_config.json")]
+    #[arg(long, env)]
     pub steward_config_keypair_path: Option<PathBuf>,
 
     /// Stake pool pubkey
