@@ -6090,6 +6090,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "steward-cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "clap 4.4.18",
+ "futures",
+ "futures-util",
+ "jito-steward",
+ "log",
+ "solana-account-decoder",
+ "solana-clap-utils",
+ "solana-client",
+ "solana-metrics",
+ "solana-program",
+ "solana-sdk",
+ "spl-stake-pool",
+ "thiserror",
+ "tokio",
+ "validator-history",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

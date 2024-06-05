@@ -31,6 +31,14 @@ pub struct InitConfig {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub keypair_path: PathBuf,
 
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(long, env, default_value = "~/.config/solana/steward_config.json")]
+    pub steward_config_keypair_path: PathBuf,
+
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(long, env, default_value = "~/.config/solana/stake_pool.json")]
+    pub stake_pool_keypair_path: PathBuf,
+
     /// Tip distribution program ID (Pubkey as base58 string)
     #[arg(short, long, env)]
     pub tip_distribution_program_id: Pubkey,
