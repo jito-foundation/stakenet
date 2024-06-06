@@ -103,7 +103,7 @@ pub async fn command_crank_compute_score(
         ixs_to_run,
         &Arc::new(payer),
         args.priority_fee,
-        Some(300_000),
+        Some(150_000),
     )
     .await?;
 

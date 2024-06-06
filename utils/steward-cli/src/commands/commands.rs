@@ -38,6 +38,7 @@ pub enum Commands {
 
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
+    CrankIdle(CrankIdle),
 }
 
 #[derive(Parser)]
@@ -230,6 +231,22 @@ pub struct CrankComputeScore {
 #[derive(Parser)]
 #[command(about = "Cranks the compute delegation")]
 pub struct CrankComputeDelegations {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "200000")]
+    pub priority_fee: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Crank idle state")]
+pub struct CrankIdle {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub payer_keypair_path: PathBuf,

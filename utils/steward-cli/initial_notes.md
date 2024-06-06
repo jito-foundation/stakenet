@@ -68,6 +68,12 @@ cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3
 cargo run crank-compute-delegations --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
+## Crank Idle
+```bash
+cargo run crank-idle --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+```
+
+
 # Initial Parameters
 
 ```env
