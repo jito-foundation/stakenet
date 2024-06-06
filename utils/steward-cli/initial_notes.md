@@ -43,6 +43,14 @@ cargo run init-config \
   --minimum-voting-epochs 5
 ```
 
+## Update Config
+```bash
+cargo run update-config \
+  --authority-keypair-path ../../credentials/stakenet_test.json \
+  --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S \
+  --compute-score-slot-range 50000 
+```
+
 ## View Config
 ```bash
 cargo run view-config --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
