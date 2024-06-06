@@ -6,6 +6,7 @@ use jito_steward::{
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
+use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
     pub config_account: Config,
@@ -104,4 +105,28 @@ pub async fn get_validator_list_account(
         ValidatorList::try_deserialize(&mut validator_list_account_raw.data.as_slice())
             .expect("Could not deserialize validator list account"),
     )
+}
+
+pub fn get_cluster_history_address(validator_history_program_id: &Pubkey) -> Pubkey {
+    let (address, _) =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], validator_history_program_id);
+    address
+}
+
+pub fn get_validator_history_address(
+    vote_account: &Pubkey,
+    validator_history_program_id: &Pubkey,
+) -> Pubkey {
+    let (address, _) = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, &vote_account.to_bytes()],
+        validator_history_program_id,
+    );
+
+    address
+}
+
+pub fn get_validator_history_config_address(validator_history_program_id: &Pubkey) -> Pubkey {
+    let (address, _) = Pubkey::find_program_address(&[Config::SEED], validator_history_program_id);
+
+    address
 }

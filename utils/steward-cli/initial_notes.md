@@ -20,7 +20,9 @@
 
 ## Create Config
 ```bash
-cargo run init-config --authority-keypair-path ../../credentials/stakenet_test.json --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j \
+cargo run init-config \
+  --authority-keypair-path ../../credentials/stakenet_test.json \
+  --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j \
   --mev-commission-range 10 \
   --epoch-credits-range 30 \
   --commission-range 30 \
@@ -58,7 +60,7 @@ cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT
 
 ## Crank Compute Score
 ```bash
-cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
+cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 # Initial Parameters

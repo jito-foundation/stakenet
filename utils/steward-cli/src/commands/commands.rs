@@ -220,4 +220,8 @@ pub struct CrankComputeScore {
     /// Steward account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "1000")]
+    pub priority_fee: u64,
 }

@@ -1,6 +1,5 @@
-use anchor_lang::AccountDeserialize;
 use anyhow::Result;
-use jito_steward::{StewardStateAccount, StewardStateEnum};
+use jito_steward::StewardStateAccount;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 

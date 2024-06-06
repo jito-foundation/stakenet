@@ -1,13 +1,10 @@
-use anchor_lang::AccountDeserialize;
 use anyhow::Result;
-use jito_steward::{steward_state, Config, Staker, StewardStateAccount};
+use jito_steward::{Config, Staker};
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::utils::accounts::{
-    get_steward_config_account, get_steward_state_account, get_steward_state_address,
-};
+use crate::utils::accounts::{get_steward_config_account, get_steward_state_address};
 
 use super::commands::ViewConfig;
 
