@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::submit_instructions;
+use keeper_core::submit_instructions_no_packing;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
@@ -98,11 +98,12 @@ pub async fn command_crank_compute_score(
 
     println!("Submitting {} instructions", ixs_to_run.len());
 
-    submit_instructions(
+    submit_instructions_no_packing(
         &Arc::new(client),
         ixs_to_run,
         &Arc::new(payer),
         args.priority_fee,
+        Some(300_000),
     )
     .await?;
 

@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use commands::{
     commands::{Args, Commands},
+    cranks::compute_delegations::command_crank_compute_delegations,
     cranks::compute_score::command_crank_compute_score,
     init_config::command_init_config,
     init_state::command_init_state,
@@ -30,6 +31,9 @@ async fn main() -> Result<()> {
         Commands::ViewState(args) => command_view_state(args, client, program_id).await,
         Commands::CrankComputeScore(args) => {
             command_crank_compute_score(args, client, program_id).await
+        }
+        Commands::CrankComputeDelegations(args) => {
+            command_crank_compute_delegations(args, client, program_id).await
         }
     };
 

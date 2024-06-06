@@ -37,6 +37,7 @@ pub enum Commands {
     ViewState(ViewState),
 
     CrankComputeScore(CrankComputeScore),
+    CrankComputeDelegations(CrankComputeDelegations),
 }
 
 #[derive(Parser)]
@@ -222,6 +223,22 @@ pub struct CrankComputeScore {
     pub steward_config: Pubkey,
 
     /// priority fee in microlamports
-    #[arg(long, env, default_value = "1000")]
+    #[arg(long, env, default_value = "200000")]
+    pub priority_fee: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Cranks the compute delegation")]
+pub struct CrankComputeDelegations {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "200000")]
     pub priority_fee: u64,
 }
