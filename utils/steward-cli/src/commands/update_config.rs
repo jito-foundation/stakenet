@@ -1,6 +1,8 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
+use anyhow::Result;
 use jito_steward::UpdateParametersArgs;
-use solana_client::rpc_client::RpcClient;
+
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
@@ -8,7 +10,11 @@ use solana_sdk::{
 
 use super::commands::UpdateConfig;
 
-pub fn command_update_config(args: UpdateConfig, client: RpcClient, program_id: Pubkey) {
+pub async fn command_update_config(
+    args: UpdateConfig,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> Result<()> {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -33,6 +39,7 @@ pub fn command_update_config(args: UpdateConfig, client: RpcClient, program_id: 
 
     let blockhash = client
         .get_latest_blockhash()
+        .await
         .expect("Failed to get recent blockhash");
 
     let transaction = Transaction::new_signed_with_payer(
@@ -44,6 +51,9 @@ pub fn command_update_config(args: UpdateConfig, client: RpcClient, program_id: 
 
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
+        .await
         .expect("Failed to send transaction");
     println!("Signature: {}", signature);
+
+    Ok(())
 }

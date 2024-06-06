@@ -1,7 +1,9 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
-use jito_steward::{Staker, UpdateParametersArgs};
-use solana_client::rpc_client::RpcClient;
+use anyhow::Result;
+use jito_steward::UpdateParametersArgs;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{read_keypair_file, Keypair},
@@ -9,9 +11,15 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
+use crate::utils::accounts::get_steward_staker_address;
+
 use super::commands::InitConfig;
 
-pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubkey) {
+pub async fn command_init_config(
+    args: InitConfig,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> Result<()> {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -33,20 +41,17 @@ pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubk
         }
     };
 
-    let (steward_staker, _) = Pubkey::find_program_address(
-        &[Staker::SEED, steward_config.pubkey().as_ref()],
-        &program_id,
-    );
+    let steward_staker = get_steward_staker_address(&program_id, &steward_config.pubkey());
 
     let update_parameters_args: UpdateParametersArgs =
         args.config_parameters.to_update_parameters_args();
 
     // Check if already created
-    match client.get_account(&steward_config.pubkey()) {
+    match client.get_account(&steward_config.pubkey()).await {
         Ok(config_account) => {
             if config_account.owner == program_id {
                 println!("Config account already exists");
-                return;
+                return Ok(());
             }
         }
         Err(_) => { /* Account does not exist, continue */ }
@@ -70,9 +75,7 @@ pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubk
         .data(),
     };
 
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get recent blockhash");
+    let blockhash = client.get_latest_blockhash().await?;
 
     let transaction = Transaction::new_signed_with_payer(
         &[init_ix],
@@ -83,7 +86,10 @@ pub fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubk
 
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
-        .expect("Failed to send transaction");
+        .await?;
+
     println!("Signature: {}", signature);
     println!("Steward Config: {}", steward_config.pubkey());
+
+    Ok(())
 }

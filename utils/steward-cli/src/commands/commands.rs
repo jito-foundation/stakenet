@@ -35,6 +35,8 @@ pub enum Commands {
 
     InitState(InitState),
     ViewState(ViewState),
+
+    CrankComputeScore(CrankComputeScore),
 }
 
 #[derive(Parser)]
@@ -206,4 +208,16 @@ impl ConfigParameters {
             minimum_voting_epochs: self.minimum_voting_epochs,
         }
     }
+}
+
+#[derive(Parser)]
+#[command(about = "Cranks the compute score state")]
+pub struct CrankComputeScore {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
 }

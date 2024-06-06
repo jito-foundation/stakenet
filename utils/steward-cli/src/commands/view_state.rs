@@ -1,40 +1,29 @@
 use anchor_lang::AccountDeserialize;
+use anyhow::Result;
 use jito_steward::{StewardStateAccount, StewardStateEnum};
-use solana_client::rpc_client::RpcClient;
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 use super::commands::ViewState;
+use crate::utils::{accounts::get_steward_state_account, print::state_tag_to_string};
 
-pub fn command_view_state(args: ViewState, client: RpcClient, program_id: Pubkey) {
+pub async fn command_view_state(
+    args: ViewState,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> Result<()> {
     let steward_config = args.steward_config;
 
-    let (steward_state, _) = Pubkey::find_program_address(
-        &[StewardStateAccount::SEED, steward_config.as_ref()],
-        &program_id,
-    );
-
-    let state_raw_account = client
-        .get_account(&steward_state)
-        .expect("Cannot find state account");
-
-    let state_account: StewardStateAccount =
-        StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
-            .expect("Cannot deserialize state account");
+    let (steward_state_account, steward_state) =
+        get_steward_state_account(&client, &program_id, &steward_config).await?;
 
     // let mut output = String::new(); // Initialize the string directly
-    let output = _print_default_state(&steward_config, &steward_state, &state_account).to_string();
+    let output =
+        _print_default_state(&steward_config, &steward_state, &steward_state_account).to_string();
 
     println!("{}", output);
-}
 
-fn _state_tag_to_string(tag: StewardStateEnum) -> String {
-    match tag {
-        StewardStateEnum::ComputeScores => "Compute Scores".to_string(),
-        StewardStateEnum::ComputeDelegations => "Compute Delegations".to_string(),
-        StewardStateEnum::Idle => "Idle".to_string(),
-        StewardStateEnum::ComputeInstantUnstake => "Compute Instant Unstake".to_string(),
-        StewardStateEnum::Rebalance => "Rebalance".to_string(),
-    }
+    Ok(())
 }
 
 fn _print_default_state(
@@ -52,7 +41,7 @@ fn _print_default_state(
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += "\n";
     formatted_string += "↺ State ↺\n";
-    formatted_string += &format!("State Tag: {:?}\n", _state_tag_to_string(state.state_tag));
+    formatted_string += &format!("State Tag: {:?}\n", state_tag_to_string(state.state_tag));
     formatted_string += &format!(
         "Validator Lamport Balances Count: {}\n",
         state.validator_lamport_balances.len()

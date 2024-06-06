@@ -1,25 +1,25 @@
 use anchor_lang::AccountDeserialize;
-use jito_steward::{Config, Staker, StewardStateAccount};
-use solana_client::rpc_client::RpcClient;
+use anyhow::Result;
+use jito_steward::{steward_state, Config, Staker, StewardStateAccount};
+use solana_client::nonblocking::rpc_client::RpcClient;
+
 use solana_sdk::pubkey::Pubkey;
+
+use crate::utils::accounts::{
+    get_steward_config_account, get_steward_state_account, get_steward_state_address,
+};
 
 use super::commands::ViewConfig;
 
-pub fn command_view_config(args: ViewConfig, client: RpcClient, program_id: Pubkey) {
+pub async fn command_view_config(
+    args: ViewConfig,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> Result<()> {
     let steward_config = args.steward_config;
 
-    let config_raw_account = client
-        .get_account(&steward_config)
-        .expect("Cannot find config account");
-
-    let config_account: Config = Config::try_deserialize(&mut config_raw_account.data.as_slice())
-        .expect("Cannot deserialize config account");
-
-    let (steward_state, _) = Pubkey::find_program_address(
-        &[StewardStateAccount::SEED, steward_config.as_ref()],
-        &program_id,
-    );
-
+    let steward_config_account = get_steward_config_account(&client, &steward_config).await?;
+    let steward_state = get_steward_state_address(&program_id, &steward_config);
     let (steward_staker, _) =
         Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);
 
@@ -28,11 +28,13 @@ pub fn command_view_config(args: ViewConfig, client: RpcClient, program_id: Pubk
         &steward_config,
         &steward_state,
         &steward_staker,
-        &config_account,
+        &steward_config_account,
     )
     .to_string();
 
     println!("{}", output);
+
+    Ok(())
 }
 
 fn _print_default_config(

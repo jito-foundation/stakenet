@@ -56,6 +56,11 @@ cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.js
 cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
 ```
 
+## Crank Compute Score
+```bash
+cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
+```
+
 # Initial Parameters
 
 ```env

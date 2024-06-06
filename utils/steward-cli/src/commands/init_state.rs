@@ -1,6 +1,8 @@
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
-use jito_steward::{constants::MAX_ALLOC_BYTES, utils::StakePool, StewardStateAccount};
-use solana_client::rpc_client::RpcClient;
+use anyhow::Result;
+use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount};
+use solana_client::nonblocking::rpc_client::RpcClient;
+
 use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey,
@@ -9,37 +11,34 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
+use crate::utils::accounts::{get_stake_pool_account, get_steward_state_address};
+
 use super::commands::InitState;
 
 const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 const REALLOCS_PER_TX: usize = 10;
 
-pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey) {
+pub async fn command_init_state(
+    args: InitState,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> Result<()> {
     // Creates config account
     let authority = read_keypair_file(args.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
     let steward_config = args.steward_config;
 
-    let (steward_state, _) = Pubkey::find_program_address(
-        &[StewardStateAccount::SEED, steward_config.as_ref()],
-        &jito_steward::id(),
-    );
+    let steward_state = get_steward_state_address(&program_id, &steward_config);
 
-    let stake_pool_account_raw = client
-        .get_account(&args.stake_pool)
-        .expect("Could not load stake pool account");
-
-    let stake_pool_account =
-        StakePool::try_deserialize(&mut stake_pool_account_raw.data.as_slice())
-            .expect("Could not deserialize stake pool account");
+    let stake_pool_account = get_stake_pool_account(&client, &args.stake_pool).await?;
 
     let validator_list = stake_pool_account.validator_list;
 
     let mut reallocs_left_to_run = MAX_REALLOCS;
     let mut should_create = true;
 
-    match client.get_account(&steward_state) {
+    match client.get_account(&steward_state).await {
         Ok(steward_state_account_raw) => {
             if steward_state_account_raw.data.len() == StewardStateAccount::SIZE {
                 match StewardStateAccount::try_deserialize(
@@ -48,7 +47,7 @@ pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey
                     Ok(steward_state_account) => {
                         if steward_state_account.is_initialized.into() {
                             println!("State account already exists");
-                            return;
+                            return Ok(());
                         }
                     }
                     Err(_) => { /* Account is not initialized, continue */ }
@@ -74,7 +73,8 @@ pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey
             &authority,
             &steward_state,
             &steward_config,
-        );
+        )
+        .await?;
 
         println!("Created Steward State: {}", signature);
     }
@@ -93,7 +93,8 @@ pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey
             &steward_config,
             &validator_list,
             reallocs_per_transaction,
-        );
+        )
+        .await?;
 
         reallocs_left_to_run -= reallocs_per_transaction;
         reallocs_ran += reallocs_per_transaction;
@@ -105,15 +106,17 @@ pub fn command_init_state(args: InitState, client: RpcClient, program_id: Pubkey
     }
 
     println!("Steward State: {}", steward_state);
+
+    Ok(())
 }
 
-fn _create_state(
+async fn _create_state(
     client: &RpcClient,
     program_id: &Pubkey,
     authority: &Keypair,
     steward_state: &Pubkey,
     steward_config: &Pubkey,
-) -> Signature {
+) -> Result<Signature> {
     let init_ix = Instruction {
         program_id: *program_id,
         accounts: jito_steward::accounts::InitializeState {
@@ -126,9 +129,7 @@ fn _create_state(
         data: jito_steward::instruction::InitializeState {}.data(),
     };
 
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get recent blockhash");
+    let blockhash = client.get_latest_blockhash().await?;
 
     let transaction = Transaction::new_signed_with_payer(
         &[init_ix],
@@ -137,12 +138,14 @@ fn _create_state(
         blockhash,
     );
 
-    client
+    let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
-        .expect("Failed to send transaction")
+        .await?;
+
+    Ok(signature)
 }
 
-fn _realloc_x_times(
+async fn _realloc_x_times(
     client: &RpcClient,
     program_id: &Pubkey,
     authority: &Keypair,
@@ -150,7 +153,7 @@ fn _realloc_x_times(
     steward_config: &Pubkey,
     validator_list: &Pubkey,
     count: usize,
-) -> Signature {
+) -> Result<Signature> {
     let ixs = vec![
         Instruction {
             program_id: *program_id,
@@ -167,9 +170,7 @@ fn _realloc_x_times(
         count
     ];
 
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get recent blockhash");
+    let blockhash = client.get_latest_blockhash().await?;
 
     let transaction = Transaction::new_signed_with_payer(
         &ixs,
@@ -178,7 +179,9 @@ fn _realloc_x_times(
         blockhash,
     );
 
-    client
+    let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
-        .expect("Failed to send transaction")
+        .await?;
+
+    Ok(signature)
 }
