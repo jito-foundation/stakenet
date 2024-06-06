@@ -4,9 +4,11 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use crate::state::keeper_state::KeeperState;
-use crate::{KeeperError, PRIORITY_FEE};
+use crate::KeeperError;
+use crate::{
+    entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
+};
 use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
@@ -36,30 +38,51 @@ async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
-    update_vote_accounts(client, keypair, program_id, keeper_state).await
+    update_vote_accounts(
+        client,
+        keypair,
+        program_id,
+        priority_fee_in_microlamports,
+        keeper_state,
+    )
+    .await
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
-    let (mut runs_for_epoch, mut errors_for_epoch) =
-        keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
+    let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run(epoch_info, runs_for_epoch);
 
     if should_run {
-        match _process(client, keypair, program_id, keeper_state).await {
+        match _process(
+            client,
+            keypair,
+            program_id,
+            priority_fee_in_microlamports,
+            keeper_state,
+        )
+        .await
+        {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
                         datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                    } else {
+                        txs_for_epoch += 1;
                     }
                 }
                 if stats.errors == 0 {
@@ -73,7 +96,7 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch)
+    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
 // SPECIFIC TO THIS OPERATION
@@ -81,6 +104,7 @@ pub async fn update_vote_accounts(
     rpc_client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, KeeperError> {
     let validator_history_map = &keeper_state.validator_history_map;
@@ -107,8 +131,14 @@ pub async fn update_vote_accounts(
         .map(|copy_vote_account_entry| copy_vote_account_entry.update_instruction())
         .collect::<Vec<_>>();
 
-    let submit_result =
-        submit_instructions(rpc_client, update_instructions, keypair, PRIORITY_FEE).await;
+    let submit_result = submit_instructions(
+        rpc_client,
+        update_instructions,
+        keypair,
+        priority_fee_in_microlamports,
+        Some(300_000),
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

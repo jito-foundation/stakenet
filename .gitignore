@@ -13,4 +13,5 @@ test-ledger
 **/credentials
 **/config
 **/*.env
+**/.vscode
 /scripts

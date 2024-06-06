@@ -22,10 +22,10 @@ async fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::
     emit_validator_history_metrics(keeper_state).await
 }
 
-pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64) {
+pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64, u64) {
     let operation = _get_operation();
-    let (mut runs_for_epoch, mut errors_for_epoch) =
-        keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
+    let (mut runs_for_epoch, mut errors_for_epoch, txs_for_epoch) =
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run();
 
@@ -41,7 +41,7 @@ pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64) {
         }
     }
 
-    (operation, runs_for_epoch, errors_for_epoch)
+    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------

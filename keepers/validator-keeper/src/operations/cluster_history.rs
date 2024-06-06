@@ -4,8 +4,9 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
+use crate::derive_cluster_history_address;
+use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
-use crate::{derive_cluster_history_address, PRIORITY_FEE};
 use anchor_lang::{InstructionData, ToAccountMetas};
 use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -36,32 +37,39 @@ async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
 ) -> Result<SubmitStats, TransactionExecutionError> {
-    update_cluster_info(client, keypair, program_id).await
+    update_cluster_info(client, keypair, program_id, priority_fee_in_microlamports).await
 }
 
 pub async fn fire(
-    client: &Arc<RpcClient>,
-    keypair: &Arc<Keypair>,
-    program_id: &Pubkey,
+    keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64) {
+    let client = &keeper_config.client;
+    let keypair = &keeper_config.keypair;
+    let program_id = &keeper_config.program_id;
+    let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
 
-    let (mut runs_for_epoch, mut errors_for_epoch) =
-        keeper_state.copy_runs_and_errors_for_epoch(operation.clone());
+    let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run(epoch_info, runs_for_epoch);
 
     if should_run {
-        match _process(client, keypair, program_id).await {
+        match _process(client, keypair, program_id, priority_fee_in_microlamports).await {
             Ok(stats) => {
                 for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!("cluster-history-error", ("error", e.to_string(), String),);
+                    } else {
+                        txs_for_epoch += 1;
                     }
                 }
+
                 if stats.errors == 0 {
                     runs_for_epoch += 1;
                 }
@@ -73,7 +81,7 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch)
+    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
@@ -81,11 +89,13 @@ pub async fn fire(
 pub fn get_update_cluster_info_instructions(
     program_id: &Pubkey,
     keypair: &Pubkey,
+    priority_fee_in_microlamports: u64,
 ) -> Vec<Instruction> {
     let cluster_history_account = derive_cluster_history_address(program_id);
 
-    let priority_fee_ix =
-        compute_budget::ComputeBudgetInstruction::set_compute_unit_price(PRIORITY_FEE);
+    let priority_fee_ix = compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
+        priority_fee_in_microlamports,
+    );
     let heap_request_ix = compute_budget::ComputeBudgetInstruction::request_heap_frame(256 * 1024);
     let compute_budget_ix =
         compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
@@ -112,8 +122,13 @@ pub async fn update_cluster_info(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
+    priority_fee_in_microlamports: u64,
 ) -> Result<SubmitStats, TransactionExecutionError> {
-    let ixs = get_update_cluster_info_instructions(program_id, &keypair.pubkey());
+    let ixs = get_update_cluster_info_instructions(
+        program_id,
+        &keypair.pubkey(),
+        priority_fee_in_microlamports,
+    );
 
     submit_transactions(client, vec![ixs], keypair).await
 }

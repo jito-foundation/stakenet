@@ -2,13 +2,17 @@ use std::collections::{HashMap, HashSet};
 
 use bytemuck::Zeroable;
 use solana_client::rpc_response::RpcVoteAccountInfo;
+use solana_metrics::datapoint_info;
 use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-use crate::{derive_validator_history_address, operations::keeper_operations::KeeperOperations};
+use crate::{
+    derive_validator_history_address,
+    operations::keeper_operations::{KeeperCreates, KeeperOperations},
+};
 
 pub struct KeeperState {
     pub epoch_info: EpochInfo,
@@ -16,6 +20,10 @@ pub struct KeeperState {
     // Tally array of runs and errors indexed by their respective KeeperOperations
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
     pub errors_for_epoch: [u64; KeeperOperations::LEN],
+    pub txs_for_epoch: [u64; KeeperOperations::LEN],
+
+    // Tally for creates
+    pub created_accounts_for_epoch: [u64; KeeperCreates::LEN],
 
     // All vote account info fetched with get_vote_accounts - key'd by their pubkey
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
@@ -50,18 +58,44 @@ impl KeeperState {
         self.errors_for_epoch[index] += 1;
     }
 
-    pub fn copy_runs_and_errors_for_epoch(&self, operation: KeeperOperations) -> (u64, u64) {
+    pub fn increment_update_txs_for_epoch(&mut self, operation: KeeperOperations, txs: u64) {
         let index = operation as usize;
-        (self.runs_for_epoch[index], self.errors_for_epoch[index])
+        self.errors_for_epoch[index] += txs;
     }
 
-    pub fn set_runs_and_errors_for_epoch(
+    pub fn copy_runs_errors_and_txs_for_epoch(
+        &self,
+        operation: KeeperOperations,
+    ) -> (u64, u64, u64) {
+        let index = operation as usize;
+        (
+            self.runs_for_epoch[index],
+            self.errors_for_epoch[index],
+            self.txs_for_epoch[index],
+        )
+    }
+
+    pub fn set_runs_errors_and_txs_for_epoch(
         &mut self,
-        (operation, runs_for_epoch, errors_for_epoch): (KeeperOperations, u64, u64),
+        (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch): (
+            KeeperOperations,
+            u64,
+            u64,
+            u64,
+        ),
     ) {
         let index = operation as usize;
         self.runs_for_epoch[index] = runs_for_epoch;
         self.errors_for_epoch[index] = errors_for_epoch;
+        self.txs_for_epoch[index] = txs_for_epoch;
+    }
+
+    pub fn increment_creations_for_epoch(
+        &mut self,
+        (operation, created_accounts_for_epoch): (KeeperCreates, u64),
+    ) {
+        let index = operation as usize;
+        self.created_accounts_for_epoch[index] += created_accounts_for_epoch;
     }
 
     pub fn get_history_pubkeys(&self, program_id: &Pubkey) -> HashSet<Pubkey> {
@@ -119,6 +153,50 @@ impl KeeperState {
             .map(|(pubkey, _)| pubkey)
             .collect()
     }
+
+    pub fn emit(&self) {
+        datapoint_info!(
+            "keeper-state",
+            // EPOCH INFO
+            ("epoch", self.epoch_info.epoch as i64, i64),
+            ("slot_index", self.epoch_info.slot_index as i64, i64),
+            ("slots_in_epoch", self.epoch_info.slots_in_epoch as i64, i64),
+            ("absolute_slot", self.epoch_info.absolute_slot as i64, i64),
+            ("block_height", self.epoch_info.block_height as i64, i64),
+            // KEEPER STATE
+            ("keeper_balance", self.keeper_balance as i64, i64),
+            (
+                "vote_account_map_count",
+                self.vote_account_map.len() as i64,
+                i64
+            ),
+            (
+                "validator_history_map_count",
+                self.validator_history_map.len() as i64,
+                i64
+            ),
+            (
+                "all_history_vote_account_map_count",
+                self.all_history_vote_account_map.len() as i64,
+                i64
+            ),
+            (
+                "all_get_vote_account_map_count",
+                self.all_get_vote_account_map.len() as i64,
+                i64
+            ),
+            (
+                "previous_epoch_tip_distribution_map_count",
+                self.previous_epoch_tip_distribution_map.len() as i64,
+                i64
+            ),
+            (
+                "current_epoch_tip_distribution_map_count",
+                self.current_epoch_tip_distribution_map.len() as i64,
+                i64
+            ),
+        )
+    }
 }
 
 impl Default for KeeperState {
@@ -134,6 +212,8 @@ impl Default for KeeperState {
             },
             runs_for_epoch: [0; KeeperOperations::LEN],
             errors_for_epoch: [0; KeeperOperations::LEN],
+            txs_for_epoch: [0; KeeperOperations::LEN],
+            created_accounts_for_epoch: [0; KeeperCreates::LEN],
             vote_account_map: HashMap::new(),
             validator_history_map: HashMap::new(),
             all_history_vote_account_map: HashMap::new(),
