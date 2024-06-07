@@ -42,6 +42,12 @@ fn _print_default_state(
     formatted_string += "↺ State ↺\n";
     formatted_string += &format!("State Tag: {:?}\n", state_tag_to_string(state.state_tag));
     formatted_string += &format!(
+        "Progress: {:?} / {} ({} remaining)\n",
+        state.progress.count(),
+        state.num_pool_validators,
+        state.num_pool_validators - state.progress.count()
+    );
+    formatted_string += &format!(
         "Validator Lamport Balances Count: {}\n",
         state.validator_lamport_balances.len()
     );
@@ -57,7 +63,12 @@ fn _print_default_state(
     );
     formatted_string += &format!("Delegations Count: {}\n", state.delegations.len());
     formatted_string += &format!("Instant Unstake: {:?}\n", state.instant_unstake.count());
-    formatted_string += &format!("Progress: {:?}\n", state.progress.count());
+    formatted_string += &format!(
+        "Progress: {:?} / {} ( {} left )\n",
+        state.progress.count(),
+        state.num_pool_validators,
+        state.num_pool_validators - state.progress.count()
+    );
     formatted_string += &format!(
         "Start Computing Scores Slot: {}\n",
         state.start_computing_scores_slot

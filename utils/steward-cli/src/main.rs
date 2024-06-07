@@ -4,7 +4,9 @@ use commands::{
     commands::{Args, Commands},
     cranks::{
         compute_delegations::command_crank_compute_delegations,
+        compute_instant_unstake::command_crank_compute_instant_unstake,
         compute_score::command_crank_compute_score, idle::command_crank_idle,
+        rebalance::command_crank_rebalance,
     },
     init_config::command_init_config,
     init_state::command_init_state,
@@ -38,6 +40,10 @@ async fn main() -> Result<()> {
             command_crank_compute_delegations(args, client, program_id).await
         }
         Commands::CrankIdle(args) => command_crank_idle(args, client, program_id).await,
+        Commands::CrankComputeInstantUnstake(args) => {
+            command_crank_compute_instant_unstake(args, client, program_id).await
+        }
+        Commands::CrankRebalance(args) => command_crank_rebalance(args, client, program_id).await,
     };
 
     Ok(())
