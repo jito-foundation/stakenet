@@ -37,6 +37,8 @@ pub async fn command_crank_compute_instant_unstake(
         config_account: _,
         state_account,
         state_address,
+        staker_account: _,
+        staker_address: _,
         stake_pool_account: _,
         stake_pool_address: _,
         validator_list_account,

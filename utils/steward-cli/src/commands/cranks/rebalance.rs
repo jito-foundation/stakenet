@@ -36,11 +36,13 @@ pub async fn command_crank_rebalance(
     let steward_config = args.steward_config;
 
     let UsefulStewardAccounts {
-        config_account: _,
+        config_account,
         state_account,
         state_address,
-        stake_pool_account: _,
-        stake_pool_address: _,
+        stake_pool_account,
+        stake_pool_address,
+        staker_account,
+        staker_address,
         validator_list_account,
         validator_list_address,
     } = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
@@ -83,12 +85,12 @@ pub async fn command_crank_rebalance(
         .map(|(validator_index, _, history_account)| Instruction {
             program_id: program_id,
             accounts: jito_steward::accounts::Rebalance {
-                config: todo!(),
-                state_account: todo!(),
-                validator_history: todo!(),
-                stake_pool_program: todo!(),
-                stake_pool: todo!(),
-                staker: todo!(),
+                config: steward_config,
+                state_account: state_address,
+                validator_history: *history_account,
+                stake_pool_program: spl_stake_pool::id(),
+                stake_pool: stake_pool_address,
+                staker: staker_address,
                 withdraw_authority: todo!(),
                 validator_list: todo!(),
                 reserve_stake: todo!(),

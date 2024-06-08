@@ -5,11 +5,13 @@ use jito_steward::{
     Config, Staker, StewardStateAccount,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{pubkey::Pubkey, stake};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
     pub config_account: Config,
+    pub staker_account: Staker,
+    pub staker_address: Pubkey,
     pub state_account: StewardStateAccount,
     pub state_address: Pubkey,
     pub stake_pool_account: StakePool,
@@ -28,6 +30,8 @@ pub async fn get_all_steward_accounts(
         get_steward_state_account(client, program_id, steward_config).await?;
     let stake_pool_address = config_account.stake_pool;
     let stake_pool_account = get_stake_pool_account(client, &stake_pool_address).await?;
+    let (staker_account, staker_address) =
+        get_steward_staker_account(client, program_id, steward_config).await?;
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
         get_validator_list_account(client, &validator_list_address).await?;
@@ -36,6 +40,8 @@ pub async fn get_all_steward_accounts(
         config_account,
         state_account,
         state_address,
+        staker_account,
+        staker_address,
         stake_pool_account,
         stake_pool_address,
         validator_list_account,
@@ -93,6 +99,22 @@ pub fn get_steward_staker_address(program_id: &Pubkey, steward_config: &Pubkey) 
         Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);
 
     steward_staker
+}
+
+pub async fn get_steward_staker_account(
+    client: &RpcClient,
+    program_id: &Pubkey,
+    steward_config: &Pubkey,
+) -> Result<(Staker, Pubkey)> {
+    let steward_staker = get_steward_staker_address(program_id, steward_config);
+
+    let staker_raw_account = client.get_account(&steward_staker).await?;
+
+    Ok((
+        Staker::try_deserialize(&mut staker_raw_account.data.as_slice())
+            .expect("Cannot deserialize staker account"),
+        steward_staker,
+    ))
 }
 
 pub async fn get_validator_list_account(
