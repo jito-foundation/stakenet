@@ -144,7 +144,7 @@ pub struct RemoveValidatorFromPool<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     #[account(mut)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: Box<Account<'info, ValidatorList>>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub stake_account: AccountInfo<'info>,

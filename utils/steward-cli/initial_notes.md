@@ -66,6 +66,11 @@ cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.js
 cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
 ```
 
+## Remove Bad Validators
+```bash
+cargo run remove-bad-validators --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+```
+
 ## Crank Compute Score
 ```bash
 cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json

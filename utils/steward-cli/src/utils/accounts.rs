@@ -23,81 +23,25 @@ pub struct UsefulStewardAccounts {
     pub validator_list_address: Pubkey,
 }
 
-pub async fn test_get_all_steward_accounts(
-    client: &RpcClient,
-    program_id: &Pubkey,
-    steward_config: &Pubkey,
-) -> Result<()> {
-    let config_account = get_steward_config_account(client, steward_config).await?;
-    println!("0");
-    let (state_account, state_address) =
-        get_steward_state_account(client, program_id, steward_config).await?;
-    println!("1");
-
-    let stake_pool_address = config_account.stake_pool;
-    println!("2");
-
-    let stake_pool_account = get_stake_pool_account(client, &stake_pool_address).await?;
-    println!("3");
-
-    let (staker_account, staker_address) =
-        get_steward_staker_account(client, program_id, steward_config).await?;
-    println!("4");
-    let stake_pool_withdraw_authority =
-        get_withdraw_authority_address(&stake_pool_address, &stake_pool_account);
-    println!("5");
-    let validator_list_address = stake_pool_account.validator_list;
-    println!("6");
-    let validator_list_account =
-        get_validator_list_account(client, &validator_list_address).await?;
-    println!("7");
-
-    println!("config_account: {:?}", config_account.authority);
-    println!("state_account: {:?}", state_account.bump);
-    println!("staker_account: {:?}", staker_account.bump);
-    println!("stake_pool_account: {:?}", stake_pool_account.account_type);
-    println!(
-        "stake_pool_withdraw_authority: {:?}",
-        stake_pool_withdraw_authority
-    );
-    println!(
-        "validator_list_account: {:?}",
-        validator_list_account.validators.len()
-    );
-
-    Ok(())
-}
-
 pub async fn get_all_steward_accounts(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<UsefulStewardAccounts> {
+) -> Result<Box<UsefulStewardAccounts>> {
     let config_account = get_steward_config_account(client, steward_config).await?;
-    println!("0");
     let (state_account, state_address) =
         get_steward_state_account(client, program_id, steward_config).await?;
-    println!("1");
-
     let stake_pool_address = config_account.stake_pool;
-    println!("2");
-
     let stake_pool_account = get_stake_pool_account(client, &stake_pool_address).await?;
-    println!("3");
-
     let (staker_account, staker_address) =
         get_steward_staker_account(client, program_id, steward_config).await?;
-    println!("4");
     let stake_pool_withdraw_authority =
         get_withdraw_authority_address(&stake_pool_address, &stake_pool_account);
-    println!("5");
     let validator_list_address = stake_pool_account.validator_list;
-    println!("6");
     let validator_list_account =
         get_validator_list_account(client, &validator_list_address).await?;
-    println!("7");
 
-    Ok(UsefulStewardAccounts {
+    Ok(Box::new(UsefulStewardAccounts {
         config_account,
         state_account,
         state_address,
@@ -108,7 +52,7 @@ pub async fn get_all_steward_accounts(
         stake_pool_withdraw_authority,
         validator_list_account,
         validator_list_address,
-    })
+    }))
 }
 
 pub async fn get_steward_config_account(

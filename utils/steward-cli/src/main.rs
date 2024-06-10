@@ -10,6 +10,7 @@ use commands::{
     },
     init_config::command_init_config,
     init_state::command_init_state,
+    remove_bad_validators::command_remove_bad_validators,
     update_config::command_update_config,
     view_config::command_view_config,
     view_state::command_view_state,
@@ -33,6 +34,10 @@ async fn main() -> Result<()> {
         Commands::ViewConfig(args) => command_view_config(args, client, program_id).await,
         Commands::InitState(args) => command_init_state(args, client, program_id).await,
         Commands::ViewState(args) => command_view_state(args, client, program_id).await,
+        Commands::RemoveBadValidators(args) => {
+            command_remove_bad_validators(args, client, program_id).await
+            // Ok(())
+        }
         Commands::CrankComputeScore(args) => {
             command_crank_compute_score(args, client, program_id).await
         }

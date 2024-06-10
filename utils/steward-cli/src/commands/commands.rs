@@ -36,6 +36,8 @@ pub enum Commands {
     InitState(InitState),
     ViewState(ViewState),
 
+    RemoveBadValidators(RemoveBadValidators),
+
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
     CrankIdle(CrankIdle),
@@ -212,6 +214,22 @@ impl ConfigParameters {
             minimum_voting_epochs: self.minimum_voting_epochs,
         }
     }
+}
+
+#[derive(Parser)]
+#[command(about = "Cranks rebalance")]
+pub struct RemoveBadValidators {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "200000")]
+    pub priority_fee: u64,
 }
 
 #[derive(Parser)]

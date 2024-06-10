@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::submit_instructions_no_packing;
+use keeper_core::submit_instructions;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
@@ -35,33 +35,23 @@ pub async fn command_crank_rebalance(
     let validator_history_program_id = validator_history_id();
     let steward_config = args.steward_config;
 
-    let UsefulStewardAccounts {
-        config_account,
-        state_account,
-        state_address,
-        stake_pool_account,
-        stake_pool_address,
-        staker_account,
-        staker_address,
-        stake_pool_withdraw_authority,
-        validator_list_account,
-        validator_list_address,
-    } = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
+    let steward_accounts = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
 
-    match state_account.state.state_tag {
+    match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::ComputeInstantUnstake => { /* Continue */ }
         _ => {
             println!(
                 "State account is not in Compute Instant Unstake state: {}",
-                state_tag_to_string(state_account.state.state_tag)
+                state_tag_to_string(steward_accounts.state_account.state.state_tag)
             );
             return Ok(());
         }
     }
 
-    let validators_to_run = (0..validator_list_account.validators.len())
+    let validators_to_run = (0..steward_accounts.validator_list_account.validators.len())
         .filter_map(|validator_index| {
-            let has_been_scored = state_account
+            let has_been_scored = steward_accounts
+                .state_account
                 .state
                 .progress
                 .get(validator_index)
@@ -69,8 +59,9 @@ pub async fn command_crank_rebalance(
             if has_been_scored {
                 return None;
             } else {
-                let vote_account =
-                    validator_list_account.validators[validator_index].vote_account_address;
+                let vote_account = steward_accounts.validator_list_account.validators
+                    [validator_index]
+                    .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
@@ -87,11 +78,11 @@ pub async fn command_crank_rebalance(
             program_id: program_id,
             accounts: jito_steward::accounts::Rebalance {
                 config: steward_config,
-                state_account: state_address,
+                state_account: steward_accounts.state_address,
                 validator_history: *history_account,
                 stake_pool_program: spl_stake_pool::id(),
-                stake_pool: stake_pool_address,
-                staker: staker_address,
+                stake_pool: steward_accounts.stake_pool_address,
+                staker: steward_accounts.staker_address,
                 withdraw_authority: todo!(),
                 validator_list: todo!(),
                 reserve_stake: todo!(),
@@ -116,7 +107,7 @@ pub async fn command_crank_rebalance(
 
     println!("Submitting {} instructions", ixs_to_run.len());
 
-    submit_instructions_no_packing(
+    submit_instructions(
         &Arc::new(client),
         ixs_to_run,
         &Arc::new(payer),
