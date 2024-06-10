@@ -389,6 +389,24 @@ impl StewardState {
             .checked_sub(1)
             .ok_or(StewardError::ArithmeticError)?;
 
+        {
+            // Check if the validator index is in the sorted indices
+            let validator_yield_score_index = self
+                .sorted_yield_score_indices
+                .iter()
+                .position(|&i| i == index as u16);
+
+            let validator_score_index = self
+                .sorted_score_indices
+                .iter()
+                .position(|&i| i == index as u16);
+
+            if validator_yield_score_index.is_none() || validator_score_index.is_none() {
+                // msg!("Validator index not found in sorted indices - skipping removal");
+                return Ok(());
+            }
+        }
+
         // Shift all validator state to the left
         for i in index..self.num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
