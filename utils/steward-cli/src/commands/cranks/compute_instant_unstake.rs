@@ -41,6 +41,7 @@ pub async fn command_crank_compute_instant_unstake(
         staker_address: _,
         stake_pool_account: _,
         stake_pool_address: _,
+        stake_pool_withdraw_authority: _,
         validator_list_account,
         validator_list_address,
     } = get_all_steward_accounts(&client, &program_id, &steward_config).await?;

@@ -16,7 +16,7 @@ use commands::{
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub mod commands;
 pub mod utils;

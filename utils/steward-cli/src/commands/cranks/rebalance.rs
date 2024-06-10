@@ -43,6 +43,7 @@ pub async fn command_crank_rebalance(
         stake_pool_address,
         staker_account,
         staker_address,
+        stake_pool_withdraw_authority,
         validator_list_account,
         validator_list_address,
     } = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
