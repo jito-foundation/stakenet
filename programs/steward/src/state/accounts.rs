@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, IdlBuild};
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 

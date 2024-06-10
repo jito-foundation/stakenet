@@ -8,7 +8,7 @@ use crate::constants::MAX_VALIDATORS;
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{
-    get_config_authority, get_stake_pool, get_validator_stake_info_at_index, StakePool,
+    get_config_authority, get_stake_pool_address, get_validator_stake_info_at_index, StakePool,
     ValidatorList,
 };
 use crate::StewardStateAccount;
@@ -30,7 +30,7 @@ pub struct AddValidatorToPool<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -133,7 +133,7 @@ pub struct RemoveValidatorFromPool<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -225,7 +225,7 @@ pub struct SetPreferredValidator<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -290,7 +290,7 @@ pub struct IncreaseValidatorStake<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -418,7 +418,7 @@ pub struct DecreaseValidatorStake<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -539,7 +539,7 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     )]
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -672,7 +672,7 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     /// CHECK: CPI program
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(
@@ -778,7 +778,7 @@ pub struct SetStaker<'info> {
     )]
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
-        mut, address = get_stake_pool(&config)?
+        mut, address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
     #[account(

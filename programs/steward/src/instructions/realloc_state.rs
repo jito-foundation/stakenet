@@ -73,7 +73,7 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
         state_account.state.state_tag = StewardStateEnum::ComputeScores;
-        state_account.state.num_pool_validators = validator_list.len() as usize;
+        state_account.state.num_pool_validators = validator_list.len() as u64;
         state_account.state.scores = [0; MAX_VALIDATORS];
         state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
         state_account.state.yield_scores = [0; MAX_VALIDATORS];

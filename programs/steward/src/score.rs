@@ -1,5 +1,6 @@
 use anchor_lang::{
-    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
+    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, IdlBuild,
+    Result,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 

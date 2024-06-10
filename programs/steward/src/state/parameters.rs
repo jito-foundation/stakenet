@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::Result, zero_copy};
+use anchor_lang::{prelude::Result, zero_copy, IdlBuild};
 use borsh::{BorshDeserialize, BorshSerialize};
 use validator_history::utils::cast_epoch;
 
@@ -28,7 +28,7 @@ pub struct UpdateParametersArgs {
     pub stake_deposit_unstake_cap_bps: Option<u32>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
-    pub compute_score_slot_range: Option<usize>,
+    pub compute_score_slot_range: Option<u64>,
     pub instant_unstake_inputs_epoch_progress: Option<f64>,
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
@@ -82,7 +82,7 @@ pub struct Parameters {
 
     /////// State machine operation parameters ///////
     /// Number of slots that scoring must be completed in
-    pub compute_score_slot_range: usize,
+    pub compute_score_slot_range: u64,
 
     /// Progress in epoch before instant unstake is allowed
     pub instant_unstake_epoch_progress: f64,
@@ -288,7 +288,7 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
-        if !(COMPUTE_SCORE_SLOT_RANGE_MIN..=slots_per_epoch as usize)
+        if !(COMPUTE_SCORE_SLOT_RANGE_MIN as u64..=slots_per_epoch)
             .contains(&self.compute_score_slot_range)
         {
             return Err(StewardError::InvalidParameterValue.into());

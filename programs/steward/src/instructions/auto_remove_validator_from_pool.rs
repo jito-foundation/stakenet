@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
-use crate::utils::{get_stake_pool, get_validator_stake_info_at_index, StakePool};
+use crate::utils::{get_stake_pool_address, get_validator_stake_info_at_index, StakePool};
 use crate::StewardStateAccount;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use anchor_lang::{prelude::*, system_program};
@@ -39,7 +39,7 @@ pub struct AutoRemoveValidator<'info> {
 
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
 

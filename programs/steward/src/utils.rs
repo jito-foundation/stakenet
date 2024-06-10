@@ -1,6 +1,6 @@
 use std::ops::{Deref, Not};
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, IdlBuild};
 use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
@@ -10,7 +10,7 @@ use spl_stake_pool::{
 
 use crate::{errors::StewardError, Config, Delegation};
 
-pub fn get_stake_pool(account: &AccountLoader<Config>) -> Result<Pubkey> {
+pub fn get_stake_pool_address(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
     Ok(config.stake_pool)
 }
@@ -119,6 +119,30 @@ impl From<U8Bool> for bool {
     fn from(val: U8Bool) -> Self {
         val.is_true()
     }
+}
+
+pub fn deserialize_stake_pool(
+    account_info: &AccountInfo,
+) -> Result<spl_stake_pool::state::StakePool> {
+    if account_info.owner != &spl_stake_pool::ID {
+        return Err(ProgramError::InvalidAccountOwner.into());
+    }
+    let data = account_info.try_borrow_data()?;
+    Ok(spl_stake_pool::state::StakePool::deserialize(
+        &mut data.as_ref(),
+    )?)
+}
+
+pub fn deserialize_validator_list(
+    account_info: &AccountInfo,
+) -> Result<spl_stake_pool::state::ValidatorList> {
+    if account_info.owner != &spl_stake_pool::ID {
+        return Err(ProgramError::InvalidAccountOwner.into());
+    }
+    let data = account_info.try_borrow_data()?;
+    Ok(spl_stake_pool::state::ValidatorList::deserialize(
+        &mut data.as_ref(),
+    )?)
 }
 
 #[derive(Clone)]

@@ -1,7 +1,7 @@
 use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
-use crate::utils::{get_stake_pool, StakePool};
+use crate::utils::{get_stake_pool_address, StakePool};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
@@ -28,7 +28,7 @@ pub struct AutoAddValidator<'info> {
 
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: Account<'info, StakePool>,
 

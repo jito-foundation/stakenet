@@ -17,10 +17,11 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = ["custom-heap"]
 custom-heap = []
-# idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = { features = ["idl-build"], version = "0.30.0" }
+anchor-spl = { features = ["idl-build"], version = "0.30.0" }
 bincode = "1.3.3"
 blake3 = "1.3.1"
 borsh = "0.10.0"

@@ -2,7 +2,7 @@ use crate::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
-    utils::{get_config_authority, get_stake_pool, StakePool},
+    utils::{get_config_authority, get_stake_pool_address, StakePool},
     BitMask, Delegation, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
@@ -19,7 +19,7 @@ pub struct ResetStewardState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
-    #[account(address = get_stake_pool(&config)?)]
+    #[account(address = get_stake_pool_address(&config)?)]
     pub stake_pool: Account<'info, StakePool>,
 
     #[account(address = stake_pool.validator_list)]

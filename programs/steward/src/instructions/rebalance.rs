@@ -20,7 +20,7 @@ use crate::{
     delegation::RebalanceType,
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_stake_pool, get_validator_stake_info_at_index, StakePool},
+    utils::{get_stake_pool_address, get_validator_stake_info_at_index, StakePool},
     Config, Staker, StewardStateAccount,
 };
 
@@ -47,7 +47,7 @@ pub struct Rebalance<'info> {
     #[account(address = spl_stake_pool::ID)]
     pub stake_pool_program: AccountInfo<'info>,
 
-    #[account(address = get_stake_pool(&config)?)]
+    #[account(address = get_stake_pool_address(&config)?)]
     pub stake_pool: Account<'info, StakePool>,
 
     #[account(
