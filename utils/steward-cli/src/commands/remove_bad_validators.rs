@@ -4,10 +4,13 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::UpdateParametersArgs;
 
-use keeper_core::{get_multiple_accounts_batched, submit_instructions};
+use keeper_core::{get_multiple_accounts_batched, submit_instructions, submit_transactions};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
+use spl_stake_pool::{
+    find_stake_program_address, find_transient_stake_program_address,
+    find_withdraw_authority_program_address,
+};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
@@ -17,8 +20,9 @@ use solana_sdk::{
 };
 use validator_history::id;
 
-use crate::utils::accounts::{
-    get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts,
+use crate::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts},
+    print,
 };
 
 use super::commands::RemoveBadValidators;
@@ -133,35 +137,35 @@ pub async fn command_remove_bad_validators(
         })
         .collect::<Vec<Instruction>>();
 
+    let txs_to_run = _package_remove_bad_validator_instructions(&ixs_to_run, args.priority_fee);
+
     println!("Submitting {} instructions", ixs_to_run.len());
-    println!(
-        "Validator List Length: {}",
-        steward_accounts.validator_list_account.validators.len()
-    );
 
-    let (blockhash, _) = arc_client
-        .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
-        .await?;
+    let submit_stats = submit_transactions(&arc_client, txs_to_run, &Arc::new(payer)).await?;
 
-    let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(1_000_000),
-            ComputeBudgetInstruction::request_heap_frame(256 * 1024),
-            ixs_to_run[0].clone(),
-        ],
-        Some(&payer.pubkey()),
-        &[&payer],
-        blockhash,
-    );
-
-    println!("Sending transaction");
-
-    let result = arc_client.send_and_confirm_transaction(&tx).await;
-
-    match result {
-        Ok(signature) => println!("Signature: {:?}", signature),
-        Err(e) => println!("Error: {:?}", e),
-    }
+    println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
+}
+
+fn _package_remove_bad_validator_instructions(
+    ixs: &Vec<Instruction>,
+    priority_fee: u64,
+) -> Vec<Vec<Instruction>> {
+    ixs.chunks(1)
+        .map(|chunk: &[Instruction]| {
+            let mut chunk_vec = chunk.to_vec();
+            chunk_vec.insert(
+                0,
+                ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            );
+            chunk_vec.insert(0, ComputeBudgetInstruction::request_heap_frame(256 * 1024));
+            chunk_vec.insert(
+                0,
+                ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
+            );
+
+            chunk_vec
+        })
+        .collect::<Vec<Vec<Instruction>>>()
 }

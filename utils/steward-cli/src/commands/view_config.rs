@@ -21,15 +21,12 @@ pub async fn command_view_config(
         Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);
 
     // let mut output = String::new(); // Initialize the string directly
-    let output = _print_default_config(
+    _print_default_config(
         &steward_config,
         &steward_state,
         &steward_staker,
         &steward_config_account,
-    )
-    .to_string();
-
-    println!("{}", output);
+    );
 
     Ok(())
 }
@@ -39,7 +36,7 @@ fn _print_default_config(
     steward_state: &Pubkey,
     steward_staker: &Pubkey,
     config_account: &Config,
-) -> String {
+) {
     let mut formatted_string = String::new();
 
     formatted_string += "------- Config -------\n";
@@ -133,5 +130,5 @@ fn _print_default_config(
     );
     formatted_string += "---------------------";
 
-    formatted_string
+    println!("{}", formatted_string)
 }

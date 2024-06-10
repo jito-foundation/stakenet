@@ -2,9 +2,13 @@ use anyhow::Result;
 use jito_steward::StewardStateAccount;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
+use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 
 use super::commands::ViewState;
-use crate::utils::{accounts::get_steward_state_account, print::state_tag_to_string};
+use crate::utils::{
+    accounts::{get_all_steward_accounts, UsefulStewardAccounts},
+    print::state_tag_to_string,
+};
 
 pub async fn command_view_state(
     args: ViewState,
@@ -13,23 +17,103 @@ pub async fn command_view_state(
 ) -> Result<()> {
     let steward_config = args.steward_config;
 
-    let (steward_state_account, steward_state) =
-        get_steward_state_account(&client, &program_id, &steward_config).await?;
+    let steward_state_accounts =
+        get_all_steward_accounts(&client, &program_id, &steward_config).await?;
 
-    // let mut output = String::new(); // Initialize the string directly
-    let output =
-        _print_default_state(&steward_config, &steward_state, &steward_state_account).to_string();
+    _print_verbose_state(&steward_state_accounts);
 
-    println!("{}", output);
+    // _print_default_state(
+    //     &steward_config,
+    //     &steward_state_accounts.state_address,
+    //     &steward_state_accounts.state_account,
+    // );
 
     Ok(())
+}
+
+fn _print_verbose_state(steward_state_accounts: &Box<UsefulStewardAccounts>) {
+    let mut formatted_string;
+
+    for (index, validator) in steward_state_accounts
+        .validator_list_account
+        .validators
+        .iter()
+        .enumerate()
+    {
+        let vote_account = validator.vote_account_address;
+        let (stake_address, _) = find_stake_program_address(
+            &spl_stake_pool::id(),
+            &vote_account,
+            &steward_state_accounts.stake_pool_address,
+            None,
+        );
+
+        let (transient_stake_address, _) = find_transient_stake_program_address(
+            &spl_stake_pool::id(),
+            &vote_account,
+            &steward_state_accounts.stake_pool_address,
+            validator.transient_seed_suffix.into(),
+        );
+
+        let score_index = steward_state_accounts
+            .state_account
+            .state
+            .sorted_score_indices
+            .iter()
+            .position(|&i| i == index as u16);
+        let yield_score_index = steward_state_accounts
+            .state_account
+            .state
+            .sorted_yield_score_indices
+            .iter()
+            .position(|&i| i == index as u16);
+
+        formatted_string = String::new();
+
+        formatted_string += &format!("Vote Account: {:?}\n", vote_account);
+        formatted_string += &format!("Stake Account: {:?}\n", stake_address);
+        formatted_string += &format!("Transient Stake Account: {:?}\n", transient_stake_address);
+        formatted_string += &format!(
+            "Validator Lamports: {:?}\n",
+            u64::from(validator.active_stake_lamports)
+        );
+        formatted_string += &format!("Index: {:?}\n", index);
+        formatted_string += &format!(
+            "Is Blacklisted: {:?}\n",
+            steward_state_accounts.config_account.blacklist.get(index)
+        );
+        formatted_string += &format!(
+            "Is Instant Unstake: {:?}\n",
+            steward_state_accounts
+                .state_account
+                .state
+                .instant_unstake
+                .get(index)
+        );
+        formatted_string += &format!(
+            "Score: {:?}\n",
+            steward_state_accounts.state_account.state.scores.get(index)
+        );
+        formatted_string += &format!(
+            "Yield Score: {:?}\n",
+            steward_state_accounts
+                .state_account
+                .state
+                .yield_scores
+                .get(index)
+        );
+        formatted_string += &format!("Score Index: {:?}\n", score_index);
+        formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
+
+        println!("{}", formatted_string);
+    }
 }
 
 fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
     state_account: &StewardStateAccount,
-) -> String {
+) {
     let state = &state_account.state;
 
     let mut formatted_string = String::new();
@@ -90,5 +174,5 @@ fn _print_default_state(
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
     formatted_string += "---------------------";
 
-    formatted_string
+    println!("{}", formatted_string)
 }

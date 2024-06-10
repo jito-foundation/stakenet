@@ -85,7 +85,15 @@ cargo run crank-compute-delegations --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8
 ```bash
 cargo run crank-idle --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
 ```
+# Deploy and Upgrade
 
+- upgrade solana cli to 1.18.16
+- make sure your configured keypair is `aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8`
+- create a new keypair: `solana-keygen new -o credentials/temp-buffer.json`
+- use anchor `0.30.0`: `avm install 0.30.0 && avm use 0.30.0`
+- build .so file: `anchor build --no-docs`
+- Write to buffer: `solana program write-buffer --use-rpc --buffer credentials/temp-buffer.json --url $(solana config get | grep "RPC URL" | awk '{print $3}') --with-compute-unit-price 10000 --max-sign-attempts 10000 target/deploy/jito_steward.so --keypair credentials/stakenet_test.json`
+- Upgrade: `solana program upgrade $(solana address --keypair credentials/temp-buffer.json) sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP --keypair credentials/stakenet_test.json`
 
 # Initial Parameters
 

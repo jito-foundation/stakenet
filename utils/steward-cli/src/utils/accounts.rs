@@ -7,7 +7,7 @@ use jito_steward::{
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, stake};
-use spl_stake_pool::find_stake_program_address;
+use spl_stake_pool::{find_stake_program_address, find_withdraw_authority_program_address};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
@@ -35,8 +35,7 @@ pub async fn get_all_steward_accounts(
     let stake_pool_account = get_stake_pool_account(client, &stake_pool_address).await?;
     let (staker_account, staker_address) =
         get_steward_staker_account(client, program_id, steward_config).await?;
-    let stake_pool_withdraw_authority =
-        get_withdraw_authority_address(&stake_pool_address, &stake_pool_account);
+    let stake_pool_withdraw_authority = get_withdraw_authority_address(&stake_pool_address);
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
         get_validator_list_account(client, &validator_list_address).await?;
@@ -100,18 +99,9 @@ pub async fn get_stake_pool_account(client: &RpcClient, stake_pool: &Pubkey) -> 
     )
 }
 
-pub fn get_withdraw_authority_address(
-    stake_pool_address: &Pubkey,
-    stake_pool_account: &StakePool,
-) -> Pubkey {
-    let (withdraw_authority, _) = Pubkey::find_program_address(
-        &[
-            stake_pool_address.as_ref(),
-            STAKE_POOL_WITHDRAW_SEED,
-            &[stake_pool_account.stake_withdraw_bump_seed],
-        ],
-        &spl_stake_pool::id(),
-    );
+pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
+    let (withdraw_authority, _) =
+        find_withdraw_authority_program_address(&spl_stake_pool::id(), &stake_pool_address);
 
     withdraw_authority
 }
