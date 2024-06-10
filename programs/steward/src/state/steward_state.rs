@@ -389,24 +389,6 @@ impl StewardState {
             .checked_sub(1)
             .ok_or(StewardError::ArithmeticError)?;
 
-        {
-            // Check if the validator index is in the sorted indices
-            let validator_yield_score_index = self
-                .sorted_yield_score_indices
-                .iter()
-                .position(|&i| i == index as u16);
-
-            let validator_score_index = self
-                .sorted_score_indices
-                .iter()
-                .position(|&i| i == index as u16);
-
-            if validator_yield_score_index.is_none() || validator_score_index.is_none() {
-                // msg!("Validator index not found in sorted indices - skipping removal");
-                return Ok(());
-            }
-        }
-
         // Shift all validator state to the left
         for i in index..self.num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
@@ -418,26 +400,29 @@ impl StewardState {
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
         }
+
         // Update score indices
         let yield_score_index = self
             .sorted_yield_score_indices
             .iter()
-            .position(|&i| i == index as u16)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+            .position(|&i| i == index as u16);
         let score_index = self
             .sorted_score_indices
             .iter()
-            .position(|&i| i == index as u16)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+            .position(|&i| i == index as u16);
 
-        for i in yield_score_index..self.num_pool_validators {
-            let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
-            self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
+        if let Some(yield_score_index) = yield_score_index {
+            for i in yield_score_index..self.num_pool_validators {
+                let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
+                self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
+            }
         }
 
-        for i in score_index..self.num_pool_validators {
-            let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
-            self.sorted_score_indices[i] = self.sorted_score_indices[next_i];
+        if let Some(score_index) = score_index {
+            for i in score_index..self.num_pool_validators {
+                let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
+                self.sorted_score_indices[i] = self.sorted_score_indices[next_i];
+            }
         }
 
         for i in 0..self.num_pool_validators {
