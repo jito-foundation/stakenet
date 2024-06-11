@@ -4,6 +4,7 @@
 */
 
 use jito_steward::{constants::MAX_VALIDATORS, Delegation, StewardStateEnum};
+use spl_stake_pool::state::StakeStatus;
 use tests::steward_fixtures::StateMachineFixtures;
 
 #[test]
@@ -28,6 +29,7 @@ pub fn test_compute_scores_to_compute_delegations() {
                 cluster_history,
                 config,
                 state.num_pool_validators,
+                StakeStatus::Active,
             )
             .unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -70,6 +72,7 @@ pub fn test_compute_scores_to_new_compute_scores() {
             cluster_history,
             config,
             state.num_pool_validators,
+            StakeStatus::Active,
         )
         .unwrap();
     assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -242,6 +245,7 @@ pub fn test_compute_instant_unstake_to_rebalance() {
                 validator.index as usize,
                 cluster_history,
                 config,
+                StakeStatus::Active,
             )
             .unwrap();
         assert!(matches!(
@@ -257,6 +261,7 @@ pub fn test_compute_instant_unstake_to_rebalance() {
             validators[0].index as usize,
             cluster_history,
             config,
+            StakeStatus::Active,
         )
         .unwrap();
     assert!(state

@@ -3,7 +3,7 @@ use crate::{
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::PodStakeStatus;
+use spl_stake_pool::state::{PodStakeStatus, StakeStatus};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 #[derive(Accounts)]
@@ -49,12 +49,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         StewardError::ValidatorNotInList
     );
 
-    match validator_stake_info.status {
-        PodStakeStatus::Active(_) => {
-            return Err(StewardError::ValidatorNotInList.into());
-        }
-    }
-
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());
     }
@@ -66,7 +60,9 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         validator_list_index,
         &cluster,
         &config,
+        StakeStatus::try_from(validator_stake_info.status).unwrap(),
     )?;
+
     maybe_transition_and_emit(
         &mut state_account.state,
         &clock,

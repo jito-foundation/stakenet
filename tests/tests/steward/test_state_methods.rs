@@ -14,7 +14,7 @@ use jito_steward::{
     Delegation, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
-use spl_stake_pool::big_vec::BigVec;
+use spl_stake_pool::{big_vec::BigVec, state::StakeStatus};
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
 
@@ -52,6 +52,7 @@ fn test_compute_scores() {
             cluster_history,
             config,
             state.num_pool_validators,
+            StakeStatus::Active,
         );
         assert!(res.is_ok());
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -80,6 +81,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert_eq!(res, Err(Error::from(StewardError::InvalidState)));
 
@@ -100,6 +102,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -120,6 +123,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -138,6 +142,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -161,6 +166,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     // validator would not have a score of 0 if it was not blacklisted
@@ -183,6 +189,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.start_computing_scores_slot == clock.slot);
@@ -203,6 +210,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.current_epoch == current_epoch);
@@ -223,6 +231,7 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.start_computing_scores_slot == clock.slot);
@@ -316,6 +325,7 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InstantUnstakeNotReady)));
 
@@ -328,6 +338,7 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InvalidState)));
 
@@ -340,6 +351,7 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InvalidState)));
 
@@ -359,6 +371,7 @@ fn test_compute_instant_unstake_errors() {
         validator.index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::VoteHistoryNotRecentEnough)));
 
@@ -375,6 +388,7 @@ fn test_compute_instant_unstake_errors() {
         validator.index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::VoteHistoryNotRecentEnough)));
 
@@ -389,6 +403,7 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::ClusterHistoryNotRecentEnough)));
 }
@@ -416,6 +431,7 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(matches!(
@@ -441,6 +457,7 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state
@@ -458,6 +475,7 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state
@@ -508,6 +526,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -543,6 +562,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
 
     assert!(res.is_ok());
@@ -598,6 +618,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -648,6 +669,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -679,6 +701,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -697,6 +720,7 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
+        StakeStatus::Active,
     );
     match res {
         Ok(_) => panic!("Expected StewardError::InvalidState"),

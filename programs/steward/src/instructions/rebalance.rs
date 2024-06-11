@@ -1,4 +1,4 @@
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, result};
 
 use anchor_lang::{
     prelude::*,
@@ -11,7 +11,7 @@ use anchor_lang::{
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
-    state::ValidatorListHeader,
+    state::{PodStakeStatus, StakeStatus, ValidatorListHeader},
 };
 use validator_history::ValidatorHistory;
 
@@ -183,6 +183,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             minimum_delegation,
             stake_rent,
             &config.parameters,
+            StakeStatus::try_from(validator_stake_info.status).unwrap(),
         )?
     };
 

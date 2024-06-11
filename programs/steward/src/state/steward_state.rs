@@ -16,7 +16,10 @@ use crate::{
 use anchor_lang::prelude::*;
 
 use bytemuck::{Pod, Zeroable};
-use spl_stake_pool::big_vec::BigVec;
+use spl_stake_pool::{
+    big_vec::BigVec,
+    state::{StakeStatus, ValidatorStakeInfo},
+};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
@@ -452,6 +455,43 @@ impl StewardState {
         Ok(())
     }
 
+    /// Marks a validator as skipped in the current state
+    pub fn skip_bad_validator(&mut self, index: usize) -> Result<()> {
+        {
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(());
+            }
+        }
+
+        match self.state_tag {
+            StewardStateEnum::ComputeScores => {
+                self.scores[index] = 0 as u32;
+                self.yield_scores[index] = 0 as u32;
+
+                let num_scores_calculated = self.progress.count();
+                insert_sorted_index(
+                    &mut self.sorted_score_indices,
+                    &self.scores,
+                    index as u16,
+                    self.scores[index],
+                    num_scores_calculated,
+                )?;
+                insert_sorted_index(
+                    &mut self.sorted_yield_score_indices,
+                    &self.yield_scores,
+                    index as u16,
+                    self.yield_scores[index],
+                    num_scores_calculated,
+                )?;
+            }
+            _ => {}
+        }
+
+        self.progress.set(index, true)?;
+        Ok(())
+    }
+
     /// One instruction per validator. Can be done in any order.
     /// Computes score for a validator for the current epoch, stores score, and yield score component.
     /// Inserts this validator's index into sorted_score_indices and sorted_yield_score_indices, sorted by
@@ -468,7 +508,40 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: usize,
+        stake_status: StakeStatus,
     ) -> Result<()> {
+        {
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(());
+            }
+        }
+
+        {
+            // Skip if not active
+            if stake_status != StakeStatus::Active {
+                self.scores[index] = 0 as u32;
+                self.yield_scores[index] = 0 as u32;
+
+                let num_scores_calculated = self.progress.count();
+                insert_sorted_index(
+                    &mut self.sorted_score_indices,
+                    &self.scores,
+                    index as u16,
+                    self.scores[index],
+                    num_scores_calculated,
+                )?;
+                insert_sorted_index(
+                    &mut self.sorted_yield_score_indices,
+                    &self.yield_scores,
+                    index as u16,
+                    self.yield_scores[index],
+                    num_scores_calculated,
+                )?;
+                return Ok(());
+            }
+        }
+
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -594,7 +667,23 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
+        stake_status: StakeStatus,
     ) -> Result<()> {
+        {
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(());
+            }
+        }
+
+        {
+            // Skip if not active
+            if stake_status != StakeStatus::Active {
+                self.progress.set(index, true)?;
+                return Ok(());
+            }
+        }
+
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
                 return Err(invalid_state_error(
@@ -670,7 +759,23 @@ impl StewardState {
         minimum_delegation: u64,
         stake_rent: u64,
         parameters: &Parameters,
+        stake_status: StakeStatus,
     ) -> Result<RebalanceType> {
+        {
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(RebalanceType::None);
+            }
+        }
+
+        {
+            // Skip if not active
+            if stake_status != StakeStatus::Active {
+                self.progress.set(index, true)?;
+                return Ok(RebalanceType::None);
+            }
+        }
+
         if matches!(self.state_tag, StewardStateEnum::Rebalance) {
             if current_epoch >= self.next_cycle_epoch {
                 return Err(invalid_state_error(
