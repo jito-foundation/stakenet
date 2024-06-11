@@ -6,7 +6,7 @@ use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_ad
 
 use super::commands::ViewState;
 use crate::utils::{
-    accounts::{get_all_steward_accounts, UsefulStewardAccounts},
+    accounts::{get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts},
     print::state_tag_to_string,
 };
 

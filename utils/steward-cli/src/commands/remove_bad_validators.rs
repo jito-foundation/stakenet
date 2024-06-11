@@ -23,6 +23,7 @@ use validator_history::id;
 use crate::utils::{
     accounts::{get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts},
     print,
+    transactions::debug_send_single_transaction,
 };
 
 use super::commands::RemoveBadValidators;
@@ -37,6 +38,7 @@ pub async fn command_remove_bad_validators(
     // Creates config account
     let payer =
         read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let arc_payer = Arc::new(payer);
 
     let validator_history_program_id = validator_history_id();
     let steward_config = args.steward_config;
@@ -114,7 +116,7 @@ pub async fn command_remove_bad_validators(
             Instruction {
                 program_id: program_id,
                 accounts: jito_steward::accounts::RemoveValidatorFromPool {
-                    signer: payer.pubkey(),
+                    signer: arc_payer.pubkey(),
                     config: steward_config,
                     steward_state: steward_accounts.state_address,
                     stake_pool_program: spl_stake_pool::id(),
@@ -139,9 +141,11 @@ pub async fn command_remove_bad_validators(
 
     let txs_to_run = _package_remove_bad_validator_instructions(&ixs_to_run, args.priority_fee);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
+    debug_send_single_transaction(&arc_client, &arc_payer, &txs_to_run[4], Some(true)).await;
 
-    let submit_stats = submit_transactions(&arc_client, txs_to_run, &Arc::new(payer)).await?;
+    // println!("Submitting {} instructions", ixs_to_run.len());
+
+    let submit_stats = submit_transactions(&arc_client, txs_to_run, &arc_payer).await?;
 
     println!("Submit stats: {:?}", submit_stats);
 

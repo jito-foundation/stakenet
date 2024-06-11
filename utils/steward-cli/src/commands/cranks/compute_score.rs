@@ -116,7 +116,7 @@ fn _package_compute_score_instructions(
     ixs: &Vec<Instruction>,
     priority_fee: u64,
 ) -> Vec<Vec<Instruction>> {
-    ixs.chunks(1)
+    ixs.chunks(11)
         .map(|chunk: &[Instruction]| {
             let mut chunk_vec = chunk.to_vec();
             chunk_vec.insert(
