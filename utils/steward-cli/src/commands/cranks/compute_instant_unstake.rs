@@ -78,6 +78,15 @@ pub async fn command_crank_compute_instant_unstake(
 
     let cluster_history = get_cluster_history_address(&validator_history_program_id);
 
+    println!(
+        "Validator List Length: {}",
+        steward_accounts.validator_list_account.validators.len()
+    );
+    println!(
+        "Validators in state {}",
+        steward_accounts.state_account.state.num_pool_validators
+    );
+
     let mut dne_error_count = 0;
     let mut outdated_error_count = 0;
     let mut other_error_count = 0;
