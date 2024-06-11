@@ -80,7 +80,7 @@ async fn test_compute_delegations() {
         steward_state_account.state.sorted_yield_score_indices[i] = yield_score_vec[i].0 as u16;
     }
 
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
     steward_state_account.state.state_tag =
         jito_steward::state::StewardStateEnum::ComputeDelegations;
     steward_state_account.state.current_epoch = clock.epoch;
@@ -176,7 +176,8 @@ async fn test_compute_scores() {
     fixture.initialize_config(None).await;
     fixture.initialize_steward_state().await;
 
-    let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
+    let epoch_credits: Vec<(u64, u64, u64)> =
+        vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
     let validator_history_account = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, vote_account.as_ref()],
@@ -239,7 +240,7 @@ async fn test_compute_scores() {
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Basic state setup
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
     steward_state_account.state.state_tag = jito_steward::state::StewardStateEnum::ComputeScores;
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.next_cycle_epoch =
@@ -296,7 +297,7 @@ async fn test_compute_scores() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeScore {
-            validator_list_index: validator_history.index as usize,
+            validator_list_index: validator_history.index as u64,
         }
         .data(),
     };
@@ -578,7 +579,7 @@ async fn test_compute_instant_unstake() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeInstantUnstake {
-            validator_list_index: validator_history.index as usize,
+            validator_list_index: validator_history.index as u64,
         }
         .data(),
     };
@@ -676,7 +677,7 @@ async fn test_idle() {
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
 
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -806,7 +807,7 @@ async fn test_rebalance_increase() {
     steward_config.parameters.stake_deposit_unstake_cap_bps = 0;
     steward_config.parameters.minimum_voting_epochs = 1;
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS - 1;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
 
@@ -964,7 +965,7 @@ async fn test_rebalance_increase() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
-            validator_list_index: MAX_VALIDATORS - 1,
+            validator_list_index: MAX_VALIDATORS as u64 - 1,
         }
         .data(),
     };
@@ -1047,7 +1048,7 @@ async fn test_rebalance_decrease() {
     steward_config.parameters.minimum_voting_epochs = 1;
 
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS - 1;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
 
@@ -1273,7 +1274,7 @@ async fn test_rebalance_decrease() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
-            validator_list_index: MAX_VALIDATORS - 1,
+            validator_list_index: MAX_VALIDATORS as u64 - 1,
         }
         .data(),
     };
@@ -1450,7 +1451,7 @@ async fn test_rebalance_other_cases() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
-            validator_list_index: MAX_VALIDATORS - 1,
+            validator_list_index: MAX_VALIDATORS as u64 - 1,
         }
         .data(),
     };
@@ -1469,7 +1470,7 @@ async fn test_rebalance_other_cases() {
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
-    steward_state_account.state.num_pool_validators = MAX_VALIDATORS;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
     steward_config.set_paused(false);

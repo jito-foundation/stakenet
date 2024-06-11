@@ -35,7 +35,7 @@ pub fn test_compute_scores_to_compute_delegations() {
 
     assert!(state
         .progress
-        .is_complete(state.num_pool_validators)
+        .is_complete(state.num_pool_validators as usize)
         .unwrap());
 
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -261,7 +261,7 @@ pub fn test_compute_instant_unstake_to_rebalance() {
         .unwrap();
     assert!(state
         .progress
-        .is_complete(state.num_pool_validators)
+        .is_complete(state.num_pool_validators as usize)
         .unwrap());
 
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -338,7 +338,7 @@ pub fn test_rebalance_to_idle() {
 
     state.state_tag = StewardStateEnum::Rebalance;
 
-    for i in 0..state.num_pool_validators {
+    for i in 0..state.num_pool_validators as usize {
         let _ = state.progress.set(i, true);
         assert!(matches!(state.state_tag, StewardStateEnum::Rebalance));
     }

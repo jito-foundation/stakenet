@@ -98,7 +98,7 @@ async fn _setup_test_steward_state(
     steward_config.parameters.instant_unstake_cap_bps = 0;
     steward_config.parameters.stake_deposit_unstake_cap_bps = 0;
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
-    steward_state_account.state.num_pool_validators = validators_to_add - 1;
+    steward_state_account.state.num_pool_validators = validators_to_add as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
 
@@ -232,7 +232,7 @@ async fn _set_and_check_preferred_validator(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetPreferredValidator {
-            validator_type: preferred_validator_type.clone(),
+            validator_type: preferred_validator_type.clone().into(),
             validator,
         }
         .data(),
@@ -559,7 +559,7 @@ async fn test_remove_validator_from_pool() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorFromPool {
-            validator_list_index,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };

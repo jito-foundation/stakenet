@@ -58,7 +58,7 @@ fn test_compute_scores() {
     }
     assert!(state
         .progress
-        .is_complete(state.num_pool_validators)
+        .is_complete(state.num_pool_validators as usize)
         .unwrap());
     assert!(state.scores[0..3] == [1_000_000_000, 0, 950_000_000]);
     assert!(state.sorted_score_indices[0..3] == [0, 2, 1]);
