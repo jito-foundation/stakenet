@@ -161,8 +161,6 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         StewardError::ValidatorNotRemovable
     );
 
-    state_account.state.remove_validator(validator_list_index)?;
-
     invoke_signed(
         &spl_stake_pool::instruction::remove_validator_from_pool(
             &ctx.accounts.stake_pool_program.key(),

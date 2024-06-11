@@ -3,6 +3,7 @@ use crate::{
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
+use spl_stake_pool::state::PodStakeStatus;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 #[derive(Accounts)]
@@ -47,6 +48,12 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         validator_stake_info.vote_account_address == validator_history.vote_account,
         StewardError::ValidatorNotInList
     );
+
+    match validator_stake_info.status {
+        PodStakeStatus::Active(_) => {
+            return Err(StewardError::ValidatorNotInList.into());
+        }
+    }
 
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());

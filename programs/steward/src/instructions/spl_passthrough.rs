@@ -182,8 +182,6 @@ pub fn remove_validator_from_pool_handler(
         if validator_list_stake_account != ctx.accounts.stake_account.key() {
             return Err(StewardError::ValidatorNotInList.into());
         }
-
-        state_account.state.remove_validator(validator_list_index)?;
     }
 
     invoke_signed(
@@ -234,7 +232,7 @@ pub struct SetPreferredValidator<'info> {
     )]
     pub staker: Account<'info, Staker>,
     #[account(address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     #[account(mut, address = get_config_authority(&config)?)]
     pub signer: Signer<'info>,
 }
@@ -301,7 +299,7 @@ pub struct IncreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut)]
+    #[account(mut, address = stake_pool.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -429,7 +427,7 @@ pub struct DecreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut)]
+    #[account(mut, address = stake_pool.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -550,7 +548,7 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
@@ -683,7 +681,7 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,

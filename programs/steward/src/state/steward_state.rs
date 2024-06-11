@@ -39,8 +39,13 @@ pub fn maybe_transition_and_emit(
     params: &Parameters,
     epoch_schedule: &EpochSchedule,
 ) -> Result<()> {
+    if clock.epoch != state_account.current_epoch {
+        return Err(StewardError::EpochUpdateNotComplete.into());
+    }
+
     let initial_state = state_account.state_tag.to_string();
     state_account.transition(clock, params, epoch_schedule)?;
+
     if initial_state != state_account.state_tag.to_string() {
         emit!(StateTransition {
             epoch: clock.epoch,
@@ -202,6 +207,7 @@ impl StewardState {
         let current_epoch = clock.epoch;
         let current_slot = clock.slot;
         let epoch_progress = epoch_progress(clock, epoch_schedule)?;
+
         match self.state_tag {
             StewardStateEnum::ComputeScores => self.transition_compute_scores(
                 current_epoch,
@@ -271,7 +277,6 @@ impl StewardState {
             )?;
         } else if self.compute_delegations_completed.into() {
             self.state_tag = StewardStateEnum::Idle;
-            self.current_epoch = current_epoch;
             self.rebalance_completed = false.into();
         }
         Ok(())
@@ -319,7 +324,6 @@ impl StewardState {
             )?;
         } else if current_epoch > self.current_epoch {
             self.state_tag = StewardStateEnum::Idle;
-            self.current_epoch = current_epoch;
             self.instant_unstake = BitMask::default();
             self.progress = BitMask::default();
         } else if self.progress.is_complete(self.num_pool_validators)? {
@@ -345,12 +349,10 @@ impl StewardState {
             )?;
         } else if current_epoch > self.current_epoch {
             self.state_tag = StewardStateEnum::Idle;
-            self.current_epoch = current_epoch;
             self.progress = BitMask::default();
             self.rebalance_completed = false.into();
         } else if self.progress.is_complete(self.num_pool_validators)? {
             self.state_tag = StewardStateEnum::Idle;
-            self.current_epoch = current_epoch;
             self.rebalance_completed = true.into();
         }
         Ok(())
@@ -367,7 +369,6 @@ impl StewardState {
         self.scores = [0; MAX_VALIDATORS];
         self.yield_scores = [0; MAX_VALIDATORS];
         self.progress = BitMask::default();
-        self.current_epoch = current_epoch;
         self.next_cycle_epoch = current_epoch
             .checked_add(num_epochs_between_scoring)
             .ok_or(StewardError::ArithmeticError)?;

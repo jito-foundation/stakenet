@@ -50,4 +50,6 @@ pub enum StewardError {
     MaxValidatorsReached,
     #[msg("Validator history account does not match vote account")]
     ValidatorHistoryMismatch,
+    #[msg("Epoch Update must be called before continuing")]
+    EpochUpdateNotComplete,
 }

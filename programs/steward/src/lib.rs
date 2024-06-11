@@ -90,6 +90,11 @@ pub mod steward {
         instructions::auto_remove_validator_from_pool::handler(ctx, validator_list_index)
     }
 
+    /// Housekeeping, run at the start of any new epoch before any other instructions
+    pub fn epoch_update(ctx: Context<EpochUpdate>) -> Result<()> {
+        instructions::epoch_update::handler(ctx)
+    }
+
     /// Computes score for a the validator at `validator_list_index` for the current cycle.
     pub fn compute_score(ctx: Context<ComputeScore>, validator_list_index: usize) -> Result<()> {
         instructions::compute_score::handler(ctx, validator_list_index)
