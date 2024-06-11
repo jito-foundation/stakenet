@@ -1,4 +1,7 @@
-use anchor_lang::{prelude::Result, zero_copy, IdlBuild};
+// #[cfg(feature = "idl-build")]
+use anchor_lang::idl::types::*;
+use anchor_lang::idl::*;
+use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
 use validator_history::utils::cast_epoch;
 
@@ -33,6 +36,113 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
+}
+
+// #[cfg(feature = "idl-build")]
+impl IdlBuild for UpdateParametersArgs {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "UpdateParametersArgs".to_string(),
+            ty: IdlTypeDefTy::Struct {
+                fields: Some(IdlDefinedFields::Named(vec![
+                    IdlField {
+                        name: "mev_commission_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "epoch_credits_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "commission_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "scoring_delinquency_threshold_ratio".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_delinquency_threshold_ratio".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "mev_commission_bps_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "commission_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "historical_commission_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "num_delegation_validators".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "scoring_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "stake_deposit_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "compute_score_slot_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_inputs_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "num_epochs_between_scoring".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "minimum_stake_lamports".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "minimum_voting_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                ])),
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
 }
 
 #[derive(BorshSerialize, Default)]

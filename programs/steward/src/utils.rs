@@ -1,11 +1,11 @@
 use std::ops::{Deref, Not};
 
-use anchor_lang::{prelude::*, IdlBuild};
+use anchor_lang::{idl::types::*, prelude::*};
 use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
     big_vec::BigVec,
-    state::{ValidatorListHeader, ValidatorStakeInfo},
+    state::{StakePool as SPLStakePool, ValidatorListHeader, ValidatorStakeInfo},
 };
 
 use crate::{errors::StewardError, Config, Delegation};
@@ -143,6 +143,45 @@ pub fn deserialize_validator_list(
     Ok(spl_stake_pool::state::ValidatorList::deserialize(
         &mut data.as_ref(),
     )?)
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct PreferredValidatorType(spl_stake_pool::instruction::PreferredValidatorType);
+
+impl AsRef<spl_stake_pool::instruction::PreferredValidatorType> for PreferredValidatorType {
+    fn as_ref(&self) -> &spl_stake_pool::instruction::PreferredValidatorType {
+        &self.0
+    }
+}
+
+impl From<spl_stake_pool::instruction::PreferredValidatorType> for PreferredValidatorType {
+    fn from(val: spl_stake_pool::instruction::PreferredValidatorType) -> Self {
+        Self(val)
+    }
+}
+
+impl IdlBuild for PreferredValidatorType {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "PreferredValidatorType".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "Deposit".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Withdraw".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
 }
 
 #[derive(Clone)]

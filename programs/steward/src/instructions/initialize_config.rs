@@ -1,6 +1,9 @@
 use anchor_lang::{prelude::*, solana_program::program::invoke};
 
-use crate::{utils::StakePool, Config, Staker, UpdateParametersArgs};
+use crate::{
+    utils::{deserialize_stake_pool, StakePool},
+    Config, Staker, UpdateParametersArgs,
+};
 
 #[derive(Accounts)]
 pub struct InitializeConfig<'info> {
@@ -23,8 +26,9 @@ pub struct InitializeConfig<'info> {
     )]
     pub staker: Account<'info, Staker>,
 
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
 
     /// CHECK: CPI program
     #[account(address = spl_stake_pool::ID)]
@@ -34,7 +38,7 @@ pub struct InitializeConfig<'info> {
 
     #[account(
         mut,
-        address = stake_pool.staker
+        address = deserialize_stake_pool(&stake_pool)?.staker
     )]
     pub signer: Signer<'info>,
 }
@@ -44,6 +48,8 @@ pub fn handler(
     authority: Pubkey,
     update_parameters_args: &UpdateParametersArgs,
 ) -> Result<()> {
+    // Confirm that the stake pool is valid
+    let _ = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
     let mut config = ctx.accounts.config.load_init()?;
     config.stake_pool = ctx.accounts.stake_pool.key();
     config.authority = authority;

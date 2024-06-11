@@ -43,6 +43,7 @@ pub struct ReallocState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
+    /// CHECK: TODO
     #[account(
         owner = spl_stake_pool::ID,
     )]

@@ -1,8 +1,9 @@
 #![allow(clippy::redundant_pub_crate)]
 use anchor_lang::prelude::*;
+use anchor_lang::IdlBuild;
 use instructions::*;
 
-use spl_stake_pool::instruction::PreferredValidatorType;
+use crate::utils::PreferredValidatorType;
 
 mod allocator;
 pub mod constants;
@@ -204,7 +205,7 @@ pub mod steward {
     ) -> Result<()> {
         instructions::spl_passthrough::set_preferred_validator_handler(
             ctx,
-            validator_type,
+            validator_type.as_ref(),
             validator,
         )
     }

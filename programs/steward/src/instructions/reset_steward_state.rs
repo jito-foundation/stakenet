@@ -2,7 +2,7 @@ use crate::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
-    utils::{get_config_authority, get_stake_pool_address, StakePool},
+    utils::{deserialize_stake_pool, get_config_authority, get_stake_pool_address, StakePool},
     BitMask, Delegation, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
@@ -19,10 +19,12 @@ pub struct ResetStewardState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
+    /// CHECK: TODO
     #[account(address = get_stake_pool_address(&config)?)]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
 
-    #[account(address = stake_pool.validator_list)]
+    /// CHECK: TODO
+    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
 
     #[account(mut, address = get_config_authority(&config)?)]
@@ -44,7 +46,7 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
     state_account.state.state_tag = StewardStateEnum::ComputeScores;
-    state_account.state.num_pool_validators = validator_list.len() as usize;
+    state_account.state.num_pool_validators = validator_list.len() as u64;
     state_account.state.scores = [0; MAX_VALIDATORS];
     state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
     state_account.state.yield_scores = [0; MAX_VALIDATORS];

@@ -20,6 +20,7 @@ pub struct ComputeScore<'info> {
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
+    /// CHECK: TODO
     #[account(owner = spl_stake_pool::id())]
     pub validator_list: AccountInfo<'info>,
 
@@ -53,7 +54,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let num_pool_validators = {
         let mut validator_list_data = validator_list.try_borrow_mut_data()?;
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
-        validator_list.len() as usize
+        validator_list.len() as u64
     };
 
     if config.is_paused() {

@@ -13,6 +13,7 @@ use crate::{
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index, U8Bool},
     Config, Parameters,
 };
+use anchor_lang::idl::types::*;
 use anchor_lang::{prelude::*, IdlBuild};
 
 use bytemuck::{Pod, Zeroable};
@@ -21,7 +22,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
 fn invalid_state_error(expected: String, actual: String) -> Error {
-    msg!("Invalid state. Expected {}, Actual {}", expected, actual);
+    // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
 }
 
@@ -191,15 +192,41 @@ impl Display for StewardStateEnum {
     }
 }
 
-// impl IdlBuild for StewardStateEnum {
-//     #[cfg(feature = "idl-build")]
-//     fn create_type() -> Option<IdlTypeDef> {
-//         Some(IdlTypeDef {
-//             name: "StewardStateEnum".into(),
-//             ty: IdlTypeDef::
-//         })
-//     }
-// }
+impl IdlBuild for StewardStateEnum {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "StewardStateEnum".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "ComputeScores".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "ComputeDelegations".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Idle".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "ComputeInstantUnstake".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Rebalance".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
+}
 
 impl StewardState {
     /// Top level transition method. Tries to transition to a new state based on current state and epoch conditions
