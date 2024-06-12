@@ -52,4 +52,10 @@ pub enum StewardError {
     ValidatorHistoryMismatch,
     #[msg("Epoch Update must be called before continuing")]
     EpochUpdateNotComplete,
+    #[msg("The stake pool must be updated before continuing")]
+    StakePoolNotUpdated,
+    #[msg("Validator not marked for removal")]
+    ValidatorNotMarkedForRemoval,
+    #[msg("Not all validators have been removed from the list")]
+    NotAllValidatorsRemoved,
 }

@@ -3,7 +3,7 @@ use crate::{
     errors::StewardError,
     state::{Config, StewardStateAccount},
     utils::{get_config_authority, get_stake_pool, StakePool},
-    BitMask, Delegation, StewardStateEnum,
+    BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE, STATE_PADDING_1_SIZE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::ValidatorListHeader;
@@ -59,6 +59,8 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     state_account.state.rebalance_completed = false.into();
     state_account.state.instant_unstake = BitMask::default();
     state_account.state.start_computing_scores_slot = clock.slot;
-    state_account.state._padding0 = [0; 6 + MAX_VALIDATORS * 8];
+    state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
+    state_account.state.validators_to_remove = BitMask::default();
+    state_account.state._padding1 = [0; STATE_PADDING_1_SIZE];
     Ok(())
 }

@@ -91,8 +91,11 @@ pub mod steward {
     }
 
     /// Housekeeping, run at the start of any new epoch before any other instructions
-    pub fn epoch_update(ctx: Context<EpochUpdate>) -> Result<()> {
-        instructions::epoch_update::handler(ctx)
+    pub fn epoch_maintenance(
+        ctx: Context<EpochMaintenance>,
+        validator_index_to_remove: Option<usize>,
+    ) -> Result<()> {
+        instructions::epoch_maintenance::handler(ctx, validator_index_to_remove)
     }
 
     /// Computes score for a the validator at `validator_list_index` for the current cycle.

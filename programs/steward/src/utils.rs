@@ -86,6 +86,16 @@ pub fn get_validator_stake_info_at_index(
     Ok(validator_stake_info)
 }
 
+pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> Result<usize> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+    Ok(validator_list.len() as usize)
+}
+
 /// A boolean type stored as a u8.
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
 #[zero_copy]

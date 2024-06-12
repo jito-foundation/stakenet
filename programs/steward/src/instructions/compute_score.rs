@@ -89,7 +89,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         &cluster_history,
         &config,
         num_pool_validators,
-        StakeStatus::try_from(validator_stake_info.status).unwrap(),
     )?;
 
     maybe_transition_and_emit(

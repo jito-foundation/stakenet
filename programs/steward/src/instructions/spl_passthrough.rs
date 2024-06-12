@@ -143,8 +143,8 @@ pub struct RemoveValidatorFromPool<'info> {
     pub staker: Account<'info, Staker>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
-    #[account(mut)]
-    pub validator_list: Account<'info, ValidatorList>,
+    #[account(mut, address = stake_pool.validator_list)]
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub stake_account: AccountInfo<'info>,
@@ -165,6 +165,13 @@ pub fn remove_validator_from_pool_handler(
     validator_list_index: usize,
 ) -> Result<()> {
     let mut state_account = ctx.accounts.steward_state.load_mut()?;
+    let epoch = Clock::get()?.epoch;
+
+    // Should not be able to remove a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochUpdateNotComplete
+    );
 
     if validator_list_index < state_account.state.num_pool_validators {
         let validator_list_stake_info = get_validator_stake_info_at_index(
@@ -183,6 +190,10 @@ pub fn remove_validator_from_pool_handler(
             return Err(StewardError::ValidatorNotInList.into());
         }
     }
+
+    state_account
+        .state
+        .mark_validator_for_removal(validator_list_index)?;
 
     invoke_signed(
         &spl_stake_pool::instruction::remove_validator_from_pool(

@@ -37,31 +37,34 @@ pub struct StateTransition {
 }
 
 pub fn maybe_transition_and_emit(
-    state_account: &mut StewardState,
+    steward_state: &mut StewardState,
     clock: &Clock,
     params: &Parameters,
     epoch_schedule: &EpochSchedule,
 ) -> Result<()> {
-    if clock.epoch != state_account.current_epoch {
-        return Err(StewardError::EpochUpdateNotComplete.into());
-    }
+    require!(
+        clock.epoch == steward_state.current_epoch,
+        StewardError::EpochUpdateNotComplete
+    );
 
-    let initial_state = state_account.state_tag.to_string();
-    state_account.transition(clock, params, epoch_schedule)?;
+    let initial_state = steward_state.state_tag.to_string();
+    steward_state.transition(clock, params, epoch_schedule)?;
 
-    if initial_state != state_account.state_tag.to_string() {
+    if initial_state != steward_state.state_tag.to_string() {
         emit!(StateTransition {
             epoch: clock.epoch,
             slot: clock.slot,
             previous_state: initial_state,
-            new_state: state_account.state_tag.to_string(),
+            new_state: steward_state.state_tag.to_string(),
         });
     }
     Ok(())
 }
 
 /// Tracks state of the stake pool.
-/// Follow state transitions here: [TODO add link to github diagram]
+/// Follow state transitions here:
+/// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
+// TODO Reorder fields to optimize for alignment
 #[derive(BorshSerialize)]
 #[zero_copy]
 pub struct StewardState {
@@ -123,10 +126,19 @@ pub struct StewardState {
     /// Tracks whether unstake and delegate steps have completed
     pub rebalance_completed: U8Bool,
 
+    pub _padding0: [u8; STATE_PADDING_0_SIZE],
+    // TODO add closer to the top
+    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This is cleaned up in the next epoch
+    pub validators_to_remove: BitMask,
+
     /// Future state and #[repr(C)] alignment
-    pub _padding0: [u8; 6 + MAX_VALIDATORS * 8],
+    pub _padding1: [u8; STATE_PADDING_1_SIZE],
     // TODO ADD MORE PADDING
 }
+
+pub const STATE_PADDING_0_SIZE: usize = 6;
+pub const STATE_PADDING_1_SIZE: usize = MAX_VALIDATORS * 8 - std::mem::size_of::<BitMask>();
 
 #[derive(Clone, Copy)]
 #[repr(u64)]
@@ -388,6 +400,11 @@ impl StewardState {
 
     /// Update internal state when a validator is removed from the pool
     pub fn remove_validator(&mut self, index: usize) -> Result<()> {
+        require!(
+            self.validators_to_remove.get(index)?,
+            StewardError::ValidatorNotMarkedForRemoval
+        );
+
         self.num_pool_validators = self
             .num_pool_validators
             .checked_sub(1)
@@ -403,6 +420,8 @@ impl StewardState {
             self.instant_unstake
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
+            self.validators_to_remove
+                .set(i, self.validators_to_remove.get(next_i)?)?;
         }
 
         // Update score indices
@@ -451,44 +470,16 @@ impl StewardState {
         self.delegations[self.num_pool_validators] = Delegation::default();
         self.instant_unstake.set(self.num_pool_validators, false)?;
         self.progress.set(self.num_pool_validators, false)?;
+        self.progress.set(self.num_pool_validators, false)?;
 
         Ok(())
     }
 
-    /// Marks a validator as skipped in the current state
-    pub fn skip_bad_validator(&mut self, index: usize) -> Result<()> {
-        {
-            // Skip if already processed
-            if self.progress.get(index)? {
-                return Ok(());
-            }
-        }
-
-        match self.state_tag {
-            StewardStateEnum::ComputeScores => {
-                self.scores[index] = 0 as u32;
-                self.yield_scores[index] = 0 as u32;
-
-                let num_scores_calculated = self.progress.count();
-                insert_sorted_index(
-                    &mut self.sorted_score_indices,
-                    &self.scores,
-                    index as u16,
-                    self.scores[index],
-                    num_scores_calculated,
-                )?;
-                insert_sorted_index(
-                    &mut self.sorted_yield_score_indices,
-                    &self.yield_scores,
-                    index as u16,
-                    self.yield_scores[index],
-                    num_scores_calculated,
-                )?;
-            }
-            _ => {}
-        }
-
-        self.progress.set(index, true)?;
+    /// Mark a validator for removal from the pool - this happens right after
+    /// `remove_validator_from_pool` has been called on the stake pool
+    /// This is cleaned up in the next epoch
+    pub fn mark_validator_for_removal(&mut self, index: usize) -> Result<()> {
+        self.validators_to_remove.set(index, true)?;
         Ok(())
     }
 
@@ -508,7 +499,6 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: usize,
-        stake_status: StakeStatus,
     ) -> Result<()> {
         {
             // Skip if already processed
@@ -518,8 +508,8 @@ impl StewardState {
         }
 
         {
-            // Skip if not active
-            if stake_status != StakeStatus::Active {
+            // Skip if marked for deletion
+            if self.validators_to_remove.get(index)? {
                 self.scores[index] = 0 as u32;
                 self.yield_scores[index] = 0 as u32;
 
@@ -677,8 +667,8 @@ impl StewardState {
         }
 
         {
-            // Skip if not active
-            if stake_status != StakeStatus::Active {
+            // Skip if marked for deletion
+            if self.validators_to_remove.get(index)? {
                 self.progress.set(index, true)?;
                 return Ok(());
             }
@@ -769,8 +759,8 @@ impl StewardState {
         }
 
         {
-            // Skip if not active
-            if stake_status != StakeStatus::Active {
+            // Skip if marked for deletion
+            if self.validators_to_remove.get(index)? {
                 self.progress.set(index, true)?;
                 return Ok(RebalanceType::None);
             }
