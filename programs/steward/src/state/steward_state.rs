@@ -16,10 +16,7 @@ use crate::{
 use anchor_lang::prelude::*;
 
 use bytemuck::{Pod, Zeroable};
-use spl_stake_pool::{
-    big_vec::BigVec,
-    state::{StakeStatus, ValidatorStakeInfo},
-};
+use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
@@ -514,38 +511,6 @@ impl StewardState {
         config: &Config,
         num_pool_validators: usize,
     ) -> Result<()> {
-        {
-            // Skip if already processed
-            if self.progress.get(index)? {
-                return Ok(());
-            }
-        }
-
-        {
-            // Skip if marked for deletion
-            if self.validators_to_remove.get(index)? {
-                self.scores[index] = 0 as u32;
-                self.yield_scores[index] = 0 as u32;
-
-                let num_scores_calculated = self.progress.count();
-                insert_sorted_index(
-                    &mut self.sorted_score_indices,
-                    &self.scores,
-                    index as u16,
-                    self.scores[index],
-                    num_scores_calculated,
-                )?;
-                insert_sorted_index(
-                    &mut self.sorted_yield_score_indices,
-                    &self.yield_scores,
-                    index as u16,
-                    self.yield_scores[index],
-                    num_scores_calculated,
-                )?;
-                return Ok(());
-            }
-        }
-
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -584,13 +549,42 @@ impl StewardState {
                     config.parameters.num_epochs_between_scoring,
                 )?;
                 // Updates num_pool_validators at the start of the cycle so validator additions later won't be considered
+
                 require!(
                     num_pool_validators
                         == self.num_pool_validators + self.validators_added as usize,
-                    StewardError::ValidatorListTypeMismatch
+                    StewardError::ListStateMismatch
                 );
                 self.num_pool_validators = num_pool_validators;
                 self.validators_added = 0;
+            }
+
+            // Skip scoring if already processed
+            if self.progress.get(index)? {
+                return Ok(());
+            }
+
+            // Skip scoring if marked for deletion
+            if self.validators_to_remove.get(index)? {
+                self.scores[index] = 0_u32;
+                self.yield_scores[index] = 0_u32;
+
+                let num_scores_calculated = self.progress.count();
+                insert_sorted_index(
+                    &mut self.sorted_score_indices,
+                    &self.scores,
+                    index as u16,
+                    self.scores[index],
+                    num_scores_calculated,
+                )?;
+                insert_sorted_index(
+                    &mut self.sorted_yield_score_indices,
+                    &self.yield_scores,
+                    index as u16,
+                    self.yield_scores[index],
+                    num_scores_calculated,
+                )?;
+                return Ok(());
             }
 
             let score = validator_score(validator, index, cluster, config, current_epoch as u16)?;
@@ -677,23 +671,7 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-        stake_status: StakeStatus,
     ) -> Result<()> {
-        {
-            // Skip if already processed
-            if self.progress.get(index)? {
-                return Ok(());
-            }
-        }
-
-        {
-            // Skip if marked for deletion
-            if self.validators_to_remove.get(index)? {
-                self.progress.set(index, true)?;
-                return Ok(());
-            }
-        }
-
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
                 return Err(invalid_state_error(
@@ -706,6 +684,17 @@ impl StewardState {
                 < config.parameters.instant_unstake_epoch_progress
             {
                 return Err(StewardError::InstantUnstakeNotReady.into());
+            }
+
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(());
+            }
+
+            // Skip if marked for deletion
+            if self.validators_to_remove.get(index)? {
+                self.progress.set(index, true)?;
+                return Ok(());
             }
 
             let first_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
@@ -769,23 +758,7 @@ impl StewardState {
         minimum_delegation: u64,
         stake_rent: u64,
         parameters: &Parameters,
-        stake_status: StakeStatus,
     ) -> Result<RebalanceType> {
-        {
-            // Skip if already processed
-            if self.progress.get(index)? {
-                return Ok(RebalanceType::None);
-            }
-        }
-
-        {
-            // Skip if marked for deletion
-            if self.validators_to_remove.get(index)? {
-                self.progress.set(index, true)?;
-                return Ok(RebalanceType::None);
-            }
-        }
-
         if matches!(self.state_tag, StewardStateEnum::Rebalance) {
             if current_epoch >= self.next_cycle_epoch {
                 return Err(invalid_state_error(
@@ -793,6 +766,18 @@ impl StewardState {
                     self.state_tag.to_string(),
                 ));
             }
+
+            // Skip if already processed
+            if self.progress.get(index)? {
+                return Ok(RebalanceType::None);
+            }
+
+            // Skip if marked for deletion
+            if self.validators_to_remove.get(index)? {
+                self.progress.set(index, true)?;
+                return Ok(RebalanceType::None);
+            }
+
             let base_lamport_balance = minimum_delegation
                 .checked_add(stake_rent)
                 .ok_or(StewardError::ArithmeticError)?;

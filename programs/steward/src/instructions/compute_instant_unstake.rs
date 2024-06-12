@@ -3,7 +3,6 @@ use crate::{
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::{PodStakeStatus, StakeStatus};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 #[derive(Accounts)]
@@ -60,7 +59,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         validator_list_index,
         &cluster,
         &config,
-        StakeStatus::try_from(validator_stake_info.status).unwrap(),
     )?;
 
     maybe_transition_and_emit(

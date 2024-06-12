@@ -4,7 +4,6 @@ use crate::{
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
-use spl_stake_pool::state;
 
 #[derive(Accounts)]
 pub struct EpochMaintenance<'info> {
@@ -66,7 +65,7 @@ pub fn handler(
 
     {
         // Routine - Update state
-        let okay_to_update = state_account.state.validators_to_remove.count() == 0;
+        let okay_to_update = state_account.state.validators_to_remove.is_empty();
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;
         }

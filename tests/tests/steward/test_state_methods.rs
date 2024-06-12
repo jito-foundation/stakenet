@@ -14,7 +14,7 @@ use jito_steward::{
     Delegation, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
-use spl_stake_pool::{big_vec::BigVec, state::StakeStatus};
+use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
 
@@ -71,6 +71,7 @@ fn test_compute_scores() {
     assert!(state.current_epoch == current_epoch);
 
     // Test invalid state
+    state.progress.reset();
     state.state_tag = StewardStateEnum::Idle;
     let res = state.compute_score(
         clock,
@@ -187,25 +188,26 @@ fn test_compute_scores() {
     assert!(res.is_ok());
     assert!(state.start_computing_scores_slot == clock.slot);
     assert!(state.next_cycle_epoch == current_epoch + parameters.num_epochs_between_scoring);
-    assert!(state.current_epoch == current_epoch);
     assert!(state.num_pool_validators == 4);
 
     // 2) Progress stalled and time moved into next epoch
     // Conditions: clock.epoch > state.current_epoch and !state.progress.is_empty()
-    state.current_epoch = current_epoch - 1;
-    assert!(!state.progress.is_empty());
-    assert!(state.current_epoch < clock.epoch);
-    let res = state.compute_score(
-        clock,
-        epoch_schedule,
-        &validators[0],
-        validators[0].index as usize,
-        cluster_history,
-        config,
-        state.num_pool_validators,
-    );
-    assert!(res.is_ok());
-    assert!(state.current_epoch == current_epoch);
+    // REDACTED: The epoch is now updated in the epoch_maintenance method
+
+    // state.current_epoch = current_epoch - 1;
+    // assert!(!state.progress.is_empty());
+    // assert!(state.current_epoch < clock.epoch);
+    // let res = state.compute_score(
+    //     clock,
+    //     epoch_schedule,
+    //     &validators[0],
+    //     validators[0].index as usize,
+    //     cluster_history,
+    //     config,
+    //     state.num_pool_validators,
+    // );
+    // assert!(res.is_ok());
+    // assert!(state.current_epoch == current_epoch);
 
     // 3) Progress started, but took >1000 slots to complete
     // Conditions: start_computing_scores_slot > 1000 slots ago, !progress.is_empty(), and clock.epoch == state.current_epoch
@@ -225,6 +227,8 @@ fn test_compute_scores() {
         state.num_pool_validators,
     );
     assert!(res.is_ok());
+    println!("{:?}", state.start_computing_scores_slot);
+    println!("{:?}", clock.slot);
     assert!(state.start_computing_scores_slot == clock.slot);
 }
 
@@ -316,7 +320,6 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InstantUnstakeNotReady)));
 
@@ -329,7 +332,6 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InvalidState)));
 
@@ -342,7 +344,6 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::InvalidState)));
 
@@ -362,7 +363,6 @@ fn test_compute_instant_unstake_errors() {
         validator.index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::VoteHistoryNotRecentEnough)));
 
@@ -379,7 +379,6 @@ fn test_compute_instant_unstake_errors() {
         validator.index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::VoteHistoryNotRecentEnough)));
 
@@ -394,7 +393,6 @@ fn test_compute_instant_unstake_errors() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res == Err(Error::from(StewardError::ClusterHistoryNotRecentEnough)));
 }
@@ -422,7 +420,6 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(matches!(
@@ -434,7 +431,19 @@ fn test_compute_instant_unstake_success() {
         .get(validators[0].index as usize)
         .unwrap());
 
+    // Should skip validator since it's already been computed
+    let res = state.compute_instant_unstake(
+        clock,
+        epoch_schedule,
+        &validators[0],
+        validators[0].index as usize,
+        cluster_history,
+        config,
+    );
+    assert!(res.is_ok());
+
     // Instant unstakeable validator
+    state.progress.reset();
     state.instant_unstake.reset();
     config
         .blacklist
@@ -448,7 +457,6 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state
@@ -458,6 +466,7 @@ fn test_compute_instant_unstake_success() {
 
     // Instant unstakeable validator with no delegation amount
     state.delegations[validators[0].index as usize] = Delegation::new(0, 1);
+    state.progress.reset();
     state.instant_unstake.reset();
     let res = state.compute_instant_unstake(
         clock,
@@ -466,7 +475,6 @@ fn test_compute_instant_unstake_success() {
         validators[0].index as usize,
         cluster_history,
         config,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state
@@ -517,7 +525,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -553,7 +560,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
 
     assert!(res.is_ok());
@@ -582,6 +588,24 @@ fn test_rebalance() {
         _ => panic!("Expected RebalanceType::Decrease"),
     }
 
+    // Test that rebalance will be skipped if validator has already been run
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        1,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        1000 * LAMPORTS_PER_SOL,
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected RebalanceType::None"),
+    }
+
     // Instant unstake validator, but no delegation, so other delegations are not affected
     // Same scenario as above but out-of-band validator
     state.delegations[0..3].copy_from_slice(&[
@@ -600,6 +624,7 @@ fn test_rebalance() {
     // Validator index 1: 1000 SOL, 0.5 score, 0 delegation, -> Decrease stake, from "instant unstake" category, and set delegation to 0
     // Validator index 2: 1000 SOL, 0 score, 0 delegation -> Decrease stake, from "regular unstake" category
 
+    state.progress.reset();
     let res = state.rebalance(
         fixtures.current_epoch,
         1,
@@ -609,7 +634,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -651,6 +675,8 @@ fn test_rebalance() {
     state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.instant_unstake.reset();
     state.instant_unstake.set(0, true).unwrap();
+
+    state.progress.reset();
     let res = state.rebalance(
         fixtures.current_epoch,
         0,
@@ -660,7 +686,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -683,6 +708,7 @@ fn test_rebalance() {
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 1_000_000_000, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.progress.reset();
     let res = state.rebalance(
         fixtures.current_epoch,
         0,
@@ -692,7 +718,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     match res.unwrap() {
@@ -711,7 +736,6 @@ fn test_rebalance() {
         0,
         0,
         &fixtures.config.parameters,
-        StakeStatus::Active,
     );
     match res {
         Ok(_) => panic!("Expected StewardError::InvalidState"),

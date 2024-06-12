@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, rc::Rc, str::FromStr, vec};
 
 use crate::spl_stake_pool_cli;
@@ -176,6 +177,30 @@ impl TestFixture {
         };
 
         account
+    }
+
+    pub async fn simulate_stake_pool_update(&self) {
+        let stake_pool: StakePool = self
+            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
+            .await;
+
+        let mut stake_pool_spl = stake_pool.as_ref().clone();
+
+        let current_epoch = self
+            .ctx
+            .borrow_mut()
+            .banks_client
+            .get_sysvar::<Clock>()
+            .await
+            .unwrap()
+            .epoch;
+
+        stake_pool_spl.last_update_epoch = current_epoch;
+
+        self.ctx.borrow_mut().set_account(
+            &self.stake_pool_meta.stake_pool,
+            &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
+        );
     }
 
     pub async fn initialize_stake_pool(&self) {

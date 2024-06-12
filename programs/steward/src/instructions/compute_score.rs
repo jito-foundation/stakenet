@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::{StakeStatus, ValidatorListHeader};
 
 use crate::{
     errors::StewardError,

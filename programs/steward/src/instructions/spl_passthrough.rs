@@ -9,7 +9,6 @@ use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{
     get_config_authority, get_stake_pool, get_validator_stake_info_at_index, StakePool,
-    ValidatorList,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
