@@ -15,7 +15,7 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
     Config, Delegation, Parameters, Staker, StewardState, StewardStateAccount, StewardStateEnum,
-    UpdateParametersArgs,
+    UpdateParametersArgs, STATE_PADDING_0_SIZE, STATE_PADDING_1_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -929,7 +929,10 @@ impl Default for StateMachineFixtures {
             instant_unstake: BitMask::default(),
             compute_delegations_completed: false.into(),
             rebalance_completed: false.into(),
-            _padding0: [0; 6 + 8 * MAX_VALIDATORS],
+            _padding0: [0; STATE_PADDING_0_SIZE],
+            validators_added: 0,
+            validators_to_remove: BitMask::default(),
+            _padding1: [0; STATE_PADDING_1_SIZE],
         };
 
         StateMachineFixtures {

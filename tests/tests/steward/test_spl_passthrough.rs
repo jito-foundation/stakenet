@@ -162,6 +162,7 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
     let instruction = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AddValidatorToPool {
+            steward_state: fixture.steward_state,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,

@@ -52,7 +52,6 @@ fn test_compute_scores() {
             cluster_history,
             config,
             state.num_pool_validators,
-            StakeStatus::Active,
         );
         assert!(res.is_ok());
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -81,7 +80,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert_eq!(res, Err(Error::from(StewardError::InvalidState)));
 
@@ -102,7 +100,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -123,7 +120,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -142,7 +138,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert_eq!(
         res,
@@ -166,7 +161,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     // validator would not have a score of 0 if it was not blacklisted
@@ -189,7 +183,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.start_computing_scores_slot == clock.slot);
@@ -210,7 +203,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.current_epoch == current_epoch);
@@ -231,7 +223,6 @@ fn test_compute_scores() {
         cluster_history,
         config,
         state.num_pool_validators,
-        StakeStatus::Active,
     );
     assert!(res.is_ok());
     assert!(state.start_computing_scores_slot == clock.slot);

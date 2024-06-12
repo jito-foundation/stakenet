@@ -29,7 +29,6 @@ pub fn test_compute_scores_to_compute_delegations() {
                 cluster_history,
                 config,
                 state.num_pool_validators,
-                StakeStatus::Active,
             )
             .unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -72,7 +71,6 @@ pub fn test_compute_scores_to_new_compute_scores() {
             cluster_history,
             config,
             state.num_pool_validators,
-            StakeStatus::Active,
         )
         .unwrap();
     assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));

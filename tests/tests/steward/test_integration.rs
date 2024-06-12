@@ -918,6 +918,7 @@ async fn test_rebalance_increase() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
@@ -1150,6 +1151,8 @@ async fn test_rebalance_decrease() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
+
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
@@ -1391,6 +1394,7 @@ async fn test_rebalance_other_cases() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
