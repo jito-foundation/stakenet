@@ -51,8 +51,10 @@ pub fn handler(
 
         // Ensure the validators have been removed from the list
         require!(
-            state_account.state.num_pool_validators - validators_to_remove == validators_in_list,
-            StewardError::NotAllValidatorsRemoved
+            state_account.state.num_pool_validators + state_account.state.validators_added as usize
+                - validators_to_remove
+                == validators_in_list,
+            StewardError::ListStateMismatch
         );
 
         if let Some(validator_index_to_remove) = validator_index_to_remove {

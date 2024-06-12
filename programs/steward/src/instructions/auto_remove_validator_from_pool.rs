@@ -143,7 +143,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
     // Should not be able to remove a validator if update is not complete
     require!(
         epoch == state_account.state.current_epoch,
-        StewardError::EpochUpdateNotComplete
+        StewardError::EpochMaintenanceNotComplete
     );
 
     // Checks state for deactivate delinquent status, preventing pool from merging stake with activating

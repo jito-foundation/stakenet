@@ -23,6 +23,13 @@ use validator_history::ValidatorHistory;
 #[derive(Accounts)]
 pub struct AddValidatorToPool<'info> {
     pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub steward_state: AccountLoader<'info, StewardStateAccount>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -72,6 +79,15 @@ pub fn add_validator_to_pool_handler(
     ctx: Context<AddValidatorToPool>,
     validator_seed: Option<u32>,
 ) -> Result<()> {
+    let mut state_account = ctx.accounts.steward_state.load_mut()?;
+    let epoch = Clock::get()?.epoch;
+
+    // Should not be able to add a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
@@ -80,6 +96,9 @@ pub fn add_validator_to_pool_handler(
             return Err(StewardError::MaxValidatorsReached.into());
         }
     }
+
+    state_account.state.increment_validator_to_add()?;
+
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(
             &ctx.accounts.stake_pool_program.key(),
@@ -170,7 +189,7 @@ pub fn remove_validator_from_pool_handler(
     // Should not be able to remove a validator if update is not complete
     require!(
         epoch == state_account.state.current_epoch,
-        StewardError::EpochUpdateNotComplete
+        StewardError::EpochMaintenanceNotComplete
     );
 
     if validator_list_index < state_account.state.num_pool_validators {

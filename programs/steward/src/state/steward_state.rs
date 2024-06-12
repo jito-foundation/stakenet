@@ -44,7 +44,7 @@ pub fn maybe_transition_and_emit(
 ) -> Result<()> {
     require!(
         clock.epoch == steward_state.current_epoch,
-        StewardError::EpochUpdateNotComplete
+        StewardError::EpochMaintenanceNotComplete
     );
 
     let initial_state = steward_state.state_tag.to_string();
@@ -127,6 +127,10 @@ pub struct StewardState {
     pub rebalance_completed: U8Bool,
 
     pub _padding0: [u8; STATE_PADDING_0_SIZE],
+
+    /// Number of validators added to the pool in the current cycle
+    pub validators_added: u16,
+
     // TODO add closer to the top
     /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
     /// This is cleaned up in the next epoch
@@ -137,7 +141,7 @@ pub struct StewardState {
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = 6;
+pub const STATE_PADDING_0_SIZE: usize = 4;
 pub const STATE_PADDING_1_SIZE: usize = MAX_VALIDATORS * 8 - std::mem::size_of::<BitMask>();
 
 #[derive(Clone, Copy)]
@@ -483,6 +487,16 @@ impl StewardState {
         Ok(())
     }
 
+    /// Called when adding a validator to the pool so that we can ensure a 1-1 mapping between
+    /// the validator list and the steward state
+    pub fn increment_validator_to_add(&mut self) -> Result<()> {
+        self.validators_added = self
+            .validators_added
+            .checked_add(1)
+            .ok_or(StewardError::ArithmeticError)?;
+        Ok(())
+    }
+
     /// One instruction per validator. Can be done in any order.
     /// Computes score for a validator for the current epoch, stores score, and yield score component.
     /// Inserts this validator's index into sorted_score_indices and sorted_yield_score_indices, sorted by
@@ -570,7 +584,13 @@ impl StewardState {
                     config.parameters.num_epochs_between_scoring,
                 )?;
                 // Updates num_pool_validators at the start of the cycle so validator additions later won't be considered
+                require!(
+                    num_pool_validators
+                        == self.num_pool_validators + self.validators_added as usize,
+                    StewardError::ValidatorListTypeMismatch
+                );
                 self.num_pool_validators = num_pool_validators;
+                self.validators_added = 0;
             }
 
             let score = validator_score(validator, index, cluster, config, current_epoch as u16)?;

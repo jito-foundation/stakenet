@@ -2,6 +2,7 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{get_stake_pool, StakePool};
+use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
@@ -10,6 +11,15 @@ use validator_history::state::ValidatorHistory;
 
 #[derive(Accounts)]
 pub struct AutoAddValidator<'info> {
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub steward_state: AccountLoader<'info, StewardStateAccount>,
+
     // Only adding validators where this exists
     #[account(
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -17,8 +27,6 @@ pub struct AutoAddValidator<'info> {
         bump
     )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
-
-    pub config: AccountLoader<'info, Config>,
 
     /// CHECK: CPI address
     #[account(
@@ -101,9 +109,16 @@ all the validators we want to be eligible for delegation, as well as to accept s
 Performs some eligibility checks in order to not fill up the validator list with offline or malicious validators.
 */
 pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
+    let mut state_account = ctx.accounts.steward_state.load_mut()?;
     let config = ctx.accounts.config.load()?;
     let validator_history = ctx.accounts.validator_history_account.load()?;
     let epoch = Clock::get()?.epoch;
+
+    // Should not be able to add a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
 
     {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
@@ -138,6 +153,8 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
     } else {
         return Err(StewardError::ValidatorBelowLivenessMinimum.into());
     }
+
+    state_account.state.increment_validator_to_add()?;
 
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(

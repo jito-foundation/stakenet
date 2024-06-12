@@ -50,12 +50,12 @@ pub enum StewardError {
     MaxValidatorsReached,
     #[msg("Validator history account does not match vote account")]
     ValidatorHistoryMismatch,
-    #[msg("Epoch Update must be called before continuing")]
-    EpochUpdateNotComplete,
+    #[msg("Epoch Maintenance must be called before continuing")]
+    EpochMaintenanceNotComplete,
     #[msg("The stake pool must be updated before continuing")]
     StakePoolNotUpdated,
     #[msg("Validator not marked for removal")]
     ValidatorNotMarkedForRemoval,
-    #[msg("Not all validators have been removed from the list")]
-    NotAllValidatorsRemoved,
+    #[msg("Validator List count does not match state machine")]
+    ListStateMismatch,
 }
