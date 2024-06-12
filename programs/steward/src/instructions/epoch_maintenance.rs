@@ -1,9 +1,12 @@
 use crate::{
     errors::StewardError,
-    utils::{get_stake_pool, get_validator_list_length, StakePool},
+    utils::{
+        check_validator_list_has_stake_status, get_stake_pool, get_validator_list_length, StakePool,
+    },
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
+use spl_stake_pool::state::StakeStatus;
 
 #[derive(Accounts)]
 pub struct EpochMaintenance<'info> {
@@ -48,7 +51,16 @@ pub fn handler(
         let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
         let validators_to_remove = state_account.state.validators_to_remove.count();
 
-        // Ensure the validators have been removed from the list
+        // Ensure there are no validators in the list that have not been removed, that should be
+        require!(
+            !check_validator_list_has_stake_status(
+                &ctx.accounts.validator_list,
+                StakeStatus::ReadyForRemoval
+            )?,
+            StewardError::ValidatorsHaveNotBeenRemoved
+        );
+
+        // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
         require!(
             state_account.state.num_pool_validators + state_account.state.validators_added as usize
                 - validators_to_remove

@@ -56,6 +56,8 @@ pub enum StewardError {
     StakePoolNotUpdated,
     #[msg("Validator not marked for removal")]
     ValidatorNotMarkedForRemoval,
+    #[msg("Validators have not been removed")]
+    ValidatorsHaveNotBeenRemoved,
     #[msg("Validator List count does not match state machine")]
     ListStateMismatch,
 }

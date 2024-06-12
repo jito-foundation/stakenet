@@ -5,7 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
     big_vec::BigVec,
-    state::{ValidatorListHeader, ValidatorStakeInfo},
+    state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
 };
 
 use crate::{errors::StewardError, Config, Delegation};
@@ -84,6 +84,33 @@ pub fn get_validator_stake_info_at_index(
         .ok_or(StewardError::ValidatorNotInList)?;
 
     Ok(validator_stake_info)
+}
+
+pub fn check_validator_list_has_stake_status(
+    validator_list_account_info: &AccountInfo,
+    flag: StakeStatus,
+) -> Result<bool> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+
+    for index in 0..validator_list.len() as usize {
+        let stake_status_index = VEC_SIZE_BYTES
+            .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+            .checked_add(40)
+            .ok_or(StewardError::ArithmeticError)?;
+
+        let stake_status = validator_list.data[stake_status_index];
+
+        if stake_status == flag as u8 {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> Result<usize> {
