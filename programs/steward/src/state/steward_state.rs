@@ -39,11 +39,6 @@ pub fn maybe_transition_and_emit(
     params: &Parameters,
     epoch_schedule: &EpochSchedule,
 ) -> Result<()> {
-    require!(
-        clock.epoch == steward_state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
     let initial_state = steward_state.state_tag.to_string();
     steward_state.transition(clock, params, epoch_schedule)?;
 
@@ -480,8 +475,7 @@ impl StewardState {
     /// `remove_validator_from_pool` has been called on the stake pool
     /// This is cleaned up in the next epoch
     pub fn mark_validator_for_removal(&mut self, index: usize) -> Result<()> {
-        self.validators_to_remove.set(index, true)?;
-        Ok(())
+        self.validators_to_remove.set(index, true)
     }
 
     /// Called when adding a validator to the pool so that we can ensure a 1-1 mapping between

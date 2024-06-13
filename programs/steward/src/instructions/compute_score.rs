@@ -53,6 +53,11 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
 
     let num_pool_validators = get_validator_list_length(validator_list)?;
 
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());
     }
