@@ -36,6 +36,8 @@ pub enum Commands {
     InitState(InitState),
     ViewState(ViewState),
 
+    SetStaker(SetStaker),
+
     RemoveBadValidators(RemoveBadValidators),
 
     CrankComputeScore(CrankComputeScore),
@@ -55,6 +57,18 @@ pub struct InitState {
     /// Stake pool pubkey
     #[arg(long, env)]
     pub stake_pool: Pubkey,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize config account")]
+pub struct SetStaker {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
 
     /// Steward account
     #[arg(long, env)]
