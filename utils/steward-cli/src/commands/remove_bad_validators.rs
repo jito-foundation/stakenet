@@ -33,6 +33,7 @@ pub async fn command_remove_bad_validators(
     client: RpcClient,
     program_id: Pubkey,
 ) -> Result<()> {
+    let args = args.permissionless_parameters;
     let arc_client = Arc::new(client);
 
     // Creates config account

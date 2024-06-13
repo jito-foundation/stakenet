@@ -18,7 +18,6 @@ use crate::{
     utils::{
         accounts::{
             get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
-            UsefulStewardAccounts,
         },
         print::state_tag_to_string,
         transactions::{debug_send_single_transaction, package_instructions},
@@ -30,6 +29,8 @@ pub async fn command_crank_compute_instant_unstake(
     client: RpcClient,
     program_id: Pubkey,
 ) -> Result<()> {
+    let args = args.permissionless_parameters;
+
     // Creates config account
     let payer =
         read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
@@ -54,7 +55,7 @@ pub async fn command_crank_compute_instant_unstake(
         }
     }
 
-    let validators_to_run = (0..steward_accounts.validator_list_account.validators.len())
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {
             let has_been_scored = steward_accounts
                 .state_account

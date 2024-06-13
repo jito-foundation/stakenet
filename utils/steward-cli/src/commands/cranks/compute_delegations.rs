@@ -18,6 +18,8 @@ pub async fn command_crank_compute_delegations(
     client: RpcClient,
     program_id: Pubkey,
 ) -> Result<()> {
+    let args = args.permissionless_parameters;
+
     // Creates config account
     let payer =
         read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");

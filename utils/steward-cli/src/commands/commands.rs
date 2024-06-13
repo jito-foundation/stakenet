@@ -36,8 +36,10 @@ pub enum Commands {
     InitState(InitState),
     ViewState(ViewState),
 
+    ResetState(ResetState),
     RemoveBadValidators(RemoveBadValidators),
 
+    CrankEpochMaintenance(CrankEpochMaintenance),
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
     CrankIdle(CrankIdle),
@@ -217,97 +219,85 @@ impl ConfigParameters {
 }
 
 #[derive(Parser)]
-#[command(about = "Cranks rebalance")]
+pub struct PermissionlessParameters {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "200000")]
+    pub priority_fee: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Reset Steward State")]
+pub struct ResetState {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// priority fee in microlamports
+    #[arg(long, env, default_value = "200000")]
+    pub priority_fee: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Removes bad validators from the pool")]
 pub struct RemoveBadValidators {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Cranks the compute score state")]
+#[command(about = "Run epoch maintenance - needs to be run at the start of each epoch")]
+pub struct CrankEpochMaintenance {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index to remove, gotten from `validators_to_remove` Bitmask
+    #[arg(long, env)]
+    pub validator_index_to_remove: Option<usize>,
+}
+
+#[derive(Parser)]
+#[command(about = "Crank `compute_score` state")]
 pub struct CrankComputeScore {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Cranks the compute delegation")]
+#[command(about = "Crank `compute_delegations` state")]
 pub struct CrankComputeDelegations {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Crank idle state")]
+#[command(about = "Crank `idle` state")]
 pub struct CrankIdle {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Cranks the compute instant")]
+#[command(about = "Crank `compute_instant_unstake` state")]
 pub struct CrankComputeInstantUnstake {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Cranks rebalance")]
+#[command(about = "Crank `rebalance` state")]
 pub struct CrankRebalance {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }

@@ -28,6 +28,7 @@ pub async fn command_crank_rebalance(
     client: RpcClient,
     program_id: Pubkey,
 ) -> Result<()> {
+    let args = args.permissionless_parameters;
     // Creates config account
     let payer =
         read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
@@ -38,25 +39,25 @@ pub async fn command_crank_rebalance(
     let steward_accounts = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
 
     match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::ComputeInstantUnstake => { /* Continue */ }
+        StewardStateEnum::Rebalance => { /* Continue */ }
         _ => {
             println!(
-                "State account is not in Compute Instant Unstake state: {}",
+                "State account is not in Rebalance state: {}",
                 state_tag_to_string(steward_accounts.state_account.state.state_tag)
             );
             return Ok(());
         }
     }
 
-    let validators_to_run = (0..steward_accounts.validator_list_account.validators.len())
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {
-            let has_been_scored = steward_accounts
+            let has_been_rebalanced = steward_accounts
                 .state_account
                 .state
                 .progress
                 .get(validator_index)
                 .expect("Index is not in progress bitmask");
-            if has_been_scored {
+            if has_been_rebalanced {
                 return None;
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
@@ -83,8 +84,8 @@ pub async fn command_crank_rebalance(
                 stake_pool_program: spl_stake_pool::id(),
                 stake_pool: steward_accounts.stake_pool_address,
                 staker: steward_accounts.staker_address,
-                withdraw_authority: todo!(),
-                validator_list: todo!(),
+                withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
+                validator_list: steward_accounts.validator_list_address,
                 reserve_stake: todo!(),
                 stake_account: todo!(),
                 transient_stake_account: todo!(),

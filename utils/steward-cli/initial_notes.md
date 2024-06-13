@@ -71,6 +71,11 @@ cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT
 cargo run remove-bad-validators --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
+## Crank Epoch Maintenance
+```bash
+cargo run crank-epoch-maintenance --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+```
+
 ## Crank Compute Score
 ```bash
 cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
@@ -99,7 +104,9 @@ cargo run crank-compute-instant-unstake --steward-config BF9n2VmQT7DLB8h8STmyghp
 - use anchor `0.30.0`: `avm install 0.30.0 && avm use 0.30.0`
 - build .so file: `anchor build --no-idl`
 - Write to buffer: `solana program write-buffer --use-rpc --buffer credentials/temp-buffer.json --url $(solana config get | grep "RPC URL" | awk '{print $3}') --with-compute-unit-price 10000 --max-sign-attempts 10000 target/deploy/jito_steward.so --keypair credentials/stakenet_test.json`
-- Upgrade: `solana program upgrade $(solana address --keypair credentials/temp-buffer.json) sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP --keypair credentials/stakenet_test.json`
+- Upgrade: `solana program upgrade $(solana address --keypair credentials/temp-buffer.json) sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP --keypair credentials/stakenet_test.json --url $(solana config get | grep "RPC URL" | awk '{print $3}')`
+- Close Buffers: `solana program close --buffers --keypair credentials/stakenet_test.json`
+- Upgrade Program Size: `solana program extend sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP 1000000 --keypair credentials/stakenet_test.json --url $(solana config get | grep "RPC URL" | awk '{print $3}')`
 
 # Initial Parameters
 

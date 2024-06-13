@@ -1,6 +1,5 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
@@ -8,16 +7,14 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{
-    commands::commands::CrankIdle,
-    utils::{accounts::get_steward_state_account, print::state_tag_to_string},
-};
+use crate::{commands::commands::CrankEpochMaintenance, utils::accounts::get_all_steward_accounts};
 
-pub async fn command_crank_idle(
-    args: CrankIdle,
+pub async fn command_crank_epoch_maintenance(
+    args: CrankEpochMaintenance,
     client: RpcClient,
     program_id: Pubkey,
 ) -> Result<()> {
+    let validator_index_to_remove = args.validator_index_to_remove;
     let args = args.permissionless_parameters;
 
     // Creates config account
@@ -26,29 +23,29 @@ pub async fn command_crank_idle(
 
     let steward_config = args.steward_config;
 
-    let (state_account, state_address) =
-        get_steward_state_account(&client, &program_id, &steward_config).await?;
+    let all_steward_accounts =
+        get_all_steward_accounts(&client, &program_id, &steward_config).await?;
 
-    match state_account.state.state_tag {
-        StewardStateEnum::Idle => { /* Continue */ }
-        _ => {
-            println!(
-                "State account is not in Idle state: {}",
-                state_tag_to_string(state_account.state.state_tag)
-            );
-            return Ok(());
-        }
+    let epoch = client.get_epoch_info().await?.epoch;
+
+    if epoch == all_steward_accounts.state_account.state.current_epoch {
+        println!("Epoch is the same as the current epoch: {}", epoch);
+        return Ok(());
     }
 
     let ix = Instruction {
         program_id: program_id,
-        accounts: jito_steward::accounts::Idle {
+        accounts: jito_steward::accounts::EpochMaintenance {
             config: steward_config,
-            state_account: state_address,
-            signer: payer.pubkey(),
+            state_account: all_steward_accounts.state_address,
+            validator_list: all_steward_accounts.validator_list_address,
+            stake_pool: all_steward_accounts.stake_pool_address,
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::Idle {}.data(),
+        data: jito_steward::instruction::EpochMaintenance {
+            validator_index_to_remove,
+        }
+        .data(),
     };
 
     let blockhash = client.get_latest_blockhash().await?;

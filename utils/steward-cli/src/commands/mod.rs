@@ -8,5 +8,6 @@ pub mod init_state;
 pub mod view_state;
 
 pub mod remove_bad_validators;
+pub mod reset_state;
 
 pub mod cranks;
