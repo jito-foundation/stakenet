@@ -56,7 +56,6 @@ pub fn maybe_transition_and_emit(
 /// Tracks state of the stake pool.
 /// Follow state transitions here:
 /// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
-// TODO Reorder fields to optimize for alignment
 #[derive(BorshSerialize)]
 #[zero_copy]
 pub struct StewardState {
