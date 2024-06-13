@@ -158,10 +158,28 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
     let (stake_account_address, _, withdraw_authority) =
         fixture.stake_accounts_for_validator(vote_account).await;
 
+    fixture.simulate_stake_pool_update().await;
+
+    let epoch_maintenance_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::EpochMaintenance {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::EpochMaintenance {
+            validator_index_to_remove: None,
+        }
+        .data(),
+    };
+
     // Add Validator
     let instruction = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AddValidatorToPool {
+            steward_state: fixture.steward_state,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
@@ -189,7 +207,7 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
     let latest_blockhash = _get_latest_blockhash(fixture).await;
 
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[epoch_maintenance_ix, instruction],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         latest_blockhash,
@@ -500,7 +518,7 @@ async fn test_add_validator_to_pool() {
     }
 
     {
-        // Add 5 validators
+        // Add 10 validators
         for _ in 0..10 {
             _add_test_validator(&fixture, Pubkey::new_unique()).await;
         }
@@ -518,7 +536,7 @@ async fn test_remove_validator_from_pool() {
     fixture.initialize_steward_state().await;
 
     // Setup the steward state
-    _setup_test_steward_state(&fixture, MAX_VALIDATORS, 1_000_000_000).await;
+    // _setup_test_steward_state(&fixture, MAX_VALIDATORS, 1_000_000_000).await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -805,6 +823,7 @@ async fn test_decrease_additional_validator_stake() {
     let validator_list_account_raw = fixture
         .get_account(&fixture.stake_pool_meta.validator_list)
         .await;
+
     let validator_list_account: ValidatorList =
         ValidatorList::try_deserialize_unchecked(&mut validator_list_account_raw.data.as_slice())
             .expect("Failed to deserialize validator list account");
@@ -814,14 +833,20 @@ async fn test_decrease_additional_validator_stake() {
         .get(validator_list_index)
         .expect("Validator is not in list");
 
+    println!("4");
+
     let vote_account = validator_to_increase_stake.vote_account_address;
     let (stake_account_address, transient_stake_account_address, withdraw_authority) =
         fixture.stake_accounts_for_validator(vote_account).await;
 
+    println!("5");
+
     _simulate_stake_deposit(&fixture, stake_account_address, 2_000_000_000).await;
+    println!("6");
 
     let validator_history =
         fixture.initialize_validator_history_with_credits(vote_account, validator_list_index);
+    println!("7");
 
     let (ephemeral_stake_account, _) = find_ephemeral_stake_program_address(
         &spl_stake_pool::id(),
@@ -861,6 +886,7 @@ async fn test_decrease_additional_validator_stake() {
     };
 
     let latest_blockhash = _get_latest_blockhash(&fixture).await;
+    println!("8");
 
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
@@ -869,6 +895,7 @@ async fn test_decrease_additional_validator_stake() {
         latest_blockhash,
     );
     fixture.submit_transaction_assert_success(transaction).await;
+    println!("9");
 
     drop(fixture);
 }

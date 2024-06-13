@@ -48,6 +48,11 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         StewardError::ValidatorNotInList
     );
 
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());
     }
@@ -60,6 +65,7 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         &cluster,
         &config,
     )?;
+
     maybe_transition_and_emit(
         &mut state_account.state,
         &clock,

@@ -244,6 +244,7 @@ async fn test_compute_scores() {
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.next_cycle_epoch =
         clock.epoch + steward_config.parameters.num_epochs_between_scoring;
+    // steward_state_account.state.validators_added = MAX_VALIDATORS as u16;
 
     // Setup validator list
     let mut validator_list_validators = (0..MAX_VALIDATORS)
@@ -283,6 +284,23 @@ async fn test_compute_scores() {
         &serialized_config(steward_config).into(),
     );
 
+    fixture.simulate_stake_pool_update().await;
+
+    let epoch_maintenance_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::EpochMaintenance {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::EpochMaintenance {
+            validator_index_to_remove: None,
+        }
+        .data(),
+    };
+
     // Basic test - test score computation that requires most compute
     let compute_scores_ix = Instruction {
         program_id: jito_steward::id(),
@@ -304,8 +322,9 @@ async fn test_compute_scores() {
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(800_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
+            epoch_maintenance_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
@@ -314,6 +333,8 @@ async fn test_compute_scores() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
+
+    println!("Okay!");
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -331,6 +352,30 @@ async fn test_compute_scores() {
 
     // Transition out of this state
     // Reset current state, set progress[1] to true, progress[0] to false
+
+    {
+        // Reset Validator List, such that there are only 2 validators
+        let mut validator_list_validators = (0..2)
+            .map(|_| ValidatorStakeInfo {
+                vote_account_address: Pubkey::new_unique(),
+                ..ValidatorStakeInfo::default()
+            })
+            .collect::<Vec<_>>();
+        validator_list_validators[0].vote_account_address = vote_account;
+        let validator_list = spl_stake_pool::state::ValidatorList {
+            header: ValidatorListHeader {
+                account_type: AccountType::ValidatorList,
+                max_validators: MAX_VALIDATORS as u32,
+            },
+            validators: validator_list_validators,
+        };
+
+        fixture.ctx.borrow_mut().set_account(
+            &fixture.stake_pool_meta.validator_list,
+            &serialized_validator_list_account(validator_list, None).into(),
+        );
+    }
+
     steward_state_account.state.num_pool_validators = 2;
     steward_state_account.state.scores[..2].copy_from_slice(&[0, 0]);
     steward_state_account.state.yield_scores[..2].copy_from_slice(&[0, 0]);
@@ -918,6 +963,7 @@ async fn test_rebalance_increase() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
@@ -1150,6 +1196,8 @@ async fn test_rebalance_decrease() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
+
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
@@ -1391,6 +1439,7 @@ async fn test_rebalance_other_cases() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
