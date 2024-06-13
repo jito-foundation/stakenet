@@ -955,7 +955,6 @@ impl Default for StateMachineFixtures {
             compute_delegations_completed: false.into(),
             rebalance_completed: false.into(),
             validators_added: 0,
-            checked_validators_removed_from_list: false.into(),
             validators_to_remove: BitMask::default(),
             _padding0: [0; STATE_PADDING_0_SIZE],
         };

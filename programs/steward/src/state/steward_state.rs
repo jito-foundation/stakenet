@@ -56,7 +56,6 @@ pub fn maybe_transition_and_emit(
 /// Tracks state of the stake pool.
 /// Follow state transitions here:
 /// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
-// TODO Reorder fields to optimize for alignment
 #[derive(BorshSerialize)]
 #[zero_copy]
 pub struct StewardState {
@@ -125,15 +124,12 @@ pub struct StewardState {
     /// Tracks whether unstake and delegate steps have completed
     pub rebalance_completed: U8Bool,
 
-    /// So we only have to check the validator list once for `ReadyToRemove`
-    pub checked_validators_removed_from_list: U8Bool,
-
     /// Future state and #[repr(C)] alignment
     pub _padding0: [u8; STATE_PADDING_0_SIZE],
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 3;
+pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 4;
 
 #[derive(Clone, Copy)]
 #[repr(u64)]
