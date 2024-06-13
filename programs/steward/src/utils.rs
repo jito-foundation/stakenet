@@ -5,7 +5,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
     big_vec::BigVec,
-    state::{StakePool as SPLStakePool, ValidatorListHeader, ValidatorStakeInfo},
+    state::{ValidatorListHeader, ValidatorStakeInfo},
 };
 
 use crate::{errors::StewardError, Config, Delegation};

@@ -35,7 +35,7 @@ pub fn test_compute_scores_to_compute_delegations() {
 
     assert!(state
         .progress
-        .is_complete(state.num_pool_validators as usize)
+        .is_complete(state.num_pool_validators)
         .unwrap());
 
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -261,7 +261,7 @@ pub fn test_compute_instant_unstake_to_rebalance() {
         .unwrap();
     assert!(state
         .progress
-        .is_complete(state.num_pool_validators as usize)
+        .is_complete(state.num_pool_validators)
         .unwrap());
 
     let res = state.transition(clock, parameters, epoch_schedule);

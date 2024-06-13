@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-cargo-build-sbf && \
-  RUST_LOG=DEBUG \
-  SBF_OUT_DIR=/Users/evanbatsell/jito/stakenet/target/sbf-solana-solana/release \
-  cargo test-sbf

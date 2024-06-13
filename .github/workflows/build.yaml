@@ -81,9 +81,9 @@ jobs:
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       # build the program and IDL; exit if error
-      - run: anchor build --no-idl
-      # - name: Check for diff on IDL
-      #   run: git diff --exit-code
+      - run: anchor build --idl idl
+      - name: Check for diff on IDL
+        run: git diff --exit-code
 
       # run verified build
       - run: solana-verify build --library-name validator_history
@@ -100,11 +100,16 @@ jobs:
         with:
           name: jito_steward.so
           path: target/deploy/jito_steward.so
-      # - name: Upload IDL
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: validator_history.json
-      #     path: programs/validator-history/idl/validator_history.json
+      - name: Upload Validator History IDL
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator_history.json
+          path: programs/validator-history/idl/validator_history.json
+      - name: Upload Jito Steward IDL
+        uses: actions/upload-artifact@v4
+        with:
+          name: jito_steward.json
+          path: programs/steward/idl/jito_steward.json
 
   # tests run on verified build
   test:

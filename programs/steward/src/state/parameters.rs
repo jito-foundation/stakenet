@@ -1,4 +1,3 @@
-// #[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
 use anchor_lang::idl::*;
 use anchor_lang::{prelude::Result, zero_copy};
@@ -398,7 +397,7 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
-        if !(COMPUTE_SCORE_SLOT_RANGE_MIN as u64..=slots_per_epoch)
+        if !(COMPUTE_SCORE_SLOT_RANGE_MIN..=slots_per_epoch)
             .contains(&self.compute_score_slot_range)
         {
             return Err(StewardError::InvalidParameterValue.into());

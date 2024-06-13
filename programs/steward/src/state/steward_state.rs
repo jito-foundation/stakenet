@@ -1,4 +1,5 @@
 use borsh::BorshSerialize;
+use core::num;
 use std::fmt::Display;
 
 use crate::{
@@ -284,10 +285,7 @@ impl StewardState {
                 current_slot,
                 num_epochs_between_scoring,
             )?;
-        } else if self
-            .progress
-            .is_complete(self.num_pool_validators as usize)?
-        {
+        } else if self.progress.is_complete(self.num_pool_validators)? {
             self.state_tag = StewardStateEnum::ComputeDelegations;
             self.progress = BitMask::default();
             self.delegations = [Delegation::default(); MAX_VALIDATORS];
@@ -362,10 +360,7 @@ impl StewardState {
             self.current_epoch = current_epoch;
             self.instant_unstake = BitMask::default();
             self.progress = BitMask::default();
-        } else if self
-            .progress
-            .is_complete(self.num_pool_validators as usize)?
-        {
+        } else if self.progress.is_complete(self.num_pool_validators)? {
             self.state_tag = StewardStateEnum::Rebalance;
             self.progress = BitMask::default();
         }
@@ -391,10 +386,7 @@ impl StewardState {
             self.current_epoch = current_epoch;
             self.progress = BitMask::default();
             self.rebalance_completed = false.into();
-        } else if self
-            .progress
-            .is_complete(self.num_pool_validators as usize)?
-        {
+        } else if self.progress.is_complete(self.num_pool_validators)? {
             self.state_tag = StewardStateEnum::Idle;
             self.current_epoch = current_epoch;
             self.rebalance_completed = true.into();
@@ -434,9 +426,10 @@ impl StewardState {
             .num_pool_validators
             .checked_sub(1)
             .ok_or(StewardError::ArithmeticError)?;
+        let num_pool_validators = self.num_pool_validators as usize;
 
         // Shift all validator state to the left
-        for i in index..self.num_pool_validators as usize {
+        for i in index..num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.validator_lamport_balances[i] = self.validator_lamport_balances[next_i];
             self.scores[i] = self.scores[next_i];
@@ -458,20 +451,20 @@ impl StewardState {
             .position(|&i| i == index as u16);
 
         if let Some(yield_score_index) = yield_score_index {
-            for i in yield_score_index..self.num_pool_validators as usize {
+            for i in yield_score_index..num_pool_validators {
                 let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
                 self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
             }
         }
 
         if let Some(score_index) = score_index {
-            for i in score_index..self.num_pool_validators as usize {
+            for i in score_index..num_pool_validators {
                 let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
                 self.sorted_score_indices[i] = self.sorted_score_indices[next_i];
             }
         }
 
-        for i in 0..self.num_pool_validators as usize {
+        for i in 0..num_pool_validators {
             if self.sorted_yield_score_indices[i] as usize > index {
                 self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[i]
                     .checked_sub(1)
@@ -485,16 +478,14 @@ impl StewardState {
         }
 
         // Clear values on empty last index
-        self.validator_lamport_balances[self.num_pool_validators as usize] = 0;
-        self.scores[self.num_pool_validators as usize] = 0;
-        self.yield_scores[self.num_pool_validators as usize] = 0;
-        self.sorted_score_indices[self.num_pool_validators as usize] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[self.num_pool_validators as usize] = SORTED_INDEX_DEFAULT;
-        self.delegations[self.num_pool_validators as usize] = Delegation::default();
-        self.instant_unstake
-            .set(self.num_pool_validators as usize, false)?;
-        self.progress
-            .set(self.num_pool_validators as usize, false)?;
+        self.validator_lamport_balances[num_pool_validators] = 0;
+        self.scores[num_pool_validators] = 0;
+        self.yield_scores[num_pool_validators] = 0;
+        self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.delegations[num_pool_validators] = Delegation::default();
+        self.instant_unstake.set(num_pool_validators, false)?;
+        self.progress.set(num_pool_validators, false)?;
 
         Ok(())
     }
@@ -546,7 +537,7 @@ impl StewardState {
                 .ok_or(StewardError::ArithmeticError)?;
             if self.progress.is_empty()
                 || current_epoch > self.current_epoch
-                || slots_since_scoring_started > config.parameters.compute_score_slot_range as u64
+                || slots_since_scoring_started > config.parameters.compute_score_slot_range
             {
                 self.reset_state_for_new_cycle(
                     clock.epoch,
