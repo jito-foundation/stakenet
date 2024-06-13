@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use commands::{
+    auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
     commands::{Args, Commands},
     cranks::{
         compute_delegations::command_crank_compute_delegations,
@@ -37,6 +38,9 @@ async fn main() -> Result<()> {
         Commands::InitState(args) => command_init_state(args, client, program_id).await,
         Commands::ViewState(args) => command_view_state(args, client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, client, program_id).await,
+        Commands::AutoRemoveValidatorFromPool(args) => {
+            command_auto_remove_validator_from_pool(args, client, program_id).await
+        }
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, client, program_id).await
         }

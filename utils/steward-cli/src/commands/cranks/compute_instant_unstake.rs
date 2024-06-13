@@ -195,7 +195,7 @@ pub async fn command_crank_compute_instant_unstake(
     //     .collect::<Vec<Instruction>>();
 
     // let txs_to_run =
-    //     package_instructions(&ixs_to_run, 1, Some(args.priority_fee), Some(200_000), None);
+    //     package_instructions(&ixs_to_run, 1, Some(args.priority_fee), Some(300_000), None);
 
     // println!("Submitting {} instructions", ixs_to_run.len());
     // println!("Submitting {} transactions", txs_to_run.len());

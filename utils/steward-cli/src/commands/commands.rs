@@ -38,6 +38,7 @@ pub enum Commands {
 
     ResetState(ResetState),
     RemoveBadValidators(RemoveBadValidators),
+    AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
 
     CrankEpochMaintenance(CrankEpochMaintenance),
     CrankComputeScore(CrankComputeScore),
@@ -254,6 +255,17 @@ pub struct ResetState {
 pub struct RemoveBadValidators {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Call `auto_remove_validator_from_pool`")]
+pub struct AutoRemoveValidatorFromPool {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index of Validator List to remove
+    #[arg(long, env)]
+    pub validator_index_to_remove: usize,
 }
 
 #[derive(Parser)]

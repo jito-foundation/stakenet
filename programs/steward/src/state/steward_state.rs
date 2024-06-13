@@ -508,22 +508,6 @@ impl StewardState {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
 
-            // Check that latest_update_slot is within the current epoch to guarantee previous epoch data is complete
-            let last_update_slot = validator
-                .history
-                .vote_account_last_update_slot_latest()
-                .ok_or(StewardError::VoteHistoryNotRecentEnough)?;
-            if last_update_slot < epoch_schedule.get_first_slot_in_epoch(current_epoch) {
-                return Err(StewardError::VoteHistoryNotRecentEnough.into());
-            }
-
-            // Check that cluster history is within current epoch to guarantee previous epoch data is complete
-            if cluster.cluster_history_last_update_slot
-                < epoch_schedule.get_first_slot_in_epoch(current_epoch)
-            {
-                return Err(StewardError::ClusterHistoryNotRecentEnough.into());
-            }
-
             /* Reset common state if:
                 - it's a new delegation cycle
                 - it's been more than `compute_score_slot_range` slots since compute scores started
@@ -577,7 +561,26 @@ impl StewardState {
                     self.yield_scores[index],
                     num_scores_calculated,
                 )?;
+
+                self.progress.set(index, true)?;
+
                 return Ok(());
+            }
+
+            // Check that latest_update_slot is within the current epoch to guarantee previous epoch data is complete
+            let last_update_slot = validator
+                .history
+                .vote_account_last_update_slot_latest()
+                .ok_or(StewardError::VoteHistoryNotRecentEnough)?;
+            if last_update_slot < epoch_schedule.get_first_slot_in_epoch(current_epoch) {
+                return Err(StewardError::VoteHistoryNotRecentEnough.into());
+            }
+
+            // Check that cluster history is within current epoch to guarantee previous epoch data is complete
+            if cluster.cluster_history_last_update_slot
+                < epoch_schedule.get_first_slot_in_epoch(current_epoch)
+            {
+                return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
             let score = validator_score(validator, index, cluster, config, current_epoch as u16)?;

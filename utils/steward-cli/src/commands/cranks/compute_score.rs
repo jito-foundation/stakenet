@@ -105,20 +105,20 @@ pub async fn command_crank_compute_score(
 
     let txs_to_run = _package_compute_score_instructions(&ixs_to_run, args.priority_fee);
 
-    debug_send_single_transaction(
-        &Arc::new(client),
-        &Arc::new(payer),
-        &txs_to_run[0],
-        Some(true),
-    )
-    .await?;
+    // debug_send_single_transaction(
+    //     &Arc::new(client),
+    //     &Arc::new(payer),
+    //     &txs_to_run[0],
+    //     Some(true),
+    // )
+    // .await?;
 
-    // println!("Submitting {} instructions", ixs_to_run.len());
-    // println!("Submitting {} transactions", txs_to_run.len());
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
 
-    // let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+    let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
 
-    // println!("Submit stats: {:?}", submit_stats);
+    println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
 }
