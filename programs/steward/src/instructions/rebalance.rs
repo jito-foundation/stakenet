@@ -160,6 +160,11 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     );
     let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
 
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());
     }

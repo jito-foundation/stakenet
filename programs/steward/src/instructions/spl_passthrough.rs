@@ -9,7 +9,6 @@ use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{
     get_config_authority, get_stake_pool, get_validator_stake_info_at_index, StakePool,
-    ValidatorList,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
@@ -23,6 +22,13 @@ use validator_history::ValidatorHistory;
 #[derive(Accounts)]
 pub struct AddValidatorToPool<'info> {
     pub config: AccountLoader<'info, Config>,
+
+    #[account(
+        mut,
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub steward_state: AccountLoader<'info, StewardStateAccount>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -72,6 +78,15 @@ pub fn add_validator_to_pool_handler(
     ctx: Context<AddValidatorToPool>,
     validator_seed: Option<u32>,
 ) -> Result<()> {
+    let mut state_account = ctx.accounts.steward_state.load_mut()?;
+    let epoch = Clock::get()?.epoch;
+
+    // Should not be able to add a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
@@ -80,6 +95,9 @@ pub fn add_validator_to_pool_handler(
             return Err(StewardError::MaxValidatorsReached.into());
         }
     }
+
+    state_account.state.increment_validator_to_add()?;
+
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(
             &ctx.accounts.stake_pool_program.key(),
@@ -143,8 +161,8 @@ pub struct RemoveValidatorFromPool<'info> {
     pub staker: Account<'info, Staker>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
-    #[account(mut)]
-    pub validator_list: Box<Account<'info, ValidatorList>>,
+    #[account(mut, address = stake_pool.validator_list)]
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub stake_account: AccountInfo<'info>,
@@ -165,6 +183,13 @@ pub fn remove_validator_from_pool_handler(
     validator_list_index: usize,
 ) -> Result<()> {
     let mut state_account = ctx.accounts.steward_state.load_mut()?;
+    let epoch = Clock::get()?.epoch;
+
+    // Should not be able to remove a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
 
     if validator_list_index < state_account.state.num_pool_validators {
         let validator_list_stake_info = get_validator_stake_info_at_index(
@@ -182,9 +207,11 @@ pub fn remove_validator_from_pool_handler(
         if validator_list_stake_account != ctx.accounts.stake_account.key() {
             return Err(StewardError::ValidatorNotInList.into());
         }
-
-        state_account.state.remove_validator(validator_list_index)?;
     }
+
+    state_account
+        .state
+        .mark_validator_for_removal(validator_list_index)?;
 
     invoke_signed(
         &spl_stake_pool::instruction::remove_validator_from_pool(
@@ -234,7 +261,7 @@ pub struct SetPreferredValidator<'info> {
     )]
     pub staker: Account<'info, Staker>,
     #[account(address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     #[account(mut, address = get_config_authority(&config)?)]
     pub signer: Signer<'info>,
 }
@@ -301,7 +328,7 @@ pub struct IncreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut)]
+    #[account(mut, address = stake_pool.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -429,7 +456,7 @@ pub struct DecreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut)]
+    #[account(mut, address = stake_pool.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -550,7 +577,7 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
@@ -683,7 +710,7 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
