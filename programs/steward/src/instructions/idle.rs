@@ -33,6 +33,11 @@ pub fn handler(ctx: Context<Idle>) -> Result<()> {
         StewardError::InvalidState
     );
 
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());
     }

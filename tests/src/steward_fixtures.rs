@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, rc::Rc, str::FromStr, vec};
 
 use crate::spl_stake_pool_cli;
@@ -15,7 +16,7 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
     Config, Delegation, Parameters, Staker, StewardState, StewardStateAccount, StewardStateEnum,
-    UpdateParametersArgs,
+    UpdateParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -176,6 +177,30 @@ impl TestFixture {
         };
 
         account
+    }
+
+    pub async fn simulate_stake_pool_update(&self) {
+        let stake_pool: StakePool = self
+            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
+            .await;
+
+        let mut stake_pool_spl = stake_pool.as_ref().clone();
+
+        let current_epoch = self
+            .ctx
+            .borrow_mut()
+            .banks_client
+            .get_sysvar::<Clock>()
+            .await
+            .unwrap()
+            .epoch;
+
+        stake_pool_spl.last_update_epoch = current_epoch;
+
+        self.ctx.borrow_mut().set_account(
+            &self.stake_pool_meta.stake_pool,
+            &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
+        );
     }
 
     pub async fn initialize_stake_pool(&self) {
@@ -929,7 +954,10 @@ impl Default for StateMachineFixtures {
             instant_unstake: BitMask::default(),
             compute_delegations_completed: false.into(),
             rebalance_completed: false.into(),
-            _padding0: [0; 6 + 8 * MAX_VALIDATORS],
+            validators_added: 0,
+            checked_validators_removed_from_list: false.into(),
+            validators_to_remove: BitMask::default(),
+            _padding0: [0; STATE_PADDING_0_SIZE],
         };
 
         StateMachineFixtures {

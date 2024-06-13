@@ -143,6 +143,12 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         StewardError::ValidatorNotInList
     );
 
+    // Should not be able to remove a validator if update is not complete
+    require!(
+        epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
     // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
     let stake_account_deactivated = {
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
@@ -164,7 +170,9 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         StewardError::ValidatorNotRemovable
     );
 
-    state_account.state.remove_validator(validator_list_index)?;
+    state_account
+        .state
+        .mark_validator_for_removal(validator_list_index)?;
 
     invoke_signed(
         &spl_stake_pool::instruction::remove_validator_from_pool(

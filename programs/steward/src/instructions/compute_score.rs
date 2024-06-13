@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::ValidatorListHeader;
 
 use crate::{
-    errors::StewardError, maybe_transition_and_emit, utils::get_validator_stake_info_at_index,
+    errors::StewardError,
+    maybe_transition_and_emit,
+    utils::{get_validator_list_length, get_validator_stake_info_at_index},
     Config, StewardStateAccount, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -51,11 +52,12 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         StewardError::ValidatorNotInList
     );
 
-    let num_pool_validators = {
-        let mut validator_list_data = validator_list.try_borrow_mut_data()?;
-        let (_, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
-        validator_list.len() as u64
-    };
+    let num_pool_validators = get_validator_list_length(validator_list)?;
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
 
     if config.is_paused() {
         return Err(StewardError::StateMachinePaused.into());

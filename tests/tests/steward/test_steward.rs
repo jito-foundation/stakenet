@@ -41,6 +41,7 @@ async fn _auto_add_validator_to_pool(fixture: &TestFixture, vote_account: &Pubke
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
