@@ -5,16 +5,16 @@
 `aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8`
 
 **Steward Config**   
-`BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S`
+`6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5`
 
 **Stake Pool**
 `3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j`
 
 **Staker**
-`Eo3dSDhQi11AJbsoK19i1kBRLzpBiFLkWBq7pdVkfucG`
+`4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z`
 
 **State**
-`7iZSeAiJNpW86VtUceL3a49xkTShcwgG1UwaMuXssxXN`
+`6SJrBTYSSu3jWmsPWWhMMHvrPxqKWXtLe9tRfYpU8EZa`
 
 # Initial Commands
 
@@ -22,6 +22,7 @@
 ```bash
 cargo run init-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
+  --steward-config-keypair-path ../../credentials/steward_config.json \
   --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j \
   --mev-commission-range 10 \
   --epoch-credits-range 30 \
@@ -35,11 +36,11 @@ cargo run init-config \
   --scoring-unstake-cap-bps 750 \
   --instant-unstake-cap-bps 1000 \
   --stake-deposit-unstake-cap-bps 1000 \
-  --compute-score-slot-range 1000 \
+  --compute-score-slot-range 50000 \
   --instant-unstake-epoch-progress 0.50 \
   --instant-unstake-inputs-epoch-progress 0.50 \
   --num-epochs-between-scoring 3 \
-  --minimum-stake-lamports 100_000_000_000 \
+  --minimum-stake-lamports 100000000000 \
   --minimum-voting-epochs 5
 ```
 
@@ -47,53 +48,53 @@ cargo run init-config \
 ```bash
 cargo run update-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
-  --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S \
+  --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 \
   --compute-score-slot-range 50000 
-```
-
-## View Config
-```bash
-cargo run view-config --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
 ```
 
 ## Create State
 ```bash
-cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.json --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
+cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.json --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
+```
+
+## View Config
+```bash
+cargo run view-config --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View State
 ```bash
-cargo run view-state --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S
+cargo run view-state --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## Remove Bad Validators
 ```bash
-cargo run remove-bad-validators --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run remove-bad-validators --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Epoch Maintenance
 ```bash
-cargo run crank-epoch-maintenance --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-epoch-maintenance --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Score
 ```bash
-cargo run crank-compute-score --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-score --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Delegations
 ```bash
-cargo run crank-compute-delegations --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-delegations --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Idle
 ```bash
-cargo run crank-idle --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-idle --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Instant Unstake
 ```bash
-cargo run crank-compute-instant-unstake --steward-config BF9n2VmQT7DLB8h8STmyghpnYV8pPRUj3DCe3gAWyT1S --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-instant-unstake --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 # Deploy and Upgrade

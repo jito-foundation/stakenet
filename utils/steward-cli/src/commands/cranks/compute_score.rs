@@ -21,6 +21,7 @@ use crate::{
             UsefulStewardAccounts,
         },
         print::state_tag_to_string,
+        transactions::debug_send_single_transaction,
     },
 };
 
@@ -104,12 +105,20 @@ pub async fn command_crank_compute_score(
 
     let txs_to_run = _package_compute_score_instructions(&ixs_to_run, args.priority_fee);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    debug_send_single_transaction(
+        &Arc::new(client),
+        &Arc::new(payer),
+        &txs_to_run[0],
+        Some(true),
+    )
+    .await?;
 
-    let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+    // println!("Submitting {} instructions", ixs_to_run.len());
+    // println!("Submitting {} transactions", txs_to_run.len());
 
-    println!("Submit stats: {:?}", submit_stats);
+    // let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+
+    // println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
 }
@@ -118,7 +127,7 @@ fn _package_compute_score_instructions(
     ixs: &Vec<Instruction>,
     priority_fee: u64,
 ) -> Vec<Vec<Instruction>> {
-    ixs.chunks(11)
+    ixs.chunks(1)
         .map(|chunk: &[Instruction]| {
             let mut chunk_vec = chunk.to_vec();
             chunk_vec.insert(
