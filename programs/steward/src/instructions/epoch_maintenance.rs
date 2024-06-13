@@ -45,12 +45,7 @@ pub fn handler(
         StewardError::StakePoolNotUpdated
     );
 
-    {
-        // Routine - Remove marked validators
-        // We still want these checks to run even if we don't specify a validator to remove
-        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
-        let validators_to_remove = state_account.state.validators_to_remove.count();
-
+    if (!state_account.state.checked_validators_removed_from_list).into() {
         // Ensure there are no validators in the list that have not been removed, that should be
         require!(
             !check_validator_list_has_stake_status(
@@ -59,6 +54,14 @@ pub fn handler(
             )?,
             StewardError::ValidatorsHaveNotBeenRemoved
         );
+        state_account.state.checked_validators_removed_from_list = true.into();
+    }
+
+    {
+        // Routine - Remove marked validators
+        // We still want these checks to run even if we don't specify a validator to remove
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        let validators_to_remove = state_account.state.validators_to_remove.count();
 
         // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
         require!(
@@ -77,9 +80,14 @@ pub fn handler(
 
     {
         // Routine - Update state
-        let okay_to_update = state_account.state.validators_to_remove.is_empty();
+        let okay_to_update = state_account.state.validators_to_remove.is_empty()
+            && state_account
+                .state
+                .checked_validators_removed_from_list
+                .into();
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;
+            state_account.state.checked_validators_removed_from_list = false.into();
         }
     }
 

@@ -94,6 +94,10 @@ pub struct StewardState {
     /// Tracks progress of states that require one instruction per validator
     pub progress: BitMask,
 
+    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This is cleaned up in the next epoch
+    pub validators_to_remove: BitMask,
+
     ////// Cycle metadata fields //////
     /// Slot of the first ComputeScores instruction in the current cycle
     pub start_computing_scores_slot: u64,
@@ -117,29 +121,24 @@ pub struct StewardState {
     /// Total lamports that have been due to stake deposits this cycle
     pub stake_deposit_unstake_total: u64,
 
+    /// Number of validators added to the pool in the current cycle
+    pub validators_added: u16,
+
     /// Tracks whether delegation computation has been completed
     pub compute_delegations_completed: U8Bool,
 
     /// Tracks whether unstake and delegate steps have completed
     pub rebalance_completed: U8Bool,
 
-    pub _padding0: [u8; STATE_PADDING_0_SIZE],
-
-    /// Number of validators added to the pool in the current cycle
-    pub validators_added: u16,
-
-    // TODO add closer to the top
-    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
-    /// This is cleaned up in the next epoch
-    pub validators_to_remove: BitMask,
+    /// So we only have to check the validator list once for `ReadyToRemove`
+    pub checked_validators_removed_from_list: U8Bool,
 
     /// Future state and #[repr(C)] alignment
-    pub _padding1: [u8; STATE_PADDING_1_SIZE],
+    pub _padding0: [u8; STATE_PADDING_0_SIZE],
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = 4;
-pub const STATE_PADDING_1_SIZE: usize = MAX_VALIDATORS * 8 - std::mem::size_of::<BitMask>();
+pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 3;
 
 #[derive(Clone, Copy)]
 #[repr(u64)]
@@ -470,7 +469,8 @@ impl StewardState {
         self.sorted_yield_score_indices[self.num_pool_validators] = SORTED_INDEX_DEFAULT;
         self.delegations[self.num_pool_validators] = Delegation::default();
         self.instant_unstake.set(self.num_pool_validators, false)?;
-        self.progress.set(self.num_pool_validators, false)?;
+        self.validators_to_remove
+            .set(self.num_pool_validators, false)?;
         self.progress.set(self.num_pool_validators, false)?;
 
         Ok(())
