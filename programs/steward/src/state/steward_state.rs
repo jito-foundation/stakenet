@@ -307,9 +307,11 @@ impl StewardState {
                 current_slot,
                 num_epochs_between_scoring,
             )?;
-        } else if (!self.rebalance_completed).into()
+        } else if ((!self.rebalance_completed).into()
+            || ((self.rebalance_completed).into() && current_epoch > self.current_epoch))
             && epoch_progress >= min_epoch_progress_for_instant_unstake
         {
+            self.rebalance_completed = false.into();
             self.state_tag = StewardStateEnum::ComputeInstantUnstake;
             self.instant_unstake = BitMask::default();
             self.progress = BitMask::default();
