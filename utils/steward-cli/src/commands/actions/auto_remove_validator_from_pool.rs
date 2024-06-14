@@ -2,43 +2,25 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::UpdateParametersArgs;
 
-use keeper_core::{get_multiple_accounts_batched, submit_instructions, submit_transactions};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address,
-    find_withdraw_authority_program_address,
-};
+use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    commitment_config::CommitmentConfig,
-    compute_budget::ComputeBudgetInstruction,
-    pubkey::Pubkey,
-    signature::read_keypair_file,
-    signer::Signer,
-    stake, stake_history, system_program,
-    sysvar::{self, rent},
-    transaction::Transaction,
+    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, stake, system_program, transaction::Transaction,
 };
-use validator_history::id;
 
 use crate::{
-    commands::commands::AutoRemoveValidatorFromPool,
-    utils::{
-        accounts::{
-            get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts,
-        },
-        print,
-        transactions::debug_send_single_transaction,
-    },
+    commands::command_args::AutoRemoveValidatorFromPool,
+    utils::accounts::{get_all_steward_accounts, get_validator_history_address},
 };
 
 pub async fn command_auto_remove_validator_from_pool(
     args: AutoRemoveValidatorFromPool,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let validator_index = args.validator_index_to_remove;
@@ -78,7 +60,7 @@ pub async fn command_auto_remove_validator_from_pool(
     );
 
     let remove_ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts: jito_steward::accounts::AutoRemoveValidator {
             validator_history_account: history_account,
             config: args.steward_config,
@@ -91,11 +73,11 @@ pub async fn command_auto_remove_validator_from_pool(
             validator_list: steward_accounts.validator_list_address,
             stake_account: stake_address,
             transient_stake_account: transient_stake_address,
-            vote_account: vote_account,
+            vote_account,
             rent: solana_sdk::sysvar::rent::id(),
             clock: solana_sdk::sysvar::clock::id(),
             stake_history: solana_sdk::sysvar::stake_history::id(),
-            stake_config: stake::config::id(),
+            stake_config: stake::config::ID,
             system_program: system_program::id(),
             stake_program: stake::program::id(),
             signer: arc_payer.pubkey(),
@@ -133,7 +115,7 @@ pub async fn command_auto_remove_validator_from_pool(
 }
 
 fn _package_remove_bad_validator_instructions(
-    ixs: &Vec<Instruction>,
+    ixs: &[Instruction],
     priority_fee: u64,
 ) -> Vec<Vec<Instruction>> {
     ixs.chunks(1)

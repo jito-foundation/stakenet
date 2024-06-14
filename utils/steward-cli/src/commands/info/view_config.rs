@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use jito_steward::{Config, Staker};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -5,18 +7,18 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::{
-    commands::commands::ViewConfig,
+    commands::command_args::ViewConfig,
     utils::accounts::{get_steward_config_account, get_steward_state_address},
 };
 
 pub async fn command_view_config(
     args: ViewConfig,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let steward_config = args.steward_config;
 
-    let steward_config_account = get_steward_config_account(&client, &steward_config).await?;
+    let steward_config_account = get_steward_config_account(client, &steward_config).await?;
     let steward_state = get_steward_state_address(&program_id, &steward_config);
     let (steward_staker, _) =
         Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);

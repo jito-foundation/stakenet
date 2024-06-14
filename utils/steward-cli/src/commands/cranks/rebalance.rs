@@ -3,36 +3,28 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::{submit_instructions, submit_transactions};
+use keeper_core::submit_transactions;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    pubkey::Pubkey,
-    signature::read_keypair_file,
-    signer::Signer,
-    stake, system_program,
-    sysvar::{self, rent},
-    transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program,
 };
 
 use crate::{
-    commands::commands::CrankRebalance,
+    commands::command_args::CrankRebalance,
     utils::{
-        accounts::{
-            get_all_steward_accounts, get_cluster_history_address, get_steward_state_account,
-            get_validator_history_address, UsefulStewardAccounts,
-        },
+        accounts::{get_all_steward_accounts, get_validator_history_address},
         print::state_tag_to_string,
-        transactions::{debug_send_single_transaction, package_instructions},
+        transactions::package_instructions,
     },
 };
 
 pub async fn command_crank_rebalance(
     args: CrankRebalance,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
@@ -43,7 +35,7 @@ pub async fn command_crank_rebalance(
     let validator_history_program_id = validator_history_id();
     let steward_config = args.steward_config;
 
-    let steward_accounts = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
+    let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::Rebalance => { /* Continue */ }
@@ -65,7 +57,7 @@ pub async fn command_crank_rebalance(
                 .get(validator_index)
                 .expect("Index is not in progress bitmask");
             if has_been_rebalanced {
-                return None;
+                None
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
                     [validator_index]
@@ -73,7 +65,7 @@ pub async fn command_crank_rebalance(
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                return Some((validator_index, vote_account, history_account));
+                Some((validator_index, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -85,21 +77,21 @@ pub async fn command_crank_rebalance(
 
             let (stake_address, _) = find_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_account,
+                vote_account,
                 &steward_accounts.stake_pool_address,
                 None,
             );
 
             let (transient_stake_address, _) = find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_account,
+                vote_account,
                 &steward_accounts.stake_pool_address,
                 steward_accounts.validator_list_account.validators[*validator_index]
                     .transient_seed_suffix
                     .into(),
             );
             Instruction {
-                program_id: program_id,
+                program_id,
                 accounts: jito_steward::accounts::Rebalance {
                     config: steward_config,
                     state_account: steward_accounts.state_address,
@@ -118,7 +110,7 @@ pub async fn command_crank_rebalance(
                     rent: solana_sdk::sysvar::rent::id(),
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
-                    stake_config: stake::config::id(),
+                    stake_config: stake::config::ID,
                     signer: payer.pubkey(),
                 }
                 .to_account_metas(None),
@@ -141,17 +133,11 @@ pub async fn command_crank_rebalance(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    debug_send_single_transaction(
-        &Arc::new(client),
-        &Arc::new(payer),
-        &txs_to_run[0],
-        Some(true),
-    )
-    .await;
+    // debug_send_single_transaction(client, &Arc::new(payer), &txs_to_run[0], Some(true)).await;
 
-    // let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+    let submit_stats = submit_transactions(client, txs_to_run, &Arc::new(payer)).await?;
 
-    // println!("Submit stats: {:?}", submit_stats);
+    println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
 }

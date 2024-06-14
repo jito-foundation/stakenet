@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount};
@@ -12,7 +14,7 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::commands::InitState,
+    commands::command_args::InitState,
     utils::accounts::{get_stake_pool_account, get_steward_state_address},
 };
 
@@ -21,7 +23,7 @@ const REALLOCS_PER_TX: usize = 10;
 
 pub async fn command_init_state(
     args: InitState,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
@@ -32,7 +34,7 @@ pub async fn command_init_state(
 
     let steward_state = get_steward_state_address(&program_id, &steward_config);
 
-    let stake_pool_account = get_stake_pool_account(&client, &args.stake_pool).await?;
+    let stake_pool_account = get_stake_pool_account(client, &args.stake_pool).await?;
 
     let validator_list = stake_pool_account.validator_list;
 
@@ -69,7 +71,7 @@ pub async fn command_init_state(
 
     if should_create {
         let signature = _create_state(
-            &client,
+            client,
             &program_id,
             &authority,
             &steward_state,
@@ -87,7 +89,7 @@ pub async fn command_init_state(
         let reallocs_per_transaction = reallocs_left_to_run.min(REALLOCS_PER_TX);
 
         let signature = _realloc_x_times(
-            &client,
+            client,
             &program_id,
             &authority,
             &steward_state,

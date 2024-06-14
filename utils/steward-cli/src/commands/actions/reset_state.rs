@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -8,11 +10,11 @@ use solana_sdk::{
     signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::commands::ResetState, utils::accounts::get_all_steward_accounts};
+use crate::{commands::command_args::ResetState, utils::accounts::get_all_steward_accounts};
 
 pub async fn command_reset_state(
     args: ResetState,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
@@ -20,10 +22,10 @@ pub async fn command_reset_state(
         .expect("Failed reading keypair file ( Authority )");
 
     let all_steward_accounts =
-        get_all_steward_accounts(&client, &program_id, &args.steward_config).await?;
+        get_all_steward_accounts(client, &program_id, &args.steward_config).await?;
 
     let reset_ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts: jito_steward::accounts::ResetStewardState {
             state_account: all_steward_accounts.state_address,
             config: args.steward_config,

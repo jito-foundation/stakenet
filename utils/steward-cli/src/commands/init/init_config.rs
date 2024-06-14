@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::UpdateParametersArgs;
@@ -11,11 +13,11 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{commands::commands::InitConfig, utils::accounts::get_steward_staker_address};
+use crate::{commands::command_args::InitConfig, utils::accounts::get_steward_staker_address};
 
 pub async fn command_init_config(
     args: InitConfig,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
@@ -56,7 +58,7 @@ pub async fn command_init_config(
     }
 
     let init_ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts: jito_steward::accounts::InitializeConfig {
             config: steward_config.pubkey(),
             stake_pool: args.stake_pool,

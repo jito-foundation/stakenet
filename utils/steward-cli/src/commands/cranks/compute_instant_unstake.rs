@@ -3,30 +3,30 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::{submit_instructions, submit_transactions};
+use keeper_core::submit_transactions;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, instruction::InstructionError, pubkey::Pubkey,
-    signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer,
 };
 
 use crate::{
-    commands::commands::CrankComputeInstantUnstake,
+    commands::command_args::CrankComputeInstantUnstake,
     utils::{
         accounts::{
             get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
         },
         print::state_tag_to_string,
-        transactions::{debug_send_single_transaction, package_instructions},
+        transactions::package_instructions,
     },
 };
 
 pub async fn command_crank_compute_instant_unstake(
     args: CrankComputeInstantUnstake,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
@@ -64,7 +64,7 @@ pub async fn command_crank_compute_instant_unstake(
                 .get(validator_index)
                 .expect("Index is not in progress bitmask");
             if has_been_scored {
-                return None;
+                None
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
                     [validator_index]
@@ -72,7 +72,7 @@ pub async fn command_crank_compute_instant_unstake(
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                return Some((validator_index, vote_account, history_account));
+                Some((validator_index, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -177,13 +177,13 @@ pub async fn command_crank_compute_instant_unstake(
     let ixs_to_run = validators_to_run
         .iter()
         .map(|(validator_index, _, history_account)| Instruction {
-            program_id: program_id,
+            program_id,
             accounts: jito_steward::accounts::ComputeInstantUnstake {
                 config: steward_config,
                 state_account: steward_accounts.state_address,
                 validator_history: *history_account,
                 validator_list: steward_accounts.validator_list_address,
-                cluster_history: cluster_history,
+                cluster_history,
                 signer: arc_payer.pubkey(),
             }
             .to_account_metas(None),
@@ -213,7 +213,7 @@ pub async fn command_crank_compute_instant_unstake(
 }
 
 fn _package_compute_instant_unstake(
-    ixs: &Vec<Instruction>,
+    ixs: &[Instruction],
     priority_fee: u64,
 ) -> Vec<Vec<Instruction>> {
     ixs.chunks(15)

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use jito_steward::StewardStateAccount;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -5,24 +7,22 @@ use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 
 use crate::{
-    commands::commands::ViewState,
+    commands::command_args::ViewState,
     utils::{
-        accounts::{
-            get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts,
-        },
+        accounts::{get_all_steward_accounts, UsefulStewardAccounts},
         print::state_tag_to_string,
     },
 };
 
 pub async fn command_view_state(
     args: ViewState,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let steward_config = args.steward_config;
 
     let steward_state_accounts =
-        get_all_steward_accounts(&client, &program_id, &steward_config).await?;
+        get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     // _print_validators_to_remove(&steward_state_accounts);
     // _print_verbose_state(&steward_state_accounts);
@@ -36,7 +36,7 @@ pub async fn command_view_state(
     Ok(())
 }
 
-fn _print_validators_to_remove(steward_state_accounts: &Box<UsefulStewardAccounts>) {
+fn _print_validators_to_remove(steward_state_accounts: &UsefulStewardAccounts) {
     for i in 0..steward_state_accounts
         .state_account
         .state
@@ -54,7 +54,7 @@ fn _print_validators_to_remove(steward_state_accounts: &Box<UsefulStewardAccount
     }
 }
 
-fn _print_verbose_state(steward_state_accounts: &Box<UsefulStewardAccounts>) {
+fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {
     let mut formatted_string;
 
     for (index, validator) in steward_state_accounts

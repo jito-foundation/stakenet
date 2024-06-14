@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
@@ -9,13 +11,13 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::commands::CrankIdle,
+    commands::command_args::CrankIdle,
     utils::{accounts::get_steward_state_account, print::state_tag_to_string},
 };
 
 pub async fn command_crank_idle(
     args: CrankIdle,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
@@ -27,7 +29,7 @@ pub async fn command_crank_idle(
     let steward_config = args.steward_config;
 
     let (state_account, state_address) =
-        get_steward_state_account(&client, &program_id, &steward_config).await?;
+        get_steward_state_account(client, &program_id, &steward_config).await?;
 
     match state_account.state.state_tag {
         StewardStateEnum::Idle => { /* Continue */ }
@@ -41,7 +43,7 @@ pub async fn command_crank_idle(
     }
 
     let ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts: jito_steward::accounts::Idle {
             config: steward_config,
             state_account: state_address,

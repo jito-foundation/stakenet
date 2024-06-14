@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -7,11 +9,13 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::commands::CrankEpochMaintenance, utils::accounts::get_all_steward_accounts};
+use crate::{
+    commands::command_args::CrankEpochMaintenance, utils::accounts::get_all_steward_accounts,
+};
 
 pub async fn command_crank_epoch_maintenance(
     args: CrankEpochMaintenance,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let validator_index_to_remove = args.validator_index_to_remove;
@@ -24,7 +28,7 @@ pub async fn command_crank_epoch_maintenance(
     let steward_config = args.steward_config;
 
     let all_steward_accounts =
-        get_all_steward_accounts(&client, &program_id, &steward_config).await?;
+        get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     let epoch = client.get_epoch_info().await?.epoch;
 
@@ -34,7 +38,7 @@ pub async fn command_crank_epoch_maintenance(
     }
 
     let ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts: jito_steward::accounts::EpochMaintenance {
             config: steward_config,
             state_account: all_steward_accounts.state_address,

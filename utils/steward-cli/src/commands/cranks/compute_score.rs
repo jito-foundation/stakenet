@@ -14,20 +14,18 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::commands::CrankComputeScore,
+    commands::command_args::CrankComputeScore,
     utils::{
         accounts::{
             get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
-            UsefulStewardAccounts,
         },
         print::state_tag_to_string,
-        transactions::debug_send_single_transaction,
     },
 };
 
 pub async fn command_crank_compute_score(
     args: CrankComputeScore,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
@@ -39,7 +37,7 @@ pub async fn command_crank_compute_score(
     let validator_history_program_id = validator_history_id();
     let steward_config = args.steward_config;
 
-    let steward_accounts = get_all_steward_accounts(&client, &program_id, &steward_config).await?;
+    let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::ComputeScores => { /* Continue */ }
@@ -61,7 +59,7 @@ pub async fn command_crank_compute_score(
                 .get(validator_index)
                 .expect("Index is not in progress bitmask");
             if has_been_scored {
-                return None;
+                None
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
                     [validator_index]
@@ -69,7 +67,7 @@ pub async fn command_crank_compute_score(
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                return Some((validator_index, vote_account, history_account));
+                Some((validator_index, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -85,13 +83,13 @@ pub async fn command_crank_compute_score(
             );
 
             Instruction {
-                program_id: program_id,
+                program_id,
                 accounts: jito_steward::accounts::ComputeScore {
                     config: steward_config,
                     state_account: steward_accounts.state_address,
                     validator_history: *history_account,
                     validator_list: steward_accounts.validator_list_address,
-                    cluster_history: cluster_history,
+                    cluster_history,
                     signer: payer.pubkey(),
                 }
                 .to_account_metas(None),
@@ -116,7 +114,7 @@ pub async fn command_crank_compute_score(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+    let submit_stats = submit_transactions(client, txs_to_run, &Arc::new(payer)).await?;
 
     println!("Submit stats: {:?}", submit_stats);
 
@@ -124,7 +122,7 @@ pub async fn command_crank_compute_score(
 }
 
 fn _package_compute_score_instructions(
-    ixs: &Vec<Instruction>,
+    ixs: &[Instruction],
     priority_fee: u64,
 ) -> Vec<Vec<Instruction>> {
     ixs.chunks(1)

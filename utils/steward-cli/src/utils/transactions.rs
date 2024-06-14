@@ -10,7 +10,7 @@ use solana_sdk::{
 };
 
 pub fn package_instructions(
-    ixs: &Vec<Instruction>,
+    ixs: &[Instruction],
     chunk_size: usize,
     priority_fee: Option<u64>,
     compute_limit: Option<u32>,
@@ -43,11 +43,11 @@ pub fn package_instructions(
 pub async fn debug_send_single_transaction(
     client: &Arc<RpcClient>,
     payer: &Arc<Keypair>,
-    instructions: &Vec<Instruction>,
+    instructions: &[Instruction],
     debug_print: Option<bool>,
 ) -> Result<solana_sdk::signature::Signature, solana_client::client_error::ClientError> {
     let transaction = Transaction::new_signed_with_payer(
-        &instructions,
+        instructions,
         Some(&payer.pubkey()),
         &[&payer],
         client.get_latest_blockhash().await?,
@@ -55,7 +55,7 @@ pub async fn debug_send_single_transaction(
 
     let result = client.send_and_confirm_transaction(&transaction).await;
 
-    if let Some(debug_print) = debug_print {
+    if debug_print.unwrap_or(false) {
         match &result {
             Ok(signature) => {
                 println!("Signature: {}", signature);
@@ -67,5 +67,5 @@ pub async fn debug_send_single_transaction(
         }
     }
 
-    return result;
+    result
 }

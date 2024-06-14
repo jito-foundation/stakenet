@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::UpdateParametersArgs;
@@ -8,11 +10,11 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::commands::commands::UpdateConfig;
+use crate::commands::command_args::UpdateConfig;
 
 pub async fn command_update_config(
     args: UpdateConfig,
-    client: RpcClient,
+    client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
