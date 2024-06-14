@@ -8,9 +8,7 @@ use solana_sdk::{
     signer::Signer, transaction::Transaction,
 };
 
-use crate::utils::accounts::get_all_steward_accounts;
-
-use super::commands::ResetState;
+use crate::{commands::commands::ResetState, utils::accounts::get_all_steward_accounts};
 
 pub async fn command_reset_state(
     args: ResetState,

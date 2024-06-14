@@ -3,13 +3,19 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::submit_instructions;
+use keeper_core::{submit_instructions, submit_transactions};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    pubkey::Pubkey,
+    signature::read_keypair_file,
+    signer::Signer,
+    stake, system_program,
+    sysvar::{self, rent},
+    transaction::Transaction,
 };
 
 use crate::{
@@ -20,6 +26,7 @@ use crate::{
             get_validator_history_address, UsefulStewardAccounts,
         },
         print::state_tag_to_string,
+        transactions::{debug_send_single_transaction, package_instructions},
     },
 };
 
@@ -71,51 +78,80 @@ pub async fn command_crank_rebalance(
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
 
-    let cluster_history = get_cluster_history_address(&validator_history_program_id);
-
     let ixs_to_run = validators_to_run
         .iter()
-        .map(|(validator_index, _, history_account)| Instruction {
-            program_id: program_id,
-            accounts: jito_steward::accounts::Rebalance {
-                config: steward_config,
-                state_account: steward_accounts.state_address,
-                validator_history: *history_account,
-                stake_pool_program: spl_stake_pool::id(),
-                stake_pool: steward_accounts.stake_pool_address,
-                staker: steward_accounts.staker_address,
-                withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
-                validator_list: steward_accounts.validator_list_address,
-                reserve_stake: todo!(),
-                stake_account: todo!(),
-                transient_stake_account: todo!(),
-                vote_account: todo!(),
-                clock: todo!(),
-                rent: todo!(),
-                stake_history: todo!(),
-                stake_config: todo!(),
-                system_program: todo!(),
-                stake_program: todo!(),
-                signer: todo!(),
+        .map(|(validator_index, vote_account, history_account)| {
+            println!("vote_account ({}): {}", validator_index, vote_account);
+
+            let (stake_address, _) = find_stake_program_address(
+                &spl_stake_pool::id(),
+                &vote_account,
+                &steward_accounts.stake_pool_address,
+                None,
+            );
+
+            let (transient_stake_address, _) = find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                &vote_account,
+                &steward_accounts.stake_pool_address,
+                steward_accounts.validator_list_account.validators[*validator_index]
+                    .transient_seed_suffix
+                    .into(),
+            );
+            Instruction {
+                program_id: program_id,
+                accounts: jito_steward::accounts::Rebalance {
+                    config: steward_config,
+                    state_account: steward_accounts.state_address,
+                    validator_history: *history_account,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: steward_accounts.stake_pool_address,
+                    staker: steward_accounts.staker_address,
+                    withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: steward_accounts.validator_list_address,
+                    reserve_stake: steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    transient_stake_account: transient_stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::id(),
+                    signer: payer.pubkey(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::Rebalance {
+                    validator_list_index: *validator_index,
+                }
+                .data(),
             }
-            .to_account_metas(None),
-            data: jito_steward::instruction::Rebalance {
-                validator_list_index: *validator_index,
-            }
-            .data(),
         })
         .collect::<Vec<Instruction>>();
 
-    println!("Submitting {} instructions", ixs_to_run.len());
+    let txs_to_run = package_instructions(
+        &ixs_to_run,
+        1,
+        Some(args.priority_fee),
+        Some(1_400_000),
+        None,
+    );
 
-    submit_instructions(
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
+
+    debug_send_single_transaction(
         &Arc::new(client),
-        ixs_to_run,
         &Arc::new(payer),
-        args.priority_fee,
-        Some(150_000),
+        &txs_to_run[0],
+        Some(true),
     )
-    .await?;
+    .await;
+
+    // let submit_stats = submit_transactions(&Arc::new(client), txs_to_run, &Arc::new(payer)).await?;
+
+    // println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
 }

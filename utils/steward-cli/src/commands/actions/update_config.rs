@@ -8,7 +8,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use super::commands::UpdateConfig;
+use crate::commands::commands::UpdateConfig;
 
 pub async fn command_update_config(
     args: UpdateConfig,

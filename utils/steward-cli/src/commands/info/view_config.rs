@@ -4,9 +4,10 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::utils::accounts::{get_steward_config_account, get_steward_state_address};
-
-use super::commands::ViewConfig;
+use crate::{
+    commands::commands::ViewConfig,
+    utils::accounts::{get_steward_config_account, get_steward_state_address},
+};
 
 pub async fn command_view_config(
     args: ViewConfig,

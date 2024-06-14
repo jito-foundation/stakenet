@@ -286,10 +286,7 @@ pub fn instant_unstake_validator(
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
-    let vote_credits_rate = validator
-        .history
-        .epoch_credits_latest()
-        .ok_or(StewardError::VoteHistoryNotRecentEnough)? as f64
+    let vote_credits_rate = validator.history.epoch_credits_latest().unwrap_or(0) as f64
         / validator_history_slot_index as f64;
 
     let delinquency_check = if blocks_produced_rate > 0. {

@@ -49,7 +49,8 @@ cargo run init-config \
 cargo run update-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
   --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 \
-  --compute-score-slot-range 50000 
+  --instant-unstake-inputs-epoch-progress 0.10 \
+  --instant-unstake-epoch-progress 0.10
 ```
 
 ## Create State
@@ -100,6 +101,11 @@ cargo run crank-idle --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1
 ## Crank Compute Instant Unstake
 ```bash
 cargo run crank-compute-instant-unstake --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
+```
+
+## Crank Rebalance
+```bash
+cargo run crank-rebalance --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 # Deploy and Upgrade

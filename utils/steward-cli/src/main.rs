@@ -1,7 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
 use commands::{
-    auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
+    actions::{
+        auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
+        remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
+        update_config::command_update_config,
+    },
     commands::{Args, Commands},
     cranks::{
         compute_delegations::command_crank_compute_delegations,
@@ -10,17 +14,12 @@ use commands::{
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
         rebalance::command_crank_rebalance,
     },
-    init_config::command_init_config,
-    init_state::command_init_state,
-    remove_bad_validators::command_remove_bad_validators,
-    reset_state::command_reset_state,
-    update_config::command_update_config,
-    view_config::command_view_config,
-    view_state::command_view_state,
+    info::{view_config::command_view_config, view_state::command_view_state},
+    init::{init_config::command_init_config, init_state::command_init_state},
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 pub mod commands;
 pub mod utils;

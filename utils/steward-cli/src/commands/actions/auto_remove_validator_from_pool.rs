@@ -25,13 +25,16 @@ use solana_sdk::{
 };
 use validator_history::id;
 
-use crate::utils::{
-    accounts::{get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts},
-    print,
-    transactions::debug_send_single_transaction,
+use crate::{
+    commands::commands::AutoRemoveValidatorFromPool,
+    utils::{
+        accounts::{
+            get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts,
+        },
+        print,
+        transactions::debug_send_single_transaction,
+    },
 };
-
-use super::commands::AutoRemoveValidatorFromPool;
 
 pub async fn command_auto_remove_validator_from_pool(
     args: AutoRemoveValidatorFromPool,

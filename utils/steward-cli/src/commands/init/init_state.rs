@@ -11,9 +11,10 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::utils::accounts::{get_stake_pool_account, get_steward_state_address};
-
-use super::commands::InitState;
+use crate::{
+    commands::commands::InitState,
+    utils::accounts::{get_stake_pool_account, get_steward_state_address},
+};
 
 const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 const REALLOCS_PER_TX: usize = 10;

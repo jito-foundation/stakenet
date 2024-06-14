@@ -11,9 +11,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::utils::accounts::get_steward_staker_address;
-
-use super::commands::InitConfig;
+use crate::{commands::commands::InitConfig, utils::accounts::get_steward_staker_address};
 
 pub async fn command_init_config(
     args: InitConfig,

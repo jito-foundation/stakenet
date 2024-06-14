@@ -20,13 +20,16 @@ use solana_sdk::{
 };
 use validator_history::id;
 
-use crate::utils::{
-    accounts::{get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts},
-    print,
-    transactions::debug_send_single_transaction,
+use crate::{
+    commands::commands::RemoveBadValidators,
+    utils::{
+        accounts::{
+            get_all_steward_accounts, get_validator_history_address, UsefulStewardAccounts,
+        },
+        print,
+        transactions::debug_send_single_transaction,
+    },
 };
-
-use super::commands::RemoveBadValidators;
 
 pub async fn command_remove_bad_validators(
     args: RemoveBadValidators,
