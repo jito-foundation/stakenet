@@ -88,6 +88,7 @@ pub fn handler(
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;
             state_account.state.checked_validators_removed_from_list = false.into();
+            state_account.state.rebalance_completed = false.into();
         }
     }
 
