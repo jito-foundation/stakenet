@@ -20,7 +20,7 @@ pub struct ComputeScore<'info> {
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
-    /// CHECK: TODO
+    /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
     #[account(owner = spl_stake_pool::id())]
     pub validator_list: AccountInfo<'info>,
 

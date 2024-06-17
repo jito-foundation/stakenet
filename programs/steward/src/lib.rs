@@ -161,20 +161,6 @@ pub mod steward {
         instructions::update_parameters::handler(ctx, &update_parameters_args)
     }
 
-    /* TEMPORARY ADMIN INSTRUCTIONS for testing */
-
-    /// Resets steward state account to its initial state.
-    pub fn reset_steward_state(ctx: Context<ResetStewardState>) -> Result<()> {
-        instructions::reset_steward_state::handler(ctx)
-    }
-
-    /// Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).
-    /// Config is not closed as it is a Keypair, so lamports can simply be withdrawn.
-    /// Reclaims lamports to authority
-    pub fn close_steward_accounts(ctx: Context<CloseStewardAccounts>) -> Result<()> {
-        instructions::close_steward_accounts::handler(ctx)
-    }
-
     /* Passthrough instructions to spl-stake-pool, where the signer is Staker. Must be invoked by `config.authority` */
 
     pub fn set_staker(ctx: Context<SetStaker>) -> Result<()> {
