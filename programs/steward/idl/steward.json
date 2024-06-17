@@ -1,5 +1,5 @@
 {
-  "address": "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP",
+  "address": "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8",
   "metadata": {
     "name": "steward",
     "version": "0.1.0",
@@ -284,43 +284,6 @@
           "type": "u64"
         }
       ]
-    },
-    {
-      "name": "close_steward_accounts",
-      "docs": [
-        "Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).",
-        "Config is not closed as it is a Keypair, so lamports can simply be withdrawn.",
-        "Reclaims lamports to authority"
-      ],
-      "discriminator": [
-        172,
-        171,
-        212,
-        186,
-        90,
-        10,
-        181,
-        24
-      ],
-      "accounts": [
-        {
-          "name": "config"
-        },
-        {
-          "name": "staker",
-          "writable": true
-        },
-        {
-          "name": "state_account",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": []
     },
     {
       "name": "compute_delegations",
@@ -1181,43 +1144,6 @@
           "type": "u64"
         }
       ]
-    },
-    {
-      "name": "reset_steward_state",
-      "docs": [
-        "Resets steward state account to its initial state."
-      ],
-      "discriminator": [
-        84,
-        248,
-        158,
-        46,
-        200,
-        205,
-        234,
-        86
-      ],
-      "accounts": [
-        {
-          "name": "state_account",
-          "writable": true
-        },
-        {
-          "name": "config"
-        },
-        {
-          "name": "stake_pool"
-        },
-        {
-          "name": "validator_list"
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": []
     },
     {
       "name": "resume_steward",

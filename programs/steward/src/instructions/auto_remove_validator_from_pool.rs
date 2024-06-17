@@ -4,7 +4,7 @@ use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{
-    deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index, StakePool,
+    deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};

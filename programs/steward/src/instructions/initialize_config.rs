@@ -1,9 +1,6 @@
 use anchor_lang::{prelude::*, solana_program::program::invoke};
 
-use crate::{
-    utils::{deserialize_stake_pool, StakePool},
-    Config, Staker, UpdateParametersArgs,
-};
+use crate::{utils::deserialize_stake_pool, Config, Staker, UpdateParametersArgs};
 
 #[derive(Accounts)]
 pub struct InitializeConfig<'info> {

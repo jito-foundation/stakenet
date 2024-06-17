@@ -1,5 +1,4 @@
 use borsh::BorshSerialize;
-use core::num;
 use std::fmt::Display;
 
 use crate::{
@@ -22,7 +21,7 @@ use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
-fn invalid_state_error(expected: String, actual: String) -> Error {
+fn invalid_state_error(_expected: String, _actual: String) -> Error {
     // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
 }
