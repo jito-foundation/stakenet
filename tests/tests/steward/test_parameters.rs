@@ -825,7 +825,7 @@ fn test_compute_score_slot_range() {
         // Cannot be below min_slots_per_epoch
         let new_value = min_slots_per_epoch - 1;
         let update_parameters = UpdateParametersArgs {
-            compute_score_slot_range: Some(new_value as u64),
+            compute_score_slot_range: Some(new_value),
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, Some(slots_per_epoch), None);
@@ -845,7 +845,7 @@ fn test_compute_score_slot_range() {
 
     {
         // In range
-        let new_value = COMPUTE_SCORE_SLOT_RANGE_MIN as u64 + 1;
+        let new_value = COMPUTE_SCORE_SLOT_RANGE_MIN + 1;
         let update_parameters = UpdateParametersArgs {
             compute_score_slot_range: Some(new_value),
             ..UpdateParametersArgs::default()
