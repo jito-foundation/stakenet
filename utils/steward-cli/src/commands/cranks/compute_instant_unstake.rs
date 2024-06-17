@@ -15,7 +15,6 @@ use crate::{
         accounts::{
             get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
         },
-        print::state_tag_to_string,
         transactions::{package_instructions, submit_packaged_transactions},
     },
 };
@@ -41,7 +40,7 @@ pub async fn command_crank_compute_instant_unstake(
         _ => {
             println!(
                 "State account is not in Compute Instant Unstake state: {}",
-                state_tag_to_string(steward_accounts.state_account.state.state_tag)
+                steward_accounts.state_account.state.state_tag
             );
             return Ok(());
         }

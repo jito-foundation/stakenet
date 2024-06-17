@@ -59,10 +59,9 @@ pub async fn get_steward_config_account(
 ) -> Result<Config> {
     let config_raw_account = client.get_account(steward_config).await?;
 
-    Ok(
-        Config::try_deserialize(&mut config_raw_account.data.as_slice())
-            .expect("Cannot deserialize config account"),
-    )
+    Ok(Config::try_deserialize(
+        &mut config_raw_account.data.as_slice(),
+    )?)
 }
 
 pub fn get_steward_state_address(program_id: &Pubkey, steward_config: &Pubkey) -> Pubkey {
@@ -83,8 +82,7 @@ pub async fn get_steward_state_account(
 
     let state_raw_account = client.get_account(&steward_state).await?;
     Ok((
-        StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
-            .expect("Cannot deserialize state account"),
+        StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())?,
         steward_state,
     ))
 }
@@ -92,10 +90,9 @@ pub async fn get_steward_state_account(
 pub async fn get_stake_pool_account(client: &RpcClient, stake_pool: &Pubkey) -> Result<StakePool> {
     let stake_pool_account_raw = client.get_account(stake_pool).await?;
 
-    Ok(
-        StakePool::try_deserialize(&mut stake_pool_account_raw.data.as_slice())
-            .expect("Could not deserialize stake pool account"),
-    )
+    Ok(StakePool::try_deserialize(
+        &mut stake_pool_account_raw.data.as_slice(),
+    )?)
 }
 
 pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
@@ -122,8 +119,7 @@ pub async fn get_steward_staker_account(
     let staker_raw_account = client.get_account(&steward_staker).await?;
 
     Ok((
-        Staker::try_deserialize(&mut staker_raw_account.data.as_slice())
-            .expect("Cannot deserialize staker account"),
+        Staker::try_deserialize(&mut staker_raw_account.data.as_slice())?,
         steward_staker,
     ))
 }
@@ -134,10 +130,9 @@ pub async fn get_validator_list_account(
 ) -> Result<ValidatorList> {
     let validator_list_account_raw = client.get_account(validator_list).await?;
 
-    Ok(
-        ValidatorList::try_deserialize(&mut validator_list_account_raw.data.as_slice())
-            .expect("Could not deserialize validator list account"),
-    )
+    Ok(ValidatorList::try_deserialize(
+        &mut validator_list_account_raw.data.as_slice(),
+    )?)
 }
 
 pub fn get_cluster_history_address(validator_history_program_id: &Pubkey) -> Pubkey {

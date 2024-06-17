@@ -12,10 +12,7 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CrankComputeDelegations,
-    utils::{
-        accounts::get_steward_state_account, print::state_tag_to_string,
-        transactions::configure_instruction,
-    },
+    utils::{accounts::get_steward_state_account, transactions::configure_instruction},
 };
 
 pub async fn command_crank_compute_delegations(
@@ -39,7 +36,7 @@ pub async fn command_crank_compute_delegations(
         _ => {
             println!(
                 "State account is not in Compute Delegation state: {}",
-                state_tag_to_string(state_account.state.state_tag)
+                state_account.state.state_tag
             );
             return Ok(());
         }

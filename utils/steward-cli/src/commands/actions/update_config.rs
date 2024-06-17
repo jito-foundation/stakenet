@@ -23,8 +23,7 @@ pub async fn command_update_config(
 
     let steward_config = args.permissioned_parameters.steward_config;
 
-    let update_parameters_args: UpdateParametersArgs =
-        args.config_parameters.to_update_parameters_args();
+    let update_parameters_args: UpdateParametersArgs = args.config_parameters.into();
 
     let ix = Instruction {
         program_id,

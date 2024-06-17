@@ -10,10 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::CrankIdle,
-    utils::{accounts::get_steward_state_account, print::state_tag_to_string},
-};
+use crate::{commands::command_args::CrankIdle, utils::accounts::get_steward_state_account};
 
 pub async fn command_crank_idle(
     args: CrankIdle,
@@ -36,7 +33,7 @@ pub async fn command_crank_idle(
         _ => {
             println!(
                 "State account is not in Idle state: {}",
-                state_tag_to_string(state_account.state.state_tag)
+                state_account.state.state_tag
             );
             return Ok(());
         }

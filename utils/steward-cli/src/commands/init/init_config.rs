@@ -46,8 +46,7 @@ pub async fn command_init_config(
 
     let steward_staker = get_steward_staker_address(&program_id, &steward_config.pubkey());
 
-    let update_parameters_args: UpdateParametersArgs =
-        args.config_parameters.to_update_parameters_args();
+    let update_parameters_args: UpdateParametersArgs = args.config_parameters.into();
 
     // Check if already created
     match client.get_account(&steward_config.pubkey()).await {

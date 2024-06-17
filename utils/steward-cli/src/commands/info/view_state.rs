@@ -8,10 +8,7 @@ use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_ad
 
 use crate::{
     commands::command_args::ViewState,
-    utils::{
-        accounts::{get_all_steward_accounts, UsefulStewardAccounts},
-        print::state_tag_to_string,
-    },
+    utils::accounts::{get_all_steward_accounts, UsefulStewardAccounts},
 };
 
 pub async fn command_view_state(
@@ -24,11 +21,15 @@ pub async fn command_view_state(
     let steward_state_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    _print_default_state(
-        &steward_config,
-        &steward_state_accounts.state_address,
-        &steward_state_accounts.state_account,
-    );
+    if args.verbose {
+        _print_verbose_state(&steward_state_accounts);
+    } else {
+        _print_default_state(
+            &steward_config,
+            &steward_state_accounts.state_address,
+            &steward_state_accounts.state_account,
+        );
+    }
 
     Ok(())
 }
@@ -126,7 +127,7 @@ fn _print_default_state(
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += "\n";
     formatted_string += "↺ State ↺\n";
-    formatted_string += &format!("State Tag: {:?}\n", state_tag_to_string(state.state_tag));
+    formatted_string += &format!("State Tag: {}\n", state.state_tag);
     formatted_string += &format!(
         "Progress: {:?} / {} ({} remaining)\n",
         state.progress.count(),

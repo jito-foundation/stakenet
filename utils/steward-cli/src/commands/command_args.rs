@@ -103,28 +103,28 @@ pub struct ConfigParameters {
     pub minimum_voting_epochs: Option<u64>,
 }
 
-impl ConfigParameters {
-    pub fn to_update_parameters_args(&self) -> UpdateParametersArgs {
+impl From<ConfigParameters> for UpdateParametersArgs {
+    fn from(config: ConfigParameters) -> Self {
         UpdateParametersArgs {
-            mev_commission_range: self.mev_commission_range,
-            epoch_credits_range: self.epoch_credits_range,
-            commission_range: self.commission_range,
-            scoring_delinquency_threshold_ratio: self.scoring_delinquency_threshold_ratio,
-            instant_unstake_delinquency_threshold_ratio: self
+            mev_commission_range: config.mev_commission_range,
+            epoch_credits_range: config.epoch_credits_range,
+            commission_range: config.commission_range,
+            scoring_delinquency_threshold_ratio: config.scoring_delinquency_threshold_ratio,
+            instant_unstake_delinquency_threshold_ratio: config
                 .instant_unstake_delinquency_threshold_ratio,
-            mev_commission_bps_threshold: self.mev_commission_bps_threshold,
-            commission_threshold: self.commission_threshold,
-            historical_commission_threshold: self.historical_commission_threshold,
-            num_delegation_validators: self.num_delegation_validators,
-            scoring_unstake_cap_bps: self.scoring_unstake_cap_bps,
-            instant_unstake_cap_bps: self.instant_unstake_cap_bps,
-            stake_deposit_unstake_cap_bps: self.stake_deposit_unstake_cap_bps,
-            compute_score_slot_range: self.compute_score_slot_range,
-            instant_unstake_epoch_progress: self.instant_unstake_epoch_progress,
-            instant_unstake_inputs_epoch_progress: self.instant_unstake_inputs_epoch_progress,
-            num_epochs_between_scoring: self.num_epochs_between_scoring,
-            minimum_stake_lamports: self.minimum_stake_lamports,
-            minimum_voting_epochs: self.minimum_voting_epochs,
+            mev_commission_bps_threshold: config.mev_commission_bps_threshold,
+            commission_threshold: config.commission_threshold,
+            historical_commission_threshold: config.historical_commission_threshold,
+            num_delegation_validators: config.num_delegation_validators,
+            scoring_unstake_cap_bps: config.scoring_unstake_cap_bps,
+            instant_unstake_cap_bps: config.instant_unstake_cap_bps,
+            stake_deposit_unstake_cap_bps: config.stake_deposit_unstake_cap_bps,
+            compute_score_slot_range: config.compute_score_slot_range,
+            instant_unstake_epoch_progress: config.instant_unstake_epoch_progress,
+            instant_unstake_inputs_epoch_progress: config.instant_unstake_inputs_epoch_progress,
+            num_epochs_between_scoring: config.num_epochs_between_scoring,
+            minimum_stake_lamports: config.minimum_stake_lamports,
+            minimum_voting_epochs: config.minimum_voting_epochs,
         }
     }
 }
@@ -188,7 +188,6 @@ pub struct ViewParameters {
 pub enum Commands {
     // Views
     ViewState(ViewState),
-    ViewStatePerValidator(ViewStatePerValidator),
     ViewConfig(ViewConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
 
@@ -218,13 +217,10 @@ pub enum Commands {
 pub struct ViewState {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
-}
 
-#[derive(Parser)]
-#[command(about = "Views the steward state for all validators in the pool")]
-pub struct ViewStatePerValidator {
-    #[command(flatten)]
-    pub view_parameters: ViewParameters,
+    /// Views the steward state for all validators in the pool
+    #[arg(short, long)]
+    pub verbose: bool,
 }
 
 #[derive(Parser)]

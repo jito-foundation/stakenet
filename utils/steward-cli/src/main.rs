@@ -18,7 +18,7 @@ use commands::{
     info::{
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
-        view_state::command_view_state, view_state_per_validator::command_view_state_per_validator,
+        view_state::command_view_state,
     },
     init::{init_config::command_init_config, init_state::command_init_state},
 };
@@ -44,9 +44,6 @@ async fn main() -> Result<()> {
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
-        }
-        Commands::ViewStatePerValidator(args) => {
-            command_view_state_per_validator(args, &client, program_id).await
         }
 
         // --- Actions ---

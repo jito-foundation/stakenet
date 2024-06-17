@@ -16,7 +16,6 @@ use crate::{
     commands::command_args::CrankRebalance,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
-        print::state_tag_to_string,
         transactions::{package_instructions, submit_packaged_transactions},
     },
 };
@@ -42,7 +41,7 @@ pub async fn command_crank_rebalance(
         _ => {
             println!(
                 "State account is not in Rebalance state: {}",
-                state_tag_to_string(steward_accounts.state_account.state.state_tag)
+                steward_accounts.state_account.state.state_tag
             );
             return Ok(());
         }
