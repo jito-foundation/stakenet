@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::submit_transactions;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
@@ -18,7 +17,7 @@ use crate::{
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
         print::state_tag_to_string,
-        transactions::package_instructions,
+        transactions::{package_instructions, submit_packaged_transactions},
     },
 };
 
@@ -27,13 +26,14 @@ pub async fn command_crank_rebalance(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let args = args.permissionless_parameters;
     // Creates config account
-    let payer =
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let payer = Arc::new(
+        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
+            .expect("Failed reading keypair file ( Payer )"),
+    );
 
     let validator_history_program_id = validator_history_id();
-    let steward_config = args.steward_config;
+    let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
@@ -124,18 +124,24 @@ pub async fn command_crank_rebalance(
 
     let txs_to_run = package_instructions(
         &ixs_to_run,
-        1,
-        Some(args.priority_fee),
-        Some(1_400_000),
+        args.permissionless_parameters
+            .transaction_parameters
+            .chunk_size
+            .unwrap_or(1),
+        args.permissionless_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissionless_parameters
+            .transaction_parameters
+            .compute_limit
+            .or(Some(1_400_000)),
         None,
     );
 
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    // debug_send_single_transaction(client, &Arc::new(payer), &txs_to_run[0], Some(true)).await;
-
-    let submit_stats = submit_transactions(client, txs_to_run, &Arc::new(payer)).await?;
+    let submit_stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
     println!("Submit stats: {:?}", submit_stats);
 

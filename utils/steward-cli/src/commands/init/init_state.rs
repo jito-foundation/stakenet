@@ -15,7 +15,10 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::InitState,
-    utils::accounts::{get_stake_pool_account, get_steward_state_address},
+    utils::{
+        accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
+        transactions::configure_instruction,
+    },
 };
 
 const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
@@ -27,14 +30,17 @@ pub async fn command_init_state(
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
-    let authority = read_keypair_file(args.authority_keypair_path)
+    let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
-    let steward_config = args.steward_config;
+    let steward_config = args.permissioned_parameters.steward_config;
+    let steward_config_account =
+        get_steward_config_account(client, &args.permissioned_parameters.steward_config).await?;
 
     let steward_state = get_steward_state_address(&program_id, &steward_config);
 
-    let stake_pool_account = get_stake_pool_account(client, &args.stake_pool).await?;
+    let stake_pool_account =
+        get_stake_pool_account(client, &steward_config_account.stake_pool).await?;
 
     let validator_list = stake_pool_account.validator_list;
 
@@ -96,6 +102,15 @@ pub async fn command_init_state(
             &steward_config,
             &validator_list,
             reallocs_per_transaction,
+            args.permissioned_parameters
+                .transaction_parameters
+                .priority_fee,
+            args.permissioned_parameters
+                .transaction_parameters
+                .compute_limit,
+            args.permissioned_parameters
+                .transaction_parameters
+                .heap_size,
         )
         .await?;
 
@@ -148,6 +163,7 @@ async fn _create_state(
     Ok(signature)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _realloc_x_times(
     client: &RpcClient,
     program_id: &Pubkey,
@@ -156,6 +172,9 @@ async fn _realloc_x_times(
     steward_config: &Pubkey,
     validator_list: &Pubkey,
     count: usize,
+    priority_fee: Option<u64>,
+    compute_limit: Option<u32>,
+    heap_size: Option<u32>,
 ) -> Result<Signature> {
     let ixs = vec![
         Instruction {
@@ -175,8 +194,10 @@ async fn _realloc_x_times(
 
     let blockhash = client.get_latest_blockhash().await?;
 
+    let configured_ixs = configure_instruction(&ixs, priority_fee, compute_limit, heap_size);
+
     let transaction = Transaction::new_signed_with_payer(
-        &ixs,
+        &configured_ixs,
         Some(&authority.pubkey()),
         &[&authority],
         blockhash,

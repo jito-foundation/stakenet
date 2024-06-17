@@ -10,13 +10,15 @@ use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_ad
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
-    signer::Signer, stake, system_program, sysvar,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program, sysvar,
 };
 
 use crate::{
     commands::command_args::RemoveBadValidators,
-    utils::accounts::{get_all_steward_accounts, get_validator_history_address},
+    utils::{
+        accounts::{get_all_steward_accounts, get_validator_history_address},
+        transactions::package_instructions,
+    },
 };
 
 pub async fn command_remove_bad_validators(
@@ -24,15 +26,13 @@ pub async fn command_remove_bad_validators(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let args = args.permissionless_parameters;
-
     // Creates config account
-    let payer =
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let payer = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
+        .expect("Failed reading keypair file ( Payer )");
     let arc_payer = Arc::new(payer);
 
     let validator_history_program_id = validator_history_id();
-    let steward_config = args.steward_config;
+    let steward_config = args.permissioned_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
@@ -129,9 +129,24 @@ pub async fn command_remove_bad_validators(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = _package_remove_bad_validator_instructions(&ixs_to_run, args.priority_fee);
-
-    // debug_send_single_transaction(&arc_client, &arc_payer, &txs_to_run[4], Some(true)).await;
+    let txs_to_run = package_instructions(
+        &ixs_to_run,
+        args.permissioned_parameters
+            .transaction_parameters
+            .chunk_size
+            .unwrap_or(1),
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit
+            .or(Some(1_400_000)),
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size
+            .or(Some(256 * 1024)),
+    );
 
     println!("Submitting {} instructions", ixs_to_run.len());
 
@@ -140,26 +155,4 @@ pub async fn command_remove_bad_validators(
     println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
-}
-
-fn _package_remove_bad_validator_instructions(
-    ixs: &[Instruction],
-    priority_fee: u64,
-) -> Vec<Vec<Instruction>> {
-    ixs.chunks(1)
-        .map(|chunk: &[Instruction]| {
-            let mut chunk_vec = chunk.to_vec();
-            chunk_vec.insert(
-                0,
-                ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
-            );
-            chunk_vec.insert(0, ComputeBudgetInstruction::request_heap_frame(256 * 1024));
-            chunk_vec.insert(
-                0,
-                ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
-            );
-
-            chunk_vec
-        })
-        .collect::<Vec<Vec<Instruction>>>()
 }

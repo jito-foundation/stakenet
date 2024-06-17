@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use commands::{
     actions::{
+        auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
         update_config::command_update_config,
@@ -14,7 +15,11 @@ use commands::{
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
         rebalance::command_crank_rebalance,
     },
-    info::{view_config::command_view_config, view_state::command_view_state},
+    info::{
+        view_config::command_view_config,
+        view_next_index_to_remove::command_view_next_index_to_remove,
+        view_state::command_view_state, view_state_per_validator::command_view_state_per_validator,
+    },
     init::{init_config::command_init_config, init_state::command_init_state},
 };
 use dotenv::dotenv;
@@ -34,18 +39,32 @@ async fn main() -> Result<()> {
     ));
     let program_id = args.program_id;
     let _ = match args.commands {
+        // ---- Views ----
+        Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
+        Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
+        Commands::ViewNextIndexToRemove(args) => {
+            command_view_next_index_to_remove(args, &client, program_id).await
+        }
+        Commands::ViewStatePerValidator(args) => {
+            command_view_state_per_validator(args, &client, program_id).await
+        }
+
+        // --- Actions ---
         Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
-        Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
         Commands::InitState(args) => command_init_state(args, &client, program_id).await,
-        Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
         }
+        Commands::AutoAddValidatorFromPool(args) => {
+            command_auto_add_validator_from_pool(args, &client, program_id).await
+        }
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, program_id).await
         }
+
+        // --- Cranks ---
         Commands::CrankEpochMaintenance(args) => {
             command_crank_epoch_maintenance(args, &client, program_id).await
         }

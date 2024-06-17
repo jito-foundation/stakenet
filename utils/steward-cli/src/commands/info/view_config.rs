@@ -16,7 +16,7 @@ pub async fn command_view_config(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let steward_config = args.steward_config;
+    let steward_config = args.view_parameters.steward_config;
 
     let steward_config_account = get_steward_config_account(client, &steward_config).await?;
     let steward_state = get_steward_state_address(&program_id, &steward_config);

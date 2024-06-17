@@ -13,7 +13,10 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{commands::command_args::InitConfig, utils::accounts::get_steward_staker_address};
+use crate::{
+    commands::command_args::InitConfig,
+    utils::{accounts::get_steward_staker_address, transactions::configure_instruction},
+};
 
 pub async fn command_init_config(
     args: InitConfig,
@@ -77,8 +80,15 @@ pub async fn command_init_config(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let transaction = Transaction::new_signed_with_payer(
+    let ixs = configure_instruction(
         &[init_ix],
+        args.transaction_parameters.priority_fee,
+        args.transaction_parameters.compute_limit,
+        args.transaction_parameters.heap_size,
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &ixs,
         Some(&authority.pubkey()),
         &[&authority, &steward_config, &staker_keypair],
         blockhash,

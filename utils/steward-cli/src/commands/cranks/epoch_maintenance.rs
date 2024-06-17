@@ -10,7 +10,8 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::command_args::CrankEpochMaintenance, utils::accounts::get_all_steward_accounts,
+    commands::command_args::CrankEpochMaintenance,
+    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
 };
 
 pub async fn command_crank_epoch_maintenance(
@@ -54,8 +55,19 @@ pub async fn command_crank_epoch_maintenance(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let transaction =
-        Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer], blockhash);
+    let configured_ix = configure_instruction(
+        &[ix],
+        args.transaction_parameters.priority_fee,
+        args.transaction_parameters.compute_limit,
+        args.transaction_parameters.heap_size,
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &configured_ix,
+        Some(&payer.pubkey()),
+        &[&payer],
+        blockhash,
+    );
 
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)

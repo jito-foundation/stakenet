@@ -19,13 +19,10 @@ pub async fn command_view_state(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let steward_config = args.steward_config;
+    let steward_config = args.view_parameters.steward_config;
 
     let steward_state_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
-
-    // _print_validators_to_remove(&steward_state_accounts);
-    // _print_verbose_state(&steward_state_accounts);
 
     _print_default_state(
         &steward_config,
@@ -34,24 +31,6 @@ pub async fn command_view_state(
     );
 
     Ok(())
-}
-
-fn _print_validators_to_remove(steward_state_accounts: &UsefulStewardAccounts) {
-    for i in 0..steward_state_accounts
-        .state_account
-        .state
-        .num_pool_validators
-    {
-        let value = steward_state_accounts
-            .state_account
-            .state
-            .validators_to_remove
-            .get_unsafe(i);
-
-        if value {
-            println!("Validator {} is marked for removal", i);
-        }
-    }
 }
 
 fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {

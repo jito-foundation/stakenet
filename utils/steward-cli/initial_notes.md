@@ -68,9 +68,24 @@ cargo run view-config --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP
 cargo run view-state --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
-## Auto Remove Bad Validator
+## View State Per Validator
+```bash
+cargo run view-state-per-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
+```
+
+## View Next Index To Remove
+```bash
+cargo run view-next-index-to-remove --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
+```
+
+## Auto Remove Validator
 ```bash
 cargo run auto-remove-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 1397
+```
+
+## Auto Add Validator
+```bash
+cargo run auto-add-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
 ```
 
 ## Remove Bad Validators

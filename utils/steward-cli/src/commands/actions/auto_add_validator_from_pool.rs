@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
+use spl_stake_pool::find_stake_program_address;
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
@@ -14,33 +14,30 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::command_args::AutoRemoveValidatorFromPool,
+    commands::command_args::AutoAddValidatorFromPool,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
         transactions::configure_instruction,
     },
 };
 
-pub async fn command_auto_remove_validator_from_pool(
-    args: AutoRemoveValidatorFromPool,
+pub async fn command_auto_add_validator_from_pool(
+    args: AutoAddValidatorFromPool,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let validator_index = args.validator_index_to_remove;
-    let args = args.permissionless_parameters;
-
     // Creates config account
     let payer = Arc::new(
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )"),
+        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
+            .expect("Failed reading keypair file ( Payer )"),
     );
 
     let validator_history_program_id = validator_history_id();
-    let steward_config = args.steward_config;
+    let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let vote_account =
-        steward_accounts.validator_list_account.validators[validator_index].vote_account_address;
+    let vote_account = args.vote_account;
     let history_account =
         get_validator_history_address(&vote_account, &validator_history_program_id);
 
@@ -51,21 +48,12 @@ pub async fn command_auto_remove_validator_from_pool(
         None,
     );
 
-    let (transient_stake_address, _) = find_transient_stake_program_address(
-        &spl_stake_pool::id(),
-        &vote_account,
-        &steward_accounts.stake_pool_address,
-        steward_accounts.validator_list_account.validators[validator_index]
-            .transient_seed_suffix
-            .into(),
-    );
-
     let ix = Instruction {
         program_id,
-        accounts: jito_steward::accounts::AutoRemoveValidator {
+        accounts: jito_steward::accounts::AutoAddValidator {
             validator_history_account: history_account,
-            config: args.steward_config,
-            state_account: steward_accounts.state_address,
+            steward_state: steward_accounts.state_address,
+            config: args.permissionless_parameters.steward_config,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: steward_accounts.stake_pool_address,
             staker: steward_accounts.staker_address,
@@ -73,7 +61,6 @@ pub async fn command_auto_remove_validator_from_pool(
             withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
             validator_list: steward_accounts.validator_list_address,
             stake_account: stake_address,
-            transient_stake_account: transient_stake_address,
             vote_account,
             rent: solana_sdk::sysvar::rent::id(),
             clock: solana_sdk::sysvar::clock::id(),
@@ -84,10 +71,7 @@ pub async fn command_auto_remove_validator_from_pool(
             signer: payer.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::AutoRemoveValidatorFromPool {
-            validator_list_index: validator_index,
-        }
-        .data(),
+        data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
     };
 
     let blockhash = client
@@ -97,9 +81,15 @@ pub async fn command_auto_remove_validator_from_pool(
 
     let configured_ix = configure_instruction(
         &[ix],
-        args.transaction_parameters.priority_fee,
-        args.transaction_parameters.compute_limit,
-        args.transaction_parameters.heap_size,
+        args.permissionless_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissionless_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissionless_parameters
+            .transaction_parameters
+            .heap_size,
     );
 
     let transaction = Transaction::new_signed_with_payer(

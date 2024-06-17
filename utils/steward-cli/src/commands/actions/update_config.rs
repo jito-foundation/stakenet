@@ -10,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::commands::command_args::UpdateConfig;
+use crate::{commands::command_args::UpdateConfig, utils::transactions::configure_instruction};
 
 pub async fn command_update_config(
     args: UpdateConfig,
@@ -18,15 +18,15 @@ pub async fn command_update_config(
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
-    let authority = read_keypair_file(args.authority_keypair_path)
+    let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
-    let steward_config = args.steward_config;
+    let steward_config = args.permissioned_parameters.steward_config;
 
     let update_parameters_args: UpdateParametersArgs =
         args.config_parameters.to_update_parameters_args();
 
-    let update_ix = Instruction {
+    let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::UpdateParameters {
             config: steward_config,
@@ -44,8 +44,21 @@ pub async fn command_update_config(
         .await
         .expect("Failed to get recent blockhash");
 
+    let configured_ix = configure_instruction(
+        &[ix],
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size,
+    );
+
     let transaction = Transaction::new_signed_with_payer(
-        &[update_ix],
+        &configured_ix,
         Some(&authority.pubkey()),
         &[&authority],
         blockhash,

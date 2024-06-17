@@ -3,15 +3,11 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
-use keeper_core::submit_transactions;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
 
-use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
-    signer::Signer,
-};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
 
 use crate::{
     commands::command_args::CrankComputeScore,
@@ -20,6 +16,7 @@ use crate::{
             get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
         },
         print::state_tag_to_string,
+        transactions::{package_instructions, submit_packaged_transactions},
     },
 };
 
@@ -28,14 +25,14 @@ pub async fn command_crank_compute_score(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let args = args.permissionless_parameters;
-
     // Creates config account
-    let payer =
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let payer = Arc::new(
+        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
+            .expect("Failed reading keypair file ( Payer )"),
+    );
 
     let validator_history_program_id = validator_history_id();
-    let steward_config = args.steward_config;
+    let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
@@ -101,43 +98,30 @@ pub async fn command_crank_compute_score(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = _package_compute_score_instructions(&ixs_to_run, args.priority_fee);
-
-    // debug_send_single_transaction(
-    //     &Arc::new(client),
-    //     &Arc::new(payer),
-    //     &txs_to_run[0],
-    //     Some(true),
-    // )
-    // .await?;
+    let txs_to_run = package_instructions(
+        &ixs_to_run,
+        args.permissionless_parameters
+            .transaction_parameters
+            .chunk_size
+            .unwrap_or(11),
+        args.permissionless_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissionless_parameters
+            .transaction_parameters
+            .compute_limit
+            .or(Some(1_400_000)),
+        args.permissionless_parameters
+            .transaction_parameters
+            .heap_size,
+    );
 
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let submit_stats = submit_transactions(client, txs_to_run, &Arc::new(payer)).await?;
+    let submit_stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
     println!("Submit stats: {:?}", submit_stats);
 
     Ok(())
-}
-
-fn _package_compute_score_instructions(
-    ixs: &[Instruction],
-    priority_fee: u64,
-) -> Vec<Vec<Instruction>> {
-    ixs.chunks(1)
-        .map(|chunk: &[Instruction]| {
-            let mut chunk_vec = chunk.to_vec();
-            chunk_vec.insert(
-                0,
-                ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
-            );
-            chunk_vec.insert(
-                0,
-                ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
-            );
-
-            chunk_vec
-        })
-        .collect::<Vec<Vec<Instruction>>>()
 }

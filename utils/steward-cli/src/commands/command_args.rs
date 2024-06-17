@@ -4,7 +4,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "CLI for validator history program")]
+#[command(about = "CLI for the steward program")]
 pub struct Args {
     /// RPC URL for the cluster
     #[arg(
@@ -15,7 +15,7 @@ pub struct Args {
     )]
     pub json_rpc_url: String,
 
-    /// Steward Program ID
+    /// Steward program ID
     #[arg(
         long,
         env,
@@ -27,97 +27,7 @@ pub struct Args {
     pub commands: Commands,
 }
 
-#[derive(Subcommand)]
-pub enum Commands {
-    InitConfig(InitConfig),
-    ViewConfig(ViewConfig),
-    UpdateConfig(UpdateConfig),
-
-    InitState(InitState),
-    ViewState(ViewState),
-
-    ResetState(ResetState),
-    RemoveBadValidators(RemoveBadValidators),
-    AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
-
-    CrankEpochMaintenance(CrankEpochMaintenance),
-    CrankComputeScore(CrankComputeScore),
-    CrankComputeDelegations(CrankComputeDelegations),
-    CrankIdle(CrankIdle),
-    CrankComputeInstantUnstake(CrankComputeInstantUnstake),
-    CrankRebalance(CrankRebalance),
-}
-
-#[derive(Parser)]
-#[command(about = "Initialize config account")]
-pub struct InitState {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
-
-    /// Stake pool pubkey
-    #[arg(long, env)]
-    pub stake_pool: Pubkey,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-}
-
-#[derive(Parser)]
-#[command(about = "View the current config account parameters")]
-pub struct ViewState {
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-}
-
-#[derive(Parser)]
-#[command(about = "Initialize config account")]
-pub struct InitConfig {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
-
-    /// Defaults to authority keypair
-    #[arg(short, long, env)]
-    pub staker_keypair_path: Option<PathBuf>,
-
-    /// Optional path to Steward Config keypair
-    #[arg(long, env)]
-    pub steward_config_keypair_path: Option<PathBuf>,
-
-    /// Stake pool pubkey
-    #[arg(long, env)]
-    pub stake_pool: Pubkey,
-
-    #[command(flatten)]
-    pub config_parameters: ConfigParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "Updates Config account parameters")]
-pub struct UpdateConfig {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    #[command(flatten)]
-    pub config_parameters: ConfigParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "View the current config account parameters")]
-pub struct ViewConfig {
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-}
-
+// ---------- Meta Parameters ------------
 #[derive(Parser)]
 pub struct ConfigParameters {
     /// Number of recent epochs used to evaluate MEV commissions and running Jito for scoring
@@ -220,53 +130,199 @@ impl ConfigParameters {
 }
 
 #[derive(Parser)]
-pub struct PermissionlessParameters {
-    /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub payer_keypair_path: PathBuf,
-
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
+pub struct TransactionParameters {
     /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    #[arg(long, env)]
+    pub priority_fee: Option<u64>,
+
+    /// CUs per transaction
+    #[arg(long, env)]
+    pub compute_limit: Option<u32>,
+
+    /// Heap size for heap frame
+    #[arg(long, env)]
+    pub heap_size: Option<u32>,
+
+    /// Amount of instructions to process in a single transaction
+    #[arg(long, env)]
+    pub chunk_size: Option<usize>,
 }
 
 #[derive(Parser)]
-#[command(about = "Reset Steward State")]
-pub struct ResetState {
+pub struct PermissionlessParameters {
+    /// Path to keypair used to pay for the transaction
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+pub struct PermissionedParameters {
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    // Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+pub struct ViewParameters {
+    /// Steward account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+}
+
+// ---------- COMMANDS ------------
+#[derive(Subcommand)]
+pub enum Commands {
+    // Views
+    ViewState(ViewState),
+    ViewStatePerValidator(ViewStatePerValidator),
+    ViewConfig(ViewConfig),
+    ViewNextIndexToRemove(ViewNextIndexToRemove),
+
+    // Actions
+    InitConfig(InitConfig),
+    UpdateConfig(UpdateConfig),
+
+    InitState(InitState),
+    ResetState(ResetState),
+
+    RemoveBadValidators(RemoveBadValidators),
+    AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
+    AutoAddValidatorFromPool(AutoAddValidatorFromPool),
+
+    // Cranks
+    CrankEpochMaintenance(CrankEpochMaintenance),
+    CrankComputeScore(CrankComputeScore),
+    CrankComputeDelegations(CrankComputeDelegations),
+    CrankIdle(CrankIdle),
+    CrankComputeInstantUnstake(CrankComputeInstantUnstake),
+    CrankRebalance(CrankRebalance),
+}
+
+// ---------- VIEWS ------------
+#[derive(Parser)]
+#[command(about = "View the steward state")]
+pub struct ViewState {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Views the steward state for all validators in the pool")]
+pub struct ViewStatePerValidator {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View the current steward config account")]
+pub struct ViewConfig {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View the next index to remove in in the `epoch_maintenance` call")]
+pub struct ViewNextIndexToRemove {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+}
+
+// ---------- ACTIONS ------------
+
+#[derive(Parser)]
+#[command(about = "Initialize config account")]
+pub struct InitConfig {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
 
-    /// Steward account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
+    /// The current staker keypair path, defaults to the authority keypair path
+    #[arg(short, long, env)]
+    pub staker_keypair_path: Option<PathBuf>,
 
-    /// priority fee in microlamports
-    #[arg(long, env, default_value = "200000")]
-    pub priority_fee: u64,
+    /// Optional path to Steward Config keypair, if not provided, a new keypair will be created
+    #[arg(long, env)]
+    pub steward_config_keypair_path: Option<PathBuf>,
+
+    /// Stake pool pubkey
+    #[arg(long, env)]
+    pub stake_pool: Pubkey,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Updates config account parameters")]
+pub struct UpdateConfig {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize state account")]
+pub struct InitState {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Reset steward state")]
+pub struct ResetState {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
 }
 
 #[derive(Parser)]
 #[command(about = "Removes bad validators from the pool")]
 pub struct RemoveBadValidators {
     #[command(flatten)]
-    pub permissionless_parameters: PermissionlessParameters,
+    pub permissioned_parameters: PermissionedParameters,
 }
 
 #[derive(Parser)]
-#[command(about = "Call `auto_remove_validator_from_pool`")]
+#[command(about = "Calls `auto_remove_validator_from_pool`")]
 pub struct AutoRemoveValidatorFromPool {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
 
-    /// Validator index of Validator List to remove
+    /// Validator index of validator list to remove
     #[arg(long, env)]
     pub validator_index_to_remove: usize,
 }
+
+#[derive(Parser)]
+#[command(about = "Calls `auto_add_validator_from_pool`")]
+pub struct AutoAddValidatorFromPool {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator vote account to add
+    #[arg(long, env)]
+    pub vote_account: Pubkey,
+}
+
+// ---------- CRANKS ------------
 
 #[derive(Parser)]
 #[command(about = "Run epoch maintenance - needs to be run at the start of each epoch")]

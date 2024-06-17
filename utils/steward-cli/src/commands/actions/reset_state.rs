@@ -6,11 +6,13 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::read_keypair_file,
-    signer::Signer, transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::command_args::ResetState, utils::accounts::get_all_steward_accounts};
+use crate::{
+    commands::command_args::ResetState,
+    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
+};
 
 pub async fn command_reset_state(
     args: ResetState,
@@ -18,17 +20,21 @@ pub async fn command_reset_state(
     program_id: Pubkey,
 ) -> Result<()> {
     // Creates config account
-    let authority = read_keypair_file(args.authority_keypair_path)
+    let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
-    let all_steward_accounts =
-        get_all_steward_accounts(client, &program_id, &args.steward_config).await?;
+    let all_steward_accounts = get_all_steward_accounts(
+        client,
+        &program_id,
+        &args.permissioned_parameters.steward_config,
+    )
+    .await?;
 
-    let reset_ix = Instruction {
+    let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::ResetStewardState {
             state_account: all_steward_accounts.state_address,
-            config: args.steward_config,
+            config: args.permissioned_parameters.steward_config,
             stake_pool: all_steward_accounts.stake_pool_address,
             validator_list: all_steward_accounts.validator_list_address,
             authority: authority.pubkey(),
@@ -39,11 +45,21 @@ pub async fn command_reset_state(
 
     let blockhash = client.get_latest_blockhash().await?;
 
+    let configured_ix = configure_instruction(
+        &[ix],
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size,
+    );
+
     let transaction = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_price(args.priority_fee),
-            reset_ix,
-        ],
+        &configured_ix,
         Some(&authority.pubkey()),
         &[&authority],
         blockhash,
