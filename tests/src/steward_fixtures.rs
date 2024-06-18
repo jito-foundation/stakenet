@@ -161,6 +161,7 @@ impl TestFixture {
         additional_accounts: HashMap<Pubkey, Account>,
     ) -> Self {
         let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
+        program.add_program("validator_history", validator_history::id(), None);
         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
 
         for (key, account) in accounts_fixture.to_accounts_vec() {
@@ -625,6 +626,26 @@ impl TestFixture {
     }
 }
 
+pub struct ValidatorEntry {
+    pub vote_address: Pubkey,
+    pub vote_account: VoteStateVersions,
+    pub validator_history: ValidatorHistory,
+}
+
+impl Default for ValidatorEntry {
+    fn default() -> Self {
+        let vote_address = Pubkey::new_unique();
+        let vote_account = new_vote_state_versions(vote_address, vote_address, 0, None);
+        let validator_history = validator_history_default(vote_address, 0);
+
+        Self {
+            vote_address,
+            vote_account,
+            validator_history,
+        }
+    }
+}
+
 pub struct FixtureDefaultAccounts {
     pub stake_pool_meta: StakePoolMetadata,
     pub stake_pool: spl_stake_pool::state::StakePool,
@@ -635,9 +656,7 @@ pub struct FixtureDefaultAccounts {
     pub steward_state: StewardStateAccount,
     pub validator_history_config: validator_history::state::Config,
     pub cluster_history: ClusterHistory,
-    pub vote_address: Pubkey,
-    pub vote_account: VoteStateVersions,
-    pub validator_history: ValidatorHistory,
+    pub validators: Vec<ValidatorEntry>,
     pub keypair: Keypair,
 }
 
@@ -709,9 +728,6 @@ impl Default for FixtureDefaultAccounts {
             tip_distribution_program: jito_tip_distribution::id(),
             ..Default::default()
         };
-        let vote_address = Pubkey::new_unique();
-        let vote_account = new_vote_state_versions(vote_address, vote_address, 0, None);
-        let validator_history = validator_history_default(vote_address, 0);
         let cluster_history = cluster_history_default();
 
         Self {
@@ -724,9 +740,7 @@ impl Default for FixtureDefaultAccounts {
             steward_state: steward_state_account,
             validator_history_config,
             cluster_history,
-            vote_address,
-            vote_account,
-            validator_history,
+            validators: vec![],
             keypair,
         }
     }
@@ -734,11 +748,39 @@ impl Default for FixtureDefaultAccounts {
 
 impl FixtureDefaultAccounts {
     fn to_accounts_vec(&self) -> Vec<(Pubkey, Account)> {
-        let validator_history_address = Pubkey::find_program_address(
-            &[ValidatorHistory::SEED, self.vote_address.as_ref()],
-            &validator_history::id(),
-        )
-        .0;
+        let validator_entry_accounts = self
+            .validators
+            .iter()
+            .map(|ve| {
+                let validator_history_address = Pubkey::find_program_address(
+                    &[ValidatorHistory::SEED, ve.vote_address.as_ref()],
+                    &validator_history::id(),
+                )
+                .0;
+                (
+                    validator_history_address,
+                    serialized_validator_history_account(ve.validator_history.clone()),
+                )
+            })
+            .collect::<Vec<_>>();
+        let vote_accounts_and_addresses = self
+            .validators
+            .iter()
+            .map(|ve| {
+                let vote_address = ve.vote_address;
+                let mut data = vec![0; VoteState::size_of()];
+                VoteState::serialize(&ve.vote_account, &mut data).unwrap();
+
+                let vote_account = Account {
+                    lamports: 1000000,
+                    data,
+                    owner: anchor_lang::solana_program::vote::program::ID,
+                    ..Account::default()
+                };
+                (vote_address, vote_account)
+            })
+            .collect::<Vec<_>>();
+
         let cluster_history_address =
             Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
         let steward_state_address = Pubkey::find_program_address(
@@ -756,7 +798,7 @@ impl FixtureDefaultAccounts {
         )
         .0;
         // For each account, serialize and return as a tuple
-        vec![
+        let mut accounts = vec![
             (
                 self.steward_config_keypair.pubkey(),
                 serialized_config(self.steward_config),
@@ -772,27 +814,29 @@ impl FixtureDefaultAccounts {
                     self.validator_history_config.counter,
                 ),
             ),
-            (
-                self.stake_pool_meta.stake_pool,
-                serialized_stake_pool_account(
-                    self.stake_pool.clone(),
-                    std::mem::size_of::<StakePool>(),
-                ),
-            ),
-            (
-                self.stake_pool_meta.validator_list,
-                serialized_validator_list_account(self.validator_list.clone(), None),
-            ),
+            // (
+            //     self.stake_pool_meta.stake_pool,
+            //     serialized_stake_pool_account(
+            //         self.stake_pool.clone(),
+            //         std::mem::size_of::<StakePool>(),
+            //     ),
+            // ),
+            // (
+            //     self.stake_pool_meta.validator_list,
+            //     serialized_validator_list_account(
+            //         self.validator_list.clone(),
+            //         Some(std::mem::size_of_val(&self.validator_list)),
+            //     ),
+            // ),
             (
                 cluster_history_address,
                 serialized_cluster_history_account(self.cluster_history),
             ),
-            (
-                validator_history_address,
-                serialized_validator_history_account(self.validator_history),
-            ),
             (self.keypair.pubkey(), system_account(100_000_000_000)),
-        ]
+        ];
+        accounts.extend(validator_entry_accounts);
+        accounts.extend(vote_accounts_and_addresses);
+        accounts
     }
 
     fn stake_pool_default(
@@ -967,6 +1011,7 @@ pub fn serialized_validator_list_account(
     validator_list.serialize(&mut data).unwrap();
     let account_size = account_size.unwrap_or(5 + 4 + 73 * validator_list.validators.len());
     data.extend(vec![0; account_size - data.len()]);
+    println!("Validator list account size: {}", data.len());
     Account {
         lamports: 1_000_000_000,
         data,
@@ -1121,6 +1166,7 @@ pub struct StateMachineFixtures {
     pub clock: Clock,
     pub epoch_schedule: EpochSchedule,
     pub validators: Vec<ValidatorHistory>,
+    pub vote_accounts: Vec<VoteStateVersions>,
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
@@ -1166,7 +1212,10 @@ impl Default for StateMachineFixtures {
 
         // Setup Sysvars: Clock, EpochSchedule
 
-        let epoch_schedule = EpochSchedule::custom(1000, 1000, false);
+        let epoch_schedule = EpochSchedule::default();
+
+        // TODO support both types
+        // let epoch_schedule = EpochSchedule::custom(1000, 1000, false);
 
         let clock = Clock {
             epoch: current_epoch,
@@ -1175,15 +1224,18 @@ impl Default for StateMachineFixtures {
         };
 
         // Setup ValidatorHistory accounts
-        let vote_account_1 = Pubkey::new_unique();
-        let vote_account_2 = Pubkey::new_unique();
-        let vote_account_3 = Pubkey::new_unique();
+        let vote_address_1 = Pubkey::new_unique();
+        let vote_address_2 = Pubkey::new_unique();
+        let vote_address_3 = Pubkey::new_unique();
 
         // First one: Good validator
-        let mut validator_history_1 = validator_history_default(vote_account_1, 0);
+        let mut validator_history_1 = validator_history_default(vote_address_1, 0);
+        let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
+
         for i in 0..=20 {
+            epoch_credits.push((i, (i + 1) * 1000, i * 1000));
             validator_history_1.history.push(ValidatorHistoryEntry {
-                epoch: i,
+                epoch: i as u16,
                 epoch_credits: 1000,
                 commission: 0,
                 mev_commission: 0,
@@ -1193,11 +1245,16 @@ impl Default for StateMachineFixtures {
             });
         }
 
+        let vote_account_1 =
+            new_vote_state_versions(vote_address_1, vote_address_1, 0, Some(epoch_credits));
+
         // Second one: Bad validator
-        let mut validator_history_2 = validator_history_default(vote_account_2, 1);
+        let mut validator_history_2 = validator_history_default(vote_address_2, 1);
+        let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
         for i in 0..=20 {
+            epoch_credits.push((i, (i + 1) * 200, i * 200));
             validator_history_2.history.push(ValidatorHistoryEntry {
-                epoch: i,
+                epoch: i as u16,
                 epoch_credits: 200,
                 commission: 99,
                 mev_commission: 10000,
@@ -1206,12 +1263,16 @@ impl Default for StateMachineFixtures {
                 ..ValidatorHistoryEntry::default()
             });
         }
+        let vote_account_2 =
+            new_vote_state_versions(vote_address_2, vote_address_2, 99, Some(epoch_credits));
 
         // Third one: Good validator
-        let mut validator_history_3 = validator_history_default(vote_account_3, 2);
+        let mut validator_history_3 = validator_history_default(vote_address_3, 2);
+        let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
         for i in 0..=20 {
+            epoch_credits.push((i, (i + 1) * 1000, i * 1000));
             validator_history_3.history.push(ValidatorHistoryEntry {
-                epoch: i,
+                epoch: i as u16,
                 epoch_credits: 1000,
                 commission: 5,
                 mev_commission: 500,
@@ -1220,6 +1281,8 @@ impl Default for StateMachineFixtures {
                 ..ValidatorHistoryEntry::default()
             });
         }
+        let vote_account_3 =
+            new_vote_state_versions(vote_address_3, vote_address_3, 5, Some(epoch_credits));
 
         // Setup ClusterHistory
         let mut cluster_history = cluster_history_default();
@@ -1289,6 +1352,7 @@ impl Default for StateMachineFixtures {
                 validator_history_2,
                 validator_history_3,
             ],
+            vote_accounts: vec![vote_account_1, vote_account_2, vote_account_3],
             cluster_history,
             config,
             validator_list,
