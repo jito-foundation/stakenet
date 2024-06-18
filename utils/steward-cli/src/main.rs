@@ -21,6 +21,7 @@ use commands::{
         view_state::command_view_state,
     },
     init::{init_config::command_init_config, init_state::command_init_state},
+    monkey::crank::command_crank_monkey,
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -62,6 +63,7 @@ async fn main() -> Result<()> {
         }
 
         // --- Cranks ---
+        Commands::CrankMonkey(args) => command_crank_monkey(args, &client, program_id).await,
         Commands::CrankEpochMaintenance(args) => {
             command_crank_epoch_maintenance(args, &client, program_id).await
         }

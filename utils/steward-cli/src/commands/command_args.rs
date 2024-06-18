@@ -203,6 +203,7 @@ pub enum Commands {
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
 
     // Cranks
+    CrankMonkey(CrankMonkey),
     CrankEpochMaintenance(CrankEpochMaintenance),
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
@@ -319,6 +320,13 @@ pub struct AutoAddValidatorFromPool {
 }
 
 // ---------- CRANKS ------------
+
+#[derive(Parser)]
+#[command(about = "Crank `compute_score` state")]
+pub struct CrankMonkey {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+}
 
 #[derive(Parser)]
 #[command(about = "Run epoch maintenance - needs to be run at the start of each epoch")]
