@@ -11,6 +11,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
     pub config_account: Config,
+    pub config_address: Pubkey,
     pub staker_account: Staker,
     pub staker_address: Pubkey,
     pub state_account: StewardStateAccount,
@@ -27,6 +28,7 @@ pub async fn get_all_steward_accounts(
     program_id: &Pubkey,
     steward_config: &Pubkey,
 ) -> Result<Box<UsefulStewardAccounts>> {
+    let config_address = *steward_config;
     let config_account = get_steward_config_account(client, steward_config).await?;
     let (state_account, state_address) =
         get_steward_state_account(client, program_id, steward_config).await?;
@@ -41,6 +43,7 @@ pub async fn get_all_steward_accounts(
 
     Ok(Box::new(UsefulStewardAccounts {
         config_account,
+        config_address,
         state_account,
         state_address,
         staker_account,
