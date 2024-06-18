@@ -1,5 +1,5 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use std::{cell::RefCell, rc::Rc, str::FromStr, vec};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 
 use crate::spl_stake_pool_cli;
 use anchor_lang::{
@@ -20,13 +20,20 @@ use jito_steward::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    account::Account, epoch_schedule::EpochSchedule, hash::Hash, instruction::Instruction,
-    native_token::LAMPORTS_PER_SOL, rent::Rent, signature::Keypair, signer::Signer,
-    stake::state::StakeStateV2, transaction::Transaction,
+    account::Account,
+    epoch_schedule::EpochSchedule,
+    hash::Hash,
+    instruction::Instruction,
+    native_token::LAMPORTS_PER_SOL,
+    rent::Rent,
+    signature::Keypair,
+    signer::Signer,
+    stake::state::{Lockup, StakeStateV2},
+    transaction::Transaction,
 };
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address,
-    state::{Fee, StakeStatus, ValidatorList, ValidatorStakeInfo},
+    state::{AccountType, Fee, FutureEpoch, StakeStatus, ValidatorList, ValidatorStakeInfo},
 };
 use validator_history::{
     self, constants::MAX_ALLOC_BYTES, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
@@ -146,6 +153,58 @@ impl TestFixture {
             validator_history_config,
             cluster_history_account,
             keypair,
+        }
+    }
+
+    pub async fn new_from_accounts(
+        accounts_fixture: FixtureDefaultAccounts,
+        additional_accounts: HashMap<Pubkey, Account>,
+    ) -> Self {
+        let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
+        program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
+
+        for (key, account) in accounts_fixture.to_accounts_vec() {
+            // Skip keys that are overriden by additional_accounts
+            if !additional_accounts.contains_key(&key) {
+                program.add_account(key, account);
+            }
+        }
+        for (key, account) in additional_accounts {
+            program.add_account(key, account);
+        }
+
+        program.deactivate_feature(
+            Pubkey::from_str("9onWzzvCzNC2jfhxxeqRgs5q7nFAAKpCUvkj6T6GJK9i").unwrap(),
+        );
+        let ctx = Rc::new(RefCell::new(program.start_with_context().await));
+
+        let steward_config_address = accounts_fixture.steward_config_keypair.pubkey();
+
+        Self {
+            ctx,
+            stake_pool_meta: accounts_fixture.stake_pool_meta,
+            staker: Pubkey::find_program_address(
+                &[Staker::SEED, steward_config_address.as_ref()],
+                &jito_steward::id(),
+            )
+            .0,
+            steward_config: accounts_fixture.steward_config_keypair,
+            steward_state: Pubkey::find_program_address(
+                &[StewardStateAccount::SEED, steward_config_address.as_ref()],
+                &jito_steward::id(),
+            )
+            .0,
+            cluster_history_account: Pubkey::find_program_address(
+                &[ClusterHistory::SEED],
+                &validator_history::id(),
+            )
+            .0,
+            validator_history_config: Pubkey::find_program_address(
+                &[validator_history::state::Config::SEED],
+                &validator_history::id(),
+            )
+            .0,
+            keypair: accounts_fixture.keypair,
         }
     }
 
@@ -566,6 +625,241 @@ impl TestFixture {
     }
 }
 
+pub struct FixtureDefaultAccounts {
+    pub stake_pool_meta: StakePoolMetadata,
+    pub stake_pool: spl_stake_pool::state::StakePool,
+    pub validator_list: ValidatorList,
+    pub steward_config_keypair: Keypair,
+    pub steward_config: Config,
+    pub steward_state_address: Pubkey,
+    pub steward_state: StewardStateAccount,
+    pub validator_history_config: validator_history::state::Config,
+    pub cluster_history: ClusterHistory,
+    pub vote_address: Pubkey,
+    pub vote_account: VoteStateVersions,
+    pub validator_history: ValidatorHistory,
+    pub keypair: Keypair,
+}
+
+impl Default for FixtureDefaultAccounts {
+    fn default() -> Self {
+        let keypair = Keypair::new();
+
+        // For each main thing to add to runtime, create a default account
+        let stake_pool_meta = StakePoolMetadata::default();
+        let stake_pool =
+            FixtureDefaultAccounts::stake_pool_default(&stake_pool_meta, keypair.pubkey());
+
+        let validator_list = ValidatorList::new(MAX_VALIDATORS as u32);
+
+        let steward_config_keypair = Keypair::new();
+        let steward_config = Config {
+            stake_pool: stake_pool_meta.stake_pool.clone(),
+            authority: keypair.pubkey(),
+            blacklist: BitMask::default(),
+            parameters: Parameters::default(),
+            _padding: [0; 1023],
+            paused: false.into(),
+        };
+
+        let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
+            &[
+                StewardStateAccount::SEED,
+                steward_config_keypair.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        );
+
+        let steward_state = StewardState {
+            state_tag: StewardStateEnum::ComputeScores,
+            validator_lamport_balances: [0; MAX_VALIDATORS],
+            scores: [0; MAX_VALIDATORS],
+            sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            yield_scores: [0; MAX_VALIDATORS],
+            sorted_yield_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            delegations: [Delegation::default(); MAX_VALIDATORS],
+            instant_unstake: BitMask::default(),
+            progress: BitMask::default(),
+            validators_to_remove: BitMask::default(),
+            start_computing_scores_slot: 0,
+            current_epoch: 0,
+            next_cycle_epoch: 10,
+            num_pool_validators: 0,
+            scoring_unstake_total: 0,
+            instant_unstake_total: 0,
+            stake_deposit_unstake_total: 0,
+            validators_added: 0,
+            compute_delegations_completed: false.into(),
+            rebalance_completed: false.into(),
+            checked_validators_removed_from_list: false.into(),
+            _padding0: [0; STATE_PADDING_0_SIZE],
+        };
+        let steward_state_account = StewardStateAccount {
+            state: steward_state,
+            is_initialized: true.into(),
+            bump: steward_state_bump,
+            _padding: [0; 6],
+        };
+
+        let validator_history_config = validator_history::state::Config {
+            bump: 0,
+            counter: 1,
+            admin: keypair.pubkey(),
+            oracle_authority: keypair.pubkey(),
+            tip_distribution_program: jito_tip_distribution::id(),
+            ..Default::default()
+        };
+        let vote_address = Pubkey::new_unique();
+        let vote_account = new_vote_state_versions(vote_address, vote_address, 0, None);
+        let validator_history = validator_history_default(vote_address, 0);
+        let cluster_history = cluster_history_default();
+
+        Self {
+            stake_pool_meta,
+            stake_pool,
+            validator_list,
+            steward_config_keypair,
+            steward_config,
+            steward_state_address,
+            steward_state: steward_state_account,
+            validator_history_config,
+            cluster_history,
+            vote_address,
+            vote_account,
+            validator_history,
+            keypair,
+        }
+    }
+}
+
+impl FixtureDefaultAccounts {
+    fn to_accounts_vec(&self) -> Vec<(Pubkey, Account)> {
+        let validator_history_address = Pubkey::find_program_address(
+            &[ValidatorHistory::SEED, self.vote_address.as_ref()],
+            &validator_history::id(),
+        )
+        .0;
+        let cluster_history_address =
+            Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
+        let steward_state_address = Pubkey::find_program_address(
+            &[
+                StewardStateAccount::SEED,
+                self.steward_config_keypair.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+
+        let validator_history_config_address = Pubkey::find_program_address(
+            &[validator_history::state::Config::SEED],
+            &validator_history::id(),
+        )
+        .0;
+        // For each account, serialize and return as a tuple
+        vec![
+            (
+                self.steward_config_keypair.pubkey(),
+                serialized_config(self.steward_config),
+            ),
+            (
+                steward_state_address,
+                serialized_steward_state_account(self.steward_state),
+            ),
+            (
+                validator_history_config_address,
+                validator_history_config_account(
+                    self.validator_history_config.bump,
+                    self.validator_history_config.counter,
+                ),
+            ),
+            (
+                self.stake_pool_meta.stake_pool,
+                serialized_stake_pool_account(
+                    self.stake_pool.clone(),
+                    std::mem::size_of::<StakePool>(),
+                ),
+            ),
+            (
+                self.stake_pool_meta.validator_list,
+                serialized_validator_list_account(self.validator_list.clone(), None),
+            ),
+            (
+                cluster_history_address,
+                serialized_cluster_history_account(self.cluster_history),
+            ),
+            (
+                validator_history_address,
+                serialized_validator_history_account(self.validator_history),
+            ),
+            (self.keypair.pubkey(), system_account(100_000_000_000)),
+        ]
+    }
+
+    fn stake_pool_default(
+        stake_pool_meta: &StakePoolMetadata,
+        admin: Pubkey,
+    ) -> spl_stake_pool::state::StakePool {
+        let stake_pool_address = stake_pool_meta.stake_pool;
+        let validator_list = stake_pool_meta.validator_list;
+        let reserve_stake = stake_pool_meta.reserve;
+        let stake_deposit_authority = Pubkey::find_program_address(
+            &[&stake_pool_address.as_ref(), b"deposit"],
+            &spl_stake_pool::id(),
+        )
+        .0;
+        let stake_withdraw_bump_seed = Pubkey::find_program_address(
+            &[&stake_pool_address.as_ref(), b"withdrawal"],
+            &spl_stake_pool::id(),
+        )
+        .1;
+        let epoch_fee = Fee {
+            numerator: 1,
+            denominator: 100,
+        };
+        let withdrawal_fee = Fee {
+            numerator: 1,
+            denominator: 100,
+        };
+        let deposit_fee = Fee {
+            numerator: 1,
+            denominator: 100,
+        };
+        // Use default values from stake pool initialization
+        spl_stake_pool::state::StakePool {
+            account_type: AccountType::StakePool,
+            manager: admin,
+            staker: admin,
+            stake_deposit_authority,
+            stake_withdraw_bump_seed,
+            validator_list,
+            reserve_stake,
+            pool_mint: Pubkey::new_unique(),
+            manager_fee_account: Pubkey::new_unique(),
+            token_program_id: spl_token::id(),
+            total_lamports: 0,
+            pool_token_supply: 0,
+            last_update_epoch: 0,
+            lockup: Lockup::default(),
+            epoch_fee,
+            next_epoch_fee: FutureEpoch::None,
+            preferred_deposit_validator_vote_address: None,
+            preferred_withdraw_validator_vote_address: None,
+            stake_deposit_fee: deposit_fee,
+            stake_withdrawal_fee: withdrawal_fee,
+            next_stake_withdrawal_fee: FutureEpoch::None,
+            stake_referral_fee: 0,
+            sol_deposit_authority: None,
+            sol_deposit_fee: deposit_fee,
+            sol_withdraw_authority: None,
+            sol_referral_fee: 0,
+            sol_withdrawal_fee: withdrawal_fee,
+            next_sol_withdrawal_fee: FutureEpoch::None,
+            last_epoch_pool_token_supply: 0,
+            last_epoch_total_lamports: 0,
+        }
+    }
+}
+
 pub fn validator_history_config_account(bump: u8, num_validators: u32) -> Account {
     let config = validator_history::state::Config {
         bump,
@@ -591,6 +885,32 @@ pub fn system_account(lamports: u64) -> Account {
         rent_epoch: 0,
         data: vec![],
     }
+}
+
+pub fn new_vote_state_versions(
+    node_pubkey: Pubkey,
+    vote_pubkey: Pubkey,
+    commission: u8,
+    maybe_epoch_credits: Option<Vec<(u64, u64, u64)>>,
+) -> VoteStateVersions {
+    let vote_init = VoteInit {
+        node_pubkey,
+        authorized_voter: vote_pubkey,
+        authorized_withdrawer: vote_pubkey,
+        commission,
+    };
+    let clock = Clock {
+        epoch: 0,
+        slot: 0,
+        unix_timestamp: 0,
+        leader_schedule_epoch: 0,
+        epoch_start_timestamp: 0,
+    };
+    let mut vote_state = VoteState::new(&vote_init, &clock);
+    if let Some(epoch_credits) = maybe_epoch_credits {
+        vote_state.epoch_credits = epoch_credits;
+    }
+    VoteStateVersions::new_current(vote_state)
 }
 
 pub fn new_vote_account(

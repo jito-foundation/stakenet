@@ -1,4 +1,5 @@
 mod test_algorithms;
+mod test_cycle;
 mod test_integration;
 mod test_parameters;
 mod test_spl_passthrough;
