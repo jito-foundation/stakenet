@@ -70,7 +70,7 @@ cargo run view-state --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1
 
 ## View State Per Validator
 ```bash
-cargo run view-state-per-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
+cargo run view-state --verbose --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View Next Index To Remove

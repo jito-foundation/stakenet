@@ -12,7 +12,7 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CrankComputeDelegations,
-    utils::{accounts::get_steward_state_account, transactions::configure_instruction},
+    utils::{accounts::get_steward_state_account_and_address, transactions::configure_instruction},
 };
 
 pub async fn command_crank_compute_delegations(
@@ -29,7 +29,7 @@ pub async fn command_crank_compute_delegations(
     let steward_config = args.steward_config;
 
     let (state_account, state_address) =
-        get_steward_state_account(client, &program_id, &steward_config).await?;
+        get_steward_state_account_and_address(client, &program_id, &steward_config).await?;
 
     match state_account.state.state_tag {
         StewardStateEnum::ComputeDelegations => { /* Continue */ }

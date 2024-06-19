@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use jito_steward::StewardStateAccount;
+use jito_steward::{utils::ValidatorList, Config, StewardStateAccount};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 
 use crate::{
     commands::command_args::ViewState,
-    utils::accounts::{get_all_steward_accounts, UsefulStewardAccounts},
+    utils::accounts::{
+        get_stake_pool_account, get_steward_config_account, get_steward_state_account_and_address,
+        get_validator_list_account,
+    },
 };
 
 pub async fn command_view_state(
@@ -18,54 +21,60 @@ pub async fn command_view_state(
 ) -> Result<()> {
     let steward_config = args.view_parameters.steward_config;
 
-    let steward_state_accounts =
-        get_all_steward_accounts(client, &program_id, &steward_config).await?;
+    let (steward_state_account, steward_state_address) =
+        get_steward_state_account_and_address(client, &program_id, &steward_config).await?;
+    let steward_config_account = get_steward_config_account(client, &steward_config).await?;
+    let stake_pool_account =
+        get_stake_pool_account(client, &steward_config_account.stake_pool).await?;
+    let validator_list_account =
+        get_validator_list_account(client, &stake_pool_account.validator_list).await?;
 
     if args.verbose {
-        _print_verbose_state(&steward_state_accounts);
+        _print_verbose_state(
+            &steward_state_account,
+            &steward_config_account,
+            &validator_list_account,
+        );
     } else {
         _print_default_state(
             &steward_config,
-            &steward_state_accounts.state_address,
-            &steward_state_accounts.state_account,
+            &steward_state_address,
+            &steward_state_account,
         );
     }
 
     Ok(())
 }
 
-fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {
+fn _print_verbose_state(
+    steward_state_account: &Box<StewardStateAccount>,
+    config_account: &Box<Config>,
+    validator_list_account: &Box<ValidatorList>,
+) {
     let mut formatted_string;
 
-    for (index, validator) in steward_state_accounts
-        .validator_list_account
-        .validators
-        .iter()
-        .enumerate()
-    {
+    for (index, validator) in validator_list_account.validators.iter().enumerate() {
         let vote_account = validator.vote_account_address;
         let (stake_address, _) = find_stake_program_address(
             &spl_stake_pool::id(),
             &vote_account,
-            &steward_state_accounts.stake_pool_address,
+            &config_account.stake_pool,
             None,
         );
 
         let (transient_stake_address, _) = find_transient_stake_program_address(
             &spl_stake_pool::id(),
             &vote_account,
-            &steward_state_accounts.stake_pool_address,
+            &config_account.stake_pool,
             validator.transient_seed_suffix.into(),
         );
 
-        let score_index = steward_state_accounts
-            .state_account
+        let score_index = steward_state_account
             .state
             .sorted_score_indices
             .iter()
             .position(|&i| i == index as u16);
-        let yield_score_index = steward_state_accounts
-            .state_account
+        let yield_score_index = steward_state_account
             .state
             .sorted_yield_score_indices
             .iter()
@@ -83,27 +92,19 @@ fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {
         formatted_string += &format!("Index: {:?}\n", index);
         formatted_string += &format!(
             "Is Blacklisted: {:?}\n",
-            steward_state_accounts.config_account.blacklist.get(index)
+            config_account.blacklist.get(index)
         );
         formatted_string += &format!(
             "Is Instant Unstake: {:?}\n",
-            steward_state_accounts
-                .state_account
-                .state
-                .instant_unstake
-                .get(index)
+            steward_state_account.state.instant_unstake.get(index)
         );
         formatted_string += &format!(
             "Score: {:?}\n",
-            steward_state_accounts.state_account.state.scores.get(index)
+            steward_state_account.state.scores.get(index)
         );
         formatted_string += &format!(
             "Yield Score: {:?}\n",
-            steward_state_accounts
-                .state_account
-                .state
-                .yield_scores
-                .get(index)
+            steward_state_account.state.yield_scores.get(index)
         );
         formatted_string += &format!("Score Index: {:?}\n", score_index);
         formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
@@ -115,7 +116,7 @@ fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {
 fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
-    state_account: &StewardStateAccount,
+    state_account: &Box<StewardStateAccount>,
 ) {
     let state = &state_account.state;
 

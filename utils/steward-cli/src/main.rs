@@ -38,6 +38,7 @@ async fn main() -> Result<()> {
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
     ));
+
     let program_id = args.program_id;
     let _ = match args.commands {
         // ---- Views ----

@@ -10,7 +10,9 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::command_args::CrankIdle, utils::accounts::get_steward_state_account};
+use crate::{
+    commands::command_args::CrankIdle, utils::accounts::get_steward_state_account_and_address,
+};
 
 pub async fn command_crank_idle(
     args: CrankIdle,
@@ -26,7 +28,7 @@ pub async fn command_crank_idle(
     let steward_config = args.steward_config;
 
     let (state_account, state_address) =
-        get_steward_state_account(client, &program_id, &steward_config).await?;
+        get_steward_state_account_and_address(client, &program_id, &steward_config).await?;
 
     match state_account.state.state_tag {
         StewardStateEnum::Idle => { /* Continue */ }

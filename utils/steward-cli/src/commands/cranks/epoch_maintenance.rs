@@ -69,6 +69,8 @@ pub async fn command_crank_epoch_maintenance(
         blockhash,
     );
 
+    // debug_send_single_transaction(client, &Arc::new(payer), &configured_ix, Some(true)).await?;
+
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .await?;
