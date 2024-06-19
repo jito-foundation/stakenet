@@ -6,7 +6,10 @@ use jito_steward::{
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use spl_stake_pool::find_withdraw_authority_program_address;
+use spl_stake_pool::{
+    find_stake_program_address, find_transient_stake_program_address,
+    find_withdraw_authority_program_address,
+};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
@@ -187,4 +190,33 @@ pub fn get_validator_history_config_address(validator_history_program_id: &Pubke
     let (address, _) = Pubkey::find_program_address(&[Config::SEED], validator_history_program_id);
 
     address
+}
+
+pub fn get_stake_address(vote_account_address: &Pubkey, stake_pool_address: &Pubkey) -> Pubkey {
+    let (stake_address, _) = find_stake_program_address(
+        &spl_stake_pool::id(),
+        vote_account_address,
+        stake_pool_address,
+        None,
+    );
+
+    stake_address
+}
+
+pub fn get_transient_stake_address(
+    vote_account_address: &Pubkey,
+    stake_pool_address: &Pubkey,
+    validator_list_account: &ValidatorList,
+    validator_index: usize,
+) -> Pubkey {
+    let (transient_stake_address, _) = find_transient_stake_program_address(
+        &spl_stake_pool::id(),
+        vote_account_address,
+        stake_pool_address,
+        validator_list_account.validators[validator_index]
+            .transient_seed_suffix
+            .into(),
+    );
+
+    transient_stake_address
 }

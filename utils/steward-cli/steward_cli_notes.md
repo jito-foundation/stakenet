@@ -123,6 +123,11 @@ cargo run crank-compute-instant-unstake --steward-config 6auT7Q91SSgAoYLAnu449DK
 cargo run crank-rebalance --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
+## Crank Monkey
+```bash
+cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') crank-monkey --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --priority-fee 200000
+```
+
 # Deploy and Upgrade
 
 - upgrade solana cli to 1.18.16

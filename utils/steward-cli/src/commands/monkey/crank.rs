@@ -5,21 +5,20 @@ use jito_steward::StewardStateEnum;
 use keeper_core::{MultipleAccountsError, SubmitStats, TransactionExecutionError};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
-use thiserror::Error as ThisError;
 
 use solana_sdk::{
-    pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair},
-    signer::Signer,
-    transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, signer::Signer, stake,
+    system_program,
 };
+use thiserror::Error as ThisError;
 
 use crate::{
     commands::command_args::CrankMonkey,
     utils::{
         accounts::{
-            get_all_steward_accounts, get_cluster_history_address, get_steward_state_account,
-            get_validator_history_address, UsefulStewardAccounts,
+            get_all_steward_accounts, get_cluster_history_address, get_stake_address,
+            get_steward_state_account, get_transient_stake_address, get_validator_history_address,
+            UsefulStewardAccounts,
         },
         transactions::{configure_instruction, package_instructions, submit_packaged_transactions},
     },
@@ -228,9 +227,59 @@ async fn _handle_compute_instant_unstake(
     all_steward_accounts: &Box<UsefulStewardAccounts>,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    // println!("IDLE: {:?}", signature);
+    let validator_history_program_id = validator_history::id();
+    let cluster_history: Pubkey = get_cluster_history_address(&validator_history_program_id);
 
-    Ok(SubmitStats::default())
+    let validators_to_run = (0..all_steward_accounts.state_account.state.num_pool_validators)
+        .filter_map(|validator_index| {
+            let has_been_scored = all_steward_accounts
+                .state_account
+                .state
+                .progress
+                .get(validator_index)
+                .expect("Index is not in progress bitmask");
+            if has_been_scored {
+                None
+            } else {
+                let vote_account = all_steward_accounts.validator_list_account.validators
+                    [validator_index]
+                    .vote_account_address;
+                let history_account =
+                    get_validator_history_address(&vote_account, &validator_history_program_id);
+
+                Some((validator_index, vote_account, history_account))
+            }
+        })
+        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+
+    let ixs_to_run = validators_to_run
+        .iter()
+        .map(|(validator_index, _, history_account)| Instruction {
+            program_id: *program_id,
+            accounts: jito_steward::accounts::ComputeInstantUnstake {
+                config: all_steward_accounts.config_address,
+                state_account: all_steward_accounts.state_address,
+                validator_history: *history_account,
+                validator_list: all_steward_accounts.validator_list_address,
+                cluster_history,
+                signer: payer.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::ComputeInstantUnstake {
+                validator_list_index: *validator_index,
+            }
+            .data(),
+        })
+        .collect::<Vec<Instruction>>();
+
+    let txs_to_run = package_instructions(&ixs_to_run, 11, priority_fee, Some(1_400_000), None);
+
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
+
+    let stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+
+    Ok(stats)
 }
 
 async fn _handle_rebalance(
@@ -240,9 +289,83 @@ async fn _handle_rebalance(
     all_steward_accounts: &Box<UsefulStewardAccounts>,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    // println!("IDLE: {:?}", signature);
+    let validator_history_program_id = validator_history::id();
 
-    Ok(SubmitStats::default())
+    let validators_to_run = (0..all_steward_accounts.state_account.state.num_pool_validators)
+        .filter_map(|validator_index| {
+            let has_been_rebalanced = all_steward_accounts
+                .state_account
+                .state
+                .progress
+                .get(validator_index)
+                .expect("Index is not in progress bitmask");
+            if has_been_rebalanced {
+                None
+            } else {
+                let vote_account = all_steward_accounts.validator_list_account.validators
+                    [validator_index]
+                    .vote_account_address;
+                let history_account =
+                    get_validator_history_address(&vote_account, &validator_history_program_id);
+
+                Some((validator_index, vote_account, history_account))
+            }
+        })
+        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+
+    let ixs_to_run = validators_to_run
+        .iter()
+        .map(|(validator_index, vote_account, history_account)| {
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+            let transient_stake_address = get_transient_stake_address(
+                vote_account,
+                &all_steward_accounts.stake_pool_address,
+                &all_steward_accounts.validator_list_account,
+                *validator_index,
+            );
+
+            Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::Rebalance {
+                    config: all_steward_accounts.config_address,
+                    state_account: all_steward_accounts.state_address,
+                    validator_history: *history_account,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: all_steward_accounts.stake_pool_address,
+                    staker: all_steward_accounts.staker_address,
+                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: all_steward_accounts.validator_list_address,
+                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    transient_stake_account: transient_stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::ID,
+                    signer: payer.pubkey(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::Rebalance {
+                    validator_list_index: *validator_index,
+                }
+                .data(),
+            }
+        })
+        .collect::<Vec<Instruction>>();
+
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
+
+    let stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+
+    Ok(stats)
 }
 
 pub async fn crank_monkey(
@@ -257,6 +380,8 @@ pub async fn crank_monkey(
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
         if all_steward_accounts.state_account.state.current_epoch != epoch {
+            println!("Cranking Epoch Maintenance...");
+
             return _handle_epoch_maintenance(
                 &payer,
                 client,
@@ -275,6 +400,8 @@ pub async fn crank_monkey(
         // State
         match all_steward_accounts.state_account.state.state_tag {
             StewardStateEnum::ComputeScores => {
+                println!("Cranking Compute Score...");
+
                 return _handle_compute_score(
                     &payer,
                     client,
@@ -282,9 +409,11 @@ pub async fn crank_monkey(
                     &all_steward_accounts,
                     priority_fee,
                 )
-                .await
+                .await;
             }
             StewardStateEnum::ComputeDelegations => {
+                println!("Cranking Compute Delegations...");
+
                 return _handle_compute_delegations(
                     &payer,
                     client,
@@ -292,9 +421,11 @@ pub async fn crank_monkey(
                     &all_steward_accounts,
                     priority_fee,
                 )
-                .await
+                .await;
             }
             StewardStateEnum::Idle => {
+                println!("Cranking Idle...");
+
                 return _handle_idle(
                     &payer,
                     client,
@@ -302,27 +433,31 @@ pub async fn crank_monkey(
                     &all_steward_accounts,
                     priority_fee,
                 )
-                .await
+                .await;
             }
             StewardStateEnum::ComputeInstantUnstake => {
-                return _handle_compute_score(
+                println!("Cranking Compute Instant Unstake...");
+
+                return _handle_compute_instant_unstake(
                     &payer,
                     client,
                     &program_id,
                     &all_steward_accounts,
                     priority_fee,
                 )
-                .await
+                .await;
             }
             StewardStateEnum::Rebalance => {
+                println!("Cranking Rebalance...");
+
                 return _handle_rebalance(
                     &payer,
                     client,
                     &program_id,
-                    &all_steward_accounts,
+                    all_steward_accounts,
                     priority_fee,
                 )
-                .await
+                .await;
             }
         };
     }
@@ -351,7 +486,7 @@ pub async fn command_crank_monkey(
 
     let epoch = client.get_epoch_info().await?.epoch;
 
-    crank_monkey(
+    let results = crank_monkey(
         client,
         &payer,
         &program_id,
@@ -360,6 +495,8 @@ pub async fn command_crank_monkey(
         priority_fee,
     )
     .await?;
+
+    println!("Results: {:?}", results);
 
     Ok(())
 }
