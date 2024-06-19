@@ -327,11 +327,11 @@ impl Parameters {
     /// Validate reasonable bounds on parameters
     pub fn validate(&self, current_epoch: u64, slots_per_epoch: u64) -> Result<()> {
         // Cannot evaluate epochs before VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH or beyond the CircBuf length
-        let window_max = (current_epoch as usize)
+        let window_max = current_epoch
             .checked_sub(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH)
             .ok_or(StewardError::ArithmeticError)?
             .min(validator_history::ValidatorHistory::MAX_ITEMS - 1);
-        let window_max = cast_epoch(window_max as u64)?;
+        let window_max = cast_epoch(window_max)?;
 
         if self.mev_commission_range > window_max {
             return Err(StewardError::InvalidParameterValue.into());
