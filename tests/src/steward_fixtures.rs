@@ -720,8 +720,13 @@ impl Default for FixtureDefaultAccounts {
             _padding: [0; 6],
         };
 
+        let validator_history_config_bump = Pubkey::find_program_address(
+            &[validator_history::state::Config::SEED],
+            &validator_history::id(),
+        )
+        .1;
         let validator_history_config = validator_history::state::Config {
-            bump: 0,
+            bump: validator_history_config_bump,
             counter: 1,
             admin: keypair.pubkey(),
             oracle_authority: keypair.pubkey(),
@@ -797,6 +802,7 @@ impl FixtureDefaultAccounts {
             &validator_history::id(),
         )
         .0;
+
         // For each account, serialize and return as a tuple
         let mut accounts = vec![
             (
@@ -809,10 +815,7 @@ impl FixtureDefaultAccounts {
             ),
             (
                 validator_history_config_address,
-                validator_history_config_account(
-                    self.validator_history_config.bump,
-                    self.validator_history_config.counter,
-                ),
+                serialized_validator_history_config(self.validator_history_config.clone()),
             ),
             // (
             //     self.stake_pool_meta.stake_pool,
@@ -1011,7 +1014,6 @@ pub fn serialized_validator_list_account(
     validator_list.serialize(&mut data).unwrap();
     let account_size = account_size.unwrap_or(5 + 4 + 73 * validator_list.validators.len());
     data.extend(vec![0; account_size - data.len()]);
-    println!("Validator list account size: {}", data.len());
     Account {
         lamports: 1_000_000_000,
         data,

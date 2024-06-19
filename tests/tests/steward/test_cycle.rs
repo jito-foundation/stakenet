@@ -1,34 +1,22 @@
 use std::collections::HashMap;
 
-use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
-
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
-    AnchorDeserialize, InstructionData, ToAccountMetas,
+    InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     utils::{StakePool, ValidatorList},
-    Config, Delegation, Parameters, Staker, StewardStateAccount, StewardStateEnum,
-    UpdateParametersArgs,
+    Staker, StewardStateAccount, UpdateParametersArgs,
 };
 use solana_program_test::*;
 use solana_sdk::{
     clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
-    signature::Keypair, signer::Signer, stake::state::StakeStateV2, system_program,
-    transaction::Transaction,
-};
-/// Basic integration test
-use spl_stake_pool::find_withdraw_authority_program_address;
-use spl_stake_pool::{
-    find_stake_program_address, minimum_delegation,
-    state::{AccountType, ValidatorListHeader, ValidatorStakeInfo},
+    signature::Keypair, signer::Signer, system_program, transaction::Transaction,
 };
 use tests::steward_fixtures::{
-    new_vote_state_versions, validator_history_default, FixtureDefaultAccounts,
-    StateMachineFixtures, TestFixture, ValidatorEntry,
+    FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
 };
-use validator_history::ValidatorHistory;
+use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct ExtraValidatorAccounts {
     vote_account: Pubkey,
@@ -273,6 +261,98 @@ async fn _crank_rebalance(
     }
 }
 
+async fn _copy_vote_account(
+    fixture: &TestFixture,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    index: usize,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: extra_validator_accounts[index].validator_history_address,
+            vote_account: extra_validator_accounts[index].vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+async fn _update_stake_history(
+    fixture: &TestFixture,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    index: usize,
+    epoch: u64,
+    lamports: u64,
+    rank: u32,
+    is_superminority: bool,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::UpdateStakeHistory {
+            validator_history_account: extra_validator_accounts[index].validator_history_address,
+            vote_account: extra_validator_accounts[index].vote_account,
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::UpdateStakeHistory {
+            epoch,
+            is_superminority,
+            lamports,
+            rank,
+        }
+        .data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+async fn _copy_cluster_info(fixture: &TestFixture) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyClusterInfo {
+            cluster_history_account: fixture.cluster_history_account,
+            slot_history: sysvar::slot_history::id(),
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyClusterInfo {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::request_heap_frame(1024 * 256),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ix,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
 #[tokio::test]
 async fn test_cycle() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
@@ -338,7 +418,7 @@ async fn test_cycle() {
             instant_unstake_epoch_progress: Some(0.00),
             compute_score_slot_range: Some(1000),
             instant_unstake_inputs_epoch_progress: Some(0.50),
-            num_epochs_between_scoring: Some(10),
+            num_epochs_between_scoring: Some(2), // 2 epoch cycle
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
@@ -365,8 +445,6 @@ async fn test_cycle() {
             withdraw_authority,
         })
     }
-
-    println!("{:?}", steward.bump);
 
     // Auto add validator - adds to validator list
     for i in 0..unit_test_fixtures.validators.len() {
@@ -411,7 +489,6 @@ async fn test_cycle() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    println!("{:?}", validator_list.validators.len());
 
     _crank_epoch_maintence(&fixture).await;
 
@@ -419,8 +496,8 @@ async fn test_cycle() {
 
     _crank_compute_delegations(&fixture).await;
 
-    // let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-    // let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
+    let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
+    let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
 
     // fixture
     //     .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch))
@@ -444,24 +521,62 @@ async fn test_cycle() {
         .increment_vote_account_credits(&extra_validator_accounts[0].vote_account, 1000);
 
     // CopyVoteAccount
-    let ix = Instruction {
-        program_id: validator_history::id(),
-        accounts: validator_history::accounts::CopyVoteAccount {
-            validator_history_account: extra_validator_accounts[0].validator_history_address,
-            vote_account: extra_validator_accounts[0].vote_account,
-            signer: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: validator_history::instruction::CopyVoteAccount {}.data(),
-    };
-    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        blockhash,
+    _copy_vote_account(&fixture, &extra_validator_accounts, 0).await;
+
+    // only field that's relevant to score is is_superminority
+    _update_stake_history(
+        &fixture,
+        &extra_validator_accounts,
+        0,
+        clock.epoch,
+        1_000_000,
+        1_000,
+        false,
+    )
+    .await;
+
+    _copy_cluster_info(&fixture).await;
+    // Need to read cluster info to actually understand what's going on here?
+    let cluster_history: ClusterHistory = fixture
+        .load_and_deserialize(&fixture.cluster_history_account)
+        .await;
+    println!("{:?}", cluster_history.cluster_history_last_update_slot);
+    let latest_entry = cluster_history.history.last().unwrap();
+    println!(
+        "{} {} {}",
+        latest_entry.epoch, latest_entry.total_blocks, latest_entry.epoch_start_timestamp
     );
-    fixture.submit_transaction_assert_success(tx).await;
+
+    _crank_compute_score(&fixture, &unit_test_fixtures, &extra_validator_accounts).await;
+    _crank_compute_delegations(&fixture).await;
+
+    _crank_idle(&fixture).await;
+
+    fixture
+        .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch))
+        .await;
+
+    _crank_compute_instant_unstake(&fixture, &unit_test_fixtures, &extra_validator_accounts).await;
+
+    _crank_rebalance(&fixture, &unit_test_fixtures, &extra_validator_accounts).await;
 
     drop(fixture);
+}
+
+#[tokio::test]
+async fn test_remove_validator_next_epoch() {
+    // Setup a pool
+
+    // Remove a validator during a cycle
+
+    // Check the "validators_to_remove" state
+
+    // Advance to next cycle and do epoch maintenance, ensure the validator was actually removed
+
+    // Continue advancing? What other edge cases to test
+}
+
+#[tokio::test]
+async fn test_add_validator_next_cycle() {
+    // What is the risky thing to test here? I suppose mostly that in the next cycle, we actually update num_pool_validators
 }
