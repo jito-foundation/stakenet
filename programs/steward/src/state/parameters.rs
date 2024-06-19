@@ -330,7 +330,7 @@ impl Parameters {
         let window_max = current_epoch
             .checked_sub(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH)
             .ok_or(StewardError::ArithmeticError)?
-            .min(validator_history::ValidatorHistory::MAX_ITEMS - 1);
+            .min(validator_history::ValidatorHistory::MAX_ITEMS as usize - 1);
         let window_max = cast_epoch(window_max)?;
 
         if self.mev_commission_range > window_max {
