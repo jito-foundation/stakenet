@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-pub async fn _handle_epoch_maintenance(
+async fn _handle_epoch_maintenance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -95,7 +95,7 @@ pub async fn _handle_epoch_maintenance(
     Ok(())
 }
 
-pub async fn _handle_compute_score(
+async fn _handle_compute_score(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -107,7 +107,7 @@ pub async fn _handle_compute_score(
     Ok(())
 }
 
-pub async fn _handle_compute_delegations(
+async fn _handle_compute_delegations(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -145,7 +145,7 @@ pub async fn _handle_compute_delegations(
     Ok(())
 }
 
-pub async fn _handle_idle(
+async fn _handle_idle(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -157,7 +157,7 @@ pub async fn _handle_idle(
     Ok(())
 }
 
-pub async fn _handle_compute_instant_unstake(
+async fn _handle_compute_instant_unstake(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -169,7 +169,7 @@ pub async fn _handle_compute_instant_unstake(
     Ok(())
 }
 
-pub async fn _handle_rebalance(
+async fn _handle_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -181,27 +181,13 @@ pub async fn _handle_rebalance(
     Ok(())
 }
 
-// Only runs one set of commands per "crank"
-pub async fn command_crank_monkey(
-    args: CrankMonkey,
+pub async fn crank_monkey(
     client: &Arc<RpcClient>,
-    program_id: Pubkey,
+    payer: &Arc<Keypair>,
+    program_id: &Pubkey,
+    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    priority_fee: Option<u64>,
 ) -> Result<()> {
-    // ----------- Collect Accounts -------------
-    let steward_config = args.permissionless_parameters.steward_config;
-    let payer = Arc::new(
-        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
-            .expect("Failed reading keypair file ( Payer )"),
-    );
-
-    let all_steward_accounts =
-        get_all_steward_accounts(client, &program_id, &steward_config).await?;
-
-    let priority_fee = args
-        .permissionless_parameters
-        .transaction_parameters
-        .priority_fee;
-
     // ----------- Triage -------------
     {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
@@ -276,4 +262,35 @@ pub async fn command_crank_monkey(
             }
         };
     }
+}
+
+// Only runs one set of commands per "crank"
+pub async fn command_crank_monkey(
+    args: CrankMonkey,
+    client: &Arc<RpcClient>,
+    program_id: Pubkey,
+) -> Result<()> {
+    // ----------- Collect Accounts -------------
+    let steward_config = args.permissionless_parameters.steward_config;
+    let payer = Arc::new(
+        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
+            .expect("Failed reading keypair file ( Payer )"),
+    );
+
+    let priority_fee = args
+        .permissionless_parameters
+        .transaction_parameters
+        .priority_fee;
+
+    let all_steward_accounts =
+        get_all_steward_accounts(client, &program_id, &steward_config).await?;
+
+    return crank_monkey(
+        client,
+        &payer,
+        &program_id,
+        &all_steward_accounts,
+        priority_fee,
+    )
+    .await;
 }
