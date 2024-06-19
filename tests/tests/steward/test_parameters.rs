@@ -836,7 +836,7 @@ fn test_compute_score_slot_range() {
         // Cannot be above slots_per_epoch
         let new_value = slots_per_epoch + 1;
         let update_parameters = UpdateParametersArgs {
-            compute_score_slot_range: Some(new_value as usize),
+            compute_score_slot_range: Some(new_value),
             ..UpdateParametersArgs::default()
         };
         let result = _test_parameter(&update_parameters, None, Some(slots_per_epoch), None);

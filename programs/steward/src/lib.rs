@@ -1,8 +1,9 @@
 #![allow(clippy::redundant_pub_crate)]
 use anchor_lang::prelude::*;
+use anchor_lang::IdlBuild;
 use instructions::*;
 
-use spl_stake_pool::instruction::PreferredValidatorType;
+use crate::utils::PreferredValidatorType;
 
 mod allocator;
 pub mod constants;
@@ -85,14 +86,14 @@ pub mod steward {
     /// Removes a validator from the pool if its stake account is inactive or the vote account has closed
     pub fn auto_remove_validator_from_pool(
         ctx: Context<AutoRemoveValidator>,
-        validator_list_index: usize,
+        validator_list_index: u64,
     ) -> Result<()> {
-        instructions::auto_remove_validator_from_pool::handler(ctx, validator_list_index)
+        instructions::auto_remove_validator_from_pool::handler(ctx, validator_list_index as usize)
     }
 
     /// Computes score for a the validator at `validator_list_index` for the current cycle.
-    pub fn compute_score(ctx: Context<ComputeScore>, validator_list_index: usize) -> Result<()> {
-        instructions::compute_score::handler(ctx, validator_list_index)
+    pub fn compute_score(ctx: Context<ComputeScore>, validator_list_index: u64) -> Result<()> {
+        instructions::compute_score::handler(ctx, validator_list_index as usize)
     }
 
     /// Computes delegation for a validator for the current cycle.
@@ -109,15 +110,15 @@ pub mod steward {
     /// Checks if a validator at `validator_list_index` should be instant unstaked, and marks it if so
     pub fn compute_instant_unstake(
         ctx: Context<ComputeInstantUnstake>,
-        validator_list_index: usize,
+        validator_list_index: u64,
     ) -> Result<()> {
-        instructions::compute_instant_unstake::handler(ctx, validator_list_index)
+        instructions::compute_instant_unstake::handler(ctx, validator_list_index as usize)
     }
 
     /// Increases or decreases stake for a validator at `validator_list_index` to match the target stake,
     /// given constraints on increase/decrease priority, reserve balance, and unstaking caps
-    pub fn rebalance(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
-        instructions::rebalance::handler(ctx, validator_list_index)
+    pub fn rebalance(ctx: Context<Rebalance>, validator_list_index: u64) -> Result<()> {
+        instructions::rebalance::handler(ctx, validator_list_index as usize)
     }
 
     /* Admin instructions */
@@ -175,9 +176,12 @@ pub mod steward {
 
     pub fn remove_validator_from_pool(
         ctx: Context<RemoveValidatorFromPool>,
-        validator_list_index: usize,
+        validator_list_index: u64,
     ) -> Result<()> {
-        instructions::spl_passthrough::remove_validator_from_pool_handler(ctx, validator_list_index)
+        instructions::spl_passthrough::remove_validator_from_pool_handler(
+            ctx,
+            validator_list_index as usize,
+        )
     }
 
     pub fn set_preferred_validator(
@@ -187,7 +191,7 @@ pub mod steward {
     ) -> Result<()> {
         instructions::spl_passthrough::set_preferred_validator_handler(
             ctx,
-            validator_type,
+            validator_type.as_ref(),
             validator,
         )
     }

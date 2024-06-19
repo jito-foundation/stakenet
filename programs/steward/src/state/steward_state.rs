@@ -13,15 +13,16 @@ use crate::{
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index, U8Bool},
     Config, Parameters,
 };
-use anchor_lang::prelude::*;
+use anchor_lang::idl::types::*;
+use anchor_lang::{prelude::*, IdlBuild};
 
 use bytemuck::{Pod, Zeroable};
 use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 // Tests will fail here - comment out msg! to pass
-fn invalid_state_error(expected: String, actual: String) -> Error {
-    msg!("Invalid state. Expected {}, Actual {}", expected, actual);
+fn invalid_state_error(_expected: String, _actual: String) -> Error {
+    // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
 }
 
@@ -98,7 +99,7 @@ pub struct StewardState {
 
     /// Number of validators in the stake pool, used to determine the number of validators to be scored.
     /// Updated at the start of each cycle and when validators are removed.
-    pub num_pool_validators: usize,
+    pub num_pool_validators: u64,
 
     /// Total lamports that have been due to scoring this cycle
     pub scoring_unstake_total: u64,
@@ -188,6 +189,42 @@ impl Display for StewardStateEnum {
             }
             Self::Rebalance => write!(f, "Rebalance"),
         }
+    }
+}
+
+impl IdlBuild for StewardStateEnum {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "StewardStateEnum".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "ComputeScores".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "ComputeDelegations".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Idle".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "ComputeInstantUnstake".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Rebalance".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
     }
 }
 
@@ -388,9 +425,10 @@ impl StewardState {
             .num_pool_validators
             .checked_sub(1)
             .ok_or(StewardError::ArithmeticError)?;
+        let num_pool_validators = self.num_pool_validators as usize;
 
         // Shift all validator state to the left
-        for i in index..self.num_pool_validators {
+        for i in index..num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.validator_lamport_balances[i] = self.validator_lamport_balances[next_i];
             self.scores[i] = self.scores[next_i];
@@ -400,6 +438,7 @@ impl StewardState {
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
         }
+
         // Update score indices
         let yield_score_index = self
             .sorted_yield_score_indices
@@ -412,17 +451,17 @@ impl StewardState {
             .position(|&i| i == index as u16)
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
-        for i in yield_score_index..self.num_pool_validators {
+        for i in yield_score_index..num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
         }
 
-        for i in score_index..self.num_pool_validators {
+        for i in score_index..num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.sorted_score_indices[i] = self.sorted_score_indices[next_i];
         }
 
-        for i in 0..self.num_pool_validators {
+        for i in 0..num_pool_validators {
             if self.sorted_yield_score_indices[i] as usize > index {
                 self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[i]
                     .checked_sub(1)
@@ -436,14 +475,14 @@ impl StewardState {
         }
 
         // Clear values on empty last index
-        self.validator_lamport_balances[self.num_pool_validators] = 0;
-        self.scores[self.num_pool_validators] = 0;
-        self.yield_scores[self.num_pool_validators] = 0;
-        self.sorted_score_indices[self.num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[self.num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.delegations[self.num_pool_validators] = Delegation::default();
-        self.instant_unstake.set(self.num_pool_validators, false)?;
-        self.progress.set(self.num_pool_validators, false)?;
+        self.validator_lamport_balances[num_pool_validators] = 0;
+        self.scores[num_pool_validators] = 0;
+        self.yield_scores[num_pool_validators] = 0;
+        self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.delegations[num_pool_validators] = Delegation::default();
+        self.instant_unstake.set(num_pool_validators, false)?;
+        self.progress.set(num_pool_validators, false)?;
 
         Ok(())
     }
@@ -463,7 +502,7 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-        num_pool_validators: usize,
+        num_pool_validators: u64,
     ) -> Result<()> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
@@ -495,7 +534,7 @@ impl StewardState {
                 .ok_or(StewardError::ArithmeticError)?;
             if self.progress.is_empty()
                 || current_epoch > self.current_epoch
-                || slots_since_scoring_started > config.parameters.compute_score_slot_range as u64
+                || slots_since_scoring_started > config.parameters.compute_score_slot_range
             {
                 self.reset_state_for_new_cycle(
                     clock.epoch,
@@ -552,8 +591,8 @@ impl StewardState {
             }
 
             let validators_to_delegate = select_validators_to_delegate(
-                &self.scores[..self.num_pool_validators],
-                &self.sorted_score_indices[..self.num_pool_validators],
+                &self.scores[..self.num_pool_validators as usize],
+                &self.sorted_score_indices[..self.num_pool_validators as usize],
                 config.parameters.num_delegation_validators as usize,
             );
 
@@ -815,7 +854,7 @@ impl StewardState {
                         }
 
                         let next_i = index.checked_add(1).ok_or(StewardError::ArithmeticError)?;
-                        for i in next_i..self.num_pool_validators {
+                        for i in next_i..self.num_pool_validators as usize {
                             if self.delegations[i].numerator > 0 {
                                 self.delegations[i].denominator =
                                     self.delegations[i].denominator.saturating_sub(1).max(1);

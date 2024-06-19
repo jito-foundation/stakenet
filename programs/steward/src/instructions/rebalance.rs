@@ -20,12 +20,12 @@ use crate::{
     delegation::RebalanceType,
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_stake_pool, get_validator_stake_info_at_index, StakePool},
+    utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
     Config, Staker, StewardStateAccount,
 };
 
 #[derive(Accounts)]
-#[instruction(validator_list_index: usize)]
+#[instruction(validator_list_index: u64)]
 pub struct Rebalance<'info> {
     pub config: AccountLoader<'info, Config>,
 
@@ -47,8 +47,9 @@ pub struct Rebalance<'info> {
     #[account(address = spl_stake_pool::ID)]
     pub stake_pool_program: AccountInfo<'info>,
 
-    #[account(address = get_stake_pool(&config)?)]
-    pub stake_pool: Account<'info, StakePool>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(address = get_stake_pool_address(&config)?)]
+    pub stake_pool: AccountInfo<'info>,
 
     #[account(
         mut,
@@ -64,21 +65,21 @@ pub struct Rebalance<'info> {
             STAKE_POOL_WITHDRAW_SEED
         ],
         seeds::program = spl_stake_pool::ID,
-        bump = stake_pool.stake_withdraw_bump_seed
+        bump = deserialize_stake_pool(&stake_pool)?.stake_withdraw_bump_seed
     )]
     pub withdraw_authority: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = stake_pool.validator_list
+        address = deserialize_stake_pool(&stake_pool)?.validator_list
     )]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = stake_pool.reserve_stake
+        address = deserialize_stake_pool(&stake_pool)?.reserve_stake
     )]
     pub reserve_stake: AccountInfo<'info>,
 
@@ -91,7 +92,7 @@ pub struct Rebalance<'info> {
             &stake_pool.key(),
             NonZeroU32::new(
                 u32::from(
-                    get_validator_stake_info_at_index(&validator_list, validator_list_index)?
+                    get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?
                         .validator_seed_suffix
                 )
             )
@@ -108,7 +109,7 @@ pub struct Rebalance<'info> {
             &spl_stake_pool::id(),
             &vote_account.key(),
             &stake_pool.key(),
-            get_validator_stake_info_at_index(&validator_list, validator_list_index)?.transient_seed_suffix.into()
+            get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?.transient_seed_suffix.into()
         ).0
     )]
     pub transient_stake_account: AccountInfo<'info>,
@@ -171,7 +172,8 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
-        let stake_pool_lamports_with_fixed_cost = ctx.accounts.stake_pool.total_lamports;
+        let stake_pool_lamports_with_fixed_cost =
+            deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
         let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
         state_account.state.rebalance(

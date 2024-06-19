@@ -72,7 +72,8 @@ impl BitMask {
     }
 
     #[allow(clippy::integer_division)]
-    pub fn is_complete(&self, num_validators: usize) -> Result<bool> {
+    pub fn is_complete(&self, num_validators: u64) -> Result<bool> {
+        let num_validators = num_validators as usize;
         if num_validators > MAX_VALIDATORS {
             return Err(StewardError::BitmaskOutOfBounds.into());
         }

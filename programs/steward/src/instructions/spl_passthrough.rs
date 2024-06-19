@@ -8,8 +8,8 @@ use crate::constants::MAX_VALIDATORS;
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
 use crate::utils::{
-    get_config_authority, get_stake_pool, get_validator_stake_info_at_index, StakePool,
-    ValidatorList,
+    deserialize_stake_pool, get_config_authority, get_stake_pool_address,
+    get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
@@ -30,9 +30,10 @@ pub struct AddValidatorToPool<'info> {
     pub stake_pool_program: AccountInfo<'info>,
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -44,7 +45,7 @@ pub struct AddValidatorToPool<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.validator_list)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
@@ -131,11 +132,12 @@ pub struct RemoveValidatorFromPool<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -143,8 +145,9 @@ pub struct RemoveValidatorFromPool<'info> {
     pub staker: Account<'info, Staker>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
-    pub validator_list: Account<'info, ValidatorList>,
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub stake_account: AccountInfo<'info>,
@@ -166,7 +169,7 @@ pub fn remove_validator_from_pool_handler(
 ) -> Result<()> {
     let mut state_account = ctx.accounts.steward_state.load_mut()?;
 
-    if validator_list_index < state_account.state.num_pool_validators {
+    if validator_list_index < state_account.state.num_pool_validators as usize {
         let validator_list_stake_info = get_validator_stake_info_at_index(
             &ctx.accounts.validator_list.to_account_info(),
             validator_list_index,
@@ -223,25 +226,27 @@ pub struct SetPreferredValidator<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
     )]
     pub staker: Account<'info, Staker>,
-    #[account(address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    pub validator_list: AccountInfo<'info>,
     #[account(mut, address = get_config_authority(&config)?)]
     pub signer: Signer<'info>,
 }
 
 pub fn set_preferred_validator_handler(
     ctx: Context<SetPreferredValidator>,
-    validator_type: PreferredValidatorType,
+    validator_type: &PreferredValidatorType,
     validator: Option<Pubkey>,
 ) -> Result<()> {
     invoke_signed(
@@ -250,7 +255,7 @@ pub fn set_preferred_validator_handler(
             &ctx.accounts.stake_pool.key(),
             &ctx.accounts.staker.key(),
             &ctx.accounts.validator_list.key(),
-            validator_type,
+            validator_type.clone(),
             validator,
         ),
         &[
@@ -288,11 +293,12 @@ pub struct IncreaseValidatorStake<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -306,7 +312,7 @@ pub struct IncreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = stake_pool.reserve_stake
+        address = deserialize_stake_pool(&stake_pool)?.reserve_stake
     )]
     pub reserve_stake: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -416,11 +422,12 @@ pub struct DecreaseValidatorStake<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -434,7 +441,7 @@ pub struct DecreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = stake_pool.reserve_stake
+        address = deserialize_stake_pool(&stake_pool)?.reserve_stake
     )]
     pub reserve_stake: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -538,10 +545,11 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -549,8 +557,9 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     pub staker: Account<'info, Staker>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
-    #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
@@ -671,10 +680,11 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     )]
     /// CHECK: CPI program
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump
@@ -682,8 +692,9 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     pub staker: Account<'info, Staker>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
-    #[account(mut, address = stake_pool.validator_list)]
-    pub validator_list: Account<'info, ValidatorList>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
@@ -777,10 +788,11 @@ pub struct SetStaker<'info> {
         address = spl_stake_pool::ID
     )]
     pub stake_pool_program: AccountInfo<'info>,
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
-        mut, address = get_stake_pool(&config)?
+        mut, address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
         bump = staker.bump

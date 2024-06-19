@@ -18,6 +18,7 @@ pub struct ComputeInstantUnstake<'info> {
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
+    /// CHECK: TODO add validator list to config
     #[account(owner = spl_stake_pool::id())]
     pub validator_list: AccountInfo<'info>,
 

@@ -1,3 +1,5 @@
+use anchor_lang::idl::types::*;
+use anchor_lang::idl::*;
 use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
 use validator_history::utils::cast_epoch;
@@ -28,11 +30,118 @@ pub struct UpdateParametersArgs {
     pub stake_deposit_unstake_cap_bps: Option<u32>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
-    pub compute_score_slot_range: Option<usize>,
+    pub compute_score_slot_range: Option<u64>,
     pub instant_unstake_inputs_epoch_progress: Option<f64>,
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
+}
+
+// #[cfg(feature = "idl-build")]
+impl IdlBuild for UpdateParametersArgs {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "UpdateParametersArgs".to_string(),
+            ty: IdlTypeDefTy::Struct {
+                fields: Some(IdlDefinedFields::Named(vec![
+                    IdlField {
+                        name: "mev_commission_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "epoch_credits_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "commission_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "scoring_delinquency_threshold_ratio".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_delinquency_threshold_ratio".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "mev_commission_bps_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "commission_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "historical_commission_threshold".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "num_delegation_validators".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "scoring_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "stake_deposit_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "compute_score_slot_range".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "instant_unstake_inputs_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "num_epochs_between_scoring".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "minimum_stake_lamports".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "minimum_voting_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                ])),
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
 }
 
 #[derive(BorshSerialize, Default)]
@@ -82,7 +191,7 @@ pub struct Parameters {
 
     /////// State machine operation parameters ///////
     /// Number of slots that scoring must be completed in
-    pub compute_score_slot_range: usize,
+    pub compute_score_slot_range: u64,
 
     /// Progress in epoch before instant unstake is allowed
     pub instant_unstake_epoch_progress: f64,
@@ -218,11 +327,11 @@ impl Parameters {
     /// Validate reasonable bounds on parameters
     pub fn validate(&self, current_epoch: u64, slots_per_epoch: u64) -> Result<()> {
         // Cannot evaluate epochs before VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH or beyond the CircBuf length
-        let window_max = (current_epoch as usize)
+        let window_max = current_epoch
             .checked_sub(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH)
             .ok_or(StewardError::ArithmeticError)?
-            .min(validator_history::ValidatorHistory::MAX_ITEMS - 1);
-        let window_max = cast_epoch(window_max as u64)?;
+            .min(validator_history::ValidatorHistory::MAX_ITEMS as u64 - 1);
+        let window_max = cast_epoch(window_max)?;
 
         if self.mev_commission_range > window_max {
             return Err(StewardError::InvalidParameterValue.into());
@@ -288,7 +397,7 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
-        if !(COMPUTE_SCORE_SLOT_RANGE_MIN..=slots_per_epoch as usize)
+        if !(COMPUTE_SCORE_SLOT_RANGE_MIN..=slots_per_epoch)
             .contains(&self.compute_score_slot_range)
         {
             return Err(StewardError::InvalidParameterValue.into());
