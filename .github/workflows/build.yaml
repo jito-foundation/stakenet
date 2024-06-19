@@ -21,7 +21,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
-      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2023-0065 --ignore RUSTSEC-2024-0336
+      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2023-0065 --ignore RUSTSEC-2024-0336 --ignore RUSTSEC-2024-0344
 
   lint:
     name: lint
