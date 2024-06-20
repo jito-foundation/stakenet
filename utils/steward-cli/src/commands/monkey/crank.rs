@@ -160,7 +160,7 @@ async fn _handle_compute_score(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+    let txs_to_run = package_instructions(&ixs_to_run, 10, priority_fee, Some(1_400_000), None);
 
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());

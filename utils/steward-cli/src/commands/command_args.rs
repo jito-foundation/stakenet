@@ -199,6 +199,7 @@ pub enum Commands {
     ResetState(ResetState),
 
     RemoveBadValidators(RemoveBadValidators),
+    ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
 
@@ -288,6 +289,17 @@ pub struct InitState {
 pub struct ResetState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Removes validator from pool")]
+pub struct ManuallyRemoveValidator {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_index_to_remove: usize,
 }
 
 #[derive(Parser)]

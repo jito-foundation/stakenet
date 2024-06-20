@@ -83,8 +83,6 @@ cargo run view-state --verbose --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmt
 cargo run view-next-index-to-remove --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
-
-
 ## Auto Remove Validator
 ```bash
 cargo run auto-remove-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 1397
@@ -93,6 +91,11 @@ cargo run auto-remove-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449
 ## Auto Add Validator
 ```bash
 cargo run auto-add-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
+```
+
+## Manually Remove Validator
+```bash
+cargo run manually-remove-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --authority-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 0
 ```
 
 ## Remove Bad Validators
@@ -149,7 +152,7 @@ cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $
 
 # Initial Parameters
 
-```env
+```bash
 # Note - Do not use this .env when updating the parameters - this will update them all
 MEV_COMMISSION_RANGE=10
 EPOCH_CREDITS_RANGE=30
@@ -169,4 +172,22 @@ INSTANT_UNSTAKE_INPUTS_EPOCH_PROGRESS=0.50
 NUM_EPOCHS_BETWEEN_SCORING=3
 MINIMUM_STAKE_LAMPORTS=100000000000
 MINIMUM_VOTING_EPOCHS=5
+```
+
+# Testing
+
+
+To Remove
+```bash
+Vote Account: 6VSu1wCkeugWdSB3ZgCCFSAttu5XTuSWVRD1vJVPVQXq
+Stake Account: 2kdoEDkHqtVVQXghLEpxRjBQrKE73roJP525EBXEBtWZ
+Transient Stake Account: MPyP83sm5fNBXAYaAxqPsURsEoaDn7P5L7rs4dBKwTm
+Validator Lamports: 3285712
+Index: 1737
+Is Blacklisted: Ok(false)
+Is Instant Unstake: Ok(true)
+Score: Some(0)
+Yield Score: Some(872581150)
+Score Index: Some(307)
+Yield Score Index: Some(1142)
 ```

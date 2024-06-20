@@ -4,6 +4,7 @@ use commands::{
     actions::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
+        manually_remove_validator::command_manually_remove_validator,
         remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
         update_config::command_update_config,
     },
@@ -53,6 +54,9 @@ async fn main() -> Result<()> {
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
         Commands::InitState(args) => command_init_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        Commands::ManuallyRemoveValidator(args) => {
+            command_manually_remove_validator(args, &client, program_id).await
+        }
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
         }
