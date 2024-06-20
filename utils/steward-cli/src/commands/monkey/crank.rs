@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::StewardStateEnum;
-use keeper_core::{MultipleAccountsError, SubmitStats, TransactionExecutionError};
+use keeper_core::{
+    MultipleAccountsError, SendTransactionError, SubmitStats, TransactionExecutionError,
+};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
 
@@ -158,12 +160,12 @@ async fn _handle_compute_score(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = package_instructions(&ixs_to_run, 11, priority_fee, Some(1_400_000), None);
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, &payer, Some(1), None).await?;
 
     Ok(stats)
 }
@@ -376,13 +378,18 @@ pub async fn crank_monkey(
     all_steward_accounts: &Box<UsefulStewardAccounts>,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
+    let mut return_stats = SubmitStats::default();
+    let should_run_epoch_maintenance =
+        all_steward_accounts.state_account.state.current_epoch != epoch;
+    let should_crank_state = !should_run_epoch_maintenance;
+
     {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
-        if all_steward_accounts.state_account.state.current_epoch != epoch {
+        if should_run_epoch_maintenance {
             println!("Cranking Epoch Maintenance...");
 
-            return _handle_epoch_maintenance(
+            let stats = _handle_epoch_maintenance(
                 &payer,
                 client,
                 &program_id,
@@ -390,77 +397,109 @@ pub async fn crank_monkey(
                 &all_steward_accounts,
                 priority_fee,
             )
-            .await;
+            .await?;
+
+            return_stats.combine(&stats);
         }
     }
 
     {
         // --------- CHECK AND HANDLE STATE -----------
 
-        // State
-        match all_steward_accounts.state_account.state.state_tag {
-            StewardStateEnum::ComputeScores => {
-                println!("Cranking Compute Score...");
+        if should_crank_state {
+            let stats = match all_steward_accounts.state_account.state.state_tag {
+                StewardStateEnum::ComputeScores => {
+                    println!("Cranking Compute Score...");
 
-                return _handle_compute_score(
-                    &payer,
-                    client,
-                    &program_id,
-                    &all_steward_accounts,
-                    priority_fee,
-                )
-                .await;
-            }
-            StewardStateEnum::ComputeDelegations => {
-                println!("Cranking Compute Delegations...");
+                    _handle_compute_score(
+                        &payer,
+                        client,
+                        &program_id,
+                        &all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::ComputeDelegations => {
+                    println!("Cranking Compute Delegations...");
 
-                return _handle_compute_delegations(
-                    &payer,
-                    client,
-                    &program_id,
-                    &all_steward_accounts,
-                    priority_fee,
-                )
-                .await;
-            }
-            StewardStateEnum::Idle => {
-                println!("Cranking Idle...");
+                    _handle_compute_delegations(
+                        &payer,
+                        client,
+                        &program_id,
+                        &all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::Idle => {
+                    println!("Cranking Idle...");
 
-                return _handle_idle(
-                    &payer,
-                    client,
-                    &program_id,
-                    &all_steward_accounts,
-                    priority_fee,
-                )
-                .await;
-            }
-            StewardStateEnum::ComputeInstantUnstake => {
-                println!("Cranking Compute Instant Unstake...");
+                    _handle_idle(
+                        &payer,
+                        client,
+                        &program_id,
+                        &all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::ComputeInstantUnstake => {
+                    println!("Cranking Compute Instant Unstake...");
 
-                return _handle_compute_instant_unstake(
-                    &payer,
-                    client,
-                    &program_id,
-                    &all_steward_accounts,
-                    priority_fee,
-                )
-                .await;
-            }
-            StewardStateEnum::Rebalance => {
-                println!("Cranking Rebalance...");
+                    _handle_compute_instant_unstake(
+                        &payer,
+                        client,
+                        &program_id,
+                        &all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::Rebalance => {
+                    println!("Cranking Rebalance...");
 
-                return _handle_rebalance(
-                    &payer,
-                    client,
-                    &program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await;
-            }
-        };
+                    _handle_rebalance(
+                        &payer,
+                        client,
+                        &program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+            };
+
+            return_stats.combine(&stats);
+        }
     }
+
+    return_stats.results.iter().for_each(|result| {
+        if let Err(error) = result {
+            // Access and print the error
+            match error {
+                SendTransactionError::ExceededRetries => {
+                    // Continue
+                    println!("Exceeded Retries: {:?}", error);
+                }
+                SendTransactionError::TransactionError(e) => {
+                    // Flag
+                    println!("Transaction: {:?}", e);
+                }
+                SendTransactionError::RpcSimulateTransactionResult(e) => {
+                    // Recover
+                    println!("\n\nERROR: ");
+                    e.logs.iter().for_each(|log| {
+                        log.iter().enumerate().for_each(|(i, log)| {
+                            println!("{}: {:?}", i, log);
+                        });
+                    });
+                }
+            }
+        }
+    });
+
+    Ok(return_stats)
 }
 
 // Only runs one set of commands per "crank"
@@ -486,7 +525,7 @@ pub async fn command_crank_monkey(
 
     let epoch = client.get_epoch_info().await?.epoch;
 
-    let results = crank_monkey(
+    let _ = crank_monkey(
         client,
         &payer,
         &program_id,
@@ -496,7 +535,8 @@ pub async fn command_crank_monkey(
     )
     .await?;
 
-    println!("Results: {:?}", results);
-
     Ok(())
 }
+
+// Notes on handling errors
+// Try lowering the number of instructions per transaction

@@ -58,6 +58,11 @@ cargo run update-config \
 cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.json --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
+## Reset State
+```bash
+cargo run reset-state --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5  --authority-keypair-path ../../credentials/stakenet_test.json
+```
+
 ## View Config
 ```bash
 cargo run view-config --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
@@ -77,6 +82,8 @@ cargo run view-state --verbose --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmt
 ```bash
 cargo run view-next-index-to-remove --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
+
+
 
 ## Auto Remove Validator
 ```bash
