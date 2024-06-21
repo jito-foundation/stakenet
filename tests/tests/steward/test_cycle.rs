@@ -674,6 +674,7 @@ async fn test_remove_validator_next_epoch() {
     fixture_accounts.cluster_history = unit_test_fixtures.cluster_history;
 
     let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
+    let ctx = &fixture.ctx;
 
     fixture.steward_config = Keypair::new();
     fixture.steward_state = Pubkey::find_program_address(
