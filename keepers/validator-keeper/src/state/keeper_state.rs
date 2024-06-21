@@ -7,6 +7,7 @@ use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
 };
+use steward_cli::utils::accounts::UsefulStewardAccounts;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 use crate::{
@@ -43,6 +44,8 @@ pub struct KeeperState {
 
     pub cluster_history: ClusterHistory,
     pub keeper_balance: u64,
+
+    pub all_steward_accounts: Option<Box<UsefulStewardAccounts>>,
 }
 impl KeeperState {
     pub fn new() -> Self {
@@ -234,6 +237,7 @@ impl Default for KeeperState {
             current_epoch_tip_distribution_map: HashMap::new(),
             cluster_history: ClusterHistory::zeroed(),
             keeper_balance: 0,
+            all_steward_accounts: None,
         }
     }
 }

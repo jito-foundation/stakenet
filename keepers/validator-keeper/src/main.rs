@@ -7,8 +7,11 @@ use clap::Parser;
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
-use solana_sdk::signature::read_keypair_file;
-use std::{sync::Arc, time::Duration};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
+use std::{str::FromStr, sync::Arc, time::Duration};
+use steward_cli::{
+    commands::monkey::crank::crank_monkey, utils::accounts::get_all_steward_accounts,
+};
 use tokio::time::sleep;
 use validator_keeper::{
     operations::{
@@ -52,8 +55,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
+    let monkey_interval = 60 * 8; // 5 minute
 
-    let intervals = vec![validator_history_interval, metrics_interval];
+    let intervals = vec![
+        validator_history_interval,
+        metrics_interval,
+        monkey_interval,
+    ];
 
     // Stateful data
     let mut keeper_state = KeeperState::new();
@@ -178,6 +186,35 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::metrics_emit::fire(&keeper_state).await,
             );
+        }
+
+        // MONKEY
+        if should_fire(tick, monkey_interval) {
+            info!("Monkeying around...");
+
+            let steward_program_id = jito_steward::id();
+            let steward_config = Pubkey::from_str("6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5")
+                .expect("Error parsing config pubkey");
+
+            keeper_state.all_steward_accounts = Some(
+                get_all_steward_accounts(
+                    &keeper_config.client,
+                    &steward_program_id,
+                    &steward_config,
+                )
+                .await
+                .expect("Could not fetch steward accoutns"),
+            );
+
+            let _ = crank_monkey(
+                &keeper_config.client,
+                &keeper_config.keypair,
+                &steward_program_id,
+                keeper_state.epoch_info.epoch,
+                keeper_state.all_steward_accounts.as_ref().unwrap(),
+                Some(300_000),
+            )
+            .await;
         }
 
         // ---------------------- EMIT ---------------------------------
