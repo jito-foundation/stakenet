@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use keeper_core::{parallel_execute_transactions, SubmitStats, TransactionExecutionError};
+use keeper_core::{
+    parallel_execute_transactions, SendTransactionError, SubmitStats, TransactionExecutionError,
+};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
@@ -110,4 +112,31 @@ pub async fn debug_send_single_transaction(
     }
 
     result
+}
+
+pub fn print_errors_if_any(submit_stats: &SubmitStats) {
+    submit_stats.results.iter().for_each(|result| {
+        if let Err(error) = result {
+            // Access and print the error
+            match error {
+                SendTransactionError::ExceededRetries => {
+                    // Continue
+                    println!("Exceeded Retries: {:?}", error);
+                }
+                SendTransactionError::TransactionError(e) => {
+                    // Flag
+                    println!("Transaction: {:?}", e);
+                }
+                SendTransactionError::RpcSimulateTransactionResult(e) => {
+                    // Recover
+                    println!("\n\nERROR: ");
+                    e.logs.iter().for_each(|log| {
+                        log.iter().enumerate().for_each(|(i, log)| {
+                            println!("{}: {:?}", i, log);
+                        });
+                    });
+                }
+            }
+        }
+    });
 }

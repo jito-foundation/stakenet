@@ -47,9 +47,9 @@ pub async fn command_view_state(
 }
 
 fn _print_verbose_state(
-    steward_state_account: &Box<StewardStateAccount>,
-    config_account: &Box<Config>,
-    validator_list_account: &Box<ValidatorList>,
+    steward_state_account: &StewardStateAccount,
+    config_account: &Config,
+    validator_list_account: &ValidatorList,
 ) {
     let mut formatted_string;
 
@@ -95,6 +95,10 @@ fn _print_verbose_state(
             config_account.blacklist.get(index)
         );
         formatted_string += &format!(
+            "Marked for removal: {:?}\n",
+            steward_state_account.state.validators_to_remove.get(index)
+        );
+        formatted_string += &format!(
             "Is Instant Unstake: {:?}\n",
             steward_state_account.state.instant_unstake.get(index)
         );
@@ -116,7 +120,7 @@ fn _print_verbose_state(
 fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
-    state_account: &Box<StewardStateAccount>,
+    state_account: &StewardStateAccount,
 ) {
     let state = &state_account.state;
 

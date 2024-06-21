@@ -445,9 +445,7 @@ pub async fn parallel_execute_transactions(
                                     } => {
                                         match data {
                                             solana_client::rpc_request::RpcResponseErrorData::Empty => {
-                                                results[idx] = Err(SendTransactionError::TransactionError(format!(
-                                                    "TX - RPC Error (Request - Empty)",
-                                                )))
+                                                results[idx] = Err(SendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
                                                 results[idx] = Err(SendTransactionError::RpcSimulateTransactionResult(e))

@@ -199,6 +199,7 @@ pub enum Commands {
     ResetState(ResetState),
 
     RemoveBadValidators(RemoveBadValidators),
+    ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
     ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
@@ -289,6 +290,17 @@ pub struct InitState {
 pub struct ResetState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Manually updates vote account per validator index")]
+pub struct ManuallyCopyVoteAccount {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index of validator list to update
+    #[arg(long, env)]
+    pub validator_index_to_update: usize,
 }
 
 #[derive(Parser)]

@@ -4,6 +4,7 @@ use commands::{
     actions::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
+        manually_copy_vote_accounts::command_manually_copy_vote_account,
         manually_remove_validator::command_manually_remove_validator,
         remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
         update_config::command_update_config,
@@ -41,7 +42,7 @@ async fn main() -> Result<()> {
     ));
 
     let program_id = args.program_id;
-    let _ = match args.commands {
+    let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
@@ -52,6 +53,9 @@ async fn main() -> Result<()> {
         // --- Actions ---
         Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
+        Commands::ManuallyCopyVoteAccount(args) => {
+            command_manually_copy_vote_account(args, &client, program_id).await
+        }
         Commands::InitState(args) => command_init_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::ManuallyRemoveValidator(args) => {
@@ -84,6 +88,16 @@ async fn main() -> Result<()> {
         }
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
+
+    match result {
+        Ok(_) => {
+            println!("\n✅ DONE\n");
+        }
+        Err(e) => {
+            eprintln!("\n❌ Error: \n\n{:?}\n", e);
+            std::process::exit(1);
+        }
+    }
 
     Ok(())
 }

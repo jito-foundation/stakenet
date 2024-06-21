@@ -15,6 +15,7 @@ use crate::{
 };
 
 pub struct KeeperState {
+    pub startup_flag: bool,
     pub epoch_info: EpochInfo,
 
     // Tally array of runs and errors indexed by their respective KeeperOperations
@@ -45,7 +46,17 @@ pub struct KeeperState {
 }
 impl KeeperState {
     pub fn new() -> Self {
-        Self::default()
+        let mut state = Self::default();
+        state.set_startup_flag();
+        state
+    }
+
+    pub fn set_startup_flag(&mut self) {
+        self.startup_flag = true;
+    }
+
+    pub fn clear_startup_flag(&mut self) {
+        self.startup_flag = false;
     }
 
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
@@ -202,6 +213,7 @@ impl KeeperState {
 impl Default for KeeperState {
     fn default() -> Self {
         Self {
+            startup_flag: false,
             epoch_info: EpochInfo {
                 epoch: 0,
                 slot_index: 0,

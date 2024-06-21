@@ -112,14 +112,16 @@ pub async fn update_vote_accounts(
 
     // Update all open vote accounts, less the ones that have been recently updated
     let mut vote_accounts_to_update = keeper_state.get_all_open_vote_accounts();
-    vote_accounts_to_update.retain(|vote_account| {
-        !vote_account_uploaded_recently(
-            validator_history_map,
-            vote_account,
-            epoch_info.epoch,
-            epoch_info.absolute_slot,
-        )
-    });
+    if !keeper_state.startup_flag {
+        vote_accounts_to_update.retain(|vote_account| {
+            !vote_account_uploaded_recently(
+                validator_history_map,
+                vote_account,
+                epoch_info.epoch,
+                epoch_info.absolute_slot,
+            )
+        });
+    }
 
     let entries = vote_accounts_to_update
         .iter()

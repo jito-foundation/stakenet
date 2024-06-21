@@ -24,7 +24,7 @@ pub async fn command_view_next_index_to_remove(
     Ok(())
 }
 
-fn _print_next_index_to_remove(state_account: &Box<StewardStateAccount>) {
+fn _print_next_index_to_remove(state_account: &StewardStateAccount) {
     for i in 0..state_account.state.num_pool_validators {
         let value = state_account.state.validators_to_remove.get_unsafe(i);
 

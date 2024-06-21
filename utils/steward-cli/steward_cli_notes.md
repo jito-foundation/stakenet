@@ -93,6 +93,11 @@ cargo run auto-remove-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449
 cargo run auto-add-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
 ```
 
+## Manually Update Vote Account
+```bash
+cargo run manually-copy-vote-account --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-update 1
+```
+
 ## Manually Remove Validator
 ```bash
 cargo run manually-remove-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --authority-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 0

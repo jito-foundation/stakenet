@@ -38,17 +38,17 @@ pub async fn get_all_steward_accounts(
     let validator_list_address = stake_pool_account.validator_list;
 
     Ok(Box::new(UsefulStewardAccounts {
-        config_account: config_account,
+        config_account,
         config_address: *steward_config,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: get_steward_state_address(program_id, steward_config),
         staker_account: get_steward_staker_account(client, program_id, steward_config).await?,
         staker_address: get_steward_staker_address(program_id, steward_config),
         stake_pool_address,
-        stake_pool_account: stake_pool_account,
+        stake_pool_account,
         stake_pool_withdraw_authority: get_withdraw_authority_address(&stake_pool_address),
         validator_list_account: get_validator_list_account(client, &validator_list_address).await?,
-        validator_list_address: validator_list_address,
+        validator_list_address,
     }))
 }
 

@@ -43,7 +43,7 @@ async fn _handle_epoch_maintenance(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
     epoch: u64,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut state_epoch = all_steward_accounts.state_account.state.current_epoch;
@@ -61,9 +61,7 @@ async fn _handle_epoch_maintenance(
             if validators_to_remove.get(i).map_err(|e| {
                 MonkeyCrankError::Custom(format!(
                     "Error fetching bitmask index for removed validator: {}/{} - {}",
-                    i,
-                    num_validators,
-                    e.to_string()
+                    i, num_validators, e
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -89,14 +87,14 @@ async fn _handle_epoch_maintenance(
         let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
         let new_stats =
-            submit_packaged_transactions(client, vec![configured_ix], &payer, None, None).await?;
+            submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
 
         stats.combine(&new_stats);
 
         // NOTE: This is the only time an account is fetched
         // in any of these cranking functions
         let updated_state_account =
-            get_steward_state_account(client, &program_id, &all_steward_accounts.config_address)
+            get_steward_state_account(client, program_id, &all_steward_accounts.config_address)
                 .await
                 .unwrap();
 
@@ -112,7 +110,7 @@ async fn _handle_compute_score(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
@@ -165,7 +163,7 @@ async fn _handle_compute_score(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, &payer, Some(1), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
 }
@@ -174,7 +172,7 @@ async fn _handle_compute_delegations(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let ix = Instruction {
@@ -191,7 +189,7 @@ async fn _handle_compute_delegations(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], &payer, None, None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
 
     Ok(stats)
 }
@@ -200,7 +198,7 @@ async fn _handle_idle(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let ix = Instruction {
@@ -217,7 +215,7 @@ async fn _handle_idle(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], &payer, None, None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
 
     Ok(stats)
 }
@@ -226,7 +224,7 @@ async fn _handle_compute_instant_unstake(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
@@ -274,12 +272,12 @@ async fn _handle_compute_instant_unstake(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = package_instructions(&ixs_to_run, 11, priority_fee, Some(1_400_000), None);
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, None, None).await?;
 
     Ok(stats)
 }
@@ -288,7 +286,7 @@ async fn _handle_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
@@ -365,7 +363,7 @@ async fn _handle_rebalance(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, None, None).await?;
 
     Ok(stats)
 }
@@ -375,7 +373,7 @@ pub async fn crank_monkey(
     payer: &Arc<Keypair>,
     program_id: &Pubkey,
     epoch: u64,
-    all_steward_accounts: &Box<UsefulStewardAccounts>,
+    all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut return_stats = SubmitStats::default();
@@ -390,11 +388,11 @@ pub async fn crank_monkey(
             println!("Cranking Epoch Maintenance...");
 
             let stats = _handle_epoch_maintenance(
-                &payer,
+                payer,
                 client,
-                &program_id,
+                program_id,
                 epoch,
-                &all_steward_accounts,
+                all_steward_accounts,
                 priority_fee,
             )
             .await?;
@@ -412,10 +410,10 @@ pub async fn crank_monkey(
                     println!("Cranking Compute Score...");
 
                     _handle_compute_score(
-                        &payer,
+                        payer,
                         client,
-                        &program_id,
-                        &all_steward_accounts,
+                        program_id,
+                        all_steward_accounts,
                         priority_fee,
                     )
                     .await?
@@ -424,10 +422,10 @@ pub async fn crank_monkey(
                     println!("Cranking Compute Delegations...");
 
                     _handle_compute_delegations(
-                        &payer,
+                        payer,
                         client,
-                        &program_id,
-                        &all_steward_accounts,
+                        program_id,
+                        all_steward_accounts,
                         priority_fee,
                     )
                     .await?
@@ -436,10 +434,10 @@ pub async fn crank_monkey(
                     println!("Cranking Idle...");
 
                     _handle_idle(
-                        &payer,
+                        payer,
                         client,
-                        &program_id,
-                        &all_steward_accounts,
+                        program_id,
+                        all_steward_accounts,
                         priority_fee,
                     )
                     .await?
@@ -448,10 +446,10 @@ pub async fn crank_monkey(
                     println!("Cranking Compute Instant Unstake...");
 
                     _handle_compute_instant_unstake(
-                        &payer,
+                        payer,
                         client,
-                        &program_id,
-                        &all_steward_accounts,
+                        program_id,
+                        all_steward_accounts,
                         priority_fee,
                     )
                     .await?
@@ -460,9 +458,9 @@ pub async fn crank_monkey(
                     println!("Cranking Rebalance...");
 
                     _handle_rebalance(
-                        &payer,
+                        payer,
                         client,
-                        &program_id,
+                        program_id,
                         all_steward_accounts,
                         priority_fee,
                     )

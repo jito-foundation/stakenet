@@ -22,6 +22,11 @@ use validator_keeper::{
     },
 };
 
+fn should_clear_startup_flag(tick: u64, intervals: &[u64]) -> bool {
+    let max_interval = intervals.iter().max().unwrap();
+    tick % (max_interval + 1) == 0
+}
+
 fn should_emit(tick: u64, intervals: &[u64]) -> bool {
     intervals.iter().any(|interval| tick % (interval + 1) == 0)
 }
@@ -186,6 +191,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
+        }
+
+        // ---------- CLEAR STARTUP ----------
+        if should_clear_startup_flag(tick, &intervals) {
+            keeper_state.clear_startup_flag();
         }
 
         // ---------- SLEEP ----------
