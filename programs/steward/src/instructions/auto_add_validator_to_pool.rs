@@ -1,7 +1,7 @@
 use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
-use crate::state::{Config, Staker};
-use crate::utils::{get_stake_pool, StakePool};
+use crate::state::{Config, Staker, StewardStateAccount};
+use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
@@ -34,11 +34,12 @@ pub struct AutoAddValidator<'info> {
     )]
     pub stake_pool_program: AccountInfo<'info>,
 
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
 
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
@@ -47,7 +48,7 @@ pub struct AutoAddValidator<'info> {
     pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.reserve_stake)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.reserve_stake)]
     pub reserve_stake: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -57,12 +58,12 @@ pub struct AutoAddValidator<'info> {
             STAKE_POOL_WITHDRAW_SEED
         ],
         seeds::program = spl_stake_pool::ID,
-        bump = stake_pool.stake_withdraw_bump_seed
+        bump = deserialize_stake_pool(&stake_pool)?.stake_withdraw_bump_seed
     )]
     pub withdraw_authority: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.validator_list)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool

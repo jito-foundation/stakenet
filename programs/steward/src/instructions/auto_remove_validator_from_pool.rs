@@ -3,7 +3,9 @@ use std::num::NonZeroU32;
 use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
 use crate::state::{Config, Staker};
-use crate::utils::{get_stake_pool, get_validator_stake_info_at_index, StakePool};
+use crate::utils::{
+    deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+};
 use crate::StewardStateAccount;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use anchor_lang::{prelude::*, system_program};
@@ -13,7 +15,7 @@ use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_ad
 use validator_history::state::ValidatorHistory;
 
 #[derive(Accounts)]
-#[instruction(validator_list_index: usize)]
+#[instruction(validator_list_index: u64)]
 pub struct AutoRemoveValidator<'info> {
     #[account(
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -37,11 +39,12 @@ pub struct AutoRemoveValidator<'info> {
     )]
     pub stake_pool_program: AccountInfo<'info>,
 
+    /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
 
     #[account(
         seeds = [Staker::SEED, config.key().as_ref()],
@@ -50,7 +53,7 @@ pub struct AutoRemoveValidator<'info> {
     pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.reserve_stake)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.reserve_stake)]
     pub reserve_stake: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -60,12 +63,12 @@ pub struct AutoRemoveValidator<'info> {
             STAKE_POOL_WITHDRAW_SEED
         ],
         seeds::program = spl_stake_pool::ID,
-        bump = stake_pool.stake_withdraw_bump_seed
+        bump = deserialize_stake_pool(&stake_pool)?.stake_withdraw_bump_seed
     )]
     pub withdraw_authority: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.validator_list)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -77,7 +80,7 @@ pub struct AutoRemoveValidator<'info> {
             &stake_pool.key(),
             NonZeroU32::new(
                 u32::from(
-                    get_validator_stake_info_at_index(&validator_list, validator_list_index)?
+                    get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?
                         .validator_seed_suffix
                 )
             )
@@ -94,7 +97,7 @@ pub struct AutoRemoveValidator<'info> {
             &spl_stake_pool::id(),
             &vote_account.key(),
             &stake_pool.key(),
-            get_validator_stake_info_at_index(&validator_list, validator_list_index)?.transient_seed_suffix.into()
+            get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?.transient_seed_suffix.into()
         ).0
     )]
     pub transient_stake_account: AccountInfo<'info>,

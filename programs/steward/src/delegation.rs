@@ -39,7 +39,7 @@ pub fn decrease_stake_calculation(
     minimum_delegation: u64,
     stake_rent: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators {
+    if target_index >= state.num_pool_validators as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
@@ -47,7 +47,7 @@ pub fn decrease_stake_calculation(
         .checked_add(stake_rent)
         .ok_or(StewardError::ArithmeticError)?;
 
-    for idx in state.sorted_yield_score_indices[..state.num_pool_validators]
+    for idx in state.sorted_yield_score_indices[..state.num_pool_validators as usize]
         .iter()
         .rev()
     {
@@ -115,7 +115,7 @@ pub fn increase_stake_calculation(
     minimum_delegation: u64,
     stake_rent: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators {
+    if target_index >= state.num_pool_validators as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
     let target_lamports: u64 =
@@ -126,7 +126,7 @@ pub fn increase_stake_calculation(
         .ok_or(StewardError::ArithmeticError)?;
 
     if current_lamports < target_lamports {
-        for idx in state.sorted_score_indices[..state.num_pool_validators].iter() {
+        for idx in state.sorted_score_indices[..state.num_pool_validators as usize].iter() {
             let temp_index = *idx as usize;
             let lamports = if state.delegations[temp_index].numerator > 0
                 && !state.instant_unstake.get(temp_index)?

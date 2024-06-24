@@ -181,6 +181,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // ON-CHAIN METRICS
+        // ON-CHAIN METRICS
         if should_fire(tick, metrics_interval) {
             info!("Emitting metrics...");
             keeper_state.set_runs_errors_and_txs_for_epoch(

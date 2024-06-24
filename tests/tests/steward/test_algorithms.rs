@@ -1028,7 +1028,7 @@ fn test_increase_stake_calculation() {
         &state,
         0,
         u64::from(validator_list[0].active_stake_lamports) - minimum_delegation,
-        2000 * LAMPORTS_PER_SOL - (state.num_pool_validators as u64 * minimum_delegation),
+        2000 * LAMPORTS_PER_SOL - (state.num_pool_validators * minimum_delegation),
         &validator_list_bigvec,
         1002 * LAMPORTS_PER_SOL,
         minimum_delegation,

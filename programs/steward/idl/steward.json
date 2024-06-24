@@ -1,622 +1,36 @@
 {
-  "version": "0.1.0",
-  "name": "steward",
+  "address": "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP",
+  "metadata": {
+    "name": "steward",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Program for permissionlessly managing an SPL Stake Pool"
+  },
   "instructions": [
     {
-      "name": "initializeConfig",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "staker",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistoryConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
+      "name": "add_validator_to_blacklist",
+      "docs": [
+        "Adds the validator at `index` to the blacklist. It will be instant unstaked and never receive delegations"
       ],
-      "args": [
-        {
-          "name": "authority",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initializeState",
-      "accounts": [
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
+      "discriminator": [
+        18,
+        30,
+        248,
+        201,
+        28,
+        196,
+        137,
+        118
       ],
-      "args": []
-    },
-    {
-      "name": "reallocState",
-      "accounts": [
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistoryConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "autoAddValidatorToPool",
-      "accounts": [
-        {
-          "name": "validatorHistoryAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "reserveStake",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "computeScore",
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistoryConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clusterHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "computeDelegations",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "idle",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "computeInstantUnstake",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clusterHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "recomputeDelegations",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "unstake",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "validatorListIndex",
-          "type": {
-            "defined": "usize"
-          }
-        }
-      ]
-    },
-    {
-      "name": "delegate",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stateAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "validatorHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "reserveStake",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "validatorListIndex",
-          "type": {
-            "defined": "usize"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setNewAuthority",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "newAuthority",
-          "isMut": false,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "pauseSteward",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "resumeSteward",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "addValidatorToBlacklist",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
@@ -627,172 +41,80 @@
       ]
     },
     {
-      "name": "removeValidatorFromBlacklist",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
+      "name": "add_validator_to_pool",
+      "discriminator": [
+        181,
+        6,
+        29,
+        25,
+        192,
+        211,
+        190,
+        187
       ],
-      "args": [
-        {
-          "name": "index",
-          "type": "u32"
-        }
-      ]
-    },
-    {
-      "name": "updateParameters",
       "accounts": [
         {
-          "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "authority",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "updateParametersArgs",
-          "type": {
-            "defined": "UpdateParametersArgs"
-          }
-        }
-      ]
-    },
-    {
-      "name": "setStaker",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "steward_state",
+          "writable": true
         },
         {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool_program"
         },
         {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool",
+          "writable": true
         },
         {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
+          "name": "staker"
         },
         {
-          "name": "newStaker",
-          "isMut": false,
-          "isSigner": false
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
         },
         {
           "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "addValidatorToPool",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "reserveStake",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "validatorSeed",
+          "name": "validator_seed",
           "type": {
             "option": "u32"
           }
@@ -800,924 +122,1448 @@
       ]
     },
     {
-      "name": "removeValidatorFromPool",
+      "name": "auto_add_validator_to_pool",
+      "docs": [
+        "Adds a validator to the pool if it has a validator history account, matches stake_minimum, and is not yet in the pool"
+      ],
+      "discriminator": [
+        166,
+        226,
+        7,
+        8,
+        169,
+        239,
+        220,
+        69
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "steward_state",
+          "writable": true
         },
         {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
+          "name": "validator_history_account"
         },
         {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool_program"
         },
         {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool",
+          "writable": true
         },
         {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
+          "name": "staker"
         },
         {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
+          "name": "reserve_stake",
+          "writable": true
         },
         {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
+          "name": "withdraw_authority"
         },
         {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
+          "name": "validator_list",
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_account",
+          "writable": true
         },
         {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "vote_account"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
         },
         {
           "name": "signer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": []
     },
     {
-      "name": "setPreferredValidator",
+      "name": "auto_remove_validator_from_pool",
+      "docs": [
+        "Removes a validator from the pool if its stake account is inactive or the vote account has closed"
+      ],
+      "discriminator": [
+        65,
+        39,
+        73,
+        213,
+        52,
+        34,
+        181,
+        94
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "validator_history_account"
         },
         {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
+          "name": "state_account",
+          "writable": true
         },
         {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool_program"
         },
         {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "docs": [
+            "Account may not exist yet so no owner check done"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
         },
         {
           "name": "signer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "validatorType",
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_steward_accounts",
+      "docs": [
+        "Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).",
+        "Config is not closed as it is a Keypair, so lamports can simply be withdrawn.",
+        "Reclaims lamports to authority"
+      ],
+      "discriminator": [
+        172,
+        171,
+        212,
+        186,
+        90,
+        10,
+        181,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "staker",
+          "writable": true
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "compute_delegations",
+      "docs": [
+        "Computes delegation for a validator for the current cycle.",
+        "All validators must have delegations computed before stake can be delegated"
+      ],
+      "discriminator": [
+        249,
+        138,
+        49,
+        247,
+        69,
+        32,
+        11,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "compute_instant_unstake",
+      "docs": [
+        "Checks if a validator at `validator_list_index` should be instant unstaked, and marks it if so"
+      ],
+      "discriminator": [
+        172,
+        220,
+        51,
+        183,
+        2,
+        94,
+        253,
+        251
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_history"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "cluster_history"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "compute_score",
+      "docs": [
+        "Computes score for a the validator at `validator_list_index` for the current cycle."
+      ],
+      "discriminator": [
+        161,
+        101,
+        4,
+        93,
+        120,
+        62,
+        41,
+        20
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_history"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "cluster_history"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "decrease_additional_validator_stake",
+      "discriminator": [
+        90,
+        22,
+        113,
+        73,
+        21,
+        229,
+        33,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "ephemeral_stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        },
+        {
+          "name": "transient_seed",
+          "type": "u64"
+        },
+        {
+          "name": "ephemeral_seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "decrease_validator_stake",
+      "discriminator": [
+        145,
+        203,
+        107,
+        123,
+        71,
+        63,
+        35,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        },
+        {
+          "name": "transient_seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "epoch_maintenance",
+      "docs": [
+        "Housekeeping, run at the start of any new epoch before any other instructions"
+      ],
+      "discriminator": [
+        208,
+        225,
+        211,
+        82,
+        219,
+        242,
+        58,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "stake_pool"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_index_to_remove",
           "type": {
-            "defined": "PreferredValidatorType"
+            "option": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idle",
+      "docs": [
+        "Idle state, waiting for epoch progress before transitioning to next state"
+      ],
+      "discriminator": [
+        200,
+        79,
+        16,
+        41,
+        251,
+        91,
+        239,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "increase_additional_validator_stake",
+      "discriminator": [
+        93,
+        136,
+        94,
+        230,
+        32,
+        54,
+        167,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "ephemeral_stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "writable": true
+        },
+        {
+          "name": "stake_account"
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        },
+        {
+          "name": "transient_seed",
+          "type": "u64"
+        },
+        {
+          "name": "ephemeral_seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "increase_validator_stake",
+      "discriminator": [
+        5,
+        121,
+        50,
+        243,
+        14,
+        159,
+        97,
+        6
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        },
+        {
+          "name": "transient_seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "staker",
+          "writable": true
+        },
+        {
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "update_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdateParametersArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_state",
+      "docs": [
+        "Creates state account"
+      ],
+      "discriminator": [
+        190,
+        171,
+        224,
+        219,
+        217,
+        72,
+        199,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause_steward",
+      "discriminator": [
+        214,
+        85,
+        52,
+        67,
+        192,
+        238,
+        178,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "realloc_state",
+      "docs": [
+        "Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE"
+      ],
+      "discriminator": [
+        67,
+        181,
+        233,
+        214,
+        215,
+        148,
+        245,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rebalance",
+      "docs": [
+        "Increases or decreases stake for a validator at `validator_list_index` to match the target stake,",
+        "given constraints on increase/decrease priority, reserve balance, and unstaking caps"
+      ],
+      "discriminator": [
+        108,
+        158,
+        77,
+        9,
+        210,
+        52,
+        88,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_history"
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "staker",
+          "writable": true
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "docs": [
+            "Account may not exist yet so no owner check done"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "remove_validator_from_blacklist",
+      "docs": [
+        "Removes the validator at `index` from the blacklist"
+      ],
+      "discriminator": [
+        253,
+        48,
+        101,
+        237,
+        109,
+        14,
+        153,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "remove_validator_from_pool",
+      "discriminator": [
+        161,
+        32,
+        213,
+        239,
+        221,
+        15,
+        181,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "reset_steward_state",
+      "docs": [
+        "Resets steward state account to its initial state."
+      ],
+      "discriminator": [
+        84,
+        248,
+        158,
+        46,
+        200,
+        205,
+        234,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resume_steward",
+      "discriminator": [
+        25,
+        71,
+        153,
+        183,
+        197,
+        197,
+        187,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_new_authority",
+      "discriminator": [
+        94,
+        40,
+        220,
+        124,
+        122,
+        142,
+        142,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "new_authority"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_preferred_validator",
+      "discriminator": [
+        114,
+        42,
+        19,
+        98,
+        212,
+        97,
+        109,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool",
+          "writable": true
+        },
+        {
+          "name": "staker"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_type",
+          "type": {
+            "defined": {
+              "name": "PreferredValidatorType"
+            }
           }
         },
         {
           "name": "validator",
           "type": {
-            "option": "publicKey"
+            "option": "pubkey"
           }
         }
       ]
     },
     {
-      "name": "increaseValidatorStake",
+      "name": "set_staker",
+      "discriminator": [
+        149,
+        203,
+        114,
+        28,
+        80,
+        138,
+        17,
+        131
+      ],
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "name": "config"
         },
         {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool_program"
         },
         {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
+          "name": "stake_pool",
+          "writable": true
         },
         {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
+          "name": "staker"
         },
         {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "reserveStake",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "new_staker"
         },
         {
           "name": "signer",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         }
       ],
-      "args": [
-        {
-          "name": "lamports",
-          "type": "u64"
-        },
-        {
-          "name": "transientSeed",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
-      "name": "decreaseValidatorStake",
+      "name": "update_parameters",
+      "docs": [
+        "For parameters that are present in args, the instruction checks that they are within sensible bounds and saves them to config struct"
+      ],
+      "discriminator": [
+        116,
+        107,
+        24,
+        207,
+        101,
+        49,
+        213,
+        77
+      ],
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
-          "isSigner": false
+          "writable": true
         },
         {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
+          "name": "authority",
+          "writable": true,
+          "signer": true
         }
       ],
       "args": [
         {
-          "name": "lamports",
-          "type": "u64"
-        },
-        {
-          "name": "transientSeed",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "increaseAdditionalValidatorStake",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "reserveStake",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ephemeralStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "lamports",
-          "type": "u64"
-        },
-        {
-          "name": "transientSeed",
-          "type": "u64"
-        },
-        {
-          "name": "ephemeralSeed",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "decreaseAdditionalValidatorStake",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "ephemeralStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "transientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "lamports",
-          "type": "u64"
-        },
-        {
-          "name": "transientSeed",
-          "type": "u64"
-        },
-        {
-          "name": "ephemeralSeed",
-          "type": "u64"
-        }
-      ]
-    },
-    {
-      "name": "redelegate",
-      "accounts": [
-        {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePoolProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakePool",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "staker",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "withdrawAuthority",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "validatorList",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sourceStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sourceEphemeralStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "sourceTransientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "destinationTransientStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "destinationStakeAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "voteAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeHistory",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeConfig",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "stakeProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "signer",
-          "isMut": true,
-          "isSigner": true
-        }
-      ],
-      "args": [
-        {
-          "name": "lamports",
-          "type": "u64"
-        },
-        {
-          "name": "sourceTransientStakeSeed",
-          "type": "u64"
-        },
-        {
-          "name": "ephemeralStakeSeed",
-          "type": "u64"
-        },
-        {
-          "name": "destinationTransientSeed",
-          "type": "u64"
+          "name": "update_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdateParametersArgs"
+            }
+          }
         }
       ]
     }
   ],
   "accounts": [
     {
+      "name": "ClusterHistory",
+      "discriminator": [
+        41,
+        154,
+        241,
+        80,
+        135,
+        88,
+        85,
+        252
+      ]
+    },
+    {
       "name": "Config",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "stakePool",
-            "type": "publicKey"
-          },
-          {
-            "name": "authority",
-            "type": "publicKey"
-          },
-          {
-            "name": "minimumStakeLamports",
-            "type": "u64"
-          },
-          {
-            "name": "blacklist",
-            "type": {
-              "defined": "BitMask"
-            }
-          },
-          {
-            "name": "parameters",
-            "type": {
-              "defined": "Parameters"
-            }
-          },
-          {
-            "name": "paused",
-            "type": "u8"
-          },
-          {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                1023
-              ]
-            }
-          }
-        ]
-      }
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
     },
     {
       "name": "Staker",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
+      "discriminator": [
+        171,
+        229,
+        193,
+        85,
+        67,
+        177,
+        151,
+        4
+      ]
     },
     {
       "name": "StewardStateAccount",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "state",
-            "type": {
-              "defined": "StewardState"
-            }
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "BitMask",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "values",
-            "type": {
-              "array": [
-                "u64",
-                157
-              ]
-            }
-          }
-        ]
-      }
+      "discriminator": [
+        55,
+        216,
+        46,
+        49,
+        148,
+        67,
+        228,
+        29
+      ]
     },
     {
-      "name": "Parameters",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mevCommissionRange",
-            "type": "u16"
-          },
-          {
-            "name": "epochCreditsRange",
-            "type": "u16"
-          },
-          {
-            "name": "commissionRange",
-            "type": "u16"
-          },
-          {
-            "name": "mevCommissionBpsThreshold",
-            "type": "u16"
-          },
-          {
-            "name": "scoringDelinquencyThresholdRatio",
-            "type": "f64"
-          },
-          {
-            "name": "instantUnstakeDelinquencyThresholdRatio",
-            "type": "f64"
-          },
-          {
-            "name": "commissionThreshold",
-            "type": "u8"
-          },
-          {
-            "name": "padding0",
-            "type": {
-              "array": [
-                "u8",
-                7
-              ]
-            }
-          },
-          {
-            "name": "minPerfScore",
-            "type": "f64"
-          },
-          {
-            "name": "minStakeAmount",
-            "type": "f64"
-          },
-          {
-            "name": "computeScoreSlotRange",
-            "type": {
-              "defined": "usize"
-            }
-          },
-          {
-            "name": "instantUnstakeEpochProgress",
-            "type": "f64"
-          },
-          {
-            "name": "clusterHistoryUpdateEpochProgress",
-            "type": "f64"
-          },
-          {
-            "name": "voteAccountUpdateEpochProgress",
-            "type": "f64"
-          },
-          {
-            "name": "numEpochsBetweenScoring",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "UpdateParametersArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mevCommissionRange",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "epochCreditsRange",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "commissionRange",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "scoringDelinquencyThresholdRatio",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "instantUnstakeDelinquencyThresholdRatio",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "mevCommissionBpsThreshold",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "commissionThreshold",
-            "type": {
-              "option": "u8"
-            }
-          },
-          {
-            "name": "minPerfScore",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "minStakeAmount",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "instantUnstakeEpochProgress",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "computeScoreSlotRange",
-            "type": {
-              "option": {
-                "defined": "usize"
-              }
-            }
-          },
-          {
-            "name": "clusterHistoryUpdateEpochProgress",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "voteAccountUpdateEpochProgress",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "numEpochsBetweenScoring",
-            "type": {
-              "option": "u64"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "StewardStateEnum",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "ComputeScores"
-          },
-          {
-            "name": "ComputeDelegations"
-          },
-          {
-            "name": "Idle"
-          },
-          {
-            "name": "ComputeInstantUnstake"
-          },
-          {
-            "name": "RecomputeDelegations"
-          },
-          {
-            "name": "Unstake"
-          },
-          {
-            "name": "Delegate"
-          }
-        ]
-      }
+      "name": "ValidatorHistory",
+      "discriminator": [
+        205,
+        25,
+        8,
+        221,
+        253,
+        131,
+        2,
+        146
+      ]
     }
   ],
   "events": [
     {
+      "name": "DecreaseComponents",
+      "discriminator": [
+        129,
+        8,
+        124,
+        12,
+        11,
+        140,
+        0,
+        8
+      ]
+    },
+    {
+      "name": "InstantUnstakeComponents",
+      "discriminator": [
+        217,
+        80,
+        196,
+        114,
+        226,
+        11,
+        127,
+        77
+      ]
+    },
+    {
+      "name": "ScoreComponents",
+      "discriminator": [
+        218,
+        204,
+        53,
+        7,
+        22,
+        2,
+        217,
+        251
+      ]
+    },
+    {
       "name": "StateTransition",
-      "fields": [
-        {
-          "name": "previousState",
-          "type": "string",
-          "index": false
-        },
-        {
-          "name": "newState",
-          "type": "string",
-          "index": false
-        }
+      "discriminator": [
+        106,
+        9,
+        120,
+        247,
+        169,
+        106,
+        206,
+        233
       ]
     }
   ],
@@ -1778,23 +1624,1357 @@
     },
     {
       "code": 6011,
-      "name": "ValidatorHistoryNotRecentEnough",
-      "msg": "Validator History data not recent enough to be used for scoring. Must be updated this epoch"
+      "name": "VoteHistoryNotRecentEnough",
+      "msg": "Validator History vote data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
       "code": 6012,
+      "name": "StakeHistoryNotRecentEnough",
+      "msg": "Validator History stake data not recent enough to be used for scoring. Must be updated this epoch"
+    },
+    {
+      "code": 6013,
       "name": "ClusterHistoryNotRecentEnough",
       "msg": "Cluster History data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "StateMachinePaused",
       "msg": "Steward State Machine is paused. No state machine actions can be taken"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidParameterValue",
       "msg": "Config parameter is out of range or otherwise invalid"
+    },
+    {
+      "code": 6016,
+      "name": "InstantUnstakeNotReady",
+      "msg": "Instant unstake cannot be performed yet."
+    },
+    {
+      "code": 6017,
+      "name": "ValidatorIndexOutOfBounds",
+      "msg": "Validator index out of bounds of state machine"
+    },
+    {
+      "code": 6018,
+      "name": "ValidatorListTypeMismatch",
+      "msg": "ValidatorList account type mismatch"
+    },
+    {
+      "code": 6019,
+      "name": "ArithmeticError",
+      "msg": "An operation caused an overflow/underflow"
+    },
+    {
+      "code": 6020,
+      "name": "ValidatorNotRemovable",
+      "msg": "Validator not eligible for removal. Must be delinquent or have closed vote account"
+    },
+    {
+      "code": 6021,
+      "name": "MaxValidatorsReached",
+      "msg": "Max validators reached"
+    },
+    {
+      "code": 6022,
+      "name": "ValidatorHistoryMismatch",
+      "msg": "Validator history account does not match vote account"
+    },
+    {
+      "code": 6023,
+      "name": "EpochMaintenanceNotComplete",
+      "msg": "Epoch Maintenance must be called before continuing"
+    },
+    {
+      "code": 6024,
+      "name": "StakePoolNotUpdated",
+      "msg": "The stake pool must be updated before continuing"
+    },
+    {
+      "code": 6025,
+      "name": "ValidatorNotMarkedForRemoval",
+      "msg": "Validator not marked for removal"
+    },
+    {
+      "code": 6026,
+      "name": "ValidatorsHaveNotBeenRemoved",
+      "msg": "Validators have not been removed"
+    },
+    {
+      "code": 6027,
+      "name": "ListStateMismatch",
+      "msg": "Validator List count does not match state machine"
+    }
+  ],
+  "types": [
+    {
+      "name": "BitMask",
+      "docs": [
+        "Data structure used to efficiently pack a binary array, primarily used to store all validators.",
+        "Each validator has an index (its index in the spl_stake_pool::ValidatorList), corresponding to a bit in the bitmask.",
+        "When an operation is executed on a validator, the bit corresponding to that validator's index is set to 1.",
+        "When all bits are 1, the operation is complete."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                "u64",
+                79
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircBuf",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "idx",
+            "type": "u64"
+          },
+          {
+            "name": "is_empty",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "arr",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "ValidatorHistoryEntry"
+                  }
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircBufCluster",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "idx",
+            "type": "u64"
+          },
+          {
+            "name": "is_empty",
+            "type": "u8"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "arr",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "ClusterHistoryEntry"
+                  }
+                },
+                512
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClientVersion",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "major",
+            "type": "u8"
+          },
+          {
+            "name": "minor",
+            "type": "u8"
+          },
+          {
+            "name": "patch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClusterHistory",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "struct_version",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "cluster_history_last_update_slot",
+            "type": "u64"
+          },
+          {
+            "name": "_padding1",
+            "type": {
+              "array": [
+                "u8",
+                232
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": {
+                "name": "CircBufCluster"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClusterHistoryEntry",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_blocks",
+            "type": "u32"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "epoch_start_timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "padding",
+            "type": {
+              "array": [
+                "u8",
+                240
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "docs": [
+        "Config is a user-provided keypair.",
+        "This is so there can be multiple configs per stake pool, and one party can't",
+        "squat a config address for another party's stake pool."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake_pool",
+            "docs": [
+              "SPL Stake Pool address that this program is managing"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority for pool stewardship, can execute SPL Staker commands and adjust Delegation parameters"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "blacklist",
+            "docs": [
+              "Bitmask representing index of validators that are not allowed delegation"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "parameters",
+            "docs": [
+              "Parameters for scoring, delegation, and state machine"
+            ],
+            "type": {
+              "defined": {
+                "name": "Parameters"
+              }
+            }
+          },
+          {
+            "name": "_padding",
+            "docs": [
+              "Padding for future governance parameters"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                1023
+              ]
+            }
+          },
+          {
+            "name": "paused",
+            "docs": [
+              "Halts any state machine progress"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DecreaseComponents",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "scoring_unstake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "instant_unstake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "stake_deposit_unstake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "total_unstake_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Delegation",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "numerator",
+            "type": "u32"
+          },
+          {
+            "name": "denominator",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstantUnstakeComponents",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "instant_unstake",
+            "docs": [
+              "Aggregate of all checks"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "delinquency_check",
+            "docs": [
+              "Checks if validator has missed > instant_unstake_delinquency_threshold_ratio of votes this epoch"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "commission_check",
+            "docs": [
+              "Checks if validator has increased commission > commission_threshold"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "mev_commission_check",
+            "docs": [
+              "Checks if validator has increased MEV commission > mev_commission_bps_threshold"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "is_blacklisted",
+            "docs": [
+              "Checks if validator was added to blacklist blacklisted"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Parameters",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mev_commission_range",
+            "docs": [
+              "Number of epochs to consider for MEV commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "epoch_credits_range",
+            "docs": [
+              "Number of epochs to consider for epoch credits"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "commission_range",
+            "docs": [
+              "Number of epochs to consider for commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "mev_commission_bps_threshold",
+            "docs": [
+              "Highest MEV commission rate allowed in bps"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "scoring_delinquency_threshold_ratio",
+            "docs": [
+              "Proportion of delinquent slots to total slots to trigger delinquency measurement in scoring"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "instant_unstake_delinquency_threshold_ratio",
+            "docs": [
+              "Proportion of delinquent slots to total slots to trigger instant unstake"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "commission_threshold",
+            "docs": [
+              "Highest commission rate allowed in commission_range epochs, in percent"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "historical_commission_threshold",
+            "docs": [
+              "Highest commission rate allowed in tracked history"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "docs": [
+              "Required so that the struct is 8-byte aligned",
+              "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "num_delegation_validators",
+            "docs": [
+              "Number of validators to delegate to"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "scoring_unstake_cap_bps",
+            "docs": [
+              "Maximum amount of the pool to be unstaked in a cycle for scoring (in basis points)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "instant_unstake_cap_bps",
+            "type": "u32"
+          },
+          {
+            "name": "stake_deposit_unstake_cap_bps",
+            "docs": [
+              "Maximum amount of the pool to be unstaked in a cycle from stake deposits (in basis points)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "compute_score_slot_range",
+            "docs": [
+              "Number of slots that scoring must be completed in"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "instant_unstake_epoch_progress",
+            "docs": [
+              "Progress in epoch before instant unstake is allowed"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "instant_unstake_inputs_epoch_progress",
+            "docs": [
+              "Validator history copy_vote_account and Cluster History must be updated past this epoch progress before calculating instant unstake"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "num_epochs_between_scoring",
+            "docs": [
+              "Number of epochs a given validator set will be delegated to before recomputing scores"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "minimum_stake_lamports",
+            "docs": [
+              "Minimum stake required to be added to pool ValidatorList and eligible for delegation"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "minimum_voting_epochs",
+            "docs": [
+              "Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PreferredValidatorType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Deposit"
+          },
+          {
+            "name": "Withdraw"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreComponents",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "score",
+            "docs": [
+              "Product of all scoring components"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "yield_score",
+            "docs": [
+              "vote_credits_ratio * (1 - commission)"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "mev_commission_score",
+            "docs": [
+              "If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "blacklisted_score",
+            "docs": [
+              "If validator is blacklisted, score is 0.0, else 1.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "superminority_score",
+            "docs": [
+              "If validator is not in the superminority, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "delinquency_score",
+            "docs": [
+              "If delinquency is not > threshold in any epoch, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "running_jito_score",
+            "docs": [
+              "If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "commission_score",
+            "docs": [
+              "If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "historical_commission_score",
+            "docs": [
+              "If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "vote_credits_ratio",
+            "docs": [
+              "Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs",
+              "Excluding current epoch"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Staker",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StateTransition",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "previous_state",
+            "type": "string"
+          },
+          {
+            "name": "new_state",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardState",
+      "docs": [
+        "Tracks state of the stake pool.",
+        "Follow state transitions here:",
+        "https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png"
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state_tag",
+            "docs": [
+              "Current state of the Steward"
+            ],
+            "type": {
+              "defined": {
+                "name": "StewardStateEnum"
+              }
+            }
+          },
+          {
+            "name": "validator_lamport_balances",
+            "docs": [
+              "Internal lamport balance of each validator, used to track stake deposits that need to be unstaked,",
+              "so not always equal to the stake account balance."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "scores",
+            "docs": [
+              "Overall score of validator, used to determine delegates and order for delegation."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "sorted_score_indices",
+            "docs": [
+              "Indices of validators, sorted by score descending"
+            ],
+            "type": {
+              "array": [
+                "u16",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "yield_scores",
+            "docs": [
+              "Yield component of the score. Used as secondary priority, to determine order for unstaking."
+            ],
+            "type": {
+              "array": [
+                "u32",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "sorted_yield_score_indices",
+            "docs": [
+              "Indices of validators, sorted by yield score descending"
+            ],
+            "type": {
+              "array": [
+                "u16",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "delegations",
+            "docs": [
+              "Target share of pool represented as a proportion, indexed by spl_stake_pool::ValidatorList index"
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "Delegation"
+                  }
+                },
+                5000
+              ]
+            }
+          },
+          {
+            "name": "instant_unstake",
+            "docs": [
+              "Each bit represents a validator, true if validator should be unstaked"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "progress",
+            "docs": [
+              "Tracks progress of states that require one instruction per validator"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "validators_to_remove",
+            "docs": [
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "start_computing_scores_slot",
+            "docs": [
+              "Slot of the first ComputeScores instruction in the current cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "current_epoch",
+            "docs": [
+              "Internal current epoch, for tracking when epoch has changed"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "next_cycle_epoch",
+            "docs": [
+              "Next cycle start"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "num_pool_validators",
+            "docs": [
+              "Number of validators in the stake pool, used to determine the number of validators to be scored.",
+              "Updated at the start of each cycle and when validators are removed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "scoring_unstake_total",
+            "docs": [
+              "Total lamports that have been due to scoring this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "instant_unstake_total",
+            "docs": [
+              "Total lamports that have been due to instant unstaking this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "stake_deposit_unstake_total",
+            "docs": [
+              "Total lamports that have been due to stake deposits this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "validators_added",
+            "docs": [
+              "Number of validators added to the pool in the current cycle"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "compute_delegations_completed",
+            "docs": [
+              "Tracks whether delegation computation has been completed"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "rebalance_completed",
+            "docs": [
+              "Tracks whether unstake and delegate steps have completed"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "checked_validators_removed_from_list",
+            "docs": [
+              "So we only have to check the validator list once for `ReadyToRemove`"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "_padding0",
+            "docs": [
+              "Future state and #[repr(C)] alignment"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                40003
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardStateAccount",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "StewardState"
+              }
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardStateEnum",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ComputeScores"
+          },
+          {
+            "name": "ComputeDelegations"
+          },
+          {
+            "name": "Idle"
+          },
+          {
+            "name": "ComputeInstantUnstake"
+          },
+          {
+            "name": "Rebalance"
+          }
+        ]
+      }
+    },
+    {
+      "name": "U8Bool",
+      "docs": [
+        "A boolean type stored as a u8."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateParametersArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mev_commission_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "epoch_credits_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "commission_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "scoring_delinquency_threshold_ratio",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "instant_unstake_delinquency_threshold_ratio",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "mev_commission_bps_threshold",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "commission_threshold",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "historical_commission_threshold",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "num_delegation_validators",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "scoring_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "instant_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "stake_deposit_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "instant_unstake_epoch_progress",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "compute_score_slot_range",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "instant_unstake_inputs_epoch_progress",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "num_epochs_between_scoring",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "minimum_stake_lamports",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "minimum_voting_epochs",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorHistory",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "struct_version",
+            "type": "u32"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "last_ip_timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "last_version_timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "_padding1",
+            "type": {
+              "array": [
+                "u8",
+                232
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": {
+                "name": "CircBuf"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorHistoryEntry",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "activated_stake_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "mev_commission",
+            "type": "u16"
+          },
+          {
+            "name": "epoch_credits",
+            "type": "u32"
+          },
+          {
+            "name": "commission",
+            "type": "u8"
+          },
+          {
+            "name": "client_type",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": {
+              "defined": {
+                "name": "ClientVersion"
+              }
+            }
+          },
+          {
+            "name": "ip",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "padding0",
+            "type": "u8"
+          },
+          {
+            "name": "is_superminority",
+            "type": "u8"
+          },
+          {
+            "name": "rank",
+            "type": "u32"
+          },
+          {
+            "name": "vote_account_last_update_slot",
+            "type": "u64"
+          },
+          {
+            "name": "mev_earned",
+            "type": "u32"
+          },
+          {
+            "name": "padding1",
+            "type": {
+              "array": [
+                "u8",
+                84
+              ]
+            }
+          }
+        ]
+      }
     }
   ]
 }

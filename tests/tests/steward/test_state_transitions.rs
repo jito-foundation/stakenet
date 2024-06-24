@@ -338,7 +338,7 @@ pub fn test_rebalance_to_idle() {
 
     state.state_tag = StewardStateEnum::Rebalance;
 
-    for i in 0..state.num_pool_validators {
+    for i in 0..state.num_pool_validators as usize {
         let _ = state.progress.set(i, true);
         assert!(matches!(state.state_tag, StewardStateEnum::Rebalance));
     }

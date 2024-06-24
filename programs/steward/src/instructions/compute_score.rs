@@ -21,6 +21,7 @@ pub struct ComputeScore<'info> {
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
+    /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
     #[account(owner = spl_stake_pool::id())]
     pub validator_list: AccountInfo<'info>,
 
@@ -90,7 +91,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         validator_list_index,
         &cluster_history,
         &config,
-        num_pool_validators,
+        num_pool_validators as u64,
     )?;
 
     maybe_transition_and_emit(

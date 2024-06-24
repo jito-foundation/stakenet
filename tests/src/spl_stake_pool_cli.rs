@@ -30,6 +30,8 @@ macro_rules! unique_signers {
 }
 
 type Error = Box<dyn std::error::Error>;
+
+#[allow(dead_code)]
 pub struct CliConfig {
     pub manager: Keypair,
     pub staker: Keypair,
