@@ -1,5 +1,5 @@
 {
-  "address": "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8",
+  "address": "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP",
   "metadata": {
     "name": "steward",
     "version": "0.1.0",
@@ -55,6 +55,10 @@
       "accounts": [
         {
           "name": "config"
+        },
+        {
+          "name": "steward_state",
+          "writable": true
         },
         {
           "name": "stake_pool_program"
@@ -134,10 +138,14 @@
       ],
       "accounts": [
         {
-          "name": "validator_history_account"
+          "name": "config"
         },
         {
-          "name": "config"
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history_account"
         },
         {
           "name": "stake_pool_program"
@@ -284,6 +292,43 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "close_steward_accounts",
+      "docs": [
+        "Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).",
+        "Config is not closed as it is a Keypair, so lamports can simply be withdrawn.",
+        "Reclaims lamports to authority"
+      ],
+      "discriminator": [
+        172,
+        171,
+        212,
+        186,
+        90,
+        10,
+        181,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "staker",
+          "writable": true
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "compute_delegations",
@@ -584,6 +629,45 @@
         {
           "name": "transient_seed",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "epoch_maintenance",
+      "docs": [
+        "Housekeeping, run at the start of any new epoch before any other instructions"
+      ],
+      "discriminator": [
+        208,
+        225,
+        211,
+        82,
+        219,
+        242,
+        58,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "stake_pool"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_index_to_remove",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -1146,6 +1230,43 @@
       ]
     },
     {
+      "name": "reset_steward_state",
+      "docs": [
+        "Resets steward state account to its initial state."
+      ],
+      "discriminator": [
+        84,
+        248,
+        158,
+        46,
+        200,
+        205,
+        234,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "resume_steward",
       "discriminator": [
         25,
@@ -1560,6 +1681,31 @@
       "code": 6022,
       "name": "ValidatorHistoryMismatch",
       "msg": "Validator history account does not match vote account"
+    },
+    {
+      "code": 6023,
+      "name": "EpochMaintenanceNotComplete",
+      "msg": "Epoch Maintenance must be called before continuing"
+    },
+    {
+      "code": 6024,
+      "name": "StakePoolNotUpdated",
+      "msg": "The stake pool must be updated before continuing"
+    },
+    {
+      "code": 6025,
+      "name": "ValidatorNotMarkedForRemoval",
+      "msg": "Validator not marked for removal"
+    },
+    {
+      "code": 6026,
+      "name": "ValidatorsHaveNotBeenRemoved",
+      "msg": "Validators have not been removed"
+    },
+    {
+      "code": 6027,
+      "name": "ListStateMismatch",
+      "msg": "Validator List count does not match state machine"
     }
   ],
   "types": [
@@ -2250,7 +2396,8 @@
       "name": "StewardState",
       "docs": [
         "Tracks state of the stake pool.",
-        "Follow state transitions here: [TODO add link to github diagram]"
+        "Follow state transitions here:",
+        "https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png"
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -2370,6 +2517,18 @@
             }
           },
           {
+            "name": "validators_to_remove",
+            "docs": [
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
             "name": "start_computing_scores_slot",
             "docs": [
               "Slot of the first ComputeScores instruction in the current cycle"
@@ -2420,6 +2579,13 @@
             "type": "u64"
           },
           {
+            "name": "validators_added",
+            "docs": [
+              "Number of validators added to the pool in the current cycle"
+            ],
+            "type": "u16"
+          },
+          {
             "name": "compute_delegations_completed",
             "docs": [
               "Tracks whether delegation computation has been completed"
@@ -2442,6 +2608,17 @@
             }
           },
           {
+            "name": "checked_validators_removed_from_list",
+            "docs": [
+              "So we only have to check the validator list once for `ReadyToRemove`"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
             "name": "_padding0",
             "docs": [
               "Future state and #[repr(C)] alignment"
@@ -2449,7 +2626,7 @@
             "type": {
               "array": [
                 "u8",
-                40006
+                40003
               ]
             }
           }

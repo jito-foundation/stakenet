@@ -469,14 +469,14 @@ impl StewardState {
             .position(|&i| i == index as u16);
 
         if let Some(yield_score_index) = yield_score_index {
-            for i in yield_score_index..self.num_pool_validators {
+            for i in yield_score_index..num_pool_validators {
                 let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
                 self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
             }
         }
 
         if let Some(score_index) = score_index {
-            for i in score_index..self.num_pool_validators {
+            for i in score_index..num_pool_validators {
                 let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
                 self.sorted_score_indices[i] = self.sorted_score_indices[next_i];
             }
@@ -496,16 +496,15 @@ impl StewardState {
         }
 
         // Clear values on empty last index
-        self.validator_lamport_balances[self.num_pool_validators] = 0;
-        self.scores[self.num_pool_validators] = 0;
-        self.yield_scores[self.num_pool_validators] = 0;
-        self.sorted_score_indices[self.num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[self.num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.delegations[self.num_pool_validators] = Delegation::default();
-        self.instant_unstake.set(self.num_pool_validators, false)?;
-        self.validators_to_remove
-            .set(self.num_pool_validators, false)?;
-        self.progress.set(self.num_pool_validators, false)?;
+        self.validator_lamport_balances[num_pool_validators] = 0;
+        self.scores[num_pool_validators] = 0;
+        self.yield_scores[num_pool_validators] = 0;
+        self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.delegations[num_pool_validators] = Delegation::default();
+        self.instant_unstake.set(num_pool_validators, false)?;
+        self.validators_to_remove.set(num_pool_validators, false)?;
+        self.progress.set(num_pool_validators, false)?;
 
         Ok(())
     }
@@ -568,8 +567,7 @@ impl StewardState {
                 // Updates num_pool_validators at the start of the cycle so validator additions later won't be considered
 
                 require!(
-                    num_pool_validators
-                        == self.num_pool_validators + self.validators_added as usize,
+                    num_pool_validators == self.num_pool_validators + self.validators_added as u64,
                     StewardError::ListStateMismatch
                 );
                 self.num_pool_validators = num_pool_validators;

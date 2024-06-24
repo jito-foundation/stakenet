@@ -132,7 +132,7 @@ fn _print_default_state(
         "Progress: {:?} / {} ({} remaining)\n",
         state.progress.count(),
         state.num_pool_validators,
-        state.num_pool_validators - state.progress.count()
+        state.num_pool_validators - state.progress.count() as u64
     );
     formatted_string += &format!(
         "Validator Lamport Balances Count: {}\n",
@@ -154,7 +154,7 @@ fn _print_default_state(
         "Progress: {:?} / {} ( {} left )\n",
         state.progress.count(),
         state.num_pool_validators,
-        state.num_pool_validators - state.progress.count()
+        state.num_pool_validators - state.progress.count() as u64
     );
     formatted_string += &format!(
         "Start Computing Scores Slot: {}\n",

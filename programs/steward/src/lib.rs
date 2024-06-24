@@ -94,9 +94,9 @@ pub mod steward {
     /// Housekeeping, run at the start of any new epoch before any other instructions
     pub fn epoch_maintenance(
         ctx: Context<EpochMaintenance>,
-        validator_index_to_remove: Option<usize>,
+        validator_index_to_remove: Option<u64>,
     ) -> Result<()> {
-        instructions::epoch_maintenance::handler(ctx, validator_index_to_remove)
+        instructions::epoch_maintenance::handler(ctx, validator_index_to_remove.map(|x| x as usize))
     }
 
     /// Computes score for a the validator at `validator_list_index` for the current cycle.

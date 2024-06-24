@@ -122,7 +122,7 @@ pub async fn command_remove_bad_validators(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::RemoveValidatorFromPool {
-                    validator_list_index: *validator_index,
+                    validator_list_index: *validator_index as u64,
                 }
                 .data(),
             }

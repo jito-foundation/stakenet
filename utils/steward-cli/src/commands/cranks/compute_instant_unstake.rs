@@ -46,7 +46,7 @@ pub async fn command_crank_compute_instant_unstake(
         }
     }
 
-    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators as usize)
         .filter_map(|validator_index| {
             let has_been_scored = steward_accounts
                 .state_account
@@ -84,7 +84,7 @@ pub async fn command_crank_compute_instant_unstake(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeInstantUnstake {
-                validator_list_index: *validator_index,
+                validator_list_index: *validator_index as u64,
             }
             .data(),
         })

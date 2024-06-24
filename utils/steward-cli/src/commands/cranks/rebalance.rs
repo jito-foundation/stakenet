@@ -47,7 +47,7 @@ pub async fn command_crank_rebalance(
         }
     }
 
-    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators as usize)
         .filter_map(|validator_index| {
             let has_been_rebalanced = steward_accounts
                 .state_account
@@ -114,7 +114,7 @@ pub async fn command_crank_rebalance(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {
-                    validator_list_index: *validator_index,
+                    validator_list_index: *validator_index as u64,
                 }
                 .data(),
             }

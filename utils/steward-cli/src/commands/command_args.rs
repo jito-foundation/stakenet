@@ -80,7 +80,7 @@ pub struct ConfigParameters {
 
     /// Scoring window such that the validators are all scored within a similar timeframe (in slots)
     #[arg(long, env)]
-    pub compute_score_slot_range: Option<usize>,
+    pub compute_score_slot_range: Option<u64>,
 
     /// Point in epoch progress before instant unstake can be computed
     #[arg(long, env)]
@@ -328,7 +328,7 @@ pub struct CrankEpochMaintenance {
 
     /// Validator index to remove, gotten from `validators_to_remove` Bitmask
     #[arg(long, env)]
-    pub validator_index_to_remove: Option<usize>,
+    pub validator_index_to_remove: Option<u64>,
 }
 
 #[derive(Parser)]

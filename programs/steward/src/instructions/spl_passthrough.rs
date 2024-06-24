@@ -165,7 +165,7 @@ pub struct RemoveValidatorFromPool<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
@@ -335,7 +335,7 @@ pub struct IncreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.validator_list)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -464,7 +464,7 @@ pub struct DecreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(mut, address = stake_pool.validator_list)]
+    #[account(mut, address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(

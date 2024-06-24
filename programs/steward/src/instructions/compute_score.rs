@@ -91,7 +91,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         validator_list_index,
         &cluster_history,
         &config,
-        num_pool_validators,
+        num_pool_validators as u64,
     )?;
 
     maybe_transition_and_emit(

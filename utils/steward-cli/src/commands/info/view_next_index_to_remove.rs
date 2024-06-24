@@ -27,7 +27,7 @@ fn _print_next_index_to_remove(steward_state_accounts: &UsefulStewardAccounts) {
     for i in 0..steward_state_accounts
         .state_account
         .state
-        .num_pool_validators
+        .num_pool_validators as usize
     {
         let value = steward_state_accounts
             .state_account
