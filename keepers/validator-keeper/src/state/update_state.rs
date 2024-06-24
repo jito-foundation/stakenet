@@ -9,6 +9,7 @@ use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAcc
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
+use steward_cli::utils::accounts::{get_all_steward_accounts, get_all_steward_validator_accounts};
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
 use crate::{
@@ -117,6 +118,25 @@ pub async fn post_create_update(
         keeper_state.epoch_info.epoch,
     )
     .await?;
+
+    //TODO change to config
+    let steward_program_id = jito_steward::id();
+    let steward_config = Pubkey::from_str("6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5")
+        .expect("Error parsing config pubkey");
+
+    keeper_state.all_steward_accounts = Some(
+        get_all_steward_accounts(&keeper_config.client, &steward_program_id, &steward_config)
+            .await?,
+    );
+
+    keeper_state.all_steward_validator_accounts = Some(
+        get_all_steward_validator_accounts(
+            &keeper_config.client,
+            keeper_state.all_steward_accounts.as_ref().unwrap(),
+            program_id,
+        )
+        .await?,
+    );
 
     Ok(())
 }

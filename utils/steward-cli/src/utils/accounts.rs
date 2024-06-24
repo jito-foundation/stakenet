@@ -1,18 +1,26 @@
+use std::{collections::HashMap, sync::Arc};
+
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
     utils::{StakePool, ValidatorList},
     Config, Staker, StewardStateAccount,
 };
+use keeper_core::get_multiple_accounts_batched;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{
+    account::Account,
+    borsh0_10::try_from_slice_unchecked,
+    pubkey::Pubkey,
+    stake::{self, state::StakeStateV2},
+};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address,
     find_withdraw_authority_program_address,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-pub struct UsefulStewardAccounts {
+pub struct AllStewardAccounts {
     pub config_account: Box<Config>,
     pub config_address: Pubkey,
     pub staker_account: Box<Staker>,
@@ -26,18 +34,80 @@ pub struct UsefulStewardAccounts {
     pub validator_list_address: Pubkey,
 }
 
+pub struct AllStewardValidatorAccounts {
+    pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
+    pub all_stake_account_map: HashMap<Pubkey, Option<Account>>,
+}
+
+pub async fn get_all_steward_validator_accounts(
+    client: &Arc<RpcClient>,
+    all_steward_accounts: &AllStewardAccounts,
+    validator_history_program_id: &Pubkey,
+) -> Result<Box<AllStewardValidatorAccounts>> {
+    let accounts_to_fetch = all_steward_accounts
+        .validator_list_account
+        .validators
+        .iter()
+        .map(|validator| {
+            let vote_account = validator.vote_account_address;
+            let stake_account =
+                get_stake_address(&vote_account, &all_steward_accounts.stake_pool_address);
+            let history_account =
+                get_validator_history_address(&vote_account, &validator_history_program_id);
+
+            (vote_account, stake_account, history_account)
+        });
+
+    let vote_accounts: Vec<Pubkey> = accounts_to_fetch
+        .clone()
+        .into_iter()
+        .map(|(vote_account, _, _)| vote_account)
+        .collect();
+
+    let stake_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
+        .clone()
+        .into_iter()
+        .map(|(_, stake_account, _)| stake_account)
+        .collect();
+
+    let history_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
+        .clone()
+        .into_iter()
+        .map(|(_, _, history_account)| history_account)
+        .collect();
+
+    let stake_accounts =
+        get_multiple_accounts_batched(stake_accounts_to_fetch.as_slice(), client).await?;
+
+    let history_accounts =
+        get_multiple_accounts_batched(history_accounts_to_fetch.as_slice(), client).await?;
+
+    Ok(Box::new(AllStewardValidatorAccounts {
+        all_history_vote_account_map: vote_accounts
+            .clone()
+            .into_iter()
+            .zip(history_accounts)
+            .collect::<HashMap<Pubkey, Option<Account>>>(),
+
+        all_stake_account_map: vote_accounts
+            .into_iter()
+            .zip(stake_accounts)
+            .collect::<HashMap<Pubkey, Option<Account>>>(),
+    }))
+}
+
 pub async fn get_all_steward_accounts(
-    client: &RpcClient,
+    client: &Arc<RpcClient>,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<Box<UsefulStewardAccounts>> {
+) -> Result<Box<AllStewardAccounts>> {
     let config_account = get_steward_config_account(client, steward_config).await?;
     let stake_pool_address = config_account.stake_pool;
 
     let stake_pool_account = get_stake_pool_account(client, &stake_pool_address).await?;
     let validator_list_address = stake_pool_account.validator_list;
 
-    Ok(Box::new(UsefulStewardAccounts {
+    Ok(Box::new(AllStewardAccounts {
         config_account,
         config_address: *steward_config,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
@@ -221,78 +291,98 @@ pub fn get_transient_stake_address(
     transient_stake_address
 }
 
+pub struct ProgressionInfo {
+    pub index: usize,
+    pub vote_account: Pubkey,
+    pub history_account: Pubkey,
+}
+
+pub fn get_unprogressed_validators(
+    all_steward_accounts: &AllStewardAccounts,
+    validator_history_program_id: &Pubkey,
+) -> Vec<ProgressionInfo> {
+    (0..all_steward_accounts.state_account.state.num_pool_validators)
+        .filter_map(|validator_index| {
+            let has_progressed = all_steward_accounts
+                .state_account
+                .state
+                .progress
+                .get(validator_index as usize)
+                .expect("Index is not in progress bitmask");
+            if has_progressed {
+                None
+            } else {
+                let vote_account = all_steward_accounts.validator_list_account.validators
+                    [validator_index as usize]
+                    .vote_account_address;
+                let history_account =
+                    get_validator_history_address(&vote_account, &validator_history_program_id);
+
+                Some(ProgressionInfo {
+                    index: validator_index as usize,
+                    vote_account,
+                    history_account,
+                })
+            }
+        })
+        .collect::<Vec<ProgressionInfo>>()
+}
+
 pub struct StakeAccountChecks {
     pub is_deactivated: bool,
     pub has_history: bool,
     pub deactivation_epoch: u64,
 }
 
-// pub async fn check_stake_accounts(
-//     client: &Arc<RpcClient>,
-//     stake_account_infos: &[StakeAccountInfo],
-//     epoch: u64,
-// ) -> Vec<StakeAccountChecks> {
-//     let stake_accounts_to_fetch = stake_account_infos.iter().map(|info| info.stake_account);
-//     let history_accounts_to_fetch = stake_account_infos
-//         .iter()
-//         .map(|info| info.validator_history);
+pub fn check_stake_accounts(
+    all_steward_accounts: &AllStewardAccounts,
+    all_validator_accounts: &AllStewardValidatorAccounts,
+    epoch: u64,
+) -> HashMap<Pubkey, StakeAccountChecks> {
+    let vote_accounts = all_steward_accounts
+        .validator_list_account
+        .validators
+        .iter()
+        .map(|validator| validator.vote_account_address);
 
-//     println!(
-//         "\nFetching {} stake accounts...\n",
-//         stake_accounts_to_fetch.len()
-//     );
+    let checks = vote_accounts
+        .clone()
+        .map(|vote_account| {
+            let stake_account = all_validator_accounts
+                .all_stake_account_map
+                .get(&vote_account)
+                .expect("Could not find stake account in map");
+            let history_account = all_validator_accounts
+                .all_history_vote_account_map
+                .get(&vote_account)
+                .expect("Could not find history account in map");
 
-//     let stake_accounts = get_multiple_accounts_batched(
-//         stake_accounts_to_fetch.collect::<Vec<_>>().as_slice(),
-//         &Arc::clone(client),
-//     )
-//     .await
-//     .expect("Could not fetch stake accounts");
+            let deactivation_epoch = stake_account
+                .as_ref()
+                .map(|stake_account| {
+                    // This code will only run if stake_account is Some
+                    let stake_state =
+                        try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice())
+                            .expect("Could not parse stake state");
+                    match stake_state {
+                        StakeStateV2::Stake(_, stake, _) => stake.delegation.deactivation_epoch,
+                        _ => 0,
+                    }
+                })
+                .unwrap_or(0);
 
-//     println!(
-//         "Fetching {} history accounts...",
-//         history_accounts_to_fetch.len()
-//     );
+            let has_history = history_account.is_some();
 
-//     let history_accounts = get_multiple_accounts_batched(
-//         history_accounts_to_fetch.collect::<Vec<_>>().as_slice(),
-//         &Arc::clone(client),
-//     )
-//     .await
-//     .expect("Could not fetch history accounts");
+            StakeAccountChecks {
+                is_deactivated: deactivation_epoch < epoch,
+                has_history,
+                deactivation_epoch,
+            }
+        })
+        .collect::<Vec<StakeAccountChecks>>();
 
-//     assert!(stake_accounts.len() == stake_account_infos.len());
-
-//     let mut stake_stats = Vec::new();
-
-//     for index in 0..stake_accounts.len() {
-//         let stake_account = &stake_accounts[index];
-//         let history_account = &history_accounts[index];
-
-//         let deactivation_epoch = stake_account
-//             .as_ref()
-//             .map(|stake_account| {
-//                 // This code will only run if stake_account is Some
-//                 let stake_state =
-//                     try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice())
-//                         .expect("Could not parse stake state");
-//                 match stake_state {
-//                     StakeStateV2::Stake(_, stake, _) => stake.delegation.deactivation_epoch,
-//                     _ => 0,
-//                 }
-//             })
-//             .unwrap_or(0);
-
-//         let has_history = history_account.is_some();
-
-//         let stats = StakeAccountChecks {
-//             is_deactivated: deactivation_epoch < epoch,
-//             has_history,
-//             deactivation_epoch,
-//         };
-
-//         stake_stats.push(stats);
-//     }
-
-//     stake_stats
-// }
+    vote_accounts
+        .into_iter()
+        .zip(checks)
+        .collect::<HashMap<Pubkey, StakeAccountChecks>>()
+}

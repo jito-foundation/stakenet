@@ -19,6 +19,10 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 
 use crate::commands::info::view_state::format_state;
+use crate::utils::accounts::{
+    check_stake_accounts, get_all_steward_validator_accounts, get_unprogressed_validators,
+    AllStewardValidatorAccounts,
+};
 use crate::utils::transactions::print_errors_if_any;
 use crate::{
     commands::command_args::CrankMonkey,
@@ -26,7 +30,7 @@ use crate::{
         accounts::{
             get_all_steward_accounts, get_cluster_history_address, get_stake_address,
             get_steward_state_account, get_transient_stake_address, get_validator_history_address,
-            UsefulStewardAccounts,
+            AllStewardAccounts,
         },
         transactions::{configure_instruction, package_instructions, submit_packaged_transactions},
     },
@@ -49,12 +53,14 @@ async fn _handle_delinquent_validators(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
     epoch: u64,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
+    all_validator_accounts: &AllStewardValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut stats = SubmitStats::default();
 
     // let stats = check_stake_accounts();
+    let checks = check_stake_accounts(all_steward_accounts, all_validator_accounts, epoch);
 
     Ok(stats)
 }
@@ -64,7 +70,7 @@ async fn _handle_epoch_maintenance(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
     epoch: u64,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut current_epoch = epoch;
@@ -150,49 +156,30 @@ async fn _handle_compute_score(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
     let cluster_history: Pubkey = get_cluster_history_address(&validator_history_program_id);
 
-    let validators_to_run = (0..all_steward_accounts.state_account.state.num_pool_validators)
-        .filter_map(|validator_index| {
-            let has_been_scored = all_steward_accounts
-                .state_account
-                .state
-                .progress
-                .get(validator_index as usize)
-                .expect("Index is not in progress bitmask");
-            if has_been_scored {
-                None
-            } else {
-                let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index as usize]
-                    .vote_account_address;
-                let history_account =
-                    get_validator_history_address(&vote_account, &validator_history_program_id);
-
-                Some((validator_index as usize, vote_account, history_account))
-            }
-        })
-        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+    let validators_to_run =
+        get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
     let ixs_to_run = validators_to_run
         .iter()
-        .map(|(validator_index, _, history_account)| Instruction {
+        .map(|validator_info| Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::ComputeScore {
                 config: all_steward_accounts.config_address,
                 state_account: all_steward_accounts.state_address,
-                validator_history: *history_account,
+                validator_history: validator_info.history_account,
                 validator_list: all_steward_accounts.validator_list_address,
                 cluster_history,
                 signer: payer.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeScore {
-                validator_list_index: *validator_index as u64,
+                validator_list_index: validator_info.index as u64,
             }
             .data(),
         })
@@ -212,7 +199,7 @@ async fn _handle_compute_delegations(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let ix = Instruction {
@@ -238,7 +225,7 @@ async fn _handle_idle(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let ix = Instruction {
@@ -264,49 +251,30 @@ async fn _handle_compute_instant_unstake(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
     let cluster_history: Pubkey = get_cluster_history_address(&validator_history_program_id);
 
-    let validators_to_run = (0..all_steward_accounts.state_account.state.num_pool_validators)
-        .filter_map(|validator_index| {
-            let has_been_scored = all_steward_accounts
-                .state_account
-                .state
-                .progress
-                .get(validator_index as usize)
-                .expect("Index is not in progress bitmask");
-            if has_been_scored {
-                None
-            } else {
-                let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index as usize]
-                    .vote_account_address;
-                let history_account =
-                    get_validator_history_address(&vote_account, &validator_history_program_id);
-
-                Some((validator_index as usize, vote_account, history_account))
-            }
-        })
-        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+    let validators_to_run =
+        get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
     let ixs_to_run = validators_to_run
         .iter()
-        .map(|(validator_index, _, history_account)| Instruction {
+        .map(|validator_info| Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::ComputeInstantUnstake {
                 config: all_steward_accounts.config_address,
                 state_account: all_steward_accounts.state_address,
-                validator_history: *history_account,
+                validator_history: validator_info.history_account,
                 validator_list: all_steward_accounts.validator_list_address,
                 cluster_history,
                 signer: payer.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeInstantUnstake {
-                validator_list_index: *validator_index as u64,
+                validator_list_index: validator_info.index as u64,
             }
             .data(),
         })
@@ -326,36 +294,21 @@ async fn _handle_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let validator_history_program_id = validator_history::id();
 
-    let validators_to_run = (0..all_steward_accounts.state_account.state.num_pool_validators)
-        .filter_map(|validator_index| {
-            let has_been_rebalanced = all_steward_accounts
-                .state_account
-                .state
-                .progress
-                .get(validator_index as usize)
-                .expect("Index is not in progress bitmask");
-            if has_been_rebalanced {
-                None
-            } else {
-                let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index as usize]
-                    .vote_account_address;
-                let history_account =
-                    get_validator_history_address(&vote_account, &validator_history_program_id);
-
-                Some((validator_index as usize, vote_account, history_account))
-            }
-        })
-        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+    let validators_to_run =
+        get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
     let ixs_to_run = validators_to_run
         .iter()
-        .map(|(validator_index, vote_account, history_account)| {
+        .map(|validator_info| {
+            let validator_index = validator_info.index;
+            let vote_account = &validator_info.vote_account;
+            let history_account = validator_info.history_account;
+
             let stake_address =
                 get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
@@ -363,7 +316,7 @@ async fn _handle_rebalance(
                 vote_account,
                 &all_steward_accounts.stake_pool_address,
                 &all_steward_accounts.validator_list_account,
-                *validator_index,
+                validator_index,
             );
 
             Instruction {
@@ -371,7 +324,7 @@ async fn _handle_rebalance(
                 accounts: jito_steward::accounts::Rebalance {
                     config: all_steward_accounts.config_address,
                     state_account: all_steward_accounts.state_address,
-                    validator_history: *history_account,
+                    validator_history: history_account,
                     stake_pool_program: spl_stake_pool::id(),
                     stake_pool: all_steward_accounts.stake_pool_address,
                     staker: all_steward_accounts.staker_address,
@@ -391,7 +344,7 @@ async fn _handle_rebalance(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {
-                    validator_list_index: *validator_index as u64,
+                    validator_list_index: validator_index as u64,
                 }
                 .data(),
             }
@@ -413,7 +366,8 @@ pub async fn crank_monkey(
     payer: &Arc<Keypair>,
     program_id: &Pubkey,
     epoch: u64,
-    all_steward_accounts: &UsefulStewardAccounts,
+    all_steward_accounts: &AllStewardAccounts,
+    all_validator_accounts: &AllStewardValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut return_stats = SubmitStats::default();
@@ -443,6 +397,7 @@ pub async fn crank_monkey(
             program_id,
             epoch,
             all_steward_accounts,
+            all_validator_accounts,
             priority_fee,
         )
         .await?;
@@ -630,6 +585,10 @@ pub async fn command_crank_monkey(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
+    let all_validator_accounts =
+        get_all_steward_validator_accounts(client, &all_steward_accounts, &validator_history::id())
+            .await?;
+
     let epoch = client.get_epoch_info().await?.epoch;
 
     let _ = crank_monkey(
@@ -638,6 +597,7 @@ pub async fn command_crank_monkey(
         &program_id,
         epoch,
         &all_steward_accounts,
+        &all_validator_accounts,
         priority_fee,
     )
     .await?;

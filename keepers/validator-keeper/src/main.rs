@@ -7,11 +7,9 @@ use clap::Parser;
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
-use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
-use std::{str::FromStr, sync::Arc, time::Duration};
-use steward_cli::{
-    commands::monkey::crank::crank_monkey, utils::accounts::get_all_steward_accounts,
-};
+use solana_sdk::signature::read_keypair_file;
+use std::{sync::Arc, time::Duration};
+use steward_cli::commands::monkey::crank::crank_monkey;
 use tokio::time::sleep;
 use validator_keeper::{
     operations::{
@@ -194,18 +192,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             info!("Monkeying around...");
 
             let steward_program_id = jito_steward::id();
-            let steward_config = Pubkey::from_str("6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5")
-                .expect("Error parsing config pubkey");
-
-            keeper_state.all_steward_accounts = Some(
-                get_all_steward_accounts(
-                    &keeper_config.client,
-                    &steward_program_id,
-                    &steward_config,
-                )
-                .await
-                .expect("Could not fetch steward accoutns"),
-            );
 
             let _ = crank_monkey(
                 &keeper_config.client,
@@ -213,6 +199,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 &steward_program_id,
                 keeper_state.epoch_info.epoch,
                 keeper_state.all_steward_accounts.as_ref().unwrap(),
+                keeper_state
+                    .all_steward_validator_accounts
+                    .as_ref()
+                    .unwrap(),
                 Some(300_000),
             )
             .await;
