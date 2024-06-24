@@ -220,3 +220,79 @@ pub fn get_transient_stake_address(
 
     transient_stake_address
 }
+
+pub struct StakeAccountChecks {
+    pub is_deactivated: bool,
+    pub has_history: bool,
+    pub deactivation_epoch: u64,
+}
+
+// pub async fn check_stake_accounts(
+//     client: &Arc<RpcClient>,
+//     stake_account_infos: &[StakeAccountInfo],
+//     epoch: u64,
+// ) -> Vec<StakeAccountChecks> {
+//     let stake_accounts_to_fetch = stake_account_infos.iter().map(|info| info.stake_account);
+//     let history_accounts_to_fetch = stake_account_infos
+//         .iter()
+//         .map(|info| info.validator_history);
+
+//     println!(
+//         "\nFetching {} stake accounts...\n",
+//         stake_accounts_to_fetch.len()
+//     );
+
+//     let stake_accounts = get_multiple_accounts_batched(
+//         stake_accounts_to_fetch.collect::<Vec<_>>().as_slice(),
+//         &Arc::clone(client),
+//     )
+//     .await
+//     .expect("Could not fetch stake accounts");
+
+//     println!(
+//         "Fetching {} history accounts...",
+//         history_accounts_to_fetch.len()
+//     );
+
+//     let history_accounts = get_multiple_accounts_batched(
+//         history_accounts_to_fetch.collect::<Vec<_>>().as_slice(),
+//         &Arc::clone(client),
+//     )
+//     .await
+//     .expect("Could not fetch history accounts");
+
+//     assert!(stake_accounts.len() == stake_account_infos.len());
+
+//     let mut stake_stats = Vec::new();
+
+//     for index in 0..stake_accounts.len() {
+//         let stake_account = &stake_accounts[index];
+//         let history_account = &history_accounts[index];
+
+//         let deactivation_epoch = stake_account
+//             .as_ref()
+//             .map(|stake_account| {
+//                 // This code will only run if stake_account is Some
+//                 let stake_state =
+//                     try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice())
+//                         .expect("Could not parse stake state");
+//                 match stake_state {
+//                     StakeStateV2::Stake(_, stake, _) => stake.delegation.deactivation_epoch,
+//                     _ => 0,
+//                 }
+//             })
+//             .unwrap_or(0);
+
+//         let has_history = history_account.is_some();
+
+//         let stats = StakeAccountChecks {
+//             is_deactivated: deactivation_epoch < epoch,
+//             has_history,
+//             deactivation_epoch,
+//         };
+
+//         stake_stats.push(stats);
+//     }
+
+//     stake_stats
+// }

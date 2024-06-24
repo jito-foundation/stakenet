@@ -53,18 +53,18 @@ pub async fn command_crank_rebalance(
                 .state_account
                 .state
                 .progress
-                .get(validator_index)
+                .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
             if has_been_rebalanced {
                 None
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
-                    [validator_index]
+                    [validator_index as usize]
                     .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                Some((validator_index, vote_account, history_account))
+                Some((validator_index as usize, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -114,7 +114,7 @@ pub async fn command_crank_rebalance(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {
-                    validator_list_index: *validator_index,
+                    validator_list_index: *validator_index as u64,
                 }
                 .data(),
             }

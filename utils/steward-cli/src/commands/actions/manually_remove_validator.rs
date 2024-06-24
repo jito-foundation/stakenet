@@ -33,7 +33,8 @@ pub async fn command_manually_remove_validator(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let validator_to_remove = steward_accounts.validator_list_account.validators[index_to_remove];
+    let validator_to_remove =
+        steward_accounts.validator_list_account.validators[index_to_remove as usize];
     let vote_account = validator_to_remove.vote_account_address;
 
     let (stake_address, _) = find_stake_program_address(
@@ -47,7 +48,7 @@ pub async fn command_manually_remove_validator(
         &spl_stake_pool::id(),
         &vote_account,
         &steward_accounts.stake_pool_address,
-        steward_accounts.validator_list_account.validators[index_to_remove]
+        steward_accounts.validator_list_account.validators[index_to_remove as usize]
             .transient_seed_suffix
             .into(),
     );
@@ -71,7 +72,7 @@ pub async fn command_manually_remove_validator(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorFromPool {
-            validator_list_index: index_to_remove,
+            validator_list_index: index_to_remove as u64,
         }
         .data(),
     };

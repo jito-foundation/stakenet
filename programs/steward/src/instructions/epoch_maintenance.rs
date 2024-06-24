@@ -1,7 +1,8 @@
 use crate::{
     errors::StewardError,
     utils::{
-        check_validator_list_has_stake_status, get_stake_pool, get_validator_list_length, StakePool,
+        check_validator_list_has_stake_status, deserialize_stake_pool, get_stake_pool_address,
+        get_validator_list_length,
     },
     Config, StewardStateAccount,
 };
@@ -19,13 +20,15 @@ pub struct EpochMaintenance<'info> {
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
-    #[account(mut, address = stake_pool.validator_list)]
+    /// CHECK: Correct account guaranteed if address is correct
+    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
 
+    /// CHECK: Correct account guaranteed if address is correct
     #[account(
-        address = get_stake_pool(&config)?
+        address = get_stake_pool_address(&config)?
     )]
-    pub stake_pool: Account<'info, StakePool>,
+    pub stake_pool: AccountInfo<'info>,
 }
 
 /// Runs maintenance tasks at the start of each epoch, needs to be run multiple times
@@ -35,7 +38,7 @@ pub fn handler(
     ctx: Context<EpochMaintenance>,
     validator_index_to_remove: Option<usize>,
 ) -> Result<()> {
-    let stake_pool = &ctx.accounts.stake_pool;
+    let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     let clock = Clock::get()?;
@@ -65,7 +68,8 @@ pub fn handler(
 
         // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
         require!(
-            state_account.state.num_pool_validators + state_account.state.validators_added as usize
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
                 - validators_to_remove
                 == validators_in_list,
             StewardError::ListStateMismatch

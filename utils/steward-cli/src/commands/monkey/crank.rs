@@ -54,6 +54,8 @@ async fn _handle_delinquent_validators(
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut stats = SubmitStats::default();
 
+    // let stats = check_stake_accounts();
+
     Ok(stats)
 }
 
@@ -78,7 +80,7 @@ async fn _handle_epoch_maintenance(
     while state_epoch != current_epoch {
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
-            if validators_to_remove.get(i).map_err(|e| {
+            if validators_to_remove.get(i as usize).map_err(|e| {
                 MonkeyCrankError::Custom(format!(
                     "Error fetching bitmask index for removed validator: {}/{} - {}",
                     i, num_validators, e
@@ -160,18 +162,18 @@ async fn _handle_compute_score(
                 .state_account
                 .state
                 .progress
-                .get(validator_index)
+                .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
             if has_been_scored {
                 None
             } else {
                 let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index]
+                    [validator_index as usize]
                     .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                Some((validator_index, vote_account, history_account))
+                Some((validator_index as usize, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -190,7 +192,7 @@ async fn _handle_compute_score(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeScore {
-                validator_list_index: *validator_index,
+                validator_list_index: *validator_index as u64,
             }
             .data(),
         })
@@ -274,18 +276,18 @@ async fn _handle_compute_instant_unstake(
                 .state_account
                 .state
                 .progress
-                .get(validator_index)
+                .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
             if has_been_scored {
                 None
             } else {
                 let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index]
+                    [validator_index as usize]
                     .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                Some((validator_index, vote_account, history_account))
+                Some((validator_index as usize, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -304,7 +306,7 @@ async fn _handle_compute_instant_unstake(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeInstantUnstake {
-                validator_list_index: *validator_index,
+                validator_list_index: *validator_index as u64,
             }
             .data(),
         })
@@ -335,18 +337,18 @@ async fn _handle_rebalance(
                 .state_account
                 .state
                 .progress
-                .get(validator_index)
+                .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
             if has_been_rebalanced {
                 None
             } else {
                 let vote_account = all_steward_accounts.validator_list_account.validators
-                    [validator_index]
+                    [validator_index as usize]
                     .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                Some((validator_index, vote_account, history_account))
+                Some((validator_index as usize, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -389,7 +391,7 @@ async fn _handle_rebalance(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {
-                    validator_list_index: *validator_index,
+                    validator_list_index: *validator_index as u64,
                 }
                 .data(),
             }
@@ -432,6 +434,20 @@ pub async fn crank_monkey(
 
     {
         // --------- CHECK VALIDATORS TO REMOVE -----------
+        log_string += "Finding and Removing Bad Validators\n";
+        println!("Finding and Removing Bad Validators...");
+
+        let stats = _handle_delinquent_validators(
+            payer,
+            client,
+            program_id,
+            epoch,
+            all_steward_accounts,
+            priority_fee,
+        )
+        .await?;
+
+        return_stats.combine(&stats);
     }
 
     {

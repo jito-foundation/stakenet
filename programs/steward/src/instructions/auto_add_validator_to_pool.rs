@@ -2,7 +2,6 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::state::{Config, Staker, StewardStateAccount};
 use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
-use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;

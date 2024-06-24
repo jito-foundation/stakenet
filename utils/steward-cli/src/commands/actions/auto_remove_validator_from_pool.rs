@@ -39,8 +39,8 @@ pub async fn command_auto_remove_validator_from_pool(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let vote_account =
-        steward_accounts.validator_list_account.validators[validator_index].vote_account_address;
+    let vote_account = steward_accounts.validator_list_account.validators[validator_index as usize]
+        .vote_account_address;
     let history_account =
         get_validator_history_address(&vote_account, &validator_history_program_id);
 
@@ -55,7 +55,7 @@ pub async fn command_auto_remove_validator_from_pool(
         &spl_stake_pool::id(),
         &vote_account,
         &steward_accounts.stake_pool_address,
-        steward_accounts.validator_list_account.validators[validator_index]
+        steward_accounts.validator_list_account.validators[validator_index as usize]
             .transient_seed_suffix
             .into(),
     );
@@ -85,7 +85,7 @@ pub async fn command_auto_remove_validator_from_pool(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoRemoveValidatorFromPool {
-            validator_list_index: validator_index,
+            validator_list_index: validator_index as u64,
         }
         .data(),
     };
