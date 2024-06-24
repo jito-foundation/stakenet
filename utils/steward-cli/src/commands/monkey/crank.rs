@@ -7,6 +7,7 @@ use keeper_core::{
 };
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
+use solana_sdk::transaction::Transaction;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::Error;
@@ -18,6 +19,7 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 
 use crate::commands::info::view_state::format_state;
+use crate::utils::transactions::print_errors_if_any;
 use crate::{
     commands::command_args::CrankMonkey,
     utils::{
@@ -74,6 +76,8 @@ async fn _handle_epoch_maintenance(
             }
         }
 
+        println!("Validator Index to Remove: {:?}", validator_index_to_remove);
+
         let ix = Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::EpochMaintenance {
@@ -89,12 +93,40 @@ async fn _handle_epoch_maintenance(
             .data(),
         };
 
-        let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
+        let cu = match validator_index_to_remove {
+            Some(_) => Some(1_400_000),
+            None => None,
+        };
+        let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
 
+        // let blockhash = client
+        //     .get_latest_blockhash()
+        //     .await
+        //     .expect("Failed to get recent blockhash");
+        // let transaction = Transaction::new_signed_with_payer(
+        //     &configured_ix,
+        //     Some(&payer.pubkey()),
+        //     &[&payer],
+        //     blockhash,
+        // );
+
+        // let signature = client
+        //     .send_and_confirm_transaction_with_spinner(&transaction)
+        //     .await
+        //     .expect("Failed to send transaction");
+
+        // println!("Signature: {}", signature);
+
+        println!("Submitting Epoch Maintenance");
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
 
         stats.combine(&new_stats);
+        print_errors_if_any(&stats);
+
+        if stats.errors > 0 {
+            return Ok(stats);
+        }
 
         // NOTE: This is the only time an account is fetched
         // in any of these cranking functions
