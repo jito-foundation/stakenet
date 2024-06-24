@@ -50,6 +50,7 @@ async fn _handle_epoch_maintenance(
     all_steward_accounts: &UsefulStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
+    let mut current_epoch = epoch;
     let mut state_epoch = all_steward_accounts.state_account.state.current_epoch;
     let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators;
     let mut validators_to_remove = all_steward_accounts
@@ -59,7 +60,7 @@ async fn _handle_epoch_maintenance(
 
     let mut stats = SubmitStats::default();
 
-    while state_epoch != epoch {
+    while state_epoch != current_epoch {
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
             if validators_to_remove.get(i).map_err(|e| {
@@ -105,6 +106,12 @@ async fn _handle_epoch_maintenance(
         num_validators = updated_state_account.state.num_pool_validators;
         validators_to_remove = updated_state_account.state.validators_to_remove;
         state_epoch = updated_state_account.state.current_epoch;
+        current_epoch = client.get_epoch_info().await?.epoch;
+
+        println!(
+            "State Epoch: {} | Current Epoch: {}",
+            state_epoch, current_epoch
+        );
     }
 
     Ok(stats)
