@@ -44,6 +44,19 @@ pub enum MonkeyCrankError {
     Custom(String),
 }
 
+async fn _handle_delinquent_validators(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+    epoch: u64,
+    all_steward_accounts: &UsefulStewardAccounts,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, MonkeyCrankError> {
+    let mut stats = SubmitStats::default();
+
+    Ok(stats)
+}
+
 async fn _handle_epoch_maintenance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
@@ -98,24 +111,6 @@ async fn _handle_epoch_maintenance(
             None => None,
         };
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
-
-        // let blockhash = client
-        //     .get_latest_blockhash()
-        //     .await
-        //     .expect("Failed to get recent blockhash");
-        // let transaction = Transaction::new_signed_with_payer(
-        //     &configured_ix,
-        //     Some(&payer.pubkey()),
-        //     &[&payer],
-        //     blockhash,
-        // );
-
-        // let signature = client
-        //     .send_and_confirm_transaction_with_spinner(&transaction)
-        //     .await
-        //     .expect("Failed to send transaction");
-
-        // println!("Signature: {}", signature);
 
         println!("Submitting Epoch Maintenance");
         let new_stats =
@@ -422,7 +417,6 @@ pub async fn crank_monkey(
     let mut return_stats = SubmitStats::default();
     let should_run_epoch_maintenance =
         all_steward_accounts.state_account.state.current_epoch != epoch;
-    let should_crank_state = !should_run_epoch_maintenance;
 
     let mut log_string: String = "\n--------- NEW LOG ---------\n".to_string();
     log_string += &format_state(
@@ -433,100 +427,104 @@ pub async fn crank_monkey(
     log_string += "\n";
 
     {
+        // --------- CHECK VALIDATORS TO ADD -----------
+    }
+
+    {
+        // --------- CHECK VALIDATORS TO REMOVE -----------
+    }
+
+    {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
-        if should_run_epoch_maintenance {
-            log_string += "Cranking Epoch Maintenance\n";
-            println!("Cranking Epoch Maintenance...");
+        log_string += "Cranking Epoch Maintenance\n";
+        println!("Cranking Epoch Maintenance...");
 
-            let stats = _handle_epoch_maintenance(
-                payer,
-                client,
-                program_id,
-                epoch,
-                all_steward_accounts,
-                priority_fee,
-            )
-            .await?;
+        let stats = _handle_epoch_maintenance(
+            payer,
+            client,
+            program_id,
+            epoch,
+            all_steward_accounts,
+            priority_fee,
+        )
+        .await?;
 
-            return_stats.combine(&stats);
-        }
+        return_stats.combine(&stats);
     }
 
     {
         // --------- CHECK AND HANDLE STATE -----------
 
-        if should_crank_state {
-            let stats = match all_steward_accounts.state_account.state.state_tag {
-                StewardStateEnum::ComputeScores => {
-                    log_string += "Cranking Compute Score\n";
-                    println!("Cranking Compute Score...");
+        let stats = match all_steward_accounts.state_account.state.state_tag {
+            StewardStateEnum::ComputeScores => {
+                log_string += "Cranking Compute Score\n";
+                println!("Cranking Compute Score...");
 
-                    _handle_compute_score(
-                        payer,
-                        client,
-                        program_id,
-                        all_steward_accounts,
-                        priority_fee,
-                    )
-                    .await?
-                }
-                StewardStateEnum::ComputeDelegations => {
-                    log_string += "Cranking Compute Delegations\n";
-                    println!("Cranking Compute Delegations...");
+                _handle_compute_score(
+                    payer,
+                    client,
+                    program_id,
+                    all_steward_accounts,
+                    priority_fee,
+                )
+                .await?
+            }
+            StewardStateEnum::ComputeDelegations => {
+                log_string += "Cranking Compute Delegations\n";
+                println!("Cranking Compute Delegations...");
 
-                    _handle_compute_delegations(
-                        payer,
-                        client,
-                        program_id,
-                        all_steward_accounts,
-                        priority_fee,
-                    )
-                    .await?
-                }
-                StewardStateEnum::Idle => {
-                    log_string += "Cranking Idle\n";
-                    println!("Cranking Idle...");
+                _handle_compute_delegations(
+                    payer,
+                    client,
+                    program_id,
+                    all_steward_accounts,
+                    priority_fee,
+                )
+                .await?
+            }
+            StewardStateEnum::Idle => {
+                log_string += "Cranking Idle\n";
+                println!("Cranking Idle...");
 
-                    _handle_idle(
-                        payer,
-                        client,
-                        program_id,
-                        all_steward_accounts,
-                        priority_fee,
-                    )
-                    .await?
-                }
-                StewardStateEnum::ComputeInstantUnstake => {
-                    log_string += "Cranking Compute Instant Unstake\n";
-                    println!("Cranking Compute Instant Unstake...");
+                _handle_idle(
+                    payer,
+                    client,
+                    program_id,
+                    all_steward_accounts,
+                    priority_fee,
+                )
+                .await?
+            }
+            StewardStateEnum::ComputeInstantUnstake => {
+                log_string += "Cranking Compute Instant Unstake\n";
+                println!("Cranking Compute Instant Unstake...");
 
-                    _handle_compute_instant_unstake(
-                        payer,
-                        client,
-                        program_id,
-                        all_steward_accounts,
-                        priority_fee,
-                    )
-                    .await?
-                }
-                StewardStateEnum::Rebalance => {
-                    log_string += "Cranking Rebalance\n";
-                    println!("Cranking Rebalance...");
+                _handle_compute_instant_unstake(
+                    payer,
+                    client,
+                    program_id,
+                    all_steward_accounts,
+                    priority_fee,
+                )
+                .await?
+            }
+            StewardStateEnum::Rebalance => {
+                log_string += "Cranking Rebalance\n";
+                println!("Cranking Rebalance...");
 
-                    _handle_rebalance(
-                        payer,
-                        client,
-                        program_id,
-                        all_steward_accounts,
-                        priority_fee,
-                    )
-                    .await?
-                }
-            };
+                _handle_rebalance(
+                    payer,
+                    client,
+                    program_id,
+                    all_steward_accounts,
+                    priority_fee,
+                )
+                .await?
+            }
+        };
 
-            return_stats.combine(&stats);
-        }
+        return_stats.combine(&stats);
     }
 
     log_string += &format!(
@@ -576,6 +574,10 @@ pub async fn crank_monkey(
                 println!("Error writing to file: {:?}", e);
             }
         }
+    }
+
+    {
+        // --------- RECOVER FROM ERROR -----------
     }
 
     Ok(return_stats)
