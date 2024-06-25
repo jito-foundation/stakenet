@@ -394,9 +394,16 @@ pub async fn parallel_execute_transactions(
         let mut is_blockhash_not_found = false;
 
         for (idx, tx) in signed_txs.iter().enumerate() {
-            if results[idx].is_ok() {
-                continue;
+            match results[idx] {
+                Ok(_) => {
+                    continue; // Skip transactions that have already been confirmed
+                }
+                Err(SendTransactionError::RpcSimulateTransactionResult(_)) => {
+                    continue; // Skip transactions that errored on simulation
+                }
+                _ => {}
             }
+
             if idx % 50 == 0 {
                 // Need to avoid spamming the rpc or lots of transactions will get dropped
                 sleep(Duration::from_secs(3)).await;
@@ -405,10 +412,14 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
+                    debug!("Submitted transaction: {:?}", signature);
                     println!("Submitted transaction: {:?}", signature);
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => {
+                    debug!("Transaction error: {:?}", e);
+                    println!("Transaction error: {:?}", e);
+
                     match e.get_transaction_error() {
                         Some(TransactionError::BlockhashNotFound) => {
                             is_blockhash_not_found = true;
@@ -448,6 +459,7 @@ pub async fn parallel_execute_transactions(
                                                 results[idx] = Err(SendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
+                                                println!("\n\n\nPREFLIGHT ERROR - SKIP\n\n\n");
                                                 results[idx] = Err(SendTransactionError::RpcSimulateTransactionResult(e))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::NodeUnhealthy { num_slots_behind } => {
