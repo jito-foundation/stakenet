@@ -7,8 +7,7 @@ use keeper_core::{
 };
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
-use solana_sdk::transaction::Transaction;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io::Error;
 
@@ -23,7 +22,7 @@ use crate::utils::accounts::{
     check_stake_accounts, get_all_steward_validator_accounts, get_unprogressed_validators,
     AllStewardValidatorAccounts,
 };
-use crate::utils::transactions::print_errors_if_any;
+use crate::utils::transactions::{debug_send_single_transaction, print_errors_if_any};
 use crate::{
     commands::command_args::CrankMonkey,
     utils::{
@@ -57,10 +56,82 @@ async fn _handle_delinquent_validators(
     all_validator_accounts: &AllStewardValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    let mut stats = SubmitStats::default();
-
     // let stats = check_stake_accounts();
     let checks = check_stake_accounts(all_steward_accounts, all_validator_accounts, epoch);
+
+    let bad_vote_accounts = checks
+        .iter()
+        .filter_map(|(vote_account, check)| {
+            if !check.has_history || check.is_deactivated {
+                println!("Bad Vote Account: {:?}", vote_account);
+                Some(vote_account.clone())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<Pubkey>>();
+
+    let ixs_to_run = bad_vote_accounts
+        .iter()
+        .map(|vote_account| {
+            let validator_index = all_steward_accounts
+                .validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address == *vote_account)
+                .expect("Cannot find vote account in Validator List");
+
+            let history_account =
+                get_validator_history_address(vote_account, &validator_history::id());
+
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+            let transient_stake_address = get_transient_stake_address(
+                vote_account,
+                &all_steward_accounts.stake_pool_address,
+                &all_steward_accounts.validator_list_account,
+                validator_index,
+            );
+
+            Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::AutoRemoveValidator {
+                    config: all_steward_accounts.config_address,
+                    state_account: all_steward_accounts.state_address,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: all_steward_accounts.stake_pool_address,
+                    validator_history_account: history_account,
+                    staker: all_steward_accounts.staker_address,
+                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: all_steward_accounts.validator_list_address,
+                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    transient_stake_account: transient_stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::ID,
+                    signer: payer.pubkey(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::AutoRemoveValidatorFromPool {
+                    validator_list_index: validator_index as u64,
+                }
+                .data(),
+            }
+        })
+        .collect::<Vec<Instruction>>();
+
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
+
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
 }
@@ -280,6 +351,9 @@ async fn _handle_compute_instant_unstake(
         })
         .collect::<Vec<Instruction>>();
 
+    // let test_tx =
+    //     debug_send_single_transaction(client, payer, &[ixs_to_run[0].clone()], Some(true)).await?;
+
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
     println!("Submitting {} instructions", ixs_to_run.len());
@@ -373,6 +447,7 @@ pub async fn crank_monkey(
     let mut return_stats = SubmitStats::default();
     let should_run_epoch_maintenance =
         all_steward_accounts.state_account.state.current_epoch != epoch;
+    let should_crank_state = !should_run_epoch_maintenance;
 
     let mut log_string: String = "\n--------- NEW LOG ---------\n".to_string();
     log_string += &format_state(
@@ -408,94 +483,97 @@ pub async fn crank_monkey(
     {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
-        log_string += "Cranking Epoch Maintenance\n";
-        println!("Cranking Epoch Maintenance...");
+        if should_run_epoch_maintenance {
+            log_string += "Cranking Epoch Maintenance\n";
+            println!("Cranking Epoch Maintenance...");
 
-        let stats = _handle_epoch_maintenance(
-            payer,
-            client,
-            program_id,
-            epoch,
-            all_steward_accounts,
-            priority_fee,
-        )
-        .await?;
+            let stats = _handle_epoch_maintenance(
+                payer,
+                client,
+                program_id,
+                epoch,
+                all_steward_accounts,
+                priority_fee,
+            )
+            .await?;
 
-        return_stats.combine(&stats);
+            return_stats.combine(&stats);
+        }
     }
 
     {
         // --------- CHECK AND HANDLE STATE -----------
+        if should_crank_state {
+            let stats = match all_steward_accounts.state_account.state.state_tag {
+                StewardStateEnum::ComputeScores => {
+                    log_string += "Cranking Compute Score\n";
+                    println!("Cranking Compute Score...");
 
-        let stats = match all_steward_accounts.state_account.state.state_tag {
-            StewardStateEnum::ComputeScores => {
-                log_string += "Cranking Compute Score\n";
-                println!("Cranking Compute Score...");
+                    _handle_compute_score(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::ComputeDelegations => {
+                    log_string += "Cranking Compute Delegations\n";
+                    println!("Cranking Compute Delegations...");
 
-                _handle_compute_score(
-                    payer,
-                    client,
-                    program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await?
-            }
-            StewardStateEnum::ComputeDelegations => {
-                log_string += "Cranking Compute Delegations\n";
-                println!("Cranking Compute Delegations...");
+                    _handle_compute_delegations(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::Idle => {
+                    log_string += "Cranking Idle\n";
+                    println!("Cranking Idle...");
 
-                _handle_compute_delegations(
-                    payer,
-                    client,
-                    program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await?
-            }
-            StewardStateEnum::Idle => {
-                log_string += "Cranking Idle\n";
-                println!("Cranking Idle...");
+                    _handle_idle(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::ComputeInstantUnstake => {
+                    log_string += "Cranking Compute Instant Unstake\n";
+                    println!("Cranking Compute Instant Unstake...");
 
-                _handle_idle(
-                    payer,
-                    client,
-                    program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await?
-            }
-            StewardStateEnum::ComputeInstantUnstake => {
-                log_string += "Cranking Compute Instant Unstake\n";
-                println!("Cranking Compute Instant Unstake...");
+                    _handle_compute_instant_unstake(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+                StewardStateEnum::Rebalance => {
+                    log_string += "Cranking Rebalance\n";
+                    println!("Cranking Rebalance...");
 
-                _handle_compute_instant_unstake(
-                    payer,
-                    client,
-                    program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await?
-            }
-            StewardStateEnum::Rebalance => {
-                log_string += "Cranking Rebalance\n";
-                println!("Cranking Rebalance...");
+                    _handle_rebalance(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
+                }
+            };
 
-                _handle_rebalance(
-                    payer,
-                    client,
-                    program_id,
-                    all_steward_accounts,
-                    priority_fee,
-                )
-                .await?
-            }
-        };
-
-        return_stats.combine(&stats);
+            return_stats.combine(&stats);
+        }
     }
 
     log_string += &format!(
