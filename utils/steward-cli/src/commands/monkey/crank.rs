@@ -63,7 +63,6 @@ async fn _handle_delinquent_validators(
         .iter()
         .filter_map(|(vote_account, check)| {
             if !check.has_history || check.is_deactivated {
-                println!("Bad Vote Account: {:?}", vote_account);
                 Some(vote_account.clone())
             } else {
                 None
@@ -73,7 +72,7 @@ async fn _handle_delinquent_validators(
 
     let ixs_to_run = bad_vote_accounts
         .iter()
-        .map(|vote_account| {
+        .filter_map(|vote_account| {
             let validator_index = all_steward_accounts
                 .validator_list_account
                 .validators
@@ -94,7 +93,17 @@ async fn _handle_delinquent_validators(
                 validator_index,
             );
 
-            Instruction {
+            if all_steward_accounts
+                .state_account
+                .state
+                .validators_to_remove
+                .get(validator_index)
+                .expect("Could not find validator index in validators_to_remove")
+            {
+                return None;
+            }
+
+            Some(Instruction {
                 program_id: *program_id,
                 accounts: jito_steward::accounts::AutoRemoveValidator {
                     config: all_steward_accounts.config_address,
@@ -122,7 +131,7 @@ async fn _handle_delinquent_validators(
                     validator_list_index: validator_index as u64,
                 }
                 .data(),
-            }
+            })
         })
         .collect::<Vec<Instruction>>();
 

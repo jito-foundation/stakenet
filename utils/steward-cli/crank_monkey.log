@@ -4275,3 +4275,39 @@ Successes: 233
 Errors: 0
 
 
+
+--------- NEW LOG ---------
+------- State -------
+📚 Accounts 📚
+Config:      6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
+State:       6SJrBTYSSu3jWmsPWWhMMHvrPxqKWXtLe9tRfYpU8EZa
+
+↺ State ↺
+State Tag: Idle
+Progress: 1737 / 1737 (0 remaining)
+Validator Lamport Balances Count: 5000
+Scores Count: 5000
+Sorted Score Indices Count: 5000
+Yield Scores Count: 5000
+Sorted Yield Score Indices Count: 5000
+Delegations Count: 5000
+Instant Unstake: 1268
+Progress: 1737 / 1737 ( 0 left )
+Start Computing Scores Slot: 273044232
+Current Epoch: 634
+Next Cycle Epoch: 635
+Number of Pool Validators: 1737
+Scoring Unstake Total: 19796525487
+Instant Unstake Total: 2478174861
+Stake Deposit Unstake Total: 12028661
+Compute Delegations Completed: U8Bool { value: 1 }
+Rebalance Completed: U8Bool { value: 1 }
+Padding0 Length: 40003
+---------------------
+Finding and Removing Bad Validators
+Cranking Idle
+
+Successes: 1
+Errors: 0
+
+
