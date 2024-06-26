@@ -58,17 +58,12 @@ pub mod steward {
 
     // Initializes Config and Staker accounts. Must be called before any other instruction
     // Requires Pool to be initialized
-    pub fn initialize_config(
-        ctx: Context<InitializeConfig>,
+    pub fn initialize_steward(
+        ctx: Context<InitializeSteward>,
         authority: Pubkey,
         update_parameters_args: UpdateParametersArgs,
     ) -> Result<()> {
-        instructions::initialize_config::handler(ctx, authority, &update_parameters_args)
-    }
-
-    /// Creates state account
-    pub const fn initialize_state(ctx: Context<InitializeState>) -> Result<()> {
-        instructions::initialize_state::handler(ctx)
+        instructions::initialize_steward::handler(ctx, authority, &update_parameters_args)
     }
 
     /// Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE
@@ -133,8 +128,11 @@ pub mod steward {
 
     // If `new_authority` is not a pubkey you own, you cannot regain the authority, but you can
     // use the stake pool manager to set a new staker
-    pub fn set_new_authority(ctx: Context<SetNewAuthority>) -> Result<()> {
-        instructions::set_new_authority::handler(ctx)
+    pub fn set_new_authority(
+        ctx: Context<SetNewAuthority>,
+        authority_type: AuthorityType,
+    ) -> Result<()> {
+        instructions::set_new_authority::handler(ctx, authority_type)
     }
 
     pub fn pause_steward(ctx: Context<PauseSteward>) -> Result<()> {
@@ -148,17 +146,17 @@ pub mod steward {
     /// Adds the validator at `index` to the blacklist. It will be instant unstaked and never receive delegations
     pub fn add_validator_to_blacklist(
         ctx: Context<AddValidatorToBlacklist>,
-        index: u32,
+        validator_history_blacklist: u32,
     ) -> Result<()> {
-        instructions::add_validator_to_blacklist::handler(ctx, index)
+        instructions::add_validator_to_blacklist::handler(ctx, validator_history_blacklist)
     }
 
     /// Removes the validator at `index` from the blacklist
     pub fn remove_validator_from_blacklist(
         ctx: Context<RemoveValidatorFromBlacklist>,
-        index: u32,
+        validator_history_blacklist: u32,
     ) -> Result<()> {
-        instructions::remove_validator_from_blacklist::handler(ctx, index)
+        instructions::remove_validator_from_blacklist::handler(ctx, validator_history_blacklist)
     }
 
     /// For parameters that are present in args, the instruction checks that they are within sensible bounds and saves them to config struct

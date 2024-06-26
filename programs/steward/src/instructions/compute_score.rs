@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_validator_list_length, get_validator_stake_info_at_index},
+    utils::{get_validator_list, get_validator_list_length, get_validator_stake_info_at_index},
     Config, StewardStateAccount, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -22,7 +22,7 @@ pub struct ComputeScore<'info> {
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
     /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
-    #[account(owner = spl_stake_pool::id())]
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     #[account(
@@ -31,9 +31,6 @@ pub struct ComputeScore<'info> {
         bump
     )]
     pub cluster_history: AccountLoader<'info, ClusterHistory>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Result<()> {

@@ -621,7 +621,7 @@ impl StewardState {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            let score = validator_score(validator, index, cluster, config, current_epoch as u16)?;
+            let score = validator_score(validator, cluster, config, current_epoch as u16)?;
             emit!(score);
 
             self.scores[index] = (score.score * 1_000_000_000.) as u32;
@@ -755,7 +755,6 @@ impl StewardState {
 
             let instant_unstake_result = instant_unstake_validator(
                 validator,
-                index,
                 cluster,
                 config,
                 first_slot,
@@ -816,13 +815,16 @@ impl StewardState {
                 .checked_add(stake_rent)
                 .ok_or(StewardError::ArithmeticError)?;
 
-            // Maximum increase amount is the total lamports in the reserve stake account minus 2 * stake_rent, which accounts for reserve rent + transient rent
-            // Saturating_sub because reserve stake may be less than 2 * stake_rent, but needs more than 2 * stake_rent to be able to delegate
-            let reserve_lamports = reserve_lamports.saturating_sub(
-                stake_rent
-                    .checked_mul(2)
-                    .ok_or(StewardError::ArithmeticError)?,
-            );
+            // Maximum increase amount is the total lamports in the reserve stake account minus (num_validators + 1) * stake_rent, which covers rent for all validators plus the transient rent
+            let accounts_needed_reserve_for_rent = validator_list
+                .len()
+                .checked_add(1)
+                .ok_or(StewardError::ArithmeticError)?;
+            let reserve_minimum = stake_rent
+                .checked_mul(accounts_needed_reserve_for_rent as u64)
+                .ok_or(StewardError::ArithmeticError)?;
+            // Saturating_sub because reserve stake may be less than the reserve_minimum but needs more than the reserve_minimum to be able to delegate
+            let reserve_lamports = reserve_lamports.saturating_sub(reserve_minimum);
 
             // Represents the amount of lamports that can be delegated to validators beyond the fixed costs of rent and minimum_delegation
             let stake_pool_lamports = stake_pool_lamports

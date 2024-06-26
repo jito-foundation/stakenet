@@ -6,9 +6,9 @@
 
 use crate::constants::MAX_VALIDATORS;
 use crate::errors::StewardError;
-use crate::state::{Config, Staker};
+use crate::state::Config;
 use crate::utils::{
-    deserialize_stake_pool, get_config_authority, get_stake_pool_address,
+    deserialize_stake_pool, get_config_admin, get_stake_pool_address,
     get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
@@ -41,11 +41,7 @@ pub struct AddValidatorToPool<'info> {
     )]
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
@@ -72,8 +68,8 @@ pub struct AddValidatorToPool<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn add_validator_to_pool_handler(
@@ -104,7 +100,7 @@ pub fn add_validator_to_pool_handler(
         &spl_stake_pool::instruction::add_validator_to_pool(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.reserve_stake.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
@@ -114,7 +110,7 @@ pub fn add_validator_to_pool_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.reserve_stake.to_owned(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
@@ -128,9 +124,9 @@ pub fn add_validator_to_pool_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -157,11 +153,7 @@ pub struct RemoveValidatorFromPool<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -178,8 +170,8 @@ pub struct RemoveValidatorFromPool<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn remove_validator_from_pool_handler(
@@ -221,7 +213,7 @@ pub fn remove_validator_from_pool_handler(
         &spl_stake_pool::instruction::remove_validator_from_pool(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.stake_account.key(),
@@ -229,7 +221,7 @@ pub fn remove_validator_from_pool_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
             ctx.accounts.stake_account.to_account_info(),
@@ -238,9 +230,9 @@ pub fn remove_validator_from_pool_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -249,6 +241,12 @@ pub fn remove_validator_from_pool_handler(
 #[derive(Accounts)]
 pub struct SetPreferredValidator<'info> {
     pub config: AccountLoader<'info, Config>,
+    #[account(
+        mut,
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub steward_state: AccountLoader<'info, StewardStateAccount>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -260,16 +258,12 @@ pub struct SetPreferredValidator<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn set_preferred_validator_handler(
@@ -281,20 +275,20 @@ pub fn set_preferred_validator_handler(
         &spl_stake_pool::instruction::set_preferred_validator(
             ctx.accounts.stake_pool_program.key,
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.validator_list.key(),
             validator_type.clone(),
             validator,
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.validator_list.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -327,11 +321,7 @@ pub struct IncreaseValidatorStake<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -364,10 +354,9 @@ pub struct IncreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
-
 pub fn increase_validator_stake_handler(
     ctx: Context<IncreaseValidatorStake>,
     lamports: u64,
@@ -394,7 +383,7 @@ pub fn increase_validator_stake_handler(
         &spl_stake_pool::instruction::increase_validator_stake(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.reserve_stake.key(),
@@ -406,7 +395,7 @@ pub fn increase_validator_stake_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
             ctx.accounts.reserve_stake.to_account_info(),
@@ -421,9 +410,9 @@ pub fn increase_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -456,11 +445,7 @@ pub struct DecreaseValidatorStake<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -490,8 +475,8 @@ pub struct DecreaseValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn decrease_validator_stake_handler(
@@ -520,7 +505,7 @@ pub fn decrease_validator_stake_handler(
         &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.reserve_stake.key(),
@@ -531,7 +516,7 @@ pub fn decrease_validator_stake_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
             ctx.accounts.reserve_stake.to_account_info(),
@@ -544,9 +529,9 @@ pub fn decrease_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -578,11 +563,7 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -614,8 +595,8 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn increase_additional_validator_stake_handler(
@@ -645,7 +626,7 @@ pub fn increase_additional_validator_stake_handler(
         &spl_stake_pool::instruction::increase_additional_validator_stake(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.reserve_stake.key(),
@@ -659,7 +640,7 @@ pub fn increase_additional_validator_stake_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
             ctx.accounts.reserve_stake.to_account_info(),
@@ -674,9 +655,9 @@ pub fn increase_additional_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -713,11 +694,7 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub withdraw_authority: AccountInfo<'info>,
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -743,8 +720,8 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 pub fn decrease_additional_validator_stake_handler(
@@ -774,7 +751,7 @@ pub fn decrease_additional_validator_stake_handler(
         &spl_stake_pool::instruction::decrease_additional_validator_stake(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.reserve_stake.key(),
@@ -787,7 +764,7 @@ pub fn decrease_additional_validator_stake_handler(
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
             ctx.accounts.reserve_stake.to_account_info(),
@@ -800,9 +777,9 @@ pub fn decrease_additional_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())
@@ -811,6 +788,12 @@ pub fn decrease_additional_validator_stake_handler(
 #[derive(Accounts)]
 pub struct SetStaker<'info> {
     pub config: AccountLoader<'info, Config>,
+    #[account(
+        mut,
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub steward_state: AccountLoader<'info, StewardStateAccount>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -821,15 +804,11 @@ pub struct SetStaker<'info> {
         mut, address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
+
     /// CHECK: passing through, checks are done by spl-stake-pool
     pub new_staker: AccountInfo<'info>,
-    #[account(mut, address = get_config_authority(&config)?)]
-    pub signer: Signer<'info>,
+    #[account(mut, address = get_config_admin(&config)?)]
+    pub admin: Signer<'info>,
 }
 
 /// Note this function can only be called once by the Steward, as it will lose it's authority
@@ -840,18 +819,18 @@ pub fn set_staker_handler(ctx: Context<SetStaker>) -> Result<()> {
         &spl_stake_pool::instruction::set_staker(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.new_staker.key(),
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.new_staker.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
     Ok(())

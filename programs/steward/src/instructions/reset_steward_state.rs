@@ -2,7 +2,7 @@ use crate::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
-    utils::{deserialize_stake_pool, get_config_authority, get_stake_pool_address},
+    utils::{deserialize_stake_pool, get_config_admin, get_stake_pool_address},
     BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
 };
 use anchor_lang::prelude::*;
@@ -27,7 +27,7 @@ pub struct ResetStewardState<'info> {
     #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
     pub validator_list: AccountInfo<'info>,
 
-    #[account(mut, address = get_config_authority(&config)?)]
+    #[account(mut, address = get_config_admin(&config)?)]
     pub authority: Signer<'info>,
 }
 

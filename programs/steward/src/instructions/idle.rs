@@ -14,9 +14,6 @@ pub struct Idle<'info> {
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 /*

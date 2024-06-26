@@ -1,7 +1,6 @@
 use crate::{
     state::{Config, StewardStateAccount},
-    utils::get_config_authority,
-    Staker,
+    utils::get_config_admin,
 };
 use anchor_lang::prelude::*;
 
@@ -12,20 +11,12 @@ pub struct CloseStewardAccounts<'info> {
     #[account(
         mut,
         close = authority,
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump,
-    )]
-    staker: Account<'info, Staker>,
-
-    #[account(
-        mut,
-        close = authority,
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
-    #[account(mut, address = get_config_authority(&config)?)]
+    #[account(mut, address = get_config_admin(&config)?)]
     pub authority: Signer<'info>,
 }
 

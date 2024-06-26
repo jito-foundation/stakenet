@@ -1,6 +1,6 @@
 use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
-use crate::state::{Config, Staker, StewardStateAccount};
+use crate::state::{Config, StewardStateAccount};
 use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
@@ -39,12 +39,6 @@ pub struct AutoAddValidator<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut, address = deserialize_stake_pool(&stake_pool)?.reserve_stake)]
@@ -98,9 +92,6 @@ pub struct AutoAddValidator<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 /*
@@ -160,7 +151,7 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         &spl_stake_pool::instruction::add_validator_to_pool(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.stake_account.key(),
             &ctx.accounts.reserve_stake.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
@@ -170,7 +161,7 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.stake_account.to_account_info(),
             ctx.accounts.reserve_stake.to_owned(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
@@ -184,9 +175,9 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.steward_state],
         ]],
     )?;
 
