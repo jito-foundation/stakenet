@@ -58,21 +58,25 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         return Err(StewardError::StateMachinePaused.into());
     }
 
-    state_account.state.compute_instant_unstake(
+    if let Some(instant_unstake) = state_account.state.compute_instant_unstake(
         &clock,
         &epoch_schedule,
         &validator_history,
         validator_list_index,
         &cluster,
         &config,
-    )?;
+    )? {
+        emit!(instant_unstake);
+    }
 
-    maybe_transition_and_emit(
+    if let Some(event) = maybe_transition_and_emit(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }
