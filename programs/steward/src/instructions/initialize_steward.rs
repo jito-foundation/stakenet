@@ -9,14 +9,14 @@ use crate::{
 pub struct InitializeSteward<'info> {
     #[account(
         init,
-        payer = admin,
+        payer = current_staker,
         space = Config::SIZE,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         init,
-        payer = admin,
+        payer = current_staker,
         space = MAX_ALLOC_BYTES,
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
@@ -38,9 +38,6 @@ pub struct InitializeSteward<'info> {
         address = deserialize_stake_pool(&stake_pool)?.staker
     )]
     pub current_staker: Signer<'info>,
-
-    #[account(mut)]
-    pub admin: Signer<'info>,
 }
 
 pub fn handler(
@@ -55,8 +52,8 @@ pub fn handler(
     config.stake_pool = ctx.accounts.stake_pool.key();
     config.validator_list = stake_pool_account.validator_list;
 
-    // Set all authorities to the admin
-    let admin = ctx.accounts.admin.key();
+    // Set all authorities to the current_staker
+    let admin = ctx.accounts.current_staker.key();
     config.admin = admin;
     config.blacklist_authority = admin;
     config.parameters_authority = admin;
