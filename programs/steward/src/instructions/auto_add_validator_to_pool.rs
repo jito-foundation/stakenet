@@ -147,11 +147,14 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
 
     state_account.state.increment_validator_to_add()?;
 
+    // Have to drop the state account before calling the CPI
+    drop(state_account);
+
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.stake_account.key(),
+            &ctx.accounts.steward_state.key(),
             &ctx.accounts.reserve_stake.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
@@ -161,7 +164,7 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.stake_account.to_account_info(),
+            ctx.accounts.steward_state.to_account_info(),
             ctx.accounts.reserve_stake.to_owned(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),

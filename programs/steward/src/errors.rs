@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum StewardError {
+    #[msg("Invalid set authority type: 0: SetAdmin, 1: SetBlacklistAuthority, 2: SetParametersAuthority")]
+    InvalidAuthorityType,
     #[msg("Scoring must be completed before any other steps can be taken")]
     ScoringNotComplete,
     #[msg("Validator does not exist at the ValidatorList index provided")]

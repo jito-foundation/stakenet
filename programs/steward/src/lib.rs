@@ -60,10 +60,9 @@ pub mod steward {
     // Requires Pool to be initialized
     pub fn initialize_steward(
         ctx: Context<InitializeSteward>,
-        authority: Pubkey,
         update_parameters_args: UpdateParametersArgs,
     ) -> Result<()> {
-        instructions::initialize_steward::handler(ctx, authority, &update_parameters_args)
+        instructions::initialize_steward::handler(ctx, &update_parameters_args)
     }
 
     /// Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE

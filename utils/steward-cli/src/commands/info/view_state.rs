@@ -82,10 +82,6 @@ fn _print_verbose_state(steward_state_accounts: &UsefulStewardAccounts) {
         );
         formatted_string += &format!("Index: {:?}\n", index);
         formatted_string += &format!(
-            "Is Blacklisted: {:?}\n",
-            steward_state_accounts.config_account.blacklist.get(index)
-        );
-        formatted_string += &format!(
             "Is Instant Unstake: {:?}\n",
             steward_state_accounts
                 .state_account

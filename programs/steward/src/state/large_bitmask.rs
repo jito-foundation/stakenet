@@ -1,11 +1,19 @@
+/*
+    This file is largely copied over from bitmask.rs
+    This is because making a generic bitmask struct either didn't play well with
+    zero-copy, or it added too much overhead to a struct meant for performance.
+*/
+
 use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::{constants::MAX_VALIDATORS, errors::StewardError};
+use crate::errors::StewardError;
 
-const LARGE_BITMASK_INDEXES: usize = MAX_VALIDATORS * 4;
+//We are allocating at this size to handle future growth of ValidatorHistory accounts, at 2800 in June 2024
+const LARGE_BITMASK_INDEXES: usize = 20_000;
+
 #[allow(clippy::integer_division)]
-const LARGE_BITMASK: usize = (LARGE_BITMASK_INDEXES + 64 - 1) / 64; // ceil(MAX_VALIDATORS / 64)
+const LARGE_BITMASK: usize = (LARGE_BITMASK_INDEXES + 64 - 1) / 64; // ceil(LARGE_BITMASK_INDEXES / 64)
 
 /// Data structure used to efficiently pack a binary array, primarily used to store all validators.
 /// Each validator has an index (its index in the spl_stake_pool::ValidatorList), corresponding to a bit in the bitmask.

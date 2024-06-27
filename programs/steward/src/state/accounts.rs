@@ -19,21 +19,19 @@ pub struct Config {
     pub validator_list: Pubkey,
 
     /// Admin
-    /// To be controlled by a committee of stakeholders
     /// - Update the `parameters_authority`
     /// - Update the `blacklist_authority`
     /// - Can call SPL Passthrough functions
     /// - Can pause/reset the state machine
     pub admin: Pubkey,
 
-    /// Parameters Committee
-    /// To be controlled by a committee of stakeholders
+    /// Parameters Authority
     /// - Can update steward parameters
     pub parameters_authority: Pubkey,
 
-    /// Blacklist Committee
-    /// To be controlled by a committee of stakeholders
-    /// - Can update the blacklist
+    /// Blacklist Authority
+    /// - Can add to the blacklist
+    /// - Can remove from the blacklist
     pub blacklist_authority: Pubkey,
 
     /// Bitmask representing index of validators that are not allowed delegation
@@ -76,4 +74,11 @@ impl StewardStateAccount {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"steward_state";
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
+}
+
+pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[StewardStateAccount::SEED, steward_config.as_ref()],
+        &crate::id(),
+    )
 }

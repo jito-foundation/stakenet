@@ -183,6 +183,9 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         )?
     };
 
+    // Have to drop the state account before calling the CPI
+    drop(state_account);
+
     match result {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
@@ -260,12 +263,17 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         RebalanceType::None => {}
     }
 
-    maybe_transition_and_emit(
-        &mut state_account.state,
-        &clock,
-        &config.parameters,
-        &epoch_schedule,
-    )?;
+    {
+        // We had to drop the state account before calling the CPI
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+        maybe_transition_and_emit(
+            &mut state_account.state,
+            &clock,
+            &config.parameters,
+            &epoch_schedule,
+        )?;
+    }
 
     Ok(())
 }

@@ -151,7 +151,7 @@ fn test_compute_scores() {
 
     // Test blacklist validator
     config
-        .blacklist
+        .validator_history_blacklist
         .set(validators[0].index as usize, true)
         .unwrap();
     let res = state.compute_score(
@@ -446,7 +446,7 @@ fn test_compute_instant_unstake_success() {
     state.progress.reset();
     state.instant_unstake.reset();
     config
-        .blacklist
+        .validator_history_blacklist
         .set(validators[0].index as usize, true)
         .unwrap();
 

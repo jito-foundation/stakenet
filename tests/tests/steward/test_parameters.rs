@@ -174,8 +174,8 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
 async fn test_update_parameters() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     _set_parameter(
         &fixture,

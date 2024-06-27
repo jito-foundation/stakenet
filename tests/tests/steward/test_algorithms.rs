@@ -36,7 +36,6 @@ fn test_compute_score() {
     // Regular run
     let components = validator_score(
         &good_validator,
-        good_validator.index as usize,
         &cluster_history,
         &config,
         current_epoch as u16,
@@ -64,14 +63,8 @@ fn test_compute_score() {
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().mev_commission = 1001;
 
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -92,14 +85,8 @@ fn test_compute_score() {
 
     let mut validator = good_validator;
     validator.history.arr[11].mev_commission = 1001;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -119,14 +106,8 @@ fn test_compute_score() {
     );
     let mut validator = good_validator;
     validator.history.arr[9].mev_commission = 1001;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -148,17 +129,11 @@ fn test_compute_score() {
     // blacklist
     let validator = good_validator;
     config
-        .blacklist
+        .validator_history_blacklist
         .set(validator.index as usize, true)
         .unwrap();
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -176,19 +151,13 @@ fn test_compute_score() {
             epoch: current_epoch as u16
         }
     );
-    config.blacklist.reset();
+    config.validator_history_blacklist.reset();
 
     // superminority score
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().is_superminority = 1;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -212,14 +181,8 @@ fn test_compute_score() {
     for i in 0..19 {
         validator.history.arr_mut()[i].is_superminority = 1;
     }
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -244,14 +207,8 @@ fn test_compute_score() {
         validator.history.arr_mut()[i].mev_commission =
             ValidatorHistoryEntry::default().mev_commission;
     }
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -273,14 +230,8 @@ fn test_compute_score() {
     // commission
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().commission = 11;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -310,14 +261,8 @@ fn test_compute_score() {
     // commission above regular threshold, below historical threshold, outside of regular threshold window
     validator.history.arr[0].commission = 14;
 
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -337,14 +282,8 @@ fn test_compute_score() {
     );
 
     validator.history.arr[0].commission = 16;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -371,14 +310,8 @@ fn test_compute_score() {
         validator.history.arr_mut()[i].epoch_credits = 880;
         cluster_history.history.arr_mut()[i].total_blocks = 1000;
     }
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -400,14 +333,8 @@ fn test_compute_score() {
     // delinquency
     let mut validator = good_validator;
     validator.history.arr[10].epoch_credits = 0;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -434,14 +361,8 @@ fn test_compute_score() {
     cluster_history.history.arr[10].total_blocks = ClusterHistoryEntry::default().total_blocks;
     cluster_history.history.arr[11].total_blocks = ClusterHistoryEntry::default().total_blocks;
 
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -466,14 +387,8 @@ fn test_compute_score() {
     assert_eq!(current_epoch, 20);
     validator.history.arr[current_epoch as usize].epoch_credits = 0;
     cluster_history.history.arr[current_epoch as usize].total_blocks = 0;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
         ScoreComponents {
@@ -505,27 +420,15 @@ fn test_compute_score() {
     validator.history.arr[current_epoch as usize - 2].is_superminority =
         ValidatorHistoryEntry::default().is_superminority;
     validator.history.arr[current_epoch as usize - 3].is_superminority = 1;
-    let components = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    )
-    .unwrap();
+    let components =
+        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert!(components.superminority_score == 0.0);
 
     // Test error: superminority should exist if epoch credits exist
     let mut validator = good_validator;
     validator.history.arr[current_epoch as usize].is_superminority =
         ValidatorHistoryEntry::default().is_superminority;
-    let res = validator_score(
-        &validator,
-        validator.index as usize,
-        &cluster_history,
-        &config,
-        current_epoch as u16,
-    );
+    let res = validator_score(&validator, &cluster_history, &config, current_epoch as u16);
     assert!(res == Err(StewardError::StakeHistoryNotRecentEnough.into()));
 }
 
@@ -557,7 +460,6 @@ fn test_instant_unstake() {
 
     let res = instant_unstake_validator(
         &good_validator,
-        good_validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
@@ -580,17 +482,17 @@ fn test_instant_unstake() {
 
     // Is blacklisted
     config
-        .blacklist
+        .validator_history_blacklist
         .set(good_validator.index as usize, true)
         .unwrap();
     let res = instant_unstake_validator(
         &good_validator,
-        good_validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
         current_epoch,
     );
+
     assert!(res.is_ok());
     assert!(
         res.unwrap()
@@ -604,17 +506,17 @@ fn test_instant_unstake() {
                 epoch: current_epoch
             }
     );
-    config.blacklist.reset();
+    config.validator_history_blacklist.reset();
 
     // Delinquency threshold + Commission
     let res = instant_unstake_validator(
         &bad_validator,
-        bad_validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
         current_epoch,
     );
+
     assert!(res.is_ok());
     assert!(
         res.unwrap()
@@ -635,12 +537,13 @@ fn test_instant_unstake() {
         ClusterHistoryEntry::default().total_blocks;
     let res = instant_unstake_validator(
         &bad_validator,
-        bad_validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
         current_epoch,
     );
+    println!("NEED Error: {:?}", res);
+
     assert!(res == Err(StewardError::ClusterHistoryNotRecentEnough.into()));
 
     let cluster_history = default_fixture.cluster_history;
@@ -650,12 +553,12 @@ fn test_instant_unstake() {
 
     let res = instant_unstake_validator(
         &validator,
-        validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
         current_epoch,
     );
+
     assert!(res == Err(StewardError::VoteHistoryNotRecentEnough.into()));
 
     let mut validator = validators[0];
@@ -667,12 +570,13 @@ fn test_instant_unstake() {
         ValidatorHistoryEntry::default().vote_account_last_update_slot;
     let res = instant_unstake_validator(
         &validator,
-        validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
         current_epoch,
     );
+    println!("NEED Error 3: {:?}", res);
+
     assert!(res == Err(StewardError::VoteHistoryNotRecentEnough.into()));
 
     // Not sure how commission would be unset with epoch credits set but test anyway
@@ -680,7 +584,6 @@ fn test_instant_unstake() {
     validator.history.last_mut().unwrap().commission = ValidatorHistoryEntry::default().commission;
     let res = instant_unstake_validator(
         &validator,
-        validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
@@ -705,7 +608,6 @@ fn test_instant_unstake() {
         ValidatorHistoryEntry::default().mev_commission;
     let res = instant_unstake_validator(
         &validator,
-        validator.index as usize,
         &cluster_history,
         &config,
         start_slot,
@@ -730,7 +632,6 @@ fn test_instant_unstake() {
     cluster_history.history.last_mut().unwrap().total_blocks = 0;
     let res = instant_unstake_validator(
         &good_validator,
-        good_validator.index as usize,
         &cluster_history,
         &config,
         start_slot,

@@ -44,7 +44,7 @@ pub struct ReallocState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
-    /// CHECK: TODO add validator_list address to config
+    /// CHECK: We check against the Config
     #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 

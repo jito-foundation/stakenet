@@ -9,14 +9,14 @@ use crate::{
 pub struct InitializeSteward<'info> {
     #[account(
         init,
-        payer = signer,
+        payer = admin,
         space = Config::SIZE,
     )]
     pub config: AccountLoader<'info, Config>,
 
     #[account(
         init,
-        payer = signer,
+        payer = admin,
         space = MAX_ALLOC_BYTES,
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
@@ -37,12 +37,14 @@ pub struct InitializeSteward<'info> {
         mut,
         address = deserialize_stake_pool(&stake_pool)?.staker
     )]
-    pub signer: Signer<'info>,
+    pub current_staker: Signer<'info>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
 }
 
 pub fn handler(
     ctx: Context<InitializeSteward>,
-    admin: Pubkey,
     update_parameters_args: &UpdateParametersArgs,
 ) -> Result<()> {
     // Confirm that the stake pool is valid
@@ -54,6 +56,7 @@ pub fn handler(
     config.validator_list = stake_pool_account.validator_list;
 
     // Set all authorities to the admin
+    let admin = ctx.accounts.admin.key();
     config.admin = admin;
     config.blacklist_authority = admin;
     config.parameters_authority = admin;
@@ -75,12 +78,12 @@ pub fn handler(
         &spl_stake_pool::instruction::set_staker(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.signer.key(),
+            &ctx.accounts.current_staker.key(),
             &ctx.accounts.state_account.key(),
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.signer.to_account_info(),
+            ctx.accounts.current_staker.to_account_info(),
             ctx.accounts.state_account.to_account_info(),
         ],
     )?;

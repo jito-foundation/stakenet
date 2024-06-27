@@ -816,12 +816,17 @@ impl StewardState {
                 .ok_or(StewardError::ArithmeticError)?;
 
             // Maximum increase amount is the total lamports in the reserve stake account minus (num_validators + 1) * stake_rent, which covers rent for all validators plus the transient rent
-            let accounts_needed_reserve_for_rent = validator_list
+            let all_accounts_needed_reserve_for_rent = validator_list
                 .len()
                 .checked_add(1)
                 .ok_or(StewardError::ArithmeticError)?;
+
+            let accounts_left_needed_reserve_for_rent = all_accounts_needed_reserve_for_rent
+                .checked_sub(self.progress.count() as u32)
+                .ok_or(StewardError::ArithmeticError)?;
+
             let reserve_minimum = stake_rent
-                .checked_mul(accounts_needed_reserve_for_rent as u64)
+                .checked_mul(accounts_left_needed_reserve_for_rent as u64)
                 .ok_or(StewardError::ArithmeticError)?;
             // Saturating_sub because reserve stake may be less than the reserve_minimum but needs more than the reserve_minimum to be able to delegate
             let reserve_lamports = reserve_lamports.saturating_sub(reserve_minimum);
