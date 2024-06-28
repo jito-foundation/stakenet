@@ -65,7 +65,6 @@ pub async fn command_init_config(
             stake_pool_program: spl_stake_pool::id(),
             system_program: anchor_lang::solana_program::system_program::id(),
             current_staker: staker_keypair.pubkey(),
-            admin: authority.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InitializeSteward {

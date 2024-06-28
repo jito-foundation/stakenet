@@ -282,7 +282,6 @@ impl TestFixture {
                 stake_pool_program: spl_stake_pool::id(),
                 system_program: anchor_lang::solana_program::system_program::id(),
                 current_staker: self.keypair.pubkey(),
-                admin: self.keypair.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::InitializeSteward {
