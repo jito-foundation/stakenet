@@ -317,8 +317,8 @@ $`
 \displaylines{
 \text{superminority\_score} = 
 \begin{cases} 
-1.0 & \text{if not in superminority in current epoch} \\
-0.0 & \text{otherwise}
+0.0 & \text{if in superminority in current epoch} \\
+1.0 & \text{otherwise}
 \end{cases} \\
 }
 `$
