@@ -103,6 +103,11 @@ cargo run manually-copy-vote-account --steward-config 6auT7Q91SSgAoYLAnu449DK1MK
 cargo run manually-remove-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --authority-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 0
 ```
 
+## Close Steward
+```bash
+cargo run close-steward --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --authority-keypair-path ../../credentials/stakenet_test.json
+```
+
 ## Remove Bad Validators
 ```bash
 cargo run remove-bad-validators --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json

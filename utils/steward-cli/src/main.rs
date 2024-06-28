@@ -4,6 +4,7 @@ use commands::{
     actions::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
+        close_steward::command_close_steward,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
         manually_remove_validator::command_manually_remove_validator,
         remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
@@ -51,6 +52,7 @@ async fn main() -> Result<()> {
         }
 
         // --- Actions ---
+        Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
         Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
         Commands::ManuallyCopyVoteAccount(args) => {

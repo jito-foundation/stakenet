@@ -198,6 +198,7 @@ pub enum Commands {
     InitState(InitState),
     ResetState(ResetState),
 
+    CloseSteward(CloseSteward),
     RemoveBadValidators(RemoveBadValidators),
     ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
     ManuallyRemoveValidator(ManuallyRemoveValidator),
@@ -288,6 +289,15 @@ pub struct InitState {
 #[derive(Parser)]
 #[command(about = "Reset steward state")]
 pub struct ResetState {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Closes the steward accounts and returns the staker to the authority calling this function"
+)]
+pub struct CloseSteward {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 }
