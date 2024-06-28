@@ -1434,6 +1434,19 @@
       ]
     },
     {
+      "name": "RebalanceEvent",
+      "discriminator": [
+        120,
+        27,
+        117,
+        235,
+        104,
+        42,
+        132,
+        75
+      ]
+    },
+    {
       "name": "ScoreComponents",
       "discriminator": [
         218,
@@ -2260,6 +2273,59 @@
           },
           {
             "name": "Withdraw"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebalanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "rebalance_type_tag",
+            "type": {
+              "defined": {
+                "name": "RebalanceTypeTag"
+              }
+            }
+          },
+          {
+            "name": "increase_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "decrease_components",
+            "type": {
+              "defined": {
+                "name": "DecreaseComponents"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebalanceTypeTag",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Increase"
+          },
+          {
+            "name": "Decrease"
           }
         ]
       }
