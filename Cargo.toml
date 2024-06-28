@@ -2,8 +2,8 @@
 members = [
   "keepers/*",
   "programs/*",
-  "utils/*",
   "tests",
+  "utils/*",
 ]
 
 [profile.release]
