@@ -38,12 +38,14 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
         .state
         .compute_delegations(clock.epoch, &config)?;
 
-    maybe_transition_and_emit(
+    if let Some(event) = maybe_transition_and_emit(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }

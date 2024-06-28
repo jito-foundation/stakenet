@@ -81,7 +81,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         StewardError::InvalidState
     );
 
-    state_account.state.compute_score(
+    if let Some(score) = state_account.state.compute_score(
         &clock,
         &epoch_schedule,
         &validator_history,
@@ -89,14 +89,18 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         &cluster_history,
         &config,
         num_pool_validators as u64,
-    )?;
+    )? {
+        emit!(score);
+    }
 
-    maybe_transition_and_emit(
+    if let Some(event) = maybe_transition_and_emit(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }

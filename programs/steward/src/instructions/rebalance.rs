@@ -1,6 +1,8 @@
 use std::num::NonZeroU32;
 
 use anchor_lang::{
+    idl::types::*,
+    idl::*,
     prelude::*,
     solana_program::{
         program::invoke_signed,
@@ -8,6 +10,7 @@ use anchor_lang::{
         system_program, sysvar, vote,
     },
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
@@ -17,7 +20,7 @@ use validator_history::ValidatorHistory;
 
 use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
-    delegation::RebalanceType,
+    delegation::{DecreaseComponents, RebalanceType},
     errors::StewardError,
     maybe_transition_and_emit,
     utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
@@ -183,10 +186,9 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         )?
     };
 
-    // Have to drop the state account before calling the CPI
     drop(state_account);
 
-    match result {
+    match result.clone() {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
@@ -264,16 +266,97 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     }
 
     {
-        // We had to drop the state account before calling the CPI
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 
-        maybe_transition_and_emit(
+        emit!(rebalance_to_event(
+            ctx.accounts.vote_account.key(),
+            clock.epoch as u16,
+            result
+        ));
+
+        if let Some(event) = maybe_transition_and_emit(
             &mut state_account.state,
             &clock,
             &config.parameters,
             &epoch_schedule,
-        )?;
+        )? {
+            emit!(event);
+        }
     }
 
     Ok(())
+}
+
+#[event]
+pub struct RebalanceEvent {
+    pub vote_account: Pubkey,
+    pub epoch: u16,
+    pub rebalance_type_tag: RebalanceTypeTag,
+    pub increase_lamports: u64,
+    pub decrease_components: DecreaseComponents,
+}
+
+fn rebalance_to_event(
+    vote_account: Pubkey,
+    epoch: u16,
+    rebalance_type: RebalanceType,
+) -> RebalanceEvent {
+    match rebalance_type {
+        RebalanceType::None => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::None,
+            increase_lamports: 0,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Increase(lamports) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Increase,
+            increase_lamports: lamports,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Decrease(decrease_components) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Decrease,
+            increase_lamports: 0,
+            decrease_components,
+        },
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum RebalanceTypeTag {
+    None,
+    Increase,
+    Decrease,
+}
+
+impl IdlBuild for RebalanceTypeTag {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "RebalanceTypeTag".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "None".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Increase".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Decrease".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
 }
