@@ -263,7 +263,7 @@ $`
 \displaylines{
 \text{delinquency\_score} = 
 \begin{cases} 
-1.0 & \text{if } \left( \frac{\text{vote\_credits}_t}{\text{total_blocks}_t} \right) > \text{scoring\_delinquency\_threshold\_ratio} \text{ for all } t_1 \leq t \leq t_2 \\
+1.0 & \text{if } \left( \frac{\text{vote\_credits}_t}{\text{total\_blocks}_t} \right) > \text{scoring\_delinquency\_threshold\_ratio} \text{ for all } t_1 \leq t \leq t_2 \\
 0.0 & \text{otherwise}
 \end{cases} \\
 \text{where } t_1 = \text{current\_epoch} - \text{epoch\_credits\_range} \\
@@ -327,7 +327,7 @@ $`
 
 $`
 \displaylines{
-\text{vote\_credits\_ratio} = \frac{\sum_{t=t_1}^{t_2} \text{vote\_credits}_t}{\sum_{t=t_1}^{t_2} \text{total_blocks}_t} \\
+\text{vote\_credits\_ratio} = \frac{\sum_{t=t_1}^{t_2} \text{vote\_credits}_t}{\sum_{t=t_1}^{t_2} \text{total\_blocks}_t} \\
 \text{where } t_1 = \text{current\_epoch} - \text{epoch\_credits\_range} \\
 \text{and } t_2 = \text{current\_epoch} - 1
 }
