@@ -56,7 +56,6 @@ async fn _handle_delinquent_validators(
     all_validator_accounts: &AllStewardValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    // let stats = check_stake_accounts();
     let checks = check_stake_accounts(all_steward_accounts, all_validator_accounts, epoch);
 
     let bad_vote_accounts = checks
@@ -103,6 +102,9 @@ async fn _handle_delinquent_validators(
                 return None;
             }
 
+            //TODO Fix
+            return None;
+
             Some(Instruction {
                 program_id: *program_id,
                 accounts: jito_steward::accounts::AutoRemoveValidator {
@@ -139,6 +141,7 @@ async fn _handle_delinquent_validators(
     println!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
 }

@@ -23,9 +23,12 @@ pub async fn command_view_state(
 
     let (steward_state_account, steward_state_address) =
         get_steward_state_account_and_address(client, &program_id, &steward_config).await?;
+
     let steward_config_account = get_steward_config_account(client, &steward_config).await?;
+
     let stake_pool_account =
         get_stake_pool_account(client, &steward_config_account.stake_pool).await?;
+
     let validator_list_account =
         get_validator_list_account(client, &stake_pool_account.validator_list).await?;
 

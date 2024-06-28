@@ -4311,3 +4311,111 @@ Successes: 1
 Errors: 0
 
 
+
+--------- NEW LOG ---------
+------- State -------
+📚 Accounts 📚
+Config:      AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+State:       Hmctj1WrZnBx3cmJ8njeid6zKMGT8XHp8C6UkojSF72C
+
+↺ State ↺
+State Tag: ComputeScores
+Progress: 0 / 1737 (1737 remaining)
+Validator Lamport Balances Count: 5000
+Scores Count: 5000
+Sorted Score Indices Count: 5000
+Yield Scores Count: 5000
+Sorted Yield Score Indices Count: 5000
+Delegations Count: 5000
+Instant Unstake: 0
+Progress: 0 / 1737 ( 1737 left )
+Start Computing Scores Slot: 274552008
+Current Epoch: 635
+Next Cycle Epoch: 638
+Number of Pool Validators: 1737
+Scoring Unstake Total: 0
+Instant Unstake Total: 0
+Stake Deposit Unstake Total: 0
+Compute Delegations Completed: U8Bool { value: 0 }
+Rebalance Completed: U8Bool { value: 0 }
+Padding0 Length: 40003
+---------------------
+Finding and Removing Bad Validators
+Cranking Compute Score
+
+Successes: 174
+Errors: 0
+
+
+
+--------- NEW LOG ---------
+------- State -------
+📚 Accounts 📚
+Config:      AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+State:       Hmctj1WrZnBx3cmJ8njeid6zKMGT8XHp8C6UkojSF72C
+
+↺ State ↺
+State Tag: ComputeDelegations
+Progress: 0 / 1737 (1737 remaining)
+Validator Lamport Balances Count: 5000
+Scores Count: 5000
+Sorted Score Indices Count: 5000
+Yield Scores Count: 5000
+Sorted Yield Score Indices Count: 5000
+Delegations Count: 5000
+Instant Unstake: 0
+Progress: 0 / 1737 ( 1737 left )
+Start Computing Scores Slot: 274560040
+Current Epoch: 635
+Next Cycle Epoch: 638
+Number of Pool Validators: 1737
+Scoring Unstake Total: 0
+Instant Unstake Total: 0
+Stake Deposit Unstake Total: 0
+Compute Delegations Completed: U8Bool { value: 0 }
+Rebalance Completed: U8Bool { value: 0 }
+Padding0 Length: 40003
+---------------------
+Finding and Removing Bad Validators
+Cranking Compute Delegations
+
+Successes: 1
+Errors: 0
+
+
+
+--------- NEW LOG ---------
+------- State -------
+📚 Accounts 📚
+Config:      AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+State:       Hmctj1WrZnBx3cmJ8njeid6zKMGT8XHp8C6UkojSF72C
+
+↺ State ↺
+State Tag: Idle
+Progress: 0 / 1737 (1737 remaining)
+Validator Lamport Balances Count: 5000
+Scores Count: 5000
+Sorted Score Indices Count: 5000
+Yield Scores Count: 5000
+Sorted Yield Score Indices Count: 5000
+Delegations Count: 5000
+Instant Unstake: 0
+Progress: 0 / 1737 ( 1737 left )
+Start Computing Scores Slot: 274560040
+Current Epoch: 635
+Next Cycle Epoch: 638
+Number of Pool Validators: 1737
+Scoring Unstake Total: 0
+Instant Unstake Total: 0
+Stake Deposit Unstake Total: 0
+Compute Delegations Completed: U8Bool { value: 1 }
+Rebalance Completed: U8Bool { value: 0 }
+Padding0 Length: 40003
+---------------------
+Finding and Removing Bad Validators
+Cranking Idle
+
+Successes: 1
+Errors: 0
+
+
