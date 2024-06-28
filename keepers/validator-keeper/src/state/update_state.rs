@@ -121,7 +121,7 @@ pub async fn post_create_update(
 
     //TODO change to config
     let steward_program_id = jito_steward::id();
-    let steward_config = Pubkey::from_str("6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5")
+    let steward_config = Pubkey::from_str("AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq")
         .expect("Error parsing config pubkey");
 
     keeper_state.all_steward_accounts = Some(
