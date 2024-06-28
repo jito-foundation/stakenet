@@ -73,6 +73,12 @@ let score = mev_commission_score
     * yield_score
 ```
 
+As a validator, in order to receive a high score for JitoSOL, you must meet these binary eligibility criteria, and return a high rate of rewards to your stakers. The eligibility criteria ensure that we're delegating to validators that meet some important properties for decentralization, Solana network health, operator quality, and MEV sharing. The yield score is an objective way to compare validators' relative yield and ensure we're returning a competitive APY to JitoSOL holders, which in turn attracts more stake to delegate to validators.
+
+In this version 0 of the score formula, there is no weighting of any factor above any other, because it is a product of all factors. But because all factors besides `yield_score` will only be `1.0` or `0.0`, yield is the main factor for determining validator ranking assuming all eligibility criteria is met. Even if one of the eligibility factors is not met, or the score is not high enough to be selected for the pool delegation, it is still advantageous to have a high `yield_score` as it is used for ranking which validators to unstake first.
+
+For a breakdown of the formulas used for each score, see the Appendix.
+
 Take a look at the implementation in [score.rs](./src/score.rs#L14)
 
 ### Compute Delegations
@@ -189,35 +195,162 @@ Administrators can:
 
 ## Parameters
 
-
-| Parameter                                     | Value         | Description                                                                                                                                                                                             |
-| --------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Scoring Parameters**                        |               |                                                                                                                                                                                                         |
-| `mev_commission_range`                        | 10            | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                                                                                   |
-| `epoch_credits_range`                         | 30            | Number of recent epochs used to evaluate yield                                                                                                                                                          |
-| `commission_range`                            | 30            | Number of recent epochs used to evaluate commissions for scoring                                                                                                                                        |
-| `mev_commission_bps_threshold`                | 1000          | Maximum allowable MEV commission in mev_commission_range (stored in basis points)                                                                                                                       |
-| `commission_threshold`                        | 5             | Maximum allowable validator commission in commission_range (stored in percent)                                                                                                                          |
-| `historical_commission_threshold`             | 50            | Maximum allowable validator commission in all history (stored in percent)                                                                                                                               |
-| `scoring_delinquency_threshold_ratio`         | 0.85          | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
-|                                               |               |                                                                                                                                                                                                         |
-| **Delegation Parameters**                     |               |                                                                                                                                                                                                         |
-| `instant_unstake_delinquency_threshold_ratio` | 0.70          | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
-| `num_delegation_validators`                   | 200           | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
-| `scoring_unstake_cap_bps`                     | 750           | Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)                                                                                                         |
-| `instant_unstake_cap_bps`                     | 1000          | Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)                                                                                                          |
-| `stake_deposit_unstake_cap_bps`               | 1000          | Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)                                                                                       |
-|                                               |               |                                                                                                                                                                                                         |
-| **State Machine Operation Parameters**        |               |                                                                                                                                                                                                         |
-| `compute_score_slot_range`                    | 1000          | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                                                                            |
-| `instant_unstake_epoch_progress`              | 0.90          | Point in epoch progress before instant unstake can be computed                                                                                                                                          |
-| `instant_unstake_inputs_epoch_progress`       | 0.50          | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                                                                                |
-| `num_epochs_between_scoring`                  | 10            | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                                                                                      |
+| Parameter                                     | Value                        | Description                                                                                                                                                                                             |
+| --------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scoring Parameters**                        |                              |                                                                                                                                                                                                         |
+| `mev_commission_range`                        | 10                           | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                                                                                   |
+| `epoch_credits_range`                         | 30                           | Number of recent epochs used to evaluate yield                                                                                                                                                          |
+| `commission_range`                            | 30                           | Number of recent epochs used to evaluate commissions for scoring                                                                                                                                        |
+| `mev_commission_bps_threshold`                | 1000                         | Maximum allowable MEV commission in mev_commission_range (stored in basis points)                                                                                                                       |
+| `commission_threshold`                        | 5                            | Maximum allowable validator commission in commission_range (stored in percent)                                                                                                                          |
+| `historical_commission_threshold`             | 50                           | Maximum allowable validator commission in all history (stored in percent)                                                                                                                               |
+| `scoring_delinquency_threshold_ratio`         | 0.85                         | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
+|                                               |                              |                                                                                                                                                                                                         |
+| **Delegation Parameters**                     |                              |                                                                                                                                                                                                         |
+| `instant_unstake_delinquency_threshold_ratio` | 0.70                         | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
+| `num_delegation_validators`                   | 200                          | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
+| `scoring_unstake_cap_bps`                     | 750                          | Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)                                                                                                         |
+| `instant_unstake_cap_bps`                     | 1000                         | Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)                                                                                                          |
+| `stake_deposit_unstake_cap_bps`               | 1000                         | Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)                                                                                       |
+|                                               |                              |                                                                                                                                                                                                         |
+| **State Machine Operation Parameters**        |                              |                                                                                                                                                                                                         |
+| `compute_score_slot_range`                    | 1000                         | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                                                                            |
+| `instant_unstake_epoch_progress`              | 0.90                         | Point in epoch progress before instant unstake can be computed                                                                                                                                          |
+| `instant_unstake_inputs_epoch_progress`       | 0.50                         | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                                                                                |
+| `num_epochs_between_scoring`                  | 10                           | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                                                                                      |
 | `minimum_stake_lamports`                      | 5,000,000,000,000 (5000 SOL) | Minimum number of stake lamports for a validator to be considered for the pool                                                                                                                          |
-| `minimum_voting_epochs`                       | 5             | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                                                                                   |                                                                                      |
+| `minimum_voting_epochs`                       | 5                            | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                                                                                   |
 
 ## Code and Tests
 
 - **Code Repository**: [Steward Program Code](https://github.com/jito-foundation/stakenet/tree/steward)
 - **Program**: [Steward Program](https://github.com/jito-foundation/stakenet/tree/steward/programs/steward)
 - **Tests**: [Steward Program Tests](https://github.com/jito-foundation/stakenet/tree/steward/tests/tests/steward)
+
+## Appendix
+
+### Score Formulas
+
+$`
+\displaylines{
+\text{mev\_commission\_score} = 
+\begin{cases} 
+1.0 & \text{if } \max(\text{mev\_commission}_{t_1, t_2}) \leq \text{mev\_commission\_bps\_threshold} \\
+0.0 & \text{otherwise}
+\end{cases} \\
+\text{where } t_1 = \text{current\_epoch} - \text{mev\_commission\_range} \\
+\text{and } t_2 = \text{current\_epoch}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{running\_jito\_score} = 
+\begin{cases} 
+1.0 & \text{if any MEV commission exists in } t_1 \text{ to } t_2 \\
+0.0 & \text{otherwise}
+\end{cases} \\
+\text{where } t_1 = \text{current\_epoch} - \text{mev\_commission\_range} \\
+\text{and } t_2 = \text{current\_epoch}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{delinquency\_score} = 
+\begin{cases} 
+1.0 & \text{if } \left( \frac{\text{vote\_credits}_t}{\text{total\_blocks}_t} \right) > \text{scoring\_delinquency\_threshold\_ratio} \text{ for all } t_1 \leq t \leq t_2 \\
+0.0 & \text{otherwise}
+\end{cases} \\
+\text{where } t_1 = \text{current\_epoch} - \text{epoch\_credits\_range} \\
+\text{and } t_2 = \text{current\_epoch} - 1
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{commission\_score} = 
+\begin{cases} 
+1.0 & \text{if } \max(\text{commission}_{t_1, t_2}) \leq \text{commission\_threshold} \\
+0.0 & \text{otherwise}
+\end{cases} \\
+\text{where } t_1 = \text{current\_epoch} - \text{commission\_range} \\
+\text{and } t_2 = \text{current\_epoch}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{historical\_commission\_score} = 
+\begin{cases} 
+1.0 & \text{if } \max(\text{historical\_commission}_{t_1, t_2}) \leq \text{historical\_commission\_threshold} \\
+0.0 & \text{otherwise}
+\end{cases} \\
+\text{where } t_1 = \text{first\_reliable\_epoch} = 520 \\
+\text{and } t_2 = \text{current\_epoch}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{blacklisted\_score} = 
+\begin{cases} 
+0.0 & \text{if blacklisted in current epoch} \\
+1.0 & \text{otherwise}
+\end{cases}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{superminority\_score} = 
+\begin{cases} 
+0.0 & \text{if in superminority in current epoch} \\
+1.0 & \text{otherwise}
+\end{cases} \\
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{vote\_credits\_ratio} = \frac{\sum_{t=t_1}^{t_2} \text{vote\_credits}_t}{\sum_{t=t_1}^{t_2} \text{total\_blocks}_t} \\
+\text{where } t_1 = \text{current\_epoch} - \text{epoch\_credits\_range} \\
+\text{and } t_2 = \text{current\_epoch} - 1
+}
+`$
+
+Note: total_blocks is the field in ClusterHistory that tracks how many blocks were created by the cluster in a given epoch. This represents the maximum number of vote credits that a validator can earn. Vote credits are synonymous with epoch credits.
+
+---
+
+$`
+\displaylines{
+\text{yield\_score} = \text{vote\_credits\_ratio} \times (1 - max(\text{commission}_{t_1, t_2})) \\
+\text{where } t_1 = \text{current\_epoch} - \text{commission\_range} \\
+\text{and } t_2 = \text{current\_epoch}
+}
+`$
+
+Note: Yield score is a relative measure of the yield returned to stakers by the validator, not an exact measure of its APY.
+
+---
+
+$`
+\displaylines{
+\text{final\_score} = \text{mev\_commission\_score} \times \text{commission\_score} \times \text{historical\_commission\_score} \times \text{blacklisted\_score} \times \text{superminority\_score} \times \text{delinquency\_score} \times \text{running\_jito\_score} \times \text{yield\_score}
+}
+`$
