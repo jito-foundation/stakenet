@@ -339,7 +339,7 @@ Note: total_blocks is the field in ClusterHistory that tracks how many blocks we
 
 $`
 \displaylines{
-\text{yield\_score} = \text{vote\_credits\_ratio} \times (1 - max(\text{commission}_{t_1, t_2}))
+\text{yield\_score} = \text{vote\_credits\_ratio} \times (1 - max(\text{commission}_{t_1, t_2})) \\
 \text{where } t_1 = \text{current\_epoch} - \text{commission\_range} \\
 \text{and } t_2 = \text{current\_epoch}
 }
