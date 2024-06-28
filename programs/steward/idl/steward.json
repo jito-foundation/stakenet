@@ -35,7 +35,7 @@
       ],
       "args": [
         {
-          "name": "index",
+          "name": "validator_history_blacklist",
           "type": "u32"
         }
       ]
@@ -57,7 +57,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -66,9 +66,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "reserve_stake",
@@ -107,7 +104,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -155,9 +152,6 @@
           "writable": true
         },
         {
-          "name": "staker"
-        },
-        {
           "name": "reserve_stake",
           "writable": true
         },
@@ -192,11 +186,6 @@
         },
         {
           "name": "stake_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": []
@@ -233,9 +222,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "reserve_stake",
@@ -279,11 +265,6 @@
         },
         {
           "name": "stake_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -313,10 +294,6 @@
       "accounts": [
         {
           "name": "config"
-        },
-        {
-          "name": "staker",
-          "writable": true
         },
         {
           "name": "state_account",
@@ -353,11 +330,6 @@
         {
           "name": "state_account",
           "writable": true
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": []
@@ -393,11 +365,6 @@
         },
         {
           "name": "cluster_history"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -438,11 +405,6 @@
         },
         {
           "name": "cluster_history"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -469,7 +431,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -484,9 +446,6 @@
         },
         {
           "name": "stake_pool"
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -524,7 +483,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -561,7 +520,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -574,9 +533,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -616,7 +572,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -693,11 +649,6 @@
         {
           "name": "state_account",
           "writable": true
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": []
@@ -719,7 +670,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -731,9 +682,6 @@
         },
         {
           "name": "stake_pool"
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -776,7 +724,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -813,7 +761,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -826,9 +774,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -871,7 +816,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -888,16 +833,16 @@
       ]
     },
     {
-      "name": "initialize_config",
+      "name": "initialize_steward",
       "discriminator": [
-        208,
-        127,
-        21,
-        1,
-        194,
-        190,
-        196,
-        70
+        195,
+        182,
+        16,
+        84,
+        217,
+        58,
+        220,
+        175
       ],
       "accounts": [
         {
@@ -906,7 +851,7 @@
           "signer": true
         },
         {
-          "name": "staker",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -920,16 +865,12 @@
           "name": "system_program"
         },
         {
-          "name": "signer",
+          "name": "current_staker",
           "writable": true,
           "signer": true
         }
       ],
       "args": [
-        {
-          "name": "authority",
-          "type": "pubkey"
-        },
         {
           "name": "update_parameters_args",
           "type": {
@@ -939,40 +880,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "initialize_state",
-      "docs": [
-        "Creates state account"
-      ],
-      "discriminator": [
-        190,
-        171,
-        224,
-        219,
-        217,
-        72,
-        199,
-        176
-      ],
-      "accounts": [
-        {
-          "name": "state_account",
-          "writable": true
-        },
-        {
-          "name": "config"
-        },
-        {
-          "name": "system_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": []
     },
     {
       "name": "pause_steward",
@@ -1070,10 +977,6 @@
           "name": "stake_pool"
         },
         {
-          "name": "staker",
-          "writable": true
-        },
-        {
           "name": "withdraw_authority"
         },
         {
@@ -1115,11 +1018,6 @@
         },
         {
           "name": "stake_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -1157,7 +1055,7 @@
       ],
       "args": [
         {
-          "name": "index",
+          "name": "validator_history_blacklist",
           "type": "u32"
         }
       ]
@@ -1179,7 +1077,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -1188,9 +1086,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -1217,7 +1112,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1312,12 +1207,21 @@
           "name": "new_authority"
         },
         {
-          "name": "authority",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "authority_type",
+          "type": {
+            "defined": {
+              "name": "AuthorityType"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "set_preferred_validator",
@@ -1336,6 +1240,10 @@
           "name": "config"
         },
         {
+          "name": "state_account",
+          "writable": true
+        },
+        {
           "name": "stake_pool_program"
         },
         {
@@ -1343,13 +1251,10 @@
           "writable": true
         },
         {
-          "name": "staker"
-        },
-        {
           "name": "validator_list"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1388,6 +1293,10 @@
           "name": "config"
         },
         {
+          "name": "state_account",
+          "writable": true
+        },
+        {
           "name": "stake_pool_program"
         },
         {
@@ -1395,13 +1304,10 @@
           "writable": true
         },
         {
-          "name": "staker"
-        },
-        {
           "name": "new_staker"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1471,19 +1377,6 @@
         250,
         204,
         130
-      ]
-    },
-    {
-      "name": "Staker",
-      "discriminator": [
-        171,
-        229,
-        193,
-        85,
-        67,
-        177,
-        151,
-        4
       ]
     },
     {
@@ -1570,145 +1463,191 @@
   "errors": [
     {
       "code": 6000,
+      "name": "InvalidAuthorityType",
+      "msg": "Invalid set authority type: 0: SetAdmin, 1: SetBlacklistAuthority, 2: SetParametersAuthority"
+    },
+    {
+      "code": 6001,
       "name": "ScoringNotComplete",
       "msg": "Scoring must be completed before any other steps can be taken"
     },
     {
-      "code": 6001,
+      "code": 6002,
       "name": "ValidatorNotInList",
       "msg": "Validator does not exist at the ValidatorList index provided"
     },
     {
-      "code": 6002,
+      "code": 6003,
       "name": "AddValidatorsNotComplete",
       "msg": "Add validators step must be completed before any other steps can be taken"
     },
     {
-      "code": 6003,
+      "code": 6004,
       "name": "EpochNotOver",
       "msg": "Cannot reset state before epoch is over"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "Unauthorized",
       "msg": "Unauthorized to perform this action"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "BitmaskOutOfBounds",
       "msg": "Bitmask index out of bounds"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "StateNotReset",
       "msg": "Epoch state not reset"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "ValidatorOutOfRange",
       "msg": "Validator History created after epoch start, out of range"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "InvalidState"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "ValidatorBelowStakeMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet stake minimum"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "ValidatorBelowLivenessMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet recent voting minimum"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "VoteHistoryNotRecentEnough",
       "msg": "Validator History vote data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "StakeHistoryNotRecentEnough",
       "msg": "Validator History stake data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "ClusterHistoryNotRecentEnough",
       "msg": "Cluster History data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "StateMachinePaused",
       "msg": "Steward State Machine is paused. No state machine actions can be taken"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidParameterValue",
       "msg": "Config parameter is out of range or otherwise invalid"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InstantUnstakeNotReady",
       "msg": "Instant unstake cannot be performed yet."
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "ValidatorIndexOutOfBounds",
       "msg": "Validator index out of bounds of state machine"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "ValidatorListTypeMismatch",
       "msg": "ValidatorList account type mismatch"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "ArithmeticError",
       "msg": "An operation caused an overflow/underflow"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "ValidatorNotRemovable",
       "msg": "Validator not eligible for removal. Must be delinquent or have closed vote account"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "MaxValidatorsReached",
       "msg": "Max validators reached"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "ValidatorHistoryMismatch",
       "msg": "Validator history account does not match vote account"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "EpochMaintenanceNotComplete",
       "msg": "Epoch Maintenance must be called before continuing"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "StakePoolNotUpdated",
       "msg": "The stake pool must be updated before continuing"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "ValidatorNotMarkedForRemoval",
       "msg": "Validator not marked for removal"
     },
     {
-      "code": 6026,
+      "code": 6027,
       "name": "ValidatorsHaveNotBeenRemoved",
       "msg": "Validators have not been removed"
     },
     {
-      "code": 6027,
+      "code": 6028,
       "name": "ListStateMismatch",
       "msg": "Validator List count does not match state machine"
     }
   ],
   "types": [
+    {
+      "name": "AuthorityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SetAdmin",
+            "fields": [
+              {
+                "name": "SetAdmin",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetBlacklistAuthority",
+            "fields": [
+              {
+                "name": "SetBlacklistAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetParameterAuthority",
+            "fields": [
+              {
+                "name": "SetParameterAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "name": "BitMask",
       "docs": [
@@ -1958,20 +1897,49 @@
             "type": "pubkey"
           },
           {
-            "name": "authority",
+            "name": "validator_list",
             "docs": [
-              "Authority for pool stewardship, can execute SPL Staker commands and adjust Delegation parameters"
+              "Validator List"
             ],
             "type": "pubkey"
           },
           {
-            "name": "blacklist",
+            "name": "admin",
             "docs": [
-              "Bitmask representing index of validators that are not allowed delegation"
+              "Admin",
+              "- Update the `parameters_authority`",
+              "- Update the `blacklist_authority`",
+              "- Can call SPL Passthrough functions",
+              "- Can pause/reset the state machine"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parameters_authority",
+            "docs": [
+              "Parameters Authority",
+              "- Can update steward parameters"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "blacklist_authority",
+            "docs": [
+              "Blacklist Authority",
+              "- Can add to the blacklist",
+              "- Can remove from the blacklist"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validator_history_blacklist",
+            "docs": [
+              "Bitmask representing index of validators that are not allowed delegation",
+              "NOTE: This is indexed off of the validator history, NOT the validator list"
             ],
             "type": {
               "defined": {
-                "name": "BitMask"
+                "name": "LargeBitMask"
               }
             }
           },
@@ -1987,6 +1955,17 @@
             }
           },
           {
+            "name": "paused",
+            "docs": [
+              "Halts any state machine progress"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -1996,17 +1975,6 @@
                 "u8",
                 1023
               ]
-            }
-          },
-          {
-            "name": "paused",
-            "docs": [
-              "Halts any state machine progress"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
             }
           }
         ]
@@ -2103,6 +2071,33 @@
           {
             "name": "epoch",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LargeBitMask",
+      "docs": [
+        "Data structure used to efficiently pack a binary array, primarily used to store all validators.",
+        "Each validator has an index (its index in the spl_stake_pool::ValidatorList), corresponding to a bit in the bitmask.",
+        "When an operation is executed on a validator, the bit corresponding to that validator's index is set to 1.",
+        "When all bits are 1, the operation is complete."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                "u64",
+                313
+              ]
+            }
           }
         ]
       }
@@ -2352,18 +2347,6 @@
           {
             "name": "epoch",
             "type": "u16"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Staker",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }
