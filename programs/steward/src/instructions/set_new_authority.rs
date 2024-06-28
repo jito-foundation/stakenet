@@ -17,23 +17,6 @@ impl AuthorityType {
     pub fn to_u8(self) -> u8 {
         self as u8
     }
-
-    pub fn into(&self) -> u8 {
-        match self {
-            AuthorityType::SetAdmin => 0,
-            AuthorityType::SetBlacklistAuthority => 1,
-            AuthorityType::SetParametersAuthority => 2,
-        }
-    }
-
-    pub fn from(index: u8) -> Result<Self> {
-        match index {
-            0 => Ok(AuthorityType::SetAdmin),
-            1 => Ok(AuthorityType::SetBlacklistAuthority),
-            2 => Ok(AuthorityType::SetParametersAuthority),
-            _ => Err(StewardError::InvalidAuthorityType.into()),
-        }
-    }
 }
 
 // Implement IdlBuild for AuthorityType
