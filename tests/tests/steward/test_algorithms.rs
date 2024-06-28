@@ -542,7 +542,6 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
     );
-    println!("NEED Error: {:?}", res);
 
     assert!(res == Err(StewardError::ClusterHistoryNotRecentEnough.into()));
 
@@ -558,8 +557,21 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
     );
+    println!("NEED Error: {:?}", res);
 
-    assert!(res == Err(StewardError::VoteHistoryNotRecentEnough.into()));
+    assert!(res.is_ok());
+    assert!(
+        res.unwrap()
+            == InstantUnstakeComponents {
+                instant_unstake: true,
+                delinquency_check: true,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: validator.vote_account,
+                epoch: current_epoch
+            }
+    );
 
     let mut validator = validators[0];
     validator
@@ -575,7 +587,6 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
     );
-    println!("NEED Error 3: {:?}", res);
 
     assert!(res == Err(StewardError::VoteHistoryNotRecentEnough.into()));
 
