@@ -343,7 +343,7 @@ $`
 }
 `$
 
-Yield score is a relative measure of the yield
+Note: Yield score is a relative measure of the yield returned to stakers by the validator, not an exact measure of its APY.
 
 ---
 
