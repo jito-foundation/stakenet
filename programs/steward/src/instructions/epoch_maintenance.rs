@@ -1,8 +1,8 @@
 use crate::{
     errors::StewardError,
     utils::{
-        check_validator_list_has_stake_status, deserialize_stake_pool, get_stake_pool_address,
-        get_validator_list_length,
+        check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
+        get_stake_pool_address, get_validator_list_length,
     },
     Config, StewardStateAccount,
 };
@@ -51,12 +51,13 @@ pub fn handler(
     if (!state_account.state.checked_validators_removed_from_list).into() {
         // Ensure there are no validators in the list that have not been removed, that should be
         require!(
-            !check_validator_list_has_stake_status(
+            !check_validator_list_has_stake_status_other_than(
                 &ctx.accounts.validator_list,
-                StakeStatus::ReadyForRemoval
+                StakeStatus::Active
             )?,
             StewardError::ValidatorsHaveNotBeenRemoved
         );
+
         state_account.state.checked_validators_removed_from_list = true.into();
     }
 
@@ -74,7 +75,6 @@ pub fn handler(
                 == validators_in_list,
             StewardError::ListStateMismatch
         );
-
         if let Some(validator_index_to_remove) = validator_index_to_remove {
             state_account
                 .state

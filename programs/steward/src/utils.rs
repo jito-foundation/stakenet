@@ -15,9 +15,24 @@ pub fn get_stake_pool_address(account: &AccountLoader<Config>) -> Result<Pubkey>
     Ok(config.stake_pool)
 }
 
-pub fn get_config_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+pub fn get_validator_list(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
-    Ok(config.authority)
+    Ok(config.validator_list)
+}
+
+pub fn get_config_admin(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.admin)
+}
+
+pub fn get_config_blacklist_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.blacklist_authority)
+}
+
+pub fn get_config_parameter_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.parameters_authority)
 }
 
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {
@@ -86,7 +101,7 @@ pub fn get_validator_stake_info_at_index(
     Ok(validator_stake_info)
 }
 
-pub fn check_validator_list_has_stake_status(
+pub fn check_validator_list_has_stake_status_other_than(
     validator_list_account_info: &AccountInfo,
     flag: StakeStatus,
 ) -> Result<bool> {
@@ -105,7 +120,7 @@ pub fn check_validator_list_has_stake_status(
 
         let stake_status = validator_list.data[stake_status_index];
 
-        if stake_status == flag as u8 {
+        if stake_status != flag as u8 {
             return Ok(true);
         }
     }

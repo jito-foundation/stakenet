@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use jito_steward::{Config, Staker};
+use jito_steward::Config;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
@@ -20,38 +20,34 @@ pub async fn command_view_config(
 
     let steward_config_account = get_steward_config_account(client, &steward_config).await?;
     let steward_state = get_steward_state_address(&program_id, &steward_config);
-    let (steward_staker, _) =
-        Pubkey::find_program_address(&[Staker::SEED, steward_config.as_ref()], &program_id);
 
     // let mut output = String::new(); // Initialize the string directly
-    _print_default_config(
-        &steward_config,
-        &steward_state,
-        &steward_staker,
-        &steward_config_account,
-    );
+    _print_default_config(&steward_config, &steward_state, &steward_config_account);
 
     Ok(())
 }
 
-fn _print_default_config(
-    steward_config: &Pubkey,
-    steward_state: &Pubkey,
-    steward_staker: &Pubkey,
-    config_account: &Config,
-) {
+fn _print_default_config(steward_config: &Pubkey, steward_state: &Pubkey, config_account: &Config) {
     let mut formatted_string = String::new();
 
     formatted_string += "------- Config -------\n";
     formatted_string += "📚 Accounts 📚\n";
     formatted_string += &format!("Config:      {}\n", steward_config);
-    formatted_string += &format!("Authority:   {}\n", config_account.authority);
-    formatted_string += &format!("Staker:      {}\n", steward_staker);
+    formatted_string += &format!("Admin:   {}\n", config_account.admin);
+    formatted_string += &format!("Blacklist Auth:   {}\n", config_account.blacklist_authority);
+    formatted_string += &format!(
+        "Parameter Auth:   {}\n",
+        config_account.parameters_authority
+    );
+    formatted_string += &format!("Staker (State):      {}\n", steward_state);
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
     formatted_string += "\n↺ State ↺\n";
     formatted_string += &format!("Is Paused:   {:?}\n", config_account.paused);
-    formatted_string += &format!("Blacklisted: {:?}\n", config_account.blacklist.count());
+    formatted_string += &format!(
+        "Blacklisted: {:?}\n",
+        config_account.validator_history_blacklist.count()
+    );
     formatted_string += "\n⚙️ Parameters ⚙️\n";
     formatted_string += &format!(
         "Commission Range:  {:?}\n",

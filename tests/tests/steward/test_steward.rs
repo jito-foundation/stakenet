@@ -3,7 +3,9 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     InstructionData, ToAccountMetas,
 };
-use jito_steward::{utils::ValidatorList, Config, StewardStateAccount};
+use jito_steward::{
+    instructions::AuthorityType, utils::ValidatorList, Config, StewardStateAccount,
+};
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::{
@@ -46,7 +48,6 @@ async fn _auto_add_validator_to_pool(fixture: &TestFixture, vote_account: &Pubke
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -58,7 +59,6 @@ async fn _auto_add_validator_to_pool(fixture: &TestFixture, vote_account: &Pubke
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -108,8 +108,8 @@ async fn test_auto_add_validator_to_pool() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     _auto_add_validator_to_pool(&fixture, &Pubkey::new_unique()).await;
 
@@ -121,8 +121,8 @@ async fn test_auto_remove() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -135,7 +135,10 @@ async fn test_auto_remove() {
         fixture.stake_accounts_for_validator(vote_account).await;
 
     // Add vote account
+    println!("DID STEWARD STATE");
+
     _auto_add_validator_to_pool(&fixture, &vote_account).await;
+    println!("ADDED VALIDATOR");
 
     let auto_remove_validator_ix = Instruction {
         program_id: jito_steward::id(),
@@ -145,7 +148,6 @@ async fn test_auto_remove() {
             state_account: fixture.steward_state,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -158,7 +160,6 @@ async fn test_auto_remove() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoRemoveValidatorFromPool {
@@ -207,7 +208,7 @@ async fn test_pause() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
+    fixture.initialize_steward(None).await;
 
     let ix = Instruction {
         program_id: jito_steward::id(),
@@ -266,7 +267,7 @@ async fn test_blacklist() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
+    fixture.initialize_steward(None).await;
 
     let ix = Instruction {
         program_id: jito_steward::id(),
@@ -275,7 +276,10 @@ async fn test_blacklist() {
             authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::AddValidatorToBlacklist { index: 0 }.data(),
+        data: jito_steward::instruction::AddValidatorToBlacklist {
+            validator_history_blacklist: 0,
+        }
+        .data(),
     };
 
     let tx = Transaction::new_signed_with_payer(
@@ -290,7 +294,7 @@ async fn test_blacklist() {
     let config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    assert!(config.blacklist.get(0).unwrap());
+    assert!(config.validator_history_blacklist.get(0).unwrap());
 
     let ix = Instruction {
         program_id: jito_steward::id(),
@@ -299,7 +303,10 @@ async fn test_blacklist() {
             authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::RemoveValidatorFromBlacklist { index: 0 }.data(),
+        data: jito_steward::instruction::RemoveValidatorFromBlacklist {
+            validator_history_blacklist: 0,
+        }
+        .data(),
     };
 
     let tx = Transaction::new_signed_with_payer(
@@ -313,7 +320,7 @@ async fn test_blacklist() {
     let config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    assert!(!config.blacklist.get(0).unwrap());
+    assert!(!config.validator_history_blacklist.get(0).unwrap());
 
     drop(fixture);
 }
@@ -323,7 +330,7 @@ async fn test_set_new_authority() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
+    fixture.initialize_steward(None).await;
 
     // Regular test
     let new_authority = Keypair::new();
@@ -337,10 +344,13 @@ async fn test_set_new_authority() {
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
             new_authority: new_authority.pubkey(),
-            authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::SetNewAuthority {}.data(),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetAdmin,
+        }
+        .data(),
     };
     let tx = Transaction::new_signed_with_payer(
         &[ix],
@@ -354,7 +364,58 @@ async fn test_set_new_authority() {
     let config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    assert!(config.authority == new_authority.pubkey());
+    assert!(config.admin == new_authority.pubkey());
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: new_authority.pubkey(),
+            admin: new_authority.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetBlacklistAuthority,
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&new_authority.pubkey()),
+        &[&new_authority],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: new_authority.pubkey(),
+            admin: new_authority.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetParametersAuthority,
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&new_authority.pubkey()),
+        &[&new_authority],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    assert!(config.admin == new_authority.pubkey());
+    assert!(config.blacklist_authority == new_authority.pubkey());
+    assert!(config.parameters_authority == new_authority.pubkey());
 
     // Try to transfer back with original authority
     let ix = Instruction {
@@ -362,21 +423,29 @@ async fn test_set_new_authority() {
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
             new_authority: fixture.keypair.pubkey(),
-            authority: fixture.keypair.pubkey(),
+            admin: new_authority.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::SetNewAuthority {}.data(),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetAdmin,
+        }
+        .data(),
     };
     let tx = Transaction::new_signed_with_payer(
         &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&new_authority.pubkey()),
+        &[&new_authority],
         ctx.borrow().last_blockhash,
     );
 
-    fixture
-        .submit_transaction_assert_error(tx, "Unauthorized")
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
+    assert!(config.admin == fixture.keypair.pubkey());
+    assert!(config.blacklist_authority == new_authority.pubkey());
+    assert!(config.parameters_authority == new_authority.pubkey());
 
     drop(fixture);
 }

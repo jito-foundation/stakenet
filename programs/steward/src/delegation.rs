@@ -1,4 +1,6 @@
+use anchor_lang::idl::*;
 use anchor_lang::prelude::*;
+use borsh::BorshSerialize;
 use spl_stake_pool::big_vec::BigVec;
 
 use crate::{
@@ -7,7 +9,7 @@ use crate::{
     StewardState,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RebalanceType {
     Increase(u64),
     Decrease(DecreaseComponents),
@@ -15,7 +17,7 @@ pub enum RebalanceType {
 }
 
 #[event]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct DecreaseComponents {
     pub scoring_unstake_lamports: u64,
     pub instant_unstake_lamports: u64,

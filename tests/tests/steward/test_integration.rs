@@ -36,8 +36,8 @@ async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -101,7 +101,6 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -146,7 +145,6 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -173,8 +171,8 @@ async fn test_compute_scores() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
         vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -311,7 +309,6 @@ async fn test_compute_scores() {
             validator_history: validator_history_account,
             validator_list: fixture.stake_pool_meta.validator_list,
             cluster_history: cluster_history_account,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeScore {
@@ -469,7 +466,7 @@ async fn test_compute_instant_unstake() {
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture
-        .initialize_config(Some(UpdateParametersArgs {
+        .initialize_steward(Some(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
             epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
             commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
@@ -490,7 +487,7 @@ async fn test_compute_instant_unstake() {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
         .await;
-    fixture.initialize_steward_state().await;
+    fixture.realloc_steward_state().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -620,7 +617,6 @@ async fn test_compute_instant_unstake() {
             validator_history: validator_history_account,
             validator_list: fixture.stake_pool_meta.validator_list,
             cluster_history: cluster_history_account,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeInstantUnstake {
@@ -703,8 +699,8 @@ async fn test_idle() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -739,7 +735,6 @@ async fn test_idle() {
         accounts: jito_steward::accounts::Idle {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
@@ -839,8 +834,8 @@ async fn test_rebalance_increase() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -969,7 +964,6 @@ async fn test_rebalance_increase() {
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -981,7 +975,6 @@ async fn test_rebalance_increase() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -996,7 +989,6 @@ async fn test_rebalance_increase() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -1007,7 +999,6 @@ async fn test_rebalance_increase() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
@@ -1059,7 +1050,13 @@ async fn test_rebalance_increase() {
         pool_minimum_delegation
     );
 
-    let expected_transient_stake = reserve_before_rebalance.lamports - 2 * stake_rent;
+    let steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    let validators_that_need_rent = steward_state_account.state.num_pool_validators + 1
+        - (steward_state_account.state.progress.count() as u64 - 1);
+    let expected_transient_stake =
+        reserve_before_rebalance.lamports - (stake_rent * validators_that_need_rent);
     assert_eq!(
         transient_stake_account.stake().unwrap().delegation.stake,
         expected_transient_stake
@@ -1078,8 +1075,8 @@ async fn test_rebalance_decrease() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1203,7 +1200,6 @@ async fn test_rebalance_decrease() {
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -1215,7 +1211,6 @@ async fn test_rebalance_decrease() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -1307,7 +1302,6 @@ async fn test_rebalance_decrease() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -1318,7 +1312,6 @@ async fn test_rebalance_decrease() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
@@ -1382,8 +1375,8 @@ async fn test_rebalance_other_cases() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1445,7 +1438,6 @@ async fn test_rebalance_other_cases() {
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -1457,7 +1449,6 @@ async fn test_rebalance_other_cases() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -1485,7 +1476,6 @@ async fn test_rebalance_other_cases() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -1496,7 +1486,6 @@ async fn test_rebalance_other_cases() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {

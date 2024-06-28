@@ -1,6 +1,8 @@
 use std::num::NonZeroU32;
 
 use anchor_lang::{
+    idl::types::*,
+    idl::*,
     prelude::*,
     solana_program::{
         program::invoke_signed,
@@ -8,6 +10,7 @@ use anchor_lang::{
         system_program, sysvar, vote,
     },
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
@@ -17,11 +20,11 @@ use validator_history::ValidatorHistory;
 
 use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
-    delegation::RebalanceType,
+    delegation::{DecreaseComponents, RebalanceType},
     errors::StewardError,
     maybe_transition_and_emit,
     utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
-    Config, Staker, StewardStateAccount,
+    Config, StewardStateAccount,
 };
 
 #[derive(Accounts)]
@@ -50,13 +53,6 @@ pub struct Rebalance<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = get_stake_pool_address(&config)?)]
     pub stake_pool: AccountInfo<'info>,
-
-    #[account(
-        mut,
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -140,9 +136,6 @@ pub struct Rebalance<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
@@ -193,13 +186,15 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         )?
     };
 
-    match result {
+    drop(state_account);
+
+    match result.clone() {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
                     &ctx.accounts.stake_pool_program.key(),
                     &ctx.accounts.stake_pool.key(),
-                    &ctx.accounts.staker.key(),
+                    &ctx.accounts.state_account.key(),
                     &ctx.accounts.withdraw_authority.key(),
                     &ctx.accounts.validator_list.key(),
                     &ctx.accounts.reserve_stake.key(),
@@ -210,7 +205,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 ),
                 &[
                     ctx.accounts.stake_pool.to_account_info(),
-                    ctx.accounts.staker.to_account_info(),
+                    ctx.accounts.state_account.to_account_info(),
                     ctx.accounts.withdraw_authority.to_owned(),
                     ctx.accounts.validator_list.to_account_info(),
                     ctx.accounts.reserve_stake.to_account_info(),
@@ -223,9 +218,9 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    Staker::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
-                    &[ctx.accounts.staker.bump],
+                    &[ctx.bumps.state_account],
                 ]],
             )?;
         }
@@ -234,7 +229,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 &spl_stake_pool::instruction::increase_validator_stake(
                     &ctx.accounts.stake_pool_program.key(),
                     &ctx.accounts.stake_pool.key(),
-                    &ctx.accounts.staker.key(),
+                    &ctx.accounts.state_account.key(),
                     &ctx.accounts.withdraw_authority.key(),
                     &ctx.accounts.validator_list.key(),
                     &ctx.accounts.reserve_stake.key(),
@@ -246,7 +241,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 ),
                 &[
                     ctx.accounts.stake_pool.to_account_info(),
-                    ctx.accounts.staker.to_account_info(),
+                    ctx.accounts.state_account.to_account_info(),
                     ctx.accounts.withdraw_authority.to_owned(),
                     ctx.accounts.validator_list.to_account_info(),
                     ctx.accounts.reserve_stake.to_account_info(),
@@ -261,21 +256,107 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    Staker::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
-                    &[ctx.accounts.staker.bump],
+                    &[ctx.bumps.state_account],
                 ]],
             )?;
         }
         RebalanceType::None => {}
     }
 
-    maybe_transition_and_emit(
-        &mut state_account.state,
-        &clock,
-        &config.parameters,
-        &epoch_schedule,
-    )?;
+    {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+        emit!(rebalance_to_event(
+            ctx.accounts.vote_account.key(),
+            clock.epoch as u16,
+            result
+        ));
+
+        if let Some(event) = maybe_transition_and_emit(
+            &mut state_account.state,
+            &clock,
+            &config.parameters,
+            &epoch_schedule,
+        )? {
+            emit!(event);
+        }
+    }
 
     Ok(())
+}
+
+#[event]
+pub struct RebalanceEvent {
+    pub vote_account: Pubkey,
+    pub epoch: u16,
+    pub rebalance_type_tag: RebalanceTypeTag,
+    pub increase_lamports: u64,
+    pub decrease_components: DecreaseComponents,
+}
+
+fn rebalance_to_event(
+    vote_account: Pubkey,
+    epoch: u16,
+    rebalance_type: RebalanceType,
+) -> RebalanceEvent {
+    match rebalance_type {
+        RebalanceType::None => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::None,
+            increase_lamports: 0,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Increase(lamports) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Increase,
+            increase_lamports: lamports,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Decrease(decrease_components) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Decrease,
+            increase_lamports: 0,
+            decrease_components,
+        },
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum RebalanceTypeTag {
+    None,
+    Increase,
+    Decrease,
+}
+
+impl IdlBuild for RebalanceTypeTag {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "RebalanceTypeTag".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "None".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Increase".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Decrease".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
+    }
 }

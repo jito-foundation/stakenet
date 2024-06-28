@@ -56,7 +56,6 @@ pub async fn command_auto_add_validator_from_pool(
             config: args.permissionless_parameters.steward_config,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: steward_accounts.stake_pool_address,
-            staker: steward_accounts.staker_address,
             reserve_stake: steward_accounts.stake_pool_account.reserve_stake,
             withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
             validator_list: steward_accounts.validator_list_address,
@@ -68,7 +67,6 @@ pub async fn command_auto_add_validator_from_pool(
             stake_config: stake::config::ID,
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: payer.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),

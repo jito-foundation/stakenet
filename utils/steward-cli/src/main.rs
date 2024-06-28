@@ -20,7 +20,7 @@ use commands::{
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_state::command_view_state,
     },
-    init::{init_config::command_init_config, init_state::command_init_state},
+    init::{init_state::command_init_state, init_steward::command_init_config},
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::UpdateParametersArgs;
+use jito_steward::{derive_steward_state_address, UpdateParametersArgs};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
@@ -13,10 +13,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::InitConfig,
-    utils::{accounts::get_steward_staker_address, transactions::configure_instruction},
-};
+use crate::{commands::command_args::InitConfig, utils::transactions::configure_instruction};
 
 pub async fn command_init_config(
     args: InitConfig,
@@ -44,7 +41,7 @@ pub async fn command_init_config(
         }
     };
 
-    let steward_staker = get_steward_staker_address(&program_id, &steward_config.pubkey());
+    let (state_account, _) = derive_steward_state_address(&steward_config.pubkey());
 
     let update_parameters_args: UpdateParametersArgs = args.config_parameters.into();
 
@@ -61,17 +58,16 @@ pub async fn command_init_config(
 
     let init_ix = Instruction {
         program_id,
-        accounts: jito_steward::accounts::InitializeConfig {
+        accounts: jito_steward::accounts::InitializeSteward {
             config: steward_config.pubkey(),
             stake_pool: args.stake_pool,
-            staker: steward_staker,
+            state_account,
             stake_pool_program: spl_stake_pool::id(),
             system_program: anchor_lang::solana_program::system_program::id(),
-            signer: staker_keypair.pubkey(),
+            current_staker: staker_keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::InitializeConfig {
-            authority: authority.pubkey(),
+        data: jito_steward::instruction::InitializeSteward {
             update_parameters_args,
         }
         .data(),

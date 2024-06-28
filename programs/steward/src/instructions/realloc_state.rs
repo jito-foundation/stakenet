@@ -3,6 +3,7 @@ use crate::{
     constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
+    utils::get_validator_list,
     Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
 };
 use anchor_lang::prelude::*;
@@ -43,10 +44,8 @@ pub struct ReallocState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
-    /// CHECK: TODO add validator_list address to config
-    #[account(
-        owner = spl_stake_pool::ID,
-    )]
+    /// CHECK: We check against the Config
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,

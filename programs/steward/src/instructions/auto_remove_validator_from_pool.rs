@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
-use crate::state::{Config, Staker};
+use crate::state::Config;
 use crate::utils::{
     deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
 };
@@ -45,12 +45,6 @@ pub struct AutoRemoveValidator<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
-
-    #[account(
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut, address = deserialize_stake_pool(&stake_pool)?.reserve_stake)]
@@ -123,62 +117,63 @@ pub struct AutoRemoveValidator<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 /*
 
 */
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
-    let mut state_account = ctx.accounts.state_account.load_mut()?;
-    let validator_list = &ctx.accounts.validator_list;
-    let epoch = Clock::get()?.epoch;
+    {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+        let validator_list = &ctx.accounts.validator_list;
+        let epoch = Clock::get()?.epoch;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
-        StewardError::ValidatorNotInList
-    );
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+            StewardError::ValidatorNotInList
+        );
 
-    // Should not be able to remove a validator if update is not complete
-    require!(
-        epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+        // Should not be able to remove a validator if update is not complete
+        require!(
+            epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-    // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
-    let stake_account_deactivated = {
-        let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
-        let stake_state: StakeStateV2 =
-            try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+        // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
+        let stake_account_deactivated = {
+            let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
+            let stake_state: StakeStateV2 =
+                try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
 
-        let deactivation_epoch = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.deactivation_epoch,
-            _ => return Err(StewardError::InvalidState.into()), // TODO fix
+            let deactivation_epoch = match stake_state {
+                StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                    stake.delegation.deactivation_epoch
+                }
+                _ => return Err(StewardError::InvalidState.into()), // TODO fix
+            };
+            deactivation_epoch < epoch
         };
-        deactivation_epoch < epoch
-    };
 
-    // Check if vote account closed
-    let vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
+        // Check if vote account closed
+        let vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
 
-    require!(
-        stake_account_deactivated || vote_account_closed,
-        StewardError::ValidatorNotRemovable
-    );
+        require!(
+            stake_account_deactivated || vote_account_closed,
+            StewardError::ValidatorNotRemovable
+        );
 
-    state_account
-        .state
-        .mark_validator_for_removal(validator_list_index)?;
+        state_account
+            .state
+            .mark_validator_for_removal(validator_list_index)?;
+    }
 
     invoke_signed(
         &spl_stake_pool::instruction::remove_validator_from_pool(
             &ctx.accounts.stake_pool_program.key(),
             &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.staker.key(),
+            &ctx.accounts.state_account.key(),
             &ctx.accounts.withdraw_authority.key(),
             &ctx.accounts.validator_list.key(),
             &ctx.accounts.stake_account.key(),
@@ -186,7 +181,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         ),
         &[
             ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.staker.to_account_info(),
+            ctx.accounts.state_account.to_account_info(),
             ctx.accounts.reserve_stake.to_owned(),
             ctx.accounts.withdraw_authority.to_owned(),
             ctx.accounts.validator_list.to_account_info(),
@@ -201,9 +196,9 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            Staker::SEED,
+            StewardStateAccount::SEED,
             &ctx.accounts.config.key().to_bytes(),
-            &[ctx.accounts.staker.bump],
+            &[ctx.bumps.state_account],
         ]],
     )?;
 
