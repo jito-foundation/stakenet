@@ -90,10 +90,10 @@ fn _print_verbose_state(
             u64::from(validator.active_stake_lamports)
         );
         formatted_string += &format!("Index: {:?}\n", index);
-        formatted_string += &format!(
-            "Is Blacklisted: {:?}\n",
-            config_account.blacklist.get(index)
-        );
+        // formatted_string += &format!(
+        //     "Is Blacklisted: {:?}\n",
+        //     config_account.validator_history_blacklist.get(index)
+        // );
         formatted_string += &format!(
             "Marked for removal: {:?}\n",
             steward_state_account.state.validators_to_remove.get(index)

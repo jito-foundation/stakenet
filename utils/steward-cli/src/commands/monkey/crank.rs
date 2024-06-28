@@ -22,7 +22,7 @@ use crate::utils::accounts::{
     check_stake_accounts, get_all_steward_validator_accounts, get_unprogressed_validators,
     AllStewardValidatorAccounts,
 };
-use crate::utils::transactions::{debug_send_single_transaction, print_errors_if_any};
+use crate::utils::transactions::print_errors_if_any;
 use crate::{
     commands::command_args::CrankMonkey,
     utils::{
@@ -111,7 +111,6 @@ async fn _handle_delinquent_validators(
                     stake_pool_program: spl_stake_pool::id(),
                     stake_pool: all_steward_accounts.stake_pool_address,
                     validator_history_account: history_account,
-                    staker: all_steward_accounts.staker_address,
                     withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
                     validator_list: all_steward_accounts.validator_list_address,
                     reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
@@ -124,7 +123,6 @@ async fn _handle_delinquent_validators(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
-                    signer: payer.pubkey(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::AutoRemoveValidatorFromPool {
@@ -255,7 +253,6 @@ async fn _handle_compute_score(
                 validator_history: validator_info.history_account,
                 validator_list: all_steward_accounts.validator_list_address,
                 cluster_history,
-                signer: payer.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeScore {
@@ -287,7 +284,6 @@ async fn _handle_compute_delegations(
         accounts: jito_steward::accounts::ComputeDelegations {
             config: all_steward_accounts.config_address,
             state_account: all_steward_accounts.state_address,
-            signer: payer.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -313,7 +309,6 @@ async fn _handle_idle(
         accounts: jito_steward::accounts::Idle {
             config: all_steward_accounts.config_address,
             state_account: all_steward_accounts.state_address,
-            signer: payer.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
@@ -350,7 +345,6 @@ async fn _handle_compute_instant_unstake(
                 validator_history: validator_info.history_account,
                 validator_list: all_steward_accounts.validator_list_address,
                 cluster_history,
-                signer: payer.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeInstantUnstake {
@@ -410,7 +404,6 @@ async fn _handle_rebalance(
                     validator_history: history_account,
                     stake_pool_program: spl_stake_pool::id(),
                     stake_pool: all_steward_accounts.stake_pool_address,
-                    staker: all_steward_accounts.staker_address,
                     withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
                     validator_list: all_steward_accounts.validator_list_address,
                     reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
@@ -423,7 +416,6 @@ async fn _handle_rebalance(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
-                    signer: payer.pubkey(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {

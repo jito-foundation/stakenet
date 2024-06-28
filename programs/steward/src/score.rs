@@ -51,7 +51,6 @@ pub struct ScoreComponents {
 
 pub fn validator_score(
     validator: &ValidatorHistory,
-    index: usize,
     cluster: &ClusterHistory,
     config: &Config,
     current_epoch: u16,
@@ -195,7 +194,11 @@ pub fn validator_score(
     let superminority_score = if !is_superminority { 1.0 } else { 0.0 };
 
     /////// Blacklist ///////
-    let blacklisted_score = if config.blacklist.get(index).unwrap_or(false) {
+    let blacklisted_score = if config
+        .validator_history_blacklist
+        .get(validator.index as usize)
+        .unwrap_or(false)
+    {
         0.0
     } else {
         1.0
@@ -257,7 +260,6 @@ pub struct InstantUnstakeComponents {
 /// Before running, checks are needed on cluster and validator history to be updated this epoch past the halfway point of the epoch.
 pub fn instant_unstake_validator(
     validator: &ValidatorHistory,
-    index: usize,
     cluster: &ClusterHistory,
     config: &Config,
     epoch_start_slot: u64,
@@ -321,7 +323,9 @@ pub fn instant_unstake_validator(
     let commission_check = commission > params.commission_threshold;
 
     /////// Blacklist ///////
-    let is_blacklisted = config.blacklist.get(index)?;
+    let is_blacklisted = config
+        .validator_history_blacklist
+        .get(validator.index as usize)?;
 
     let instant_unstake =
         delinquency_check || commission_check || mev_commission_check || is_blacklisted;

@@ -8,9 +8,7 @@ use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::id as validator_history_id;
 
-use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program,
-};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
 
 use crate::{
     commands::command_args::CrankRebalance,
@@ -97,7 +95,6 @@ pub async fn command_crank_rebalance(
                     validator_history: *history_account,
                     stake_pool_program: spl_stake_pool::id(),
                     stake_pool: steward_accounts.stake_pool_address,
-                    staker: steward_accounts.staker_address,
                     withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
                     validator_list: steward_accounts.validator_list_address,
                     reserve_stake: steward_accounts.stake_pool_account.reserve_stake,
@@ -110,7 +107,6 @@ pub async fn command_crank_rebalance(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
-                    signer: payer.pubkey(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {

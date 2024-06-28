@@ -192,10 +192,10 @@ pub enum Commands {
     ViewNextIndexToRemove(ViewNextIndexToRemove),
 
     // Actions
-    InitConfig(InitConfig),
-    UpdateConfig(UpdateConfig),
+    InitSteward(InitSteward),
+    ReallocState(ReallocState),
 
-    InitState(InitState),
+    UpdateConfig(UpdateConfig),
     ResetState(ResetState),
 
     CloseSteward(CloseSteward),
@@ -245,7 +245,7 @@ pub struct ViewNextIndexToRemove {
 
 #[derive(Parser)]
 #[command(about = "Initialize config account")]
-pub struct InitConfig {
+pub struct InitSteward {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
@@ -281,7 +281,7 @@ pub struct UpdateConfig {
 
 #[derive(Parser)]
 #[command(about = "Initialize state account")]
-pub struct InitState {
+pub struct ReallocState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 }

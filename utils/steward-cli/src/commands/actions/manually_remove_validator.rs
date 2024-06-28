@@ -56,12 +56,11 @@ pub async fn command_manually_remove_validator(
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::RemoveValidatorFromPool {
-            signer: authority.pubkey(),
+            admin: authority.pubkey(),
             config: steward_config,
-            steward_state: steward_accounts.state_address,
+            state_account: steward_accounts.state_address,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: steward_accounts.stake_pool_address,
-            staker: steward_accounts.stake_pool_account.staker,
             withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
             validator_list: steward_accounts.validator_list_address,
             stake_account: stake_address,

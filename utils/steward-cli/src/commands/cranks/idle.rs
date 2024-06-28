@@ -46,7 +46,6 @@ pub async fn command_crank_idle(
         accounts: jito_steward::accounts::Idle {
             config: steward_config,
             state_account: state_address,
-            signer: payer.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),

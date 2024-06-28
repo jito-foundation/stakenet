@@ -23,7 +23,7 @@ use commands::{
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_state::command_view_state,
     },
-    init::{init_config::command_init_config, init_state::command_init_state},
+    init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
     monkey::crank::command_crank_monkey,
 };
 use dotenv::dotenv;
@@ -53,12 +53,12 @@ async fn main() -> Result<()> {
 
         // --- Actions ---
         Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
-        Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
+        Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
         Commands::ManuallyCopyVoteAccount(args) => {
             command_manually_copy_vote_account(args, &client, program_id).await
         }
-        Commands::InitState(args) => command_init_state(args, &client, program_id).await,
+        Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::ManuallyRemoveValidator(args) => {
             command_manually_remove_validator(args, &client, program_id).await

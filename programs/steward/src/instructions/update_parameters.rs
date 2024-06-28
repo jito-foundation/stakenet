@@ -1,4 +1,4 @@
-use crate::{utils::get_config_authority, Config, UpdateParametersArgs};
+use crate::{utils::get_config_parameter_authority, Config, UpdateParametersArgs};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -6,7 +6,7 @@ pub struct UpdateParameters<'info> {
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 
-    #[account(mut, address = get_config_authority(&config)?)]
+    #[account(mut, address = get_config_parameter_authority(&config)?)]
     pub authority: Signer<'info>,
 }
 

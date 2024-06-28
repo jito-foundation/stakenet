@@ -9,7 +9,9 @@ use crate::{
         UnstakeState,
     },
     errors::StewardError,
-    score::{instant_unstake_validator, validator_score},
+    score::{
+        instant_unstake_validator, validator_score, InstantUnstakeComponents, ScoreComponents,
+    },
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index, U8Bool},
     Config, Parameters,
 };
@@ -27,11 +29,12 @@ fn invalid_state_error(_expected: String, _actual: String) -> Error {
 }
 
 #[event]
+#[derive(Debug)]
 pub struct StateTransition {
-    epoch: u64,
-    slot: u64,
-    previous_state: String,
-    new_state: String,
+    pub epoch: u64,
+    pub slot: u64,
+    pub previous_state: String,
+    pub new_state: String,
 }
 
 pub fn maybe_transition_and_emit(
@@ -39,19 +42,19 @@ pub fn maybe_transition_and_emit(
     clock: &Clock,
     params: &Parameters,
     epoch_schedule: &EpochSchedule,
-) -> Result<()> {
+) -> Result<Option<StateTransition>> {
     let initial_state = steward_state.state_tag.to_string();
     steward_state.transition(clock, params, epoch_schedule)?;
 
     if initial_state != steward_state.state_tag.to_string() {
-        emit!(StateTransition {
+        return Ok(Some(StateTransition {
             epoch: clock.epoch,
             slot: clock.slot,
             previous_state: initial_state,
             new_state: steward_state.state_tag.to_string(),
-        });
+        }));
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Tracks state of the stake pool.
@@ -542,7 +545,7 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-    ) -> Result<()> {
+    ) -> Result<Option<ScoreComponents>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -576,7 +579,7 @@ impl StewardState {
 
             // Skip scoring if already processed
             if self.progress.get(index)? {
-                return Ok(());
+                return Ok(None);
             }
 
             // Skip scoring if marked for deletion
@@ -602,7 +605,7 @@ impl StewardState {
 
                 self.progress.set(index, true)?;
 
-                return Ok(());
+                return Ok(None);
             }
 
             // Check that latest_update_slot is within the current epoch to guarantee previous epoch data is complete
@@ -621,8 +624,7 @@ impl StewardState {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            let score = validator_score(validator, index, cluster, config, current_epoch as u16)?;
-            emit!(score);
+            let score = validator_score(validator, cluster, config, current_epoch as u16)?;
 
             self.scores[index] = (score.score * 1_000_000_000.) as u32;
             self.yield_scores[index] = (score.yield_score * 1_000_000_000.) as u32;
@@ -645,7 +647,7 @@ impl StewardState {
             )?;
 
             self.progress.set(index, true)?;
-            return Ok(());
+            return Ok(Some(score));
         }
         Err(invalid_state_error(
             "ComputeScores".to_string(),
@@ -705,7 +707,7 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-    ) -> Result<()> {
+    ) -> Result<Option<InstantUnstakeComponents>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
                 return Err(invalid_state_error(
@@ -722,13 +724,13 @@ impl StewardState {
 
             // Skip if already processed
             if self.progress.get(index)? {
-                return Ok(());
+                return Ok(None);
             }
 
             // Skip if marked for deletion
             if self.validators_to_remove.get(index)? {
                 self.progress.set(index, true)?;
-                return Ok(());
+                return Ok(None);
             }
 
             let first_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
@@ -755,17 +757,16 @@ impl StewardState {
 
             let instant_unstake_result = instant_unstake_validator(
                 validator,
-                index,
                 cluster,
                 config,
                 first_slot,
                 clock.epoch as u16,
             )?;
-            emit!(instant_unstake_result);
+
             self.instant_unstake
                 .set(index, instant_unstake_result.instant_unstake)?;
             self.progress.set(index, true)?;
-            return Ok(());
+            return Ok(Some(instant_unstake_result));
         }
         Err(invalid_state_error(
             "ComputeInstantUnstake".to_string(),
@@ -816,13 +817,27 @@ impl StewardState {
                 .checked_add(stake_rent)
                 .ok_or(StewardError::ArithmeticError)?;
 
-            // Maximum increase amount is the total lamports in the reserve stake account minus 2 * stake_rent, which accounts for reserve rent + transient rent
-            // Saturating_sub because reserve stake may be less than 2 * stake_rent, but needs more than 2 * stake_rent to be able to delegate
-            let reserve_lamports = reserve_lamports.saturating_sub(
-                stake_rent
-                    .checked_mul(2)
-                    .ok_or(StewardError::ArithmeticError)?,
+            msg!("Reserve lamports before adjustment: {}", reserve_lamports);
+            msg!(
+                "Stake pool lamports before adjustment: {}",
+                stake_pool_lamports
             );
+
+            // Maximum increase amount is the total lamports in the reserve stake account minus (num_validators + 1) * stake_rent, which covers rent for all validators plus the transient rent
+            let all_accounts_needed_reserve_for_rent = validator_list
+                .len()
+                .checked_add(1)
+                .ok_or(StewardError::ArithmeticError)?;
+
+            let accounts_left_needed_reserve_for_rent = all_accounts_needed_reserve_for_rent
+                .checked_sub(self.progress.count() as u32)
+                .ok_or(StewardError::ArithmeticError)?;
+
+            let reserve_minimum = stake_rent
+                .checked_mul(accounts_left_needed_reserve_for_rent as u64)
+                .ok_or(StewardError::ArithmeticError)?;
+            // Saturating_sub because reserve stake may be less than the reserve_minimum but needs more than the reserve_minimum to be able to delegate
+            let reserve_lamports = reserve_lamports.saturating_sub(reserve_minimum);
 
             // Represents the amount of lamports that can be delegated to validators beyond the fixed costs of rent and minimum_delegation
             let stake_pool_lamports = stake_pool_lamports
@@ -909,6 +924,15 @@ impl StewardState {
                 RebalanceType::None
             };
 
+            msg!("Reserve lamports after adjustment: {}", reserve_lamports);
+            msg!(
+                "Stake pool lamports after adjustment: {}",
+                stake_pool_lamports
+            );
+            msg!("Rebalance Type: {:?}", rebalance);
+            msg!("Current Lamports: {}", current_lamports);
+            msg!("Target Lamports: {}", target_lamports);
+
             // Update internal state based on rebalance
             match rebalance {
                 RebalanceType::Decrease(DecreaseComponents {
@@ -917,13 +941,6 @@ impl StewardState {
                     stake_deposit_unstake_lamports,
                     total_unstake_lamports,
                 }) => {
-                    emit!(DecreaseComponents {
-                        scoring_unstake_lamports,
-                        instant_unstake_lamports,
-                        stake_deposit_unstake_lamports,
-                        total_unstake_lamports,
-                    });
-
                     self.validator_lamport_balances[index] = self.validator_lamport_balances[index]
                         .saturating_sub(total_unstake_lamports);
 

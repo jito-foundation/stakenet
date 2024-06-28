@@ -7,7 +7,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
 
-use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 
 use crate::{
     commands::command_args::CrankComputeInstantUnstake,
@@ -80,7 +80,6 @@ pub async fn command_crank_compute_instant_unstake(
                 validator_history: *history_account,
                 validator_list: steward_accounts.validator_list_address,
                 cluster_history,
-                signer: payer.pubkey(),
             }
             .to_account_metas(None),
             data: jito_steward::instruction::ComputeInstantUnstake {

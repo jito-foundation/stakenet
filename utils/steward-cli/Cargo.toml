@@ -6,9 +6,13 @@ description = "CLI to manage the steward program"
 
 [dependencies]
 anchor-lang = "0.30.0"
+anyhow = "1.0.86"
 clap = { version = "4.3.0", features = ["derive", "env"] }
+dotenv = "0.15.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
+jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
+keeper-core = { path = "../../keepers/keeper-core" }
 log = "0.4.18"
 solana-account-decoder = "1.18"
 solana-clap-utils = "1.18"
@@ -16,11 +20,7 @@ solana-client = "1.18"
 solana-metrics = "1.18"
 solana-program = "1.18"
 solana-sdk = "1.18"
-thiserror = "1.0.37"
 spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
+thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
-jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
-keeper-core = { path = "../../keepers/keeper-core" }
-dotenv = "0.15.0"
-anyhow = "1.0.86"

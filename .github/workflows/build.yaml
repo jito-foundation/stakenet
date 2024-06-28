@@ -3,11 +3,13 @@ on:
   push:
     branches:
       - master
+      - steward-test-branch
     tags:
       - "v*"
   pull_request:
     branches:
       - master
+      - steward-test-branch
 
 jobs:
   security_audit:

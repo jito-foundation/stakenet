@@ -15,8 +15,8 @@ use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
-    Config, Delegation, Parameters, Staker, StewardState, StewardStateAccount, StewardStateEnum,
-    UpdateParametersArgs, STATE_PADDING_0_SIZE,
+    Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
+    StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -65,7 +65,6 @@ impl Default for StakePoolMetadata {
 pub struct TestFixture {
     pub ctx: Rc<RefCell<ProgramTestContext>>,
     pub stake_pool_meta: StakePoolMetadata,
-    pub staker: Pubkey,
     pub steward_config: Keypair,
     pub steward_state: Pubkey,
     pub cluster_history_account: Pubkey,
@@ -104,11 +103,6 @@ impl TestFixture {
 
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
-        let staker = Pubkey::find_program_address(
-            &[Staker::SEED, steward_config.pubkey().as_ref()],
-            &jito_steward::id(),
-        )
-        .0;
         let steward_state = Pubkey::find_program_address(
             &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
@@ -140,7 +134,6 @@ impl TestFixture {
         Self {
             ctx,
             stake_pool_meta,
-            staker,
             steward_state,
             steward_config,
             validator_history_config,
@@ -257,7 +250,7 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_config(&self, parameters: Option<UpdateParametersArgs>) {
+    pub async fn initialize_steward(&self, parameters: Option<UpdateParametersArgs>) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -282,17 +275,16 @@ impl TestFixture {
 
         let instruction = Instruction {
             program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::InitializeConfig {
+            accounts: jito_steward::accounts::InitializeSteward {
                 config: self.steward_config.pubkey(),
                 stake_pool: self.stake_pool_meta.stake_pool,
-                staker: self.staker,
+                state_account: self.steward_state,
                 stake_pool_program: spl_stake_pool::id(),
                 system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
+                current_staker: self.keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: jito_steward::instruction::InitializeConfig {
-                authority: self.keypair.pubkey(),
+            data: jito_steward::instruction::InitializeSteward {
                 update_parameters_args,
             }
             .data(),
@@ -307,23 +299,10 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
-    pub async fn initialize_steward_state(&self) {
-        let instruction = Instruction {
-            program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::InitializeState {
-                state_account: self.steward_state,
-                config: self.steward_config.pubkey(),
-                system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::InitializeState {}.data(),
-        };
-
-        let mut ixs = vec![instruction];
-
+    pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
         let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut ixs = vec![];
 
         while num_reallocs > 0 {
             ixs.extend(vec![
@@ -837,11 +816,14 @@ impl Default for StateMachineFixtures {
         // Setup Config
         let config = Config {
             stake_pool: Pubkey::new_unique(),
-            authority: Pubkey::new_unique(),
-            blacklist: BitMask::default(),
             parameters,
-            _padding: [0; 1023],
             paused: false.into(),
+            validator_list: Pubkey::new_unique(),
+            admin: Pubkey::new_unique(),
+            parameters_authority: Pubkey::new_unique(),
+            blacklist_authority: Pubkey::new_unique(),
+            validator_history_blacklist: LargeBitMask::default(),
+            _padding: [0; 1023],
         };
 
         // Setup Sysvars: Clock, EpochSchedule

@@ -6,8 +6,9 @@ use anchor_lang::{
 };
 use jito_steward::{
     constants::MAX_VALIDATORS,
+    derive_steward_state_address,
     utils::{StakePool, ValidatorList},
-    Config, Delegation, Staker, StewardStateAccount, StewardStateEnum,
+    Config, Delegation, StewardStateAccount, StewardStateEnum,
 };
 use rand::prelude::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
@@ -179,11 +180,10 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
     let instruction = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AddValidatorToPool {
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -195,7 +195,7 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
             stake_config: stake::config::ID,
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddValidatorToPool {
@@ -242,11 +242,11 @@ async fn _set_and_check_preferred_validator(
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetPreferredValidator {
             config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             validator_list: fixture.stake_pool_meta.validator_list,
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetPreferredValidator {
@@ -325,11 +325,10 @@ async fn _increase_and_check_stake(
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::IncreaseValidatorStake {
             config: fixture.steward_config.pubkey(),
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             validator_history,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
@@ -342,7 +341,7 @@ async fn _increase_and_check_stake(
             stake_config: stake::config::ID,
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::IncreaseValidatorStake {
@@ -418,11 +417,10 @@ async fn _increase_and_check_additional_stake(
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::IncreaseAdditionalValidatorStake {
             config: fixture.steward_config.pubkey(),
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             validator_history,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
@@ -434,7 +432,7 @@ async fn _increase_and_check_additional_stake(
             stake_config: stake::config::ID,
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
             ephemeral_stake_account,
         }
         .to_account_metas(None),
@@ -470,16 +468,16 @@ async fn _increase_and_check_additional_stake(
     );
 }
 
-pub async fn _set_staker(fixture: &TestFixture, staker: Pubkey, new_staker: Pubkey) {
+pub async fn _set_staker(fixture: &TestFixture, new_staker: Pubkey) {
     let instruction = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetStaker {
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker,
+            state_account: fixture.steward_state,
             new_staker,
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetStaker {}.data(),
@@ -509,8 +507,8 @@ async fn test_add_validator_to_pool() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     {
         // Test add 1 validator
@@ -532,8 +530,8 @@ async fn test_remove_validator_from_pool() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     // Setup the steward state
     // _setup_test_steward_state(&fixture, MAX_VALIDATORS, 1_000_000_000).await;
@@ -562,10 +560,9 @@ async fn test_remove_validator_from_pool() {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::RemoveValidatorFromPool {
             config: fixture.steward_config.pubkey(),
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_account: stake_account_address,
@@ -573,7 +570,7 @@ async fn test_remove_validator_from_pool() {
             clock: sysvar::clock::id(),
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorFromPool {
@@ -627,8 +624,8 @@ async fn test_set_preferred_validator() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -685,8 +682,8 @@ async fn test_increase_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -707,8 +704,8 @@ async fn test_decrease_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
 
@@ -742,11 +739,10 @@ async fn test_decrease_validator_stake() {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::DecreaseValidatorStake {
             config: fixture.steward_config.pubkey(),
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             validator_history,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
@@ -758,7 +754,7 @@ async fn test_decrease_validator_stake() {
             stake_history: sysvar::stake_history::id(),
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::DecreaseValidatorStake {
@@ -787,8 +783,8 @@ async fn test_increase_additional_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -810,8 +806,8 @@ async fn test_decrease_additional_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
 
@@ -858,11 +854,10 @@ async fn test_decrease_additional_validator_stake() {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::DecreaseAdditionalValidatorStake {
             config: fixture.steward_config.pubkey(),
-            steward_state: fixture.steward_state,
+            state_account: fixture.steward_state,
             validator_history,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
@@ -873,7 +868,7 @@ async fn test_decrease_additional_validator_stake() {
             stake_history: sysvar::stake_history::id(),
             system_program: system_program::id(),
             stake_program: stake::program::id(),
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
             ephemeral_stake_account,
         }
         .to_account_metas(None),
@@ -905,8 +900,8 @@ async fn test_set_staker() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let new_staker = Keypair::new();
 
@@ -921,15 +916,12 @@ async fn test_set_staker() {
             StakePool::try_deserialize_unchecked(&mut stake_pool_account_raw.data.as_slice())
                 .expect("Failed to deserialize stake pool account");
 
-        let (staker, _) = Pubkey::find_program_address(
-            &[Staker::SEED, fixture.steward_config.pubkey().as_ref()],
-            &jito_steward::id(),
-        );
+        let (steward_state, _) = derive_steward_state_address(&fixture.steward_config.pubkey());
 
         // Assert accounts are set up correctly
-        assert!(stake_pool_account.staker.eq(&staker));
-        assert!(fixture.staker.eq(&staker));
-        assert!(config_account.authority.eq(&fixture.keypair.pubkey()));
+        assert!(stake_pool_account.staker.eq(&steward_state));
+        assert!(fixture.steward_state.eq(&steward_state));
+        assert!(config_account.admin.eq(&fixture.keypair.pubkey()));
         assert!(config_account
             .stake_pool
             .eq(&fixture.stake_pool_meta.stake_pool));
@@ -937,12 +929,12 @@ async fn test_set_staker() {
 
     {
         // Test 1: Set staker to same staker
-        _set_staker(&fixture, fixture.staker, fixture.staker).await;
+        _set_staker(&fixture, fixture.steward_state).await;
     }
 
     {
         // Test 2: Set staker to different staker
-        _set_staker(&fixture, fixture.staker, new_staker.pubkey()).await;
+        _set_staker(&fixture, new_staker.pubkey()).await;
     }
 
     drop(fixture);

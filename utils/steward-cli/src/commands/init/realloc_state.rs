@@ -14,18 +14,17 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::command_args::InitState,
+    commands::command_args::ReallocState,
     utils::{
         accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
         transactions::configure_instruction,
     },
 };
 
-const MAX_REALLOCS: usize = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 const REALLOCS_PER_TX: usize = 10;
 
-pub async fn command_init_state(
-    args: InitState,
+pub async fn command_realloc_state(
+    args: ReallocState,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
@@ -44,49 +43,25 @@ pub async fn command_init_state(
 
     let validator_list = stake_pool_account.validator_list;
 
-    let mut reallocs_left_to_run = MAX_REALLOCS;
-    let mut should_create = true;
+    let steward_state_account_raw = client.get_account(&steward_state).await?;
 
-    match client.get_account(&steward_state).await {
-        Ok(steward_state_account_raw) => {
-            if steward_state_account_raw.data.len() == StewardStateAccount::SIZE {
-                match StewardStateAccount::try_deserialize(
-                    &mut steward_state_account_raw.data.as_slice(),
-                ) {
-                    Ok(steward_state_account) => {
-                        if steward_state_account.is_initialized.into() {
-                            println!("State account already exists");
-                            return Ok(());
-                        }
-                    }
-                    Err(_) => { /* Account is not initialized, continue */ }
-                };
+    if steward_state_account_raw.data.len() == StewardStateAccount::SIZE {
+        match StewardStateAccount::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
+            Ok(steward_state_account) => {
+                if steward_state_account.is_initialized.into() {
+                    println!("State account already exists");
+                    return Ok(());
+                }
             }
-
-            // if it already exists, we don't need to create it
-            should_create = false;
-
-            let data_length = steward_state_account_raw.data.len();
-            let whats_left = StewardStateAccount::SIZE - data_length.min(StewardStateAccount::SIZE);
-
-            reallocs_left_to_run =
-                (whats_left.max(MAX_ALLOC_BYTES) - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
-        }
-        Err(_) => { /* Account does not exist, continue */ }
+            Err(_) => { /* Account is not initialized, continue */ }
+        };
     }
 
-    if should_create {
-        let signature = _create_state(
-            client,
-            &program_id,
-            &authority,
-            &steward_state,
-            &steward_config,
-        )
-        .await?;
+    let data_length = steward_state_account_raw.data.len();
+    let whats_left = StewardStateAccount::SIZE - data_length.min(StewardStateAccount::SIZE);
 
-        println!("Created Steward State: {}", signature);
-    }
+    let mut reallocs_left_to_run =
+        (whats_left.max(MAX_ALLOC_BYTES) - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 
     let reallocs_to_run = reallocs_left_to_run;
     let mut reallocs_ran = 0;
@@ -126,41 +101,6 @@ pub async fn command_init_state(
     println!("Steward State: {}", steward_state);
 
     Ok(())
-}
-
-async fn _create_state(
-    client: &RpcClient,
-    program_id: &Pubkey,
-    authority: &Keypair,
-    steward_state: &Pubkey,
-    steward_config: &Pubkey,
-) -> Result<Signature> {
-    let init_ix = Instruction {
-        program_id: *program_id,
-        accounts: jito_steward::accounts::InitializeState {
-            state_account: *steward_state,
-            config: *steward_config,
-            system_program: anchor_lang::solana_program::system_program::id(),
-            signer: authority.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::InitializeState {}.data(),
-    };
-
-    let blockhash = client.get_latest_blockhash().await?;
-
-    let transaction = Transaction::new_signed_with_payer(
-        &[init_ix],
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
-
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
-
-    Ok(signature)
 }
 
 #[allow(clippy::too_many_arguments)]

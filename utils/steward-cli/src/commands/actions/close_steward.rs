@@ -36,9 +36,9 @@ pub async fn command_close_steward(
             config: all_steward_accounts.config_address,
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: all_steward_accounts.stake_pool_address,
-            staker: all_steward_accounts.staker_address,
             new_staker: authority.pubkey(),
-            signer: authority.pubkey(),
+            admin: authority.pubkey(),
+            state_account: all_steward_accounts.state_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetStaker {}.data(),
@@ -49,7 +49,6 @@ pub async fn command_close_steward(
         accounts: jito_steward::accounts::CloseStewardAccounts {
             config: all_steward_accounts.config_address,
             authority: authority.pubkey(),
-            staker: all_steward_accounts.staker_address,
             state_account: all_steward_accounts.state_address,
         }
         .to_account_metas(None),
