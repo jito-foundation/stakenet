@@ -3,10 +3,10 @@ use anchor_lang::AnchorSerialize;
 use jito_steward::{
     constants::SORTED_INDEX_DEFAULT,
     delegation::{
-        decrease_stake_calculation, increase_stake_calculation, DecreaseComponents, RebalanceType,
-        UnstakeState,
+        decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
     errors::StewardError,
+    events::DecreaseComponents,
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponents, ScoreComponents,

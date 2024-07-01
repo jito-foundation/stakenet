@@ -9,6 +9,7 @@ mod allocator;
 pub mod constants;
 pub mod delegation;
 pub mod errors;
+pub mod events;
 pub mod instructions;
 pub mod score;
 pub mod state;

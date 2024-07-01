@@ -5,10 +5,10 @@ use crate::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::{
-        decrease_stake_calculation, increase_stake_calculation, DecreaseComponents, RebalanceType,
-        UnstakeState,
+        decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
     errors::StewardError,
+    events::{DecreaseComponents, StateTransition},
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponents, ScoreComponents,
     },
@@ -26,15 +26,6 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 fn invalid_state_error(_expected: String, _actual: String) -> Error {
     // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
     StewardError::InvalidState.into()
-}
-
-#[event]
-#[derive(Debug)]
-pub struct StateTransition {
-    pub epoch: u64,
-    pub slot: u64,
-    pub previous_state: String,
-    pub new_state: String,
 }
 
 pub fn maybe_transition_and_emit(
