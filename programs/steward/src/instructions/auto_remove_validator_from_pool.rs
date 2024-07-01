@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 
 use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
+use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
 use crate::utils::{
     deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
@@ -167,6 +168,13 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         state_account
             .state
             .mark_validator_for_removal(validator_list_index)?;
+
+        emit!(AutoRemoveValidatorEvent {
+            vote_account: ctx.accounts.vote_account.key(),
+            validator_list_index: validator_list_index as u64,
+            stake_account_deactivated,
+            vote_account_closed,
+        });
     }
 
     invoke_signed(

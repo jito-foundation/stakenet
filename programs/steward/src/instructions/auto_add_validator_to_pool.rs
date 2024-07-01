@@ -1,5 +1,6 @@
 use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
+use crate::events::AutoAddValidatorEvent;
 use crate::state::{Config, StewardStateAccount};
 use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
 use anchor_lang::prelude::*;
@@ -111,13 +112,14 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         StewardError::EpochMaintenanceNotComplete
     );
 
-    {
+    let validator_list_len = {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
         let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
-        if validator_list.len().checked_add(1).unwrap() > MAX_VALIDATORS as u32 {
-            return Err(StewardError::MaxValidatorsReached.into());
-        }
+        validator_list.len()
+    };
+    if validator_list_len.checked_add(1).unwrap() > MAX_VALIDATORS as u32 {
+        return Err(StewardError::MaxValidatorsReached.into());
     }
 
     let start_epoch =
@@ -149,6 +151,11 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
 
     // Have to drop the state account before calling the CPI
     drop(state_account);
+
+    emit!(AutoAddValidatorEvent {
+        vote_account: ctx.accounts.vote_account.key(),
+        validator_list_index: validator_list_len as u64
+    });
 
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(

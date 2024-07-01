@@ -1,5 +1,6 @@
 use crate::{
     errors::StewardError,
+    events::EpochMaintenanceEvent,
     utils::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
         get_stake_pool_address, get_validator_list_length,
@@ -94,6 +95,15 @@ pub fn handler(
             state_account.state.checked_validators_removed_from_list = false.into();
             state_account.state.rebalance_completed = false.into();
         }
+
+        emit!(EpochMaintenanceEvent {
+            validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
+            validator_list_length: get_validator_list_length(&ctx.accounts.validator_list)? as u64,
+            num_pool_validators: state_account.state.num_pool_validators,
+            validators_to_remove: state_account.state.validators_to_remove.count() as u64,
+            validators_to_add: state_account.state.validators_added as u64,
+            maintenance_complete: okay_to_update,
+        });
     }
 
     Ok(())

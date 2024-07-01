@@ -1,8 +1,7 @@
-use anchor_lang::idl::*;
 use anchor_lang::prelude::*;
-use borsh::BorshSerialize;
 use spl_stake_pool::big_vec::BigVec;
 
+use crate::events::DecreaseComponents;
 use crate::{
     errors::StewardError,
     utils::{get_target_lamports, stake_lamports_at_validator_list_index},
@@ -14,15 +13,6 @@ pub enum RebalanceType {
     Increase(u64),
     Decrease(DecreaseComponents),
     None,
-}
-
-#[event]
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct DecreaseComponents {
-    pub scoring_unstake_lamports: u64,
-    pub instant_unstake_lamports: u64,
-    pub stake_deposit_unstake_lamports: u64,
-    pub total_unstake_lamports: u64,
 }
 
 /// Given a target validator, determines how much stake to remove on this validator given the constraints of unstaking caps.
