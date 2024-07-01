@@ -62,7 +62,7 @@ async fn _handle_delinquent_validators(
         .iter()
         .filter_map(|(vote_account, check)| {
             if !check.has_history || check.is_deactivated {
-                Some(vote_account.clone())
+                Some(*vote_account)
             } else {
                 None
             }
@@ -101,9 +101,6 @@ async fn _handle_delinquent_validators(
             {
                 return None;
             }
-
-            //TODO Fix
-            return None;
 
             Some(Instruction {
                 program_id: *program_id,
@@ -195,10 +192,7 @@ async fn _handle_epoch_maintenance(
             .data(),
         };
 
-        let cu = match validator_index_to_remove {
-            Some(_) => Some(1_400_000),
-            None => None,
-        };
+        let cu = validator_index_to_remove.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
 
         println!("Submitting Epoch Maintenance");
@@ -462,6 +456,27 @@ pub async fn crank_monkey(
     log_string += "\n";
 
     {
+        // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
+
+        if should_run_epoch_maintenance {
+            log_string += "Cranking Epoch Maintenance\n";
+            println!("Cranking Epoch Maintenance...");
+
+            let stats = _handle_epoch_maintenance(
+                payer,
+                client,
+                program_id,
+                epoch,
+                all_steward_accounts,
+                priority_fee,
+            )
+            .await?;
+
+            return_stats.combine(&stats);
+        }
+    }
+
+    {
         // --------- CHECK VALIDATORS TO ADD -----------
     }
 
@@ -482,27 +497,6 @@ pub async fn crank_monkey(
         .await?;
 
         return_stats.combine(&stats);
-    }
-
-    {
-        // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
-
-        if should_run_epoch_maintenance {
-            log_string += "Cranking Epoch Maintenance\n";
-            println!("Cranking Epoch Maintenance...");
-
-            let stats = _handle_epoch_maintenance(
-                payer,
-                client,
-                program_id,
-                epoch,
-                all_steward_accounts,
-                priority_fee,
-            )
-            .await?;
-
-            return_stats.combine(&stats);
-        }
     }
 
     {
