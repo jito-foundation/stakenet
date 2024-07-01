@@ -43,6 +43,7 @@ pub async fn command_view_state(
             &steward_config,
             &steward_state_address,
             &steward_state_account,
+            &validator_list_account,
         );
     }
 
@@ -192,6 +193,7 @@ fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
     state_account: &StewardStateAccount,
+    validator_list_account: &ValidatorList,
 ) {
     let state = &state_account.state;
 
@@ -251,6 +253,17 @@ fn _print_default_state(
     );
     formatted_string += &format!("Rebalance Completed: {:?}\n", state.rebalance_completed);
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
+    formatted_string += "\n\n";
+    formatted_string += &format!("num_pool_validators: {}\n", state.num_pool_validators);
+    formatted_string += &format!(
+        "validator list length: {}\n",
+        validator_list_account.validators.len()
+    );
+    formatted_string += &format!(
+        "Validators marked to remove: {}\n",
+        state.validators_to_remove.count()
+    );
+    formatted_string += "\n";
     formatted_string += "---------------------";
 
     println!("{}", formatted_string)

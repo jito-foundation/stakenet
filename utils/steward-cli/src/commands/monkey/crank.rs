@@ -447,19 +447,10 @@ pub async fn crank_monkey(
         all_steward_accounts.state_account.state.current_epoch != epoch;
     let should_crank_state = !should_run_epoch_maintenance;
 
-    let mut log_string: String = "\n--------- NEW LOG ---------\n".to_string();
-    log_string += &format_state(
-        &all_steward_accounts.config_address,
-        &all_steward_accounts.state_address,
-        &all_steward_accounts.state_account,
-    );
-    log_string += "\n";
-
     {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
         if should_run_epoch_maintenance {
-            log_string += "Cranking Epoch Maintenance\n";
             println!("Cranking Epoch Maintenance...");
 
             let stats = _handle_epoch_maintenance(
@@ -478,11 +469,14 @@ pub async fn crank_monkey(
 
     {
         // --------- CHECK VALIDATORS TO ADD -----------
+
+        // Any validator that has new history account
+        // Anything that would pass the benchmark
+        // Find any validators that that are not in pool
     }
 
     {
         // --------- CHECK VALIDATORS TO REMOVE -----------
-        log_string += "Finding and Removing Bad Validators\n";
         println!("Finding and Removing Bad Validators...");
 
         let stats = _handle_delinquent_validators(
@@ -504,7 +498,6 @@ pub async fn crank_monkey(
         if should_crank_state {
             let stats = match all_steward_accounts.state_account.state.state_tag {
                 StewardStateEnum::ComputeScores => {
-                    log_string += "Cranking Compute Score\n";
                     println!("Cranking Compute Score...");
 
                     _handle_compute_score(
@@ -517,7 +510,6 @@ pub async fn crank_monkey(
                     .await?
                 }
                 StewardStateEnum::ComputeDelegations => {
-                    log_string += "Cranking Compute Delegations\n";
                     println!("Cranking Compute Delegations...");
 
                     _handle_compute_delegations(
@@ -530,7 +522,6 @@ pub async fn crank_monkey(
                     .await?
                 }
                 StewardStateEnum::Idle => {
-                    log_string += "Cranking Idle\n";
                     println!("Cranking Idle...");
 
                     _handle_idle(
@@ -543,7 +534,6 @@ pub async fn crank_monkey(
                     .await?
                 }
                 StewardStateEnum::ComputeInstantUnstake => {
-                    log_string += "Cranking Compute Instant Unstake\n";
                     println!("Cranking Compute Instant Unstake...");
 
                     _handle_compute_instant_unstake(
@@ -556,7 +546,6 @@ pub async fn crank_monkey(
                     .await?
                 }
                 StewardStateEnum::Rebalance => {
-                    log_string += "Cranking Rebalance\n";
                     println!("Cranking Rebalance...");
 
                     _handle_rebalance(
@@ -574,70 +563,35 @@ pub async fn crank_monkey(
         }
     }
 
-    log_string += &format!(
-        "\nSuccesses: {}\nErrors: {:?}\n\n",
-        return_stats.successes, return_stats.errors
-    );
-
-    return_stats.results.iter().for_each(|result| {
-        if let Err(error) = result {
-            log_string += &format!("HAS_ERROR\n");
-            // Access and print the error
-            match error {
-                SendTransactionError::ExceededRetries => {
-                    // Continue
-                    log_string += &format!("Exceeded Retries: {:?}\n", error);
-                    println!("Exceeded Retries: {:?}", error);
-                }
-                SendTransactionError::TransactionError(e) => {
-                    // Flag
-                    log_string += &format!("Transaction: {:?}\n", e);
-                    println!("Transaction: {:?}", e);
-                }
-                SendTransactionError::RpcSimulateTransactionResult(e) => {
-                    // Recover
-                    println!("\n\nERROR: ");
-                    e.logs.iter().for_each(|log| {
-                        log.iter().enumerate().for_each(|(i, log)| {
-                            log_string += &format!("{}: {:?}\n", i, log);
-                            println!("{}: {:?}", i, log);
-                        });
-                    });
-                }
-            }
-        }
-    });
-
-    {
-        // Debug write to file
-
-        let write_result = append_to_file("crank_monkey.log", &log_string);
-
-        match write_result {
-            Ok(_) => {
-                println!("Wrote logging info");
-            }
-            Err(e) => {
-                println!("Error writing to file: {:?}", e);
-            }
-        }
-    }
-
     {
         // --------- RECOVER FROM ERROR -----------
+        return_stats.results.iter().for_each(|result| {
+            if let Err(error) = result {
+                // Access and print the error
+                match error {
+                    SendTransactionError::ExceededRetries => {
+                        // Continue
+                        println!("Exceeded Retries: {:?}", error);
+                    }
+                    SendTransactionError::TransactionError(e) => {
+                        // Flag
+                        println!("Transaction: {:?}", e);
+                    }
+                    SendTransactionError::RpcSimulateTransactionResult(e) => {
+                        // Recover
+                        println!("\n\nERROR: ");
+                        e.logs.iter().for_each(|log| {
+                            log.iter().enumerate().for_each(|(i, log)| {
+                                println!("{}: {:?}", i, log);
+                            });
+                        });
+                    }
+                }
+            }
+        });
     }
 
     Ok(return_stats)
-}
-
-fn append_to_file(filename: &str, text: &str) -> Result<(), Error> {
-    let mut file = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(filename)?;
-
-    writeln!(file, "{}", text)?;
-    Ok(())
 }
 
 // Only runs one set of commands per "crank"
