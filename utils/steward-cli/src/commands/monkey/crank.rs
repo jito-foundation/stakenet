@@ -7,17 +7,12 @@ use keeper_core::{
 };
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::io::Error;
 
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, signer::Signer, stake,
-    system_program,
+    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
 };
 use thiserror::Error as ThisError;
 
-use crate::commands::info::view_state::format_state;
 use crate::utils::accounts::{
     check_stake_accounts, get_all_steward_validator_accounts, get_unprogressed_validators,
     AllStewardValidatorAccounts,

@@ -394,14 +394,11 @@ pub async fn parallel_execute_transactions(
         let mut is_blockhash_not_found = false;
 
         for (idx, tx) in signed_txs.iter().enumerate() {
-            match results[idx] {
-                Ok(_) => {
-                    continue; // Skip transactions that have already been confirmed
-                }
-                Err(SendTransactionError::RpcSimulateTransactionResult(_)) => {
-                    continue; // Skip transactions that errored on simulation
-                }
-                _ => {}
+            if matches!(
+                results[idx],
+                Ok(_) | Err(SendTransactionError::RpcSimulateTransactionResult(_))
+            ) {
+                continue; // Skip transactions that have already been confirmed
             }
 
             if idx % 50 == 0 {
@@ -412,19 +409,19 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
-                    debug!("Submitted transaction: {:?}", signature);
-                    println!("Submitted transaction: {:?}", signature);
+                    debug!("Submitted: {:?}", signature);
+                    println!("🟨 Submitted: {:?}", signature);
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => {
                     debug!("Transaction error: {:?}", e);
-                    println!("Transaction error: {:?}", e);
-
                     match e.get_transaction_error() {
                         Some(TransactionError::BlockhashNotFound) => {
+                            println!("🟧 Blockhash not found");
                             is_blockhash_not_found = true;
                         }
                         Some(TransactionError::AlreadyProcessed) => {
+                            println!("🟧 Already Processed");
                             submitted_signatures.insert(tx.signatures[0], idx);
                         }
                         Some(_) => {
@@ -459,7 +456,7 @@ pub async fn parallel_execute_transactions(
                                                 results[idx] = Err(SendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
-                                                println!("\n\n\nPREFLIGHT ERROR - SKIP\n\n\n");
+                                                println!("🟥 Preflight Error: \n{:?}\n\n", e);
                                                 results[idx] = Err(SendTransactionError::RpcSimulateTransactionResult(e))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::NodeUnhealthy { num_slots_behind } => {
@@ -521,6 +518,16 @@ pub async fn parallel_execute_transactions(
                     }
                 }
             }
+        }
+
+        // If all TXs fail preflight, return
+        if results.iter().all(|r| {
+            matches!(
+                r,
+                Err(SendTransactionError::RpcSimulateTransactionResult(_))
+            )
+        }) {
+            break;
         }
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
