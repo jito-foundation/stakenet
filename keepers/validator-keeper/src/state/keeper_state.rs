@@ -47,7 +47,7 @@ pub struct KeeperState {
 
     pub all_steward_accounts: Option<Box<AllStewardAccounts>>,
     pub all_steward_validator_accounts: Option<Box<AllValidatorAccounts>>,
-    pub all_validator_accounts: Option<Box<AllValidatorAccounts>>,
+    pub all_active_validator_accounts: Option<Box<AllValidatorAccounts>>,
 }
 impl KeeperState {
     pub fn new() -> Self {
@@ -241,7 +241,7 @@ impl Default for KeeperState {
             keeper_balance: 0,
             all_steward_accounts: None,
             all_steward_validator_accounts: None,
-            all_validator_accounts: None,
+            all_active_validator_accounts: None,
         }
     }
 }

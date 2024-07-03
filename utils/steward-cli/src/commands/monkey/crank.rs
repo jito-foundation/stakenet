@@ -125,7 +125,7 @@ async fn _handle_adding_validators(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats) 
@@ -223,7 +223,7 @@ async fn _handle_delinquent_validators(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
@@ -283,7 +283,7 @@ async fn _handle_epoch_maintenance(
 
         println!("Submitting Epoch Maintenance");
         let new_stats =
-            submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
 
         stats.combine(&new_stats);
         print_errors_if_any(&stats);
@@ -350,7 +350,7 @@ async fn _handle_compute_score(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
 
     Ok(stats)
 }
@@ -375,7 +375,7 @@ async fn _handle_compute_delegations(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
 
     Ok(stats)
 }
@@ -400,7 +400,7 @@ async fn _handle_idle(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], payer, None, None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
 
     Ok(stats)
 }
@@ -445,7 +445,7 @@ async fn _handle_compute_instant_unstake(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, None, None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
 
     Ok(stats)
 }

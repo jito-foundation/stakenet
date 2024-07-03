@@ -138,7 +138,7 @@ pub async fn post_create_update(
         .await?,
     );
 
-    keeper_state.all_validator_accounts = Some(
+    keeper_state.all_active_validator_accounts = Some(
         get_all_validator_accounts(&keeper_config.client, program_id, MIN_VOTE_EPOCHS).await?,
     );
 
