@@ -14,8 +14,7 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 
 use crate::utils::accounts::{
-    check_stake_accounts, get_all_steward_validator_accounts, get_unprogressed_validators,
-    AllStewardValidatorAccounts,
+    check_stake_accounts, get_all_steward_validator_accounts, get_all_validator_accounts, get_unprogressed_validators, AllValidatorAccounts
 };
 use crate::utils::transactions::print_errors_if_any;
 use crate::{
@@ -42,16 +41,108 @@ pub enum MonkeyCrankError {
     Custom(String),
 }
 
+async fn _handle_adding_validators(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+    epoch: u64,
+    all_steward_accounts: &AllStewardAccounts,
+    all_validator_accounts: &AllValidatorAccounts,
+    all_vote_accounts: &AllValidatorAccounts,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, MonkeyCrankError> {
+
+    let mut keys_to_add: Vec<&Pubkey> = vec![];
+    all_vote_accounts.all_history_vote_account_map.keys().for_each(|key|{
+        if all_validator_accounts.all_history_vote_account_map.keys().find(|k|
+            *k == key
+        ).is_none() {
+            keys_to_add.push(key);
+        }
+    });
+
+    let mut accounts_to_check: AllValidatorAccounts = AllValidatorAccounts::default(); 
+    all_vote_accounts.all_history_vote_account_map.keys().for_each(|key|{
+        if keys_to_add.contains(&key) {
+            accounts_to_check.all_history_vote_account_map.insert(*key, all_vote_accounts.all_history_vote_account_map.get(key).unwrap().clone());
+            accounts_to_check.all_stake_account_map.insert(*key, all_vote_accounts.all_stake_account_map.get(key).unwrap().clone());
+        }
+    });
+
+    let checks = check_stake_accounts(&accounts_to_check, epoch);
+
+
+    let good_vote_accounts = checks
+        .iter()
+        .filter_map(|(vote_account, check)| {
+            if check.has_history && !check.is_deactivated {
+                Some(*vote_account)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<Pubkey>>();
+
+        let ixs_to_run = good_vote_accounts
+        .iter()
+        .filter_map(|vote_account| {
+                        let history_account =
+                get_validator_history_address(vote_account, &validator_history::id());
+
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+            Some(Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::AutoAddValidator {
+                    config: all_steward_accounts.config_address,
+                    steward_state: all_steward_accounts.state_address,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: all_steward_accounts.stake_pool_address,
+                    validator_history_account: history_account,
+                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: all_steward_accounts.validator_list_address,
+                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::ID,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::AutoAddValidatorToPool {
+                }
+                .data(),
+            })
+        })
+        .collect::<Vec<Instruction>>();
+
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+
+    println!("Submitting {} instructions", ixs_to_run.len());
+    println!("Submitting {} transactions", txs_to_run.len());
+
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+
+    Ok(stats) 
+
+}
+
+
 async fn _handle_delinquent_validators(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
-    all_validator_accounts: &AllStewardValidatorAccounts,
+    all_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    let checks = check_stake_accounts(all_steward_accounts, all_validator_accounts, epoch);
+    let checks = check_stake_accounts(all_validator_accounts, epoch);
 
     let bad_vote_accounts = checks
         .iter()
@@ -434,7 +525,8 @@ pub async fn crank_monkey(
     program_id: &Pubkey,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
-    all_validator_accounts: &AllStewardValidatorAccounts,
+    all_validator_accounts: &AllValidatorAccounts,
+    all_vote_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut return_stats = SubmitStats::default();
@@ -464,10 +556,22 @@ pub async fn crank_monkey(
 
     {
         // --------- CHECK VALIDATORS TO ADD -----------
-
+        println!("Adding good validators...");
         // Any validator that has new history account
         // Anything that would pass the benchmark
         // Find any validators that that are not in pool
+        let stats = _handle_adding_validators(
+            payer,
+            client,
+            program_id,
+            epoch,
+            all_steward_accounts,
+            all_validator_accounts,
+            all_vote_accounts,
+            priority_fee,
+        ).await?;
+
+        return_stats.combine(&stats);
     }
 
     {
@@ -614,6 +718,8 @@ pub async fn command_crank_monkey(
         get_all_steward_validator_accounts(client, &all_steward_accounts, &validator_history::id())
             .await?;
 
+    let all_vote_accounts = get_all_validator_accounts(client, &validator_history::id(), 5).await?;
+
     let epoch = client.get_epoch_info().await?.epoch;
 
     let _ = crank_monkey(
@@ -623,6 +729,7 @@ pub async fn command_crank_monkey(
         epoch,
         &all_steward_accounts,
         &all_validator_accounts,
+        &all_vote_accounts,
         priority_fee,
     )
     .await?;
