@@ -203,6 +203,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     .all_steward_validator_accounts
                     .as_ref()
                     .unwrap(),
+                keeper_state
+                    .all_validator_accounts
+                    .as_ref()
+                    .unwrap(),
                 Some(300_000),
             )
             .await;

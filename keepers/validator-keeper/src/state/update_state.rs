@@ -9,7 +9,7 @@ use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAcc
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
-use steward_cli::utils::accounts::{get_all_steward_accounts, get_all_steward_validator_accounts};
+use steward_cli::utils::accounts::{get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts};
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
 use crate::{
@@ -136,6 +136,10 @@ pub async fn post_create_update(
             program_id,
         )
         .await?,
+    );
+
+    keeper_state.all_validator_accounts = Some(
+        get_all_validator_accounts(&keeper_config.client, program_id, MIN_VOTE_EPOCHS).await?,
     );
 
     Ok(())
