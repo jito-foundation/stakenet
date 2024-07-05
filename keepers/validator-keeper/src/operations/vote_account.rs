@@ -57,7 +57,7 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
 
     let operation = _get_operation();

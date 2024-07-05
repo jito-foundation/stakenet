@@ -7,8 +7,10 @@ use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 pub struct KeeperConfig {
     pub client: Arc<RpcClient>,
     pub keypair: Arc<Keypair>,
-    pub program_id: Pubkey,
+    pub validator_history_program_id: Pubkey,
     pub tip_distribution_program_id: Pubkey,
+    pub steward_program_id: Pubkey,
+    pub steward_config: Pubkey,
     pub priority_fee_in_microlamports: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
@@ -47,7 +49,7 @@ pub struct Args {
         env,
         default_value = "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa"
     )]
-    pub program_id: Pubkey,
+    pub validator_history_program_id: Pubkey,
 
     /// Tip distribution program ID (Pubkey as base58 string)
     #[arg(
@@ -57,6 +59,23 @@ pub struct Args {
         default_value = "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7"
     )]
     pub tip_distribution_program_id: Pubkey,
+
+    /// Steward program ID
+    #[arg(
+        long,
+        env,
+        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
+    )]
+    pub steward_program_id: Pubkey,
+
+    /// Steward config account
+    #[arg(
+        long,
+        env,
+        default_value = "AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq"
+    )]
+    pub steward_config: Pubkey, 
+
 
     // Interval to update Validator History Accounts (default 300 sec)
     #[arg(short, long, env, default_value = "300")]

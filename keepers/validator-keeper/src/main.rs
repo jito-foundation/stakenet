@@ -267,9 +267,11 @@ async fn main() {
     let config = KeeperConfig {
         client,
         keypair,
-        program_id: args.program_id,
+        validator_history_program_id: args.validator_history_program_id,
         tip_distribution_program_id: args.tip_distribution_program_id,
         priority_fee_in_microlamports: args.priority_fees,
+        steward_program_id: args.steward_program_id,
+        steward_config: args.steward_config,
         oracle_authority_keypair,
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,

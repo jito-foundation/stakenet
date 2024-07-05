@@ -409,7 +409,7 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
-                    debug!("Submitted: {:?}", signature);
+                    debug!("🟨 Submitted: {:?}", signature);
                     println!("🟨 Submitted: {:?}", signature);
                     submitted_signatures.insert(signature, idx);
                 }
@@ -417,11 +417,13 @@ pub async fn parallel_execute_transactions(
                     debug!("Transaction error: {:?}", e);
                     match e.get_transaction_error() {
                         Some(TransactionError::BlockhashNotFound) => {
+                            debug!("🟧 Blockhash not found");
                             println!("🟧 Blockhash not found");
                             is_blockhash_not_found = true;
                         }
                         Some(TransactionError::AlreadyProcessed) => {
-                            println!("🟧 Already Processed");
+                            debug!("🟪 Already Processed");
+                            println!("🟪 Already Processed");
                             submitted_signatures.insert(tx.signatures[0], idx);
                         }
                         Some(_) => {
@@ -532,20 +534,22 @@ pub async fn parallel_execute_transactions(
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
 
-        let signatures_to_submit: HashSet<Signature> =submitted_signatures.clone().into_keys().collect(); 
+        let signatures_to_check: HashSet<Signature> =submitted_signatures.clone().into_keys().collect(); 
 
-        if signatures_to_submit.is_empty() {
+        if signatures_to_check.is_empty() {
             break;
         }
         
         let signatures = parallel_confirm_transactions(
             client,
-            signatures_to_submit
+            signatures_to_check
         ).await; 
 
         for signature in signatures
         {
             results[submitted_signatures[&signature]] = Ok(());
+            debug!("🟩 Completed: {:?}", signature);
+            println!("🟩 Completed: {:?}", signature);
         }
 
         if results.iter().all(|r| r.is_ok()) {

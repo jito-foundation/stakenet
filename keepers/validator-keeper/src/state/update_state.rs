@@ -25,7 +25,7 @@ pub async fn pre_create_update(
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let keypair = &keeper_config.keypair;
 
     // Update Epoch
@@ -69,7 +69,7 @@ pub async fn create_missing_accounts(
     keeper_state: &KeeperState,
 ) -> Result<Vec<(KeeperCreates, usize)>, Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let keypair = &keeper_config.keypair;
 
     let mut created_accounts_for_epoch = vec![];
@@ -91,11 +91,11 @@ pub async fn post_create_update(
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let validator_history_program_id = &keeper_config.validator_history_program_id;
     let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
 
     // Update Validator History Accounts
-    keeper_state.validator_history_map = get_validator_history_map(client, program_id).await?;
+    keeper_state.validator_history_map = get_validator_history_map(client, validator_history_program_id).await?;
 
     // Get all history vote accounts
     keeper_state.all_history_vote_account_map =
@@ -119,13 +119,8 @@ pub async fn post_create_update(
     )
     .await?;
 
-    //TODO change to config
-    let steward_program_id = jito_steward::id();
-    let steward_config = Pubkey::from_str("AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq")
-        .expect("Error parsing config pubkey");
-
     keeper_state.all_steward_accounts = Some(
-        get_all_steward_accounts(&keeper_config.client, &steward_program_id, &steward_config)
+        get_all_steward_accounts(&keeper_config.client, &keeper_config.steward_program_id, &keeper_config.steward_config)
             .await?,
     );
 
@@ -133,13 +128,19 @@ pub async fn post_create_update(
         get_all_steward_validator_accounts(
             &keeper_config.client,
             keeper_state.all_steward_accounts.as_ref().unwrap(),
-            program_id,
+            validator_history_program_id,
         )
         .await?,
     );
 
+    let all_get_vote_accounts: Vec<RpcVoteAccountInfo> = keeper_state
+        .vote_account_map
+        .values()
+        .cloned()
+        .collect();
+
     keeper_state.all_active_validator_accounts = Some(
-        get_all_validator_accounts(&keeper_config.client, program_id, MIN_VOTE_EPOCHS).await?,
+        get_all_validator_accounts(&keeper_config.client, &all_get_vote_accounts, validator_history_program_id, ).await?,
     );
 
     Ok(())
