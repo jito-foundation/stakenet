@@ -9,7 +9,6 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::signature::read_keypair_file;
 use std::{sync::Arc, time::Duration};
-use steward_cli::commands::monkey::crank::crank_monkey;
 use tokio::time::sleep;
 use validator_keeper::{
     operations::{
@@ -188,27 +187,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // MONKEY
         if should_fire(tick, monkey_interval) {
-            info!("Monkeying around...");
-
-            let steward_program_id = jito_steward::id();
-
-            let _ = crank_monkey(
-                &keeper_config.client,
-                &keeper_config.keypair,
-                &steward_program_id,
-                keeper_state.epoch_info.epoch,
-                keeper_state.all_steward_accounts.as_ref().unwrap(),
-                keeper_state
-                    .all_steward_validator_accounts
-                    .as_ref()
-                    .unwrap(),
-                keeper_state
-                    .all_active_validator_accounts
-                    .as_ref()
-                    .unwrap(),
-                Some(300_000),
-            )
-            .await;
+            info!("Cranking Steward...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::steward::fire(&keeper_config, &keeper_state).await,
+            );
         }
 
         // ---------------------- EMIT ---------------------------------

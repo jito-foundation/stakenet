@@ -3,7 +3,8 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::StewardStateEnum;
 use keeper_core::{
-    get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats, TransactionExecutionError
+    get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats,
+    TransactionExecutionError,
 };
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
@@ -14,7 +15,8 @@ use solana_sdk::{
 use thiserror::Error as ThisError;
 
 use crate::utils::accounts::{
-    check_stake_accounts, get_all_steward_validator_accounts, get_all_validator_accounts, get_unprogressed_validators, AllValidatorAccounts
+    check_stake_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+    get_unprogressed_validators, AllValidatorAccounts,
 };
 use crate::utils::transactions::print_errors_if_any;
 use crate::{
@@ -51,31 +53,54 @@ async fn _handle_adding_validators(
     all_vote_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-
     let mut keys_to_add: Vec<&Pubkey> = vec![];
-    all_vote_accounts.all_history_vote_account_map.keys().for_each(|key|{
-        if all_validator_accounts.all_history_vote_account_map.keys().find(|k|
-            *k == key
-        ).is_none() {
-            keys_to_add.push(key);
-        }
-    });
+    all_vote_accounts
+        .all_history_vote_account_map
+        .keys()
+        .for_each(|key| {
+            if all_validator_accounts
+                .all_history_vote_account_map
+                .keys()
+                .find(|k| *k == key)
+                .is_none()
+            {
+                keys_to_add.push(key);
+            }
+        });
 
-    let mut accounts_to_check: AllValidatorAccounts = AllValidatorAccounts::default(); 
-    all_vote_accounts.all_history_vote_account_map.keys().for_each(|key|{
-        if keys_to_add.contains(&key) {
-            accounts_to_check.all_history_vote_account_map.insert(*key, all_vote_accounts.all_history_vote_account_map.get(key).unwrap().clone());
-            accounts_to_check.all_stake_account_map.insert(*key, all_vote_accounts.all_stake_account_map.get(key).unwrap().clone());
-        }
-    });
+    let mut accounts_to_check: AllValidatorAccounts = AllValidatorAccounts::default();
+    all_vote_accounts
+        .all_history_vote_account_map
+        .keys()
+        .for_each(|key| {
+            if keys_to_add.contains(&key) {
+                accounts_to_check.all_history_vote_account_map.insert(
+                    *key,
+                    all_vote_accounts
+                        .all_history_vote_account_map
+                        .get(key)
+                        .unwrap()
+                        .clone(),
+                );
+                accounts_to_check.all_stake_account_map.insert(
+                    *key,
+                    all_vote_accounts
+                        .all_stake_account_map
+                        .get(key)
+                        .unwrap()
+                        .clone(),
+                );
+            }
+        });
 
     let checks = check_stake_accounts(&accounts_to_check, epoch);
 
     let good_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-
             if check.has_history && !check.has_stake_account {
+                //TODO check criteria
+
                 Some(*vote_account)
             } else {
                 None
@@ -83,10 +108,10 @@ async fn _handle_adding_validators(
         })
         .collect::<Vec<Pubkey>>();
 
-        let ixs_to_run = good_vote_accounts
+    let ixs_to_run = good_vote_accounts
         .iter()
         .filter_map(|vote_account| {
-                        let history_account =
+            let history_account =
                 get_validator_history_address(vote_account, &validator_history::id());
 
             let stake_address =
@@ -113,9 +138,7 @@ async fn _handle_adding_validators(
                     stake_config: stake::config::ID,
                 }
                 .to_account_metas(None),
-                data: jito_steward::instruction::AutoAddValidatorToPool {
-                }
-                .data(),
+                data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
             })
         })
         .collect::<Vec<Instruction>>();
@@ -128,10 +151,8 @@ async fn _handle_adding_validators(
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
-    Ok(stats) 
-
+    Ok(stats)
 }
-
 
 async fn _handle_delinquent_validators(
     payer: &Arc<Keypair>,
@@ -283,7 +304,8 @@ async fn _handle_epoch_maintenance(
 
         println!("Submitting Epoch Maintenance");
         let new_stats =
-            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None)
+                .await?;
 
         stats.combine(&new_stats);
         print_errors_if_any(&stats);
@@ -569,7 +591,8 @@ pub async fn crank_monkey(
             all_steward_validator_accounts,
             all_active_validator_accounts,
             priority_fee,
-        ).await?;
+        )
+        .await?;
 
         return_stats.combine(&stats);
     }
@@ -718,10 +741,11 @@ pub async fn command_crank_monkey(
         get_all_steward_validator_accounts(client, &all_steward_accounts, &validator_history::id())
             .await?;
 
-
     let all_active_vote_accounts = get_vote_accounts_with_retry(client, 5, None).await?;
 
-    let all_active_validator_accounts = get_all_validator_accounts(client, &all_active_vote_accounts, &validator_history::id()).await?;
+    let all_active_validator_accounts =
+        get_all_validator_accounts(client, &all_active_vote_accounts, &validator_history::id())
+            .await?;
 
     let epoch = client.get_epoch_info().await?.epoch;
 

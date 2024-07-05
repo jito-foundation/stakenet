@@ -114,29 +114,34 @@ pub async fn debug_send_single_transaction(
     result
 }
 
+pub fn format_steward_error_log(error: &SendTransactionError) -> String {
+    let mut error_logs = String::new();
+
+    match error {
+        SendTransactionError::ExceededRetries => {
+            error_logs.push_str("Exceeded Retries");
+        }
+        SendTransactionError::TransactionError(e) => {
+            error_logs.push_str(format!("Transaction: {:?}", e).as_str());
+        }
+        SendTransactionError::RpcSimulateTransactionResult(e) => {
+            error_logs.push_str("Preflight Error:");
+
+            e.logs.iter().for_each(|log| {
+                log.iter().enumerate().for_each(|(i, log)| {
+                    error_logs.push_str(format!("{}: {:?}", i, log).as_str());
+                });
+            });
+        }
+    }
+
+    error_logs
+}
+
 pub fn print_errors_if_any(submit_stats: &SubmitStats) {
     submit_stats.results.iter().for_each(|result| {
         if let Err(error) = result {
-            // Access and print the error
-            match error {
-                SendTransactionError::ExceededRetries => {
-                    // Continue
-                    println!("Exceeded Retries: {:?}", error);
-                }
-                SendTransactionError::TransactionError(e) => {
-                    // Flag
-                    println!("Transaction: {:?}", e);
-                }
-                SendTransactionError::RpcSimulateTransactionResult(e) => {
-                    // Recover
-                    println!("\n\nERROR: ");
-                    e.logs.iter().for_each(|log| {
-                        log.iter().enumerate().for_each(|(i, log)| {
-                            println!("{}: {:?}", i, log);
-                        });
-                    });
-                }
-            }
+            println!("{}", format_steward_error_log(error));
         }
     });
 }

@@ -6,3 +6,4 @@ pub mod mev_commission;
 pub mod mev_earned;
 pub mod stake_upload;
 pub mod vote_account;
+pub mod steward;

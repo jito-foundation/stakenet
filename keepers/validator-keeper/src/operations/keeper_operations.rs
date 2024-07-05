@@ -36,11 +36,12 @@ pub enum KeeperOperations {
     VoteAccount,
     MevEarned,
     MevCommission,
+    Steward,
     EmitMetrics,
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 10;
+    pub const LEN: usize = 11;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
@@ -215,6 +216,22 @@ impl KeeperOperations {
             (
                 "num-emit-metrics-txs",
                 txs_for_epoch[KeeperOperations::EmitMetrics as usize],
+                i64
+            ),
+            // STEWARD
+            (
+                "num-steward-runs",
+                runs_for_epoch[KeeperOperations::Steward as usize],
+                i64
+            ),
+            (
+                "num-steward-errors",
+                errors_for_epoch[KeeperOperations::Steward as usize],
+                i64
+            ),
+            (
+                "num-steward-txs",
+                txs_for_epoch[KeeperOperations::Steward as usize],
                 i64
             ),
         );
