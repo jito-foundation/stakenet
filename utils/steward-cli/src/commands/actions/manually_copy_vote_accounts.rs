@@ -3,12 +3,11 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 
-use keeper_core::SendTransactionError;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer
 };
 
 use crate::{

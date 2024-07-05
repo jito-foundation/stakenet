@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::StewardStateEnum;
 use keeper_core::{
-    MultipleAccountsError, SendTransactionError, SubmitStats, TransactionExecutionError,
+    get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats, TransactionExecutionError
 };
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
@@ -71,11 +71,11 @@ async fn _handle_adding_validators(
 
     let checks = check_stake_accounts(&accounts_to_check, epoch);
 
-
     let good_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-            if check.has_history && !check.is_deactivated {
+
+            if check.has_history && !check.has_stake_account {
                 Some(*vote_account)
             } else {
                 None
@@ -525,8 +525,8 @@ pub async fn crank_monkey(
     program_id: &Pubkey,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
-    all_validator_accounts: &AllValidatorAccounts,
-    all_vote_accounts: &AllValidatorAccounts,
+    all_steward_validator_accounts: &AllValidatorAccounts,
+    all_active_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut return_stats = SubmitStats::default();
@@ -566,8 +566,8 @@ pub async fn crank_monkey(
             program_id,
             epoch,
             all_steward_accounts,
-            all_validator_accounts,
-            all_vote_accounts,
+            all_steward_validator_accounts,
+            all_active_validator_accounts,
             priority_fee,
         ).await?;
 
@@ -584,7 +584,7 @@ pub async fn crank_monkey(
             program_id,
             epoch,
             all_steward_accounts,
-            all_validator_accounts,
+            all_steward_validator_accounts,
             priority_fee,
         )
         .await?;
@@ -714,11 +714,14 @@ pub async fn command_crank_monkey(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let all_validator_accounts =
+    let all_steward_validator_accounts =
         get_all_steward_validator_accounts(client, &all_steward_accounts, &validator_history::id())
             .await?;
 
-    let all_vote_accounts = get_all_validator_accounts(client, &validator_history::id(), 5).await?;
+
+    let all_active_vote_accounts = get_vote_accounts_with_retry(client, 5, None).await?;
+
+    let all_active_validator_accounts = get_all_validator_accounts(client, &all_active_vote_accounts, &validator_history::id()).await?;
 
     let epoch = client.get_epoch_info().await?.epoch;
 
@@ -728,8 +731,8 @@ pub async fn command_crank_monkey(
         &program_id,
         epoch,
         &all_steward_accounts,
-        &all_validator_accounts,
-        &all_vote_accounts,
+        &all_steward_validator_accounts,
+        &all_active_validator_accounts,
         priority_fee,
     )
     .await?;

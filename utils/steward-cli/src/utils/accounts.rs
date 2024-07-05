@@ -6,8 +6,8 @@ use jito_steward::{
     utils::{StakePool, ValidatorList},
     Config, StewardStateAccount,
 };
-use keeper_core::{get_multiple_accounts_batched, get_vote_accounts_with_retry};
-use solana_client::nonblocking::rpc_client::RpcClient;
+use keeper_core::get_multiple_accounts_batched;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
     account::Account, borsh0_10::try_from_slice_unchecked,  pubkey::Pubkey, stake::state::StakeStateV2
 };
@@ -45,11 +45,9 @@ impl Default for AllValidatorAccounts {
 
 pub async fn get_all_validator_accounts(
     client: &Arc<RpcClient>,
+    all_vote_accounts: &Vec<RpcVoteAccountInfo>,
     validator_history_program_id: &Pubkey,
-    min_vote_epochs: usize,
 ) -> Result<Box<AllValidatorAccounts>> {
-
-    let all_vote_accounts = get_vote_accounts_with_retry(client, min_vote_epochs, None).await?;   
 
     let accounts_to_fetch = all_vote_accounts.iter().map(|vote_account| {
         let vote_account = Pubkey::from_str(&vote_account.vote_pubkey).expect("Could not parse vote account");
@@ -352,7 +350,8 @@ pub fn get_unprogressed_validators(
 pub struct StakeAccountChecks {
     pub is_deactivated: bool,
     pub has_history: bool,
-    pub deactivation_epoch: u64,
+    pub deactivation_epoch: Option<u64>,
+    pub has_stake_account: bool,
 }
 
 pub fn check_stake_accounts(
@@ -387,14 +386,14 @@ pub fn check_stake_accounts(
                         StakeStateV2::Stake(_, stake, _) => stake.delegation.deactivation_epoch,
                         _ => 0,
                     }
-                })
-                .unwrap_or(0);
+                });
 
             let has_history = history_account.is_some();
 
             StakeAccountChecks {
-                is_deactivated: deactivation_epoch < epoch,
+                is_deactivated: deactivation_epoch.is_some() && deactivation_epoch.unwrap_or(0) < epoch,
                 has_history,
+                has_stake_account: stake_account.is_some(),
                 deactivation_epoch,
             }
         })
