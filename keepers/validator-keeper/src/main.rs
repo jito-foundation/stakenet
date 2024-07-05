@@ -176,16 +176,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 );
             }
         }
-
-        // ON-CHAIN METRICS
-        if should_fire(tick, metrics_interval) {
-            info!("Emitting metrics...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::metrics_emit::fire(&keeper_state).await,
-            );
-        }
-
-        // MONKEY
+        // ---------------------- STEWARD ---------------------------------
         if should_fire(tick, monkey_interval) {
             info!("Cranking Steward...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
@@ -194,6 +185,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // ---------------------- EMIT ---------------------------------
+
+        if should_fire(tick, metrics_interval) {
+            info!("Emitting metrics...");
+            keeper_state
+                .set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(&keeper_state));
+        }
+
         if should_emit(tick, &intervals) {
             keeper_state.emit();
 

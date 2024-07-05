@@ -37,7 +37,7 @@ pub enum KeeperOperations {
     MevEarned,
     MevCommission,
     Steward,
-    EmitMetrics,
+    EmitHistory,
 }
 
 impl KeeperOperations {
@@ -202,20 +202,20 @@ impl KeeperOperations {
                 txs_for_epoch[KeeperOperations::MevCommission as usize],
                 i64
             ),
-            // EMIT METRICS
+            // EMIT HISTORY
             (
                 "num-emit-metrics-runs",
-                runs_for_epoch[KeeperOperations::EmitMetrics as usize],
+                runs_for_epoch[KeeperOperations::EmitHistory as usize],
                 i64
             ),
             (
                 "num-emit-metrics-errors",
-                errors_for_epoch[KeeperOperations::EmitMetrics as usize],
+                errors_for_epoch[KeeperOperations::EmitHistory as usize],
                 i64
             ),
             (
                 "num-emit-metrics-txs",
-                txs_for_epoch[KeeperOperations::EmitMetrics as usize],
+                txs_for_epoch[KeeperOperations::EmitHistory as usize],
                 i64
             ),
             // STEWARD
