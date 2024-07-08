@@ -1,18 +1,22 @@
 use std::sync::Arc;
 
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use jito_steward::StewardStateEnum;
 use keeper_core::{
     get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats,
     TransactionExecutionError,
 };
+use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
 
+use solana_sdk::config;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
+    borsh0_10::try_from_slice_unchecked, pubkey::Pubkey, signature::read_keypair_file,
+    signature::Keypair, stake, system_program,
 };
 use thiserror::Error as ThisError;
+use validator_history::ValidatorHistory;
 
 use crate::utils::accounts::{
     check_stake_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
@@ -49,16 +53,16 @@ async fn _handle_adding_validators(
     program_id: &Pubkey,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
+    all_steward_validator_accounts: &AllValidatorAccounts,
     all_validator_accounts: &AllValidatorAccounts,
-    all_vote_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut keys_to_add: Vec<&Pubkey> = vec![];
-    all_vote_accounts
+    all_validator_accounts
         .all_history_vote_account_map
         .keys()
         .for_each(|key| {
-            if all_validator_accounts
+            if all_steward_validator_accounts
                 .all_history_vote_account_map
                 .keys()
                 .find(|k| *k == key)
@@ -69,14 +73,14 @@ async fn _handle_adding_validators(
         });
 
     let mut accounts_to_check: AllValidatorAccounts = AllValidatorAccounts::default();
-    all_vote_accounts
+    all_validator_accounts
         .all_history_vote_account_map
         .keys()
         .for_each(|key| {
             if keys_to_add.contains(&key) {
                 accounts_to_check.all_history_vote_account_map.insert(
                     *key,
-                    all_vote_accounts
+                    all_validator_accounts
                         .all_history_vote_account_map
                         .get(key)
                         .unwrap()
@@ -84,7 +88,7 @@ async fn _handle_adding_validators(
                 );
                 accounts_to_check.all_stake_account_map.insert(
                     *key,
-                    all_vote_accounts
+                    all_validator_accounts
                         .all_stake_account_map
                         .get(key)
                         .unwrap()
@@ -95,13 +99,71 @@ async fn _handle_adding_validators(
 
     let checks = check_stake_accounts(&accounts_to_check, epoch);
 
+    let min_stake_lamports = all_steward_accounts
+        .config_account
+        .parameters
+        .minimum_stake_lamports;
+
     let good_vote_accounts = checks
         .iter()
-        .filter_map(|(vote_account, check)| {
+        .filter_map(|(vote_address, check)| {
             if check.has_history && !check.has_stake_account {
-                //TODO check criteria
+                let raw_history_account = all_validator_accounts
+                    .all_history_vote_account_map
+                    .get(vote_address)
+                    .unwrap();
 
-                Some(*vote_account)
+                match raw_history_account {
+                    Some(raw_history_account) => {
+                        let history_account = ValidatorHistory::try_deserialize(
+                            &mut raw_history_account.data.as_slice(),
+                        )
+                        .ok()
+                        .unwrap();
+
+                        let start_epoch = epoch.saturating_sub(
+                            all_steward_accounts
+                                .config_account
+                                .parameters
+                                .minimum_voting_epochs
+                                .saturating_sub(1),
+                        );
+                        if let Some(entry) = history_account.history.last() {
+                            // Steward requires that validators have been active for last minimum_voting_epochs epochs
+                            if history_account
+                                .history
+                                .epoch_credits_range(start_epoch as u16, epoch as u16)
+                                .iter()
+                                .any(|entry| entry.is_none())
+                            {
+                                println!("Validator {} below liveness minimum", vote_address);
+                                return None;
+                            }
+                            if entry.activated_stake_lamports
+                                < all_steward_accounts
+                                    .config_account
+                                    .parameters
+                                    .minimum_stake_lamports
+                            {
+                                println!(
+                                    "Validator {} below minimum. Required: {} Actual: {}",
+                                    vote_address,
+                                    min_stake_lamports,
+                                    entry.activated_stake_lamports
+                                );
+                                return None;
+                            }
+                        } else {
+                            println!("Validator {} below liveness minimum", vote_address);
+                            return None;
+                        }
+                    }
+                    _ => {
+                        return None;
+                    }
+                }
+
+                Some(*vote_address)
             } else {
                 None
             }

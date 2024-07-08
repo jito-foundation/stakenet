@@ -59,7 +59,7 @@ pub async fn get_all_validator_accounts(
         (vote_account, stake_account, history_account)
     });
 
-    let vote_accounts: Vec<Pubkey> = accounts_to_fetch
+    let vote_addresses: Vec<Pubkey> = accounts_to_fetch
         .clone()
         .into_iter()
         .map(|(vote_account, _, _)| vote_account)
@@ -84,13 +84,14 @@ pub async fn get_all_validator_accounts(
         get_multiple_accounts_batched(history_accounts_to_fetch.as_slice(), client).await?;
 
     Ok(Box::new(AllValidatorAccounts {
-        all_history_vote_account_map: vote_accounts
+        all_history_vote_account_map: vote_addresses
             .clone()
             .into_iter()
             .zip(history_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
 
-        all_stake_account_map: vote_accounts
+        all_stake_account_map: vote_addresses
+            .clone()
             .into_iter()
             .zip(stake_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
@@ -116,7 +117,7 @@ pub async fn get_all_steward_validator_accounts(
             (vote_account, stake_account, history_account)
         });
 
-    let vote_accounts: Vec<Pubkey> = accounts_to_fetch
+    let vote_addresses: Vec<Pubkey> = accounts_to_fetch
         .clone()
         .into_iter()
         .map(|(vote_account, _, _)| vote_account)
@@ -141,13 +142,14 @@ pub async fn get_all_steward_validator_accounts(
         get_multiple_accounts_batched(history_accounts_to_fetch.as_slice(), client).await?;
 
     Ok(Box::new(AllValidatorAccounts {
-        all_history_vote_account_map: vote_accounts
+        all_history_vote_account_map: vote_addresses
             .clone()
             .into_iter()
             .zip(history_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
 
-        all_stake_account_map: vote_accounts
+        all_stake_account_map: vote_addresses
+            .clone()
             .into_iter()
             .zip(stake_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
