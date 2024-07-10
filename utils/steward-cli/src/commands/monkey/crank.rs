@@ -6,14 +6,11 @@ use keeper_core::{
     get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats,
     TransactionExecutionError,
 };
-use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
 
-use solana_sdk::config;
 use solana_sdk::{
-    borsh0_10::try_from_slice_unchecked, pubkey::Pubkey, signature::read_keypair_file,
-    signature::Keypair, stake, system_program,
+    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
 };
 use thiserror::Error as ThisError;
 use validator_history::ValidatorHistory;
@@ -222,10 +219,10 @@ async fn _handle_delinquent_validators(
     program_id: &Pubkey,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
-    all_validator_accounts: &AllValidatorAccounts,
+    all_steward_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
-    let checks = check_stake_accounts(all_validator_accounts, epoch);
+    let checks = check_stake_accounts(all_steward_validator_accounts, epoch);
 
     let bad_vote_accounts = checks
         .iter()
