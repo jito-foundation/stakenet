@@ -263,6 +263,7 @@ fn _print_default_state(
         "Validators marked to remove: {}\n",
         state.validators_to_remove.count()
     );
+    formatted_string += &format!("Validators added: {}\n", state.validators_added);
     formatted_string += "\n";
     formatted_string += "---------------------";
 
