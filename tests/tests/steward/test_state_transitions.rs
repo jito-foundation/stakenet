@@ -3,7 +3,9 @@
     These tests cover all possible state transitions when calling the `transition` method on the `StewardState` struct.
 */
 
-use jito_steward::{constants::MAX_VALIDATORS, Delegation, StewardStateEnum, REBALANCE};
+use jito_steward::{
+    constants::MAX_VALIDATORS, Delegation, StewardStateEnum, REBALANCE, RESET_TO_IDLE,
+};
 use tests::steward_fixtures::StateMachineFixtures;
 
 #[test]
@@ -274,15 +276,13 @@ pub fn test_compute_instant_unstake_to_rebalance() {
 pub fn test_compute_instant_unstake_to_idle() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
-    let current_epoch = fixtures.clock.epoch;
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeInstantUnstake;
-    clock.epoch = current_epoch + 1;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
+    state.set_flag(RESET_TO_IDLE);
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -350,8 +350,8 @@ pub fn test_rebalance_to_idle() {
     // Test didn't finish rebalance case
     state.state_tag = StewardStateEnum::Rebalance;
     state.progress.reset();
-    clock.epoch += 1;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
+    state.set_flag(RESET_TO_IDLE);
+
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
