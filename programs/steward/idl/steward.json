@@ -2741,44 +2741,18 @@
             "type": "u64"
           },
           {
+            "name": "status_flags",
+            "docs": [
+              "Various flags to track state progress - See"
+            ],
+            "type": "u32"
+          },
+          {
             "name": "validators_added",
             "docs": [
               "Number of validators added to the pool in the current cycle"
             ],
             "type": "u16"
-          },
-          {
-            "name": "compute_delegations_completed",
-            "docs": [
-              "Tracks whether delegation computation has been completed"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
-          },
-          {
-            "name": "rebalance_completed",
-            "docs": [
-              "Tracks whether unstake and delegate steps have completed"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
-          },
-          {
-            "name": "checked_validators_removed_from_list",
-            "docs": [
-              "So we only have to check the validator list once for `ReadyToRemove`"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
           },
           {
             "name": "_padding0",
@@ -2788,7 +2762,7 @@
             "type": {
               "array": [
                 "u8",
-                40003
+                40002
               ]
             }
           }
