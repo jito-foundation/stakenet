@@ -231,6 +231,7 @@ impl IdlBuild for StewardStateEnum {
 }
 
 // BITS 0-7 COMPLETED PROGRESS FLAGS
+// Used to mark the completion of a particular state
 pub const COMPUTE_SCORE: u32 = 1 << 0;
 pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
 pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
@@ -240,7 +241,14 @@ pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
+/// In epoch maintenance, we only need to check the validator pool
+/// once for any validators that still need to be removed
+/// when there are no validators to remove from the pool, the operation continues
+/// and this condition is not checked again
 pub const CHECKED_VALIDATORS_REMOVED_FROM_LIST: u32 = 1 << 16;
+/// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
+/// state transition layer that it needs to be reset to the IDLE state
+/// this flag is set in in epoch_maintenance and unset in the IDLE state transition
 pub const RESET_TO_IDLE: u32 = 1 << 17;
 // BITS 24-31 RESERVED FOR FUTURE USE
 
@@ -429,7 +437,7 @@ impl StewardState {
     }
 
     /// Update internal state when transitioning to a new cycle, and ComputeScores restarts
-    pub fn reset_state_for_new_cycle(
+    fn reset_state_for_new_cycle(
         &mut self,
         current_epoch: u64,
         current_slot: u64,
