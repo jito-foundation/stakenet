@@ -3,7 +3,7 @@
     These tests cover all possible state transitions when calling the `transition` method on the `StewardState` struct.
 */
 
-use jito_steward::{constants::MAX_VALIDATORS, Delegation, StewardStateEnum};
+use jito_steward::{constants::MAX_VALIDATORS, Delegation, StewardStateEnum, REBALANCE};
 use tests::steward_fixtures::StateMachineFixtures;
 
 #[test]
@@ -214,7 +214,7 @@ pub fn test_idle_noop() {
 
     // Case 2: still after instant_unstake_epoch_progress but after rebalance is completed
     clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
-    state.rebalance_completed = true.into();
+    state.set_flag(REBALANCE);
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
