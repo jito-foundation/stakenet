@@ -15,6 +15,41 @@ use crate::{
     operations::keeper_operations::{KeeperCreates, KeeperOperations},
 };
 
+pub struct StewardProgressFlags {
+    pub flags: u8,
+}
+
+pub enum StewardProgressFlag {
+    ComputeScores = 0x01 << 0,
+    ComputeDelegations = 0x01 << 1,
+    EpochMaintenance = 0x01 << 2,
+    PreLoopIdle = 0x01 << 3,
+    ComputeInstantUnstakes = 0x01 << 4,
+    Rebalance = 0x01 << 5,
+    PostLoopIdle = 0x01 << 6,
+}
+
+impl StewardProgressFlags {
+    // Set a flag
+    pub fn set_flag(&mut self, flag: StewardProgressFlag) {
+        self.flags |= flag as u8;
+    }
+
+    pub fn clean_flags(&mut self) {
+        self.flags = 0;
+    }
+
+    // Unset a flag
+    pub fn unset_flag(&mut self, flag: StewardProgressFlag) {
+        self.flags &= !(flag as u8);
+    }
+
+    // Check if a flag is set
+    pub fn has_flag(&self, flag: StewardProgressFlag) -> bool {
+        self.flags & (flag as u8) != 0
+    }
+}
+
 pub struct KeeperState {
     pub startup_flag: bool,
     pub epoch_info: EpochInfo,
@@ -48,6 +83,7 @@ pub struct KeeperState {
     pub all_steward_accounts: Option<Box<AllStewardAccounts>>,
     pub all_steward_validator_accounts: Option<Box<AllValidatorAccounts>>,
     pub all_active_validator_accounts: Option<Box<AllValidatorAccounts>>,
+    pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
     pub fn new() -> Self {
@@ -242,6 +278,7 @@ impl Default for KeeperState {
             all_steward_accounts: None,
             all_steward_validator_accounts: None,
             all_active_validator_accounts: None,
+            steward_progress_flags: StewardProgressFlags { flags: 0 },
         }
     }
 }
