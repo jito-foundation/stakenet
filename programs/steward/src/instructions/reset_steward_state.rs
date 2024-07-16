@@ -58,12 +58,11 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
         .checked_add(config.parameters.num_epochs_between_scoring)
         .ok_or(StewardError::ArithmeticError)?;
     state_account.state.delegations = [Delegation::default(); MAX_VALIDATORS];
-    state_account.state.rebalance_completed = false.into();
     state_account.state.instant_unstake = BitMask::default();
     state_account.state.start_computing_scores_slot = clock.slot;
     state_account.state.validators_to_remove = BitMask::default();
     state_account.state.validators_added = 0;
-    state_account.state.checked_validators_removed_from_list = false.into();
+    state_account.state.clear_flags();
     state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
     Ok(())
 }
