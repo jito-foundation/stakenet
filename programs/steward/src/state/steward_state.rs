@@ -110,7 +110,7 @@ pub struct StewardState {
     /// Total lamports that have been due to stake deposits this cycle
     pub stake_deposit_unstake_total: u64,
 
-    /// Various flags to track state progress - See
+    /// Flags to track state transitions and operations
     pub status_flags: u32,
 
     /// Number of validators added to the pool in the current cycle
