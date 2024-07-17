@@ -207,8 +207,6 @@ MINIMUM_VOTING_EPOCHS=5
 
 # Testing
 
-To Remove
-
 ```bash
 Vote Account: 6VSu1wCkeugWdSB3ZgCCFSAttu5XTuSWVRD1vJVPVQXq
 Stake Account: 2kdoEDkHqtVVQXghLEpxRjBQrKE73roJP525EBXEBtWZ
@@ -221,4 +219,11 @@ Score: Some(0)
 Yield Score: Some(872581150)
 Score Index: Some(307)
 Yield Score Index: Some(1142)
+```
+
+# Getting Ready to Merge
+
+```bash
+cargo +nightly-2024-02-04 clippy --all-features --all-targets --tests -- -D warnings
+anchor build --idl idl
 ```

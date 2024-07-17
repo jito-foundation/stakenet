@@ -4,7 +4,8 @@ use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
     utils::{StakePool, ValidatorList},
-    Config, StewardStateAccount,
+    Config, StewardState, StewardStateAccount, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES,
+    COMPUTE_SCORE, EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
 };
 use keeper_core::get_multiple_accounts_batched;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
@@ -407,4 +408,120 @@ pub fn check_stake_accounts(
         .into_iter()
         .zip(checks)
         .collect::<HashMap<Pubkey, StakeAccountChecks>>()
+}
+
+pub fn format_state_string(steward_state: &StewardState) -> String {
+    let mut state_string = String::new();
+
+    // pub const COMPUTE_SCORE: u32 = 1 << 0;
+    // pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
+    // pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
+    // pub const PRE_LOOP_IDLE: u32 = 1 << 3;
+    // pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
+    // pub const REBALANCE: u32 = 1 << 5;
+    // pub const POST_LOOP_IDLE: u32 = 1 << 6;
+
+    if steward_state.has_flag(EPOCH_MAINTENANCE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    state_string += " ⇢ ";
+
+    if steward_state.has_flag(COMPUTE_SCORE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    if steward_state.has_flag(COMPUTE_DELEGATIONS) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    state_string += " ↺ ";
+
+    if steward_state.has_flag(PRE_LOOP_IDLE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    if steward_state.has_flag(COMPUTE_INSTANT_UNSTAKES) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    if steward_state.has_flag(REBALANCE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    if steward_state.has_flag(POST_LOOP_IDLE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    state_string
+}
+
+pub fn format_simple_state_string(steward_state: &StewardState) -> String {
+    let mut state_string = String::new();
+
+    // pub const COMPUTE_SCORE: u32 = 1 << 0;
+    // pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
+    // pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
+    // pub const PRE_LOOP_IDLE: u32 = 1 << 3;
+    // pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
+    // pub const REBALANCE: u32 = 1 << 5;
+    // pub const POST_LOOP_IDLE: u32 = 1 << 6;
+
+    if steward_state.has_flag(EPOCH_MAINTENANCE) {
+        state_string += "M"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(COMPUTE_SCORE) {
+        state_string += "S"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(COMPUTE_DELEGATIONS) {
+        state_string += "D"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(PRE_LOOP_IDLE) {
+        state_string += "0"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(COMPUTE_INSTANT_UNSTAKES) {
+        state_string += "U"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(REBALANCE) {
+        state_string += "R"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(POST_LOOP_IDLE) {
+        state_string += "1"
+    } else {
+        state_string += "-"
+    }
+
+    state_string
 }

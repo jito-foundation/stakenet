@@ -9,7 +9,8 @@ use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_ad
 use crate::{
     commands::command_args::ViewState,
     utils::accounts::{
-        get_stake_pool_account, get_steward_config_account, get_steward_state_account_and_address,
+        format_simple_state_string, format_state_string, get_stake_pool_account,
+        get_steward_config_account, get_steward_state_account_and_address,
         get_validator_list_account,
     },
 };
@@ -243,11 +244,7 @@ fn _print_default_state(
         "Stake Deposit Unstake Total: {}\n",
         state.stake_deposit_unstake_total
     );
-    formatted_string += &format!(
-        "Compute Delegations Completed: {:?}\n",
-        state.compute_delegations_completed
-    );
-    formatted_string += &format!("Rebalance Completed: {:?}\n", state.rebalance_completed);
+
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
     formatted_string += "\n\n";
     formatted_string += &format!("num_pool_validators: {}\n", state.num_pool_validators);
@@ -260,6 +257,12 @@ fn _print_default_state(
         state.validators_to_remove.count()
     );
     formatted_string += &format!("Validators added: {}\n", state.validators_added);
+    formatted_string += "\n";
+    formatted_string += &format!("State: {}\n", format_state_string(&state_account.state));
+    formatted_string += &format!(
+        "State: {}\n",
+        format_simple_state_string(&state_account.state)
+    );
     formatted_string += "\n";
     formatted_string += "---------------------";
 
