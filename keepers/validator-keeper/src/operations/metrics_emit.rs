@@ -6,6 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use crate::state::keeper_state::KeeperState;
 use log::*;
 use solana_metrics::datapoint_info;
+use steward_cli::utils::accounts::{format_simple_state_string, format_state_string};
 use validator_history::ValidatorHistoryEntry;
 
 use super::keeper_operations::KeeperOperations;
@@ -197,13 +198,13 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     let current_epoch = steward_state.current_epoch;
     let actual_epoch = keeper_state.epoch_info.epoch;
     let validators_to_remove_count = steward_state.validators_to_remove.count();
-    let checked_validators_to_remove_flag =
-        steward_state.checked_validators_removed_from_list.value;
-    let compute_delegations_complete_flag = steward_state.compute_delegations_completed.value;
     let instant_unstake_count = steward_state.instant_unstake.count();
     let instant_unstake_total = steward_state.instant_unstake_total;
     let validators_added = steward_state.validators_added;
     let next_cycle_epoch = steward_state.next_cycle_epoch;
+    let state_progress = format_state_string(steward_state);
+    let simple_state_progress = format_simple_state_string(steward_state);
+    let status_flags = steward_state.status_flags;
 
     let validator_list_account = &keeper_state
         .all_steward_accounts
@@ -215,6 +216,9 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     datapoint_info!(
         "steward-stats",
         ("state", state, String),
+        ("state_progress", state_progress, String),
+        ("simple_state_progress", simple_state_progress, String),
+        ("status_flags", status_flags, i64),
         ("progress_count", progress_count, i64),
         ("num_pool_validators", num_pool_validators, i64),
         ("current_epoch", current_epoch, i64),
@@ -222,16 +226,6 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         (
             "validators_to_remove_count",
             validators_to_remove_count,
-            i64
-        ),
-        (
-            "checked_validators_to_remove_flag",
-            checked_validators_to_remove_flag,
-            i64
-        ),
-        (
-            "compute_delegations_complete_flag",
-            compute_delegations_complete_flag,
             i64
         ),
         ("instant_unstake_count", instant_unstake_count, i64),
