@@ -2743,7 +2743,7 @@
           {
             "name": "status_flags",
             "docs": [
-              "Various flags to track state progress - See"
+              "Flags to track state transitions and operations"
             ],
             "type": "u32"
           },
