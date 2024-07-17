@@ -5,7 +5,8 @@ use crate::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
         get_stake_pool_address, get_validator_list_length,
     },
-    Config, StewardStateAccount,
+    Config, StewardStateAccount, CHECKED_VALIDATORS_REMOVED_FROM_LIST, COMPUTE_INSTANT_UNSTAKES,
+    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -49,7 +50,14 @@ pub fn handler(
         StewardError::StakePoolNotUpdated
     );
 
-    if (!state_account.state.checked_validators_removed_from_list).into() {
+    // Keep this unset until we have completed all maintenance tasks
+    state_account.state.unset_flag(EPOCH_MAINTENANCE);
+
+    // We only need to check this once per maintenance cycle
+    if !state_account
+        .state
+        .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST)
+    {
         // Ensure there are no validators in the list that have not been removed, that should be
         require!(
             !check_validator_list_has_stake_status_other_than(
@@ -59,7 +67,9 @@ pub fn handler(
             StewardError::ValidatorsHaveNotBeenRemoved
         );
 
-        state_account.state.checked_validators_removed_from_list = true.into();
+        state_account
+            .state
+            .set_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
     }
 
     {
@@ -88,12 +98,22 @@ pub fn handler(
         let okay_to_update = state_account.state.validators_to_remove.is_empty()
             && state_account
                 .state
-                .checked_validators_removed_from_list
-                .into();
+                .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
+
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;
-            state_account.state.checked_validators_removed_from_list = false.into();
-            state_account.state.rebalance_completed = false.into();
+
+            // We keep Compute Scores and Compute Delegations to be unset on next epoch cycle
+            state_account.state.unset_flag(
+                CHECKED_VALIDATORS_REMOVED_FROM_LIST
+                    | PRE_LOOP_IDLE
+                    | COMPUTE_INSTANT_UNSTAKES
+                    | REBALANCE
+                    | POST_LOOP_IDLE,
+            );
+            state_account
+                .state
+                .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
         }
 
         emit!(EpochMaintenanceEvent {
