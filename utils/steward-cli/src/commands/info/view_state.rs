@@ -178,11 +178,7 @@ pub fn format_state(
         "Stake Deposit Unstake Total: {}\n",
         state.stake_deposit_unstake_total
     );
-    formatted_string += &format!(
-        "Compute Delegations Completed: {:?}\n",
-        state.compute_delegations_completed
-    );
-    formatted_string += &format!("Rebalance Completed: {:?}\n", state.rebalance_completed);
+
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
     formatted_string += "---------------------";
 

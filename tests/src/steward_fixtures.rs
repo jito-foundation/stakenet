@@ -934,10 +934,8 @@ impl Default for StateMachineFixtures {
             stake_deposit_unstake_total: 0,
             delegations: [Delegation::default(); MAX_VALIDATORS],
             instant_unstake: BitMask::default(),
-            compute_delegations_completed: false.into(),
-            rebalance_completed: false.into(),
+            status_flags: 0,
             validators_added: 0,
-            checked_validators_removed_from_list: false.into(),
             validators_to_remove: BitMask::default(),
             _padding0: [0; STATE_PADDING_0_SIZE],
         };

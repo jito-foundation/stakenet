@@ -1408,6 +1408,32 @@
   ],
   "events": [
     {
+      "name": "AutoAddValidatorEvent",
+      "discriminator": [
+        123,
+        65,
+        239,
+        15,
+        82,
+        216,
+        206,
+        28
+      ]
+    },
+    {
+      "name": "AutoRemoveValidatorEvent",
+      "discriminator": [
+        211,
+        46,
+        52,
+        163,
+        17,
+        38,
+        197,
+        186
+      ]
+    },
+    {
       "name": "DecreaseComponents",
       "discriminator": [
         129,
@@ -1418,6 +1444,19 @@
         140,
         0,
         8
+      ]
+    },
+    {
+      "name": "EpochMaintenanceEvent",
+      "discriminator": [
+        255,
+        149,
+        70,
+        161,
+        199,
+        176,
+        9,
+        42
       ]
     },
     {
@@ -1657,6 +1696,46 @@
                 }
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "AutoAddValidatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_list_index",
+            "type": "u64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AutoRemoveValidatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_list_index",
+            "type": "u64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote_account_closed",
+            "type": "bool"
+          },
+          {
+            "name": "stake_account_deactivated",
+            "type": "bool"
           }
         ]
       }
@@ -2033,6 +2112,40 @@
           {
             "name": "denominator",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EpochMaintenanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_index_to_remove",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "validator_list_length",
+            "type": "u64"
+          },
+          {
+            "name": "num_pool_validators",
+            "type": "u64"
+          },
+          {
+            "name": "validators_to_remove",
+            "type": "u64"
+          },
+          {
+            "name": "validators_to_add",
+            "type": "u64"
+          },
+          {
+            "name": "maintenance_complete",
+            "type": "bool"
           }
         ]
       }
@@ -2628,44 +2741,18 @@
             "type": "u64"
           },
           {
+            "name": "status_flags",
+            "docs": [
+              "Flags to track state transitions and operations"
+            ],
+            "type": "u32"
+          },
+          {
             "name": "validators_added",
             "docs": [
               "Number of validators added to the pool in the current cycle"
             ],
             "type": "u16"
-          },
-          {
-            "name": "compute_delegations_completed",
-            "docs": [
-              "Tracks whether delegation computation has been completed"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
-          },
-          {
-            "name": "rebalance_completed",
-            "docs": [
-              "Tracks whether unstake and delegate steps have completed"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
-          },
-          {
-            "name": "checked_validators_removed_from_list",
-            "docs": [
-              "So we only have to check the validator list once for `ReadyToRemove`"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
           },
           {
             "name": "_padding0",
@@ -2675,7 +2762,7 @@
             "type": {
               "array": [
                 "u8",
-                40003
+                40002
               ]
             }
           }
