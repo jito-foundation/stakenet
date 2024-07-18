@@ -30,6 +30,13 @@ async fn _process(
     run_crank_monkey(keeper_config, keeper_state).await
 }
 
+pub enum StewardErrorCodes {
+    ExceededRetries = 0x00,
+    TransactionError = 0x10,                    // Up to 0x9F
+    UnknownRpcSimulateTransactionResult = 0xA0, // Up to 0xFF
+    ValidatorAlreadyMarkedForRemoval = 0xA1,
+}
+
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
@@ -46,9 +53,33 @@ pub async fn fire(
             Ok(stats) => {
                 for message in stats.results.iter() {
                     if let Err(e) = message {
+                        let error_code: i64 = match e {
+                            keeper_core::SendTransactionError::ExceededRetries => {
+                                StewardErrorCodes::ExceededRetries as i64
+                            }
+                            keeper_core::SendTransactionError::TransactionError(_) => {
+                                // Just returns a string, so we can't really do anything with it
+                                StewardErrorCodes::TransactionError as i64
+                            }
+                            keeper_core::SendTransactionError::RpcSimulateTransactionResult(_) => {
+                                let error_string = format_steward_error_log(e);
+                                let mut error_code =
+                                    StewardErrorCodes::UnknownRpcSimulateTransactionResult as i64;
+
+                                if error_string.contains("Validator is already marked for removal")
+                                {
+                                    error_code =
+                                        StewardErrorCodes::ValidatorAlreadyMarkedForRemoval as i64;
+                                }
+
+                                error_code
+                            }
+                        };
+
                         datapoint_error!(
                             "steward-error",
                             ("error", format_steward_error_log(e), String),
+                            ("error_code", error_code, i64),
                         );
                     } else {
                         txs_for_epoch += 1;
