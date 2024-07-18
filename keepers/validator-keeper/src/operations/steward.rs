@@ -33,8 +33,9 @@ async fn _process(
 pub enum StewardErrorCodes {
     ExceededRetries = 0x00,
     TransactionError = 0x10,                    // Up to 0x9F
-    UnknownRpcSimulateTransactionResult = 0xA0, // Up to 0xFF
-    ValidatorAlreadyMarkedForRemoval = 0xA1,
+    UnknownRpcSimulateTransactionResult = 0xA0, // Raise Flag
+    ValidatorAlreadyMarkedForRemoval = 0xA1,    // Don't Raise Flag
+    InvalidState = 0xA2,                        // Don't Raise Flag
 }
 
 pub async fn fire(
@@ -70,6 +71,10 @@ pub async fn fire(
                                 {
                                     error_code =
                                         StewardErrorCodes::ValidatorAlreadyMarkedForRemoval as i64;
+                                }
+
+                                if error_string.contains("Invalid state") {
+                                    error_code = StewardErrorCodes::InvalidState as i64;
                                 }
 
                                 error_code
