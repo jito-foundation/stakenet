@@ -54,12 +54,16 @@ pub enum StewardError {
     ValidatorHistoryMismatch,
     #[msg("Epoch Maintenance must be called before continuing")]
     EpochMaintenanceNotComplete,
+    #[msg("Epoch Maintenance has already been run this epoch")]
+    EpochMaintenanceAlreadyCompleted,
     #[msg("The stake pool must be updated before continuing")]
     StakePoolNotUpdated,
     #[msg("Validator not marked for removal")]
     ValidatorNotMarkedForRemoval,
     #[msg("Validators have not been removed")]
     ValidatorsHaveNotBeenRemoved,
-    #[msg("Validator List count does not match state machine")]
+    #[msg("Validator List count does not match state machine - Please run IndexMismatchInterrupt")]
     ListStateMismatch,
+    #[msg("Validator List count does not match state machine within IndexMismatchInterrupt - Please reset the state machine")]
+    IndexInterruptMismatch,
 }

@@ -9,6 +9,7 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     utils::{StakePool, ValidatorList},
     Config, Delegation, StewardStateAccount, StewardStateEnum, UpdateParametersArgs,
+    COMPUTE_DELEGATIONS, COMPUTE_SCORE, EPOCH_MAINTENANCE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -129,6 +130,7 @@ async fn test_compute_delegations() {
         steward_state_account.state.state_tag,
         StewardStateEnum::Idle
     ));
+    assert!(steward_state_account.state.has_flag(COMPUTE_DELEGATIONS));
 
     // Test pause
     let pause_ix = Instruction {
@@ -332,8 +334,6 @@ async fn test_compute_scores() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    println!("Okay!");
-
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
@@ -347,6 +347,7 @@ async fn test_compute_scores() {
     assert!(steward_state_account.state.sorted_yield_score_indices[0] == 0);
     assert!(steward_state_account.state.progress.get(0).unwrap());
     assert!(!steward_state_account.state.progress.get(1).unwrap());
+    assert!(steward_state_account.state.has_flag(EPOCH_MAINTENANCE));
 
     // Transition out of this state
     // Reset current state, set progress[1] to true, progress[0] to false

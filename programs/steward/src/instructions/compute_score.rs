@@ -42,44 +42,55 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == validator_history.vote_account,
-        StewardError::ValidatorNotInList
-    );
+    {
+        // Checks
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-    let num_pool_validators = get_validator_list_length(validator_list)?;
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
+        );
 
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
-
-    // May need to force an extra transition here in case cranking got stuck in any previous state
-    // and it's now the start of a new scoring cycle
-    if !matches!(
-        state_account.state.state_tag,
-        StewardStateEnum::ComputeScores
-    ) {
-        maybe_transition_and_emit(
-            &mut state_account.state,
-            &clock,
-            &config.parameters,
-            &epoch_schedule,
-        )?;
-    }
-    require!(
-        matches!(
+        // May need to force an extra transition here in case cranking got stuck in any previous state
+        // and it's now the start of a new scoring cycle
+        if !matches!(
             state_account.state.state_tag,
             StewardStateEnum::ComputeScores
-        ),
-        StewardError::InvalidState
-    );
+        ) {
+            maybe_transition_and_emit(
+                &mut state_account.state,
+                &clock,
+                &config.parameters,
+                &epoch_schedule,
+            )?;
+        }
+        require!(
+            matches!(
+                state_account.state.state_tag,
+                StewardStateEnum::ComputeScores
+            ),
+            StewardError::InvalidState
+        );
+
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == validator_history.vote_account,
+            StewardError::ValidatorNotInList
+        );
+    }
+
+    let num_pool_validators = get_validator_list_length(validator_list)?;
 
     if let Some(score) = state_account.state.compute_score(
         &clock,

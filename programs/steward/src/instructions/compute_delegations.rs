@@ -1,5 +1,6 @@
 use crate::errors::StewardError;
-use crate::{maybe_transition_and_emit, Config, StewardStateAccount};
+use crate::utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_list_length};
+use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -12,6 +13,16 @@ pub struct ComputeDelegations<'info> {
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
+
+    /// CHECK: Correct account guaranteed if address is correct
+    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    pub validator_list: AccountInfo<'info>,
+
+    /// CHECK: Correct account guaranteed if address is correct
+    #[account(
+        address = get_stake_pool_address(&config)?
+    )]
+    pub stake_pool: AccountInfo<'info>,
 }
 
 /*
@@ -25,13 +36,32 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+    {
+        // CHECKS
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
+        );
+
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
+        require!(
+            matches!(
+                state_account.state.state_tag,
+                StewardStateEnum::ComputeDelegations
+            ),
+            StewardError::InvalidState
+        );
     }
 
     state_account

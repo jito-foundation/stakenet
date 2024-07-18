@@ -13,7 +13,7 @@ use borsh::BorshDeserialize;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
-    state::ValidatorListHeader,
+    state::{ValidatorListHeader, ValidatorStakeInfo},
 };
 use validator_history::ValidatorHistory;
 
@@ -23,8 +23,11 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition_and_emit,
-    utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
-    Config, StewardStateAccount,
+    utils::{
+        deserialize_stake_pool, get_stake_pool_address, get_validator_list_length,
+        get_validator_stake_info_at_index,
+    },
+    Config, StewardStateAccount, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -145,6 +148,32 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
+    let validator_stake_info: ValidatorStakeInfo;
+
+    {
+        // CHECKS
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
+
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
+        );
+
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
+        require!(
+            matches!(state_account.state.state_tag, StewardStateEnum::Rebalance),
+            StewardError::InvalidState
+        );
+    }
 
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
@@ -152,17 +181,8 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         validator_stake_info.vote_account_address == validator_history.vote_account,
         StewardError::ValidatorNotInList
     );
+
     let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
-
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
-
     let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
     let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 

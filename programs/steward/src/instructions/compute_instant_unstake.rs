@@ -1,8 +1,8 @@
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_validator_list, get_validator_stake_info_at_index},
-    Config, StewardStateAccount,
+    utils::{get_validator_list, get_validator_list_length, get_validator_stake_info_at_index},
+    Config, StewardStateAccount, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -41,20 +41,39 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == validator_history.vote_account,
-        StewardError::ValidatorNotInList
-    );
+    {
+        // CHECKS
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
+        );
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
+        require!(
+            matches!(
+                state_account.state.state_tag,
+                StewardStateEnum::ComputeInstantUnstake
+            ),
+            StewardError::InvalidState
+        );
+
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == validator_history.vote_account,
+            StewardError::ValidatorNotInList
+        );
     }
 
     if let Some(instant_unstake) = state_account.state.compute_instant_unstake(

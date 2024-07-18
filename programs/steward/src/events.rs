@@ -22,12 +22,16 @@ pub struct AutoAddValidatorEvent {
 
 #[event]
 pub struct EpochMaintenanceEvent {
-    pub validator_index_to_remove: Option<u64>,
+    pub maintenance_complete: bool,
+}
+
+#[event]
+pub struct IndexMismatchInterruptEvent {
+    pub validator_index_to_remove: u64,
     pub validator_list_length: u64,
     pub num_pool_validators: u64,
     pub validators_to_remove: u64,
     pub validators_to_add: u64,
-    pub maintenance_complete: bool,
 }
 
 #[event]
