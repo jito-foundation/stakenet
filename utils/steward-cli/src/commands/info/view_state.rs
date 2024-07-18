@@ -166,6 +166,9 @@ fn _print_default_state(
         state.stake_deposit_unstake_total
     );
 
+    formatted_string += &format!("Status Flags: {:b}\n", state.status_flags);
+    formatted_string += &format!("Status Flags: {}\n", state.status_flags);
+
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
     formatted_string += "---------------------";
 
