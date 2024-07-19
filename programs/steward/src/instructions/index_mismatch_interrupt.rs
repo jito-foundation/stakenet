@@ -5,6 +5,7 @@ use crate::{
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
+use spl_stake_pool::state::ValidatorListHeader;
 
 #[derive(Accounts)]
 pub struct IndexMismatchInterrupt<'info> {
@@ -37,13 +38,17 @@ pub fn handler(
 ) -> Result<()> {
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
-    require!(
-        state_account
-            .state
-            .validators_to_remove
-            .get(validator_index_to_remove)?,
-        StewardError::ValidatorNotMarkedForRemoval
-    );
+    // How do we know if a validator has been removed?
+
+    {
+        require!(
+            state_account
+                .state
+                .validators_to_remove
+                .get(validator_index_to_remove)?,
+            StewardError::ValidatorNotMarkedForRemoval
+        );
+    }
 
     state_account
         .state
