@@ -37,20 +37,12 @@ pub fn handler(
 ) -> Result<()> {
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
-    // Routine - Remove marked validators
-    // We still want these checks to run even if we don't specify a validator to remove
-    let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
-    let validators_to_remove = state_account.state.validators_to_remove.count();
-
-    // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
-    // if we don't have a 1-1 mapping, we need to reset the state
-    // this should never happen.
     require!(
-        state_account.state.num_pool_validators as usize
-            + state_account.state.validators_added as usize
-            - validators_to_remove
-            == validators_in_list,
-        StewardError::IndexInterruptMismatch
+        state_account
+            .state
+            .validators_to_remove
+            .get(validator_index_to_remove)?,
+        StewardError::ValidatorNotMarkedForRemoval
     );
 
     state_account

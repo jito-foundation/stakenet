@@ -13,7 +13,7 @@ use borsh::BorshDeserialize;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
-    state::{ValidatorListHeader, ValidatorStakeInfo},
+    state::ValidatorListHeader,
 };
 use validator_history::ValidatorHistory;
 
@@ -148,7 +148,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
-    let validator_stake_info: ValidatorStakeInfo;
 
     {
         // CHECKS

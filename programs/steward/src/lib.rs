@@ -86,12 +86,17 @@ pub mod steward {
         instructions::auto_remove_validator_from_pool::handler(ctx, validator_list_index as usize)
     }
 
-    /// Housekeeping, run at the start of any new epoch before any other instructions
-    pub fn epoch_maintenance(
-        ctx: Context<EpochMaintenance>,
-        validator_index_to_remove: Option<u64>,
+    /// Interrupts when the validator list length does not match the expected length
+    pub fn index_mismatch_interrupt(
+        ctx: Context<IndexMismatchInterrupt>,
+        validator_index_to_remove: u64,
     ) -> Result<()> {
-        instructions::epoch_maintenance::handler(ctx, validator_index_to_remove.map(|x| x as usize))
+        instructions::index_mismatch_interrupt::handler(ctx, validator_index_to_remove as usize)
+    }
+
+    /// Housekeeping, run at the start of any new epoch before any other instructions
+    pub fn epoch_maintenance(ctx: Context<EpochMaintenance>) -> Result<()> {
+        instructions::epoch_maintenance::handler(ctx)
     }
 
     /// Computes score for a the validator at `validator_list_index` for the current cycle.
