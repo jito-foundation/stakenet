@@ -106,6 +106,8 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
     let validator_history = ctx.accounts.validator_history_account.load()?;
     let epoch = Clock::get()?.epoch;
 
+    //TODO Cannot add if validator mismatch
+
     // Should not be able to add a validator if update is not complete
     require!(
         epoch == state_account.state.current_epoch,

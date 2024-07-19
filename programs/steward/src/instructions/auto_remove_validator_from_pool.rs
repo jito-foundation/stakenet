@@ -124,6 +124,8 @@ pub struct AutoRemoveValidator<'info> {
 
 */
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
+    //TODO Cannot remove if mismatch
+
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
         let validator_list = &ctx.accounts.validator_list;

@@ -32,13 +32,15 @@ pub struct IndexMismatchInterrupt<'info> {
 /// Runs maintenance tasks at the start of each epoch, needs to be run multiple times
 /// Routines:
 /// - Remove delinquent validators
-pub fn handler(
-    ctx: Context<IndexMismatchInterrupt>,
-    validator_index_to_remove: usize,
-) -> Result<()> {
+pub fn handler(ctx: Context<IndexMismatchInterrupt>) -> Result<()> {
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     // How do we know if a validator has been removed?
+
+    //TODO index passed in has to be lowest marked for removal
+    // Iterate through the list of validators and check status
+    // Use diff amount to find correct index to remove
+    //TODO take out validator index to remove - we always remove the lowest index
 
     {
         require!(
