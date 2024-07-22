@@ -2,7 +2,7 @@ use crate::{
     errors::StewardError,
     utils::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
-        get_stake_pool_address, get_validator_list_length,
+        get_stake_pool_address, get_validator_list, get_validator_list_length,
     },
     Config, StewardStateAccount,
 };
@@ -21,7 +21,7 @@ pub struct InstantRemoveValidator<'info> {
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
     /// CHECK: Correct account guaranteed if address is correct
-    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: Correct account guaranteed if address is correct
@@ -31,9 +31,7 @@ pub struct InstantRemoveValidator<'info> {
     pub stake_pool: AccountInfo<'info>,
 }
 
-/// Runs maintenance tasks at the start of each epoch, needs to be run multiple times
-/// Routines:
-/// - Remove delinquent validators
+/// Removes validators from the pool that have been marked for immediate removal
 pub fn handler(
     ctx: Context<InstantRemoveValidator>,
     validator_index_to_remove: usize,
@@ -54,8 +52,7 @@ pub fn handler(
         state_account
             .state
             .validators_for_immediate_removal
-            .get(validator_index_to_remove)
-            .unwrap(),
+            .get(validator_index_to_remove)?,
         StewardError::ValidatorNotInList
     );
 

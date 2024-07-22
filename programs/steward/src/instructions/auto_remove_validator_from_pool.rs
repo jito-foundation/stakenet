@@ -129,7 +129,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
     let vote_account_closed;
 
     {
-        let state_account = ctx.accounts.state_account.load().unwrap();
+        let state_account = ctx.accounts.state_account.load()?;
         let validator_list = &ctx.accounts.validator_list;
         let epoch = Clock::get()?.epoch;
 
@@ -212,7 +212,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         let validator_stake_info =
             get_validator_stake_info_at_index(validator_list, validator_list_index)?;
 
-        let stake_status = StakeStatus::try_from(validator_stake_info.status).unwrap();
+        let stake_status = StakeStatus::try_from(validator_stake_info.status)?;
         let marked_for_immediate_removal: bool;
 
         match stake_status {

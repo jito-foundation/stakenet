@@ -3,7 +3,7 @@ use crate::{
     events::EpochMaintenanceEvent,
     utils::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
-        get_stake_pool_address, get_validator_list_length,
+        get_stake_pool_address, get_validator_list, get_validator_list_length,
     },
     Config, StewardStateAccount, CHECKED_VALIDATORS_REMOVED_FROM_LIST, COMPUTE_INSTANT_UNSTAKES,
     EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
@@ -23,7 +23,7 @@ pub struct EpochMaintenance<'info> {
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
     /// CHECK: Correct account guaranteed if address is correct
-    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: Correct account guaranteed if address is correct
