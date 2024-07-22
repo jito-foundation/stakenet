@@ -222,14 +222,15 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
             }
             StakeStatus::DeactivatingValidator | StakeStatus::ReadyForRemoval => {
                 marked_for_immediate_removal = true;
-                // Mark for immediate removal
+                state_account
+                    .state
+                    .mark_validator_for_immediate_removal(validator_list_index)?;
             }
             StakeStatus::DeactivatingAll | StakeStatus::DeactivatingTransient => {
                 marked_for_immediate_removal = false;
                 state_account
                     .state
                     .mark_validator_for_removal(validator_list_index)?;
-                // Mark for next Epoch removal
             }
         }
 

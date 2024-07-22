@@ -95,10 +95,7 @@ pub fn handler(
 
     {
         // Routine - Update state
-        let okay_to_update = state_account.state.validators_to_remove.is_empty()
-            && state_account
-                .state
-                .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
+        let okay_to_update = state_account.state.validators_to_remove.is_empty();
 
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;

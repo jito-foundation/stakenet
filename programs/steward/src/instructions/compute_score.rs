@@ -47,11 +47,10 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
             return Err(StewardError::StateMachinePaused.into());
         }
 
-        //TODO Check do we need this?
-        // require!(
-        //     clock.epoch == state_account.state.current_epoch,
-        //     StewardError::EpochMaintenanceNotComplete
-        // );
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
         require!(
             state_account.state.validators_for_immediate_removal.count() == 0,
