@@ -5,7 +5,8 @@ use crate::errors::StewardError;
 use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
 use crate::utils::{
-    deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+    deserialize_stake_pool, get_stake_pool_address, get_validator_list_length,
+    get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
@@ -124,12 +125,26 @@ pub struct AutoRemoveValidator<'info> {
 
 */
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
-    //TODO Cannot remove if mismatch
-
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
         let validator_list = &ctx.accounts.validator_list;
         let epoch = Clock::get()?.epoch;
+
+        {
+            // CHECKS
+            require!(
+                epoch == state_account.state.current_epoch,
+                StewardError::EpochMaintenanceNotComplete
+            );
+
+            let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+            require!(
+                state_account.state.num_pool_validators as usize
+                    + state_account.state.validators_added as usize
+                    == validators_in_list,
+                StewardError::ListStateMismatch
+            );
+        }
 
         let validator_stake_info =
             get_validator_stake_info_at_index(validator_list, validator_list_index)?;

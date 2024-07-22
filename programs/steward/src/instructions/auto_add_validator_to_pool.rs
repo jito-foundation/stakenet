@@ -2,7 +2,7 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::events::AutoAddValidatorEvent;
 use crate::state::{Config, StewardStateAccount};
-use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
+use crate::utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_list_length};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
@@ -106,13 +106,21 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
     let validator_history = ctx.accounts.validator_history_account.load()?;
     let epoch = Clock::get()?.epoch;
 
-    //TODO Cannot add if validator mismatch
+    {
+        // CHECKS
+        require!(
+            epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-    // Should not be able to add a validator if update is not complete
-    require!(
-        epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
+        );
+    }
 
     let validator_list_len = {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
