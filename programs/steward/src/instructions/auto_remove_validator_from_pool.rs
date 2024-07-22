@@ -227,5 +227,17 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         ]],
     )?;
 
+    // reload validator_list
+
+    // Mark regular for removal - continue as normal
+
+    // If state is in ValidatorRemoval mark differently and call index mismatch interrupt
+
+    // Everything as is
+
+    // Add one check to all ix's needing indexes
+
+    // new function to remove validator
+
     Ok(())
 }
