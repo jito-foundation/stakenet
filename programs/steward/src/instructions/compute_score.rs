@@ -42,6 +42,22 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    {
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
+
+        require!(
+            state_account.state.validators_for_immediate_removal.count() == 0,
+            StewardError::ValidatorsNeedToBeRemoved
+        );
+
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+    }
+
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(
@@ -50,15 +66,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     );
 
     let num_pool_validators = get_validator_list_length(validator_list)?;
-
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
 
     // May need to force an extra transition here in case cranking got stuck in any previous state
     // and it's now the start of a new scoring cycle
@@ -73,6 +80,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
             &epoch_schedule,
         )?;
     }
+
     require!(
         matches!(
             state_account.state.state_tag,

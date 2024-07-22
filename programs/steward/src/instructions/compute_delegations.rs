@@ -1,5 +1,5 @@
 use crate::errors::StewardError;
-use crate::{maybe_transition_and_emit, Config, StewardStateAccount};
+use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -25,13 +25,28 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+    {
+        require!(
+            matches!(
+                state_account.state.state_tag,
+                StewardStateEnum::ComputeDelegations
+            ),
+            StewardError::InvalidState
+        );
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
+        require!(
+            clock.epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
+
+        require!(
+            state_account.state.validators_for_immediate_removal.count() == 0,
+            StewardError::ValidatorsNeedToBeRemoved
+        );
+
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
     }
 
     state_account

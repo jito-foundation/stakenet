@@ -50,8 +50,15 @@ pub fn handler(
         StewardError::StakePoolNotUpdated
     );
 
-    // Keep this unset until we have completed all maintenance tasks
-    state_account.state.unset_flag(EPOCH_MAINTENANCE);
+    require!(
+        state_account.state.current_epoch < clock.epoch,
+        StewardError::EpochMaintenanceAlreadyComplete
+    );
+
+    require!(
+        state_account.state.validators_for_immediate_removal.count() == 0,
+        StewardError::ValidatorsNeedToBeRemoved
+    );
 
     // We only need to check this once per maintenance cycle
     if !state_account
@@ -79,6 +86,7 @@ pub fn handler(
         let validators_to_remove = state_account.state.validators_to_remove.count();
 
         // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
+        // If we don't have this mapping, everything needs to be removed
         require!(
             state_account.state.num_pool_validators as usize
                 + state_account.state.validators_added as usize
@@ -114,6 +122,9 @@ pub fn handler(
             state_account
                 .state
                 .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
+        } else {
+            // Keep this unset until we have completed all maintenance tasks
+            state_account.state.unset_flag(EPOCH_MAINTENANCE);
         }
 
         emit!(EpochMaintenanceEvent {

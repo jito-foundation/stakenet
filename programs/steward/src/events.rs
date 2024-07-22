@@ -12,6 +12,7 @@ pub struct AutoRemoveValidatorEvent {
     pub vote_account: Pubkey,
     pub vote_account_closed: bool,
     pub stake_account_deactivated: bool,
+    pub marked_for_immediate_removal: bool,
 }
 
 #[event]
