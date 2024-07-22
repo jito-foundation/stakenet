@@ -46,17 +46,6 @@ pub fn handler(
     let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
 
     require!(
-        validators_to_remove > 0,
-        StewardError::NoValidatorsNeedToBeRemoved
-    );
-
-    // Has to be done on the same epoch they are marked. If not, state must be reset
-    require!(
-        state_account.state.current_epoch == clock.epoch,
-        StewardError::EpochMaintenanceAlreadyComplete
-    );
-
-    require!(
         clock.epoch == stake_pool.last_update_epoch,
         StewardError::StakePoolNotUpdated
     );

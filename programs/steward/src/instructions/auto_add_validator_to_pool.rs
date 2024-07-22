@@ -2,7 +2,7 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::events::AutoAddValidatorEvent;
 use crate::state::{Config, StewardStateAccount};
-use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
+use crate::utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_list_length};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
@@ -116,6 +116,16 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         require!(
             state_account.state.validators_for_immediate_removal.count() == 0,
             StewardError::ValidatorsNeedToBeRemoved
+        );
+
+        let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
+
+        // Cannot call auto remove if there is a validator mismatch
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
         );
     }
 

@@ -475,10 +475,19 @@ impl StewardState {
             StewardError::ValidatorNotMarkedForRemoval
         );
 
-        self.num_pool_validators = self
-            .num_pool_validators
-            .checked_sub(1)
-            .ok_or(StewardError::ArithmeticError)?;
+        // If the validator was marked for removal in the current cycle, decrement validators_added
+        if index >= self.num_pool_validators as usize {
+            self.validators_added = self
+                .validators_added
+                .checked_sub(1)
+                .ok_or(StewardError::ArithmeticError)?;
+        } else {
+            self.num_pool_validators = self
+                .num_pool_validators
+                .checked_sub(1)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
+
         let num_pool_validators = self.num_pool_validators as usize;
 
         // Shift all validator state to the left

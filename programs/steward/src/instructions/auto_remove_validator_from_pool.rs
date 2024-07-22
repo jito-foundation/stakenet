@@ -5,7 +5,8 @@ use crate::errors::StewardError;
 use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
 use crate::utils::{
-    deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+    deserialize_stake_pool, get_stake_pool_address, get_validator_list_length,
+    get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
@@ -167,6 +168,16 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         require!(
             stake_account_deactivated || vote_account_closed,
             StewardError::ValidatorNotRemovable
+        );
+
+        let validators_in_list = get_validator_list_length(&validator_list)?;
+
+        // Cannot call auto remove if there is a validator mismatch
+        require!(
+            state_account.state.num_pool_validators as usize
+                + state_account.state.validators_added as usize
+                == validators_in_list,
+            StewardError::ListStateMismatch
         );
     }
 

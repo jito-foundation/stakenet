@@ -55,11 +55,6 @@ pub fn handler(
         StewardError::EpochMaintenanceAlreadyComplete
     );
 
-    require!(
-        state_account.state.validators_for_immediate_removal.count() == 0,
-        StewardError::ValidatorsNeedToBeRemoved
-    );
-
     // Ensure there are no validators in the list that have not been removed, that should be
     require!(
         !check_validator_list_has_stake_status_other_than(
@@ -75,7 +70,8 @@ pub fn handler(
         // Routine - Remove marked validators
         // We still want these checks to run even if we don't specify a validator to remove
         let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
-        let validators_to_remove = state_account.state.validators_to_remove.count();
+        let validators_to_remove = state_account.state.validators_to_remove.count()
+            + state_account.state.validators_for_immediate_removal.count();
 
         // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
         // If we don't have this mapping, everything needs to be removed
