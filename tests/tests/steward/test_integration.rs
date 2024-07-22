@@ -332,8 +332,6 @@ async fn test_compute_scores() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    println!("Okay!");
-
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
@@ -404,6 +402,11 @@ async fn test_compute_scores() {
     fixture.submit_transaction_assert_success(tx).await;
 
     steward_state_account = fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    println!("{:?}", steward_state_account.state.num_pool_validators);
+    println!("{:?}", steward_state_account.state.progress.count());
+    println!("{}", steward_state_account.state.state_tag);
+    println!("{}", StewardStateEnum::ComputeDelegations);
 
     assert!(matches!(
         steward_state_account.state.state_tag,

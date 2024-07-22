@@ -43,19 +43,20 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let epoch_schedule = EpochSchedule::get()?;
 
     {
-        require!(
-            clock.epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
-        );
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
+        //TODO Check do we need this?
+        // require!(
+        //     clock.epoch == state_account.state.current_epoch,
+        //     StewardError::EpochMaintenanceNotComplete
+        // );
 
         require!(
             state_account.state.validators_for_immediate_removal.count() == 0,
             StewardError::ValidatorsNeedToBeRemoved
         );
-
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
     }
 
     let validator_stake_info =

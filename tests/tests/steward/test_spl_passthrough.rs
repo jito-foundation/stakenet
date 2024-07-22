@@ -161,21 +161,6 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
 
     fixture.simulate_stake_pool_update().await;
 
-    let epoch_maintenance_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::EpochMaintenance {
-            config: fixture.steward_config.pubkey(),
-            state_account: fixture.steward_state,
-            validator_list: fixture.stake_pool_meta.validator_list,
-            stake_pool: fixture.stake_pool_meta.stake_pool,
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::EpochMaintenance {
-            validator_index_to_remove: None,
-        }
-        .data(),
-    };
-
     // Add Validator
     let instruction = Instruction {
         program_id: jito_steward::id(),
@@ -207,7 +192,7 @@ async fn _add_test_validator(fixture: &TestFixture, vote_account: Pubkey) {
     let latest_blockhash = _get_latest_blockhash(fixture).await;
 
     let transaction = Transaction::new_signed_with_payer(
-        &[epoch_maintenance_ix, instruction],
+        &[instruction],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         latest_blockhash,

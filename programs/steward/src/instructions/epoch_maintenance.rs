@@ -60,24 +60,16 @@ pub fn handler(
         StewardError::ValidatorsNeedToBeRemoved
     );
 
-    // We only need to check this once per maintenance cycle
-    if !state_account
-        .state
-        .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST)
-    {
-        // Ensure there are no validators in the list that have not been removed, that should be
-        require!(
-            !check_validator_list_has_stake_status_other_than(
-                &ctx.accounts.validator_list,
-                StakeStatus::Active
-            )?,
-            StewardError::ValidatorsHaveNotBeenRemoved
-        );
+    // Ensure there are no validators in the list that have not been removed, that should be
+    require!(
+        !check_validator_list_has_stake_status_other_than(
+            &ctx.accounts.validator_list,
+            StakeStatus::Active
+        )?,
+        StewardError::ValidatorsHaveNotBeenRemoved
+    );
 
-        state_account
-            .state
-            .set_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
-    }
+    state_account.state.unset_flag(EPOCH_MAINTENANCE);
 
     {
         // Routine - Remove marked validators
@@ -122,11 +114,7 @@ pub fn handler(
             state_account
                 .state
                 .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
-        } else {
-            // Keep this unset until we have completed all maintenance tasks
-            state_account.state.unset_flag(EPOCH_MAINTENANCE);
         }
-
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
             validator_list_length: get_validator_list_length(&ctx.accounts.validator_list)? as u64,

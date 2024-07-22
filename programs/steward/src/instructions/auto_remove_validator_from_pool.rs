@@ -125,43 +125,50 @@ pub struct AutoRemoveValidator<'info> {
 
 */
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
-    let state_account = ctx.accounts.state_account.load().unwrap();
-    let validator_list = &ctx.accounts.validator_list;
-    let epoch = Clock::get()?.epoch;
+    let stake_account_deactivated;
+    let vote_account_closed;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
-        StewardError::ValidatorNotInList
-    );
+    {
+        let state_account = ctx.accounts.state_account.load().unwrap();
+        let validator_list = &ctx.accounts.validator_list;
+        let epoch = Clock::get()?.epoch;
 
-    // Should not be able to remove a validator if update is not complete
-    require!(
-        epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+            StewardError::ValidatorNotInList
+        );
 
-    // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
-    let stake_account_deactivated = {
-        let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
-        let stake_state: StakeStateV2 =
-            try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+        // Should not be able to remove a validator if update is not complete
+        require!(
+            epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
 
-        let deactivation_epoch = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.deactivation_epoch,
-            _ => return Err(StewardError::InvalidState.into()), // TODO fix
+        // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
+        stake_account_deactivated = {
+            let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
+            let stake_state: StakeStateV2 =
+                try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+
+            let deactivation_epoch = match stake_state {
+                StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                    stake.delegation.deactivation_epoch
+                }
+                _ => return Err(StewardError::InvalidState.into()), // TODO fix
+            };
+            deactivation_epoch < epoch
         };
-        deactivation_epoch < epoch
-    };
 
-    // Check if vote account closed
-    let vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
+        // Check if vote account closed
+        vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
 
-    require!(
-        stake_account_deactivated || vote_account_closed,
-        StewardError::ValidatorNotRemovable
-    );
+        require!(
+            stake_account_deactivated || vote_account_closed,
+            StewardError::ValidatorNotRemovable
+        );
+    }
 
     {
         invoke_signed(

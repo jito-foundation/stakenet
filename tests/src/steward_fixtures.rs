@@ -526,6 +526,10 @@ impl TestFixture {
         };
 
         if let Err(e) = process_transaction_result {
+            if !e.to_string().contains(error_message) {
+                panic!("Error: {}\n\nDoes not match {}", e, error_message);
+            }
+
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);

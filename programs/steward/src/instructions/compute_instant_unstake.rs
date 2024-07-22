@@ -42,6 +42,10 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let epoch_schedule = EpochSchedule::get()?;
 
     {
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
         require!(
             matches!(
                 state_account.state.state_tag,
@@ -59,10 +63,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
             state_account.state.validators_for_immediate_removal.count() == 0,
             StewardError::ValidatorsNeedToBeRemoved
         );
-
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
     }
 
     let validator_stake_info =

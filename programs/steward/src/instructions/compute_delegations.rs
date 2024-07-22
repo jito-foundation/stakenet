@@ -26,6 +26,10 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
     let epoch_schedule = EpochSchedule::get()?;
 
     {
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
         require!(
             matches!(
                 state_account.state.state_tag,
@@ -43,10 +47,6 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
             state_account.state.validators_for_immediate_removal.count() == 0,
             StewardError::ValidatorsNeedToBeRemoved
         );
-
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
     }
 
     state_account

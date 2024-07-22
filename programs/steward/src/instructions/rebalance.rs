@@ -147,6 +147,10 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let epoch_schedule = EpochSchedule::get()?;
 
     {
+        if config.is_paused() {
+            return Err(StewardError::StateMachinePaused.into());
+        }
+
         require!(
             matches!(state_account.state.state_tag, StewardStateEnum::Rebalance),
             StewardError::InvalidState
@@ -161,10 +165,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             state_account.state.validators_for_immediate_removal.count() == 0,
             StewardError::ValidatorsNeedToBeRemoved
         );
-
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
     }
 
     let validator_stake_info =
