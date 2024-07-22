@@ -111,7 +111,7 @@ pub struct Rebalance<'info> {
     pub transient_stake_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(owner = vote::program::ID)]
+    #[account(constraint = (vote_account.owner == &vote::program::ID ||  vote_account.owner == &system_program::ID))]
     pub vote_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
