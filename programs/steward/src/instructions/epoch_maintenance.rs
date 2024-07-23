@@ -3,7 +3,7 @@ use crate::{
     events::EpochMaintenanceEvent,
     utils::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
-        get_stake_pool_address, get_validator_list_length,
+        get_stake_pool_address, get_validator_list, get_validator_list_length,
     },
     Config, StewardStateAccount, CHECKED_VALIDATORS_REMOVED_FROM_LIST, COMPUTE_INSTANT_UNSTAKES,
     EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
@@ -23,7 +23,7 @@ pub struct EpochMaintenance<'info> {
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
     /// CHECK: Correct account guaranteed if address is correct
-    #[account(address = deserialize_stake_pool(&stake_pool)?.validator_list)]
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: Correct account guaranteed if address is correct
@@ -50,35 +50,31 @@ pub fn handler(
         StewardError::StakePoolNotUpdated
     );
 
-    // Keep this unset until we have completed all maintenance tasks
+    require!(
+        state_account.state.current_epoch < clock.epoch,
+        StewardError::EpochMaintenanceAlreadyComplete
+    );
+
+    // Ensure there are no validators in the list that have not been removed, that should be
+    require!(
+        !check_validator_list_has_stake_status_other_than(
+            &ctx.accounts.validator_list,
+            StakeStatus::Active
+        )?,
+        StewardError::ValidatorsHaveNotBeenRemoved
+    );
+
     state_account.state.unset_flag(EPOCH_MAINTENANCE);
-
-    // We only need to check this once per maintenance cycle
-    if !state_account
-        .state
-        .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST)
-    {
-        // Ensure there are no validators in the list that have not been removed, that should be
-        require!(
-            !check_validator_list_has_stake_status_other_than(
-                &ctx.accounts.validator_list,
-                StakeStatus::Active
-            )?,
-            StewardError::ValidatorsHaveNotBeenRemoved
-        );
-
-        state_account
-            .state
-            .set_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
-    }
 
     {
         // Routine - Remove marked validators
         // We still want these checks to run even if we don't specify a validator to remove
         let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
-        let validators_to_remove = state_account.state.validators_to_remove.count();
+        let validators_to_remove = state_account.state.validators_to_remove.count()
+            + state_account.state.validators_for_immediate_removal.count();
 
         // Ensure we have a 1-1 mapping between the number of validators in the list and the number of validators in the state
+        // If we don't have this mapping, everything needs to be removed
         require!(
             state_account.state.num_pool_validators as usize
                 + state_account.state.validators_added as usize
@@ -95,10 +91,7 @@ pub fn handler(
 
     {
         // Routine - Update state
-        let okay_to_update = state_account.state.validators_to_remove.is_empty()
-            && state_account
-                .state
-                .has_flag(CHECKED_VALIDATORS_REMOVED_FROM_LIST);
+        let okay_to_update = state_account.state.validators_to_remove.is_empty();
 
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;
@@ -115,7 +108,6 @@ pub fn handler(
                 .state
                 .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
         }
-
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
             validator_list_length: get_validator_list_length(&ctx.accounts.validator_list)? as u64,

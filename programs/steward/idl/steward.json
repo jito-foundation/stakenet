@@ -882,6 +882,43 @@
       ]
     },
     {
+      "name": "instant_remove_validator",
+      "docs": [
+        "Housekeeping, run at the start of any new epoch before any other instructions"
+      ],
+      "discriminator": [
+        119,
+        127,
+        216,
+        135,
+        24,
+        63,
+        229,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "stake_pool"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_index_to_remove",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "pause_steward",
       "discriminator": [
         214,
@@ -1624,36 +1661,56 @@
     },
     {
       "code": 6022,
+      "name": "ValidatorMarkedActive",
+      "msg": "Validator was marked active when it should be deactivating"
+    },
+    {
+      "code": 6023,
       "name": "MaxValidatorsReached",
       "msg": "Max validators reached"
     },
     {
-      "code": 6023,
+      "code": 6024,
       "name": "ValidatorHistoryMismatch",
       "msg": "Validator history account does not match vote account"
     },
     {
-      "code": 6024,
+      "code": 6025,
       "name": "EpochMaintenanceNotComplete",
       "msg": "Epoch Maintenance must be called before continuing"
     },
     {
-      "code": 6025,
+      "code": 6026,
       "name": "StakePoolNotUpdated",
       "msg": "The stake pool must be updated before continuing"
     },
     {
-      "code": 6026,
+      "code": 6027,
+      "name": "EpochMaintenanceAlreadyComplete",
+      "msg": "Epoch Maintenance has already been completed"
+    },
+    {
+      "code": 6028,
+      "name": "ValidatorsNeedToBeRemoved",
+      "msg": "Validators are marked for immediate removal"
+    },
+    {
+      "code": 6029,
+      "name": "NoValidatorsNeedToBeRemoved",
+      "msg": "No validators are marked for immediate removal"
+    },
+    {
+      "code": 6030,
       "name": "ValidatorNotMarkedForRemoval",
       "msg": "Validator not marked for removal"
     },
     {
-      "code": 6027,
+      "code": 6031,
       "name": "ValidatorsHaveNotBeenRemoved",
       "msg": "Validators have not been removed"
     },
     {
-      "code": 6028,
+      "code": 6032,
       "name": "ListStateMismatch",
       "msg": "Validator List count does not match state machine"
     }
@@ -1735,6 +1792,10 @@
           },
           {
             "name": "stake_account_deactivated",
+            "type": "bool"
+          },
+          {
+            "name": "marked_for_immediate_removal",
             "type": "bool"
           }
         ]
@@ -2683,6 +2744,18 @@
             "docs": [
               "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
               "This is cleaned up in the next epoch"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "validators_for_immediate_removal",
+            "docs": [
+              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This happens when a validator is able to be removed within the same epoch as it was marked"
             ],
             "type": {
               "defined": {

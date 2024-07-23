@@ -526,6 +526,10 @@ impl TestFixture {
         };
 
         if let Err(e) = process_transaction_result {
+            if !e.to_string().contains(error_message) {
+                panic!("Error: {}\n\nDoes not match {}", e, error_message);
+            }
+
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
@@ -937,6 +941,7 @@ impl Default for StateMachineFixtures {
             status_flags: 0,
             validators_added: 0,
             validators_to_remove: BitMask::default(),
+            validators_for_immediate_removal: BitMask::default(),
             _padding0: [0; STATE_PADDING_0_SIZE],
         };
 
