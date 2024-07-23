@@ -282,6 +282,8 @@ pub async fn upload_gossip_values(
                 let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
                 let validator_history_account = validator_history_map.get(&vote_account_pubkey)?;
 
+                println!("Building gossip entry for {}", vote_account_pubkey);
+
                 build_gossip_entry(
                     vote_account,
                     validator_history_account,
@@ -301,6 +303,7 @@ pub async fn upload_gossip_values(
         .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
         .collect::<Vec<_>>();
 
+    println!("Submitting {} transactions", update_transactions.len());
     let submit_result = submit_transactions(client, update_transactions, keypair).await;
 
     submit_result.map_err(|e| e.into())
