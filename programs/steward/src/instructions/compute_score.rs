@@ -3,7 +3,10 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_validator_list, get_validator_list_length, get_validator_stake_info_at_index},
+    utils::{
+        crank_check, get_validator_list, get_validator_list_length,
+        get_validator_stake_info_at_index,
+    },
     Config, StewardStateAccount, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -42,21 +45,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    {
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
-
-        require!(
-            clock.epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
-        );
-
-        require!(
-            state_account.state.validators_for_immediate_removal.count() == 0,
-            StewardError::ValidatorsNeedToBeRemoved
-        );
-    }
+    crank_check(&clock, &config, &state_account, validator_list, None)?;
 
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
@@ -64,8 +53,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         validator_stake_info.vote_account_address == validator_history.vote_account,
         StewardError::ValidatorNotInList
     );
-
-    let num_pool_validators = get_validator_list_length(validator_list)?;
 
     // May need to force an extra transition here in case cranking got stuck in any previous state
     // and it's now the start of a new scoring cycle
@@ -88,6 +75,8 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         ),
         StewardError::InvalidState
     );
+
+    let num_pool_validators = get_validator_list_length(validator_list)?;
 
     if let Some(score) = state_account.state.compute_score(
         &clock,

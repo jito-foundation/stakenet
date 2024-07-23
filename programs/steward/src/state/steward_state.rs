@@ -127,7 +127,7 @@ pub struct StewardState {
 
 pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 2;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 #[repr(u64)]
 pub enum StewardStateEnum {
     /// Start state

@@ -1,7 +1,7 @@
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_validator_list, get_validator_stake_info_at_index},
+    utils::{crank_check, get_validator_list, get_validator_stake_info_at_index},
     Config, StewardStateAccount, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
@@ -41,29 +41,13 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    {
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
-
-        require!(
-            matches!(
-                state_account.state.state_tag,
-                StewardStateEnum::ComputeInstantUnstake
-            ),
-            StewardError::InvalidState
-        );
-
-        require!(
-            clock.epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
-        );
-
-        require!(
-            state_account.state.validators_for_immediate_removal.count() == 0,
-            StewardError::ValidatorsNeedToBeRemoved
-        );
-    }
+    crank_check(
+        &clock,
+        &config,
+        &state_account,
+        &ctx.accounts.validator_list,
+        Some(StewardStateEnum::ComputeInstantUnstake),
+    )?;
 
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
