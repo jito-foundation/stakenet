@@ -135,10 +135,8 @@ async fn test_auto_remove() {
         fixture.stake_accounts_for_validator(vote_account).await;
 
     // Add vote account
-    println!("DID STEWARD STATE");
 
     _auto_add_validator_to_pool(&fixture, &vote_account).await;
-    println!("ADDED VALIDATOR");
 
     let auto_remove_validator_ix = Instruction {
         program_id: jito_steward::id(),
@@ -199,6 +197,43 @@ async fn test_auto_remove() {
         .set_account(&vote_account, &closed_vote_account().into());
 
     fixture.submit_transaction_assert_success(tx).await;
+
+    let steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    assert!(
+        steward_state_account
+            .state
+            .validators_for_immediate_removal
+            .count()
+            == 1
+    );
+
+    let instant_remove_validator_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::InstantRemoveValidator {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::InstantRemoveValidator {
+            validator_index_to_remove: 0,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[instant_remove_validator_ix.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(tx, "ValidatorsHaveNotBeenRemoved")
+        .await;
 
     drop(fixture);
 }

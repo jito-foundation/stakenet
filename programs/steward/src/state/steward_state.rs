@@ -87,6 +87,10 @@ pub struct StewardState {
     /// This is cleaned up in the next epoch
     pub validators_to_remove: BitMask,
 
+    /// Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This happens when a validator is able to be removed within the same epoch as it was marked
+    pub validators_for_immediate_removal: BitMask,
+
     ////// Cycle metadata fields //////
     /// Slot of the first ComputeScores instruction in the current cycle
     pub start_computing_scores_slot: u64,
@@ -123,7 +127,7 @@ pub struct StewardState {
 
 pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 2;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 #[repr(u64)]
 pub enum StewardStateEnum {
     /// Start state
@@ -241,15 +245,10 @@ pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
-/// In epoch maintenance, we only need to check the validator pool
-/// once for any validators that still need to be removed
-/// when there are no validators to remove from the pool, the operation continues
-/// and this condition is not checked again
-pub const CHECKED_VALIDATORS_REMOVED_FROM_LIST: u32 = 1 << 16;
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
 /// state transition layer that it needs to be reset to the IDLE state
 /// this flag is set in in epoch_maintenance and unset in the IDLE state transition
-pub const RESET_TO_IDLE: u32 = 1 << 17;
+pub const RESET_TO_IDLE: u32 = 1 << 16;
 // BITS 24-31 RESERVED FOR FUTURE USE
 
 impl StewardState {
@@ -463,15 +462,27 @@ impl StewardState {
 
     /// Update internal state when a validator is removed from the pool
     pub fn remove_validator(&mut self, index: usize) -> Result<()> {
+        let marked_for_regular_removal = self.validators_to_remove.get(index)?;
+        let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
+
         require!(
-            self.validators_to_remove.get(index)?,
+            marked_for_regular_removal || marked_for_immediate_removal,
             StewardError::ValidatorNotMarkedForRemoval
         );
 
-        self.num_pool_validators = self
-            .num_pool_validators
-            .checked_sub(1)
-            .ok_or(StewardError::ArithmeticError)?;
+        // If the validator was marked for removal in the current cycle, decrement validators_added
+        if index >= self.num_pool_validators as usize {
+            self.validators_added = self
+                .validators_added
+                .checked_sub(1)
+                .ok_or(StewardError::ArithmeticError)?;
+        } else {
+            self.num_pool_validators = self
+                .num_pool_validators
+                .checked_sub(1)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
+
         let num_pool_validators = self.num_pool_validators as usize;
 
         // Shift all validator state to the left
@@ -486,6 +497,8 @@ impl StewardState {
             self.progress.set(i, self.progress.get(next_i)?)?;
             self.validators_to_remove
                 .set(i, self.validators_to_remove.get(next_i)?)?;
+            self.validators_for_immediate_removal
+                .set(i, self.validators_for_immediate_removal.get(next_i)?)?;
         }
 
         // Update score indices
@@ -533,8 +546,13 @@ impl StewardState {
         self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
         self.delegations[num_pool_validators] = Delegation::default();
         self.instant_unstake.set(num_pool_validators, false)?;
-        self.validators_to_remove.set(num_pool_validators, false)?;
         self.progress.set(num_pool_validators, false)?;
+
+        if marked_for_regular_removal {
+            self.validators_to_remove.set(index, false)?;
+        } else {
+            self.validators_for_immediate_removal.set(index, false)?;
+        }
 
         Ok(())
     }
@@ -544,6 +562,10 @@ impl StewardState {
     /// This is cleaned up in the next epoch
     pub fn mark_validator_for_removal(&mut self, index: usize) -> Result<()> {
         self.validators_to_remove.set(index, true)
+    }
+
+    pub fn mark_validator_for_immediate_removal(&mut self, index: usize) -> Result<()> {
+        self.validators_for_immediate_removal.set(index, true)
     }
 
     /// Called when adding a validator to the pool so that we can ensure a 1-1 mapping between
@@ -610,7 +632,9 @@ impl StewardState {
             }
 
             // Skip scoring if marked for deletion
-            if self.validators_to_remove.get(index)? {
+            if self.validators_to_remove.get(index)?
+                || self.validators_for_immediate_removal.get(index)?
+            {
                 self.scores[index] = 0_u32;
                 self.yield_scores[index] = 0_u32;
 
@@ -755,7 +779,9 @@ impl StewardState {
             }
 
             // Skip if marked for deletion
-            if self.validators_to_remove.get(index)? {
+            if self.validators_to_remove.get(index)?
+                || self.validators_for_immediate_removal.get(index)?
+            {
                 self.progress.set(index, true)?;
                 return Ok(None);
             }
@@ -835,7 +861,9 @@ impl StewardState {
             }
 
             // Skip if marked for deletion
-            if self.validators_to_remove.get(index)? {
+            if self.validators_to_remove.get(index)?
+                || self.validators_for_immediate_removal.get(index)?
+            {
                 self.progress.set(index, true)?;
                 return Ok(RebalanceType::None);
             }

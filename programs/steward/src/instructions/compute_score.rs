@@ -3,7 +3,10 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{get_validator_list, get_validator_list_length, get_validator_stake_info_at_index},
+    utils::{
+        get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
+        state_checks,
+    },
     Config, StewardStateAccount, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -42,23 +45,14 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    state_checks(&clock, &config, &state_account, validator_list, None)?;
+
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(
         validator_stake_info.vote_account_address == validator_history.vote_account,
         StewardError::ValidatorNotInList
     );
-
-    let num_pool_validators = get_validator_list_length(validator_list)?;
-
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
 
     // May need to force an extra transition here in case cranking got stuck in any previous state
     // and it's now the start of a new scoring cycle
@@ -73,6 +67,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
             &epoch_schedule,
         )?;
     }
+
     require!(
         matches!(
             state_account.state.state_tag,
@@ -80,6 +75,8 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         ),
         StewardError::InvalidState
     );
+
+    let num_pool_validators = get_validator_list_length(validator_list)?;
 
     if let Some(score) = state_account.state.compute_score(
         &clock,

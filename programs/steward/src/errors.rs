@@ -48,6 +48,8 @@ pub enum StewardError {
     ArithmeticError,
     #[msg("Validator not eligible for removal. Must be delinquent or have closed vote account")]
     ValidatorNotRemovable,
+    #[msg("Validator was marked active when it should be deactivating")]
+    ValidatorMarkedActive,
     #[msg("Max validators reached")]
     MaxValidatorsReached,
     #[msg("Validator history account does not match vote account")]
@@ -56,6 +58,12 @@ pub enum StewardError {
     EpochMaintenanceNotComplete,
     #[msg("The stake pool must be updated before continuing")]
     StakePoolNotUpdated,
+    #[msg("Epoch Maintenance has already been completed")]
+    EpochMaintenanceAlreadyComplete,
+    #[msg("Validators are marked for immediate removal")]
+    ValidatorsNeedToBeRemoved,
+    #[msg("No validators are marked for immediate removal")]
+    NoValidatorsNeedToBeRemoved,
     #[msg("Validator not marked for removal")]
     ValidatorNotMarkedForRemoval,
     #[msg("Validators have not been removed")]

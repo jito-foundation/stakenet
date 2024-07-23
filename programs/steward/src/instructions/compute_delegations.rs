@@ -1,5 +1,5 @@
-use crate::errors::StewardError;
-use crate::{maybe_transition_and_emit, Config, StewardStateAccount};
+use crate::utils::{get_validator_list, state_checks};
+use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -12,6 +12,10 @@ pub struct ComputeDelegations<'info> {
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
+
+    /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
+    #[account(address = get_validator_list(&config)?)]
+    pub validator_list: AccountInfo<'info>,
 }
 
 /*
@@ -21,18 +25,16 @@ It computes a share of the pool for each validator.
 pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
     let config = ctx.accounts.config.load()?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
-
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
+    state_checks(
+        &clock,
+        &config,
+        &state_account,
+        &ctx.accounts.validator_list,
+        Some(StewardStateEnum::ComputeDelegations),
+    )?;
 
     state_account
         .state

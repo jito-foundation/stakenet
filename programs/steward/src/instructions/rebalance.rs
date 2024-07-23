@@ -23,8 +23,11 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition_and_emit,
-    utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
-    Config, StewardStateAccount,
+    utils::{
+        deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+        state_checks,
+    },
+    Config, StewardStateAccount, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -111,7 +114,7 @@ pub struct Rebalance<'info> {
     pub transient_stake_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(owner = vote::program::ID)]
+    #[account(constraint = (vote_account.owner == &vote::program::ID ||  vote_account.owner == &system_program::ID))]
     pub vote_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -146,6 +149,14 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    state_checks(
+        &clock,
+        &config,
+        &state_account,
+        &ctx.accounts.validator_list,
+        Some(StewardStateEnum::Rebalance),
+    )?;
+
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(
@@ -153,15 +164,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         StewardError::ValidatorNotInList
     );
     let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
-
-    require!(
-        clock.epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
 
     let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
     let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());

@@ -8,7 +8,47 @@ use spl_stake_pool::{
     state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
 };
 
-use crate::{errors::StewardError, Config, Delegation};
+use crate::{errors::StewardError, Config, Delegation, StewardStateAccount, StewardStateEnum};
+
+pub fn state_checks(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+    expected_state: Option<StewardStateEnum>,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    if let Some(expected_state) = expected_state {
+        require!(
+            state_account.state.state_tag == expected_state,
+            StewardError::InvalidState
+        );
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
+        state_account.state.validators_for_immediate_removal.count() == 0,
+        StewardError::ValidatorsNeedToBeRemoved
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
 
 pub fn get_stake_pool_address(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;

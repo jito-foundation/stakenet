@@ -61,6 +61,7 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     state_account.state.instant_unstake = BitMask::default();
     state_account.state.start_computing_scores_slot = clock.slot;
     state_account.state.validators_to_remove = BitMask::default();
+    state_account.state.validators_for_immediate_removal = BitMask::default();
     state_account.state.validators_added = 0;
     state_account.state.clear_flags();
     state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];

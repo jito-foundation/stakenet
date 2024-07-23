@@ -12,6 +12,7 @@ use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use anchor_lang::{prelude::*, system_program};
 use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
 use spl_pod::solana_program::stake::state::StakeStateV2;
+use spl_stake_pool::state::StakeStatus;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::state::ValidatorHistory;
 
@@ -124,8 +125,11 @@ pub struct AutoRemoveValidator<'info> {
 
 */
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
+    let stake_account_deactivated;
+    let vote_account_closed;
+
     {
-        let mut state_account = ctx.accounts.state_account.load_mut()?;
+        let state_account = ctx.accounts.state_account.load()?;
         let validator_list = &ctx.accounts.validator_list;
         let epoch = Clock::get()?.epoch;
 
@@ -143,7 +147,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         );
 
         // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
-        let stake_account_deactivated = {
+        stake_account_deactivated = {
             let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
             let stake_state: StakeStateV2 =
                 try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
@@ -158,57 +162,86 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         };
 
         // Check if vote account closed
-        let vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
+        vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
 
         require!(
             stake_account_deactivated || vote_account_closed,
             StewardError::ValidatorNotRemovable
         );
+    }
 
-        state_account
-            .state
-            .mark_validator_for_removal(validator_list_index)?;
+    {
+        invoke_signed(
+            &spl_stake_pool::instruction::remove_validator_from_pool(
+                &ctx.accounts.stake_pool_program.key(),
+                &ctx.accounts.stake_pool.key(),
+                &ctx.accounts.state_account.key(),
+                &ctx.accounts.withdraw_authority.key(),
+                &ctx.accounts.validator_list.key(),
+                &ctx.accounts.stake_account.key(),
+                &ctx.accounts.transient_stake_account.key(),
+            ),
+            &[
+                ctx.accounts.stake_pool.to_account_info(),
+                ctx.accounts.state_account.to_account_info(),
+                ctx.accounts.reserve_stake.to_owned(),
+                ctx.accounts.withdraw_authority.to_owned(),
+                ctx.accounts.validator_list.to_account_info(),
+                ctx.accounts.stake_account.to_account_info(),
+                ctx.accounts.transient_stake_account.to_account_info(),
+                ctx.accounts.vote_account.to_account_info(),
+                ctx.accounts.rent.to_account_info(),
+                ctx.accounts.clock.to_account_info(),
+                ctx.accounts.stake_history.to_account_info(),
+                ctx.accounts.stake_config.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+                ctx.accounts.stake_program.to_account_info(),
+            ],
+            &[&[
+                StewardStateAccount::SEED,
+                &ctx.accounts.config.key().to_bytes(),
+                &[ctx.bumps.state_account],
+            ]],
+        )?;
+    }
+
+    {
+        // Read the state account again
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+        let validator_list = &ctx.accounts.validator_list;
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+
+        let stake_status = StakeStatus::try_from(validator_stake_info.status)?;
+        let marked_for_immediate_removal: bool;
+
+        match stake_status {
+            StakeStatus::Active => {
+                // Should never happen
+                return Err(StewardError::ValidatorMarkedActive.into());
+            }
+            StakeStatus::DeactivatingValidator | StakeStatus::ReadyForRemoval => {
+                marked_for_immediate_removal = true;
+                state_account
+                    .state
+                    .mark_validator_for_immediate_removal(validator_list_index)?;
+            }
+            StakeStatus::DeactivatingAll | StakeStatus::DeactivatingTransient => {
+                marked_for_immediate_removal = false;
+                state_account
+                    .state
+                    .mark_validator_for_removal(validator_list_index)?;
+            }
+        }
 
         emit!(AutoRemoveValidatorEvent {
             vote_account: ctx.accounts.vote_account.key(),
             validator_list_index: validator_list_index as u64,
             stake_account_deactivated,
             vote_account_closed,
+            marked_for_immediate_removal,
         });
     }
-
-    invoke_signed(
-        &spl_stake_pool::instruction::remove_validator_from_pool(
-            &ctx.accounts.stake_pool_program.key(),
-            &ctx.accounts.stake_pool.key(),
-            &ctx.accounts.state_account.key(),
-            &ctx.accounts.withdraw_authority.key(),
-            &ctx.accounts.validator_list.key(),
-            &ctx.accounts.stake_account.key(),
-            &ctx.accounts.transient_stake_account.key(),
-        ),
-        &[
-            ctx.accounts.stake_pool.to_account_info(),
-            ctx.accounts.state_account.to_account_info(),
-            ctx.accounts.reserve_stake.to_owned(),
-            ctx.accounts.withdraw_authority.to_owned(),
-            ctx.accounts.validator_list.to_account_info(),
-            ctx.accounts.stake_account.to_account_info(),
-            ctx.accounts.transient_stake_account.to_account_info(),
-            ctx.accounts.vote_account.to_account_info(),
-            ctx.accounts.rent.to_account_info(),
-            ctx.accounts.clock.to_account_info(),
-            ctx.accounts.stake_history.to_account_info(),
-            ctx.accounts.stake_config.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-            ctx.accounts.stake_program.to_account_info(),
-        ],
-        &[&[
-            StewardStateAccount::SEED,
-            &ctx.accounts.config.key().to_bytes(),
-            &[ctx.bumps.state_account],
-        ]],
-    )?;
 
     Ok(())
 }

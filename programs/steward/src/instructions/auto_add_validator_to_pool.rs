@@ -107,10 +107,17 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
     let epoch = Clock::get()?.epoch;
 
     // Should not be able to add a validator if update is not complete
-    require!(
-        epoch == state_account.state.current_epoch,
-        StewardError::EpochMaintenanceNotComplete
-    );
+    {
+        require!(
+            epoch == state_account.state.current_epoch,
+            StewardError::EpochMaintenanceNotComplete
+        );
+
+        require!(
+            state_account.state.validators_for_immediate_removal.count() == 0,
+            StewardError::ValidatorsNeedToBeRemoved
+        );
+    }
 
     let validator_list_len = {
         let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;

@@ -15,6 +15,7 @@ use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
+    utils::ValidatorList,
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
     StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
 };
@@ -25,8 +26,8 @@ use solana_sdk::{
     stake::state::StakeStateV2, transaction::Transaction,
 };
 use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address,
-    state::{Fee, StakeStatus, ValidatorList, ValidatorStakeInfo},
+    find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
+    state::{Fee, StakeStatus, ValidatorList as SPLValidatorList, ValidatorStakeInfo},
 };
 use validator_history::{
     self, constants::MAX_ALLOC_BYTES, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
@@ -364,6 +365,39 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
+    pub async fn initialize_validator_list(&self, num_validators: usize) {
+        let stake_program_minimum = self.fetch_minimum_delegation().await;
+        let pool_minimum_delegation = minimum_delegation(stake_program_minimum);
+        let stake_rent = self.fetch_stake_rent().await;
+        let minimum_active_stake_with_rent = pool_minimum_delegation + stake_rent;
+
+        let validator_list_account_info =
+            self.get_account(&self.stake_pool_meta.validator_list).await;
+
+        let validator_list: ValidatorList = self
+            .load_and_deserialize(&self.stake_pool_meta.validator_list)
+            .await;
+
+        let mut spl_validator_list = validator_list.as_ref().clone();
+
+        for _ in 0..num_validators {
+            spl_validator_list.validators.push(ValidatorStakeInfo {
+                active_stake_lamports: minimum_active_stake_with_rent.into(),
+                vote_account_address: Pubkey::new_unique(),
+                ..ValidatorStakeInfo::default()
+            });
+        }
+
+        self.ctx.borrow_mut().set_account(
+            &self.stake_pool_meta.validator_list,
+            &serialized_validator_list_account(
+                spl_validator_list.clone(),
+                Some(validator_list_account_info.data.len()),
+            )
+            .into(),
+        );
+    }
+
     // Turn this into a fixture creator
     pub async fn initialize_cluster_history_account(&self) -> ClusterHistory {
         todo!()
@@ -526,6 +560,10 @@ impl TestFixture {
         };
 
         if let Err(e) = process_transaction_result {
+            if !e.to_string().contains(error_message) {
+                panic!("Error: {}\n\nDoes not match {}", e, error_message);
+            }
+
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
@@ -618,7 +656,7 @@ pub fn closed_vote_account() -> Account {
 
 // TODO write a function to serialize any account with T: AnchorSerialize
 pub fn serialized_validator_list_account(
-    validator_list: ValidatorList,
+    validator_list: SPLValidatorList,
     account_size: Option<usize>,
 ) -> Account {
     // Passes in size because zeros at the end will be truncated during serialization
@@ -937,6 +975,7 @@ impl Default for StateMachineFixtures {
             status_flags: 0,
             validators_added: 0,
             validators_to_remove: BitMask::default(),
+            validators_for_immediate_removal: BitMask::default(),
             _padding0: [0; STATE_PADDING_0_SIZE],
         };
 
