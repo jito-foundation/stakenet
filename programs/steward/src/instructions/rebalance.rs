@@ -24,8 +24,8 @@ use crate::{
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition_and_emit,
     utils::{
-        crank_check, deserialize_stake_pool, get_stake_pool_address,
-        get_validator_stake_info_at_index,
+        deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+        state_checks,
     },
     Config, StewardStateAccount, StewardStateEnum,
 };
@@ -149,7 +149,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    crank_check(
+    state_checks(
         &clock,
         &config,
         &state_account,

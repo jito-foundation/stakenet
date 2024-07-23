@@ -1,4 +1,4 @@
-use crate::utils::{crank_check, get_validator_list};
+use crate::utils::{state_checks, get_validator_list};
 use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
@@ -28,7 +28,7 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    crank_check(
+    state_checks(
         &clock,
         &config,
         &state_account,

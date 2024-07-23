@@ -245,16 +245,10 @@ pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
-/// In epoch maintenance, we only need to check the validator pool
-/// once for any validators that still need to be removed
-/// when there are no validators to remove from the pool, the operation continues
-/// and this condition is not checked again
-/// DEPRECATED: This flag is no longer used
-pub const CHECKED_VALIDATORS_REMOVED_FROM_LIST: u32 = 1 << 16;
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
 /// state transition layer that it needs to be reset to the IDLE state
 /// this flag is set in in epoch_maintenance and unset in the IDLE state transition
-pub const RESET_TO_IDLE: u32 = 1 << 17;
+pub const RESET_TO_IDLE: u32 = 1 << 16;
 // BITS 24-31 RESERVED FOR FUTURE USE
 
 impl StewardState {

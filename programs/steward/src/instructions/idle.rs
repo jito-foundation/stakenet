@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     maybe_transition_and_emit,
-    utils::{crank_check, get_validator_list},
+    utils::{get_validator_list, state_checks},
     Config, StewardStateAccount, StewardStateEnum,
 };
 
@@ -17,7 +17,7 @@ pub struct Idle<'info> {
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
-    /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
+    /// CHECK: account type checked in state_checks and address set in config
     #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 }
@@ -31,7 +31,7 @@ pub fn handler(ctx: Context<Idle>) -> Result<()> {
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    crank_check(
+    state_checks(
         &clock,
         &config,
         &state_account,

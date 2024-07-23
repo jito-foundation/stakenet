@@ -10,7 +10,7 @@ use spl_stake_pool::{
 
 use crate::{errors::StewardError, Config, Delegation, StewardStateAccount, StewardStateEnum};
 
-pub fn crank_check(
+pub fn state_checks(
     clock: &Clock,
     config: &Config,
     state_account: &StewardStateAccount,

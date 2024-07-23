@@ -1,7 +1,7 @@
 use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
-    utils::{crank_check, get_validator_list, get_validator_stake_info_at_index},
+    utils::{state_checks, get_validator_list, get_validator_stake_info_at_index},
     Config, StewardStateAccount, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
@@ -41,7 +41,7 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    crank_check(
+    state_checks(
         &clock,
         &config,
         &state_account,
