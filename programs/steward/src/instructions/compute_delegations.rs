@@ -1,4 +1,4 @@
-use crate::utils::{state_checks, get_validator_list};
+use crate::utils::{get_validator_list, state_checks};
 use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
