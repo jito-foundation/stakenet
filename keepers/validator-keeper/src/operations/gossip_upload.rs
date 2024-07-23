@@ -184,7 +184,9 @@ fn build_gossip_entry(
     // Current ContactInfo has both IP and Version, but LegacyContactInfo has only IP.
     // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
+        println!("Got contact info for validator {}", validator_vote_pubkey);
         if !check_entry_valid(entry, validator_history, validator_identity) {
+            println!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
         }
         Some(vec![GossipEntry::new(
@@ -199,6 +201,7 @@ fn build_gossip_entry(
         let mut entries = vec![];
         if let Some(entry) = crds.get::<&CrdsValue>(&legacy_contact_info_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -213,6 +216,7 @@ fn build_gossip_entry(
 
         if let Some(entry) = crds.get::<&CrdsValue>(&version_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -225,6 +229,7 @@ fn build_gossip_entry(
             ))
         } else if let Some(entry) = crds.get::<&CrdsValue>(&legacy_version_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -236,6 +241,8 @@ fn build_gossip_entry(
                 &keypair.pubkey(),
             ))
         }
+
+        println!("Entries");
         Some(entries)
     }
 }
