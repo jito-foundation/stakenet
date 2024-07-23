@@ -249,6 +249,7 @@ pub const POST_LOOP_IDLE: u32 = 1 << 6;
 /// once for any validators that still need to be removed
 /// when there are no validators to remove from the pool, the operation continues
 /// and this condition is not checked again
+/// DEPRECATED: This flag is no longer used
 pub const CHECKED_VALIDATORS_REMOVED_FROM_LIST: u32 = 1 << 16;
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
 /// state transition layer that it needs to be reset to the IDLE state
