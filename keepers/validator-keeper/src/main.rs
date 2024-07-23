@@ -134,7 +134,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
         }
 
-        // ---------------------- FIRE -----------------------------------
+        // ---------------------- FIRE ------------------------------------
+        // STEWARD
+        if should_fire(tick, monkey_interval) {
+            info!("Cranking Steward...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::steward::fire(&keeper_config, &keeper_state).await,
+            );
+        }
 
         // VALIDATOR HISTORY
         if should_fire(tick, validator_history_interval) {
@@ -175,13 +182,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
-        }
-        // ---------------------- STEWARD ---------------------------------
-        if should_fire(tick, monkey_interval) {
-            info!("Cranking Steward...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::steward::fire(&keeper_config, &keeper_state).await,
-            );
         }
 
         // ---------------------- EMIT ---------------------------------

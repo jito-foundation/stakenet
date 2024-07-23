@@ -36,6 +36,7 @@ pub enum StewardErrorCodes {
     UnknownRpcSimulateTransactionResult = 0xA0, // Raise Flag
     ValidatorAlreadyMarkedForRemoval = 0xA1,    // Don't Raise Flag
     InvalidState = 0xA2,                        // Don't Raise Flag
+    IndexesDontMatch = 0xA3,                    // Raise Flag
 }
 
 pub async fn fire(
@@ -64,18 +65,22 @@ pub async fn fire(
                             }
                             keeper_core::SendTransactionError::RpcSimulateTransactionResult(_) => {
                                 let error_string = format_steward_error_log(e);
-                                let mut error_code =
-                                    StewardErrorCodes::UnknownRpcSimulateTransactionResult as i64;
 
-                                if error_string.contains("Validator is already marked for removal")
-                                {
-                                    error_code =
-                                        StewardErrorCodes::ValidatorAlreadyMarkedForRemoval as i64;
-                                }
-
-                                if error_string.contains("Invalid state") {
-                                    error_code = StewardErrorCodes::InvalidState as i64;
-                                }
+                                let error_code = match error_string.as_str() {
+                                    s if s.contains("Validator is already marked for removal") => {
+                                        StewardErrorCodes::ValidatorAlreadyMarkedForRemoval as i64
+                                    }
+                                    s if s.contains("Invalid state") => {
+                                        StewardErrorCodes::InvalidState as i64
+                                    }
+                                    s if s.contains("ListStateMismatch") => {
+                                        StewardErrorCodes::IndexesDontMatch as i64
+                                    }
+                                    _ => {
+                                        StewardErrorCodes::UnknownRpcSimulateTransactionResult
+                                            as i64
+                                    }
+                                };
 
                                 error_code
                             }
