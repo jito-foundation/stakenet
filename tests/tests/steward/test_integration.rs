@@ -118,11 +118,7 @@ async fn test_compute_delegations() {
         ctx.borrow().last_blockhash,
     );
 
-    println!("Submitting transaction");
-
     fixture.submit_transaction_assert_success(tx).await;
-
-    println!("Transaction submitted");
 
     let steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -340,8 +336,6 @@ async fn test_compute_scores() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
-
-    println!("Okay!");
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -586,10 +580,13 @@ async fn test_compute_instant_unstake() {
             account_type: AccountType::ValidatorList,
             max_validators: MAX_VALIDATORS as u32,
         },
-        validators: vec![ValidatorStakeInfo {
-            vote_account_address: vote_account,
-            ..ValidatorStakeInfo::default()
-        }],
+        validators: vec![
+            ValidatorStakeInfo {
+                vote_account_address: vote_account,
+                ..ValidatorStakeInfo::default()
+            },
+            ValidatorStakeInfo::default(),
+        ],
     };
 
     fixture.ctx.borrow_mut().set_account(
@@ -639,6 +636,20 @@ async fn test_compute_instant_unstake() {
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
+    );
+
+    let test_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+
+    println!("{:?}", validator_list.validators.len());
+    println!(
+        "{:?}",
+        test_state_account.state.num_pool_validators
+            + test_state_account.state.validators_added as u64
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -756,20 +767,6 @@ async fn test_idle() {
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
-    );
-
-    let steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-
-    println!("{:?}", validator_list.validators.len());
-    println!(
-        "{:?}",
-        steward_state_account.state.num_pool_validators
-            + steward_state_account.state.validators_added as u64
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -1036,17 +1033,6 @@ async fn test_rebalance_increase() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
-
-    let mut steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    // Force validator into the active set, don't wait for next cycle
-    steward_state_account.state.num_pool_validators += 1;
-    steward_state_account.state.validators_added -= 1;
-    ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
-    );
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
