@@ -4,8 +4,8 @@ use crate::{
     errors::StewardError,
     maybe_transition_and_emit,
     utils::{
-        state_checks, get_validator_list, get_validator_list_length,
-        get_validator_stake_info_at_index,
+        get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
+        state_checks,
     },
     Config, StewardStateAccount, StewardStateEnum,
 };
