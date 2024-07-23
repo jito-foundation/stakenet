@@ -947,15 +947,6 @@ async fn test_rebalance_increase() {
         &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
     );
 
-    let mut steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    steward_state_account.state.num_pool_validators += 1;
-    ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
-    );
-
     let (stake_account_address, transient_stake_account_address, withdraw_authority) =
         fixture.stake_accounts_for_validator(vote_account).await;
 
@@ -1022,6 +1013,17 @@ async fn test_rebalance_increase() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let reserve_before_rebalance = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
 
@@ -1230,6 +1232,17 @@ async fn test_rebalance_decrease() {
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    // steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     // Simulating stake deposit
     let stake_account_data = fixture.get_account(&stake_account_address).await;
@@ -1468,6 +1481,17 @@ async fn test_rebalance_other_cases() {
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
