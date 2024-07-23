@@ -10,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::command_args::CrankIdle, utils::accounts::get_steward_state_account};
+use crate::{commands::command_args::CrankIdle, utils::accounts::get_all_steward_accounts};
 
 pub async fn command_crank_idle(
     args: CrankIdle,
@@ -25,15 +25,14 @@ pub async fn command_crank_idle(
 
     let steward_config = args.steward_config;
 
-    let (state_account, state_address) =
-        get_steward_state_account(client, &program_id, &steward_config).await?;
+    let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    match state_account.state.state_tag {
+    match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::Idle => { /* Continue */ }
         _ => {
             println!(
                 "State account is not in Idle state: {}",
-                state_account.state.state_tag
+                steward_accounts.state_account.state.state_tag
             );
             return Ok(());
         }
@@ -43,7 +42,8 @@ pub async fn command_crank_idle(
         program_id,
         accounts: jito_steward::accounts::Idle {
             config: steward_config,
-            state_account: state_address,
+            state_account: steward_accounts.state_address,
+            validator_list: steward_accounts.validator_list_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),

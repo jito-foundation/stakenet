@@ -101,6 +101,7 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -145,6 +146,7 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -735,6 +737,7 @@ async fn test_idle() {
         accounts: jito_steward::accounts::Idle {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
