@@ -38,7 +38,6 @@ async fn test_compute_delegations() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None).await;
     fixture.realloc_steward_state().await;
-    fixture.initialize_validator_list(MAX_VALIDATORS).await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -97,6 +96,8 @@ async fn test_compute_delegations() {
         &serialized_config(steward_config).into(),
     );
 
+    fixture.initialize_validator_list(MAX_VALIDATORS).await;
+
     let compute_delegations_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::ComputeDelegations {
@@ -117,7 +118,11 @@ async fn test_compute_delegations() {
         ctx.borrow().last_blockhash,
     );
 
+    println!("Submitting transaction");
+
     fixture.submit_transaction_assert_success(tx).await;
+
+    println!("Transaction submitted");
 
     let steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
