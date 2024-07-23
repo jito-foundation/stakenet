@@ -12,7 +12,7 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CrankComputeDelegations,
-    utils::{accounts::get_steward_state_account, transactions::configure_instruction},
+    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
 };
 
 pub async fn command_crank_compute_delegations(
@@ -28,15 +28,14 @@ pub async fn command_crank_compute_delegations(
 
     let steward_config = args.steward_config;
 
-    let (state_account, state_address) =
-        get_steward_state_account(client, &program_id, &steward_config).await?;
+    let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    match state_account.state.state_tag {
+    match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::ComputeDelegations => { /* Continue */ }
         _ => {
             println!(
                 "State account is not in Compute Delegation state: {}",
-                state_account.state.state_tag
+                steward_accounts.state_account.state.state_tag
             );
             return Ok(());
         }
@@ -46,7 +45,8 @@ pub async fn command_crank_compute_delegations(
         program_id,
         accounts: jito_steward::accounts::ComputeDelegations {
             config: steward_config,
-            state_account: state_address,
+            state_account: steward_accounts.state_address,
+            validator_list: steward_accounts.validator_list_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),

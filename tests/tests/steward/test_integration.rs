@@ -96,11 +96,14 @@ async fn test_compute_delegations() {
         &serialized_config(steward_config).into(),
     );
 
+    fixture.initialize_validator_list(MAX_VALIDATORS).await;
+
     let compute_delegations_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -114,6 +117,7 @@ async fn test_compute_delegations() {
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
     );
+
     fixture.submit_transaction_assert_success(tx).await;
 
     let steward_state_account: StewardStateAccount =
@@ -145,6 +149,7 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -331,8 +336,6 @@ async fn test_compute_scores() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
-
-    println!("Okay!");
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -577,10 +580,13 @@ async fn test_compute_instant_unstake() {
             account_type: AccountType::ValidatorList,
             max_validators: MAX_VALIDATORS as u32,
         },
-        validators: vec![ValidatorStakeInfo {
-            vote_account_address: vote_account,
-            ..ValidatorStakeInfo::default()
-        }],
+        validators: vec![
+            ValidatorStakeInfo {
+                vote_account_address: vote_account,
+                ..ValidatorStakeInfo::default()
+            },
+            ValidatorStakeInfo::default(),
+        ],
     };
 
     fixture.ctx.borrow_mut().set_account(
@@ -630,6 +636,20 @@ async fn test_compute_instant_unstake() {
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
+    );
+
+    let test_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+
+    println!("{:?}", validator_list.validators.len());
+    println!(
+        "{:?}",
+        test_state_account.state.num_pool_validators
+            + test_state_account.state.validators_added as u64
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -720,6 +740,8 @@ async fn test_idle() {
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
 
+    fixture.initialize_validator_list(MAX_VALIDATORS).await;
+
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
         &serialized_steward_state_account(steward_state_account).into(),
@@ -735,6 +757,7 @@ async fn test_idle() {
         accounts: jito_steward::accounts::Idle {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
@@ -944,15 +967,6 @@ async fn test_rebalance_increase() {
         &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
     );
 
-    let mut steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    steward_state_account.state.num_pool_validators += 1;
-    ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
-    );
-
     let (stake_account_address, transient_stake_account_address, withdraw_authority) =
         fixture.stake_accounts_for_validator(vote_account).await;
 
@@ -1019,6 +1033,17 @@ async fn test_rebalance_increase() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let reserve_before_rebalance = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
 
@@ -1227,6 +1252,17 @@ async fn test_rebalance_decrease() {
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    // steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     // Simulating stake deposit
     let stake_account_data = fixture.get_account(&stake_account_address).await;
@@ -1465,6 +1501,17 @@ async fn test_rebalance_other_cases() {
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),

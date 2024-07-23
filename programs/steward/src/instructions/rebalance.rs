@@ -23,7 +23,10 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition_and_emit,
-    utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
+    utils::{
+        deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+        state_checks,
+    },
     Config, StewardStateAccount, StewardStateEnum,
 };
 
@@ -146,26 +149,13 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    {
-        if config.is_paused() {
-            return Err(StewardError::StateMachinePaused.into());
-        }
-
-        require!(
-            matches!(state_account.state.state_tag, StewardStateEnum::Rebalance),
-            StewardError::InvalidState
-        );
-
-        require!(
-            clock.epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
-        );
-
-        require!(
-            state_account.state.validators_for_immediate_removal.count() == 0,
-            StewardError::ValidatorsNeedToBeRemoved
-        );
-    }
+    state_checks(
+        &clock,
+        &config,
+        &state_account,
+        &ctx.accounts.validator_list,
+        Some(StewardStateEnum::Rebalance),
+    )?;
 
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;

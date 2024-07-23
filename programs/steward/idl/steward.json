@@ -330,6 +330,9 @@
         {
           "name": "state_account",
           "writable": true
+        },
+        {
+          "name": "validator_list"
         }
       ],
       "args": []
@@ -649,6 +652,9 @@
         {
           "name": "state_account",
           "writable": true
+        },
+        {
+          "name": "validator_list"
         }
       ],
       "args": []

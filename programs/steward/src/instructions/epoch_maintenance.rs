@@ -5,8 +5,8 @@ use crate::{
         check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
         get_stake_pool_address, get_validator_list, get_validator_list_length,
     },
-    Config, StewardStateAccount, CHECKED_VALIDATORS_REMOVED_FROM_LIST, COMPUTE_INSTANT_UNSTAKES,
-    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
+    Config, StewardStateAccount, COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE,
+    PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -97,13 +97,9 @@ pub fn handler(
             state_account.state.current_epoch = clock.epoch;
 
             // We keep Compute Scores and Compute Delegations to be unset on next epoch cycle
-            state_account.state.unset_flag(
-                CHECKED_VALIDATORS_REMOVED_FROM_LIST
-                    | PRE_LOOP_IDLE
-                    | COMPUTE_INSTANT_UNSTAKES
-                    | REBALANCE
-                    | POST_LOOP_IDLE,
-            );
+            state_account
+                .state
+                .unset_flag(PRE_LOOP_IDLE | COMPUTE_INSTANT_UNSTAKES | REBALANCE | POST_LOOP_IDLE);
             state_account
                 .state
                 .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
