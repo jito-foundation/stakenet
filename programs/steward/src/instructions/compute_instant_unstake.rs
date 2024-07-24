@@ -18,6 +18,7 @@ pub struct ComputeInstantUnstake<'info> {
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
+    /// CHECK: We check it is the correct vote account in the handler
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
     #[account(address = get_validator_list(&config)?)]

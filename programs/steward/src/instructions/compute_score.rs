@@ -45,6 +45,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    // We don't check the state here because we force it below
     state_checks(&clock, &config, &state_account, validator_list, None)?;
 
     let validator_stake_info =

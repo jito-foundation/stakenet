@@ -2,12 +2,14 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::events::AutoAddValidatorEvent;
 use crate::state::{Config, StewardStateAccount};
-use crate::utils::{deserialize_stake_pool, get_stake_pool_address};
+use crate::utils::{
+    add_validator_check, deserialize_stake_pool, get_stake_pool_address, get_validator_list_length,
+};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
-use spl_stake_pool::state::ValidatorListHeader;
 use validator_history::state::ValidatorHistory;
+use validator_history::ValidatorHistoryEntry;
 
 #[derive(Accounts)]
 pub struct AutoAddValidator<'info> {
@@ -27,12 +29,6 @@ pub struct AutoAddValidator<'info> {
         bump
     )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
-
-    /// CHECK: CPI address
-    #[account(
-        address = spl_stake_pool::ID
-    )]
-    pub stake_pool_program: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -76,10 +72,6 @@ pub struct AutoAddValidator<'info> {
     #[account(owner = vote::program::ID)]
     pub vote_account: AccountInfo<'info>,
 
-    pub rent: Sysvar<'info, Rent>,
-
-    pub clock: Sysvar<'info, Clock>,
-
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = sysvar::stake_history::ID)]
     pub stake_history: AccountInfo<'info>,
@@ -88,11 +80,21 @@ pub struct AutoAddValidator<'info> {
     #[account(address = stake::config::ID)]
     pub stake_config: AccountInfo<'info>,
 
-    pub system_program: Program<'info, System>,
-
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
+
+    /// CHECK: CPI address
+    #[account(
+        address = spl_stake_pool::ID
+    )]
+    pub stake_pool_program: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    pub rent: Sysvar<'info, Rent>,
+
+    pub clock: Sysvar<'info, Clock>,
 }
 
 /*
@@ -101,68 +103,52 @@ all the validators we want to be eligible for delegation, as well as to accept s
 Performs some eligibility checks in order to not fill up the validator list with offline or malicious validators.
 */
 pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
-    let mut state_account = ctx.accounts.steward_state.load_mut()?;
-    let config = ctx.accounts.config.load()?;
-    let validator_history = ctx.accounts.validator_history_account.load()?;
-    let epoch = Clock::get()?.epoch;
-
-    // Should not be able to add a validator if update is not complete
     {
-        require!(
-            epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
-        );
+        let mut state_account = ctx.accounts.steward_state.load_mut()?;
+        let config = ctx.accounts.config.load()?;
+        let validator_history = ctx.accounts.validator_history_account.load()?;
+        let validator_list = &ctx.accounts.validator_list;
+        let clock = Clock::get()?;
+        let epoch = clock.epoch;
 
-        require!(
-            state_account.state.validators_for_immediate_removal.count() == 0,
-            StewardError::ValidatorsNeedToBeRemoved
-        );
-    }
+        add_validator_check(&clock, &config, &state_account, validator_list)?;
 
-    let validator_list_len = {
-        let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
-        let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
+        let validator_list_len = get_validator_list_length(&ctx.accounts.validator_list)?;
+        if validator_list_len.checked_add(1).unwrap() > MAX_VALIDATORS as usize {
+            return Err(StewardError::MaxValidatorsReached.into());
+        }
 
-        validator_list.len()
-    };
-    if validator_list_len.checked_add(1).unwrap() > MAX_VALIDATORS as u32 {
-        return Err(StewardError::MaxValidatorsReached.into());
-    }
-
-    let start_epoch =
-        epoch.saturating_sub(config.parameters.minimum_voting_epochs.saturating_sub(1));
-    if let Some(entry) = validator_history.history.last() {
-        // Steward requires that validators have been active for last minimum_voting_epochs epochs
-        if validator_history
-            .history
-            .epoch_credits_range(start_epoch as u16, epoch as u16)
-            .iter()
-            .any(|entry| entry.is_none())
-        {
+        let start_epoch =
+            epoch.saturating_sub(config.parameters.minimum_voting_epochs.saturating_sub(1));
+        if let Some(entry) = validator_history.history.last() {
+            // Steward requires that validators have been active for last minimum_voting_epochs epochs
+            if validator_history
+                .history
+                .epoch_credits_range(start_epoch as u16, epoch as u16)
+                .iter()
+                .any(|entry| entry.is_none())
+            {
+                return Err(StewardError::ValidatorBelowLivenessMinimum.into());
+            }
+            if entry.activated_stake_lamports
+                == ValidatorHistoryEntry::default().activated_stake_lamports
+            {
+                return Err(StewardError::StakeHistoryNotRecentEnough.into());
+            }
+            if entry.activated_stake_lamports < config.parameters.minimum_stake_lamports {
+                return Err(StewardError::ValidatorBelowStakeMinimum.into());
+            }
+        } else {
             return Err(StewardError::ValidatorBelowLivenessMinimum.into());
         }
-        if entry.activated_stake_lamports < config.parameters.minimum_stake_lamports {
-            msg!(
-                "Validator {} below minimum. Required: {} Actual: {}",
-                validator_history.vote_account,
-                config.parameters.minimum_stake_lamports,
-                entry.activated_stake_lamports
-            );
-            return Err(StewardError::ValidatorBelowStakeMinimum.into());
-        }
-    } else {
-        return Err(StewardError::ValidatorBelowLivenessMinimum.into());
+
+        state_account.state.increment_validator_to_add()?;
+
+        emit!(AutoAddValidatorEvent {
+            vote_account: ctx.accounts.vote_account.key(),
+            validator_list_index: validator_list_len as u64
+        });
     }
-
-    state_account.state.increment_validator_to_add()?;
-
-    // Have to drop the state account before calling the CPI
-    drop(state_account);
-
-    emit!(AutoAddValidatorEvent {
-        vote_account: ctx.accounts.vote_account.key(),
-        validator_list_index: validator_list_len as u64
-    });
 
     invoke_signed(
         &spl_stake_pool::instruction::add_validator_to_pool(

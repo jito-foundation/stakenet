@@ -14,6 +14,8 @@ pub enum StewardError {
     BitmaskOutOfBounds,
     #[msg("Invalid state")]
     InvalidState,
+    #[msg("Stake state is not Stake")]
+    StakeStateIsNotStake,
     #[msg("Validator not eligible to be added to the pool. Must meet stake minimum")]
     ValidatorBelowStakeMinimum,
     #[msg("Validator not eligible to be added to the pool. Must meet recent voting minimum")]

@@ -56,6 +56,65 @@ pub fn state_checks(
     Ok(())
 }
 
+pub fn remove_validator_check(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
+
+pub fn add_validator_check(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
+        state_account.state.validators_for_immediate_removal.count() == 0,
+        StewardError::ValidatorsNeedToBeRemoved
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
+
 pub fn get_stake_pool_address(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
     Ok(config.stake_pool)
@@ -147,7 +206,7 @@ pub fn get_validator_stake_info_at_index(
 
 pub fn check_validator_list_has_stake_status_other_than(
     validator_list_account_info: &AccountInfo,
-    flag: StakeStatus,
+    flags: &Vec<StakeStatus>,
 ) -> Result<bool> {
     let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
     let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
@@ -164,8 +223,10 @@ pub fn check_validator_list_has_stake_status_other_than(
 
         let stake_status = validator_list.data[stake_status_index];
 
-        if stake_status != flag as u8 {
-            return Ok(true);
+        for flag in flags.iter() {
+            if stake_status == *flag as u8 {
+                return Ok(true);
+            }
         }
     }
 

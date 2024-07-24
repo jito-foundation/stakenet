@@ -6,6 +6,7 @@ use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
 use crate::utils::{
     deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+    remove_validator_check,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
@@ -19,6 +20,8 @@ use validator_history::state::ValidatorHistory;
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
 pub struct AutoRemoveValidator<'info> {
+    pub config: AccountLoader<'info, Config>,
+
     #[account(
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
         seeds::program = validator_history::ID,
@@ -26,20 +29,12 @@ pub struct AutoRemoveValidator<'info> {
     )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
 
-    pub config: AccountLoader<'info, Config>,
-
     #[account(
         mut,
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
-
-    /// CHECK: CPI address
-    #[account(
-        address = spl_stake_pool::ID
-    )]
-    pub stake_pool_program: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -101,10 +96,6 @@ pub struct AutoRemoveValidator<'info> {
     /// CHECK: Owner check done in handler
     pub vote_account: AccountInfo<'info>,
 
-    pub rent: Sysvar<'info, Rent>,
-
-    pub clock: Sysvar<'info, Clock>,
-
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = sysvar::stake_history::ID)]
     pub stake_history: AccountInfo<'info>,
@@ -113,36 +104,41 @@ pub struct AutoRemoveValidator<'info> {
     #[account(address = stake::config::ID)]
     pub stake_config: AccountInfo<'info>,
 
-    pub system_program: Program<'info, System>,
-
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
+
+    /// CHECK: CPI address
+    #[account(
+        address = spl_stake_pool::ID
+    )]
+    pub stake_pool_program: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+
+    pub rent: Sysvar<'info, Rent>,
+
+    pub clock: Sysvar<'info, Clock>,
 }
 
-/*
-
-*/
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
     let stake_account_deactivated;
     let vote_account_closed;
 
     {
+        let config = ctx.accounts.config.load()?;
         let state_account = ctx.accounts.state_account.load()?;
         let validator_list = &ctx.accounts.validator_list;
-        let epoch = Clock::get()?.epoch;
+        let clock = Clock::get()?;
+        let epoch = clock.epoch;
+
+        remove_validator_check(&clock, &config, &state_account, validator_list)?;
 
         let validator_stake_info =
             get_validator_stake_info_at_index(validator_list, validator_list_index)?;
         require!(
             validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
             StewardError::ValidatorNotInList
-        );
-
-        // Should not be able to remove a validator if update is not complete
-        require!(
-            epoch == state_account.state.current_epoch,
-            StewardError::EpochMaintenanceNotComplete
         );
 
         // Checks state for deactivate delinquent status, preventing pool from merging stake with activating
@@ -155,13 +151,13 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
                 StakeStateV2::Stake(_meta, stake, _stake_flags) => {
                     stake.delegation.deactivation_epoch
                 }
-                _ => return Err(StewardError::InvalidState.into()), // TODO fix
+                _ => return Err(StewardError::StakeStateIsNotStake.into()),
             };
             deactivation_epoch < epoch
         };
 
         // Check if vote account closed
-        vote_account_closed = ctx.accounts.vote_account.owner != &vote::program::ID;
+        vote_account_closed = *ctx.accounts.vote_account.owner != vote::program::ID;
 
         require!(
             stake_account_deactivated || vote_account_closed,

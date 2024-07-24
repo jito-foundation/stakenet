@@ -44,6 +44,11 @@ pub fn handler(
     let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
 
     require!(
+        state_account.state.current_epoch == clock.epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
         clock.epoch == stake_pool.last_update_epoch,
         StewardError::StakePoolNotUpdated
     );
@@ -68,7 +73,11 @@ pub fn handler(
     require!(
         !check_validator_list_has_stake_status_other_than(
             &ctx.accounts.validator_list,
-            StakeStatus::Active
+            &vec![
+                StakeStatus::Active,
+                StakeStatus::DeactivatingAll,
+                StakeStatus::DeactivatingTransient
+            ]
         )?,
         StewardError::ValidatorsHaveNotBeenRemoved
     );
