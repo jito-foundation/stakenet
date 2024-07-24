@@ -73,7 +73,7 @@ pub fn handler(
     require!(
         !check_validator_list_has_stake_status_other_than(
             &ctx.accounts.validator_list,
-            &vec![
+            &[
                 StakeStatus::Active,
                 StakeStatus::DeactivatingAll,
                 StakeStatus::DeactivatingTransient

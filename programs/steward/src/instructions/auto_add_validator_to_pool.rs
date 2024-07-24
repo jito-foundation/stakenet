@@ -114,7 +114,7 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
         add_validator_check(&clock, &config, &state_account, validator_list)?;
 
         let validator_list_len = get_validator_list_length(&ctx.accounts.validator_list)?;
-        if validator_list_len.checked_add(1).unwrap() > MAX_VALIDATORS as usize {
+        if validator_list_len.checked_add(1).unwrap() > MAX_VALIDATORS {
             return Err(StewardError::MaxValidatorsReached.into());
         }
 

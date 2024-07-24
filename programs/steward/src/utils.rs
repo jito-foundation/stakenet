@@ -206,7 +206,7 @@ pub fn get_validator_stake_info_at_index(
 
 pub fn check_validator_list_has_stake_status_other_than(
     validator_list_account_info: &AccountInfo,
-    flags: &Vec<StakeStatus>,
+    flags: &[StakeStatus],
 ) -> Result<bool> {
     let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
     let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
