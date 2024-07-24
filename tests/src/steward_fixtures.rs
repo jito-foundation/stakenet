@@ -300,6 +300,18 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
+    pub async fn get_latest_blockhash(&self) -> Hash {
+        let blockhash = {
+            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            banks_client
+                .get_new_latest_blockhash(&Hash::default())
+                .await
+                .unwrap()
+        };
+
+        blockhash
+    }
+
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
         let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
@@ -418,6 +430,7 @@ impl TestFixture {
             validator_history.history.push(ValidatorHistoryEntry {
                 epoch: i,
                 epoch_credits: 400000,
+                activated_stake_lamports: 100_000_000_000_000,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -568,18 +581,6 @@ impl TestFixture {
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
         }
-    }
-
-    pub async fn get_latest_blockhash(&self) -> Hash {
-        let blockhash = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
-            banks_client
-                .get_new_latest_blockhash(&Hash::default())
-                .await
-                .unwrap()
-        };
-
-        blockhash
     }
 }
 
@@ -838,7 +839,7 @@ impl Default for StateMachineFixtures {
             instant_unstake_delinquency_threshold_ratio: 0.1,
             commission_threshold: 10,
             historical_commission_threshold: 10,
-            padding0: [0; 6],
+            _padding_0: [0; 6],
             num_delegation_validators: 3,
             scoring_unstake_cap_bps: 1000,
             instant_unstake_cap_bps: 1000,
@@ -849,6 +850,7 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
+            _padding_1: [0; 32],
         };
 
         // Setup Config

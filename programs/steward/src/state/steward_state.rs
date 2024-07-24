@@ -22,13 +22,7 @@ use bytemuck::{Pod, Zeroable};
 use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-// Tests will fail here - comment out msg! to pass
-fn invalid_state_error(_expected: String, _actual: String) -> Error {
-    // msg!("Invalid state. Expected {}, Actual {}", expected, actual);
-    StewardError::InvalidState.into()
-}
-
-pub fn maybe_transition_and_emit(
+pub fn maybe_transition(
     steward_state: &mut StewardState,
     clock: &Clock,
     params: &Parameters,
@@ -700,10 +694,8 @@ impl StewardState {
             self.progress.set(index, true)?;
             return Ok(Some(score));
         }
-        Err(invalid_state_error(
-            "ComputeScores".to_string(),
-            self.state_tag.to_string(),
-        ))
+
+        Err(StewardError::InvalidState.into())
     }
 
     /// Given list of scores, finds top `num_delegation_validators` and assigns an equal share
@@ -713,10 +705,7 @@ impl StewardState {
     pub fn compute_delegations(&mut self, current_epoch: u64, config: &Config) -> Result<()> {
         if matches!(self.state_tag, StewardStateEnum::ComputeDelegations) {
             if current_epoch >= self.next_cycle_epoch {
-                return Err(invalid_state_error(
-                    "ComputeScores".to_string(),
-                    self.state_tag.to_string(),
-                ));
+                return Err(StewardError::InvalidState.into());
             }
 
             let validators_to_delegate = select_validators_to_delegate(
@@ -739,10 +728,7 @@ impl StewardState {
 
             return Ok(());
         }
-        Err(invalid_state_error(
-            "ComputeDelegations".to_string(),
-            self.state_tag.to_string(),
-        ))
+        Err(StewardError::InvalidState.into())
     }
 
     /// One instruction per validator.
@@ -761,10 +747,7 @@ impl StewardState {
     ) -> Result<Option<InstantUnstakeComponents>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
-                return Err(invalid_state_error(
-                    "ComputeScores".to_string(),
-                    self.state_tag.to_string(),
-                ));
+                return Err(StewardError::InvalidState.into());
             }
 
             if epoch_progress(clock, epoch_schedule)?
@@ -821,10 +804,7 @@ impl StewardState {
             self.progress.set(index, true)?;
             return Ok(Some(instant_unstake_result));
         }
-        Err(invalid_state_error(
-            "ComputeInstantUnstake".to_string(),
-            self.state_tag.to_string(),
-        ))
+        Err(StewardError::InvalidState.into())
     }
 
     /// One instruction per validator.
@@ -849,10 +829,7 @@ impl StewardState {
     ) -> Result<RebalanceType> {
         if matches!(self.state_tag, StewardStateEnum::Rebalance) {
             if current_epoch >= self.next_cycle_epoch {
-                return Err(invalid_state_error(
-                    "ComputeScores".to_string(),
-                    self.state_tag.to_string(),
-                ));
+                return Err(StewardError::InvalidState.into());
             }
 
             // Skip if already processed
@@ -1048,10 +1025,7 @@ impl StewardState {
             self.progress.set(index, true)?;
             return Ok(rebalance);
         }
-        Err(invalid_state_error(
-            "Rebalance".to_string(),
-            self.state_tag.to_string(),
-        ))
+        Err(StewardError::InvalidState.into())
     }
 }
 

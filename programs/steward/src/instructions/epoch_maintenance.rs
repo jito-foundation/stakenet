@@ -59,7 +59,7 @@ pub fn handler(
     require!(
         !check_validator_list_has_stake_status_other_than(
             &ctx.accounts.validator_list,
-            StakeStatus::Active
+            &[StakeStatus::Active]
         )?,
         StewardError::ValidatorsHaveNotBeenRemoved
     );
@@ -91,7 +91,11 @@ pub fn handler(
 
     {
         // Routine - Update state
-        let okay_to_update = state_account.state.validators_to_remove.is_empty();
+        let okay_to_update = state_account.state.validators_to_remove.is_empty()
+            && state_account
+                .state
+                .validators_for_immediate_removal
+                .is_empty();
 
         if okay_to_update {
             state_account.state.current_epoch = clock.epoch;

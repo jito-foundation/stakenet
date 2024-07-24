@@ -16,7 +16,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_stake_pool::find_stake_program_address;
 use spl_stake_pool::instruction::PreferredValidatorType;
-use spl_stake_pool::state::ValidatorListHeader;
+use spl_stake_pool::state::{StakeStatus, ValidatorListHeader};
 use std::num::NonZeroU32;
 use validator_history::ValidatorHistory;
 
@@ -181,7 +181,7 @@ pub fn remove_validator_from_pool_handler(
     validator_list_index: usize,
 ) -> Result<()> {
     {
-        let mut state_account = ctx.accounts.state_account.load_mut()?;
+        let state_account = ctx.accounts.state_account.load_mut()?;
         let epoch = Clock::get()?.epoch;
 
         // Should not be able to remove a validator if update is not complete
@@ -207,10 +207,6 @@ pub fn remove_validator_from_pool_handler(
                 return Err(StewardError::ValidatorNotInList.into());
             }
         }
-
-        state_account
-            .state
-            .mark_validator_for_removal(validator_list_index)?;
     }
 
     invoke_signed(
@@ -239,6 +235,33 @@ pub fn remove_validator_from_pool_handler(
             &[ctx.bumps.state_account],
         ]],
     )?;
+
+    {
+        // Read the state account again
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+        let validator_list = &ctx.accounts.validator_list;
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+
+        let stake_status = StakeStatus::try_from(validator_stake_info.status)?;
+
+        match stake_status {
+            StakeStatus::Active => {
+                // Should never happen
+                return Err(StewardError::ValidatorMarkedActive.into());
+            }
+            StakeStatus::DeactivatingValidator | StakeStatus::ReadyForRemoval => {
+                state_account
+                    .state
+                    .mark_validator_for_immediate_removal(validator_list_index)?;
+            }
+            StakeStatus::DeactivatingAll | StakeStatus::DeactivatingTransient => {
+                state_account
+                    .state
+                    .mark_validator_for_removal(validator_list_index)?;
+            }
+        }
+    }
     Ok(())
 }
 

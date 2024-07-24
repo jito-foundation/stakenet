@@ -44,6 +44,11 @@ pub fn handler(
     let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
 
     require!(
+        state_account.state.current_epoch == clock.epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
         clock.epoch == stake_pool.last_update_epoch,
         StewardError::StakePoolNotUpdated
     );
@@ -56,21 +61,25 @@ pub fn handler(
         StewardError::ValidatorNotInList
     );
 
+    // Ensure there are no validators in the list that have not been removed, that should be
+    require!(
+        !check_validator_list_has_stake_status_other_than(
+            &ctx.accounts.validator_list,
+            &[
+                StakeStatus::Active,
+                StakeStatus::DeactivatingAll,
+                StakeStatus::DeactivatingTransient
+            ]
+        )?,
+        StewardError::ValidatorsHaveNotBeenRemoved
+    );
+
     require!(
         state_account.state.num_pool_validators as usize
             + state_account.state.validators_added as usize
             - validators_to_remove
             == validators_in_list,
         StewardError::ListStateMismatch
-    );
-
-    // Ensure there are no validators in the list that have not been removed, that should be
-    require!(
-        !check_validator_list_has_stake_status_other_than(
-            &ctx.accounts.validator_list,
-            StakeStatus::Active
-        )?,
-        StewardError::ValidatorsHaveNotBeenRemoved
     );
 
     state_account

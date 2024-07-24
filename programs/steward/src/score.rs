@@ -164,7 +164,7 @@ pub fn validator_score(
     /*
         If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
         the stake oracle to call UpdateStakeHistory.
-        If epoch credits is not set, we iterate through last 10 epochs to find the latest superminority flag.
+        If epoch credits is not set, we iterate through last `commission_range` epochs to find the latest superminority flag.
         If no entry is found, we assume the validator is not a superminority validator.
     */
     let is_superminority = if validator.history.epoch_credits_latest().is_some() {
@@ -196,8 +196,7 @@ pub fn validator_score(
     /////// Blacklist ///////
     let blacklisted_score = if config
         .validator_history_blacklist
-        .get(validator.index as usize)
-        .unwrap_or(false)
+        .get(validator.index as usize)?
     {
         0.0
     } else {
@@ -248,7 +247,7 @@ pub struct InstantUnstakeComponents {
     /// Checks if validator has increased MEV commission > mev_commission_bps_threshold
     pub mev_commission_check: bool,
 
-    /// Checks if validator was added to blacklist blacklisted
+    /// Checks if validator was added to blacklist
     pub is_blacklisted: bool,
 
     pub vote_account: Pubkey,
