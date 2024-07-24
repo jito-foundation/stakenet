@@ -1573,152 +1573,133 @@
     },
     {
       "code": 6003,
-      "name": "AddValidatorsNotComplete",
-      "msg": "Add validators step must be completed before any other steps can be taken"
-    },
-    {
-      "code": 6004,
-      "name": "EpochNotOver",
-      "msg": "Cannot reset state before epoch is over"
-    },
-    {
-      "code": 6005,
       "name": "Unauthorized",
       "msg": "Unauthorized to perform this action"
     },
     {
-      "code": 6006,
+      "code": 6004,
       "name": "BitmaskOutOfBounds",
       "msg": "Bitmask index out of bounds"
     },
     {
-      "code": 6007,
-      "name": "StateNotReset",
-      "msg": "Epoch state not reset"
+      "code": 6005,
+      "name": "InvalidState",
+      "msg": "Invalid state"
     },
     {
-      "code": 6008,
-      "name": "ValidatorOutOfRange",
-      "msg": "Validator History created after epoch start, out of range"
-    },
-    {
-      "code": 6009,
-      "name": "InvalidState"
-    },
-    {
-      "code": 6010,
+      "code": 6006,
       "name": "ValidatorBelowStakeMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet stake minimum"
     },
     {
-      "code": 6011,
+      "code": 6007,
       "name": "ValidatorBelowLivenessMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet recent voting minimum"
     },
     {
-      "code": 6012,
+      "code": 6008,
       "name": "VoteHistoryNotRecentEnough",
       "msg": "Validator History vote data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6013,
+      "code": 6009,
       "name": "StakeHistoryNotRecentEnough",
       "msg": "Validator History stake data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6014,
+      "code": 6010,
       "name": "ClusterHistoryNotRecentEnough",
       "msg": "Cluster History data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6015,
+      "code": 6011,
       "name": "StateMachinePaused",
       "msg": "Steward State Machine is paused. No state machine actions can be taken"
     },
     {
-      "code": 6016,
+      "code": 6012,
       "name": "InvalidParameterValue",
       "msg": "Config parameter is out of range or otherwise invalid"
     },
     {
-      "code": 6017,
+      "code": 6013,
       "name": "InstantUnstakeNotReady",
       "msg": "Instant unstake cannot be performed yet."
     },
     {
-      "code": 6018,
+      "code": 6014,
       "name": "ValidatorIndexOutOfBounds",
       "msg": "Validator index out of bounds of state machine"
     },
     {
-      "code": 6019,
+      "code": 6015,
       "name": "ValidatorListTypeMismatch",
       "msg": "ValidatorList account type mismatch"
     },
     {
-      "code": 6020,
+      "code": 6016,
       "name": "ArithmeticError",
       "msg": "An operation caused an overflow/underflow"
     },
     {
-      "code": 6021,
+      "code": 6017,
       "name": "ValidatorNotRemovable",
       "msg": "Validator not eligible for removal. Must be delinquent or have closed vote account"
     },
     {
-      "code": 6022,
+      "code": 6018,
       "name": "ValidatorMarkedActive",
       "msg": "Validator was marked active when it should be deactivating"
     },
     {
-      "code": 6023,
+      "code": 6019,
       "name": "MaxValidatorsReached",
       "msg": "Max validators reached"
     },
     {
-      "code": 6024,
-      "name": "ValidatorHistoryMismatch",
-      "msg": "Validator history account does not match vote account"
-    },
-    {
-      "code": 6025,
+      "code": 6020,
       "name": "EpochMaintenanceNotComplete",
       "msg": "Epoch Maintenance must be called before continuing"
     },
     {
-      "code": 6026,
+      "code": 6021,
       "name": "StakePoolNotUpdated",
       "msg": "The stake pool must be updated before continuing"
     },
     {
-      "code": 6027,
+      "code": 6022,
       "name": "EpochMaintenanceAlreadyComplete",
       "msg": "Epoch Maintenance has already been completed"
     },
     {
-      "code": 6028,
+      "code": 6023,
       "name": "ValidatorsNeedToBeRemoved",
       "msg": "Validators are marked for immediate removal"
     },
     {
-      "code": 6029,
-      "name": "NoValidatorsNeedToBeRemoved",
-      "msg": "No validators are marked for immediate removal"
-    },
-    {
-      "code": 6030,
+      "code": 6024,
       "name": "ValidatorNotMarkedForRemoval",
       "msg": "Validator not marked for removal"
     },
     {
-      "code": 6031,
+      "code": 6025,
       "name": "ValidatorsHaveNotBeenRemoved",
       "msg": "Validators have not been removed"
     },
     {
-      "code": 6032,
+      "code": 6026,
       "name": "ListStateMismatch",
       "msg": "Validator List count does not match state machine"
+    },
+    {
+      "code": 6027,
+      "name": "VoteAccountDoesNotMatch",
+      "msg": "Vote account does not match"
+    },
+    {
+      "code": 6028,
+      "name": "ValidatorNeedsToBeMarkedForRemoval",
+      "msg": "Validator needs to be marked for removal"
     }
   ],
   "types": [
@@ -2253,7 +2234,7 @@
           {
             "name": "is_blacklisted",
             "docs": [
-              "Checks if validator was added to blacklist blacklisted"
+              "Checks if validator was added to blacklist"
             ],
             "type": "bool"
           },
@@ -2361,7 +2342,7 @@
             "type": "u8"
           },
           {
-            "name": "padding0",
+            "name": "_padding_0",
             "docs": [
               "Required so that the struct is 8-byte aligned",
               "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
@@ -2439,6 +2420,15 @@
               "Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation"
             ],
             "type": "u64"
+          },
+          {
+            "name": "_padding_1",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
           }
         ]
       }
