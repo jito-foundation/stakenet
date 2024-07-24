@@ -8,8 +8,8 @@ use crate::utils::{
     deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
 };
 use crate::StewardStateAccount;
+use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
-use anchor_lang::{prelude::*, system_program};
 use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::state::StakeStatus;
@@ -134,11 +134,6 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
 
         let validator_stake_info =
             get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-        require!(
-            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
-            StewardError::ValidatorNotInList
-        );
-
         require!(
             validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
             StewardError::ValidatorNotInList

@@ -58,4 +58,8 @@ pub enum StewardError {
     ValidatorsHaveNotBeenRemoved,
     #[msg("Validator List count does not match state machine")]
     ListStateMismatch,
+    #[msg("Vote account does not match")]
+    VoteAccountDoesNotMatch,
+    #[msg("Validator needs to be marked for removal")]
+    ValidatorNeedsToBeMarkedForRemoval,
 }

@@ -164,14 +164,17 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     );
 
     // Checking Vote Account
+    require!(
+        validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+        StewardError::VoteAccountDoesNotMatch
+    );
+    if ctx.accounts.vote_account.owner != &vote::program::ID
+        && !state_account
+            .state
+            .validators_to_remove
+            .get(validator_list_index)?
     {
-        require!(
-            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
-            StewardError::ValidatorNotInList
-        );
-        if ctx.accounts.vote_account.owner != &vote::program::ID {
-            //TODO
-        }
+        return Err(StewardError::ValidatorNeedsToBeMarkedForRemoval.into());
     }
 
     let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
