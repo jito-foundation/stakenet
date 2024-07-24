@@ -205,7 +205,7 @@ pub fn validator_score(
 
     /////// Formula ///////
 
-    let yield_score = (average_vote_credits / average_blocks.max(1.0)) * (1. - commission);
+    let yield_score = (average_vote_credits / average_blocks) * (1. - commission);
 
     let score = mev_commission_score
         * commission_score

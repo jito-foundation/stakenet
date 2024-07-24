@@ -198,6 +198,9 @@ pub mod steward {
         instructions::close_steward_accounts::handler(ctx)
     }
 
+    /* Passthrough instructions */
+    /* passthrough to spl-stake-pool, where the signer is Staker. Must be invoked by `config.authority` */
+
     /// Passthrough spl-stake-pool: Set the staker for the pool
     pub fn set_staker(ctx: Context<SetStaker>) -> Result<()> {
         instructions::spl_passthrough::set_staker_handler(ctx)
