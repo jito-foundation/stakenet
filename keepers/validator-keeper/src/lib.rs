@@ -1,8 +1,3 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::{atomic::AtomicBool, Arc},
-};
-
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use keeper_core::{MultipleAccountsError, TransactionExecutionError};
 use log::error;
@@ -13,17 +8,11 @@ use solana_client::{
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
 };
-use solana_gossip::{
-    cluster_info::ClusterInfo, gossip_service::GossipService,
-    legacy_contact_info::LegacyContactInfo,
-};
-use solana_net_utils::bind_in_range;
 use solana_sdk::{
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use solana_streamer::socket::SocketAddrSpace;
 
 use jito_tip_distribution::state::TipDistributionAccount;
 use thiserror::Error as ThisError;
@@ -200,38 +189,4 @@ pub async fn get_balance_with_retry(
             }
         }
     }
-}
-
-pub fn start_spy_server(
-    cluster_entrypoint: SocketAddr,
-    gossip_port: u16,
-    spy_socket_addr: SocketAddr,
-    keypair: &Arc<Keypair>,
-    exit: Arc<AtomicBool>,
-) -> (GossipService, Arc<ClusterInfo>) {
-    // bind socket to expected port
-    let (_, gossip_socket) = bind_in_range(
-        IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-        (gossip_port, gossip_port + 1),
-    )
-    .map_err(|e| {
-        error!("Failed to bind to expected port");
-        e
-    })
-    .expect("Failed to bind to expected gossip port");
-
-    // connect to entrypoint and start spying on gossip
-    let node = ClusterInfo::gossip_contact_info(keypair.pubkey(), spy_socket_addr, 0);
-    let cluster_info = Arc::new(ClusterInfo::new(
-        node,
-        keypair.clone(),
-        SocketAddrSpace::Unspecified,
-    ));
-
-    cluster_info.set_entrypoint(LegacyContactInfo::new_gossip_entry_point(
-        &cluster_entrypoint,
-    ));
-    let gossip_service =
-        GossipService::new(&cluster_info, None, gossip_socket, None, true, None, exit);
-    (gossip_service, cluster_info)
 }
