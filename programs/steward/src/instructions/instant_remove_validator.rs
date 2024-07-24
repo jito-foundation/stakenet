@@ -61,14 +61,6 @@ pub fn handler(
         StewardError::ValidatorNotInList
     );
 
-    require!(
-        state_account.state.num_pool_validators as usize
-            + state_account.state.validators_added as usize
-            - validators_to_remove
-            == validators_in_list,
-        StewardError::ListStateMismatch
-    );
-
     // Ensure there are no validators in the list that have not been removed, that should be
     require!(
         !check_validator_list_has_stake_status_other_than(
@@ -80,6 +72,14 @@ pub fn handler(
             ]
         )?,
         StewardError::ValidatorsHaveNotBeenRemoved
+    );
+
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            - validators_to_remove
+            == validators_in_list,
+        StewardError::ListStateMismatch
     );
 
     state_account

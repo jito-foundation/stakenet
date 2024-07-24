@@ -9,8 +9,8 @@ use jito_steward::{
 use solana_program_test::*;
 use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::{
-    closed_vote_account, new_vote_account, serialized_steward_state_account,
-    serialized_validator_history_account, system_account, validator_history_default, TestFixture,
+    closed_vote_account, new_vote_account, serialized_validator_history_account, system_account,
+    validator_history_default, TestFixture,
 };
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
@@ -78,6 +78,7 @@ async fn _auto_add_validator_to_pool(fixture: &TestFixture, vote_account: &Pubke
     for i in 0..20 {
         validator_history.history.push(ValidatorHistoryEntry {
             epoch: i,
+            activated_stake_lamports: 100_000_000_000_000,
             epoch_credits: 400000,
             vote_account_last_update_slot: 100,
             ..ValidatorHistoryEntry::default()
@@ -165,19 +166,6 @@ async fn test_auto_remove() {
         }
         .data(),
     };
-
-    let mut steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    // Fake add vote account to state
-    steward_state_account.state.num_pool_validators = 1;
-    steward_state_account.state.sorted_score_indices[0] = 0;
-    steward_state_account.state.sorted_yield_score_indices[0] = 0;
-
-    fixture.ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
-    );
 
     let tx = Transaction::new_signed_with_payer(
         &[auto_remove_validator_ix],

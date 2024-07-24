@@ -223,10 +223,15 @@ pub fn check_validator_list_has_stake_status_other_than(
 
         let stake_status = validator_list.data[stake_status_index];
 
+        let mut has_flag = false;
         for flag in flags.iter() {
             if stake_status == *flag as u8 {
-                return Ok(true);
+                has_flag = true;
             }
+        }
+
+        if !has_flag {
+            return Ok(true);
         }
     }
 

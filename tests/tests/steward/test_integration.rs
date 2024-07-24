@@ -199,6 +199,7 @@ async fn test_compute_scores() {
         validator_history.history.push(ValidatorHistoryEntry {
             epoch: i,
             epoch_credits: 1000,
+            activated_stake_lamports: 100_000_000_000_000,
             commission: 0,
             mev_commission: 0,
             is_superminority: 0,
@@ -515,6 +516,7 @@ async fn test_compute_instant_unstake() {
     validator_history.history.push(ValidatorHistoryEntry {
         epoch: clock.epoch as u16,
         epoch_credits: 1000,
+        activated_stake_lamports: 100_000_000_000_000,
         commission: 100, // This is the condition causing instant unstake
         mev_commission: 0,
         is_superminority: 0,
@@ -1414,7 +1416,6 @@ async fn test_rebalance_other_cases() {
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    steward_config.set_paused(true);
     steward_config.parameters.minimum_voting_epochs = 1;
 
     let vote_account = Pubkey::new_unique();
@@ -1451,6 +1452,8 @@ async fn test_rebalance_other_cases() {
     let clock: Clock = fixture.get_sysvar().await;
 
     steward_state_account.state.current_epoch = clock.epoch;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
+    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
 
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -1563,6 +1566,17 @@ async fn test_rebalance_other_cases() {
         &[&fixture.keypair],
         fixture.get_latest_blockhash().await,
     );
+
+    let mut steward_config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    steward_config.set_paused(true);
+
+    ctx.borrow_mut().set_account(
+        &fixture.steward_config.pubkey(),
+        &serialized_config(steward_config).into(),
+    );
+
     fixture
         .submit_transaction_assert_error(tx, "StateMachinePaused")
         .await;

@@ -430,6 +430,7 @@ impl TestFixture {
             validator_history.history.push(ValidatorHistoryEntry {
                 epoch: i,
                 epoch_credits: 400000,
+                activated_stake_lamports: 100_000_000_000_000,
                 ..ValidatorHistoryEntry::default()
             });
         }
