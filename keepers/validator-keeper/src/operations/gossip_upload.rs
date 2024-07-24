@@ -4,7 +4,6 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::start_spy_server;
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use bytemuck::{bytes_of, Pod, Zeroable};
@@ -14,6 +13,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
 use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
+use solana_gossip::gossip_service::make_gossip_node;
 use solana_metrics::datapoint_error;
 use solana_sdk::signature::Signable;
 use solana_sdk::{
@@ -22,7 +22,8 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use std::net::IpAddr;
+use solana_streamer::socket::SocketAddrSpace;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLockReadGuard;
 use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
@@ -258,19 +259,24 @@ pub async fn upload_gossip_values(
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
 
-    let gossip_port = 0;
-
-    let spy_socket_addr = SocketAddr::new(
-        IpAddr::from_str("0.0.0.0").expect("Invalid IP"),
-        gossip_port,
-    );
+    // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-    let (_gossip_service, cluster_info) = start_spy_server(
-        *entrypoint,
-        gossip_port,
-        spy_socket_addr,
-        keypair,
+
+    let gossip_ip = solana_net_utils::get_public_ip_addr(entrypoint)?;
+    let gossip_addr = SocketAddr::new(
+        gossip_ip,
+        solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
+            .expect("unable to find an available gossip port"),
+    );
+
+    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
+        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+        Some(entrypoint),
         exit.clone(),
+        Some(&gossip_addr),
+        0,
+        true,
+        SocketAddrSpace::Global,
     );
 
     // Wait for all active validators to be received
