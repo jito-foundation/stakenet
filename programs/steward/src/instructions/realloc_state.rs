@@ -79,7 +79,7 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         state_account.state.yield_scores = [0; MAX_VALIDATORS];
         state_account.state.sorted_yield_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
         state_account.state.progress = BitMask::default();
-        state_account.state.current_epoch = clock.epoch;
+        state_account.state.current_epoch = 0; // will be set by epoch_maintenance
         state_account.state.next_cycle_epoch = clock
             .epoch
             .checked_add(config.parameters.num_epochs_between_scoring)

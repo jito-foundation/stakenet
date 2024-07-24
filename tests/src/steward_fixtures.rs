@@ -300,6 +300,18 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
+    pub async fn get_latest_blockhash(&self) -> Hash {
+        let blockhash = {
+            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            banks_client
+                .get_new_latest_blockhash(&Hash::default())
+                .await
+                .unwrap()
+        };
+
+        blockhash
+    }
+
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
         let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
@@ -568,18 +580,6 @@ impl TestFixture {
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
         }
-    }
-
-    pub async fn get_latest_blockhash(&self) -> Hash {
-        let blockhash = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
-            banks_client
-                .get_new_latest_blockhash(&Hash::default())
-                .await
-                .unwrap()
-        };
-
-        blockhash
     }
 }
 

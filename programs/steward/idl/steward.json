@@ -42,6 +42,9 @@
     },
     {
       "name": "add_validator_to_pool",
+      "docs": [
+        "Passthrough spl-stake-pool: Add a validator to the pool"
+      ],
       "discriminator": [
         181,
         6,
@@ -419,6 +422,9 @@
     },
     {
       "name": "decrease_additional_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Decrease additional validator stake"
+      ],
       "discriminator": [
         90,
         22,
@@ -508,6 +514,9 @@
     },
     {
       "name": "decrease_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Decrease validator stake"
+      ],
       "discriminator": [
         145,
         203,
@@ -661,6 +670,9 @@
     },
     {
       "name": "increase_additional_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Increase additional validator stake"
+      ],
       "discriminator": [
         93,
         136,
@@ -752,6 +764,9 @@
     },
     {
       "name": "increase_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Increase validator stake"
+      ],
       "discriminator": [
         5,
         121,
@@ -890,7 +905,7 @@
     {
       "name": "instant_remove_validator",
       "docs": [
-        "Housekeeping, run at the start of any new epoch before any other instructions"
+        "When a validator is marked for immediate removal, it needs to be removed before normal functions can continue"
       ],
       "discriminator": [
         119,
@@ -926,6 +941,9 @@
     },
     {
       "name": "pause_steward",
+      "docs": [
+        "Pauses the steward, preventing any further state transitions"
+      ],
       "discriminator": [
         214,
         85,
@@ -1105,6 +1123,9 @@
     },
     {
       "name": "remove_validator_from_pool",
+      "docs": [
+        "Passthrough spl-stake-pool: Remove a validator from the pool"
+      ],
       "discriminator": [
         161,
         32,
@@ -1206,6 +1227,9 @@
     },
     {
       "name": "resume_steward",
+      "docs": [
+        "Resumes the steward, allowing state transitions to continue"
+      ],
       "discriminator": [
         25,
         71,
@@ -1268,6 +1292,9 @@
     },
     {
       "name": "set_preferred_validator",
+      "docs": [
+        "Passthrough spl-stake-pool: Set the preferred validator"
+      ],
       "discriminator": [
         114,
         42,
@@ -1321,6 +1348,9 @@
     },
     {
       "name": "set_staker",
+      "docs": [
+        "Passthrough spl-stake-pool: Set the staker for the pool"
+      ],
       "discriminator": [
         149,
         203,
