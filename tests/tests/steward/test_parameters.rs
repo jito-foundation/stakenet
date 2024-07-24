@@ -242,7 +242,8 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
-        padding0: [0; 6],
+        _padding_0: [0; 6],
+        _padding_1: [0; 32],
     });
 
     // First Valid Epoch

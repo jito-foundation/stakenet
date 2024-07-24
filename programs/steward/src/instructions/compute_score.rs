@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     errors::StewardError,
-    maybe_transition_and_emit,
+    maybe_transition,
     utils::{
         get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
         state_checks,
@@ -45,6 +45,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    // We don't check the state here because we force it below
     state_checks(&clock, &config, &state_account, validator_list, None)?;
 
     let validator_stake_info =
@@ -60,7 +61,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ) {
-        maybe_transition_and_emit(
+        maybe_transition(
             &mut state_account.state,
             &clock,
             &config.parameters,
@@ -90,7 +91,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         emit!(score);
     }
 
-    if let Some(event) = maybe_transition_and_emit(
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,

@@ -34,7 +34,6 @@ use validator_history::{
 #[tokio::test]
 async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None).await;
     fixture.realloc_steward_state().await;
@@ -115,7 +114,7 @@ async fn test_compute_delegations() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -162,7 +161,7 @@ async fn test_compute_delegations() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture
         .submit_transaction_assert_error(tx, "StateMachinePaused")
@@ -174,7 +173,6 @@ async fn test_compute_delegations() {
 #[tokio::test]
 async fn test_compute_scores() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None).await;
     fixture.realloc_steward_state().await;
@@ -201,6 +199,7 @@ async fn test_compute_scores() {
         validator_history.history.push(ValidatorHistoryEntry {
             epoch: i,
             epoch_credits: 1000,
+            activated_stake_lamports: 100_000_000_000_000,
             commission: 0,
             mev_commission: 0,
             is_superminority: 0,
@@ -332,7 +331,7 @@ async fn test_compute_scores() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -466,7 +465,6 @@ async fn test_compute_scores() {
 #[tokio::test]
 async fn test_compute_instant_unstake() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture
         .initialize_steward(Some(UpdateParametersArgs {
@@ -518,6 +516,7 @@ async fn test_compute_instant_unstake() {
     validator_history.history.push(ValidatorHistoryEntry {
         epoch: clock.epoch as u16,
         epoch_credits: 1000,
+        activated_stake_lamports: 100_000_000_000_000,
         commission: 100, // This is the condition causing instant unstake
         mev_commission: 0,
         is_superminority: 0,
@@ -635,7 +634,7 @@ async fn test_compute_instant_unstake() {
         &[compute_instant_unstake_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     let test_state_account: StewardStateAccount =
@@ -766,7 +765,7 @@ async fn test_idle() {
         &[idle_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -1029,7 +1028,7 @@ async fn test_rebalance_increase() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -1055,7 +1054,7 @@ async fn test_rebalance_increase() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -1249,7 +1248,7 @@ async fn test_rebalance_decrease() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
 
@@ -1364,7 +1363,7 @@ async fn test_rebalance_decrease() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
 
@@ -1417,7 +1416,6 @@ async fn test_rebalance_other_cases() {
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    steward_config.set_paused(true);
     steward_config.parameters.minimum_voting_epochs = 1;
 
     let vote_account = Pubkey::new_unique();
@@ -1448,6 +1446,28 @@ async fn test_rebalance_other_cases() {
             ..ValidatorStakeInfo::default()
         });
     }
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    let clock: Clock = fixture.get_sysvar().await;
+
+    steward_state_account.state.current_epoch = clock.epoch;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
+    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+
+    ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.validator_list,
+        &serialized_validator_list_account(
+            spl_validator_list.clone(),
+            Some(validator_list_account_info.data.len()),
+        )
+        .into(),
+    );
 
     ctx.borrow_mut().set_account(
         &fixture.stake_pool_meta.validator_list,
@@ -1498,7 +1518,7 @@ async fn test_rebalance_other_cases() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
 
@@ -1544,8 +1564,19 @@ async fn test_rebalance_other_cases() {
         &[rebalance_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
+
+    let mut steward_config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    steward_config.set_paused(true);
+
+    ctx.borrow_mut().set_account(
+        &fixture.steward_config.pubkey(),
+        &serialized_config(steward_config).into(),
+    );
+
     fixture
         .submit_transaction_assert_error(tx, "StateMachinePaused")
         .await;

@@ -1,6 +1,6 @@
 use crate::{
     errors::StewardError,
-    maybe_transition_and_emit,
+    maybe_transition,
     utils::{get_validator_list, get_validator_stake_info_at_index, state_checks},
     Config, StewardStateAccount, StewardStateEnum,
 };
@@ -18,6 +18,7 @@ pub struct ComputeInstantUnstake<'info> {
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
+    /// CHECK: We check it is the correct vote account in the handler
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
     #[account(address = get_validator_list(&config)?)]
@@ -67,7 +68,7 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         emit!(instant_unstake);
     }
 
-    if let Some(event) = maybe_transition_and_emit(
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,

@@ -8,20 +8,14 @@ pub enum StewardError {
     ScoringNotComplete,
     #[msg("Validator does not exist at the ValidatorList index provided")]
     ValidatorNotInList,
-    #[msg("Add validators step must be completed before any other steps can be taken")]
-    AddValidatorsNotComplete,
-    #[msg("Cannot reset state before epoch is over")]
-    EpochNotOver,
     #[msg("Unauthorized to perform this action")]
     Unauthorized,
     #[msg("Bitmask index out of bounds")]
     BitmaskOutOfBounds,
-    #[msg("Epoch state not reset")]
-    StateNotReset,
-    #[msg("Validator History created after epoch start, out of range")]
-    ValidatorOutOfRange,
-    // Use invalid_state_error method to ensure expected and actual are logged
+    #[msg("Invalid state")]
     InvalidState,
+    #[msg("Stake state is not Stake")]
+    StakeStateIsNotStake,
     #[msg("Validator not eligible to be added to the pool. Must meet stake minimum")]
     ValidatorBelowStakeMinimum,
     #[msg("Validator not eligible to be added to the pool. Must meet recent voting minimum")]
@@ -52,8 +46,6 @@ pub enum StewardError {
     ValidatorMarkedActive,
     #[msg("Max validators reached")]
     MaxValidatorsReached,
-    #[msg("Validator history account does not match vote account")]
-    ValidatorHistoryMismatch,
     #[msg("Epoch Maintenance must be called before continuing")]
     EpochMaintenanceNotComplete,
     #[msg("The stake pool must be updated before continuing")]
@@ -62,12 +54,14 @@ pub enum StewardError {
     EpochMaintenanceAlreadyComplete,
     #[msg("Validators are marked for immediate removal")]
     ValidatorsNeedToBeRemoved,
-    #[msg("No validators are marked for immediate removal")]
-    NoValidatorsNeedToBeRemoved,
     #[msg("Validator not marked for removal")]
     ValidatorNotMarkedForRemoval,
     #[msg("Validators have not been removed")]
     ValidatorsHaveNotBeenRemoved,
     #[msg("Validator List count does not match state machine")]
     ListStateMismatch,
+    #[msg("Vote account does not match")]
+    VoteAccountDoesNotMatch,
+    #[msg("Validator needs to be marked for removal")]
+    ValidatorNeedsToBeMarkedForRemoval,
 }

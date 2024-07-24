@@ -22,7 +22,7 @@ use crate::{
     delegation::RebalanceType,
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
-    maybe_transition_and_emit,
+    maybe_transition,
     utils::{
         deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
         state_checks,
@@ -113,8 +113,7 @@ pub struct Rebalance<'info> {
     )]
     pub transient_stake_account: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(constraint = (vote_account.owner == &vote::program::ID ||  vote_account.owner == &system_program::ID))]
+    /// CHECK: We check the owning program in the handler
     pub vote_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -142,55 +141,69 @@ pub struct Rebalance<'info> {
 }
 
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
-    let config = ctx.accounts.config.load()?;
-    let mut state_account = ctx.accounts.state_account.load_mut()?;
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
+    let config = ctx.accounts.config.load()?;
 
-    state_checks(
-        &clock,
-        &config,
-        &state_account,
-        &ctx.accounts.validator_list,
-        Some(StewardStateEnum::Rebalance),
-    )?;
+    let rebalance_type: RebalanceType;
+    let transient_seed: u64;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == validator_history.vote_account,
-        StewardError::ValidatorNotInList
-    );
-    let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
+    {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
 
-    let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
-    let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
+        state_checks(
+            &clock,
+            &config,
+            &state_account,
+            &ctx.accounts.validator_list,
+            Some(StewardStateEnum::Rebalance),
+        )?;
 
-    let result = {
-        let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
-        let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == validator_history.vote_account,
+            StewardError::ValidatorNotInList
+        );
 
-        let stake_pool_lamports_with_fixed_cost =
-            deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
-        let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+        if ctx.accounts.vote_account.owner != &vote::program::ID
+            && !state_account
+                .state
+                .validators_to_remove
+                .get(validator_list_index)?
+        {
+            return Err(StewardError::ValidatorNeedsToBeMarkedForRemoval.into());
+        }
 
-        state_account.state.rebalance(
-            clock.epoch,
-            validator_list_index,
-            &validator_list,
-            stake_pool_lamports_with_fixed_cost,
-            reserve_lamports_with_rent,
-            minimum_delegation,
-            stake_rent,
-            &config.parameters,
-        )?
-    };
+        transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
 
-    drop(state_account);
+        let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
+        let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 
-    match result.clone() {
+        rebalance_type = {
+            let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
+            let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
+
+            let stake_pool_lamports_with_fixed_cost =
+                deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
+            let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+
+            state_account.state.rebalance(
+                clock.epoch,
+                validator_list_index,
+                &validator_list,
+                stake_pool_lamports_with_fixed_cost,
+                reserve_lamports_with_rent,
+                minimum_delegation,
+                stake_rent,
+                &config.parameters,
+            )?
+        };
+    }
+
+    match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
@@ -273,10 +286,10 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         emit!(rebalance_to_event(
             ctx.accounts.vote_account.key(),
             clock.epoch as u16,
-            result
+            rebalance_type
         ));
 
-        if let Some(event) = maybe_transition_and_emit(
+        if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
             &config.parameters,
