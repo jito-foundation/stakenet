@@ -139,15 +139,10 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
             StewardError::ValidatorNotInList
         );
 
-        {
-            require!(
-                validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
-                StewardError::ValidatorNotInList
-            );
-            if ctx.accounts.vote_account.owner != &vote::program::ID {
-                //TODO
-            }
-        }
+        require!(
+            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+            StewardError::ValidatorNotInList
+        );
 
         // Should not be able to remove a validator if update is not complete
         require!(
@@ -171,7 +166,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         };
 
         // Check if vote account closed
-        vote_account_closed = ctx.accounts.vote_account.owner == &system_program::ID;
+        vote_account_closed = ctx.accounts.vote_account.owner != &vote::program::ID;
 
         require!(
             stake_account_deactivated || vote_account_closed,

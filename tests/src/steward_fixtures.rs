@@ -838,7 +838,7 @@ impl Default for StateMachineFixtures {
             instant_unstake_delinquency_threshold_ratio: 0.1,
             commission_threshold: 10,
             historical_commission_threshold: 10,
-            padding0: [0; 6],
+            _padding_0: [0; 6],
             num_delegation_validators: 3,
             scoring_unstake_cap_bps: 1000,
             instant_unstake_cap_bps: 1000,
@@ -849,6 +849,7 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
+            _padding_1: [0; 32],
         };
 
         // Setup Config
