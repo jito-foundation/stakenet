@@ -45,6 +45,11 @@ To manage the validators in the pool, there are the following permissionless ins
 - `auto_remove_validator_from_pool`
 - `instant_remove_validator` - called when a validator can be removed within the same epoch it was marked for removal
 
+There are three authorities within the program:
+- `admin` - can update authority, pause, resume, and reset state
+- `parameters_authority` - can update parameters
+- `blacklist_authority` - can add and remove validators from the blacklist
+
 If manual intervention is required, the following spl-stake-pool instructions are available, and can be executed by the config.authority:
 - `add_validator_to_pool`
 - `remove_validator_from_pool`
