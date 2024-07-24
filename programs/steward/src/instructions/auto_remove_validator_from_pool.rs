@@ -98,8 +98,7 @@ pub struct AutoRemoveValidator<'info> {
     )]
     pub transient_stake_account: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(constraint = (vote_account.owner == &vote::program::ID ||  vote_account.owner == &system_program::ID))]
+    /// CHECK: Owner check done in handler
     pub vote_account: AccountInfo<'info>,
 
     pub rent: Sysvar<'info, Rent>,
@@ -139,6 +138,16 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
             validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
             StewardError::ValidatorNotInList
         );
+
+        {
+            require!(
+                validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+                StewardError::ValidatorNotInList
+            );
+            if ctx.accounts.vote_account.owner != &vote::program::ID {
+                //TODO
+            }
+        }
 
         // Should not be able to remove a validator if update is not complete
         require!(

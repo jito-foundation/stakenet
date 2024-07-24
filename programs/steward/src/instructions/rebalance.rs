@@ -22,7 +22,7 @@ use crate::{
     delegation::RebalanceType,
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
-    maybe_transition_and_emit,
+    maybe_transition,
     utils::{
         deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
         state_checks,
@@ -113,8 +113,7 @@ pub struct Rebalance<'info> {
     )]
     pub transient_stake_account: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(constraint = (vote_account.owner == &vote::program::ID ||  vote_account.owner == &system_program::ID))]
+    /// CHECK: We check the owning program in the handler
     pub vote_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -163,6 +162,18 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         validator_stake_info.vote_account_address == validator_history.vote_account,
         StewardError::ValidatorNotInList
     );
+
+    // Checking Vote Account
+    {
+        require!(
+            validator_stake_info.vote_account_address == ctx.accounts.vote_account.key(),
+            StewardError::ValidatorNotInList
+        );
+        if ctx.accounts.vote_account.owner != &vote::program::ID {
+            //TODO
+        }
+    }
+
     let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
 
     let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
@@ -276,7 +287,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             result
         ));
 
-        if let Some(event) = maybe_transition_and_emit(
+        if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
             &config.parameters,

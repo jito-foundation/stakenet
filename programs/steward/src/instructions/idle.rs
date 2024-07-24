@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    maybe_transition_and_emit,
+    maybe_transition,
     utils::{get_validator_list, state_checks},
     Config, StewardStateAccount, StewardStateEnum,
 };
@@ -39,7 +39,7 @@ pub fn handler(ctx: Context<Idle>) -> Result<()> {
         Some(StewardStateEnum::Idle),
     )?;
 
-    maybe_transition_and_emit(
+    maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,

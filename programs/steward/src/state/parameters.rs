@@ -174,7 +174,7 @@ pub struct Parameters {
 
     /// Required so that the struct is 8-byte aligned
     /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
-    pub padding0: [u8; 6],
+    pub _padding_0: [u8; 6],
 
     /////// Delegation parameters ///////
     /// Number of validators to delegate to
@@ -207,6 +207,8 @@ pub struct Parameters {
 
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
+
+    pub _padding_1: [u64; 32],
 }
 
 impl Parameters {

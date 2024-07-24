@@ -7,6 +7,8 @@ use anchor_lang::solana_program::pubkey::Pubkey;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[event]
+#[derive(Debug, Clone)]
+
 pub struct AutoRemoveValidatorEvent {
     pub validator_list_index: u64,
     pub vote_account: Pubkey,
@@ -16,12 +18,14 @@ pub struct AutoRemoveValidatorEvent {
 }
 
 #[event]
+#[derive(Debug, Clone)]
 pub struct AutoAddValidatorEvent {
     pub validator_list_index: u64,
     pub vote_account: Pubkey,
 }
 
 #[event]
+#[derive(Debug, Clone)]
 pub struct EpochMaintenanceEvent {
     pub validator_index_to_remove: Option<u64>,
     pub validator_list_length: u64,
@@ -32,7 +36,7 @@ pub struct EpochMaintenanceEvent {
 }
 
 #[event]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StateTransition {
     pub epoch: u64,
     pub slot: u64,
@@ -50,6 +54,7 @@ pub struct DecreaseComponents {
 }
 
 #[event]
+#[derive(Debug, Clone)]
 pub struct RebalanceEvent {
     pub vote_account: Pubkey,
     pub epoch: u16,
@@ -58,7 +63,7 @@ pub struct RebalanceEvent {
     pub decrease_components: DecreaseComponents,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum RebalanceTypeTag {
     None,
     Increase,

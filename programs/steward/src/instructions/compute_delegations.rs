@@ -1,5 +1,5 @@
 use crate::utils::{get_validator_list, state_checks};
-use crate::{maybe_transition_and_emit, Config, StewardStateAccount, StewardStateEnum};
+use crate::{maybe_transition, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -40,7 +40,7 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
         .state
         .compute_delegations(clock.epoch, &config)?;
 
-    if let Some(event) = maybe_transition_and_emit(
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,

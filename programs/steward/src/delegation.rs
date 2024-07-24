@@ -160,7 +160,8 @@ pub fn increase_stake_calculation(
         }
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
-    Err(StewardError::InvalidState.into())
+
+    Err(StewardError::ValidatorIndexOutOfBounds.into())
 }
 
 #[derive(Default)]
