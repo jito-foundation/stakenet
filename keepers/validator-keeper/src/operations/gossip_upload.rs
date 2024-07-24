@@ -185,7 +185,6 @@ fn build_gossip_entry(
     // Current ContactInfo has both IP and Version, but LegacyContactInfo has only IP.
     // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
-        println!("Got contact info for validator {}", validator_vote_pubkey);
         if !check_entry_valid(entry, validator_history, validator_identity) {
             println!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
@@ -243,7 +242,6 @@ fn build_gossip_entry(
             ))
         }
 
-        println!("Entries");
         Some(entries)
     }
 }
@@ -295,8 +293,6 @@ pub async fn upload_gossip_values(
                 let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
                 let validator_history_account = validator_history_map.get(&vote_account_pubkey)?;
 
-                println!("Building gossip entry for {}", vote_account_pubkey);
-
                 build_gossip_entry(
                     vote_account,
                     validator_history_account,
@@ -316,7 +312,6 @@ pub async fn upload_gossip_values(
         .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
         .collect::<Vec<_>>();
 
-    println!("Submitting {} transactions", update_transactions.len());
     let submit_result = submit_transactions(client, update_transactions, keypair).await;
 
     submit_result.map_err(|e| e.into())

@@ -135,27 +135,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // ---------------------- FIRE ------------------------------------
-        // STEWARD
-        if should_fire(tick, monkey_interval) {
-            info!("Cranking Steward...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::steward::fire(&keeper_config, &keeper_state).await,
-            );
-        }
 
         // VALIDATOR HISTORY
         if should_fire(tick, validator_history_interval) {
             info!("Firing operations...");
-
-            //TODO take out
-            if keeper_config.oracle_authority_keypair.is_some()
-                && keeper_config.gossip_entrypoint.is_some()
-            {
-                info!("Updating gossip accounts...");
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
-                );
-            }
 
             info!("Updating cluster history...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
@@ -192,6 +175,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
+        }
+
+        // STEWARD
+        if should_fire(tick, monkey_interval) {
+            info!("Cranking Steward...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::steward::fire(&keeper_config, &keeper_state).await,
+            );
         }
 
         // ---------------------- EMIT ---------------------------------

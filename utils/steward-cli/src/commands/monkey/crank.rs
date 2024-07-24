@@ -448,6 +448,7 @@ async fn _handle_compute_delegations(
         accounts: jito_steward::accounts::ComputeDelegations {
             config: all_steward_accounts.config_address,
             state_account: all_steward_accounts.state_address,
+            validator_list: all_steward_accounts.validator_list_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -473,6 +474,7 @@ async fn _handle_idle(
         accounts: jito_steward::accounts::Idle {
             config: all_steward_accounts.config_address,
             state_account: all_steward_accounts.state_address,
+            validator_list: all_steward_accounts.validator_list_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
