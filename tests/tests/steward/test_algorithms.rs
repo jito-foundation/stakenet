@@ -842,7 +842,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(match result {
-        Err(e) => e == StewardError::InvalidState.into(),
+        Err(e) => e == StewardError::ValidatorIndexOutOfBounds.into(),
         _ => false,
     });
 

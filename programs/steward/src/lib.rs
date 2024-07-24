@@ -30,15 +30,20 @@ To initialize a Steward-managed pool:
 3) `realloc_state` - increases the size of the State account to StewardStateAccount::SIZE, and initializes values once at that size
 
 Each cycle, the following steps are performed by a permissionless cranker:
-1) compute_score (once per validator)
+x) epoch_maintenance ( once per epoch )
+1) compute_score ( once per validator )
 2) compute_delegations
 3) idle
-4) compute_instant_unstake (once per validator)
-5) rebalance (once per validator)
+4) compute_instant_unstake ( once per validator )
+5) rebalance ( once per validator )
 
 For the remaining epochs in a cycle, the state will repeat idle->compute_instant_unstake->rebalance.
 After `num_epochs_between_scoring` epochs, the state can transition back to ComputeScores.
 
+To manage the validators in the pool, there are the following permissionless instructions:
+- `auto_add_validator_to_pool`
+- `auto_remove_validator_from_pool`
+- `instant_remove_validator` - called when a validator can be removed within the same epoch it was marked for removal
 
 If manual intervention is required, the following spl-stake-pool instructions are available, and can be executed by the config.authority:
 - `add_validator_to_pool`
@@ -48,7 +53,6 @@ If manual intervention is required, the following spl-stake-pool instructions ar
 - `decrease_validator_stake`
 - `increase_additional_validator_stake`
 - `decrease_additional_validator_stake`
-- `redelegate`
 - `set_staker`
 */
 #[program]
@@ -86,20 +90,20 @@ pub mod steward {
         instructions::auto_remove_validator_from_pool::handler(ctx, validator_list_index as usize)
     }
 
+    /// When a validator is marked for immediate removal, it needs to be removed before normal functions can continue
+    pub fn instant_remove_validator(
+        ctx: Context<InstantRemoveValidator>,
+        validator_index_to_remove: u64,
+    ) -> Result<()> {
+        instructions::instant_remove_validator::handler(ctx, validator_index_to_remove as usize)
+    }
+
     /// Housekeeping, run at the start of any new epoch before any other instructions
     pub fn epoch_maintenance(
         ctx: Context<EpochMaintenance>,
         validator_index_to_remove: Option<u64>,
     ) -> Result<()> {
         instructions::epoch_maintenance::handler(ctx, validator_index_to_remove.map(|x| x as usize))
-    }
-
-    /// Housekeeping, run at the start of any new epoch before any other instructions
-    pub fn instant_remove_validator(
-        ctx: Context<InstantRemoveValidator>,
-        validator_index_to_remove: u64,
-    ) -> Result<()> {
-        instructions::instant_remove_validator::handler(ctx, validator_index_to_remove as usize)
     }
 
     /// Computes score for a the validator at `validator_list_index` for the current cycle.
@@ -143,10 +147,12 @@ pub mod steward {
         instructions::set_new_authority::handler(ctx, authority_type)
     }
 
+    /// Pauses the steward, preventing any further state transitions
     pub fn pause_steward(ctx: Context<PauseSteward>) -> Result<()> {
         instructions::pause_steward::handler(ctx)
     }
 
+    /// Resumes the steward, allowing state transitions to continue
     pub fn resume_steward(ctx: Context<ResumeSteward>) -> Result<()> {
         instructions::resume_steward::handler(ctx)
     }
@@ -175,8 +181,6 @@ pub mod steward {
         instructions::update_parameters::handler(ctx, &update_parameters_args)
     }
 
-    /* TEMPORARY ADMIN INSTRUCTIONS for testing */
-
     /// Resets steward state account to its initial state.
     pub fn reset_steward_state(ctx: Context<ResetStewardState>) -> Result<()> {
         instructions::reset_steward_state::handler(ctx)
@@ -189,12 +193,12 @@ pub mod steward {
         instructions::close_steward_accounts::handler(ctx)
     }
 
-    /* Passthrough instructions to spl-stake-pool, where the signer is Staker. Must be invoked by `config.authority` */
-
+    /// Passthrough spl-stake-pool: Set the staker for the pool
     pub fn set_staker(ctx: Context<SetStaker>) -> Result<()> {
         instructions::spl_passthrough::set_staker_handler(ctx)
     }
 
+    /// Passthrough spl-stake-pool: Add a validator to the pool
     pub fn add_validator_to_pool(
         ctx: Context<AddValidatorToPool>,
         validator_seed: Option<u32>,
@@ -202,6 +206,7 @@ pub mod steward {
         instructions::spl_passthrough::add_validator_to_pool_handler(ctx, validator_seed)
     }
 
+    /// Passthrough spl-stake-pool: Remove a validator from the pool
     pub fn remove_validator_from_pool(
         ctx: Context<RemoveValidatorFromPool>,
         validator_list_index: u64,
@@ -212,6 +217,7 @@ pub mod steward {
         )
     }
 
+    /// Passthrough spl-stake-pool: Set the preferred validator
     pub fn set_preferred_validator(
         ctx: Context<SetPreferredValidator>,
         validator_type: PreferredValidatorType,
@@ -224,6 +230,7 @@ pub mod steward {
         )
     }
 
+    /// Passthrough spl-stake-pool: Increase validator stake
     pub fn increase_validator_stake(
         ctx: Context<IncreaseValidatorStake>,
         lamports: u64,
@@ -236,6 +243,7 @@ pub mod steward {
         )
     }
 
+    /// Passthrough spl-stake-pool: Decrease validator stake
     pub fn decrease_validator_stake(
         ctx: Context<DecreaseValidatorStake>,
         lamports: u64,
@@ -248,6 +256,7 @@ pub mod steward {
         )
     }
 
+    /// Passthrough spl-stake-pool: Increase additional validator stake
     pub fn increase_additional_validator_stake(
         ctx: Context<IncreaseAdditionalValidatorStake>,
         lamports: u64,
@@ -262,6 +271,7 @@ pub mod steward {
         )
     }
 
+    /// Passthrough spl-stake-pool: Decrease additional validator stake
     pub fn decrease_additional_validator_stake(
         ctx: Context<DecreaseAdditionalValidatorStake>,
         lamports: u64,
