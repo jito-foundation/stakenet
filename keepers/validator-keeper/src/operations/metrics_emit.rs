@@ -202,6 +202,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     let actual_epoch = keeper_state.epoch_info.epoch;
     let validators_to_remove_count = steward_state.validators_to_remove.count();
     let instant_unstake_count = steward_state.instant_unstake.count();
+    let stake_deposit_unstake_total = steward_state.stake_deposit_unstake_total;
     let instant_unstake_total = steward_state.instant_unstake_total;
     let validators_added = steward_state.validators_added;
     let next_cycle_epoch = steward_state.next_cycle_epoch;
@@ -229,6 +230,11 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         (
             "validators_to_remove_count",
             validators_to_remove_count,
+            i64
+        ),
+        (
+            "stake_deposit_unstake_total",
+            stake_deposit_unstake_total,
             i64
         ),
         ("instant_unstake_count", instant_unstake_count, i64),
