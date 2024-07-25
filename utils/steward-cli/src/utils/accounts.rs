@@ -393,7 +393,6 @@ pub fn check_stake_accounts(
             });
 
             let has_history = history_account.is_some();
-
             StakeAccountChecks {
                 is_deactivated: deactivation_epoch.unwrap_or(0) < epoch,
                 has_history,
