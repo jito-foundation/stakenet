@@ -6,6 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
+use spl_stake_pool::state::StakeStatus;
 use steward_cli::utils::accounts::{format_simple_state_string, format_state_string};
 use validator_history::ValidatorHistoryEntry;
 
@@ -217,6 +218,40 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         .validator_list_account;
     let validator_list_len = validator_list_account.validators.len();
 
+    let mut total_staked_lamports = 0;
+    let mut total_transient_lamports = 0;
+    let mut active_validators = 0;
+    let mut deactivating_validators = 0;
+    let mut ready_for_removal_validators = 0;
+    let mut deactivating_all_validators = 0;
+    let mut deactivating_transient_validators = 0;
+    validator_list_account
+        .clone()
+        .validators
+        .iter()
+        .for_each(|validator| {
+            total_staked_lamports += u64::from(validator.active_stake_lamports);
+            total_transient_lamports += u64::from(validator.transient_stake_lamports);
+
+            match StakeStatus::try_from(validator.status).unwrap() {
+                StakeStatus::Active => {
+                    active_validators += 1;
+                }
+                StakeStatus::DeactivatingTransient => {
+                    deactivating_transient_validators += 1;
+                }
+                StakeStatus::ReadyForRemoval => {
+                    ready_for_removal_validators += 1;
+                }
+                StakeStatus::DeactivatingValidator => {
+                    deactivating_validators += 1;
+                }
+                StakeStatus::DeactivatingAll => {
+                    deactivating_all_validators += 1;
+                }
+            }
+        });
+
     datapoint_info!(
         "steward-stats",
         ("state", state, String),
@@ -242,6 +277,25 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         ("validators_added", validators_added, i64),
         ("next_cycle_epoch", next_cycle_epoch, i64),
         ("validator_list_len", validator_list_len, i64),
+        ("total_staked_lamports", total_staked_lamports, i64),
+        ("total_transient_lamports", total_transient_lamports, i64),
+        ("active_validators", active_validators, i64),
+        ("deactivating_validators", deactivating_validators, i64),
+        (
+            "ready_for_removal_validators",
+            ready_for_removal_validators,
+            i64
+        ),
+        (
+            "deactivating_all_validators",
+            deactivating_all_validators,
+            i64
+        ),
+        (
+            "deactivating_transient_validators",
+            deactivating_transient_validators,
+            i64
+        ),
     );
 
     Ok(())

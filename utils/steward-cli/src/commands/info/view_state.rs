@@ -259,7 +259,7 @@ fn _print_default_state(
     );
 
     formatted_string += &format!("Padding0 Length: {}\n", state._padding0.len());
-    formatted_string += "\n\n";
+    formatted_string += "\n";
     formatted_string += &format!("num_pool_validators: {}\n", state.num_pool_validators);
     formatted_string += &format!(
         "validator list length: {}\n",
