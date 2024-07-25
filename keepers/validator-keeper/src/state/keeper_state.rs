@@ -50,9 +50,39 @@ impl StewardProgressFlags {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct KeeperFlags {
+    pub flags: u8,
+}
+
+pub enum KeeperFlag {
+    Startup = 0x01 << 0,
+    RerunVote = 0x01 << 1,
+}
+
+impl KeeperFlags {
+    // Set a flag
+    pub fn set_flag(&mut self, flag: KeeperFlag) {
+        self.flags |= flag as u8;
+    }
+
+    pub fn clean_flags(&mut self) {
+        self.flags = 0;
+    }
+
+    // Unset a flag
+    pub fn unset_flag(&mut self, flag: KeeperFlag) {
+        self.flags &= !(flag as u8);
+    }
+
+    // Check if a flag is set
+    pub fn check_flag(&self, flag: KeeperFlag) -> bool {
+        self.flags & (flag as u8) != 0
+    }
+}
+
 pub struct KeeperState {
-    pub startup_flag: bool,
-    pub rerun_vote_flag: bool,
+    pub keeper_flags: KeeperFlags,
     pub epoch_info: EpochInfo,
 
     // Tally array of runs and errors indexed by their respective KeeperOperations
@@ -89,24 +119,8 @@ pub struct KeeperState {
 impl KeeperState {
     pub fn new() -> Self {
         let mut state = Self::default();
-        state.set_startup_flag();
+        state.keeper_flags.set_flag(KeeperFlag::Startup);
         state
-    }
-
-    pub fn set_startup_flag(&mut self) {
-        self.startup_flag = true;
-    }
-
-    pub fn clear_startup_flag(&mut self) {
-        self.startup_flag = false;
-    }
-
-    pub fn set_rerun_vote_flag(&mut self) {
-        self.rerun_vote_flag = true;
-    }
-
-    pub fn clear_rerun_vote_flag(&mut self) {
-        self.rerun_vote_flag = false;
     }
 
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
@@ -153,19 +167,20 @@ impl KeeperState {
 
     pub fn set_runs_errors_txs_and_flags_for_epoch(
         &mut self,
-        (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch, flag): (
+        (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch, flags): (
             KeeperOperations,
             u64,
             u64,
             u64,
-            bool,
+            KeeperFlags,
         ),
     ) {
         let index = operation as usize;
         self.runs_for_epoch[index] = runs_for_epoch;
         self.errors_for_epoch[index] = errors_for_epoch;
         self.txs_for_epoch[index] = txs_for_epoch;
-        self.rerun_vote_flag = flag;
+
+        self.keeper_flags = flags;
     }
 
     pub fn increment_creations_for_epoch(
@@ -280,8 +295,7 @@ impl KeeperState {
 impl Default for KeeperState {
     fn default() -> Self {
         Self {
-            startup_flag: false,
-            rerun_vote_flag: false,
+            keeper_flags: KeeperFlags { flags: 0 },
             epoch_info: EpochInfo {
                 epoch: 0,
                 slot_index: 0,

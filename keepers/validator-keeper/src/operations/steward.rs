@@ -4,8 +4,8 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::state::keeper_config::KeeperConfig;
-use crate::state::keeper_state::KeeperState;
+use crate::state::keeper_state::{KeeperFlags, KeeperState};
+use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag};
 use keeper_core::SubmitStats;
 use solana_metrics::datapoint_error;
 use steward_cli::{
@@ -43,14 +43,14 @@ pub enum StewardErrorCodes {
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64, u64, bool) {
+) -> (KeeperOperations, u64, u64, u64, KeeperFlags) {
     let operation = _get_operation();
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
     let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
-    let mut should_rerun = false;
+    let mut keeper_flags = keeper_state.keeper_flags;
 
     if should_run {
         match _process(keeper_config, keeper_state).await {
@@ -79,7 +79,7 @@ pub async fn fire(
                                         StewardErrorCodes::IndexesDontMatch as i64
                                     }
                                     s if s.contains("VoteHistoryNotRecentEnough") => {
-                                        should_rerun = true;
+                                        keeper_flags.set_flag(KeeperFlag::RerunVote);
                                         StewardErrorCodes::VoteHistoryNotRecentEnough as i64
                                     }
                                     _ => {
@@ -118,7 +118,7 @@ pub async fn fire(
         runs_for_epoch,
         errors_for_epoch,
         txs_for_epoch,
-        should_rerun,
+        keeper_flags,
     )
 }
 

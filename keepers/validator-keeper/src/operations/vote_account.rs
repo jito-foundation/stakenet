@@ -4,7 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::state::keeper_state::KeeperState;
+use crate::state::keeper_state::{KeeperFlag, KeeperFlags, KeeperState};
 use crate::KeeperError;
 use crate::{
     entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
@@ -54,7 +54,7 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64, u64, bool) {
+) -> (KeeperOperations, u64, u64, u64, KeeperFlags) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
@@ -65,8 +65,12 @@ pub async fn fire(
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = (_should_run(epoch_info, runs_for_epoch) || keeper_state.rerun_vote_flag)
+    let should_run = (_should_run(epoch_info, runs_for_epoch)
+        || keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote))
         && check_flag(keeper_config.run_flags, operation);
+
+    let mut keeper_flags = keeper_state.keeper_flags;
+    keeper_flags.unset_flag(KeeperFlag::RerunVote);
 
     if should_run {
         match _process(
@@ -102,7 +106,7 @@ pub async fn fire(
         runs_for_epoch,
         errors_for_epoch,
         txs_for_epoch,
-        false,
+        keeper_flags,
     )
 }
 
@@ -119,7 +123,9 @@ pub async fn update_vote_accounts(
 
     // Update all open vote accounts, less the ones that have been recently updated
     let mut vote_accounts_to_update = keeper_state.get_all_open_vote_accounts();
-    if !keeper_state.startup_flag && !keeper_state.rerun_vote_flag {
+    if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup)
+        && !keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote)
+    {
         vote_accounts_to_update.retain(|vote_account| {
             !vote_account_uploaded_recently(
                 validator_history_map,

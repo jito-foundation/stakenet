@@ -17,7 +17,7 @@ use validator_keeper::{
     },
     state::{
         keeper_config::{Args, KeeperConfig},
-        keeper_state::KeeperState,
+        keeper_state::{KeeperFlag, KeeperState},
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
@@ -237,7 +237,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------- CLEAR STARTUP ----------
         if should_clear_startup_flag(tick, &intervals) {
-            keeper_state.clear_startup_flag();
+            keeper_state.keeper_flags.unset_flag(KeeperFlag::Startup);
         }
 
         // ---------- SLEEP ----------
