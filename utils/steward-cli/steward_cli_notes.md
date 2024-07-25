@@ -5,7 +5,7 @@
 `aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8`
 
 **Steward Config**
-`AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq`
+`35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH`
 
 **Stake Pool**
 `3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j`
@@ -48,7 +48,7 @@ cargo run init-steward \
 ## Create State
 
 ```bash
-cargo run realloc-state --authority-keypair-path ../../credentials/stakenet_test.json --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+cargo run realloc-state --authority-keypair-path ../../credentials/stakenet_test.json --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## Update Config
@@ -56,7 +56,7 @@ cargo run realloc-state --authority-keypair-path ../../credentials/stakenet_test
 ```bash
 cargo run update-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
-  --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq \
+  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH \
   --instant-unstake-inputs-epoch-progress 0.10 \
   --instant-unstake-epoch-progress 0.10
 ```
@@ -64,109 +64,109 @@ cargo run update-config \
 ## Reset State
 
 ```bash
-cargo run reset-state --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq  --authority-keypair-path ../../credentials/stakenet_test.json
+cargo run reset-state --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH  --authority-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## View Config
 
 ```bash
-cargo run view-config --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+cargo run view-config --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## View State
 
 ```bash
-cargo run view-state --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+cargo run view-state --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## View State Per Validator
 
 ```bash
-cargo run view-state --verbose --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+cargo run view-state --verbose --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## View Next Index To Remove
 
 ```bash
-cargo run view-next-index-to-remove --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq
+cargo run view-next-index-to-remove --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## Auto Remove Validator
 
 ```bash
-cargo run auto-remove-validator-from-pool --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 1397
+cargo run auto-remove-validator-from-pool --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 1397
 ```
 
 ## Auto Add Validator
 
 ```bash
-cargo run auto-add-validator-from-pool --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
+cargo run auto-add-validator-from-pool --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
 ```
 
 ## Manually Update Vote Account
 
 ```bash
-cargo run manually-copy-vote-account --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-update 1
+cargo run manually-copy-vote-account --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-update 1
 ```
 
 ## Manually Remove Validator
 
 ```bash
-cargo run manually-remove-validator --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --authority-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 0
+cargo run manually-remove-validator --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 0
 ```
 
 ## Close Steward
 
 ```bash
-cargo run close-steward --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --authority-keypair-path ../../credentials/stakenet_test.json
+cargo run close-steward --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Remove Bad Validators
 
 ```bash
-cargo run remove-bad-validators --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run remove-bad-validators --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Epoch Maintenance
 
 ```bash
-cargo run crank-epoch-maintenance --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-epoch-maintenance --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Score
 
 ```bash
-cargo run crank-compute-score --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-score --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Delegations
 
 ```bash
-cargo run crank-compute-delegations --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-delegations --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Idle
 
 ```bash
-cargo run crank-idle --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-idle --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Instant Unstake
 
 ```bash
-cargo run crank-compute-instant-unstake --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-compute-instant-unstake --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Rebalance
 
 ```bash
-cargo run crank-rebalance --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json
+cargo run crank-rebalance --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Monkey
 
 ```bash
-cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') crank-monkey --steward-config AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq --payer-keypair-path ../../credentials/stakenet_test.json --priority-fee 200000
+cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') crank-monkey --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json --priority-fee 200000
 ```
 
 # Deploy and Upgrade

@@ -72,10 +72,9 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value = "AFohCpk3Mp3FEYhrZsAK4TUppWKCwNZMzLpnggYTJLdq"
+        default_value = "35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH"
     )]
-    pub steward_config: Pubkey, 
-
+    pub steward_config: Pubkey,
 
     // Interval to update Validator History Accounts (default 300 sec)
     #[arg(short, long, env, default_value = "300")]
