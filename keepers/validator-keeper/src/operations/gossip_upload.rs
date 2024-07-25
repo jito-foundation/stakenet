@@ -31,7 +31,7 @@ use tokio::time::sleep;
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::GossipUpload
@@ -80,7 +80,8 @@ pub async fn fire(
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch);
+    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch)
+        && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(

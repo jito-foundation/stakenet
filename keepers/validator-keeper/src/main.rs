@@ -13,7 +13,7 @@ use tokio::time::sleep;
 use validator_keeper::{
     operations::{
         self,
-        keeper_operations::{KeeperCreates, KeeperOperations},
+        keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
         keeper_config::{Args, KeeperConfig},
@@ -21,6 +21,34 @@ use validator_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
+
+fn set_run_flags(args: &Args) -> u32 {
+    let mut run_flags = 0;
+
+    if !args.skip_cluster_history {
+        run_flags = set_flag(run_flags, KeeperOperations::ClusterHistory);
+    }
+    if !args.skip_copy_vote_accounts {
+        run_flags = set_flag(run_flags, KeeperOperations::VoteAccount);
+    }
+    if !args.skip_mev_commission {
+        run_flags = set_flag(run_flags, KeeperOperations::MevCommission);
+    }
+    if !args.skip_mev_earned {
+        run_flags = set_flag(run_flags, KeeperOperations::MevEarned);
+    }
+    if !args.skip_stake_upload {
+        run_flags = set_flag(run_flags, KeeperOperations::StakeUpload);
+    }
+    if !args.skip_gossip_upload {
+        run_flags = set_flag(run_flags, KeeperOperations::GossipUpload);
+    }
+    if !args.skip_steward {
+        run_flags = set_flag(run_flags, KeeperOperations::Steward);
+    }
+
+    run_flags
+}
 
 fn should_clear_startup_flag(tick: u64, intervals: &[u64]) -> bool {
     let max_interval = intervals.iter().max().unwrap();
@@ -146,7 +174,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             info!("Updating copy vote accounts...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::vote_account::fire(&keeper_config, &keeper_state).await,
             );
 
@@ -180,7 +208,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // STEWARD
         if should_fire(tick, monkey_interval) {
             info!("Cranking Steward...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::steward::fire(&keeper_config, &keeper_state).await,
             );
         }
@@ -189,8 +217,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         if should_fire(tick, metrics_interval) {
             info!("Emitting metrics...");
-            keeper_state
-                .set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(&keeper_state));
+            keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
+                &keeper_config,
+                &keeper_state,
+            ));
         }
 
         if should_emit(tick, &intervals) {
@@ -219,6 +249,9 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 async fn main() {
     env_logger::init();
     let args = Args::parse();
+
+    let flag_args = Args::parse();
+    let run_flags = set_run_flags(&flag_args);
 
     set_host_id(format!("{}", args.cluster));
 
@@ -257,6 +290,7 @@ async fn main() {
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
+        run_flags,
     };
 
     run_keeper(config).await;

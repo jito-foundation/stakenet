@@ -16,35 +16,30 @@ pub struct KeeperConfig {
     pub gossip_entrypoint: Option<SocketAddr>,
     pub validator_history_interval: u64,
     pub metrics_interval: u64,
+    pub run_flags: u32,
 }
 
 #[derive(Parser, Debug)]
 #[command(about = "Keeps commission history accounts up to date")]
 pub struct Args {
     /// RPC URL for the cluster
-    #[arg(
-        short,
-        long,
-        env,
-        default_value = "https://api.mainnet-beta.solana.com"
-    )]
+    #[arg(long, env, default_value = "https://api.mainnet-beta.solana.com")]
     pub json_rpc_url: String,
 
     /// Gossip entrypoint in the form of URL:PORT
-    #[arg(short, long, env)]
+    #[arg(long, env)]
     pub gossip_entrypoint: Option<String>,
 
     /// Path to keypair used to pay for account creation and execute transactions
-    #[arg(short, long, env, default_value = "./credentials/keypair.json")]
+    #[arg(long, env, default_value = "./credentials/keypair.json")]
     pub keypair: PathBuf,
 
     /// Path to keypair used specifically for submitting permissioned transactions
-    #[arg(short, long, env)]
+    #[arg(long, env)]
     pub oracle_authority_keypair: Option<PathBuf>,
 
     /// Validator history program ID (Pubkey as base58 string)
     #[arg(
-        short,
         long,
         env,
         default_value = "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa"
@@ -77,17 +72,38 @@ pub struct Args {
     pub steward_config: Pubkey,
 
     // Interval to update Validator History Accounts (default 300 sec)
-    #[arg(short, long, env, default_value = "300")]
+    #[arg(long, env, default_value = "300")]
     pub validator_history_interval: u64,
 
     // Interval to emit metrics (default 60 sec)
-    #[arg(short, long, env, default_value = "60")]
+    #[arg(long, env, default_value = "60")]
     pub metrics_interval: u64,
 
     // Priority Fees in microlamports
     #[arg(long, env, default_value = "200000")]
     pub priority_fees: u64,
 
-    #[arg(short, long, env, default_value_t = Cluster::Mainnet)]
+    #[arg(long, env, default_value_t = Cluster::Mainnet)]
     pub cluster: Cluster,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_cluster_history: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_copy_vote_accounts: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_mev_commission: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_mev_earned: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_stake_upload: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_gossip_upload: bool,
+
+    #[arg(long, env, default_value = "false")]
+    pub skip_steward: bool,
 }

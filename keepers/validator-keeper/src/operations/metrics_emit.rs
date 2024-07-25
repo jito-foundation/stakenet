@@ -3,13 +3,13 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::state::keeper_state::KeeperState;
+use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
 use steward_cli::utils::accounts::{format_simple_state_string, format_state_string};
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::EmitHistory
@@ -26,12 +26,15 @@ fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-pub fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64, u64) {
+pub fn fire(
+    keeper_config: &KeeperConfig,
+    keeper_state: &KeeperState,
+) -> (KeeperOperations, u64, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = _should_run();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(keeper_state) {

@@ -20,7 +20,7 @@ use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::MevCommission
@@ -63,7 +63,7 @@ pub async fn fire(
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = _should_run();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(

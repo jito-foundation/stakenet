@@ -13,7 +13,7 @@ use steward_cli::{
     utils::transactions::format_steward_error_log,
 };
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::Steward
@@ -37,18 +37,20 @@ pub enum StewardErrorCodes {
     ValidatorAlreadyMarkedForRemoval = 0xA1,    // Don't Raise Flag
     InvalidState = 0xA2,                        // Don't Raise Flag
     IndexesDontMatch = 0xA3,                    // Raise Flag
+    VoteHistoryNotRecentEnough = 0xA4,          // Don't Raise Flag
 }
 
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64, bool) {
     let operation = _get_operation();
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = _should_run();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
+    let mut should_rerun = false;
 
     if should_run {
         match _process(keeper_config, keeper_state).await {
@@ -75,6 +77,10 @@ pub async fn fire(
                                     }
                                     s if s.contains("ListStateMismatch") => {
                                         StewardErrorCodes::IndexesDontMatch as i64
+                                    }
+                                    s if s.contains("VoteHistoryNotRecentEnough") => {
+                                        should_rerun = true;
+                                        StewardErrorCodes::VoteHistoryNotRecentEnough as i64
                                     }
                                     _ => {
                                         StewardErrorCodes::UnknownRpcSimulateTransactionResult
@@ -107,7 +113,13 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
+    (
+        operation,
+        runs_for_epoch,
+        errors_for_epoch,
+        txs_for_epoch,
+        should_rerun,
+    )
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------

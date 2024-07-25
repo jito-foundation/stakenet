@@ -21,7 +21,7 @@ use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::VoteAccount
@@ -54,7 +54,7 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64, bool) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
@@ -65,7 +65,8 @@ pub async fn fire(
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
 
-    let should_run = _should_run(epoch_info, runs_for_epoch);
+    let should_run = (_should_run(epoch_info, runs_for_epoch) || keeper_state.rerun_vote_flag)
+        && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(
@@ -96,7 +97,13 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
+    (
+        operation,
+        runs_for_epoch,
+        errors_for_epoch,
+        txs_for_epoch,
+        false,
+    )
 }
 
 // SPECIFIC TO THIS OPERATION
@@ -112,7 +119,7 @@ pub async fn update_vote_accounts(
 
     // Update all open vote accounts, less the ones that have been recently updated
     let mut vote_accounts_to_update = keeper_state.get_all_open_vote_accounts();
-    if !keeper_state.startup_flag {
+    if !keeper_state.startup_flag && !keeper_state.rerun_vote_flag {
         vote_accounts_to_update.retain(|vote_account| {
             !vote_account_uploaded_recently(
                 validator_history_map,
