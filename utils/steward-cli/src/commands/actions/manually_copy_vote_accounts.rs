@@ -6,9 +6,7 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
-use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer
-};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
 
 use crate::{
     commands::command_args::ManuallyCopyVoteAccount,
@@ -35,7 +33,8 @@ pub async fn command_manually_copy_vote_account(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let validator_to_update = steward_accounts.validator_list_account.validators[index_to_update];
+    let validator_to_update =
+        steward_accounts.validator_list_account.validators[index_to_update as usize];
     let vote_account = validator_to_update.vote_account_address;
 
     let validator_history_account =

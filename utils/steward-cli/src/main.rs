@@ -2,12 +2,14 @@ use anyhow::Result;
 use clap::Parser;
 use commands::{
     actions::{
+        add_to_blacklist::command_add_to_blacklist,
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
         manually_remove_validator::command_manually_remove_validator,
-        remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
+        remove_bad_validators::command_remove_bad_validators,
+        remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
         update_config::command_update_config,
     },
     command_args::{Args, Commands},
@@ -71,6 +73,10 @@ async fn main() -> Result<()> {
         }
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, program_id).await
+        }
+        Commands::AddToBlacklist(args) => command_add_to_blacklist(args, &client, program_id).await,
+        Commands::RemoveFromBlacklist(args) => {
+            command_remove_from_blacklist(args, &client, program_id).await
         }
 
         // --- Cranks ---

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use anchor_lang::AccountDeserialize;
+use anchor_lang::{AccountDeserialize, Discriminator};
 use anyhow::Result;
 use jito_steward::{
     utils::{StakePool, ValidatorList},
@@ -8,7 +8,12 @@ use jito_steward::{
     COMPUTE_SCORE, EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
 };
 use keeper_core::get_multiple_accounts_batched;
-use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
+use solana_client::{
+    nonblocking::rpc_client::RpcClient,
+    rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
+    rpc_filter::{Memcmp, RpcFilterType},
+    rpc_response::RpcVoteAccountInfo,
+};
 use solana_sdk::{
     account::Account, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
     stake::state::StakeStateV2,
@@ -157,6 +162,53 @@ pub async fn get_all_steward_validator_accounts(
     }))
 }
 
+pub async fn get_all_history_accounts(
+    client: &Arc<RpcClient>,
+    validator_list: &ValidatorList,
+    validator_history_program_id: &Pubkey,
+) -> Result<HashMap<Pubkey, Option<ValidatorHistory>>> {
+    let all_vote_accounts = validator_list
+        .validators
+        .iter()
+        .map(|validator| validator.vote_account_address)
+        .collect::<Vec<Pubkey>>();
+
+    let all_history_accounts = all_vote_accounts
+        .clone()
+        .iter()
+        .map(|vote_account| {
+            get_validator_history_address(vote_account, validator_history_program_id)
+        })
+        .collect::<Vec<Pubkey>>();
+
+    let history_accounts_raw =
+        get_multiple_accounts_batched(all_history_accounts.as_slice(), client).await?;
+
+    let history_accounts = history_accounts_raw
+        .iter()
+        .map(|account| {
+            if account.is_none() {
+                None
+            } else {
+                Some(
+                    ValidatorHistory::try_deserialize(
+                        &mut account.as_ref().unwrap().data.as_slice(),
+                    )
+                    .unwrap(),
+                )
+            }
+        })
+        .collect::<Vec<Option<ValidatorHistory>>>();
+
+    let map = all_vote_accounts
+        .iter()
+        .zip(history_accounts)
+        .map(|(key, value)| (*key, value))
+        .collect::<HashMap<Pubkey, Option<ValidatorHistory>>>();
+
+    Ok(map)
+}
+
 pub async fn get_all_steward_accounts(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -170,14 +222,21 @@ pub async fn get_all_steward_accounts(
     let validator_list_address = stake_pool_account.validator_list;
     let steward_state_address = get_steward_state_address(program_id, steward_config);
 
+    let validator_list_account =
+        get_validator_list_account(client, &validator_list_address).await?;
+
+    // let history_accounts =
+    //     get_all_history_accounts(client, &validator_list_account, &validator_history::id()).await?;
+
     Ok(Box::new(AllStewardAccounts {
         stake_pool_account,
         config_address: *steward_config,
         stake_pool_withdraw_authority: get_withdraw_authority_address(&stake_pool_address),
-        validator_list_account: get_validator_list_account(client, &validator_list_address).await?,
+        validator_list_account,
         validator_list_address,
         stake_pool_address,
         config_account,
+        // history_accounts,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
     }))
@@ -248,6 +307,47 @@ pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
         find_withdraw_authority_program_address(&spl_stake_pool::id(), stake_pool_address);
 
     withdraw_authority
+}
+
+pub async fn get_validator_history_accounts_with_retry(
+    client: &RpcClient,
+    program_id: Pubkey,
+) -> Result<Vec<ValidatorHistory>> {
+    for _ in 0..4 {
+        if let Ok(validator_histories) = get_validator_history_accounts(client, program_id).await {
+            return Ok(validator_histories);
+        }
+    }
+    get_validator_history_accounts(client, program_id).await
+}
+
+pub async fn get_validator_history_accounts(
+    client: &RpcClient,
+    program_id: Pubkey,
+) -> Result<Vec<ValidatorHistory>> {
+    let gpa_config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            0,
+            ValidatorHistory::discriminator().into(),
+        ))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+    let mut validator_history_accounts = client
+        .get_program_accounts_with_config(&program_id, gpa_config)
+        .await?;
+
+    let validator_histories = validator_history_accounts
+        .iter_mut()
+        .filter_map(|(_, account)| {
+            ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+        })
+        .collect::<Vec<_>>();
+
+    Ok(validator_histories)
 }
 
 pub async fn get_validator_list_account(

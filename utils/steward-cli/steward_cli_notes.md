@@ -82,13 +82,25 @@ cargo run view-state --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQ
 ## View State Per Validator
 
 ```bash
-cargo run view-state --verbose --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --verbose --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## View Next Index To Remove
 
 ```bash
 cargo run view-next-index-to-remove --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+```
+
+## Add To Blacklist
+
+```bash
+cargo run add-to-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-blacklist 2802
+```
+
+## Remove From Blacklist
+
+```bash
+cargo run remove-from-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-deblacklist 2802
 ```
 
 ## Auto Remove Validator

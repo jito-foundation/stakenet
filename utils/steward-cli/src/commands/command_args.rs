@@ -198,6 +198,9 @@ pub enum Commands {
     UpdateConfig(UpdateConfig),
     ResetState(ResetState),
 
+    AddToBlacklist(AddToBlacklist),
+    RemoveFromBlacklist(RemoveFromBlacklist),
+
     CloseSteward(CloseSteward),
     RemoveBadValidators(RemoveBadValidators),
     ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
@@ -294,6 +297,28 @@ pub struct ResetState {
 }
 
 #[derive(Parser)]
+#[command(about = "Add to the blacklist")]
+pub struct AddToBlacklist {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_history_index_to_blacklist: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Remove from the blacklist")]
+pub struct RemoveFromBlacklist {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_history_index_to_deblacklist: u64,
+}
+
+#[derive(Parser)]
 #[command(
     about = "Closes the steward accounts and returns the staker to the authority calling this function"
 )]
@@ -310,7 +335,7 @@ pub struct ManuallyCopyVoteAccount {
 
     /// Validator index of validator list to update
     #[arg(long, env)]
-    pub validator_index_to_update: usize,
+    pub validator_index_to_update: u64,
 }
 
 #[derive(Parser)]
