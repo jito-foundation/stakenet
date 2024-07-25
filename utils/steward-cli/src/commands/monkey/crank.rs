@@ -405,7 +405,7 @@ async fn _handle_delinquent_validators(
     let bad_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-            if !check.has_history || check.is_deactivated {
+            if !check.has_history || !check.has_stake_account || check.is_deactivated {
                 Some(*vote_account)
             } else {
                 None
