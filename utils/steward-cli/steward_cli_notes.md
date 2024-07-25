@@ -94,13 +94,13 @@ cargo run view-next-index-to-remove --steward-config 35mMfFNiui7hcHy6xHTz11Q6Yuk
 ## Add To Blacklist
 
 ```bash
-cargo run add-to-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-blacklist 2802
+cargo run add-to-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-blacklist 2168
 ```
 
 ## Remove From Blacklist
 
 ```bash
-cargo run remove-from-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-deblacklist 2802
+cargo run remove-from-blacklist --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-deblacklist 2168
 ```
 
 ## Auto Remove Validator

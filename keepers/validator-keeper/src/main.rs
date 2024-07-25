@@ -89,8 +89,12 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     ];
 
     // Stateful data
-    let mut keeper_state = KeeperState::new();
+    let mut keeper_state = KeeperState::default();
     let mut tick: u64 = 0; // 1 second ticks
+
+    if keeper_config.full_startup {
+        keeper_state.keeper_flags.set_flag(KeeperFlag::Startup);
+    }
 
     loop {
         // ---------------------- FETCH -----------------------------------
@@ -291,6 +295,7 @@ async fn main() {
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
         run_flags,
+        full_startup: args.full_startup,
     };
 
     run_keeper(config).await;

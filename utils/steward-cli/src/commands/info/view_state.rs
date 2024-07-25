@@ -58,6 +58,8 @@ fn _print_verbose_state(
 ) {
     let mut formatted_string;
 
+    let mut top_scores: Vec<(Pubkey, u32)> = vec![];
+
     for (index, validator) in validator_list_account.validators.iter().enumerate() {
         let mut history_info: Option<ValidatorHistory> = None;
         for validator_history in validator_histories.iter() {
@@ -144,10 +146,15 @@ fn _print_verbose_state(
         }
 
         formatted_string += "\n";
-        formatted_string += &format!("Active Lamports: {:?}\n", validator.active_stake_lamports);
         formatted_string += &format!(
-            "Transient Lamports: {:?}\n",
-            validator.transient_stake_lamports
+            "Active Lamports: {:?} ({:.2} ◎)\n",
+            u64::from(validator.active_stake_lamports),
+            u64::from(validator.active_stake_lamports) as f64 / 10f64.powf(9.),
+        );
+        formatted_string += &format!(
+            "Transient Lamports: {:?} ({:.2} ◎)\n",
+            u64::from(validator.transient_stake_lamports),
+            u64::from(validator.transient_stake_lamports) as f64 / 10f64.powf(9.),
         );
 
         let status = match StakeStatus::try_from(validator.status).unwrap() {
@@ -161,8 +168,19 @@ fn _print_verbose_state(
 
         formatted_string += "\n";
 
+        if let Some(score) = steward_state_account.state.scores.get(index) {
+            if *score != 0 {
+                top_scores.push((vote_account, *score));
+            }
+        }
+
         println!("{}", formatted_string);
     }
+
+    top_scores.sort_by(|a, b| b.1.cmp(&a.1));
+    top_scores.iter().for_each(|(vote_account, score)| {
+        println!("Vote Account: {:?} Score: {}", vote_account, score);
+    });
 }
 
 fn _print_default_state(
@@ -206,6 +224,15 @@ fn _print_default_state(
                 }
             }
         });
+
+    let mut non_zero_score_count = 0;
+    for i in 0..state.num_pool_validators {
+        if let Some(score) = state.scores.get(i as usize) {
+            if *score != 0 {
+                non_zero_score_count += 1;
+            }
+        }
+    }
 
     let mut formatted_string = String::new();
 
@@ -271,8 +298,16 @@ fn _print_default_state(
     );
     formatted_string += &format!("Validators added: {}\n", state.validators_added);
     formatted_string += "\n";
-    formatted_string += &format!("Total Staked Lamports: {}\n", total_staked_lamports);
-    formatted_string += &format!("Total Transient Lamports: {}\n", total_transient_lamports);
+    formatted_string += &format!(
+        "Total Staked Lamports: {} ({:.2} ◎)\n",
+        total_staked_lamports,
+        total_staked_lamports as f64 / 10f64.powf(9.)
+    );
+    formatted_string += &format!(
+        "Total Transient Lamports: {} ({:.2} ◎)\n",
+        total_transient_lamports,
+        total_transient_lamports as f64 / 10f64.powf(9.)
+    );
     formatted_string += &format!("🟩 Active Validators: {}\n", active_validators);
     formatted_string += &format!(
         "🟨 Deactivating Transient Validators : {}\n",
@@ -287,6 +322,8 @@ fn _print_default_state(
         "🟥 Ready for Removal Validators: {}\n",
         ready_for_removal_validators
     );
+    formatted_string += "\n";
+    formatted_string += &format!("Non Zero Scores: {}\n", non_zero_score_count);
     formatted_string += "\n";
     formatted_string += &format!("State: {}\n", format_state_string(&state_account.state));
     formatted_string += &format!(

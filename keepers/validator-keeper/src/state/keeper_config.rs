@@ -17,6 +17,7 @@ pub struct KeeperConfig {
     pub validator_history_interval: u64,
     pub metrics_interval: u64,
     pub run_flags: u32,
+    pub full_startup: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -71,39 +72,51 @@ pub struct Args {
     )]
     pub steward_config: Pubkey,
 
-    // Interval to update Validator History Accounts (default 300 sec)
+    /// Interval to update Validator History Accounts (default 300 sec)
     #[arg(long, env, default_value = "300")]
     pub validator_history_interval: u64,
 
-    // Interval to emit metrics (default 60 sec)
+    /// Interval to emit metrics (default 60 sec)
     #[arg(long, env, default_value = "60")]
     pub metrics_interval: u64,
 
-    // Priority Fees in microlamports
+    /// Priority Fees in microlamports
     #[arg(long, env, default_value = "200000")]
     pub priority_fees: u64,
 
+    /// Cluster to specify
     #[arg(long, env, default_value_t = Cluster::Mainnet)]
     pub cluster: Cluster,
 
+    /// Skip running the cluster history
     #[arg(long, env, default_value = "false")]
     pub skip_cluster_history: bool,
 
+    /// Skip MEV commission
     #[arg(long, env, default_value = "false")]
     pub skip_copy_vote_accounts: bool,
 
+    /// Skip MEV commission
     #[arg(long, env, default_value = "false")]
     pub skip_mev_commission: bool,
 
+    /// Skip MEV earned
     #[arg(long, env, default_value = "false")]
     pub skip_mev_earned: bool,
 
+    /// Skip stake upload
     #[arg(long, env, default_value = "false")]
     pub skip_stake_upload: bool,
 
+    /// Skip gossip upload
     #[arg(long, env, default_value = "false")]
     pub skip_gossip_upload: bool,
 
+    /// Skip stake upload
     #[arg(long, env, default_value = "false")]
     pub skip_steward: bool,
+
+    /// Run with the startup flag set to true
+    #[arg(long, env, default_value = "true")]
+    pub full_startup: bool,
 }

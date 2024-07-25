@@ -117,12 +117,6 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
-    pub fn new() -> Self {
-        let mut state = Self::default();
-        state.keeper_flags.set_flag(KeeperFlag::Startup);
-        state
-    }
-
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
         let index = operation as usize;
         self.runs_for_epoch[index] += 1;

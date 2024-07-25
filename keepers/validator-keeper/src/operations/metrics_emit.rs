@@ -252,6 +252,15 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
             }
         });
 
+    let mut non_zero_score_count = 0;
+    for i in 0..steward_state.num_pool_validators {
+        if let Some(score) = steward_state.scores.get(i as usize) {
+            if *score != 0 {
+                non_zero_score_count += 1;
+            }
+        }
+    }
+
     datapoint_info!(
         "steward-stats",
         ("state", state, String),
@@ -296,6 +305,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
             deactivating_transient_validators,
             i64
         ),
+        ("non_zero_score_count", non_zero_score_count, i64),
     );
 
     Ok(())
