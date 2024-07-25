@@ -76,7 +76,7 @@ cargo run view-config --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWA
 ## View State
 
 ```bash
-cargo run view-state --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
 ```
 
 ## View State Per Validator
