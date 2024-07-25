@@ -698,9 +698,6 @@ async fn _handle_compute_instant_unstake(
         })
         .collect::<Vec<Instruction>>();
 
-    // let test_tx =
-    //     debug_send_single_transaction(client, payer, &[ixs_to_run[0].clone()], Some(true)).await?;
-
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
     println!("Submitting {} instructions", ixs_to_run.len());
