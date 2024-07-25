@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
+use jito_steward::utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
 use keeper_core::{
     get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats,
@@ -12,6 +13,11 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
 };
+use spl_stake_pool::instruction::{
+    cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
+};
+use spl_stake_pool::state::{StakeStatus, ValidatorStakeInfo};
+use spl_stake_pool::{find_withdraw_authority_program_address, MAX_VALIDATORS_TO_UPDATE};
 use thiserror::Error as ThisError;
 use validator_history::ValidatorHistory;
 
@@ -42,6 +48,190 @@ pub enum MonkeyCrankError {
     MultipleAccountsError(#[from] MultipleAccountsError),
     #[error("Custom: {0}")]
     Custom(String),
+}
+
+pub fn _get_update_stake_pool_ixs(
+    program_id: &Pubkey,
+    stake_pool: &StakePool,
+    validator_list: &ValidatorList,
+    stake_pool_address: &Pubkey,
+    no_merge: bool,
+    epoch: u64,
+) -> (Vec<Instruction>, Vec<Instruction>) {
+    let (withdraw_authority, _) =
+        find_withdraw_authority_program_address(program_id, stake_pool_address);
+
+    let mut update_list_instructions: Vec<Instruction> = vec![];
+    let mut start_index = 0;
+    for validator_info_chunk in validator_list.validators.chunks(MAX_VALIDATORS_TO_UPDATE) {
+        let should_update = validator_info_chunk
+            .iter()
+            .any(|info: &ValidatorStakeInfo| {
+                if u64::from(info.last_update_epoch) < epoch {
+                    true
+                } else {
+                    match StakeStatus::try_from(info.status).unwrap() {
+                        StakeStatus::DeactivatingValidator => true,
+                        _ => false,
+                        // StakeStatus::DeactivatingAll => false,
+                        // StakeStatus::Active => false,
+                        // StakeStatus::DeactivatingTransient => false,
+                        // StakeStatus::ReadyForRemoval => false,
+                    }
+                }
+            });
+
+        if should_update {
+            let validator_vote_accounts = validator_info_chunk
+                .iter()
+                .map(|v| v.vote_account_address)
+                .collect::<Vec<Pubkey>>();
+
+            update_list_instructions.push(update_validator_list_balance(
+                program_id,
+                stake_pool_address,
+                &withdraw_authority,
+                &stake_pool.validator_list,
+                &stake_pool.reserve_stake,
+                validator_list,
+                &validator_vote_accounts,
+                start_index,
+                no_merge,
+            ));
+        }
+        // Advance no matter what
+        start_index = start_index.saturating_add(MAX_VALIDATORS_TO_UPDATE as u32);
+    }
+
+    let final_instructions = vec![
+        update_stake_pool_balance(
+            program_id,
+            stake_pool_address,
+            &withdraw_authority,
+            &stake_pool.validator_list,
+            &stake_pool.reserve_stake,
+            &stake_pool.manager_fee_account,
+            &stake_pool.pool_mint,
+            &stake_pool.token_program_id,
+        ),
+        cleanup_removed_validator_entries(
+            program_id,
+            stake_pool_address,
+            &stake_pool.validator_list,
+        ),
+    ];
+    (update_list_instructions, final_instructions)
+}
+
+async fn _update_pool(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    epoch: u64,
+    all_steward_accounts: &AllStewardAccounts,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, MonkeyCrankError> {
+    let mut stats = SubmitStats::default();
+
+    let (update_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
+        &spl_stake_pool::ID,
+        &all_steward_accounts.stake_pool_account,
+        &all_steward_accounts.validator_list_account,
+        &all_steward_accounts.stake_pool_address,
+        false,
+        epoch,
+    );
+
+    println!("Updating Pool");
+    let update_txs_to_run =
+        package_instructions(&update_ixs, 1, priority_fee, Some(1_400_000), None);
+    let update_stats =
+        submit_packaged_transactions(client, update_txs_to_run, payer, Some(10), None).await?;
+
+    stats.combine(&update_stats);
+
+    println!("Cleaning Pool");
+    let cleanup_txs_to_run =
+        package_instructions(&cleanup_ixs, 1, priority_fee, Some(1_400_000), None);
+    let cleanup_stats =
+        submit_packaged_transactions(client, cleanup_txs_to_run, payer, Some(10), None).await?;
+
+    stats.combine(&cleanup_stats);
+
+    Ok(stats)
+}
+
+async fn _handle_instant_removal_validators(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+    all_steward_accounts: &AllStewardAccounts,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, MonkeyCrankError> {
+    let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators;
+    let mut validators_to_remove = all_steward_accounts
+        .state_account
+        .state
+        .validators_for_immediate_removal;
+
+    let mut stats = SubmitStats::default();
+
+    while validators_to_remove.count() != 0 {
+        let mut validator_index_to_remove = None;
+        for i in 0..num_validators {
+            if validators_to_remove.get(i as usize).map_err(|e| {
+                MonkeyCrankError::Custom(format!(
+                    "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
+                    i, num_validators, e
+                ))
+            })? {
+                validator_index_to_remove = Some(i);
+                break;
+            }
+        }
+
+        println!("Validator Index to Remove: {:?}", validator_index_to_remove);
+
+        let ix = Instruction {
+            program_id: *program_id,
+            accounts: jito_steward::accounts::InstantRemoveValidator {
+                config: all_steward_accounts.config_address,
+                state_account: all_steward_accounts.state_address,
+                validator_list: all_steward_accounts.validator_list_address,
+                stake_pool: all_steward_accounts.stake_pool_address,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::InstantRemoveValidator {
+                validator_index_to_remove: validator_index_to_remove.unwrap(),
+            }
+            .data(),
+        };
+
+        let configured_ix = configure_instruction(&[ix], priority_fee, Some(1_400_000), None);
+
+        println!("Submitting Instant Removal");
+        let new_stats =
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None)
+                .await?;
+
+        stats.combine(&new_stats);
+        print_errors_if_any(&stats);
+
+        if stats.errors > 0 {
+            return Ok(stats);
+        }
+
+        // NOTE: This is the only time an account is fetched
+        // in any of these cranking functions
+        let updated_state_account =
+            get_steward_state_account(client, program_id, &all_steward_accounts.config_address)
+                .await
+                .unwrap();
+
+        num_validators = updated_state_account.state.num_pool_validators;
+        validators_to_remove = updated_state_account.state.validators_for_immediate_removal;
+    }
+
+    Ok(stats)
 }
 
 async fn _handle_adding_validators(
@@ -96,11 +286,6 @@ async fn _handle_adding_validators(
 
     let checks = check_stake_accounts(&accounts_to_check, epoch);
 
-    let min_stake_lamports = all_steward_accounts
-        .config_account
-        .parameters
-        .minimum_stake_lamports;
-
     let good_vote_accounts = checks
         .iter()
         .filter_map(|(vote_address, check)| {
@@ -133,7 +318,6 @@ async fn _handle_adding_validators(
                                 .iter()
                                 .any(|entry| entry.is_none())
                             {
-                                println!("Validator {} below liveness minimum", vote_address);
                                 return None;
                             }
                             if entry.activated_stake_lamports
@@ -142,12 +326,6 @@ async fn _handle_adding_validators(
                                     .parameters
                                     .minimum_stake_lamports
                             {
-                                println!(
-                                    "Validator {} below minimum. Required: {} Actual: {}",
-                                    vote_address,
-                                    min_stake_lamports,
-                                    entry.activated_stake_lamports
-                                );
                                 return None;
                             }
                         } else {
@@ -618,6 +796,15 @@ pub async fn crank_monkey(
     let should_crank_state = !should_run_epoch_maintenance;
 
     {
+        // --------- UPDATE STAKE POOL -----------
+        println!("Update Stake Pool");
+
+        let stats = _update_pool(payer, client, epoch, all_steward_accounts, priority_fee).await?;
+
+        return_stats.combine(&stats);
+    }
+
+    {
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
         if should_run_epoch_maintenance {
@@ -638,19 +825,14 @@ pub async fn crank_monkey(
     }
 
     {
-        // --------- CHECK VALIDATORS TO ADD -----------
-        println!("Adding good validators...");
-        // Any validator that has new history account
-        // Anything that would pass the benchmark
-        // Find any validators that that are not in pool
-        let stats = _handle_adding_validators(
+        // --------- CHECK AND HANDLE INSTANT REMOVAL -----------
+        println!("Checking and Handling Instant Removal...");
+
+        let stats = _handle_instant_removal_validators(
             payer,
             client,
             program_id,
-            epoch,
             all_steward_accounts,
-            all_steward_validator_accounts,
-            all_active_validator_accounts,
             priority_fee,
         )
         .await?;
@@ -669,6 +851,31 @@ pub async fn crank_monkey(
             epoch,
             all_steward_accounts,
             all_steward_validator_accounts,
+            priority_fee,
+        )
+        .await?;
+
+        return_stats.combine(&stats);
+
+        if stats.successes > 0 {
+            return Ok(return_stats);
+        }
+    }
+
+    {
+        // --------- CHECK VALIDATORS TO ADD -----------
+        println!("Adding good validators...");
+        // Any validator that has new history account
+        // Anything that would pass the benchmark
+        // Find any validators that that are not in pool
+        let stats = _handle_adding_validators(
+            payer,
+            client,
+            program_id,
+            epoch,
+            all_steward_accounts,
+            all_steward_validator_accounts,
+            all_active_validator_accounts,
             priority_fee,
         )
         .await?;
