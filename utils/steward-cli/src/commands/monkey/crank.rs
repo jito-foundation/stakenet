@@ -145,7 +145,7 @@ async fn _update_pool(
     let update_txs_to_run =
         package_instructions(&update_ixs, 1, priority_fee, Some(1_400_000), None);
     let update_stats =
-        submit_packaged_transactions(client, update_txs_to_run, payer, Some(10), None).await?;
+        submit_packaged_transactions(client, update_txs_to_run, payer, Some(50), None).await?;
 
     stats.combine(&update_stats);
 
@@ -153,7 +153,7 @@ async fn _update_pool(
     let cleanup_txs_to_run =
         package_instructions(&cleanup_ixs, 1, priority_fee, Some(1_400_000), None);
     let cleanup_stats =
-        submit_packaged_transactions(client, cleanup_txs_to_run, payer, Some(10), None).await?;
+        submit_packaged_transactions(client, cleanup_txs_to_run, payer, Some(50), None).await?;
 
     stats.combine(&cleanup_stats);
 
@@ -210,7 +210,7 @@ async fn _handle_instant_removal_validators(
 
         println!("Submitting Instant Removal");
         let new_stats =
-            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None)
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
 
         stats.combine(&new_stats);
@@ -385,7 +385,7 @@ async fn _handle_adding_validators(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
@@ -481,7 +481,7 @@ async fn _handle_delinquent_validators(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
 
     Ok(stats)
@@ -541,7 +541,7 @@ async fn _handle_epoch_maintenance(
 
         println!("Submitting Epoch Maintenance");
         let new_stats =
-            submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None)
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
 
         stats.combine(&new_stats);
@@ -609,7 +609,7 @@ async fn _handle_compute_score(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
     Ok(stats)
 }
@@ -635,7 +635,7 @@ async fn _handle_compute_delegations(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None).await?;
 
     Ok(stats)
 }
@@ -661,7 +661,7 @@ async fn _handle_idle(
     let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
     let stats =
-        submit_packaged_transactions(client, vec![configured_ix], payer, Some(10), None).await?;
+        submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None).await?;
 
     Ok(stats)
 }
@@ -703,7 +703,7 @@ async fn _handle_compute_instant_unstake(
     println!("Submitting {} instructions", ixs_to_run.len());
     println!("Submitting {} transactions", txs_to_run.len());
 
-    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
     Ok(stats)
 }
