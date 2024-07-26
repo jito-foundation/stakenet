@@ -63,7 +63,7 @@ pub async fn fire(
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
     let should_run = (_should_run(epoch_info, runs_for_epoch)
         || keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote))

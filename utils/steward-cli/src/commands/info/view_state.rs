@@ -1,3 +1,4 @@
+use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{utils::ValidatorList, Config, StewardStateAccount};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -5,14 +6,14 @@ use solana_sdk::{account::Account, pubkey::Pubkey};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, state::StakeStatus,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 
 use crate::{
     commands::command_args::ViewState,
     utils::accounts::{
         format_simple_state_string, format_state_string, get_all_steward_accounts,
-        get_validator_history_accounts_with_retry,
+        get_validator_history_address,
     },
 };
 
@@ -28,15 +29,35 @@ pub async fn command_view_state(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let all_history_accounts =
-        get_validator_history_accounts_with_retry(client, validator_history::id()).await?;
-
     if args.verbose {
+        let vote_accounts: Vec<Pubkey> = all_steward_accounts
+            .validator_list_account
+            .validators
+            .iter()
+            .map(|validator| validator.vote_account_address)
+            .collect();
+
+        let history_accounts_to_fetch: Vec<Pubkey> = vote_accounts
+            .iter()
+            .map(|vote_account| {
+                get_validator_history_address(vote_account, &validator_history::id())
+            })
+            .collect();
+
+        let raw_history_accounts = client
+            .get_multiple_accounts(&history_accounts_to_fetch)
+            .await?;
+
+        let all_history_map: HashMap<Pubkey, Option<Account>> = vote_accounts
+            .into_iter()
+            .zip(raw_history_accounts)
+            .collect();
+
         _print_verbose_state(
             &all_steward_accounts.state_account,
             &all_steward_accounts.config_account,
             &all_steward_accounts.validator_list_account,
-            &all_history_accounts,
+            &all_history_map,
         );
     } else {
         _print_default_state(
@@ -55,20 +76,19 @@ fn _print_verbose_state(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
     validator_list_account: &ValidatorList,
-    validator_histories: &Vec<ValidatorHistory>,
+    validator_histories: &HashMap<Pubkey, Option<Account>>,
 ) {
     let mut formatted_string;
 
     let mut top_scores: Vec<(Pubkey, u32)> = vec![];
 
     for (index, validator) in validator_list_account.validators.iter().enumerate() {
-        let mut history_info: Option<ValidatorHistory> = None;
-        for validator_history in validator_histories.iter() {
-            if validator_history.vote_account == validator.vote_account_address {
-                history_info = Some(*validator_history);
-                break;
-            }
-        }
+        let history_info = validator_histories
+            .get(&validator.vote_account_address)
+            .and_then(|account| account.as_ref())
+            .and_then(|account| {
+                ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+            });
 
         let vote_account = validator.vote_account_address;
         let (stake_address, _) = find_stake_program_address(

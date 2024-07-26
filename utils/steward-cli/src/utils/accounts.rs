@@ -14,10 +14,8 @@ use solana_client::{
     rpc_filter::{Memcmp, RpcFilterType},
     rpc_response::RpcVoteAccountInfo,
 };
-use solana_sdk::{
-    account::Account, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
-    stake::state::StakeStateV2,
-};
+use solana_sdk::{account::Account, pubkey::Pubkey, stake::state::StakeStateV2};
+use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address,
     find_withdraw_authority_program_address,

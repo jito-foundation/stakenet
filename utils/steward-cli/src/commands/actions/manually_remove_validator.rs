@@ -71,7 +71,7 @@ pub async fn command_manually_remove_validator(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorFromPool {
-            validator_list_index: index_to_remove as u64,
+            validator_list_index: index_to_remove,
         }
         .data(),
     };

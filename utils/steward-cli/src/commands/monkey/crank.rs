@@ -234,6 +234,7 @@ async fn _handle_instant_removal_validators(
     Ok(stats)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _handle_adding_validators(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,

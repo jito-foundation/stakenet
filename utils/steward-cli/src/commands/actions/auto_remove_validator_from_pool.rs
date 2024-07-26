@@ -83,7 +83,7 @@ pub async fn command_auto_remove_validator_from_pool(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoRemoveValidatorFromPool {
-            validator_list_index: validator_index as u64,
+            validator_list_index: validator_index,
         }
         .data(),
     };
