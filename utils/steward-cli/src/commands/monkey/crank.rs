@@ -252,8 +252,7 @@ async fn _handle_adding_validators(
             if all_steward_validator_accounts
                 .all_history_vote_account_map
                 .keys()
-                .find(|k| *k == key)
-                .is_none()
+                .any(|k| *k == *key)
             {
                 keys_to_add.push(key);
             }
@@ -347,14 +346,14 @@ async fn _handle_adding_validators(
 
     let ixs_to_run = good_vote_accounts
         .iter()
-        .filter_map(|vote_account| {
+        .map(|vote_account| {
             let history_account =
                 get_validator_history_address(vote_account, &validator_history::id());
 
             let stake_address =
                 get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
-            Some(Instruction {
+            Instruction {
                 program_id: *program_id,
                 accounts: jito_steward::accounts::AutoAddValidator {
                     config: all_steward_accounts.config_address,
@@ -376,7 +375,7 @@ async fn _handle_adding_validators(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
-            })
+            }
         })
         .collect::<Vec<Instruction>>();
 
@@ -777,6 +776,7 @@ async fn _handle_rebalance(
     Ok(stats)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn crank_monkey(
     client: &Arc<RpcClient>,
     payer: &Arc<Keypair>,

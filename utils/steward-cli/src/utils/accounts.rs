@@ -38,23 +38,15 @@ pub struct AllStewardAccounts {
     pub reserve_stake_account: Account,
 }
 
+#[derive(Default)]
 pub struct AllValidatorAccounts {
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
     pub all_stake_account_map: HashMap<Pubkey, Option<Account>>,
 }
 
-impl Default for AllValidatorAccounts {
-    fn default() -> Self {
-        AllValidatorAccounts {
-            all_history_vote_account_map: HashMap::new(),
-            all_stake_account_map: HashMap::new(),
-        }
-    }
-}
-
 pub async fn get_all_validator_accounts(
     client: &Arc<RpcClient>,
-    all_vote_accounts: &Vec<RpcVoteAccountInfo>,
+    all_vote_accounts: &[RpcVoteAccountInfo],
     validator_history_program_id: &Pubkey,
 ) -> Result<Box<AllValidatorAccounts>> {
     let accounts_to_fetch = all_vote_accounts.iter().map(|vote_account| {
@@ -62,26 +54,23 @@ pub async fn get_all_validator_accounts(
             Pubkey::from_str(&vote_account.vote_pubkey).expect("Could not parse vote account");
         let stake_account = get_stake_address(&vote_account, &vote_account);
         let history_account =
-            get_validator_history_address(&vote_account, &validator_history_program_id);
+            get_validator_history_address(&vote_account, validator_history_program_id);
 
         (vote_account, stake_account, history_account)
     });
 
     let vote_addresses: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(vote_account, _, _)| vote_account)
         .collect();
 
     let stake_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(_, stake_account, _)| stake_account)
         .collect();
 
     let history_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(_, _, history_account)| history_account)
         .collect();
 
@@ -120,26 +109,23 @@ pub async fn get_all_steward_validator_accounts(
             let stake_account =
                 get_stake_address(&vote_account, &all_steward_accounts.stake_pool_address);
             let history_account =
-                get_validator_history_address(&vote_account, &validator_history_program_id);
+                get_validator_history_address(&vote_account, validator_history_program_id);
 
             (vote_account, stake_account, history_account)
         });
 
     let vote_addresses: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(vote_account, _, _)| vote_account)
         .collect();
 
     let stake_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(_, stake_account, _)| stake_account)
         .collect();
 
     let history_accounts_to_fetch: Vec<Pubkey> = accounts_to_fetch
         .clone()
-        .into_iter()
         .map(|(_, _, history_account)| history_account)
         .collect();
 
@@ -442,7 +428,7 @@ pub fn get_unprogressed_validators(
                     [validator_index as usize]
                     .vote_account_address;
                 let history_account =
-                    get_validator_history_address(&vote_account, &validator_history_program_id);
+                    get_validator_history_address(&vote_account, validator_history_program_id);
 
                 Some(ProgressionInfo {
                     index: validator_index as usize,
