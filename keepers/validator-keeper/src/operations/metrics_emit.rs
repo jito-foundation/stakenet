@@ -220,6 +220,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     let instant_unstake_count = steward_state.instant_unstake.count();
     let stake_deposit_unstake_total = steward_state.stake_deposit_unstake_total;
     let instant_unstake_total = steward_state.instant_unstake_total;
+    let scoring_unstake_total = steward_state.scoring_unstake_total;
     let validators_added = steward_state.validators_added;
     let next_cycle_epoch = steward_state.next_cycle_epoch;
     let state_progress = format_state_string(steward_state);
@@ -301,6 +302,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
             stake_deposit_unstake_total,
             i64
         ),
+        ("scoring_unstake_total", scoring_unstake_total, i64),
         ("instant_unstake_count", instant_unstake_count, i64),
         ("instant_unstake_total", instant_unstake_total, i64),
         ("validators_added", validators_added, i64),
