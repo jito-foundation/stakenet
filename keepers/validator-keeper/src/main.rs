@@ -5,6 +5,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 use clap::Parser;
 use log::*;
+use rand::Rng;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::signature::read_keypair_file;
@@ -76,21 +77,32 @@ async fn sleep_and_tick(tick: &mut u64) {
     advance_tick(tick);
 }
 
+/// To reduce transaction collisions, we sleep a random amount after any emit
+async fn random_cooldown() {
+    let mut rng = rand::thread_rng();
+    let sleep_duration = rng.gen_range(0..=60 * 5);
+
+    info!("\n⏰ Cooldown for {} seconds\n", sleep_duration);
+    sleep(Duration::from_secs(sleep_duration)).await;
+}
+
 async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
-    let monkey_interval = 60 * 8; // 5 minute
+    let steward_interval = keeper_config.steward_interval;
 
     let intervals = vec![
         validator_history_interval,
         metrics_interval,
-        monkey_interval,
+        steward_interval,
     ];
 
     // Stateful data
     let mut keeper_state = KeeperState::default();
-    let mut tick: u64 = 0; // 1 second ticks
+
+    let smallest_interval = intervals.iter().min().unwrap();
+    let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
 
     if keeper_config.full_startup {
         keeper_state.keeper_flags.set_flag(KeeperFlag::Startup);
@@ -210,7 +222,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // STEWARD
-        if should_fire(tick, monkey_interval) {
+        if should_fire(tick, steward_interval) {
             info!("Cranking Steward...");
             keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::steward::fire(&keeper_config, &keeper_state).await,
@@ -237,6 +249,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
+
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown().await;
+            }
         }
 
         // ---------- CLEAR STARTUP ----------
@@ -280,7 +296,7 @@ async fn main() {
             .expect("Failed to parse host and port from gossip entrypoint")
     });
 
-    info!("Starting validator history keeper...");
+    info!("👋 Welcome to the Jito Stakenet Keeper!\n\n");
 
     let config = KeeperConfig {
         client,
@@ -294,6 +310,7 @@ async fn main() {
         gossip_entrypoint,
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
+        steward_interval: args.steward_interval,
         run_flags,
         full_startup: args.full_startup,
     };

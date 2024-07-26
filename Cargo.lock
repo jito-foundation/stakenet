@@ -7075,6 +7075,7 @@ dependencies = [
  "jito-tip-distribution",
  "keeper-core",
  "log",
+ "rand 0.8.5",
  "solana-account-decoder",
  "solana-clap-utils",
  "solana-client",

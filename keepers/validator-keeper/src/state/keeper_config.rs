@@ -15,6 +15,7 @@ pub struct KeeperConfig {
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
     pub validator_history_interval: u64,
+    pub steward_interval: u64,
     pub metrics_interval: u64,
     pub run_flags: u32,
     pub full_startup: bool,
@@ -76,12 +77,16 @@ pub struct Args {
     #[arg(long, env, default_value = "300")]
     pub validator_history_interval: u64,
 
+    /// Interval to run steward (default 301 sec)
+    #[arg(long, env, default_value = "301")]
+    pub steward_interval: u64,
+
     /// Interval to emit metrics (default 60 sec)
     #[arg(long, env, default_value = "60")]
     pub metrics_interval: u64,
 
     /// Priority Fees in microlamports
-    #[arg(long, env, default_value = "200000")]
+    #[arg(long, env, default_value = "100")]
     pub priority_fees: u64,
 
     /// Cluster to specify
