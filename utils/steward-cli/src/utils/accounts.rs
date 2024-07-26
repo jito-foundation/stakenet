@@ -15,7 +15,7 @@ use solana_client::{
     rpc_response::RpcVoteAccountInfo,
 };
 use solana_sdk::{
-    account::Account, account_utils::State, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
+    account::Account, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
     stake::state::StakeStateV2,
 };
 use spl_stake_pool::{
@@ -34,6 +34,8 @@ pub struct AllStewardAccounts {
     pub stake_pool_withdraw_authority: Pubkey,
     pub validator_list_account: Box<ValidatorList>,
     pub validator_list_address: Pubkey,
+    pub reserve_stake_address: Pubkey,
+    pub reserve_stake_account: Account,
 }
 
 pub struct AllValidatorAccounts {
@@ -225,8 +227,8 @@ pub async fn get_all_steward_accounts(
     let validator_list_account =
         get_validator_list_account(client, &validator_list_address).await?;
 
-    // let history_accounts =
-    //     get_all_history_accounts(client, &validator_list_account, &validator_history::id()).await?;
+    let reserve_stake_address = stake_pool_account.reserve_stake;
+    let reserve_stake_account = client.get_account(&reserve_stake_address).await?;
 
     Ok(Box::new(AllStewardAccounts {
         stake_pool_account,
@@ -236,9 +238,10 @@ pub async fn get_all_steward_accounts(
         validator_list_address,
         stake_pool_address,
         config_account,
-        // history_accounts,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
+        reserve_stake_address,
+        reserve_stake_account,
     }))
 }
 

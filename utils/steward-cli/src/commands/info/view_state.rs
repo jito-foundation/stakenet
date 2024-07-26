@@ -1,7 +1,7 @@
 use anyhow::Result;
 use jito_steward::{utils::ValidatorList, Config, StewardStateAccount};
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{account::Account, pubkey::Pubkey};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, state::StakeStatus,
 };
@@ -44,6 +44,7 @@ pub async fn command_view_state(
             &all_steward_accounts.state_address,
             &all_steward_accounts.state_account,
             &all_steward_accounts.validator_list_account,
+            &all_steward_accounts.reserve_stake_account,
         );
     }
 
@@ -188,6 +189,7 @@ fn _print_default_state(
     steward_state: &Pubkey,
     state_account: &StewardStateAccount,
     validator_list_account: &ValidatorList,
+    reserve_stake_account: &Account,
 ) {
     let state = &state_account.state;
 
@@ -308,6 +310,13 @@ fn _print_default_state(
         total_transient_lamports,
         total_transient_lamports as f64 / 10f64.powf(9.)
     );
+
+    formatted_string += &format!(
+        "Reserve Lamports: {} ({:.2} ◎)\n",
+        reserve_stake_account.lamports,
+        reserve_stake_account.lamports as f64 / 10f64.powf(9.)
+    );
+    formatted_string += "\n";
     formatted_string += &format!("🟩 Active Validators: {}\n", active_validators);
     formatted_string += &format!(
         "🟨 Deactivating Transient Validators : {}\n",
@@ -331,6 +340,7 @@ fn _print_default_state(
         format_simple_state_string(&state_account.state)
     );
     formatted_string += "\n";
+
     formatted_string += "---------------------";
 
     println!("{}", formatted_string)

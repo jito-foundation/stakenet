@@ -198,6 +198,19 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         .unwrap()
         .state_account
         .state;
+
+    let reserve_stake = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .reserve_stake_account;
+
+    let stake_pool = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .stake_pool_account;
+
     let state = steward_state.state_tag.to_string();
     let progress_count = steward_state.progress.count();
     let num_pool_validators = steward_state.num_pool_validators;
@@ -220,6 +233,9 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         .unwrap()
         .validator_list_account;
     let validator_list_len = validator_list_account.validators.len();
+
+    let reserve_stake_lamports = reserve_stake.lamports;
+    let stake_pool_lamports = stake_pool.total_lamports;
 
     let mut total_staked_lamports = 0;
     let mut total_transient_lamports = 0;
@@ -290,6 +306,8 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         ("validators_added", validators_added, i64),
         ("next_cycle_epoch", next_cycle_epoch, i64),
         ("validator_list_len", validator_list_len, i64),
+        ("stake_pool_lamports", stake_pool_lamports, i64),
+        ("reserve_stake_lamports", reserve_stake_lamports, i64),
         ("total_staked_lamports", total_staked_lamports, i64),
         ("total_transient_lamports", total_transient_lamports, i64),
         ("active_validators", active_validators, i64),
