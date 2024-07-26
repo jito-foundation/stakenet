@@ -534,19 +534,16 @@ pub async fn parallel_execute_transactions(
 
         tokio::time::sleep(Duration::from_secs(confirmation_time)).await;
 
-        let signatures_to_check: HashSet<Signature> =submitted_signatures.clone().into_keys().collect(); 
+        let signatures_to_check: HashSet<Signature> =
+            submitted_signatures.clone().into_keys().collect();
 
         if signatures_to_check.is_empty() {
             break;
         }
-        
-        let signatures = parallel_confirm_transactions(
-            client,
-            signatures_to_check
-        ).await; 
 
-        for signature in signatures
-        {
+        let signatures = parallel_confirm_transactions(client, signatures_to_check).await;
+
+        for signature in signatures {
             results[submitted_signatures[&signature]] = Ok(());
             debug!("🟩 Completed: {:?}", signature);
             println!("🟩 Completed: {:?}", signature);

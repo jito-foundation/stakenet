@@ -9,7 +9,9 @@ use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAcc
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
-use steward_cli::utils::accounts::{get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts};
+use steward_cli::utils::accounts::{
+    get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+};
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
 use crate::{
@@ -95,7 +97,8 @@ pub async fn post_create_update(
     let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
 
     // Update Validator History Accounts
-    keeper_state.validator_history_map = get_validator_history_map(client, validator_history_program_id).await?;
+    keeper_state.validator_history_map =
+        get_validator_history_map(client, validator_history_program_id).await?;
 
     // Get all history vote accounts
     keeper_state.all_history_vote_account_map =
@@ -120,8 +123,12 @@ pub async fn post_create_update(
     .await?;
 
     keeper_state.all_steward_accounts = Some(
-        get_all_steward_accounts(&keeper_config.client, &keeper_config.steward_program_id, &keeper_config.steward_config)
-            .await?,
+        get_all_steward_accounts(
+            &keeper_config.client,
+            &keeper_config.steward_program_id,
+            &keeper_config.steward_config,
+        )
+        .await?,
     );
 
     keeper_state.all_steward_validator_accounts = Some(
@@ -133,14 +140,16 @@ pub async fn post_create_update(
         .await?,
     );
 
-    let all_get_vote_accounts: Vec<RpcVoteAccountInfo> = keeper_state
-        .vote_account_map
-        .values()
-        .cloned()
-        .collect();
+    let all_get_vote_accounts: Vec<RpcVoteAccountInfo> =
+        keeper_state.vote_account_map.values().cloned().collect();
 
     keeper_state.all_active_validator_accounts = Some(
-        get_all_validator_accounts(&keeper_config.client, &all_get_vote_accounts, validator_history_program_id, ).await?,
+        get_all_validator_accounts(
+            &keeper_config.client,
+            &all_get_vote_accounts,
+            validator_history_program_id,
+        )
+        .await?,
     );
 
     Ok(())
