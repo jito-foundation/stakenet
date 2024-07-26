@@ -312,5 +312,86 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         ("non_zero_score_count", non_zero_score_count, i64),
     );
 
+    let parameters = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .config_account
+        .parameters;
+
+    let mev_commission_range = parameters.mev_commission_range;
+    let epoch_credits_range = parameters.epoch_credits_range;
+    let commission_range = parameters.commission_range;
+    let mev_commission_bps_threshold = parameters.mev_commission_bps_threshold;
+    let scoring_delinquency_threshold_ratio = parameters.scoring_delinquency_threshold_ratio;
+    let instant_unstake_delinquency_threshold_ratio =
+        parameters.instant_unstake_delinquency_threshold_ratio;
+    let commission_threshold = parameters.commission_threshold;
+    let historical_commission_threshold = parameters.historical_commission_threshold;
+    let num_delegation_validators = parameters.num_delegation_validators;
+    let scoring_unstake_cap_bps = parameters.scoring_unstake_cap_bps;
+    let instant_unstake_cap_bps = parameters.instant_unstake_cap_bps;
+    let stake_deposit_unstake_cap_bps = parameters.stake_deposit_unstake_cap_bps;
+    let compute_score_slot_range = parameters.compute_score_slot_range;
+    let instant_unstake_epoch_progress = parameters.instant_unstake_epoch_progress;
+    let instant_unstake_inputs_epoch_progress = parameters.instant_unstake_inputs_epoch_progress;
+    let num_epochs_between_scoring = parameters.num_epochs_between_scoring;
+    let minimum_stake_lamports = parameters.minimum_stake_lamports;
+    let minimum_voting_epochs = parameters.minimum_voting_epochs;
+
+    datapoint_info!(
+        "steward-config",
+        ("mev_commission_range", mev_commission_range, i64),
+        ("epoch_credits_range", epoch_credits_range, i64),
+        ("commission_range", commission_range, i64),
+        (
+            "mev_commission_bps_threshold",
+            mev_commission_bps_threshold,
+            i64
+        ),
+        (
+            "scoring_delinquency_threshold_ratio",
+            scoring_delinquency_threshold_ratio,
+            f64
+        ),
+        (
+            "instant_unstake_delinquency_threshold_ratio",
+            instant_unstake_delinquency_threshold_ratio,
+            f64
+        ),
+        ("commission_threshold", commission_threshold, i64),
+        (
+            "historical_commission_threshold",
+            historical_commission_threshold,
+            i64
+        ),
+        ("num_delegation_validators", num_delegation_validators, i64),
+        ("scoring_unstake_cap_bps", scoring_unstake_cap_bps, i64),
+        ("instant_unstake_cap_bps", instant_unstake_cap_bps, i64),
+        (
+            "stake_deposit_unstake_cap_bps",
+            stake_deposit_unstake_cap_bps,
+            i64
+        ),
+        ("compute_score_slot_range", compute_score_slot_range, i64),
+        (
+            "instant_unstake_epoch_progress",
+            instant_unstake_epoch_progress,
+            f64
+        ),
+        (
+            "instant_unstake_inputs_epoch_progress",
+            instant_unstake_inputs_epoch_progress,
+            f64
+        ),
+        (
+            "num_epochs_between_scoring",
+            num_epochs_between_scoring,
+            i64
+        ),
+        ("minimum_stake_lamports", minimum_stake_lamports, i64),
+        ("minimum_voting_epochs", minimum_voting_epochs, i64)
+    );
+
     Ok(())
 }
