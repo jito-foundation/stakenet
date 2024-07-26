@@ -522,18 +522,18 @@ pub enum StateCode {
 }
 
 pub fn state_to_state_code(steward_state: &StewardState) -> StateCode {
-    if steward_state.has_flag(COMPUTE_SCORE) {
-        StateCode::ComputeScore
-    } else if steward_state.has_flag(COMPUTE_DELEGATIONS) {
-        StateCode::ComputeDelegations
-    } else if steward_state.has_flag(PRE_LOOP_IDLE) {
-        StateCode::PreLoopIdle
-    } else if steward_state.has_flag(COMPUTE_INSTANT_UNSTAKES) {
-        StateCode::ComputeInstantUnstake
+    if steward_state.has_flag(POST_LOOP_IDLE) {
+        StateCode::PostLoopIdle
     } else if steward_state.has_flag(REBALANCE) {
         StateCode::Rebalance
-    } else if steward_state.has_flag(POST_LOOP_IDLE) {
-        StateCode::PostLoopIdle
+    } else if steward_state.has_flag(COMPUTE_INSTANT_UNSTAKES) {
+        StateCode::ComputeInstantUnstake
+    } else if steward_state.has_flag(PRE_LOOP_IDLE) {
+        StateCode::PreLoopIdle
+    } else if steward_state.has_flag(COMPUTE_DELEGATIONS) {
+        StateCode::ComputeDelegations
+    } else if steward_state.has_flag(COMPUTE_SCORE) {
+        StateCode::ComputeScore
     } else {
         StateCode::NoState
     }
