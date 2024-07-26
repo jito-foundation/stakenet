@@ -15,7 +15,7 @@ use solana_client::{
     rpc_response::RpcVoteAccountInfo,
 };
 use solana_sdk::{
-    account::Account, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
+    account::Account, account_utils::State, borsh0_10::try_from_slice_unchecked, pubkey::Pubkey,
     stake::state::StakeStateV2,
 };
 use spl_stake_pool::{
@@ -506,6 +506,34 @@ pub fn check_stake_accounts(
         .into_iter()
         .zip(checks)
         .collect::<HashMap<Pubkey, StakeAccountChecks>>()
+}
+
+pub enum StateCode {
+    NoState = 0x00,
+    ComputeScore = 0x01 << 0,
+    ComputeDelegations = 0x01 << 1,
+    PreLoopIdle = 0x01 << 2,
+    ComputeInstantUnstake = 0x01 << 3,
+    Rebalance = 0x01 << 4,
+    PostLoopIdle = 0x01 << 5,
+}
+
+pub fn state_to_state_code(steward_state: &StewardState) -> StateCode {
+    if steward_state.has_flag(COMPUTE_SCORE) {
+        StateCode::ComputeScore
+    } else if steward_state.has_flag(COMPUTE_DELEGATIONS) {
+        StateCode::ComputeDelegations
+    } else if steward_state.has_flag(PRE_LOOP_IDLE) {
+        StateCode::PreLoopIdle
+    } else if steward_state.has_flag(COMPUTE_INSTANT_UNSTAKES) {
+        StateCode::ComputeInstantUnstake
+    } else if steward_state.has_flag(REBALANCE) {
+        StateCode::Rebalance
+    } else if steward_state.has_flag(POST_LOOP_IDLE) {
+        StateCode::PostLoopIdle
+    } else {
+        StateCode::NoState
+    }
 }
 
 pub fn format_state_string(steward_state: &StewardState) -> String {

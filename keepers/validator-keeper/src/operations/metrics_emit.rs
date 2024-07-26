@@ -7,7 +7,9 @@ use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
 use spl_stake_pool::state::StakeStatus;
-use steward_cli::utils::accounts::{format_simple_state_string, format_state_string};
+use steward_cli::utils::accounts::{
+    format_simple_state_string, format_state_string, state_to_state_code,
+};
 use validator_history::ValidatorHistoryEntry;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
@@ -209,6 +211,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     let next_cycle_epoch = steward_state.next_cycle_epoch;
     let state_progress = format_state_string(steward_state);
     let simple_state_progress = format_simple_state_string(steward_state);
+    let state_code = state_to_state_code(steward_state);
     let status_flags = steward_state.status_flags;
 
     let validator_list_account = &keeper_state
@@ -266,6 +269,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
         ("state", state, String),
         ("state_progress", state_progress, String),
         ("simple_state_progress", simple_state_progress, String),
+        ("state_code", state_code, i64),
         ("status_flags", status_flags, i64),
         ("progress_count", progress_count, i64),
         ("num_pool_validators", num_pool_validators, i64),
