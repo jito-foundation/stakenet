@@ -82,7 +82,7 @@ async fn random_cooldown() {
     let mut rng = rand::thread_rng();
     let sleep_duration = rng.gen_range(0..=60 * 20);
 
-    info!("\n⏰ Cooldown for {} seconds\n", sleep_duration);
+    info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
