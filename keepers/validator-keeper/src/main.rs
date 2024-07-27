@@ -219,6 +219,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
+
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown().await;
+            }
         }
 
         // STEWARD
@@ -227,6 +231,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::steward::fire(&keeper_config, &keeper_state).await,
             );
+
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown().await;
+            }
         }
 
         // ---------------------- EMIT ---------------------------------
@@ -249,10 +257,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
-
-            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown().await;
-            }
         }
 
         // ---------- CLEAR STARTUP ----------
