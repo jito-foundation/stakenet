@@ -250,10 +250,10 @@ async fn _handle_adding_validators(
         .all_history_vote_account_map
         .keys()
         .for_each(|key| {
-            if all_steward_validator_accounts
+            if !all_steward_validator_accounts
                 .all_history_vote_account_map
                 .keys()
-                .any(|k| *k == *key)
+                .any(|k| k == key)
             {
                 keys_to_add.push(key);
             }
