@@ -57,7 +57,7 @@ cargo run realloc-state --authority-keypair-path ../../credentials/stakenet_test
 cargo run update-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
   --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH \
-  --num-epochs-between-scoring 1
+  --num-epochs-between-scoring 3
 ```
 
 ## Reset State

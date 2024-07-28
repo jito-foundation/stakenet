@@ -86,7 +86,7 @@ pub struct Args {
     pub metrics_interval: u64,
 
     /// Priority Fees in microlamports
-    #[arg(long, env, default_value = "100")]
+    #[arg(long, env, default_value = "20000")]
     pub priority_fees: u64,
 
     /// Cluster to specify
