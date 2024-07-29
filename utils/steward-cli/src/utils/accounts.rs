@@ -502,13 +502,12 @@ pub fn check_stake_accounts(
                 }
             });
 
-            // let mut has_vote_account = false;
-            // if vote_account.is_some() {
-            //     if vote_account.unwrap().owner == spl_vote_program::id() {
-            //         has_vote_account = true;
-            //     }
-            // }
-            let has_vote_account = vote_account.is_some();
+            let mut has_vote_account = false;
+            if vote_account.is_some() {
+                if vote_account.clone().unwrap().owner == solana_program::vote::program::id() {
+                    has_vote_account = true;
+                }
+            }
 
             let has_history = history_account.is_some();
             StakeAccountChecks {

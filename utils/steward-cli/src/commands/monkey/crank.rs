@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
@@ -10,6 +11,9 @@ use keeper_core::{
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_program::instruction::Instruction;
 
+use solana_sdk::account::Account;
+use solana_sdk::stake::instruction::deactivate_delinquent_stake;
+use solana_sdk::vote::state::{vote_state_versions, VoteState};
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
 };
@@ -55,9 +59,10 @@ pub fn _get_update_stake_pool_ixs(
     stake_pool: &StakePool,
     validator_list: &ValidatorList,
     stake_pool_address: &Pubkey,
+    all_vote_accounts: HashMap<Pubkey, Option<Account>>,
     no_merge: bool,
     epoch: u64,
-) -> (Vec<Instruction>, Vec<Instruction>) {
+) -> (Vec<Instruction>, Vec<Instruction>, Vec<Instruction>) {
     let (withdraw_authority, _) =
         find_withdraw_authority_program_address(program_id, stake_pool_address);
 
@@ -103,6 +108,65 @@ pub fn _get_update_stake_pool_ixs(
         start_index = start_index.saturating_add(MAX_VALIDATORS_TO_UPDATE as u32);
     }
 
+    let mut deactivate_delinquent_instructions: Vec<Instruction> = vec![];
+    let reference_vote_account = validator_list
+        .validators
+        .iter()
+        .find(|validator_info| {
+            let raw_vote_account = all_vote_accounts
+                .get(&validator_info.vote_account_address)
+                .expect("Vote account not found");
+
+            if raw_vote_account.is_none() {
+                return false;
+            }
+
+            let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
+                .expect("Could not deserialize vote account");
+
+            let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+
+            if latest_epoch == epoch || latest_epoch == epoch - 1 {
+                return true;
+            }
+            return false;
+        })
+        .expect("Need at least one okay validator");
+
+    for validator_info in validator_list.validators.iter() {
+        let raw_vote_account = all_vote_accounts
+            .get(&validator_info.vote_account_address)
+            .expect("Vote account not found");
+
+        let mut should_deactivate = false;
+
+        if raw_vote_account.is_none() {
+            should_deactivate = true;
+        } else {
+            let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
+                .expect("Could not deserialize vote account");
+
+            let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+
+            if latest_epoch <= epoch - 5 {
+                should_deactivate = true;
+            }
+        }
+
+        if should_deactivate {
+            let stake_account =
+                get_stake_address(&validator_info.vote_account_address, &stake_pool_address);
+
+            let ix = deactivate_delinquent_stake(
+                &stake_account,
+                &validator_info.vote_account_address,
+                &reference_vote_account.vote_account_address,
+            );
+
+            deactivate_delinquent_instructions.push(ix);
+        }
+    }
+
     let final_instructions = vec![
         update_stake_pool_balance(
             program_id,
@@ -120,7 +184,11 @@ pub fn _get_update_stake_pool_ixs(
             &stake_pool.validator_list,
         ),
     ];
-    (update_list_instructions, final_instructions)
+    (
+        update_list_instructions,
+        deactivate_delinquent_instructions,
+        final_instructions,
+    )
 }
 
 async fn _update_pool(
@@ -128,15 +196,17 @@ async fn _update_pool(
     client: &Arc<RpcClient>,
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
+    all_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, MonkeyCrankError> {
     let mut stats = SubmitStats::default();
 
-    let (update_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
+    let (update_ixs, deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
         &spl_stake_pool::ID,
         &all_steward_accounts.stake_pool_account,
         &all_steward_accounts.validator_list_account,
         &all_steward_accounts.stake_pool_address,
+        all_validator_accounts.all_vote_account_map.clone(),
         false,
         epoch,
     );
@@ -144,6 +214,19 @@ async fn _update_pool(
     println!("Updating Pool");
     let update_txs_to_run =
         package_instructions(&update_ixs, 1, priority_fee, Some(1_400_000), None);
+    let update_stats =
+        submit_packaged_transactions(client, update_txs_to_run, payer, Some(50), None).await?;
+
+    stats.combine(&update_stats);
+
+    println!("Deactivating Delinquent");
+    let update_txs_to_run = package_instructions(
+        &deactivate_delinquent_ixs,
+        1,
+        priority_fee,
+        Some(1_400_000),
+        None,
+    );
     let update_stats =
         submit_packaged_transactions(client, update_txs_to_run, payer, Some(50), None).await?;
 
@@ -405,7 +488,11 @@ async fn _handle_delinquent_validators(
     let bad_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-            if !check.has_history || !check.has_stake_account || check.is_deactivated {
+            if !check.has_history
+                || !check.has_stake_account
+                || check.is_deactivated
+                || !check.has_vote_account
+            {
                 Some(*vote_account)
             } else {
                 None
@@ -797,7 +884,15 @@ pub async fn crank_monkey(
         // --------- UPDATE STAKE POOL -----------
         println!("Update Stake Pool");
 
-        let stats = _update_pool(payer, client, epoch, all_steward_accounts, priority_fee).await?;
+        let stats = _update_pool(
+            payer,
+            client,
+            epoch,
+            all_steward_accounts,
+            all_steward_validator_accounts,
+            priority_fee,
+        )
+        .await?;
 
         return_stats.combine(&stats);
     }

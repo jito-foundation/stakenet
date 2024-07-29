@@ -27,7 +27,7 @@ pub async fn command_manually_copy_all_vote_accounts(
             .expect("Failed reading keypair file ( Payer )"),
     );
 
-    let validator_history_program_id = spl_stake_pool::id();
+    let validator_history_program_id = validator_history::id();
     let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
