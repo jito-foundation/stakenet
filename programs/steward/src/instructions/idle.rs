@@ -39,12 +39,14 @@ pub fn handler(ctx: Context<Idle>) -> Result<()> {
         Some(StewardStateEnum::Idle),
     )?;
 
-    maybe_transition(
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }
