@@ -10,7 +10,10 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::command_args::UpdateConfig, utils::transactions::configure_instruction};
+use crate::{
+    commands::command_args::UpdateConfig,
+    utils::transactions::{configure_instruction, print_base58_tx},
+};
 
 pub async fn command_update_config(
     args: UpdateConfig,
@@ -63,11 +66,15 @@ pub async fn command_update_config(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await
-        .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

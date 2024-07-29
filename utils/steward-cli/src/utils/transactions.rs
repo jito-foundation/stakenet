@@ -8,7 +8,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
+    bs58, compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
     transaction::Transaction,
 };
 
@@ -143,5 +143,25 @@ pub fn print_errors_if_any(submit_stats: &SubmitStats) {
         if let Err(error) = result {
             println!("{}", format_steward_error_log(error));
         }
+    });
+}
+
+pub fn print_base58_tx(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ IX ------\n\n");
+
+        ix.accounts.iter().for_each(|account| {
+            println!(
+                "{:?} W({}) S({})",
+                account.pubkey, account.is_signer, account.is_writable
+            );
+        });
+
+        println!("\n");
+
+        let base58_string = bs58::encode(&ix.data).into_string();
+        println!("Data: {}", base58_string);
+
+        println!("\n");
     });
 }

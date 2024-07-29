@@ -17,7 +17,7 @@ use crate::{
     commands::command_args::AutoRemoveValidatorFromPool,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::configure_instruction,
+        transactions::{configure_instruction, print_base58_tx},
     },
 };
 
@@ -107,11 +107,15 @@ pub async fn command_auto_remove_validator_from_pool(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await
-        .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

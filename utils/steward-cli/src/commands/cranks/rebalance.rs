@@ -14,7 +14,7 @@ use crate::{
     commands::command_args::CrankRebalance,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::{package_instructions, submit_packaged_transactions},
+        transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
     },
 };
 
@@ -133,12 +133,21 @@ pub async fn command_crank_rebalance(
         None,
     );
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    if args
+        .permissionless_parameters
+        .transaction_parameters
+        .print_tx
+    {
+        txs_to_run.iter().for_each(|tx| print_base58_tx(tx));
+    } else {
+        println!("Submitting {} instructions", ixs_to_run.len());
+        println!("Submitting {} transactions", txs_to_run.len());
 
-    let submit_stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+        let submit_stats =
+            submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-    println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {:?}", submit_stats);
+    }
 
     Ok(())
 }

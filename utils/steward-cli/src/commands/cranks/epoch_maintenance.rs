@@ -11,7 +11,10 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CrankEpochMaintenance,
-    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
+    utils::{
+        accounts::get_all_steward_accounts,
+        transactions::{configure_instruction, print_base58_tx},
+    },
 };
 
 pub async fn command_crank_epoch_maintenance(
@@ -69,13 +72,15 @@ pub async fn command_crank_epoch_maintenance(
         blockhash,
     );
 
-    // debug_send_single_transaction(client, &Arc::new(payer), &configured_ix, Some(true)).await?;
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
-
-    println!("Signature: {}", signature);
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

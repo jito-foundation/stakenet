@@ -17,7 +17,7 @@ use crate::{
     commands::command_args::RemoveBadValidators,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::package_instructions,
+        transactions::{package_instructions, print_base58_tx},
     },
 };
 
@@ -147,11 +147,15 @@ pub async fn command_remove_bad_validators(
             .or(Some(256 * 1024)),
     );
 
-    println!("Submitting {} instructions", ixs_to_run.len());
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        txs_to_run.iter().for_each(|tx| print_base58_tx(tx));
+    } else {
+        println!("Submitting {} instructions", ixs_to_run.len());
 
-    let submit_stats = submit_transactions(client, txs_to_run, &arc_payer).await?;
+        let submit_stats = submit_transactions(client, txs_to_run, &arc_payer).await?;
 
-    println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {:?}", submit_stats);
+    }
 
     Ok(())
 }

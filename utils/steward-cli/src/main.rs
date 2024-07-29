@@ -10,7 +10,7 @@ use commands::{
         manually_remove_validator::command_manually_remove_validator,
         remove_bad_validators::command_remove_bad_validators,
         remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
-        update_config::command_update_config,
+        update_authority::command_update_authority, update_config::command_update_config,
     },
     command_args::{Args, Commands},
     cranks::{
@@ -57,6 +57,9 @@ async fn main() -> Result<()> {
         Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
         Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
+        Commands::UpdateAuthority(args) => {
+            command_update_authority(args, &client, program_id).await
+        }
         Commands::ManuallyCopyVoteAccount(args) => {
             command_manually_copy_vote_account(args, &client, program_id).await
         }

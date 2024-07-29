@@ -11,7 +11,10 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CloseSteward,
-    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
+    utils::{
+        accounts::get_all_steward_accounts,
+        transactions::{configure_instruction, print_base58_tx},
+    },
 };
 
 pub async fn command_close_steward(
@@ -77,11 +80,15 @@ pub async fn command_close_steward(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
 
-    println!("Signature: {}", signature);
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

@@ -146,6 +146,10 @@ pub struct TransactionParameters {
     /// Amount of instructions to process in a single transaction
     #[arg(long, env)]
     pub chunk_size: Option<usize>,
+
+    /// This will print out the raw TX instead of running it
+    #[arg(long, env, default_value = "false")]
+    pub print_tx: bool,
 }
 
 #[derive(Parser)]
@@ -195,6 +199,7 @@ pub enum Commands {
     InitSteward(InitSteward),
     ReallocState(ReallocState),
 
+    UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
     ResetState(ResetState),
 
@@ -272,6 +277,37 @@ pub struct InitSteward {
     pub config_parameters: ConfigParameters,
 }
 
+#[derive(Parser)]
+#[command(about = "Updates authority account parameters")]
+pub struct UpdateAuthority {
+    #[command(subcommand)]
+    pub command: AuthoritySubcommand,
+}
+
+#[derive(Subcommand)]
+pub enum AuthoritySubcommand {
+    /// Manages blacklist authority
+    Blacklist {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages admin authority
+    Admin {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages parameters authority
+    Parameters {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+}
 #[derive(Parser)]
 #[command(about = "Updates config account parameters")]
 pub struct UpdateConfig {

@@ -17,7 +17,7 @@ use crate::{
     commands::command_args::ReallocState,
     utils::{
         accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
-        transactions::configure_instruction,
+        transactions::{configure_instruction, print_base58_tx},
     },
 };
 
@@ -86,6 +86,7 @@ pub async fn command_realloc_state(
             args.permissioned_parameters
                 .transaction_parameters
                 .heap_size,
+            args.permissioned_parameters.transaction_parameters.print_tx,
         )
         .await?;
 
@@ -115,6 +116,7 @@ async fn _realloc_x_times(
     priority_fee: Option<u64>,
     compute_limit: Option<u32>,
     heap_size: Option<u32>,
+    print_tx: bool,
 ) -> Result<Signature> {
     let ixs = vec![
         Instruction {
@@ -134,18 +136,25 @@ async fn _realloc_x_times(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let configured_ixs = configure_instruction(&ixs, priority_fee, compute_limit, heap_size);
+    let configured_ix = configure_instruction(&ixs, priority_fee, compute_limit, heap_size);
 
     let transaction = Transaction::new_signed_with_payer(
-        &configured_ixs,
+        &configured_ix,
         Some(&authority.pubkey()),
         &[&authority],
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    let mut signature = Signature::default();
+    if print_tx {
+        print_base58_tx(&configured_ix);
+    } else {
+        signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(signature)
 }

@@ -7,4 +7,5 @@ pub mod manually_remove_validator;
 pub mod remove_bad_validators;
 pub mod remove_from_blacklist;
 pub mod reset_state;
+pub mod update_authority;
 pub mod update_config;

@@ -10,7 +10,8 @@ use solana_sdk::{
 };
 
 use crate::{
-    commands::command_args::RemoveFromBlacklist, utils::transactions::configure_instruction,
+    commands::command_args::RemoveFromBlacklist,
+    utils::transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_remove_from_blacklist(
@@ -57,11 +58,15 @@ pub async fn command_remove_from_blacklist(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
 
-    println!("Signature: {}", signature);
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

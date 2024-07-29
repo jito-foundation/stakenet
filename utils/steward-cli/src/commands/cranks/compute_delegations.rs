@@ -12,7 +12,10 @@ use solana_sdk::{
 
 use crate::{
     commands::command_args::CrankComputeDelegations,
-    utils::{accounts::get_all_steward_accounts, transactions::configure_instruction},
+    utils::{
+        accounts::get_all_steward_accounts,
+        transactions::{configure_instruction, print_base58_tx},
+    },
 };
 
 pub async fn command_crank_compute_delegations(
@@ -68,11 +71,15 @@ pub async fn command_crank_compute_delegations(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
 
-    println!("Signature: {}", signature);
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

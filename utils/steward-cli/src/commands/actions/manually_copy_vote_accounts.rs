@@ -12,7 +12,10 @@ use crate::{
     commands::command_args::ManuallyCopyVoteAccount,
     utils::{
         accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::{configure_instruction, print_errors_if_any, submit_packaged_transactions},
+        transactions::{
+            configure_instruction, print_base58_tx, print_errors_if_any,
+            submit_packaged_transactions,
+        },
     },
 };
 
@@ -64,10 +67,19 @@ pub async fn command_manually_copy_vote_account(
             .heap_size,
     );
 
-    let submit_stats =
-        submit_packaged_transactions(client, vec![configured_ix], &payer, Some(1), None).await?;
+    if args
+        .permissionless_parameters
+        .transaction_parameters
+        .print_tx
+    {
+        print_base58_tx(&configured_ix)
+    } else {
+        let submit_stats =
+            submit_packaged_transactions(client, vec![configured_ix], &payer, Some(1), None)
+                .await?;
 
-    print_errors_if_any(&submit_stats);
+        print_errors_if_any(&submit_stats);
+    }
 
     Ok(())
 }

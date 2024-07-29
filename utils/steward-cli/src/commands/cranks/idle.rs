@@ -10,7 +10,13 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{commands::command_args::CrankIdle, utils::accounts::get_all_steward_accounts};
+use crate::{
+    commands::command_args::CrankIdle,
+    utils::{
+        accounts::get_all_steward_accounts,
+        transactions::{configure_instruction, print_base58_tx},
+    },
+};
 
 pub async fn command_crank_idle(
     args: CrankIdle,
@@ -51,14 +57,29 @@ pub async fn command_crank_idle(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let transaction =
-        Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer], blockhash);
+    let configured_ix = configure_instruction(
+        &[ix],
+        args.transaction_parameters.priority_fee,
+        args.transaction_parameters.compute_limit,
+        args.transaction_parameters.heap_size,
+    );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    let transaction = Transaction::new_signed_with_payer(
+        &configured_ix,
+        Some(&payer.pubkey()),
+        &[&payer],
+        blockhash,
+    );
 
-    println!("Signature: {}", signature);
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

@@ -60,6 +60,17 @@ cargo run update-config \
   --num-epochs-between-scoring 3
 ```
 
+## Update Authority
+
+`blacklist` | `admin` | `parameters`
+
+```bash
+cargo run update-authority blacklist \
+  --authority-keypair-path ../../credentials/stakenet_test.json \
+  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH \
+  --new-authority 7V3HKHNgxwxiMLjcgvwPCBey7yy4WJrHUH4JVFmewu1P
+```
+
 ## Reset State
 
 ```bash
