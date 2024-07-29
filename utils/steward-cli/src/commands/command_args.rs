@@ -19,8 +19,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        // default_value_t = jito_steward::id()
-        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
+        default_value_t = jito_steward::id()
     )]
     pub program_id: Pubkey,
 
@@ -216,6 +215,7 @@ pub enum Commands {
     CloseSteward(CloseSteward),
     RemoveBadValidators(RemoveBadValidators),
     ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
+    ManuallyCopyAllVoteAccounts(ManuallyCopyAllVoteAccounts),
     ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
@@ -407,6 +407,13 @@ pub struct ManuallyCopyVoteAccount {
     /// Validator index of validator list to update
     #[arg(long, env)]
     pub validator_index_to_update: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Manually updates all vote accounts")]
+pub struct ManuallyCopyAllVoteAccounts {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
 }
 
 #[derive(Parser)]

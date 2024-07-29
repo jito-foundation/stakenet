@@ -2,6 +2,7 @@ pub mod add_to_blacklist;
 pub mod auto_add_validator_from_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_steward;
+pub mod manually_copy_all_vote_accounts;
 pub mod manually_copy_vote_accounts;
 pub mod manually_remove_validator;
 pub mod pause;

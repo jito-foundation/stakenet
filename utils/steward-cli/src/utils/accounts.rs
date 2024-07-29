@@ -40,6 +40,7 @@ pub struct AllStewardAccounts {
 pub struct AllValidatorAccounts {
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
     pub all_stake_account_map: HashMap<Pubkey, Option<Account>>,
+    pub all_vote_account_map: HashMap<Pubkey, Option<Account>>,
 }
 
 pub async fn get_all_validator_accounts(
@@ -72,6 +73,9 @@ pub async fn get_all_validator_accounts(
         .map(|(_, _, history_account)| history_account)
         .collect();
 
+    let vote_accounts =
+        get_multiple_accounts_batched(vote_addresses.clone().as_slice(), client).await?;
+
     let stake_accounts =
         get_multiple_accounts_batched(stake_accounts_to_fetch.as_slice(), client).await?;
 
@@ -89,6 +93,11 @@ pub async fn get_all_validator_accounts(
             .clone()
             .into_iter()
             .zip(stake_accounts)
+            .collect::<HashMap<Pubkey, Option<Account>>>(),
+
+        all_vote_account_map: vote_addresses
+            .into_iter()
+            .zip(vote_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
     }))
 }
@@ -133,6 +142,9 @@ pub async fn get_all_steward_validator_accounts(
     let history_accounts =
         get_multiple_accounts_batched(history_accounts_to_fetch.as_slice(), client).await?;
 
+    let vote_accounts =
+        get_multiple_accounts_batched(vote_addresses.clone().as_slice(), client).await?;
+
     Ok(Box::new(AllValidatorAccounts {
         all_history_vote_account_map: vote_addresses
             .clone()
@@ -144,6 +156,11 @@ pub async fn get_all_steward_validator_accounts(
             .clone()
             .into_iter()
             .zip(stake_accounts)
+            .collect::<HashMap<Pubkey, Option<Account>>>(),
+
+        all_vote_account_map: vote_addresses
+            .into_iter()
+            .zip(vote_accounts)
             .collect::<HashMap<Pubkey, Option<Account>>>(),
     }))
 }
@@ -443,6 +460,7 @@ pub struct StakeAccountChecks {
     pub has_history: bool,
     pub deactivation_epoch: Option<u64>,
     pub has_stake_account: bool,
+    pub has_vote_account: bool,
 }
 
 pub fn check_stake_accounts(
@@ -458,14 +476,19 @@ pub fn check_stake_accounts(
     let checks = vote_accounts
         .clone()
         .into_iter()
-        .map(|vote_account| {
+        .map(|vote_address| {
+            let vote_account = all_validator_accounts
+                .all_vote_account_map
+                .get(&vote_address)
+                .expect("Could not find vote account in map");
+
             let stake_account = all_validator_accounts
                 .all_stake_account_map
-                .get(&vote_account)
+                .get(&vote_address)
                 .expect("Could not find stake account in map");
             let history_account = all_validator_accounts
                 .all_history_vote_account_map
-                .get(&vote_account)
+                .get(&vote_address)
                 .expect("Could not find history account in map");
 
             let deactivation_epoch = stake_account.as_ref().map(|stake_account| {
@@ -479,12 +502,21 @@ pub fn check_stake_accounts(
                 }
             });
 
+            // let mut has_vote_account = false;
+            // if vote_account.is_some() {
+            //     if vote_account.unwrap().owner == spl_vote_program::id() {
+            //         has_vote_account = true;
+            //     }
+            // }
+            let has_vote_account = vote_account.is_some();
+
             let has_history = history_account.is_some();
             StakeAccountChecks {
                 is_deactivated: deactivation_epoch.unwrap_or(0) < epoch,
                 has_history,
                 has_stake_account: stake_account.is_some(),
                 deactivation_epoch,
+                has_vote_account,
             }
         })
         .collect::<Vec<StakeAccountChecks>>();

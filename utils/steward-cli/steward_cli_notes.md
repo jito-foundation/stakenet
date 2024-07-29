@@ -166,6 +166,12 @@ cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP auto-add-v
 cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP manually-copy-vote-account --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-update 1
 ```
 
+## Manually Update All Vote Accounts
+
+```bash
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 manually-copy-all-vote-accounts --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --payer-keypair-path ../../credentials/stakenet_test.json --priority-fee 300000
+```
+
 ## Manually Remove Validator
 
 ```bash

@@ -6,6 +6,7 @@ use commands::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
+        manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
         manually_remove_validator::command_manually_remove_validator, pause::command_pause,
         remove_bad_validators::command_remove_bad_validators,
@@ -75,6 +76,9 @@ async fn main() -> Result<()> {
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::ManuallyRemoveValidator(args) => {
             command_manually_remove_validator(args, &client, program_id).await
+        }
+        Commands::ManuallyCopyAllVoteAccounts(args) => {
+            command_manually_copy_all_vote_accounts(args, &client, program_id).await
         }
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
