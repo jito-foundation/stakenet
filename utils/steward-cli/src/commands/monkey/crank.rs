@@ -13,7 +13,7 @@ use solana_program::instruction::Instruction;
 
 use solana_sdk::account::Account;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
-use solana_sdk::vote::state::{vote_state_versions, VoteState};
+use solana_sdk::vote::state::VoteState;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
 };
@@ -360,6 +360,14 @@ async fn _handle_adding_validators(
                     *key,
                     all_validator_accounts
                         .all_stake_account_map
+                        .get(key)
+                        .unwrap()
+                        .clone(),
+                );
+                accounts_to_check.all_vote_account_map.insert(
+                    *key,
+                    all_validator_accounts
+                        .all_vote_account_map
                         .get(key)
                         .unwrap()
                         .clone(),
