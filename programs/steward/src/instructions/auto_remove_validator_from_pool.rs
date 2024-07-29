@@ -10,7 +10,7 @@ use crate::utils::{
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
+use anchor_lang::solana_program::{clock::Epoch, program::invoke_signed, stake, sysvar, vote};
 use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::state::StakeStatus;
@@ -124,13 +124,13 @@ pub struct AutoRemoveValidator<'info> {
 pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -> Result<()> {
     let stake_account_deactivated;
     let vote_account_closed;
+    let clock = Clock::get()?;
+    let epoch = clock.epoch;
 
     {
         let config = ctx.accounts.config.load()?;
         let state_account = ctx.accounts.state_account.load()?;
         let validator_list = &ctx.accounts.validator_list;
-        let clock = Clock::get()?;
-        let epoch = clock.epoch;
 
         remove_validator_check(&clock, &config, &state_account, validator_list)?;
 
@@ -210,12 +210,39 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
         let stake_status = StakeStatus::try_from(validator_stake_info.status)?;
         let marked_for_immediate_removal: bool;
 
+        let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
+
         match stake_status {
             StakeStatus::Active => {
                 // Should never happen
                 return Err(StewardError::ValidatorMarkedActive.into());
             }
-            StakeStatus::DeactivatingValidator | StakeStatus::ReadyForRemoval => {
+            StakeStatus::DeactivatingValidator => {
+                let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
+                let (meta, stake) =
+                    match try_from_slice_unchecked::<StakeStateV2>(stake_account_data)? {
+                        StakeStateV2::Stake(meta, stake, _stake_flags) => (meta, stake),
+                        _ => return Err(StewardError::StakeStateIsNotStake.into()),
+                    };
+
+                if stake_is_usable_by_pool(
+                    &meta,
+                    ctx.accounts.withdraw_authority.key,
+                    &stake_pool.lockup,
+                ) && stake_is_inactive_without_history(&stake, epoch)
+                {
+                    state_account
+                        .state
+                        .mark_validator_for_immediate_removal(validator_list_index)?;
+                    marked_for_immediate_removal = true;
+                } else {
+                    state_account
+                        .state
+                        .mark_validator_for_removal(validator_list_index)?;
+                    marked_for_immediate_removal = false;
+                }
+            }
+            StakeStatus::ReadyForRemoval => {
                 marked_for_immediate_removal = true;
                 state_account
                     .state
@@ -239,4 +266,24 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
     }
 
     Ok(())
+}
+
+// CHECKS FROM spl_stake_pool::processor::update_validator_list_balance
+
+/// Checks if a stake account can be managed by the pool
+fn stake_is_usable_by_pool(
+    meta: &stake::state::Meta,
+    expected_authority: &Pubkey,
+    expected_lockup: &stake::state::Lockup,
+) -> bool {
+    meta.authorized.staker == *expected_authority
+        && meta.authorized.withdrawer == *expected_authority
+        && meta.lockup == *expected_lockup
+}
+
+/// Checks if a stake account is active, without taking into account cooldowns
+fn stake_is_inactive_without_history(stake: &stake::state::Stake, epoch: Epoch) -> bool {
+    stake.delegation.deactivation_epoch < epoch
+        || (stake.delegation.activation_epoch == epoch
+            && stake.delegation.deactivation_epoch == epoch)
 }

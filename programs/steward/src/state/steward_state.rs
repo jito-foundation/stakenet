@@ -77,13 +77,13 @@ pub struct StewardState {
     /// Tracks progress of states that require one instruction per validator
     pub progress: BitMask,
 
-    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
-    /// This is cleaned up in the next epoch
-    pub validators_to_remove: BitMask,
-
     /// Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool
     /// This happens when a validator is able to be removed within the same epoch as it was marked
     pub validators_for_immediate_removal: BitMask,
+
+    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This is cleaned up in the next epoch
+    pub validators_to_remove: BitMask,
 
     ////// Cycle metadata fields //////
     /// Slot of the first ComputeScores instruction in the current cycle
