@@ -61,12 +61,14 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ) {
-        maybe_transition(
+        if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
             &config.parameters,
             &epoch_schedule,
-        )?;
+        )? {
+            emit!(event);
+        }
     }
 
     require!(

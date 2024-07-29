@@ -449,7 +449,12 @@ impl StewardState {
         self.stake_deposit_unstake_total = 0;
         self.delegations = [Delegation::default(); MAX_VALIDATORS];
         self.instant_unstake = BitMask::default();
+
+        let has_epoch_maintenance = self.has_flag(EPOCH_MAINTENANCE);
         self.clear_flags();
+        if has_epoch_maintenance {
+            self.set_flag(EPOCH_MAINTENANCE);
+        }
 
         Ok(())
     }
