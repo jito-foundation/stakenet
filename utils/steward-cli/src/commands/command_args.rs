@@ -19,7 +19,8 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value_t = jito_steward::id()
+        // default_value_t = jito_steward::id()
+        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
     )]
     pub program_id: Pubkey,
 

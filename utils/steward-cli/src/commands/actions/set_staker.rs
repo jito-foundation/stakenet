@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
-use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_program::instruction::Instruction;
 
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use spl_stake_pool::instruction::set_staker;
 
 use crate::{
     commands::command_args::SetStaker,
@@ -33,19 +32,12 @@ pub async fn command_set_staker(
     )
     .await?;
 
-    let set_staker_ix = Instruction {
-        program_id,
-        accounts: jito_steward::accounts::SetStaker {
-            config: all_steward_accounts.config_address,
-            stake_pool_program: spl_stake_pool::id(),
-            stake_pool: all_steward_accounts.stake_pool_address,
-            new_staker: all_steward_accounts.state_address,
-            admin: authority.pubkey(),
-            state_account: all_steward_accounts.state_address,
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::SetStaker {}.data(),
-    };
+    let set_staker_ix = set_staker(
+        &spl_stake_pool::id(),
+        &all_steward_accounts.stake_pool_address,
+        &authority.pubkey(),
+        &all_steward_accounts.state_address,
+    );
 
     let blockhash = client.get_latest_blockhash().await?;
 

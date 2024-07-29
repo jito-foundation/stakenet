@@ -26,25 +26,25 @@ use validator_keeper::{
 fn set_run_flags(args: &Args) -> u32 {
     let mut run_flags = 0;
 
-    if !args.skip_cluster_history {
+    if args.run_cluster_history {
         run_flags = set_flag(run_flags, KeeperOperations::ClusterHistory);
     }
-    if !args.skip_copy_vote_accounts {
+    if args.run_copy_vote_accounts {
         run_flags = set_flag(run_flags, KeeperOperations::VoteAccount);
     }
-    if !args.skip_mev_commission {
+    if args.run_mev_commission {
         run_flags = set_flag(run_flags, KeeperOperations::MevCommission);
     }
-    if !args.skip_mev_earned {
+    if args.run_mev_earned {
         run_flags = set_flag(run_flags, KeeperOperations::MevEarned);
     }
-    if !args.skip_stake_upload {
+    if args.run_stake_upload {
         run_flags = set_flag(run_flags, KeeperOperations::StakeUpload);
     }
-    if !args.skip_gossip_upload {
+    if args.run_gossip_upload {
         run_flags = set_flag(run_flags, KeeperOperations::GossipUpload);
     }
-    if !args.skip_steward {
+    if args.run_steward {
         run_flags = set_flag(run_flags, KeeperOperations::Steward);
     }
 

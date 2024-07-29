@@ -94,32 +94,34 @@ pub struct Args {
     pub cluster: Cluster,
 
     /// Skip running the cluster history
-    #[arg(long, env, default_value = "false")]
-    pub skip_cluster_history: bool,
+    #[arg(long, env, default_value = "true")]
+    pub run_cluster_history: bool,
 
     /// Skip MEV commission
-    #[arg(long, env, default_value = "false")]
-    pub skip_copy_vote_accounts: bool,
+    #[arg(long, env, default_value = "true")]
+    pub run_copy_vote_accounts: bool,
 
     /// Skip MEV commission
-    #[arg(long, env, default_value = "false")]
-    pub skip_mev_commission: bool,
+    #[arg(long, env, default_value = "true")]
+    pub run_mev_commission: bool,
 
     /// Skip MEV earned
-    #[arg(long, env, default_value = "false")]
-    pub skip_mev_earned: bool,
+    #[arg(long, env, default_value = "true")]
+    pub run_mev_earned: bool,
 
     /// Skip stake upload
+    /// NOTE: This is a permissioned operation and requires the oracle_authority_keypair
     #[arg(long, env, default_value = "false")]
-    pub skip_stake_upload: bool,
+    pub run_stake_upload: bool,
 
     /// Skip gossip upload
+    /// NOTE: This is a permissioned operation and requires the oracle_authority_keypair
     #[arg(long, env, default_value = "false")]
-    pub skip_gossip_upload: bool,
+    pub run_gossip_upload: bool,
 
     /// Skip stake upload
-    #[arg(long, env, default_value = "false")]
-    pub skip_steward: bool,
+    #[arg(long, env, default_value = "true")]
+    pub run_steward: bool,
 
     /// Run with the startup flag set to true
     #[arg(long, env, default_value = "true")]
