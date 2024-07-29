@@ -460,11 +460,6 @@ pub async fn parallel_execute_transactions(
                                             solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
                                                 println!("🟥 Preflight Error: \n{:?}\n\n", e);
 
-                                                println!("Accounts: \n");
-                                                for (i, account) in tx.message.account_keys.iter().enumerate() {
-                                                    println!("{}: {:?}", i, account);
-                                                }
-
                                                 results[idx] = Err(SendTransactionError::RpcSimulateTransactionResult(e))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::NodeUnhealthy { num_slots_behind } => {
