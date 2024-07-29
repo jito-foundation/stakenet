@@ -95,7 +95,7 @@ cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP revert-sta
 ```bash
 cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP pause \
   --authority-keypair-path ../../credentials/stakenet_test.json \
-  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --print-tx
 ```
 
 ## Resume
@@ -103,7 +103,7 @@ cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP pause \
 ```bash
 cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP resume \
   --authority-keypair-path ../../credentials/stakenet_test.json \
-  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+  --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH --print-tx
 ```
 
 ## Reset State
