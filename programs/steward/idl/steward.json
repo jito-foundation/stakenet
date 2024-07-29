@@ -2771,10 +2771,10 @@
             }
           },
           {
-            "name": "validators_to_remove",
+            "name": "validators_for_immediate_removal",
             "docs": [
-              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
-              "This is cleaned up in the next epoch"
+              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This happens when a validator is able to be removed within the same epoch as it was marked"
             ],
             "type": {
               "defined": {
@@ -2783,10 +2783,10 @@
             }
           },
           {
-            "name": "validators_for_immediate_removal",
+            "name": "validators_to_remove",
             "docs": [
-              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
-              "This happens when a validator is able to be removed within the same epoch as it was marked"
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
             ],
             "type": {
               "defined": {
