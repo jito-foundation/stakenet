@@ -148,20 +148,21 @@ pub fn print_errors_if_any(submit_stats: &SubmitStats) {
 
 pub fn print_base58_tx(ixs: &[Instruction]) {
     ixs.iter().for_each(|ix| {
-        println!("\n------ IX ------\n\n");
+        println!("\n------ IX ------\n");
+
+        println!("{}\n", ix.program_id);
 
         ix.accounts.iter().for_each(|account| {
-            println!(
-                "{:?} W({}) S({})",
-                account.pubkey, account.is_signer, account.is_writable
-            );
+            let pubkey = format!("{}", account.pubkey);
+            let writable = if account.is_writable { "W" } else { "" };
+            let signer = if account.is_signer { "S" } else { "" };
+
+            println!("{:<44} {:>2} {:>1}", pubkey, writable, signer);
         });
 
         println!("\n");
 
         let base58_string = bs58::encode(&ix.data).into_string();
-        println!("Data: {}", base58_string);
-
-        println!("\n");
+        println!("{}\n", base58_string);
     });
 }

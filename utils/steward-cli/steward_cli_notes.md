@@ -68,7 +68,7 @@ cargo run update-config \
 cargo run update-authority blacklist \
   --authority-keypair-path ../../credentials/stakenet_test.json \
   --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH \
-  --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8
+  --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8 --print-tx
 ```
 
 ## Reset State

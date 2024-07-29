@@ -7,10 +7,12 @@ use commands::{
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
-        manually_remove_validator::command_manually_remove_validator,
+        manually_remove_validator::command_manually_remove_validator, pause::command_pause,
         remove_bad_validators::command_remove_bad_validators,
         remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
-        update_authority::command_update_authority, update_config::command_update_config,
+        resume::command_resume, revert_staker::command_revert_staker,
+        set_staker::command_set_staker, update_authority::command_update_authority,
+        update_config::command_update_config,
     },
     command_args::{Args, Commands},
     cranks::{
@@ -53,6 +55,11 @@ async fn main() -> Result<()> {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
 
+        // --- Helpers ---
+        Commands::ManuallyCopyVoteAccount(args) => {
+            command_manually_copy_vote_account(args, &client, program_id).await
+        }
+
         // --- Actions ---
         Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
         Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
@@ -60,9 +67,10 @@ async fn main() -> Result<()> {
         Commands::UpdateAuthority(args) => {
             command_update_authority(args, &client, program_id).await
         }
-        Commands::ManuallyCopyVoteAccount(args) => {
-            command_manually_copy_vote_account(args, &client, program_id).await
-        }
+        Commands::SetStaker(args) => command_set_staker(args, &client, program_id).await,
+        Commands::RevertStaker(args) => command_revert_staker(args, &client, program_id).await,
+        Commands::Pause(args) => command_pause(args, &client, program_id).await,
+        Commands::Resume(args) => command_resume(args, &client, program_id).await,
         Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::ManuallyRemoveValidator(args) => {

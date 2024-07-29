@@ -199,9 +199,15 @@ pub enum Commands {
     InitSteward(InitSteward),
     ReallocState(ReallocState),
 
+    SetStaker(SetStaker),
+    RevertStaker(RevertStaker),
+
     UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
     ResetState(ResetState),
+
+    Pause(Pause),
+    Resume(Resume),
 
     AddToBlacklist(AddToBlacklist),
     RemoveFromBlacklist(RemoveFromBlacklist),
@@ -359,6 +365,34 @@ pub struct RemoveFromBlacklist {
     about = "Closes the steward accounts and returns the staker to the authority calling this function"
 )]
 pub struct CloseSteward {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Transfers the Staker to the Steward State Account")]
+pub struct SetStaker {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Transfers the Staker to the calling authority")]
+pub struct RevertStaker {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Pause the steward program")]
+pub struct Pause {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Resume the steward program")]
+pub struct Resume {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 }
