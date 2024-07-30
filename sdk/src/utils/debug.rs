@@ -1,7 +1,45 @@
+use std::sync::Arc;
+
 use jito_steward::{
     StewardState, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES, COMPUTE_SCORE, EPOCH_MAINTENANCE,
     POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
 };
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{
+    instruction::Instruction, signature::Keypair, signer::Signer, transaction::Transaction,
+};
+
+// ----------- DEBUG SEND --------------
+
+pub async fn debug_send_single_transaction(
+    client: &Arc<RpcClient>,
+    payer: &Arc<Keypair>,
+    instructions: &[Instruction],
+    debug_print: Option<bool>,
+) -> Result<solana_sdk::signature::Signature, solana_client::client_error::ClientError> {
+    let transaction = Transaction::new_signed_with_payer(
+        instructions,
+        Some(&payer.pubkey()),
+        &[&payer],
+        client.get_latest_blockhash().await?,
+    );
+
+    let result = client.send_and_confirm_transaction(&transaction).await;
+
+    if debug_print.unwrap_or(false) {
+        match &result {
+            Ok(signature) => {
+                println!("Signature: {}", signature);
+            }
+            Err(e) => {
+                println!("Accounts: {:?}", &instructions.last().unwrap().accounts);
+                println!("Error: {:?}", e);
+            }
+        }
+    }
+
+    result
+}
 
 // ----------- STEWARD STATE --------------
 

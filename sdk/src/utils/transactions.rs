@@ -20,13 +20,14 @@ use solana_sdk::{
 use tokio::task;
 use tokio::time::sleep;
 
-use crate::models::constants::DEFAULT_COMPUTE_LIMIT;
 use crate::models::errors::{
     JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError,
 };
 use crate::models::submit_stats::SubmitStats;
 
 use std::future::Future;
+
+pub const DEFAULT_COMPUTE_LIMIT: u64 = 200_000;
 
 pub async fn retry<F, Fut, T, E>(mut f: F, retries: usize) -> Result<T, E>
 where
@@ -587,44 +588,31 @@ pub async fn parallel_execute_instructions(
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: Option<u32>,
+    no_pack: bool,
 ) -> Result<Vec<Result<(), JitoSendTransactionError>>, JitoTransactionExecutionError> {
-    /*
-        Note: Assumes all instructions are equivalent in compute, equivalent in size, and can be executed in any order
-
-        1) Submits all instructions in parallel
-        2) Waits a bit for them to confirm
-        3) Checks which ones have confirmed, and keeps the ones that haven't
-        4) Repeats retry_count number of times until all have confirmed
-
-        Returns all remaining instructions that haven't executed so application can handle
-    */
-
     if instructions.is_empty() {
         return Ok(vec![]);
     }
 
-    // let instructions_per_tx = calculate_instructions_per_tx(
-    //     client,
-    //     instructions,
-    //     signer,
-    //     priority_fee_in_microlamports,
-    //     max_cu_per_tx,
-    // )
-    // .await
-    // .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?
-    //     - 1;
-
     let max_cu_per_tx = max_cu_per_tx.unwrap_or(DEFAULT_COMPUTE_LIMIT as u32);
 
-    let mut transactions: Vec<Vec<Instruction>> = pack_instructions(
-        client,
-        instructions,
-        signer,
-        priority_fee_in_microlamports,
-        max_cu_per_tx,
-    )
-    .await
-    .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
+    let mut transactions: Vec<Vec<Instruction>> = vec![];
+
+    if no_pack {
+        for ix in instructions.iter() {
+            transactions.push(vec![ix.clone()]);
+        }
+    } else {
+        transactions = pack_instructions(
+            client,
+            instructions,
+            signer,
+            priority_fee_in_microlamports,
+            max_cu_per_tx,
+        )
+        .await
+        .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
+    }
 
     for tx in transactions.iter_mut() {
         tx.insert(
@@ -678,6 +666,7 @@ pub async fn submit_instructions(
     keypair: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: Option<u32>,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     match parallel_execute_instructions(
@@ -688,6 +677,7 @@ pub async fn submit_instructions(
         20,
         priority_fee_in_microlamports,
         max_cu_per_tx,
+        no_pack,
     )
     .await
     {

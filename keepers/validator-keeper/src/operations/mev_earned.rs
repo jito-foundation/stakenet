@@ -41,6 +41,7 @@ async fn _process(
     tip_distribution_program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     update_mev_earned(
         client,
@@ -49,6 +50,7 @@ async fn _process(
         priority_fee_in_microlamports,
         tip_distribution_program_id,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -77,6 +79,7 @@ pub async fn fire(
             tip_distribution_program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -112,6 +115,7 @@ pub async fn update_mev_earned(
     priority_fee_in_microlamports: u64,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let validator_history_map = &keeper_state.validator_history_map;
@@ -162,6 +166,7 @@ pub async fn update_mev_earned(
         keypair,
         priority_fee_in_microlamports,
         None,
+        no_pack,
     )
     .await;
 

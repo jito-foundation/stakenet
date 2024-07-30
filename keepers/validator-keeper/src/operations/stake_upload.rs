@@ -40,6 +40,7 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     update_stake_history(
         client,
@@ -47,6 +48,7 @@ async fn _process(
         program_id,
         priority_fee_in_microlamports,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -74,6 +76,7 @@ pub async fn fire(
             program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -108,6 +111,7 @@ pub async fn update_stake_history(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
@@ -161,6 +165,7 @@ pub async fn update_stake_history(
         keypair,
         priority_fee_in_microlamports,
         None,
+        no_pack,
     )
     .await;
 

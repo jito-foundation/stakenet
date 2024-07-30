@@ -19,6 +19,7 @@ pub struct KeeperConfig {
     pub metrics_interval: u64,
     pub run_flags: u32,
     pub full_startup: bool,
+    pub no_pack: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -126,4 +127,8 @@ pub struct Args {
     /// Run with the startup flag set to true
     #[arg(long, env, default_value = "true")]
     pub full_startup: bool,
+
+    /// Don't smart pack instructions - it will be faster, but more expensive
+    #[arg(long, env, default_value = "false")]
+    pub no_pack: bool,
 }

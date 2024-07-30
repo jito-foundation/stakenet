@@ -42,6 +42,7 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     update_vote_accounts(
         client,
@@ -49,6 +50,7 @@ async fn _process(
         program_id,
         priority_fee_in_microlamports,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -81,6 +83,7 @@ pub async fn fire(
             program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -119,6 +122,7 @@ pub async fn update_vote_accounts(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
+    no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_map = &keeper_state.validator_history_map;
     let epoch_info = &keeper_state.epoch_info;
@@ -154,6 +158,7 @@ pub async fn update_vote_accounts(
         keypair,
         priority_fee_in_microlamports,
         Some(300_000),
+        no_pack,
     )
     .await;
 
