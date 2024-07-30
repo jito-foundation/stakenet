@@ -9,12 +9,10 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::CrankEpochMaintenance,
-    utils::{
-        accounts::get_all_steward_accounts,
-        transactions::{configure_instruction, print_base58_tx},
-    },
+use crate::commands::command_args::CrankEpochMaintenance;
+use stakenet_sdk::utils::{
+    accounts::get_all_steward_accounts,
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_crank_epoch_maintenance(

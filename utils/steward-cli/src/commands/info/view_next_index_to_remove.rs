@@ -6,9 +6,8 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{
-    commands::command_args::ViewNextIndexToRemove, utils::accounts::get_steward_state_account,
-};
+use crate::commands::command_args::ViewNextIndexToRemove;
+use stakenet_sdk::utils::accounts::get_steward_state_account;
 
 pub async fn command_view_next_index_to_remove(
     args: ViewNextIndexToRemove,

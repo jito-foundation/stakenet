@@ -1,6 +1,4 @@
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
-use keeper_core::{MultipleAccountsError, TransactionExecutionError};
-use log::error;
 use solana_account_decoder::UiDataSliceConfig;
 use solana_client::{
     client_error::ClientError,
@@ -15,27 +13,12 @@ use solana_sdk::{
 };
 
 use jito_tip_distribution::state::TipDistributionAccount;
-use thiserror::Error as ThisError;
 use validator_history::{constants::MAX_ALLOC_BYTES, ClusterHistory, Config, ValidatorHistory};
 pub mod entries;
 pub mod operations;
 pub mod state;
 
 pub type Error = Box<dyn std::error::Error>;
-
-pub const PRIORITY_FEE: u64 = 200_000;
-
-#[derive(ThisError, Debug)]
-pub enum KeeperError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-    #[error("Custom: {0}")]
-    Custom(String),
-}
 
 pub async fn get_tip_distribution_accounts(
     rpc_client: &RpcClient,

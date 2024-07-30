@@ -5,19 +5,21 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 
 use crate::state::keeper_state::KeeperState;
-use crate::KeeperError;
 use crate::{
     entries::mev_commission_entry::ValidatorMevCommissionEntry, state::keeper_config::KeeperConfig,
 };
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::state::TipDistributionAccount;
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
@@ -39,7 +41,7 @@ async fn _process(
     tip_distribution_program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     update_mev_earned(
         client,
         keypair,
@@ -110,7 +112,7 @@ pub async fn update_mev_earned(
     priority_fee_in_microlamports: u64,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let validator_history_map = &keeper_state.validator_history_map;
     let previous_epoch_tip_distribution_map = &keeper_state.previous_epoch_tip_distribution_map;

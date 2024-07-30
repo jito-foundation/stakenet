@@ -2,15 +2,19 @@ use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
-};
+
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
-use steward_cli::utils::accounts::{
-    get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+
+use stakenet_sdk::utils::{
+    accounts::{
+        get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+    },
+    transactions::{
+        get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
+    },
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 

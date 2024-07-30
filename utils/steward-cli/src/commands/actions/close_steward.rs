@@ -5,16 +5,13 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
+use crate::commands::command_args::CloseSteward;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-
-use crate::{
-    commands::command_args::CloseSteward,
-    utils::{
-        accounts::get_all_steward_accounts,
-        transactions::{configure_instruction, print_base58_tx},
-    },
+use stakenet_sdk::utils::{
+    accounts::get_all_steward_accounts,
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_close_steward(

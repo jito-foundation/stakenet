@@ -8,12 +8,11 @@ use solana_sdk::{
 };
 use spl_stake_pool::instruction::set_staker;
 
-use crate::{
-    commands::command_args::SetStaker,
-    utils::{
-        accounts::get_all_steward_accounts,
-        transactions::{configure_instruction, print_base58_tx},
-    },
+use crate::commands::command_args::SetStaker;
+
+use stakenet_sdk::utils::{
+    accounts::get_all_steward_accounts,
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_set_staker(

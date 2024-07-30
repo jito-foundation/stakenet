@@ -1,7 +1,7 @@
 use clap::{arg, command, Parser};
-use keeper_core::Cluster;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use stakenet_sdk::models::cluster::Cluster;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 pub struct KeeperConfig {
@@ -61,7 +61,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
+        default_value_t = jito_steward::id() 
     )]
     pub steward_program_id: Pubkey,
 

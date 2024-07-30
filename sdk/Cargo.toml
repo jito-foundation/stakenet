@@ -1,0 +1,29 @@
+[package]
+name = "stakenet-sdk"
+version = "0.1.0"
+description = "SDK for Stakenet"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Jito Foundation <team@jito.network>"]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "stakenet_sdk"
+
+[dependencies]
+bincode = "1.3.3"
+clap = { version = "4.3.0", features = ["derive"] }
+futures = "0.3.21"
+log = "0.4.18"
+anchor-lang = "0.30.0"
+solana-account-decoder = "1.18"
+solana-client = "1.18"
+solana-metrics = "1.18"
+solana-program = "1.18"
+solana-sdk = "1.18"
+spl-pod = "0.1.0"
+thiserror = "1.0.37"
+tokio = { version = "1.36.0", features = ["full"] }
+spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
+jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
+validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }

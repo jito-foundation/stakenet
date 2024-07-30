@@ -13,12 +13,10 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::ReallocState,
-    utils::{
-        accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
-        transactions::{configure_instruction, print_base58_tx},
-    },
+use crate::commands::command_args::ReallocState;
+use stakenet_sdk::utils::{
+    accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 const REALLOCS_PER_TX: usize = 10;

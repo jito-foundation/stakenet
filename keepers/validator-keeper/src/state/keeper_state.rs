@@ -7,7 +7,7 @@ use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
 };
-use steward_cli::utils::accounts::{AllStewardAccounts, AllValidatorAccounts};
+use stakenet_sdk::utils::accounts::{AllStewardAccounts, AllValidatorAccounts};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 use crate::{

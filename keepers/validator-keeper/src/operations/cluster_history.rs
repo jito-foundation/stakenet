@@ -8,7 +8,6 @@ use crate::derive_cluster_history_address;
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -17,6 +16,10 @@ use solana_sdk::{
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
+};
+use stakenet_sdk::{
+    models::{errors::JitoTransactionExecutionError, submit_stats::SubmitStats},
+    utils::transactions::submit_transactions,
 };
 use std::sync::Arc;
 
@@ -38,7 +41,7 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     update_cluster_info(client, keypair, program_id, priority_fee_in_microlamports).await
 }
 
@@ -124,7 +127,7 @@ pub async fn update_cluster_info(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let ixs = get_update_cluster_info_instructions(
         program_id,
         &keypair.pubkey(),

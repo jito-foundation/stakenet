@@ -9,14 +9,12 @@ use validator_history::id as validator_history_id;
 
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 
-use crate::{
-    commands::command_args::CrankComputeInstantUnstake,
-    utils::{
-        accounts::{
-            get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
-        },
-        transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
+use crate::commands::command_args::CrankComputeInstantUnstake;
+use stakenet_sdk::utils::{
+    accounts::{
+        get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
     },
+    transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
 
 pub async fn command_crank_compute_instant_unstake(

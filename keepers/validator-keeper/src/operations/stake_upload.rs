@@ -5,8 +5,6 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use crate::state::keeper_state::KeeperState;
-use crate::KeeperError;
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
@@ -16,6 +14,10 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
@@ -38,7 +40,7 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+) -> Result<SubmitStats, JitoTransactionError> {
     update_stake_history(
         client,
         keypair,
@@ -106,7 +108,7 @@ pub async fn update_stake_history(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -124,8 +126,7 @@ pub async fn update_stake_history(
         get_stake_rank_map_and_superminority_count(vote_accounts);
 
     if max_vote_account_epoch != epoch_info.epoch {
-        //TODO Go through with custom errors
-        return Err(Box::new(KeeperError::Custom("EpochMismatch".into())));
+        return Err(JitoTransactionError::Custom("EpochMismatch".into()));
     }
 
     let entries_to_update = vote_accounts

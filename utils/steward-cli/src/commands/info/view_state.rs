@@ -9,12 +9,11 @@ use spl_stake_pool::{
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 
-use crate::{
-    commands::command_args::ViewState,
-    utils::accounts::{
-        format_simple_state_string, format_state_string, get_all_steward_accounts,
-        get_validator_history_address,
-    },
+use crate::commands::command_args::ViewState;
+
+use stakenet_sdk::utils::accounts::{
+    format_simple_state_string, format_state_string, get_all_steward_accounts,
+    get_validator_history_address,
 };
 
 pub async fn command_view_state(

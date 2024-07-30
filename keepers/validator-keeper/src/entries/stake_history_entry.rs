@@ -2,10 +2,10 @@ use std::str::FromStr;
 
 use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
-use keeper_core::Address;
-use keeper_core::UpdateInstruction;
+
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
+use stakenet_sdk::models::entries::{Address, UpdateInstruction};
 
 use crate::derive_validator_history_address;
 use crate::derive_validator_history_config_address;

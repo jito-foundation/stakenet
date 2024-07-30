@@ -7,7 +7,8 @@ use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
 use spl_stake_pool::state::StakeStatus;
-use steward_cli::utils::accounts::{
+
+use stakenet_sdk::utils::accounts::{
     format_simple_state_string, format_state_string, state_to_state_code,
 };
 use validator_history::ValidatorHistoryEntry;

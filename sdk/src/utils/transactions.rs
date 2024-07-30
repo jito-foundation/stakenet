@@ -1,15 +1,14 @@
 use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
 use std::mem::size_of;
 use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use clap::ValueEnum;
 use log::*;
 use solana_client::rpc_response::{Response, RpcSimulateTransactionResult, RpcVoteAccountInfo};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_metrics::datapoint_error;
 use solana_program::hash::Hash;
+use solana_sdk::bs58;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::packet::PACKET_DATA_SIZE;
 use solana_sdk::transaction::TransactionError;
@@ -18,95 +17,19 @@ use solana_sdk::{
     instruction::Instruction, packet::Packet, pubkey::Pubkey, signature::Keypair,
     signature::Signature, signer::Signer, transaction::Transaction,
 };
-use thiserror::Error as ThisError;
-use tokio::task::{self, JoinError};
+use tokio::task;
 use tokio::time::sleep;
 
-const DEFAULT_COMPUTE_LIMIT: usize = 200_000;
-
-#[derive(Debug, Default, Clone)]
-pub struct SubmitStats {
-    pub successes: u64,
-    pub errors: u64,
-    pub results: Vec<Result<(), SendTransactionError>>,
-}
-
-impl SubmitStats {
-    pub fn combine(&mut self, other: &SubmitStats) {
-        self.successes += other.successes;
-        self.errors += other.errors;
-        self.results.extend(other.results.clone())
-    }
-}
-#[derive(Debug, Default, Clone)]
-pub struct CreateUpdateStats {
-    pub creates: SubmitStats,
-    pub updates: SubmitStats,
-}
-
-pub type Error = Box<dyn std::error::Error>;
-#[derive(ThisError, Debug, Clone)]
-pub enum TransactionExecutionError {
-    #[error("RPC Client error: {0:?}")]
-    ClientError(String),
-    #[error("RPC Client error: {0:?}")]
-    TransactionClientError(String, Vec<Result<(), SendTransactionError>>),
-}
-
-#[derive(ThisError, Clone, Debug)]
-pub enum SendTransactionError {
-    #[error("Exceeded retries")]
-    ExceededRetries,
-    // Stores ClientError.to_string(), since ClientError does not impl Clone, and we want to track both
-    // io/reqwest errors as well as transaction errors
-    #[error("Transaction error: {0}")]
-    TransactionError(String),
-
-    #[error("Verbose RPC Error")]
-    RpcSimulateTransactionResult(RpcSimulateTransactionResult),
-}
-
-#[derive(ThisError, Debug)]
-pub enum MultipleAccountsError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    JoinError(#[from] JoinError),
-}
-
-#[derive(ValueEnum, Debug, Clone)]
-pub enum Cluster {
-    Mainnet,
-    Testnet,
-    Localnet,
-}
-
-impl Display for Cluster {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Cluster::Mainnet => write!(f, "mainnet"),
-            Cluster::Testnet => write!(f, "testnet"),
-            Cluster::Localnet => write!(f, "localnet"),
-        }
-    }
-}
-
-pub trait CreateTransaction {
-    fn create_transaction(&self) -> Vec<Instruction>;
-}
-
-pub trait UpdateInstruction {
-    fn update_instruction(&self) -> Instruction;
-}
-
-pub trait Address {
-    fn address(&self) -> Pubkey;
-}
+use crate::models::constants::DEFAULT_COMPUTE_LIMIT;
+use crate::models::errors::{
+    JitoMultipleAccountsError, JitoTransactionExecutionError, JitoSendTransactionError,
+};
+use crate::models::submit_stats::SubmitStats;
 
 pub async fn get_multiple_accounts_batched(
     accounts: &[Pubkey],
     rpc_client: &Arc<RpcClient>,
-) -> Result<Vec<Option<Account>>, MultipleAccountsError> {
+) -> Result<Vec<Option<Account>>, JitoMultipleAccountsError> {
     let tasks = accounts.chunks(100).map(|chunk| {
         let client = Arc::clone(rpc_client);
         let chunk = chunk.to_owned();
@@ -120,9 +43,9 @@ pub async fn get_multiple_accounts_batched(
         match result {
             Ok(Ok(accounts)) => accounts_result.extend(accounts),
             Ok(Err(e)) => {
-                return Err(MultipleAccountsError::ClientError(e));
+                return Err(JitoMultipleAccountsError::ClientError(e));
             }
-            Err(e) => return Err(MultipleAccountsError::JoinError(e)),
+            Err(e) => return Err(JitoMultipleAccountsError::JoinError(e)),
         }
     }
     Ok(accounts_result)
@@ -376,8 +299,8 @@ pub async fn parallel_execute_transactions(
     signer: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
-) -> Result<Vec<Result<(), SendTransactionError>>, TransactionExecutionError> {
-    let mut results = vec![Err(SendTransactionError::ExceededRetries); transactions.len()];
+) -> Result<Vec<Result<(), JitoSendTransactionError>>, JitoTransactionExecutionError> {
+    let mut results = vec![Err(JitoSendTransactionError::ExceededRetries); transactions.len()];
     let mut retries = 0;
 
     if transactions.is_empty() {
@@ -386,7 +309,7 @@ pub async fn parallel_execute_transactions(
 
     let blockhash = get_latest_blockhash_with_retry(client)
         .await
-        .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+        .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
     let mut signed_txs = sign_txs(transactions, signer, blockhash);
 
     while retries < retry_count {
@@ -396,7 +319,7 @@ pub async fn parallel_execute_transactions(
         for (idx, tx) in signed_txs.iter().enumerate() {
             if matches!(
                 results[idx],
-                Ok(_) | Err(SendTransactionError::RpcSimulateTransactionResult(_))
+                Ok(_) | Err(JitoSendTransactionError::RpcSimulateTransactionResult(_))
             ) {
                 continue; // Skip transactions that have already been confirmed
             }
@@ -429,13 +352,13 @@ pub async fn parallel_execute_transactions(
                         Some(_) => {
                             match e.kind {
                                 solana_client::client_error::ClientErrorKind::Io(e) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Io Error: {:?}",
                                         e
                                     )))
                                 }
                                 solana_client::client_error::ClientErrorKind::Reqwest(e) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Reqwest Error: {:?}",
                                         e
                                     )))
@@ -443,7 +366,7 @@ pub async fn parallel_execute_transactions(
                                 solana_client::client_error::ClientErrorKind::RpcError(e) => match e
                                 {
                                     solana_client::rpc_request::RpcError::RpcRequestError(e) => {
-                                        results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                        results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                             "TX - RPC Error (Request): {:?}",
                                             e
                                         )))
@@ -455,15 +378,15 @@ pub async fn parallel_execute_transactions(
                                     } => {
                                         match data {
                                             solana_client::rpc_request::RpcResponseErrorData::Empty => {
-                                                results[idx] = Err(SendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
+                                                results[idx] = Err(JitoSendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
                                                 println!("🟥 Preflight Error: \n{:?}\n\n", e);
 
-                                                results[idx] = Err(SendTransactionError::RpcSimulateTransactionResult(e))
+                                                results[idx] = Err(JitoSendTransactionError::RpcSimulateTransactionResult(e))
                                             },
                                             solana_client::rpc_request::RpcResponseErrorData::NodeUnhealthy { num_slots_behind } => {
-                                                results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                                results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                                     "TX - RPC Error (Request - Unhealthy):  slots behind: {:?}",
                                                     num_slots_behind
                                                 )))
@@ -471,26 +394,26 @@ pub async fn parallel_execute_transactions(
                                         }
                                     }
                                     solana_client::rpc_request::RpcError::ParseError(e) => {
-                                        results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                        results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                             "TX - RPC Error (Parse): {:?}",
                                             e
                                         )))
                                     }
                                     solana_client::rpc_request::RpcError::ForUser(e) => {
-                                        results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                        results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                             "TX - RPC Error (For User): {:?}",
                                             e
                                         )))
                                     }
                                 },
                                 solana_client::client_error::ClientErrorKind::SerdeJson(e) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Serde Json Error: {:?}",
                                         e
                                     )))
                                 }
                                 solana_client::client_error::ClientErrorKind::SigningError(e) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Signing Error: {:?}",
                                         e
                                     )))
@@ -498,13 +421,13 @@ pub async fn parallel_execute_transactions(
                                 solana_client::client_error::ClientErrorKind::TransactionError(
                                     e,
                                 ) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Transaction Error: {:?}",
                                         e
                                     )))
                                 }
                                 solana_client::client_error::ClientErrorKind::Custom(e) => {
-                                    results[idx] = Err(SendTransactionError::TransactionError(format!(
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                         "TX - Custom Error: {:?}",
                                         e
                                     )))
@@ -513,7 +436,7 @@ pub async fn parallel_execute_transactions(
                         }
                         None => {
                             warn!("None Transaction error: {:?}", e);
-                            results[idx] = Err(SendTransactionError::TransactionError(format!(
+                            results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                 "None transaction error {:?}",
                                 e
                             )))
@@ -527,7 +450,7 @@ pub async fn parallel_execute_transactions(
         if results.iter().all(|r| {
             matches!(
                 r,
-                Err(SendTransactionError::RpcSimulateTransactionResult(_))
+                Err(JitoSendTransactionError::RpcSimulateTransactionResult(_))
             )
         }) {
             break;
@@ -559,7 +482,7 @@ pub async fn parallel_execute_transactions(
                 .is_blockhash_valid(&blockhash, CommitmentConfig::processed())
                 .await
                 .map_err(|e| {
-                    TransactionExecutionError::TransactionClientError(
+                    JitoTransactionExecutionError::TransactionClientError(
                         e.to_string(),
                         results.clone(),
                     )
@@ -567,7 +490,10 @@ pub async fn parallel_execute_transactions(
         {
             // Re-sign transactions with fresh blockhash
             let blockhash = get_latest_blockhash_with_retry(client).await.map_err(|e| {
-                TransactionExecutionError::TransactionClientError(e.to_string(), results.clone())
+                JitoTransactionExecutionError::TransactionClientError(
+                    e.to_string(),
+                    results.clone(),
+                )
             })?;
             signed_txs = sign_txs(transactions, signer, blockhash);
             retries += 1;
@@ -640,7 +566,7 @@ pub async fn parallel_execute_instructions(
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: Option<u32>,
-) -> Result<Vec<Result<(), SendTransactionError>>, TransactionExecutionError> {
+) -> Result<Vec<Result<(), JitoSendTransactionError>>, JitoTransactionExecutionError> {
     /*
         Note: Assumes all instructions are equivalent in compute, equivalent in size, and can be executed in any order
 
@@ -677,7 +603,7 @@ pub async fn parallel_execute_instructions(
         max_cu_per_tx,
     )
     .await
-    .map_err(|e| TransactionExecutionError::ClientError(e.to_string()))?;
+    .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
 
     for tx in transactions.iter_mut() {
         tx.insert(
@@ -703,45 +629,11 @@ pub async fn parallel_execute_instructions(
     .await
 }
 
-pub async fn build_create_and_update_instructions<
-    T: Address + CreateTransaction + UpdateInstruction,
->(
-    client: &Arc<RpcClient>,
-    account_entries: &[T],
-) -> Result<(Vec<Vec<Instruction>>, Vec<Instruction>), MultipleAccountsError> {
-    let addresses = account_entries
-        .iter()
-        .map(|a| a.address())
-        .collect::<Vec<Pubkey>>();
-    let existing_accounts_response: Vec<Option<Account>> =
-        get_multiple_accounts_batched(&addresses, client).await?;
-
-    let create_transactions = existing_accounts_response
-        .iter()
-        .zip(account_entries.iter())
-        .filter_map(|(existing_account, entry)| {
-            if existing_account.is_none() {
-                Some(entry.create_transaction())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-
-    Ok((
-        create_transactions,
-        account_entries
-            .iter()
-            .map(|entry| entry.update_instruction())
-            .collect(),
-    ))
-}
-
 pub async fn submit_transactions(
     client: &Arc<RpcClient>,
     transactions: Vec<Vec<Instruction>>,
     keypair: &Arc<Keypair>,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let tx_slice = transactions
         .iter()
@@ -765,7 +657,7 @@ pub async fn submit_instructions(
     keypair: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: Option<u32>,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     match parallel_execute_instructions(
         client,
@@ -788,23 +680,157 @@ pub async fn submit_instructions(
     }
 }
 
-pub async fn submit_create_and_update(
+pub fn configure_instruction(
+    ixs: &[Instruction],
+    priority_fee: Option<u64>,
+    compute_limit: Option<u32>,
+    heap_size: Option<u32>,
+) -> Vec<Instruction> {
+    let mut instructions = ixs.to_vec();
+    if let Some(compute_limit) = compute_limit {
+        instructions.insert(
+            0,
+            ComputeBudgetInstruction::set_compute_unit_limit(compute_limit),
+        );
+    }
+    if let Some(priority_fee) = priority_fee {
+        instructions.insert(
+            0,
+            ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
+        );
+    }
+    if let Some(heap_size) = heap_size {
+        instructions.insert(0, ComputeBudgetInstruction::request_heap_frame(heap_size));
+    }
+
+    instructions
+}
+
+pub fn package_instructions(
+    ixs: &[Instruction],
+    chunk_size: usize,
+    priority_fee: Option<u64>,
+    compute_limit: Option<u32>,
+    heap_size: Option<u32>,
+) -> Vec<Vec<Instruction>> {
+    ixs.chunks(chunk_size)
+        .map(|chunk: &[Instruction]| {
+            configure_instruction(chunk, priority_fee, compute_limit, heap_size)
+        })
+        .collect::<Vec<Vec<Instruction>>>()
+}
+
+pub async fn submit_packaged_transactions(
     client: &Arc<RpcClient>,
-    create_transactions: Vec<Vec<Instruction>>,
-    update_instructions: Vec<Instruction>,
+    transactions: Vec<Vec<Instruction>>,
     keypair: &Arc<Keypair>,
-    priority_fee_in_microlamports: u64,
-    max_cu_per_tx: Option<u32>,
-) -> Result<CreateUpdateStats, TransactionExecutionError> {
-    Ok(CreateUpdateStats {
-        creates: submit_transactions(client, create_transactions, keypair).await?,
-        updates: submit_instructions(
-            client,
-            update_instructions,
-            keypair,
-            priority_fee_in_microlamports,
-            max_cu_per_tx,
-        )
-        .await?,
-    })
+    retry_count: Option<u16>,
+    retry_interval: Option<u64>,
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
+    let mut stats = SubmitStats::default();
+    let tx_slice = transactions
+        .iter()
+        .map(|t| t.as_slice())
+        .collect::<Vec<_>>();
+
+    match parallel_execute_transactions(
+        client,
+        &tx_slice,
+        keypair,
+        retry_count.unwrap_or(3),
+        retry_interval.unwrap_or(20),
+    )
+    .await
+    {
+        Ok(results) => {
+            stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
+            stats.errors = results.len() as u64 - stats.successes;
+            stats.results = results;
+            Ok(stats)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn debug_send_single_transaction(
+    client: &Arc<RpcClient>,
+    payer: &Arc<Keypair>,
+    instructions: &[Instruction],
+    debug_print: Option<bool>,
+) -> Result<solana_sdk::signature::Signature, solana_client::client_error::ClientError> {
+    let transaction = Transaction::new_signed_with_payer(
+        instructions,
+        Some(&payer.pubkey()),
+        &[&payer],
+        client.get_latest_blockhash().await?,
+    );
+
+    let result = client.send_and_confirm_transaction(&transaction).await;
+
+    if debug_print.unwrap_or(false) {
+        match &result {
+            Ok(signature) => {
+                println!("Signature: {}", signature);
+            }
+            Err(e) => {
+                println!("Accounts: {:?}", &instructions.last().unwrap().accounts);
+                println!("Error: {:?}", e);
+            }
+        }
+    }
+
+    result
+}
+
+pub fn format_steward_error_log(error: &JitoSendTransactionError) -> String {
+    let mut error_logs = String::new();
+
+    match error {
+        JitoSendTransactionError::ExceededRetries => {
+            error_logs.push_str("Exceeded Retries");
+        }
+        JitoSendTransactionError::TransactionError(e) => {
+            error_logs.push_str(format!("Transaction: {:?}", e).as_str());
+        }
+        JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
+            error_logs.push_str("Preflight Error:");
+
+            e.logs.iter().for_each(|log| {
+                log.iter().enumerate().for_each(|(i, log)| {
+                    error_logs.push_str(format!("{}: {:?}", i, log).as_str());
+                });
+            });
+        }
+    }
+
+    error_logs
+}
+
+pub fn print_errors_if_any(submit_stats: &SubmitStats) {
+    submit_stats.results.iter().for_each(|result| {
+        if let Err(error) = result {
+            println!("{}", format_steward_error_log(error));
+        }
+    });
+}
+
+pub fn print_base58_tx(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ IX ------\n");
+
+        println!("{}\n", ix.program_id);
+
+        ix.accounts.iter().for_each(|account| {
+            let pubkey = format!("{}", account.pubkey);
+            let writable = if account.is_writable { "W" } else { "" };
+            let signer = if account.is_signer { "S" } else { "" };
+
+            println!("{:<44} {:>2} {:>1}", pubkey, writable, signer);
+        });
+
+        println!("\n");
+
+        let base58_string = bs58::encode(&ix.data).into_string();
+        println!("{}\n", base58_string);
+    });
 }

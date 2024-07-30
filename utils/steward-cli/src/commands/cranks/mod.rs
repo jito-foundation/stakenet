@@ -4,3 +4,4 @@ pub mod compute_score;
 pub mod epoch_maintenance;
 pub mod idle;
 pub mod rebalance;
+pub mod steward;

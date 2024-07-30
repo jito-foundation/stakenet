@@ -115,7 +115,7 @@ cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP reset-stat
 ## View Config
 
 ```bash
-cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP view-config --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-config --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
 ## View State
@@ -232,12 +232,6 @@ cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP crank-reba
 cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') crank-monkey --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --payer-keypair-path ../../credentials/stakenet_test.json --priority-fee 200000
 ```
 
-# Testing
-
-```rust
-debug_send_single_transaction(client, &Arc::new(authority), &configured_ix, Some(true)).await?;
-```
-
 # Deploy and Upgrade
 
 - upgrade solana cli to 1.18.16
@@ -275,6 +269,10 @@ MINIMUM_VOTING_EPOCHS=5
 ```
 
 # Testing
+
+```rust
+debug_send_single_transaction(client, &Arc::new(authority), &configured_ix, Some(true)).await?;
+```
 
 ```bash
 Vote Account: 6VSu1wCkeugWdSB3ZgCCFSAttu5XTuSWVRD1vJVPVQXq

@@ -1,13 +1,11 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{AccountDeserialize, Discriminator};
-use anyhow::Result;
 use jito_steward::{
     utils::{StakePool, ValidatorList},
     Config, StewardState, StewardStateAccount, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES,
     COMPUTE_SCORE, EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
 };
-use keeper_core::get_multiple_accounts_batched;
 use solana_client::{
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -21,6 +19,10 @@ use spl_stake_pool::{
     find_withdraw_authority_program_address,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
+
+use crate::models::errors::JitoTransactionError;
+
+use super::transactions::get_multiple_accounts_batched;
 
 pub struct AllStewardAccounts {
     pub config_account: Box<Config>,
@@ -47,7 +49,7 @@ pub async fn get_all_validator_accounts(
     client: &Arc<RpcClient>,
     all_vote_accounts: &[RpcVoteAccountInfo],
     validator_history_program_id: &Pubkey,
-) -> Result<Box<AllValidatorAccounts>> {
+) -> Result<Box<AllValidatorAccounts>, JitoTransactionError> {
     let accounts_to_fetch = all_vote_accounts.iter().map(|vote_account| {
         let vote_account =
             Pubkey::from_str(&vote_account.vote_pubkey).expect("Could not parse vote account");
@@ -106,7 +108,7 @@ pub async fn get_all_steward_validator_accounts(
     client: &Arc<RpcClient>,
     all_steward_accounts: &AllStewardAccounts,
     validator_history_program_id: &Pubkey,
-) -> Result<Box<AllValidatorAccounts>> {
+) -> Result<Box<AllValidatorAccounts>, JitoTransactionError> {
     let accounts_to_fetch = all_steward_accounts
         .validator_list_account
         .validators
@@ -169,7 +171,7 @@ pub async fn get_all_history_accounts(
     client: &Arc<RpcClient>,
     validator_list: &ValidatorList,
     validator_history_program_id: &Pubkey,
-) -> Result<HashMap<Pubkey, Option<ValidatorHistory>>> {
+) -> Result<HashMap<Pubkey, Option<ValidatorHistory>>, JitoTransactionError> {
     let all_vote_accounts = validator_list
         .validators
         .iter()
@@ -216,7 +218,7 @@ pub async fn get_all_steward_accounts(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<Box<AllStewardAccounts>> {
+) -> Result<Box<AllStewardAccounts>, JitoTransactionError> {
     let config_account = get_steward_config_account(client, steward_config).await?;
     let stake_pool_address = config_account.stake_pool;
 
@@ -249,12 +251,12 @@ pub async fn get_all_steward_accounts(
 pub async fn get_steward_config_account(
     client: &RpcClient,
     steward_config: &Pubkey,
-) -> Result<Box<Config>> {
+) -> Result<Box<Config>, JitoTransactionError> {
     let config_raw_account = client.get_account(steward_config).await?;
 
-    Ok(Box::new(Config::try_deserialize(
-        &mut config_raw_account.data.as_slice(),
-    )?))
+    Config::try_deserialize(&mut config_raw_account.data.as_slice())
+        .map(Box::new)
+        .map_err(|e| JitoTransactionError::Custom(format!("Failed to deserialize config: {}", e)))
 }
 
 pub fn get_steward_state_address(program_id: &Pubkey, steward_config: &Pubkey) -> Pubkey {
@@ -270,40 +272,48 @@ pub async fn get_steward_state_account_and_address(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<(Box<StewardStateAccount>, Pubkey)> {
+) -> Result<(Box<StewardStateAccount>, Pubkey), JitoTransactionError> {
     let steward_state = get_steward_state_address(program_id, steward_config);
 
     let state_raw_account = client.get_account(&steward_state).await?;
-    Ok((
-        Box::new(StewardStateAccount::try_deserialize(
-            &mut state_raw_account.data.as_slice(),
-        )?),
-        steward_state,
-    ))
+
+    StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
+        .map_err(|e| {
+            JitoTransactionError::Custom(format!("Failed to deserialize steward state: {}", e))
+        })
+        .map(|account| (Box::new(account), steward_state))
 }
 
 pub async fn get_steward_state_account(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<Box<StewardStateAccount>> {
+) -> Result<Box<StewardStateAccount>, JitoTransactionError> {
     let steward_state = get_steward_state_address(program_id, steward_config);
 
     let state_raw_account = client.get_account(&steward_state).await?;
-    Ok(Box::new(StewardStateAccount::try_deserialize(
-        &mut state_raw_account.data.as_slice(),
-    )?))
+
+    StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
+        .map_err(|e| {
+            JitoTransactionError::Custom(format!(
+                "Failed to deserialize steward state account: {}",
+                e
+            ))
+        })
+        .map(Box::new)
 }
 
 pub async fn get_stake_pool_account(
     client: &RpcClient,
     stake_pool: &Pubkey,
-) -> Result<Box<StakePool>> {
+) -> Result<Box<StakePool>, JitoTransactionError> {
     let stake_pool_account_raw = client.get_account(stake_pool).await?;
 
-    Ok(Box::new(StakePool::try_deserialize(
-        &mut stake_pool_account_raw.data.as_slice(),
-    )?))
+    StakePool::try_deserialize(&mut stake_pool_account_raw.data.as_slice())
+        .map_err(|e| {
+            JitoTransactionError::Custom(format!("Failed to deserialize stake pool account: {}", e))
+        })
+        .map(Box::new)
 }
 
 pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
@@ -316,7 +326,7 @@ pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
 pub async fn get_validator_history_accounts_with_retry(
     client: &RpcClient,
     program_id: Pubkey,
-) -> Result<Vec<ValidatorHistory>> {
+) -> Result<Vec<ValidatorHistory>, JitoTransactionError> {
     for _ in 0..4 {
         if let Ok(validator_histories) = get_validator_history_accounts(client, program_id).await {
             return Ok(validator_histories);
@@ -328,7 +338,7 @@ pub async fn get_validator_history_accounts_with_retry(
 pub async fn get_validator_history_accounts(
     client: &RpcClient,
     program_id: Pubkey,
-) -> Result<Vec<ValidatorHistory>> {
+) -> Result<Vec<ValidatorHistory>, JitoTransactionError> {
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
@@ -357,12 +367,17 @@ pub async fn get_validator_history_accounts(
 pub async fn get_validator_list_account(
     client: &RpcClient,
     validator_list: &Pubkey,
-) -> Result<Box<ValidatorList>> {
+) -> Result<Box<ValidatorList>, JitoTransactionError> {
     let validator_list_account_raw = client.get_account(validator_list).await?;
 
-    Ok(Box::new(ValidatorList::try_deserialize(
-        &mut validator_list_account_raw.data.as_slice(),
-    )?))
+    ValidatorList::try_deserialize(&mut validator_list_account_raw.data.as_slice())
+        .map_err(|e| {
+            JitoTransactionError::Custom(format!(
+                "Failed to deserialize validator list account: {}",
+                e
+            ))
+        })
+        .map(Box::new)
 }
 
 pub fn get_cluster_history_address(validator_history_program_id: &Pubkey) -> Pubkey {
