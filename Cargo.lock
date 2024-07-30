@@ -6105,6 +6105,7 @@ dependencies = [
  "clap 4.4.18",
  "futures",
  "jito-steward",
+ "jito-tip-distribution",
  "log",
  "solana-account-decoder",
  "solana-client",

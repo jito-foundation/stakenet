@@ -1,9 +1,10 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
-use stakenet_sdk::models::entries::{Address, UpdateInstruction};
-
-use crate::{derive_validator_history_address, derive_validator_history_config_address};
+use stakenet_sdk::{
+    models::entries::{Address, UpdateInstruction},
+    utils::accounts::{get_validator_history_address, get_validator_history_config_address},
+};
 
 #[derive(Clone)]
 pub struct ValidatorMevCommissionEntry {
@@ -24,13 +25,13 @@ impl ValidatorMevCommissionEntry {
         tip_distribution_program_id: &Pubkey,
         signer: &Pubkey,
     ) -> Self {
-        let validator_history_account = derive_validator_history_address(vote_account, program_id);
+        let validator_history_account = get_validator_history_address(vote_account, program_id);
         let (tip_distribution_account, _) = derive_tip_distribution_account_address(
             tip_distribution_program_id,
             vote_account,
             epoch,
         );
-        let config = derive_validator_history_config_address(program_id);
+        let config = get_validator_history_config_address(program_id);
 
         Self {
             vote_account: *vote_account,

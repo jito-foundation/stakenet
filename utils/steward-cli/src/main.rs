@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
         }
 
         // --- Cranks ---
-        Commands::CrankMonkey(args) => command_crank_steward(args, &client, program_id).await,
+        Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
         Commands::CrankEpochMaintenance(args) => {
             command_crank_epoch_maintenance(args, &client, program_id).await
         }

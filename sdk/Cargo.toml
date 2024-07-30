@@ -27,3 +27,4 @@ tokio = { version = "1.36.0", features = ["full"] }
 spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
 jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
+jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }

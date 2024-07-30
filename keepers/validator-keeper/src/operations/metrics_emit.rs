@@ -8,8 +8,8 @@ use log::*;
 use solana_metrics::datapoint_info;
 use spl_stake_pool::state::StakeStatus;
 
-use stakenet_sdk::utils::accounts::{
-    format_simple_state_string, format_state_string, state_to_state_code,
+use stakenet_sdk::utils::debug::{
+    format_simple_steward_state_string, format_steward_state_string, steward_state_to_state_code,
 };
 use validator_history::ValidatorHistoryEntry;
 
@@ -224,9 +224,9 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
     let scoring_unstake_total = steward_state.scoring_unstake_total;
     let validators_added = steward_state.validators_added;
     let next_cycle_epoch = steward_state.next_cycle_epoch;
-    let state_progress = format_state_string(steward_state);
-    let simple_state_progress = format_simple_state_string(steward_state);
-    let state_code = state_to_state_code(steward_state);
+    let state_progress = format_steward_state_string(steward_state);
+    let simple_state_progress = format_simple_steward_state_string(steward_state);
+    let state_code = steward_state_to_state_code(steward_state);
     let status_flags = steward_state.status_flags;
 
     let validator_list_account = &keeper_state

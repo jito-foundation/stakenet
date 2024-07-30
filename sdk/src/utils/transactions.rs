@@ -22,9 +22,30 @@ use tokio::time::sleep;
 
 use crate::models::constants::DEFAULT_COMPUTE_LIMIT;
 use crate::models::errors::{
-    JitoMultipleAccountsError, JitoTransactionExecutionError, JitoSendTransactionError,
+    JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError,
 };
 use crate::models::submit_stats::SubmitStats;
+
+use std::future::Future;
+
+pub async fn retry<F, Fut, T, E>(mut f: F, retries: usize) -> Result<T, E>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
+{
+    let mut attempts = 0;
+    loop {
+        match f().await {
+            Ok(result) => return Ok(result),
+            Err(e) => {
+                attempts += 1;
+                if attempts > retries {
+                    return Err(e);
+                }
+            }
+        }
+    }
+}
 
 pub async fn get_multiple_accounts_batched(
     accounts: &[Pubkey],

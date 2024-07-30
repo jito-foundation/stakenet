@@ -11,18 +11,18 @@ use solana_sdk::{
 use stakenet_sdk::utils::{
     accounts::{
         get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+        get_all_validator_history_accounts, get_cluster_history_address,
+        get_validator_history_address,
     },
+    instructions::get_create_validator_history_instructions,
     transactions::{
         get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
     },
+    utils::get_balance_with_retry,
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
-use crate::{
-    derive_cluster_history_address, derive_validator_history_address, get_balance_with_retry,
-    get_create_validator_history_instructions, get_validator_history_accounts_with_retry,
-    operations::keeper_operations::{KeeperCreates, KeeperOperations},
-};
+use crate::operations::keeper_operations::{KeeperCreates, KeeperOperations};
 
 use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 
@@ -182,7 +182,7 @@ async fn get_cluster_history(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
 ) -> Result<ClusterHistory, Box<dyn Error>> {
-    let cluster_history_address = derive_cluster_history_address(program_id);
+    let cluster_history_address = get_cluster_history_address(program_id);
     let cluster_history_account = client.get_account(&cluster_history_address).await?;
     let cluster_history =
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
@@ -194,8 +194,7 @@ async fn get_validator_history_map(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
 ) -> Result<HashMap<Pubkey, ValidatorHistory>, Box<dyn Error>> {
-    let validator_histories =
-        get_validator_history_accounts_with_retry(client, *program_id).await?;
+    let validator_histories = get_all_validator_history_accounts(client, *program_id).await?;
 
     let validator_history_map = HashMap::from_iter(
         validator_histories
@@ -295,7 +294,7 @@ async fn create_missing_validator_history_accounts(
 
     let all_history_addresses = &vote_accounts
         .iter()
-        .map(|vote_pubkey| derive_validator_history_address(vote_pubkey, program_id))
+        .map(|vote_pubkey| get_validator_history_address(vote_pubkey, program_id))
         .collect::<Vec<Pubkey>>();
 
     let history_accounts = get_multiple_accounts_batched(all_history_addresses, client).await?;

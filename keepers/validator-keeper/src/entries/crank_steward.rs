@@ -17,13 +17,15 @@ use spl_stake_pool::instruction::{
 };
 use spl_stake_pool::state::{StakeStatus, ValidatorStakeInfo};
 use spl_stake_pool::{find_withdraw_authority_program_address, MAX_VALIDATORS_TO_UPDATE};
+use stakenet_sdk::models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts};
 use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
 use stakenet_sdk::models::submit_stats::SubmitStats;
+
 use stakenet_sdk::utils::accounts::{
-    check_stake_accounts, get_cluster_history_address, get_stake_address,
-    get_steward_state_account, get_transient_stake_address, get_unprogressed_validators,
-    AllStewardAccounts, AllValidatorAccounts,
+    get_cluster_history_address, get_stake_address, get_steward_state_account,
+    get_transient_stake_address,
 };
+use stakenet_sdk::utils::utils::{check_stake_accounts, get_unprogressed_validators};
 use stakenet_sdk::utils::{
     accounts::get_validator_history_address,
     transactions::{

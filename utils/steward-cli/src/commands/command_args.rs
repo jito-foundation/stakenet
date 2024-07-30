@@ -221,7 +221,7 @@ pub enum Commands {
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
 
     // Cranks
-    CrankMonkey(CrankSteward),
+    CrankSteward(CrankSteward),
     CrankEpochMaintenance(CrankEpochMaintenance),
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
