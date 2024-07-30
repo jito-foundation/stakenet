@@ -4,11 +4,9 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::derive_cluster_history_address;
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -17,6 +15,10 @@ use solana_sdk::{
     instruction::Instruction,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
+};
+use stakenet_sdk::{
+    models::{errors::JitoTransactionExecutionError, submit_stats::SubmitStats},
+    utils::{accounts::get_cluster_history_address, transactions::submit_transactions},
 };
 use std::sync::Arc;
 
@@ -38,7 +40,7 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     update_cluster_info(client, keypair, program_id, priority_fee_in_microlamports).await
 }
 
@@ -92,7 +94,7 @@ pub fn get_update_cluster_info_instructions(
     keypair: &Pubkey,
     priority_fee_in_microlamports: u64,
 ) -> Vec<Instruction> {
-    let cluster_history_account = derive_cluster_history_address(program_id);
+    let cluster_history_account = get_cluster_history_address(program_id);
 
     let priority_fee_ix = compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
         priority_fee_in_microlamports,
@@ -124,7 +126,7 @@ pub async fn update_cluster_info(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let ixs = get_update_cluster_info_instructions(
         program_id,
         &keypair.pubkey(),

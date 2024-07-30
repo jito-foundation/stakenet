@@ -4,14 +4,13 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
+use crate::entries::crank_steward::crank_steward;
 use crate::state::keeper_state::{KeeperFlags, KeeperState};
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag};
-use keeper_core::SubmitStats;
 use solana_metrics::datapoint_error;
-use steward_cli::{
-    commands::monkey::crank::{crank_monkey, MonkeyCrankError},
-    utils::transactions::format_steward_error_log,
-};
+use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::format_steward_error_log;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
@@ -26,8 +25,8 @@ fn _should_run() -> bool {
 async fn _process(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, MonkeyCrankError> {
-    run_crank_monkey(keeper_config, keeper_state).await
+) -> Result<SubmitStats, JitoTransactionError> {
+    run_crank_steward(keeper_config, keeper_state).await
 }
 
 pub enum StewardErrorCodes {
@@ -58,14 +57,14 @@ pub async fn fire(
                 for message in stats.results.iter() {
                     if let Err(e) = message {
                         let error_code: i64 = match e {
-                            keeper_core::SendTransactionError::ExceededRetries => {
+                            JitoSendTransactionError::ExceededRetries => {
                                 StewardErrorCodes::ExceededRetries as i64
                             }
-                            keeper_core::SendTransactionError::TransactionError(_) => {
+                            JitoSendTransactionError::TransactionError(_) => {
                                 // Just returns a string, so we can't really do anything with it
                                 StewardErrorCodes::TransactionError as i64
                             }
-                            keeper_core::SendTransactionError::RpcSimulateTransactionResult(_) => {
+                            JitoSendTransactionError::RpcSimulateTransactionResult(_) => {
                                 let error_string = format_steward_error_log(e);
 
                                 let error_code = match error_string.as_str() {
@@ -124,11 +123,11 @@ pub async fn fire(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
-pub async fn run_crank_monkey(
+pub async fn run_crank_steward(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, MonkeyCrankError> {
-    crank_monkey(
+) -> Result<SubmitStats, JitoTransactionError> {
+    crank_steward(
         &keeper_config.client,
         &keeper_config.keypair,
         &keeper_config.steward_program_id,

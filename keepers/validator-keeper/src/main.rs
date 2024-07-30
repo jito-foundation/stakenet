@@ -317,6 +317,7 @@ async fn main() {
         steward_interval: args.steward_interval,
         run_flags,
         full_startup: args.full_startup,
+        no_pack: args.no_pack,
     };
 
     run_keeper(config).await;

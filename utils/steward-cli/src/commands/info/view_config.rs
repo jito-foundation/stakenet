@@ -6,7 +6,8 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
 
-use crate::{commands::command_args::ViewConfig, utils::accounts::get_all_steward_accounts};
+use crate::commands::command_args::ViewConfig;
+use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
 pub async fn command_view_config(
     args: ViewConfig,

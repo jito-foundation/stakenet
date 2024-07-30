@@ -2,13 +2,12 @@ use std::str::FromStr;
 
 use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
-use keeper_core::Address;
-use keeper_core::UpdateInstruction;
+
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
-
-use crate::derive_validator_history_address;
-use crate::derive_validator_history_config_address;
+use stakenet_sdk::models::entries::{Address, UpdateInstruction};
+use stakenet_sdk::utils::accounts::get_validator_history_address;
+use stakenet_sdk::utils::accounts::get_validator_history_config_address;
 
 pub struct StakeHistoryEntry {
     pub stake: u64,
@@ -33,8 +32,8 @@ impl StakeHistoryEntry {
     ) -> StakeHistoryEntry {
         let vote_pubkey =
             Pubkey::from_str(&vote_account.vote_pubkey).expect("Invalid vote account pubkey");
-        let address = derive_validator_history_address(&vote_pubkey, program_id);
-        let config = derive_validator_history_config_address(program_id);
+        let address = get_validator_history_address(&vote_pubkey, program_id);
+        let config = get_validator_history_config_address(program_id);
 
         StakeHistoryEntry {
             stake: vote_account.activated_stake,

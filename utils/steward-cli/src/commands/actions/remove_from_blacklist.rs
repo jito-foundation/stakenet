@@ -9,10 +9,8 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::RemoveFromBlacklist,
-    utils::transactions::{configure_instruction, print_base58_tx},
-};
+use crate::commands::command_args::RemoveFromBlacklist;
+use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
 pub async fn command_remove_from_blacklist(
     args: RemoveFromBlacklist,

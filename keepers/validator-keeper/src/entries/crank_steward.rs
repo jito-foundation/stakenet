@@ -4,55 +4,36 @@ use std::sync::Arc;
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use jito_steward::utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
-use keeper_core::{
-    get_vote_accounts_with_retry, MultipleAccountsError, SendTransactionError, SubmitStats,
-    TransactionExecutionError,
-};
-use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
+
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
 use solana_sdk::account::Account;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::vote::state::VoteState;
-use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signature::Keypair, stake, system_program,
-};
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
 use spl_stake_pool::instruction::{
     cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
 };
 use spl_stake_pool::state::{StakeStatus, ValidatorStakeInfo};
 use spl_stake_pool::{find_withdraw_authority_program_address, MAX_VALIDATORS_TO_UPDATE};
-use thiserror::Error as ThisError;
-use validator_history::ValidatorHistory;
+use stakenet_sdk::models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts};
+use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
+use stakenet_sdk::models::submit_stats::SubmitStats;
 
-use crate::utils::accounts::{
-    check_stake_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
-    get_unprogressed_validators, AllValidatorAccounts,
+use stakenet_sdk::utils::accounts::{
+    get_cluster_history_address, get_stake_address, get_steward_state_account,
+    get_transient_stake_address,
 };
-use crate::utils::transactions::print_errors_if_any;
-use crate::{
-    commands::command_args::CrankMonkey,
-    utils::{
-        accounts::{
-            get_all_steward_accounts, get_cluster_history_address, get_stake_address,
-            get_steward_state_account, get_transient_stake_address, get_validator_history_address,
-            AllStewardAccounts,
-        },
-        transactions::{configure_instruction, package_instructions, submit_packaged_transactions},
+use stakenet_sdk::utils::utils::{check_stake_accounts, get_unprogressed_validators};
+use stakenet_sdk::utils::{
+    accounts::get_validator_history_address,
+    transactions::{
+        configure_instruction, package_instructions, print_errors_if_any,
+        submit_packaged_transactions,
     },
 };
-
-#[derive(ThisError, Debug)]
-pub enum MonkeyCrankError {
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
-    #[error(transparent)]
-    TransactionExecutionError(#[from] TransactionExecutionError),
-    #[error(transparent)]
-    MultipleAccountsError(#[from] MultipleAccountsError),
-    #[error("Custom: {0}")]
-    Custom(String),
-}
+use validator_history::ValidatorHistory;
 
 pub fn _get_update_stake_pool_ixs(
     program_id: &Pubkey,
@@ -198,7 +179,7 @@ async fn _update_pool(
     all_steward_accounts: &AllStewardAccounts,
     all_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let mut stats = SubmitStats::default();
 
     let (update_ixs, deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
@@ -249,7 +230,7 @@ async fn _handle_instant_removal_validators(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators;
     let mut validators_to_remove = all_steward_accounts
         .state_account
@@ -262,7 +243,7 @@ async fn _handle_instant_removal_validators(
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
-                MonkeyCrankError::Custom(format!(
+                JitoTransactionError::Custom(format!(
                     "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
                     i, num_validators, e
                 ))
@@ -327,7 +308,7 @@ async fn _handle_adding_validators(
     all_steward_validator_accounts: &AllValidatorAccounts,
     all_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let mut keys_to_add: Vec<&Pubkey> = vec![];
     all_validator_accounts
         .all_history_vote_account_map
@@ -490,7 +471,7 @@ async fn _handle_delinquent_validators(
     all_steward_accounts: &AllStewardAccounts,
     all_steward_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let checks = check_stake_accounts(all_steward_validator_accounts, epoch);
 
     let bad_vote_accounts = checks
@@ -589,7 +570,7 @@ async fn _handle_epoch_maintenance(
     epoch: u64,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let mut current_epoch = epoch;
     let mut state_epoch = all_steward_accounts.state_account.state.current_epoch;
     let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators;
@@ -604,7 +585,7 @@ async fn _handle_epoch_maintenance(
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
-                MonkeyCrankError::Custom(format!(
+                JitoTransactionError::Custom(format!(
                     "Error fetching bitmask index for removed validator: {}/{} - {}",
                     i, num_validators, e
                 ))
@@ -673,7 +654,7 @@ async fn _handle_compute_score(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_program_id = validator_history::id();
     let cluster_history: Pubkey = get_cluster_history_address(&validator_history_program_id);
 
@@ -715,7 +696,7 @@ async fn _handle_compute_delegations(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let ix = Instruction {
         program_id: *program_id,
         accounts: jito_steward::accounts::ComputeDelegations {
@@ -741,7 +722,7 @@ async fn _handle_idle(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let ix = Instruction {
         program_id: *program_id,
         accounts: jito_steward::accounts::Idle {
@@ -767,7 +748,7 @@ async fn _handle_compute_instant_unstake(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_program_id = validator_history::id();
     let cluster_history: Pubkey = get_cluster_history_address(&validator_history_program_id);
 
@@ -809,7 +790,7 @@ async fn _handle_rebalance(
     program_id: &Pubkey,
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_program_id = validator_history::id();
 
     let validators_to_run =
@@ -873,7 +854,7 @@ async fn _handle_rebalance(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn crank_monkey(
+pub async fn crank_steward(
     client: &Arc<RpcClient>,
     payer: &Arc<Keypair>,
     program_id: &Pubkey,
@@ -882,7 +863,7 @@ pub async fn crank_monkey(
     all_steward_validator_accounts: &AllValidatorAccounts,
     all_active_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
-) -> Result<SubmitStats, MonkeyCrankError> {
+) -> Result<SubmitStats, JitoTransactionError> {
     let mut return_stats = SubmitStats::default();
     let should_run_epoch_maintenance =
         all_steward_accounts.state_account.state.current_epoch != epoch;
@@ -1060,15 +1041,15 @@ pub async fn crank_monkey(
             if let Err(error) = result {
                 // Access and print the error
                 match error {
-                    SendTransactionError::ExceededRetries => {
+                    JitoSendTransactionError::ExceededRetries => {
                         // Continue
                         println!("Exceeded Retries: {:?}", error);
                     }
-                    SendTransactionError::TransactionError(e) => {
+                    JitoSendTransactionError::TransactionError(e) => {
                         // Flag
                         println!("Transaction: {:?}", e);
                     }
-                    SendTransactionError::RpcSimulateTransactionResult(e) => {
+                    JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
                         // Recover
                         println!("\n\nERROR: ");
                         e.logs.iter().for_each(|log| {
@@ -1084,55 +1065,3 @@ pub async fn crank_monkey(
 
     Ok(return_stats)
 }
-
-// Only runs one set of commands per "crank"
-pub async fn command_crank_monkey(
-    args: CrankMonkey,
-    client: &Arc<RpcClient>,
-    program_id: Pubkey,
-) -> Result<(), anyhow::Error> {
-    // ----------- Collect Accounts -------------
-    let steward_config = args.permissionless_parameters.steward_config;
-    let payer = Arc::new(
-        read_keypair_file(args.permissionless_parameters.payer_keypair_path)
-            .expect("Failed reading keypair file ( Payer )"),
-    );
-
-    let priority_fee = args
-        .permissionless_parameters
-        .transaction_parameters
-        .priority_fee;
-
-    let all_steward_accounts =
-        get_all_steward_accounts(client, &program_id, &steward_config).await?;
-
-    let all_steward_validator_accounts =
-        get_all_steward_validator_accounts(client, &all_steward_accounts, &validator_history::id())
-            .await?;
-
-    let all_active_vote_accounts = get_vote_accounts_with_retry(client, 5, None).await?;
-
-    let all_active_validator_accounts =
-        get_all_validator_accounts(client, &all_active_vote_accounts, &validator_history::id())
-            .await?;
-
-    let epoch = client.get_epoch_info().await?.epoch;
-
-    let _ = crank_monkey(
-        client,
-        &payer,
-        &program_id,
-        epoch,
-        &all_steward_accounts,
-        &all_steward_validator_accounts,
-        &all_active_validator_accounts,
-        priority_fee,
-    )
-    .await?;
-
-    Ok(())
-}
-
-// Notes on handling errors
-// Try lowering the number of instructions per transaction
-//

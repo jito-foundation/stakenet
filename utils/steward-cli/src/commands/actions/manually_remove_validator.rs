@@ -7,17 +7,14 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 
+use crate::commands::command_args::ManuallyRemoveValidator;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program, sysvar,
     transaction::Transaction,
 };
-
-use crate::{
-    commands::command_args::ManuallyRemoveValidator,
-    utils::{
-        accounts::get_all_steward_accounts,
-        transactions::{configure_instruction, print_base58_tx},
-    },
+use stakenet_sdk::utils::{
+    accounts::get_all_steward_accounts,
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_manually_remove_validator(

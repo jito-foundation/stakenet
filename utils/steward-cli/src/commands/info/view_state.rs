@@ -9,12 +9,11 @@ use spl_stake_pool::{
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 
-use crate::{
-    commands::command_args::ViewState,
-    utils::accounts::{
-        format_simple_state_string, format_state_string, get_all_steward_accounts,
-        get_validator_history_address,
-    },
+use crate::commands::command_args::ViewState;
+
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    debug::{format_simple_steward_state_string, format_steward_state_string},
 };
 
 pub async fn command_view_state(
@@ -126,10 +125,7 @@ fn _print_verbose_state(
             u64::from(validator.active_stake_lamports)
         );
         formatted_string += &format!("Index: {:?}\n", index);
-        // formatted_string += &format!(
-        //     "Is Blacklisted: {:?}\n",
-        //     config_account.validator_history_blacklist.get(index)
-        // );
+
         formatted_string += &format!(
             "Marked for removal: {:?}\n",
             steward_state_account.state.validators_to_remove.get(index)
@@ -358,10 +354,13 @@ fn _print_default_state(
     formatted_string += "\n";
     formatted_string += &format!("Non Zero Scores: {}\n", non_zero_score_count);
     formatted_string += "\n";
-    formatted_string += &format!("State: {}\n", format_state_string(&state_account.state));
     formatted_string += &format!(
         "State: {}\n",
-        format_simple_state_string(&state_account.state)
+        format_steward_state_string(&state_account.state)
+    );
+    formatted_string += &format!(
+        "State: {}\n",
+        format_simple_steward_state_string(&state_account.state)
     );
     formatted_string += "\n";
 

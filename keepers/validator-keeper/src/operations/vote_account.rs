@@ -5,11 +5,9 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 
 use crate::state::keeper_state::{KeeperFlag, KeeperFlags, KeeperState};
-use crate::KeeperError;
 use crate::{
     entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
 };
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -17,6 +15,10 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
@@ -40,13 +42,15 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     update_vote_accounts(
         client,
         keypair,
         program_id,
         priority_fee_in_microlamports,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -79,6 +83,7 @@ pub async fn fire(
             program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -117,7 +122,8 @@ pub async fn update_vote_accounts(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_map = &keeper_state.validator_history_map;
     let epoch_info = &keeper_state.epoch_info;
 
@@ -152,6 +158,7 @@ pub async fn update_vote_accounts(
         keypair,
         priority_fee_in_microlamports,
         Some(300_000),
+        no_pack,
     )
     .await;
 

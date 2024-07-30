@@ -7,7 +7,6 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use bytemuck::{bytes_of, Pod, Zeroable};
-use keeper_core::{submit_transactions, SubmitStats};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
@@ -23,6 +22,8 @@ use solana_sdk::{
     signature::{Keypair, Signer},
 };
 use solana_streamer::socket::SocketAddrSpace;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_transactions;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLockReadGuard;

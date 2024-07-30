@@ -8,11 +8,9 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
-use crate::{
-    commands::command_args::AddToBlacklist,
-    utils::transactions::{configure_instruction, print_base58_tx},
-};
+use crate::commands::command_args::AddToBlacklist;
 
 pub async fn command_add_to_blacklist(
     args: AddToBlacklist,

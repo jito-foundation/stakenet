@@ -13,10 +13,8 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::InitSteward,
-    utils::transactions::{configure_instruction, print_base58_tx},
-};
+use crate::commands::command_args::InitSteward;
+use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
 pub async fn command_init_steward(
     args: InitSteward,

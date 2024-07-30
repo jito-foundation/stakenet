@@ -10,12 +10,10 @@ use validator_history::id as validator_history_id;
 
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
 
-use crate::{
-    commands::command_args::CrankRebalance,
-    utils::{
-        accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
-    },
+use crate::commands::command_args::CrankRebalance;
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
 
 pub async fn command_crank_rebalance(

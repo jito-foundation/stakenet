@@ -21,7 +21,7 @@ use commands::{
         compute_instant_unstake::command_crank_compute_instant_unstake,
         compute_score::command_crank_compute_score,
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
-        rebalance::command_crank_rebalance,
+        rebalance::command_crank_rebalance, steward::command_crank_steward,
     },
     info::{
         view_config::command_view_config,
@@ -29,14 +29,12 @@ use commands::{
         view_state::command_view_state,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
-    monkey::crank::command_crank_monkey,
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use std::{sync::Arc, time::Duration};
 
 pub mod commands;
-pub mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -95,7 +93,7 @@ async fn main() -> Result<()> {
         }
 
         // --- Cranks ---
-        Commands::CrankMonkey(args) => command_crank_monkey(args, &client, program_id).await,
+        Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
         Commands::CrankEpochMaintenance(args) => {
             command_crank_epoch_maintenance(args, &client, program_id).await
         }

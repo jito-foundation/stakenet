@@ -7,13 +7,13 @@ use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
 };
-use steward_cli::utils::accounts::{AllStewardAccounts, AllValidatorAccounts};
+use stakenet_sdk::{
+    models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
+    utils::accounts::get_validator_history_address,
+};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-use crate::{
-    derive_validator_history_address,
-    operations::keeper_operations::{KeeperCreates, KeeperOperations},
-};
+use crate::operations::keeper_operations::{KeeperCreates, KeeperOperations};
 
 pub struct StewardProgressFlags {
     pub flags: u8,
@@ -188,7 +188,7 @@ impl KeeperState {
     pub fn get_history_pubkeys(&self, program_id: &Pubkey) -> HashSet<Pubkey> {
         self.all_history_vote_account_map
             .keys()
-            .map(|vote_account| derive_validator_history_address(vote_account, program_id))
+            .map(|vote_account| get_validator_history_address(vote_account, program_id))
             .collect()
     }
 

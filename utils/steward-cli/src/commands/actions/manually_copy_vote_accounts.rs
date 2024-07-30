@@ -6,16 +6,12 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
+use crate::commands::command_args::ManuallyCopyVoteAccount;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
-
-use crate::{
-    commands::command_args::ManuallyCopyVoteAccount,
-    utils::{
-        accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::{
-            configure_instruction, print_base58_tx, print_errors_if_any,
-            submit_packaged_transactions,
-        },
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    transactions::{
+        configure_instruction, print_base58_tx, print_errors_if_any, submit_packaged_transactions,
     },
 };
 
