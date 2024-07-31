@@ -1,10 +1,10 @@
 
 # Accounts
 
-**Authority** 
+**Authority**
 `aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8`
 
-**Steward Config**   
+**Steward Config**
 `6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5`
 
 **Stake Pool**
@@ -19,6 +19,7 @@
 # Initial Commands
 
 ## Create Config
+
 ```bash
 cargo run init-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
@@ -45,6 +46,7 @@ cargo run init-config \
 ```
 
 ## Update Config
+
 ```bash
 cargo run update-config \
   --authority-keypair-path ../../credentials/stakenet_test.json \
@@ -54,71 +56,85 @@ cargo run update-config \
 ```
 
 ## Create State
+
 ```bash
 cargo run init-state --authority-keypair-path ../../credentials/stakenet_test.json --stake-pool 3DuPtyTAKrxKfHkSPZ5fqCayMcGru1BarAKKTfGDeo2j --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View Config
+
 ```bash
 cargo run view-config --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View State
+
 ```bash
 cargo run view-state --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View State Per Validator
+
 ```bash
 cargo run view-state-per-validator --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## View Next Index To Remove
+
 ```bash
 cargo run view-next-index-to-remove --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5
 ```
 
 ## Auto Remove Validator
+
 ```bash
 cargo run auto-remove-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --validator-index-to-remove 1397
 ```
 
 ## Auto Add Validator
+
 ```bash
 cargo run auto-add-validator-from-pool --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json --vote-account 4m64H5TbwAGtZVnxaGAVoTSwjZGV8BCLKRPr8agKQv4Z 
 ```
 
 ## Remove Bad Validators
+
 ```bash
 cargo run remove-bad-validators --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Epoch Maintenance
+
 ```bash
 cargo run crank-epoch-maintenance --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Score
+
 ```bash
 cargo run crank-compute-score --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Delegations
+
 ```bash
 cargo run crank-compute-delegations --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Idle
+
 ```bash
 cargo run crank-idle --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Compute Instant Unstake
+
 ```bash
 cargo run crank-compute-instant-unstake --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```
 
 ## Crank Rebalance
+
 ```bash
 cargo run crank-rebalance --steward-config 6auT7Q91SSgAoYLAnu449DK1MK9skDmtiLmtkCECP1b5 --payer-keypair-path ../../credentials/stakenet_test.json
 ```

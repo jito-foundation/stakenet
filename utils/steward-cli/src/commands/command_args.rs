@@ -197,6 +197,7 @@ pub enum Commands {
 
     InitState(InitState),
     ResetState(ResetState),
+    Surgery(Surgery),
 
     RemoveBadValidators(RemoveBadValidators),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
@@ -287,6 +288,25 @@ pub struct InitState {
 pub struct ResetState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Mark the correct validator for removal")]
+pub struct Surgery {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[arg(long)]
+    pub mark_for_removal: bool,
+
+    #[arg(long)]
+    pub immediate: bool,
+
+    #[arg(long)]
+    pub validator_list_index: usize,
+
+    #[arg(long, default_value = "false")]
+    pub submit_ix: bool,
 }
 
 #[derive(Parser)]
