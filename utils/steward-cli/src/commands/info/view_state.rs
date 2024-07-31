@@ -29,34 +29,34 @@ pub async fn command_view_state(
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     if args.verbose {
-        let vote_accounts: Vec<Pubkey> = all_steward_accounts
-            .validator_list_account
-            .validators
-            .iter()
-            .map(|validator| validator.vote_account_address)
-            .collect();
+        // let vote_accounts: Vec<Pubkey> = all_steward_accounts
+        //     .validator_list_account
+        //     .validators
+        //     .iter()
+        //     .map(|validator| validator.vote_account_address)
+        //     .collect();
 
-        let history_accounts_to_fetch: Vec<Pubkey> = vote_accounts
-            .iter()
-            .map(|vote_account| {
-                get_validator_history_address(vote_account, &validator_history::id())
-            })
-            .collect();
+        // let history_accounts_to_fetch: Vec<Pubkey> = vote_accounts
+        //     .iter()
+        //     .map(|vote_account| {
+        //         get_validator_history_address(vote_account, &validator_history::id())
+        //     })
+        //     .collect();
 
-        let raw_history_accounts = client
-            .get_multiple_accounts(&history_accounts_to_fetch)
-            .await?;
+        // let raw_history_accounts = client
+        //     .get_multiple_accounts(&history_accounts_to_fetch)
+        //     .await?;
 
-        let all_history_map: HashMap<Pubkey, Option<Account>> = vote_accounts
-            .into_iter()
-            .zip(raw_history_accounts)
-            .collect();
+        // let all_history_map: HashMap<Pubkey, Option<Account>> = vote_accounts
+        //     .into_iter()
+        //     .zip(raw_history_accounts)
+        //     .collect();
 
         _print_verbose_state(
             &all_steward_accounts.state_account,
             &all_steward_accounts.config_account,
             &all_steward_accounts.validator_list_account,
-            &all_history_map,
+            // &all_history_map,
         );
     } else {
         _print_default_state(
@@ -75,19 +75,19 @@ fn _print_verbose_state(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
     validator_list_account: &ValidatorList,
-    validator_histories: &HashMap<Pubkey, Option<Account>>,
+    // validator_histories: &HashMap<Pubkey, Option<Account>>,
 ) {
     let mut formatted_string;
 
     let mut top_scores: Vec<(Pubkey, u32)> = vec![];
 
     for (index, validator) in validator_list_account.validators.iter().enumerate() {
-        let history_info = validator_histories
-            .get(&validator.vote_account_address)
-            .and_then(|account| account.as_ref())
-            .and_then(|account| {
-                ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
-            });
+        // let history_info = validator_histories
+        //     .get(&validator.vote_account_address)
+        //     .and_then(|account| account.as_ref())
+        //     .and_then(|account| {
+        //         ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+        //     });
 
         let vote_account = validator.vote_account_address;
         let (stake_address, _) = find_stake_program_address(
@@ -145,22 +145,22 @@ fn _print_verbose_state(
         formatted_string += &format!("Score Index: {:?}\n", score_index);
         formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
 
-        if let Some(history_info) = history_info {
-            formatted_string += &format!(
-                "\nValidator History Index: {:?}\n",
-                format!("{:?}", history_info.index)
-            );
+        // if let Some(history_info) = history_info {
+        //     formatted_string += &format!(
+        //         "\nValidator History Index: {:?}\n",
+        //         format!("{:?}", history_info.index)
+        //     );
 
-            formatted_string += &format!(
-                "Is blacklisted: {:?}\n",
-                format!(
-                    "{:?}",
-                    config_account
-                        .validator_history_blacklist
-                        .get_unsafe(history_info.index as usize)
-                )
-            );
-        }
+        //     formatted_string += &format!(
+        //         "Is blacklisted: {:?}\n",
+        //         format!(
+        //             "{:?}",
+        //             config_account
+        //                 .validator_history_blacklist
+        //                 .get_unsafe(history_info.index as usize)
+        //         )
+        //     );
+        // }
 
         formatted_string += "\n";
         formatted_string += &format!(
