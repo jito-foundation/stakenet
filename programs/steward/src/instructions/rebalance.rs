@@ -10,7 +10,7 @@ use anchor_lang::{
     },
 };
 use borsh::BorshDeserialize;
-use spl_pod::solana_program::stake::state::StakeStateV2;
+use spl_pod::solana_program::{borsh1::try_from_slice_unchecked, stake::state::StakeStateV2};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
     state::ValidatorListHeader,
@@ -179,6 +179,13 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
         transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
 
+        let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
+        let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+        let stake_account_active_lamports = match stake_state {
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
+            _ => return Err(StewardError::StakeStateIsNotStake.into()),
+        };
+
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 
@@ -196,6 +203,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 &validator_list,
                 stake_pool_lamports_with_fixed_cost,
                 reserve_lamports_with_rent,
+                stake_account_active_lamports,
                 minimum_delegation,
                 stake_rent,
                 &config.parameters,
