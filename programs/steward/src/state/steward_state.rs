@@ -825,6 +825,7 @@ impl StewardState {
         validator_list: &BigVec<'_>,
         stake_pool_lamports: u64,
         reserve_lamports: u64,
+        stake_account_current_lamports: u64,
         minimum_delegation: u64,
         stake_rent: u64,
         parameters: &Parameters,
@@ -885,10 +886,11 @@ impl StewardState {
             let target_lamports =
                 get_target_lamports(&self.delegations[index], stake_pool_lamports)?;
 
-            let (mut current_lamports, some_transient_lamports) =
+            let (_, some_transient_lamports) =
                 stake_lamports_at_validator_list_index(validator_list, index)?;
 
-            current_lamports = current_lamports.saturating_sub(base_lamport_balance);
+            let current_lamports =
+                stake_account_current_lamports.saturating_sub(minimum_delegation);
 
             if !some_transient_lamports {
                 /* This field is used to determine the amount of stake deposits this validator has gotten which push it over the target.
