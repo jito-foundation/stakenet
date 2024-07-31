@@ -182,7 +182,7 @@ async fn _update_pool(
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut stats = SubmitStats::default();
 
-    let (update_ixs, deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
+    let (update_ixs, _deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
         &spl_stake_pool::ID,
         &all_steward_accounts.stake_pool_account,
         &all_steward_accounts.validator_list_account,
@@ -200,18 +200,19 @@ async fn _update_pool(
 
     stats.combine(&update_stats);
 
-    println!("Deactivating Delinquent");
-    let update_txs_to_run = package_instructions(
-        &deactivate_delinquent_ixs,
-        1,
-        priority_fee,
-        Some(1_400_000),
-        None,
-    );
-    let update_stats =
-        submit_packaged_transactions(client, update_txs_to_run, payer, Some(50), None).await?;
+    //TODO fix
+    // println!("Deactivating Delinquent");
+    // let deactivate_txs_to_run = package_instructions(
+    //     &deactivate_delinquent_ixs,
+    //     1,
+    //     priority_fee,
+    //     Some(1_400_000),
+    //     None,
+    // );
+    // let update_stats =
+    //     submit_packaged_transactions(client, deactivate_txs_to_run, payer, Some(50), None).await?;
 
-    stats.combine(&update_stats);
+    // stats.combine(&update_stats);
 
     println!("Cleaning Pool");
     let cleanup_txs_to_run =

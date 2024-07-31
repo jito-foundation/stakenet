@@ -25,7 +25,7 @@ impl KeeperCreates {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum KeeperOperations {
     PreCreateUpdate,
     CreateMissingAccounts,
@@ -41,15 +41,15 @@ pub enum KeeperOperations {
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
-    run_flags | (flag as u32)
+    run_flags | (0x01 << flag as u32)
 }
 
 pub fn unset_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
-    run_flags & !(flag as u32)
+    run_flags & !(0x01 << flag as u32)
 }
 
 pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
-    run_flags & (flag as u32) == (flag as u32)
+    run_flags & (0x01 << flag as u32) == (0x01 << flag as u32)
 }
 
 impl KeeperOperations {

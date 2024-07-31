@@ -20,6 +20,7 @@ pub struct KeeperConfig {
     pub run_flags: u32,
     pub full_startup: bool,
     pub no_pack: bool,
+    pub cool_down_range: u8,
 }
 
 #[derive(Parser, Debug)]
@@ -128,7 +129,11 @@ pub struct Args {
     #[arg(long, env, default_value = "true")]
     pub full_startup: bool,
 
-    /// Don't smart pack instructions - it will be faster, but more expensive
+    /// DEBUGGING Don't smart pack instructions - it will be faster, but more expensive
     #[arg(long, env, default_value = "false")]
     pub no_pack: bool,
+
+    /// DEBUGGING Changes the random cool down range ( minutes )
+    #[arg(long, env, default_value = "20")]
+    pub cool_down_range: u8,
 }

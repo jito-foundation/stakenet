@@ -4,6 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use clap::Parser;
+use dotenv::dotenv;
 use log::*;
 use rand::Rng;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -78,9 +79,9 @@ async fn sleep_and_tick(tick: &mut u64) {
 }
 
 /// To reduce transaction collisions, we sleep a random amount after any emit
-async fn random_cooldown() {
+async fn random_cooldown(range: u8) {
     let mut rng = rand::thread_rng();
-    let sleep_duration = rng.gen_range(0..=60 * 20);
+    let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
     info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
     sleep(Duration::from_secs(sleep_duration)).await;
@@ -221,7 +222,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown().await;
+                random_cooldown(keeper_config.cool_down_range).await;
             }
         }
 
@@ -233,7 +234,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown().await;
+                random_cooldown(keeper_config.cool_down_range).await;
             }
         }
 
@@ -271,6 +272,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     env_logger::init();
     let args = Args::parse();
 
@@ -318,6 +320,7 @@ async fn main() {
         run_flags,
         full_startup: args.full_startup,
         no_pack: args.no_pack,
+        cool_down_range: args.cool_down_range,
     };
 
     run_keeper(config).await;
