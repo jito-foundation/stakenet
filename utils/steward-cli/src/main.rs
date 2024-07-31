@@ -5,7 +5,7 @@ use commands::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
-        update_config::command_update_config,
+        surgery::command_surgery, update_config::command_update_config,
     },
     command_args::{Args, Commands},
     cranks::{
@@ -42,15 +42,16 @@ async fn main() -> Result<()> {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
-        Commands::ViewNextIndexToRemove(args) => {
-            command_view_next_index_to_remove(args, &client, program_id).await
-        }
+        // Commands::ViewNextIndexToRemove(args) => {
+        //     command_view_next_index_to_remove(args, &client, program_id).await
+        // }
 
         // --- Actions ---
         Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
-        Commands::InitState(args) => command_init_state(args, &client, program_id).await,
-        Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        // Commands::InitState(args) => command_init_state(args, &client, program_id).await,
+        // Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        Commands::Surgery(args) => command_surgery(args, &client, program_id).await,
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
         }

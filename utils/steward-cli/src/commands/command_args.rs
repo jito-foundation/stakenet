@@ -189,14 +189,15 @@ pub enum Commands {
     // Views
     ViewState(ViewState),
     ViewConfig(ViewConfig),
-    ViewNextIndexToRemove(ViewNextIndexToRemove),
+    // ViewNextIndexToRemove(ViewNextIndexToRemove),
 
     // Actions
     InitConfig(InitConfig),
     UpdateConfig(UpdateConfig),
 
-    InitState(InitState),
-    ResetState(ResetState),
+    // InitState(InitState),
+    // ResetState(ResetState),
+    Surgery(Surgery),
 
     RemoveBadValidators(RemoveBadValidators),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
@@ -287,6 +288,17 @@ pub struct InitState {
 pub struct ResetState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Mark the correct validator for removal")]
+pub struct Surgery {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, default_value = "false")]
+    pub submit_ix: bool,
 }
 
 #[derive(Parser)]
