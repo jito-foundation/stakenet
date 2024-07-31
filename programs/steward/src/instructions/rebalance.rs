@@ -180,7 +180,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
         transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
 
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
-        let stake_state = try_from_slice_unchecked::<StakeStateV2>(&stake_account_data)?;
+        let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
         let stake_account_active_lamports = match stake_state {
             StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
             _ => return Err(StewardError::StakeStateIsNotStake.into()),
