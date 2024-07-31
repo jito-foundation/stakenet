@@ -1,5 +1,6 @@
 #![allow(ambiguous_glob_reexports)]
 pub mod add_validator_to_blacklist;
+pub mod admin_mark_for_removal;
 pub mod auto_add_validator_to_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_steward_accounts;
@@ -21,6 +22,7 @@ pub mod spl_passthrough;
 pub mod update_parameters;
 
 pub use add_validator_to_blacklist::*;
+pub use admin_mark_for_removal::*;
 pub use auto_add_validator_to_pool::*;
 pub use auto_remove_validator_from_pool::*;
 pub use close_steward_accounts::*;
