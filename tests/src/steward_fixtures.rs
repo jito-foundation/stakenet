@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, rc::Rc, str::FromStr, vec};
 
 use crate::spl_stake_pool_cli;
@@ -14,8 +15,9 @@ use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     utils::StakePool,
-    Config, Delegation, Parameters, Staker, StewardState, StewardStateAccount, StewardStateEnum,
-    UpdateParametersArgs,
+    utils::ValidatorList,
+    Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
+    StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -24,8 +26,8 @@ use solana_sdk::{
     stake::state::StakeStateV2, transaction::Transaction,
 };
 use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address,
-    state::{Fee, StakeStatus, ValidatorList, ValidatorStakeInfo},
+    find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
+    state::{Fee, StakeStatus, ValidatorList as SPLValidatorList, ValidatorStakeInfo},
 };
 use validator_history::{
     self, constants::MAX_ALLOC_BYTES, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
@@ -64,7 +66,6 @@ impl Default for StakePoolMetadata {
 pub struct TestFixture {
     pub ctx: Rc<RefCell<ProgramTestContext>>,
     pub stake_pool_meta: StakePoolMetadata,
-    pub staker: Pubkey,
     pub steward_config: Keypair,
     pub steward_state: Pubkey,
     pub cluster_history_account: Pubkey,
@@ -103,11 +104,6 @@ impl TestFixture {
 
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
-        let staker = Pubkey::find_program_address(
-            &[Staker::SEED, steward_config.pubkey().as_ref()],
-            &jito_steward::id(),
-        )
-        .0;
         let steward_state = Pubkey::find_program_address(
             &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
@@ -139,7 +135,6 @@ impl TestFixture {
         Self {
             ctx,
             stake_pool_meta,
-            staker,
             steward_state,
             steward_config,
             validator_history_config,
@@ -176,6 +171,30 @@ impl TestFixture {
         };
 
         account
+    }
+
+    pub async fn simulate_stake_pool_update(&self) {
+        let stake_pool: StakePool = self
+            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
+            .await;
+
+        let mut stake_pool_spl = stake_pool.as_ref().clone();
+
+        let current_epoch = self
+            .ctx
+            .borrow_mut()
+            .banks_client
+            .get_sysvar::<Clock>()
+            .await
+            .unwrap()
+            .epoch;
+
+        stake_pool_spl.last_update_epoch = current_epoch;
+
+        self.ctx.borrow_mut().set_account(
+            &self.stake_pool_meta.stake_pool,
+            &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
+        );
     }
 
     pub async fn initialize_stake_pool(&self) {
@@ -232,7 +251,7 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_config(&self, parameters: Option<UpdateParametersArgs>) {
+    pub async fn initialize_steward(&self, parameters: Option<UpdateParametersArgs>) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -257,17 +276,16 @@ impl TestFixture {
 
         let instruction = Instruction {
             program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::InitializeConfig {
+            accounts: jito_steward::accounts::InitializeSteward {
                 config: self.steward_config.pubkey(),
                 stake_pool: self.stake_pool_meta.stake_pool,
-                staker: self.staker,
+                state_account: self.steward_state,
                 stake_pool_program: spl_stake_pool::id(),
                 system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
+                current_staker: self.keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: jito_steward::instruction::InitializeConfig {
-                authority: self.keypair.pubkey(),
+            data: jito_steward::instruction::InitializeSteward {
                 update_parameters_args,
             }
             .data(),
@@ -282,23 +300,22 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
-    pub async fn initialize_steward_state(&self) {
-        let instruction = Instruction {
-            program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::InitializeState {
-                state_account: self.steward_state,
-                config: self.steward_config.pubkey(),
-                system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::InitializeState {}.data(),
+    pub async fn get_latest_blockhash(&self) -> Hash {
+        let blockhash = {
+            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            banks_client
+                .get_new_latest_blockhash(&Hash::default())
+                .await
+                .unwrap()
         };
 
-        let mut ixs = vec![instruction];
+        blockhash
+    }
 
+    pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
         let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut ixs = vec![];
 
         while num_reallocs > 0 {
             ixs.extend(vec![
@@ -360,6 +377,39 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
+    pub async fn initialize_validator_list(&self, num_validators: usize) {
+        let stake_program_minimum = self.fetch_minimum_delegation().await;
+        let pool_minimum_delegation = minimum_delegation(stake_program_minimum);
+        let stake_rent = self.fetch_stake_rent().await;
+        let minimum_active_stake_with_rent = pool_minimum_delegation + stake_rent;
+
+        let validator_list_account_info =
+            self.get_account(&self.stake_pool_meta.validator_list).await;
+
+        let validator_list: ValidatorList = self
+            .load_and_deserialize(&self.stake_pool_meta.validator_list)
+            .await;
+
+        let mut spl_validator_list = validator_list.as_ref().clone();
+
+        for _ in 0..num_validators {
+            spl_validator_list.validators.push(ValidatorStakeInfo {
+                active_stake_lamports: minimum_active_stake_with_rent.into(),
+                vote_account_address: Pubkey::new_unique(),
+                ..ValidatorStakeInfo::default()
+            });
+        }
+
+        self.ctx.borrow_mut().set_account(
+            &self.stake_pool_meta.validator_list,
+            &serialized_validator_list_account(
+                spl_validator_list.clone(),
+                Some(validator_list_account_info.data.len()),
+            )
+            .into(),
+        );
+    }
+
     // Turn this into a fixture creator
     pub async fn initialize_cluster_history_account(&self) -> ClusterHistory {
         todo!()
@@ -380,6 +430,7 @@ impl TestFixture {
             validator_history.history.push(ValidatorHistoryEntry {
                 epoch: i,
                 epoch_credits: 400000,
+                activated_stake_lamports: 100_000_000_000_000,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -522,22 +573,14 @@ impl TestFixture {
         };
 
         if let Err(e) = process_transaction_result {
+            if !e.to_string().contains(error_message) {
+                panic!("Error: {}\n\nDoes not match {}", e, error_message);
+            }
+
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
         }
-    }
-
-    pub async fn get_latest_blockhash(&self) -> Hash {
-        let blockhash = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
-            banks_client
-                .get_new_latest_blockhash(&Hash::default())
-                .await
-                .unwrap()
-        };
-
-        blockhash
     }
 }
 
@@ -614,7 +657,7 @@ pub fn closed_vote_account() -> Account {
 
 // TODO write a function to serialize any account with T: AnchorSerialize
 pub fn serialized_validator_list_account(
-    validator_list: ValidatorList,
+    validator_list: SPLValidatorList,
     account_size: Option<usize>,
 ) -> Account {
     // Passes in size because zeros at the end will be truncated during serialization
@@ -796,7 +839,7 @@ impl Default for StateMachineFixtures {
             instant_unstake_delinquency_threshold_ratio: 0.1,
             commission_threshold: 10,
             historical_commission_threshold: 10,
-            padding0: [0; 6],
+            _padding_0: [0; 6],
             num_delegation_validators: 3,
             scoring_unstake_cap_bps: 1000,
             instant_unstake_cap_bps: 1000,
@@ -807,16 +850,20 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
+            _padding_1: [0; 32],
         };
 
         // Setup Config
         let config = Config {
             stake_pool: Pubkey::new_unique(),
-            authority: Pubkey::new_unique(),
-            blacklist: BitMask::default(),
             parameters,
-            _padding: [0; 1023],
             paused: false.into(),
+            validator_list: Pubkey::new_unique(),
+            admin: Pubkey::new_unique(),
+            parameters_authority: Pubkey::new_unique(),
+            blacklist_authority: Pubkey::new_unique(),
+            validator_history_blacklist: LargeBitMask::default(),
+            _padding: [0; 1023],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -927,9 +974,11 @@ impl Default for StateMachineFixtures {
             stake_deposit_unstake_total: 0,
             delegations: [Delegation::default(); MAX_VALIDATORS],
             instant_unstake: BitMask::default(),
-            compute_delegations_completed: false.into(),
-            rebalance_completed: false.into(),
-            _padding0: [0; 6 + 8 * MAX_VALIDATORS],
+            status_flags: 0,
+            validators_added: 0,
+            validators_to_remove: BitMask::default(),
+            validators_for_immediate_removal: BitMask::default(),
+            _padding0: [0; STATE_PADDING_0_SIZE],
         };
 
         StateMachineFixtures {

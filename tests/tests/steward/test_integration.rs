@@ -34,10 +34,9 @@ use validator_history::{
 #[tokio::test]
 async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -96,12 +95,14 @@ async fn test_compute_delegations() {
         &serialized_config(steward_config).into(),
     );
 
+    fixture.initialize_validator_list(MAX_VALIDATORS).await;
+
     let compute_delegations_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -113,8 +114,9 @@ async fn test_compute_delegations() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
+
     fixture.submit_transaction_assert_success(tx).await;
 
     let steward_state_account: StewardStateAccount =
@@ -146,7 +148,7 @@ async fn test_compute_delegations() {
         accounts: jito_steward::accounts::ComputeDelegations {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeDelegations {}.data(),
@@ -159,7 +161,7 @@ async fn test_compute_delegations() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture
         .submit_transaction_assert_error(tx, "StateMachinePaused")
@@ -171,10 +173,9 @@ async fn test_compute_delegations() {
 #[tokio::test]
 async fn test_compute_scores() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
         vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -198,6 +199,7 @@ async fn test_compute_scores() {
         validator_history.history.push(ValidatorHistoryEntry {
             epoch: i,
             epoch_credits: 1000,
+            activated_stake_lamports: 100_000_000_000_000,
             commission: 0,
             mev_commission: 0,
             is_superminority: 0,
@@ -245,6 +247,7 @@ async fn test_compute_scores() {
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.next_cycle_epoch =
         clock.epoch + steward_config.parameters.num_epochs_between_scoring;
+    // steward_state_account.state.validators_added = MAX_VALIDATORS as u16;
 
     // Setup validator list
     let mut validator_list_validators = (0..MAX_VALIDATORS)
@@ -284,6 +287,23 @@ async fn test_compute_scores() {
         &serialized_config(steward_config).into(),
     );
 
+    fixture.simulate_stake_pool_update().await;
+
+    let epoch_maintenance_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::EpochMaintenance {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::EpochMaintenance {
+            validator_index_to_remove: None,
+        }
+        .data(),
+    };
+
     // Basic test - test score computation that requires most compute
     let compute_scores_ix = Instruction {
         program_id: jito_steward::id(),
@@ -293,7 +313,6 @@ async fn test_compute_scores() {
             validator_history: validator_history_account,
             validator_list: fixture.stake_pool_meta.validator_list,
             cluster_history: cluster_history_account,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeScore {
@@ -305,13 +324,14 @@ async fn test_compute_scores() {
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(800_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
+            epoch_maintenance_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -332,6 +352,30 @@ async fn test_compute_scores() {
 
     // Transition out of this state
     // Reset current state, set progress[1] to true, progress[0] to false
+
+    {
+        // Reset Validator List, such that there are only 2 validators
+        let mut validator_list_validators = (0..2)
+            .map(|_| ValidatorStakeInfo {
+                vote_account_address: Pubkey::new_unique(),
+                ..ValidatorStakeInfo::default()
+            })
+            .collect::<Vec<_>>();
+        validator_list_validators[0].vote_account_address = vote_account;
+        let validator_list = spl_stake_pool::state::ValidatorList {
+            header: ValidatorListHeader {
+                account_type: AccountType::ValidatorList,
+                max_validators: MAX_VALIDATORS as u32,
+            },
+            validators: validator_list_validators,
+        };
+
+        fixture.ctx.borrow_mut().set_account(
+            &fixture.stake_pool_meta.validator_list,
+            &serialized_validator_list_account(validator_list, None).into(),
+        );
+    }
+
     steward_state_account.state.num_pool_validators = 2;
     steward_state_account.state.scores[..2].copy_from_slice(&[0, 0]);
     steward_state_account.state.yield_scores[..2].copy_from_slice(&[0, 0]);
@@ -421,10 +465,9 @@ async fn test_compute_scores() {
 #[tokio::test]
 async fn test_compute_instant_unstake() {
     let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture
-        .initialize_config(Some(UpdateParametersArgs {
+        .initialize_steward(Some(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
             epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
             commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
@@ -445,7 +488,7 @@ async fn test_compute_instant_unstake() {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
         .await;
-    fixture.initialize_steward_state().await;
+    fixture.realloc_steward_state().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -473,6 +516,7 @@ async fn test_compute_instant_unstake() {
     validator_history.history.push(ValidatorHistoryEntry {
         epoch: clock.epoch as u16,
         epoch_credits: 1000,
+        activated_stake_lamports: 100_000_000_000_000,
         commission: 100, // This is the condition causing instant unstake
         mev_commission: 0,
         is_superminority: 0,
@@ -535,10 +579,13 @@ async fn test_compute_instant_unstake() {
             account_type: AccountType::ValidatorList,
             max_validators: MAX_VALIDATORS as u32,
         },
-        validators: vec![ValidatorStakeInfo {
-            vote_account_address: vote_account,
-            ..ValidatorStakeInfo::default()
-        }],
+        validators: vec![
+            ValidatorStakeInfo {
+                vote_account_address: vote_account,
+                ..ValidatorStakeInfo::default()
+            },
+            ValidatorStakeInfo::default(),
+        ],
     };
 
     fixture.ctx.borrow_mut().set_account(
@@ -575,7 +622,6 @@ async fn test_compute_instant_unstake() {
             validator_history: validator_history_account,
             validator_list: fixture.stake_pool_meta.validator_list,
             cluster_history: cluster_history_account,
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::ComputeInstantUnstake {
@@ -588,7 +634,21 @@ async fn test_compute_instant_unstake() {
         &[compute_instant_unstake_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
+    );
+
+    let test_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+
+    println!("{:?}", validator_list.validators.len());
+    println!(
+        "{:?}",
+        test_state_account.state.num_pool_validators
+            + test_state_account.state.validators_added as u64
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -658,8 +718,8 @@ async fn test_idle() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -679,6 +739,8 @@ async fn test_idle() {
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
 
+    fixture.initialize_validator_list(MAX_VALIDATORS).await;
+
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
         &serialized_steward_state_account(steward_state_account).into(),
@@ -694,7 +756,7 @@ async fn test_idle() {
         accounts: jito_steward::accounts::Idle {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
-            signer: fixture.keypair.pubkey(),
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Idle {}.data(),
@@ -703,7 +765,7 @@ async fn test_idle() {
         &[idle_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -794,8 +856,8 @@ async fn test_rebalance_increase() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -904,26 +966,17 @@ async fn test_rebalance_increase() {
         &serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<StakePool>()).into(),
     );
 
-    let mut steward_state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    steward_state_account.state.num_pool_validators += 1;
-    ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
-    );
-
     let (stake_account_address, transient_stake_account_address, withdraw_authority) =
         fixture.stake_accounts_for_validator(vote_account).await;
 
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -935,7 +988,6 @@ async fn test_rebalance_increase() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -950,7 +1002,6 @@ async fn test_rebalance_increase() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -961,7 +1012,6 @@ async fn test_rebalance_increase() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
@@ -978,10 +1028,21 @@ async fn test_rebalance_increase() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let reserve_before_rebalance = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
 
@@ -993,7 +1054,7 @@ async fn test_rebalance_increase() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
 
     fixture.submit_transaction_assert_success(tx).await;
@@ -1013,7 +1074,13 @@ async fn test_rebalance_increase() {
         pool_minimum_delegation
     );
 
-    let expected_transient_stake = reserve_before_rebalance.lamports - 2 * stake_rent;
+    let steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    let validators_that_need_rent = steward_state_account.state.num_pool_validators + 1
+        - (steward_state_account.state.progress.count() as u64 - 1);
+    let expected_transient_stake =
+        reserve_before_rebalance.lamports - (stake_rent * validators_that_need_rent);
     assert_eq!(
         transient_stake_account.stake().unwrap().delegation.stake,
         expected_transient_stake
@@ -1032,8 +1099,8 @@ async fn test_rebalance_decrease() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1151,11 +1218,12 @@ async fn test_rebalance_decrease() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
+
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -1167,7 +1235,6 @@ async fn test_rebalance_decrease() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -1181,9 +1248,20 @@ async fn test_rebalance_decrease() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    // steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     // Simulating stake deposit
     let stake_account_data = fixture.get_account(&stake_account_address).await;
@@ -1259,7 +1337,6 @@ async fn test_rebalance_decrease() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -1270,7 +1347,6 @@ async fn test_rebalance_decrease() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
@@ -1287,7 +1363,7 @@ async fn test_rebalance_decrease() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
 
@@ -1334,13 +1410,12 @@ async fn test_rebalance_other_cases() {
         .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 10)
         .await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    steward_config.set_paused(true);
     steward_config.parameters.minimum_voting_epochs = 1;
 
     let vote_account = Pubkey::new_unique();
@@ -1372,6 +1447,28 @@ async fn test_rebalance_other_cases() {
         });
     }
 
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    let clock: Clock = fixture.get_sysvar().await;
+
+    steward_state_account.state.current_epoch = clock.epoch;
+    steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
+    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+
+    ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.validator_list,
+        &serialized_validator_list_account(
+            spl_validator_list.clone(),
+            Some(validator_list_account_info.data.len()),
+        )
+        .into(),
+    );
+
     ctx.borrow_mut().set_account(
         &fixture.stake_pool_meta.validator_list,
         &serialized_validator_list_account(
@@ -1392,11 +1489,11 @@ async fn test_rebalance_other_cases() {
     let add_validator_to_pool_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
             validator_history_account: validator_history_address,
             config: fixture.steward_config.pubkey(),
             stake_pool_program: spl_stake_pool::id(),
             stake_pool: fixture.stake_pool_meta.stake_pool,
-            staker: fixture.staker,
             reserve_stake: fixture.stake_pool_meta.reserve,
             withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
@@ -1408,7 +1505,6 @@ async fn test_rebalance_other_cases() {
             stake_config: stake::config::ID,
             stake_program: stake::program::id(),
             system_program: solana_program::system_program::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
@@ -1422,9 +1518,20 @@ async fn test_rebalance_other_cases() {
         ],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
     fixture.submit_transaction_assert_success(tx).await;
+
+    let mut steward_state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+
+    // Force validator into the active set, don't wait for next cycle
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
@@ -1436,7 +1543,6 @@ async fn test_rebalance_other_cases() {
             stake_pool: fixture.stake_pool_meta.stake_pool,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_pool_program: spl_stake_pool::id(),
-            staker: fixture.staker,
             withdraw_authority,
             vote_account,
             stake_account: stake_account_address,
@@ -1447,7 +1553,6 @@ async fn test_rebalance_other_cases() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
-            signer: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
@@ -1459,8 +1564,19 @@ async fn test_rebalance_other_cases() {
         &[rebalance_ix.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        fixture.get_latest_blockhash().await,
     );
+
+    let mut steward_config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    steward_config.set_paused(true);
+
+    ctx.borrow_mut().set_account(
+        &fixture.steward_config.pubkey(),
+        &serialized_config(steward_config).into(),
+    );
+
     fixture
         .submit_transaction_assert_error(tx, "StateMachinePaused")
         .await;

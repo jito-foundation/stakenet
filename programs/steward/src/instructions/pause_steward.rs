@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::{utils::get_config_authority, Config};
+use crate::{utils::get_config_admin, Config};
 
 #[derive(Accounts)]
 pub struct PauseSteward<'info> {
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 
-    #[account(mut, address = get_config_authority(&config)?)]
+    #[account(mut, address = get_config_admin(&config)?)]
     pub authority: Signer<'info>,
 }
 

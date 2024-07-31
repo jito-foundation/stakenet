@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{bitmask::BitMask, parameters::Parameters, utils::U8Bool, StewardState};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
@@ -15,20 +15,37 @@ pub struct Config {
     /// SPL Stake Pool address that this program is managing
     pub stake_pool: Pubkey,
 
-    /// Authority for pool stewardship, can execute SPL Staker commands and adjust Delegation parameters
-    pub authority: Pubkey,
+    /// Validator List
+    pub validator_list: Pubkey,
+
+    /// Admin
+    /// - Update the `parameters_authority`
+    /// - Update the `blacklist_authority`
+    /// - Can call SPL Passthrough functions
+    /// - Can pause/reset the state machine
+    pub admin: Pubkey,
+
+    /// Parameters Authority
+    /// - Can update steward parameters
+    pub parameters_authority: Pubkey,
+
+    /// Blacklist Authority
+    /// - Can add to the blacklist
+    /// - Can remove from the blacklist
+    pub blacklist_authority: Pubkey,
 
     /// Bitmask representing index of validators that are not allowed delegation
-    pub blacklist: BitMask,
+    /// NOTE: This is indexed off of the validator history, NOT the validator list
+    pub validator_history_blacklist: LargeBitMask,
 
     /// Parameters for scoring, delegation, and state machine
     pub parameters: Parameters,
 
-    /// Padding for future governance parameters
-    pub _padding: [u8; 1023],
-
     /// Halts any state machine progress
     pub paused: U8Bool,
+
+    /// Padding for future governance parameters
+    pub _padding: [u8; 1023],
 }
 
 impl Config {
@@ -44,26 +61,6 @@ impl Config {
     }
 }
 
-// PDA that is used to sign instructions for the stake pool.
-// The pool's "staker" account needs to be assigned to this address,
-// and it has authority over adding validators, removing validators, and delegating stake.
-#[account]
-pub struct Staker {
-    pub bump: u8,
-}
-impl Staker {
-    pub const SIZE: usize = 8 + size_of::<Self>();
-    pub const SEED: &'static [u8] = b"staker";
-
-    pub fn get_address(config: &Pubkey) -> Pubkey {
-        let (pubkey, _) =
-            Pubkey::find_program_address(&[Self::SEED, config.as_ref()], &crate::id());
-        pubkey
-    }
-}
-
-// static_assertions::const_assert_eq!(StewardStateAccount::SIZE, 162584);
-
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct StewardStateAccount {
@@ -77,4 +74,11 @@ impl StewardStateAccount {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"steward_state";
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
+}
+
+pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[StewardStateAccount::SEED, steward_config.as_ref()],
+        &crate::id(),
+    )
 }

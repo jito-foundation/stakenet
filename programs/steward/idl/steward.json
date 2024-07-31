@@ -35,13 +35,16 @@
       ],
       "args": [
         {
-          "name": "index",
+          "name": "validator_history_blacklist",
           "type": "u32"
         }
       ]
     },
     {
       "name": "add_validator_to_pool",
+      "docs": [
+        "Passthrough spl-stake-pool: Add a validator to the pool"
+      ],
       "discriminator": [
         181,
         6,
@@ -57,14 +60,15 @@
           "name": "config"
         },
         {
+          "name": "state_account",
+          "writable": true
+        },
+        {
           "name": "stake_pool_program"
         },
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "reserve_stake",
@@ -103,7 +107,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -134,20 +138,18 @@
       ],
       "accounts": [
         {
-          "name": "validator_history_account"
-        },
-        {
           "name": "config"
         },
         {
-          "name": "stake_pool_program"
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "validator_history_account"
         },
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "reserve_stake",
@@ -168,27 +170,25 @@
           "name": "vote_account"
         },
         {
-          "name": "rent"
-        },
-        {
-          "name": "clock"
-        },
-        {
           "name": "stake_history"
         },
         {
           "name": "stake_config"
         },
         {
-          "name": "system_program"
-        },
-        {
           "name": "stake_program"
         },
         {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "clock"
         }
       ],
       "args": []
@@ -210,24 +210,18 @@
       ],
       "accounts": [
         {
-          "name": "validator_history_account"
+          "name": "config"
         },
         {
-          "name": "config"
+          "name": "validator_history_account"
         },
         {
           "name": "state_account",
           "writable": true
         },
         {
-          "name": "stake_pool_program"
-        },
-        {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "reserve_stake",
@@ -255,27 +249,25 @@
           "name": "vote_account"
         },
         {
-          "name": "rent"
-        },
-        {
-          "name": "clock"
-        },
-        {
           "name": "stake_history"
         },
         {
           "name": "stake_config"
         },
         {
-          "name": "system_program"
-        },
-        {
           "name": "stake_program"
         },
         {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "clock"
         }
       ],
       "args": [
@@ -284,6 +276,39 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "close_steward_accounts",
+      "docs": [
+        "Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).",
+        "Config is not closed as it is a Keypair, so lamports can simply be withdrawn.",
+        "Reclaims lamports to authority"
+      ],
+      "discriminator": [
+        172,
+        171,
+        212,
+        186,
+        90,
+        10,
+        181,
+        24
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "compute_delegations",
@@ -310,9 +335,7 @@
           "writable": true
         },
         {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "validator_list"
         }
       ],
       "args": []
@@ -348,11 +371,6 @@
         },
         {
           "name": "cluster_history"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -393,11 +411,6 @@
         },
         {
           "name": "cluster_history"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -409,6 +422,9 @@
     },
     {
       "name": "decrease_additional_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Decrease additional validator stake"
+      ],
       "discriminator": [
         90,
         22,
@@ -424,7 +440,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -439,9 +455,6 @@
         },
         {
           "name": "stake_pool"
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -479,7 +492,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -501,6 +514,9 @@
     },
     {
       "name": "decrease_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Decrease validator stake"
+      ],
       "discriminator": [
         145,
         203,
@@ -516,7 +532,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -529,9 +545,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -571,7 +584,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -584,6 +597,45 @@
         {
           "name": "transient_seed",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "epoch_maintenance",
+      "docs": [
+        "Housekeeping, run at the start of any new epoch before any other instructions"
+      ],
+      "discriminator": [
+        208,
+        225,
+        211,
+        82,
+        219,
+        242,
+        58,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "stake_pool"
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_index_to_remove",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -611,15 +663,16 @@
           "writable": true
         },
         {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "validator_list"
         }
       ],
       "args": []
     },
     {
       "name": "increase_additional_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Increase additional validator stake"
+      ],
       "discriminator": [
         93,
         136,
@@ -635,7 +688,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -647,9 +700,6 @@
         },
         {
           "name": "stake_pool"
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -692,7 +742,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -714,6 +764,9 @@
     },
     {
       "name": "increase_validator_stake",
+      "docs": [
+        "Passthrough spl-stake-pool: Increase validator stake"
+      ],
       "discriminator": [
         5,
         121,
@@ -729,7 +782,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -742,9 +795,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -787,7 +837,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -804,16 +854,16 @@
       ]
     },
     {
-      "name": "initialize_config",
+      "name": "initialize_steward",
       "discriminator": [
-        208,
-        127,
-        21,
-        1,
-        194,
-        190,
-        196,
-        70
+        195,
+        182,
+        16,
+        84,
+        217,
+        58,
+        220,
+        175
       ],
       "accounts": [
         {
@@ -822,7 +872,7 @@
           "signer": true
         },
         {
-          "name": "staker",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -836,16 +886,12 @@
           "name": "system_program"
         },
         {
-          "name": "signer",
+          "name": "current_staker",
           "writable": true,
           "signer": true
         }
       ],
       "args": [
-        {
-          "name": "authority",
-          "type": "pubkey"
-        },
         {
           "name": "update_parameters_args",
           "type": {
@@ -857,41 +903,47 @@
       ]
     },
     {
-      "name": "initialize_state",
+      "name": "instant_remove_validator",
       "docs": [
-        "Creates state account"
+        "When a validator is marked for immediate removal, it needs to be removed before normal functions can continue"
       ],
       "discriminator": [
-        190,
-        171,
-        224,
-        219,
-        217,
-        72,
-        199,
-        176
+        119,
+        127,
+        216,
+        135,
+        24,
+        63,
+        229,
+        242
       ],
       "accounts": [
+        {
+          "name": "config"
+        },
         {
           "name": "state_account",
           "writable": true
         },
         {
-          "name": "config"
+          "name": "validator_list"
         },
         {
-          "name": "system_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "stake_pool"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "validator_index_to_remove",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "pause_steward",
+      "docs": [
+        "Pauses the steward, preventing any further state transitions"
+      ],
       "discriminator": [
         214,
         85,
@@ -986,10 +1038,6 @@
           "name": "stake_pool"
         },
         {
-          "name": "staker",
-          "writable": true
-        },
-        {
           "name": "withdraw_authority"
         },
         {
@@ -1031,11 +1079,6 @@
         },
         {
           "name": "stake_program"
-        },
-        {
-          "name": "signer",
-          "writable": true,
-          "signer": true
         }
       ],
       "args": [
@@ -1073,13 +1116,16 @@
       ],
       "args": [
         {
-          "name": "index",
+          "name": "validator_history_blacklist",
           "type": "u32"
         }
       ]
     },
     {
       "name": "remove_validator_from_pool",
+      "docs": [
+        "Passthrough spl-stake-pool: Remove a validator from the pool"
+      ],
       "discriminator": [
         161,
         32,
@@ -1095,7 +1141,7 @@
           "name": "config"
         },
         {
-          "name": "steward_state",
+          "name": "state_account",
           "writable": true
         },
         {
@@ -1104,9 +1150,6 @@
         {
           "name": "stake_pool",
           "writable": true
-        },
-        {
-          "name": "staker"
         },
         {
           "name": "withdraw_authority"
@@ -1133,7 +1176,7 @@
           "name": "stake_program"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1146,7 +1189,47 @@
       ]
     },
     {
+      "name": "reset_steward_state",
+      "docs": [
+        "Resets steward state account to its initial state."
+      ],
+      "discriminator": [
+        84,
+        248,
+        158,
+        46,
+        200,
+        205,
+        234,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "resume_steward",
+      "docs": [
+        "Resumes the steward, allowing state transitions to continue"
+      ],
       "discriminator": [
         25,
         71,
@@ -1191,15 +1274,27 @@
           "name": "new_authority"
         },
         {
-          "name": "authority",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "authority_type",
+          "type": {
+            "defined": {
+              "name": "AuthorityType"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "set_preferred_validator",
+      "docs": [
+        "Passthrough spl-stake-pool: Set the preferred validator"
+      ],
       "discriminator": [
         114,
         42,
@@ -1215,6 +1310,10 @@
           "name": "config"
         },
         {
+          "name": "state_account",
+          "writable": true
+        },
+        {
           "name": "stake_pool_program"
         },
         {
@@ -1222,13 +1321,10 @@
           "writable": true
         },
         {
-          "name": "staker"
-        },
-        {
           "name": "validator_list"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1252,6 +1348,9 @@
     },
     {
       "name": "set_staker",
+      "docs": [
+        "Passthrough spl-stake-pool: Set the staker for the pool"
+      ],
       "discriminator": [
         149,
         203,
@@ -1267,6 +1366,10 @@
           "name": "config"
         },
         {
+          "name": "state_account",
+          "writable": true
+        },
+        {
           "name": "stake_pool_program"
         },
         {
@@ -1274,13 +1377,10 @@
           "writable": true
         },
         {
-          "name": "staker"
-        },
-        {
           "name": "new_staker"
         },
         {
-          "name": "signer",
+          "name": "admin",
           "writable": true,
           "signer": true
         }
@@ -1353,19 +1453,6 @@
       ]
     },
     {
-      "name": "Staker",
-      "discriminator": [
-        171,
-        229,
-        193,
-        85,
-        67,
-        177,
-        151,
-        4
-      ]
-    },
-    {
       "name": "StewardStateAccount",
       "discriminator": [
         55,
@@ -1394,6 +1481,32 @@
   ],
   "events": [
     {
+      "name": "AutoAddValidatorEvent",
+      "discriminator": [
+        123,
+        65,
+        239,
+        15,
+        82,
+        216,
+        206,
+        28
+      ]
+    },
+    {
+      "name": "AutoRemoveValidatorEvent",
+      "discriminator": [
+        211,
+        46,
+        52,
+        163,
+        17,
+        38,
+        197,
+        186
+      ]
+    },
+    {
       "name": "DecreaseComponents",
       "discriminator": [
         129,
@@ -1407,6 +1520,19 @@
       ]
     },
     {
+      "name": "EpochMaintenanceEvent",
+      "discriminator": [
+        255,
+        149,
+        70,
+        161,
+        199,
+        176,
+        9,
+        42
+      ]
+    },
+    {
       "name": "InstantUnstakeComponents",
       "discriminator": [
         217,
@@ -1417,6 +1543,19 @@
         11,
         127,
         77
+      ]
+    },
+    {
+      "name": "RebalanceEvent",
+      "discriminator": [
+        120,
+        27,
+        117,
+        235,
+        104,
+        42,
+        132,
+        75
       ]
     },
     {
@@ -1449,120 +1588,241 @@
   "errors": [
     {
       "code": 6000,
+      "name": "InvalidAuthorityType",
+      "msg": "Invalid set authority type: 0: SetAdmin, 1: SetBlacklistAuthority, 2: SetParametersAuthority"
+    },
+    {
+      "code": 6001,
       "name": "ScoringNotComplete",
       "msg": "Scoring must be completed before any other steps can be taken"
     },
     {
-      "code": 6001,
+      "code": 6002,
       "name": "ValidatorNotInList",
       "msg": "Validator does not exist at the ValidatorList index provided"
     },
     {
-      "code": 6002,
-      "name": "AddValidatorsNotComplete",
-      "msg": "Add validators step must be completed before any other steps can be taken"
-    },
-    {
       "code": 6003,
-      "name": "EpochNotOver",
-      "msg": "Cannot reset state before epoch is over"
-    },
-    {
-      "code": 6004,
       "name": "Unauthorized",
       "msg": "Unauthorized to perform this action"
     },
     {
-      "code": 6005,
+      "code": 6004,
       "name": "BitmaskOutOfBounds",
       "msg": "Bitmask index out of bounds"
     },
     {
+      "code": 6005,
+      "name": "InvalidState",
+      "msg": "Invalid state"
+    },
+    {
       "code": 6006,
-      "name": "StateNotReset",
-      "msg": "Epoch state not reset"
+      "name": "StakeStateIsNotStake",
+      "msg": "Stake state is not Stake"
     },
     {
       "code": 6007,
-      "name": "ValidatorOutOfRange",
-      "msg": "Validator History created after epoch start, out of range"
-    },
-    {
-      "code": 6008,
-      "name": "InvalidState"
-    },
-    {
-      "code": 6009,
       "name": "ValidatorBelowStakeMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet stake minimum"
     },
     {
-      "code": 6010,
+      "code": 6008,
       "name": "ValidatorBelowLivenessMinimum",
       "msg": "Validator not eligible to be added to the pool. Must meet recent voting minimum"
     },
     {
-      "code": 6011,
+      "code": 6009,
       "name": "VoteHistoryNotRecentEnough",
       "msg": "Validator History vote data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6012,
+      "code": 6010,
       "name": "StakeHistoryNotRecentEnough",
       "msg": "Validator History stake data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6013,
+      "code": 6011,
       "name": "ClusterHistoryNotRecentEnough",
       "msg": "Cluster History data not recent enough to be used for scoring. Must be updated this epoch"
     },
     {
-      "code": 6014,
+      "code": 6012,
       "name": "StateMachinePaused",
       "msg": "Steward State Machine is paused. No state machine actions can be taken"
     },
     {
-      "code": 6015,
+      "code": 6013,
       "name": "InvalidParameterValue",
       "msg": "Config parameter is out of range or otherwise invalid"
     },
     {
-      "code": 6016,
+      "code": 6014,
       "name": "InstantUnstakeNotReady",
       "msg": "Instant unstake cannot be performed yet."
     },
     {
-      "code": 6017,
+      "code": 6015,
       "name": "ValidatorIndexOutOfBounds",
       "msg": "Validator index out of bounds of state machine"
     },
     {
-      "code": 6018,
+      "code": 6016,
       "name": "ValidatorListTypeMismatch",
       "msg": "ValidatorList account type mismatch"
     },
     {
-      "code": 6019,
+      "code": 6017,
       "name": "ArithmeticError",
       "msg": "An operation caused an overflow/underflow"
     },
     {
-      "code": 6020,
+      "code": 6018,
       "name": "ValidatorNotRemovable",
       "msg": "Validator not eligible for removal. Must be delinquent or have closed vote account"
     },
     {
-      "code": 6021,
+      "code": 6019,
+      "name": "ValidatorMarkedActive",
+      "msg": "Validator was marked active when it should be deactivating"
+    },
+    {
+      "code": 6020,
       "name": "MaxValidatorsReached",
       "msg": "Max validators reached"
     },
     {
+      "code": 6021,
+      "name": "EpochMaintenanceNotComplete",
+      "msg": "Epoch Maintenance must be called before continuing"
+    },
+    {
       "code": 6022,
-      "name": "ValidatorHistoryMismatch",
-      "msg": "Validator history account does not match vote account"
+      "name": "StakePoolNotUpdated",
+      "msg": "The stake pool must be updated before continuing"
+    },
+    {
+      "code": 6023,
+      "name": "EpochMaintenanceAlreadyComplete",
+      "msg": "Epoch Maintenance has already been completed"
+    },
+    {
+      "code": 6024,
+      "name": "ValidatorsNeedToBeRemoved",
+      "msg": "Validators are marked for immediate removal"
+    },
+    {
+      "code": 6025,
+      "name": "ValidatorNotMarkedForRemoval",
+      "msg": "Validator not marked for removal"
+    },
+    {
+      "code": 6026,
+      "name": "ValidatorsHaveNotBeenRemoved",
+      "msg": "Validators have not been removed"
+    },
+    {
+      "code": 6027,
+      "name": "ListStateMismatch",
+      "msg": "Validator List count does not match state machine"
+    },
+    {
+      "code": 6028,
+      "name": "VoteAccountDoesNotMatch",
+      "msg": "Vote account does not match"
+    },
+    {
+      "code": 6029,
+      "name": "ValidatorNeedsToBeMarkedForRemoval",
+      "msg": "Validator needs to be marked for removal"
     }
   ],
   "types": [
+    {
+      "name": "AuthorityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SetAdmin",
+            "fields": [
+              {
+                "name": "SetAdmin",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetBlacklistAuthority",
+            "fields": [
+              {
+                "name": "SetBlacklistAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetParameterAuthority",
+            "fields": [
+              {
+                "name": "SetParameterAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "AutoAddValidatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_list_index",
+            "type": "u64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AutoRemoveValidatorEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_list_index",
+            "type": "u64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote_account_closed",
+            "type": "bool"
+          },
+          {
+            "name": "stake_account_deactivated",
+            "type": "bool"
+          },
+          {
+            "name": "marked_for_immediate_removal",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "BitMask",
       "docs": [
@@ -1812,20 +2072,49 @@
             "type": "pubkey"
           },
           {
-            "name": "authority",
+            "name": "validator_list",
             "docs": [
-              "Authority for pool stewardship, can execute SPL Staker commands and adjust Delegation parameters"
+              "Validator List"
             ],
             "type": "pubkey"
           },
           {
-            "name": "blacklist",
+            "name": "admin",
             "docs": [
-              "Bitmask representing index of validators that are not allowed delegation"
+              "Admin",
+              "- Update the `parameters_authority`",
+              "- Update the `blacklist_authority`",
+              "- Can call SPL Passthrough functions",
+              "- Can pause/reset the state machine"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "parameters_authority",
+            "docs": [
+              "Parameters Authority",
+              "- Can update steward parameters"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "blacklist_authority",
+            "docs": [
+              "Blacklist Authority",
+              "- Can add to the blacklist",
+              "- Can remove from the blacklist"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "validator_history_blacklist",
+            "docs": [
+              "Bitmask representing index of validators that are not allowed delegation",
+              "NOTE: This is indexed off of the validator history, NOT the validator list"
             ],
             "type": {
               "defined": {
-                "name": "BitMask"
+                "name": "LargeBitMask"
               }
             }
           },
@@ -1841,6 +2130,17 @@
             }
           },
           {
+            "name": "paused",
+            "docs": [
+              "Halts any state machine progress"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -1850,17 +2150,6 @@
                 "u8",
                 1023
               ]
-            }
-          },
-          {
-            "name": "paused",
-            "docs": [
-              "Halts any state machine progress"
-            ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
             }
           }
         ]
@@ -1911,6 +2200,40 @@
       }
     },
     {
+      "name": "EpochMaintenanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_index_to_remove",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "validator_list_length",
+            "type": "u64"
+          },
+          {
+            "name": "num_pool_validators",
+            "type": "u64"
+          },
+          {
+            "name": "validators_to_remove",
+            "type": "u64"
+          },
+          {
+            "name": "validators_to_add",
+            "type": "u64"
+          },
+          {
+            "name": "maintenance_complete",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
       "name": "InstantUnstakeComponents",
       "type": {
         "kind": "struct",
@@ -1946,7 +2269,7 @@
           {
             "name": "is_blacklisted",
             "docs": [
-              "Checks if validator was added to blacklist blacklisted"
+              "Checks if validator was added to blacklist"
             ],
             "type": "bool"
           },
@@ -1957,6 +2280,33 @@
           {
             "name": "epoch",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LargeBitMask",
+      "docs": [
+        "Data structure used to efficiently pack a binary array, primarily used to store all validators.",
+        "Each validator has an index (its index in the spl_stake_pool::ValidatorList), corresponding to a bit in the bitmask.",
+        "When an operation is executed on a validator, the bit corresponding to that validator's index is set to 1.",
+        "When all bits are 1, the operation is complete."
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                "u64",
+                313
+              ]
+            }
           }
         ]
       }
@@ -2027,7 +2377,7 @@
             "type": "u8"
           },
           {
-            "name": "padding0",
+            "name": "_padding_0",
             "docs": [
               "Required so that the struct is 8-byte aligned",
               "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
@@ -2105,6 +2455,15 @@
               "Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation"
             ],
             "type": "u64"
+          },
+          {
+            "name": "_padding_1",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
           }
         ]
       }
@@ -2119,6 +2478,59 @@
           },
           {
             "name": "Withdraw"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebalanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "rebalance_type_tag",
+            "type": {
+              "defined": {
+                "name": "RebalanceTypeTag"
+              }
+            }
+          },
+          {
+            "name": "increase_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "decrease_components",
+            "type": {
+              "defined": {
+                "name": "DecreaseComponents"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RebalanceTypeTag",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Increase"
+          },
+          {
+            "name": "Decrease"
           }
         ]
       }
@@ -2211,18 +2623,6 @@
       }
     },
     {
-      "name": "Staker",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
       "name": "StateTransition",
       "type": {
         "kind": "struct",
@@ -2250,7 +2650,8 @@
       "name": "StewardState",
       "docs": [
         "Tracks state of the stake pool.",
-        "Follow state transitions here: [TODO add link to github diagram]"
+        "Follow state transitions here:",
+        "https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png"
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -2370,6 +2771,30 @@
             }
           },
           {
+            "name": "validators_for_immediate_removal",
+            "docs": [
+              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This happens when a validator is able to be removed within the same epoch as it was marked"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "validators_to_remove",
+            "docs": [
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
             "name": "start_computing_scores_slot",
             "docs": [
               "Slot of the first ComputeScores instruction in the current cycle"
@@ -2420,26 +2845,18 @@
             "type": "u64"
           },
           {
-            "name": "compute_delegations_completed",
+            "name": "status_flags",
             "docs": [
-              "Tracks whether delegation computation has been completed"
+              "Flags to track state transitions and operations"
             ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
+            "type": "u32"
           },
           {
-            "name": "rebalance_completed",
+            "name": "validators_added",
             "docs": [
-              "Tracks whether unstake and delegate steps have completed"
+              "Number of validators added to the pool in the current cycle"
             ],
-            "type": {
-              "defined": {
-                "name": "U8Bool"
-              }
-            }
+            "type": "u16"
           },
           {
             "name": "_padding0",
@@ -2449,7 +2866,7 @@
             "type": {
               "array": [
                 "u8",
-                40006
+                40002
               ]
             }
           }

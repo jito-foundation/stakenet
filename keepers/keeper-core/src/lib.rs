@@ -394,6 +394,7 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
+                    println!("Submitted transaction: {:?}", signature);
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => match e.get_transaction_error() {

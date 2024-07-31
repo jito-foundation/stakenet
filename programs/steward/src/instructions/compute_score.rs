@@ -1,8 +1,12 @@
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::ValidatorListHeader;
 
 use crate::{
-    errors::StewardError, maybe_transition_and_emit, utils::get_validator_stake_info_at_index,
+    errors::StewardError,
+    maybe_transition,
+    utils::{
+        get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
+        state_checks,
+    },
     Config, StewardStateAccount, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -21,7 +25,7 @@ pub struct ComputeScore<'info> {
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
     /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
-    #[account(owner = spl_stake_pool::id())]
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     #[account(
@@ -30,9 +34,6 @@ pub struct ComputeScore<'info> {
         bump
     )]
     pub cluster_history: AccountLoader<'info, ClusterHistory>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Result<()> {
@@ -44,6 +45,9 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    // We don't check the state here because we force it below
+    state_checks(&clock, &config, &state_account, validator_list, None)?;
+
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(
@@ -51,29 +55,22 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         StewardError::ValidatorNotInList
     );
 
-    let num_pool_validators = {
-        let mut validator_list_data = validator_list.try_borrow_mut_data()?;
-        let (_, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
-        validator_list.len() as u64
-    };
-
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
-
     // May need to force an extra transition here in case cranking got stuck in any previous state
     // and it's now the start of a new scoring cycle
     if !matches!(
         state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ) {
-        maybe_transition_and_emit(
+        if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
             &config.parameters,
             &epoch_schedule,
-        )?;
+        )? {
+            emit!(event);
+        }
     }
+
     require!(
         matches!(
             state_account.state.state_tag,
@@ -82,22 +79,28 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         StewardError::InvalidState
     );
 
-    state_account.state.compute_score(
+    let num_pool_validators = get_validator_list_length(validator_list)?;
+
+    if let Some(score) = state_account.state.compute_score(
         &clock,
         &epoch_schedule,
         &validator_history,
         validator_list_index,
         &cluster_history,
         &config,
-        num_pool_validators,
-    )?;
+        num_pool_validators as u64,
+    )? {
+        emit!(score);
+    }
 
-    maybe_transition_and_emit(
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }

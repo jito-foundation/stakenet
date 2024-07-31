@@ -51,7 +51,6 @@ pub struct ScoreComponents {
 
 pub fn validator_score(
     validator: &ValidatorHistory,
-    index: usize,
     cluster: &ClusterHistory,
     config: &Config,
     current_epoch: u16,
@@ -165,7 +164,7 @@ pub fn validator_score(
     /*
         If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
         the stake oracle to call UpdateStakeHistory.
-        If epoch credits is not set, we iterate through last 10 epochs to find the latest superminority flag.
+        If epoch credits is not set, we iterate through last `commission_range` epochs to find the latest superminority flag.
         If no entry is found, we assume the validator is not a superminority validator.
     */
     let is_superminority = if validator.history.epoch_credits_latest().is_some() {
@@ -195,7 +194,10 @@ pub fn validator_score(
     let superminority_score = if !is_superminority { 1.0 } else { 0.0 };
 
     /////// Blacklist ///////
-    let blacklisted_score = if config.blacklist.get(index).unwrap_or(false) {
+    let blacklisted_score = if config
+        .validator_history_blacklist
+        .get(validator.index as usize)?
+    {
         0.0
     } else {
         1.0
@@ -245,7 +247,7 @@ pub struct InstantUnstakeComponents {
     /// Checks if validator has increased MEV commission > mev_commission_bps_threshold
     pub mev_commission_check: bool,
 
-    /// Checks if validator was added to blacklist blacklisted
+    /// Checks if validator was added to blacklist
     pub is_blacklisted: bool,
 
     pub vote_account: Pubkey,
@@ -257,7 +259,6 @@ pub struct InstantUnstakeComponents {
 /// Before running, checks are needed on cluster and validator history to be updated this epoch past the halfway point of the epoch.
 pub fn instant_unstake_validator(
     validator: &ValidatorHistory,
-    index: usize,
     cluster: &ClusterHistory,
     config: &Config,
     epoch_start_slot: u64,
@@ -287,10 +288,7 @@ pub fn instant_unstake_validator(
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
-    let vote_credits_rate = validator
-        .history
-        .epoch_credits_latest()
-        .ok_or(StewardError::VoteHistoryNotRecentEnough)? as f64
+    let vote_credits_rate = validator.history.epoch_credits_latest().unwrap_or(0) as f64
         / validator_history_slot_index as f64;
 
     let delinquency_check = if blocks_produced_rate > 0. {
@@ -324,7 +322,9 @@ pub fn instant_unstake_validator(
     let commission_check = commission > params.commission_threshold;
 
     /////// Blacklist ///////
-    let is_blacklisted = config.blacklist.get(index)?;
+    let is_blacklisted = config
+        .validator_history_blacklist
+        .get(validator.index as usize)?;
 
     let instant_unstake =
         delinquency_check || commission_check || mev_commission_check || is_blacklisted;

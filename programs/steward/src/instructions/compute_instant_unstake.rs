@@ -1,6 +1,8 @@
 use crate::{
-    errors::StewardError, maybe_transition_and_emit, utils::get_validator_stake_info_at_index,
-    Config, StewardStateAccount,
+    errors::StewardError,
+    maybe_transition,
+    utils::{get_validator_list, get_validator_stake_info_at_index, state_checks},
+    Config, StewardStateAccount, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -16,10 +18,11 @@ pub struct ComputeInstantUnstake<'info> {
     )]
     pub state_account: AccountLoader<'info, StewardStateAccount>,
 
+    /// CHECK: We check it is the correct vote account in the handler
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
-    /// CHECK: TODO add validator list to config
-    #[account(owner = spl_stake_pool::id())]
+    #[account(address = get_validator_list(&config)?)]
+    /// CHECK: We check against the Config
     pub validator_list: AccountInfo<'info>,
 
     #[account(
@@ -28,9 +31,6 @@ pub struct ComputeInstantUnstake<'info> {
         bump
     )]
     pub cluster_history: AccountLoader<'info, ClusterHistory>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize) -> Result<()> {
@@ -42,6 +42,14 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
+    state_checks(
+        &clock,
+        &config,
+        &state_account,
+        &ctx.accounts.validator_list,
+        Some(StewardStateEnum::ComputeInstantUnstake),
+    )?;
+
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(
@@ -49,24 +57,25 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         StewardError::ValidatorNotInList
     );
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
-    }
-
-    state_account.state.compute_instant_unstake(
+    if let Some(instant_unstake) = state_account.state.compute_instant_unstake(
         &clock,
         &epoch_schedule,
         &validator_history,
         validator_list_index,
         &cluster,
         &config,
-    )?;
-    maybe_transition_and_emit(
+    )? {
+        emit!(instant_unstake);
+    }
+
+    if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
         &config.parameters,
         &epoch_schedule,
-    )?;
+    )? {
+        emit!(event);
+    }
 
     Ok(())
 }

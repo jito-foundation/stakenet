@@ -1,26 +1,18 @@
 use anchor_lang::prelude::*;
 use spl_stake_pool::big_vec::BigVec;
 
+use crate::events::DecreaseComponents;
 use crate::{
     errors::StewardError,
     utils::{get_target_lamports, stake_lamports_at_validator_list_index},
     StewardState,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RebalanceType {
     Increase(u64),
     Decrease(DecreaseComponents),
     None,
-}
-
-#[event]
-#[derive(Debug, PartialEq, Eq)]
-pub struct DecreaseComponents {
-    pub scoring_unstake_lamports: u64,
-    pub instant_unstake_lamports: u64,
-    pub stake_deposit_unstake_lamports: u64,
-    pub total_unstake_lamports: u64,
 }
 
 /// Given a target validator, determines how much stake to remove on this validator given the constraints of unstaking caps.
@@ -168,7 +160,8 @@ pub fn increase_stake_calculation(
         }
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
-    Err(StewardError::InvalidState.into())
+
+    Err(StewardError::ValidatorIndexOutOfBounds.into())
 }
 
 #[derive(Default)]

@@ -5,19 +5,139 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
     big_vec::BigVec,
-    state::{ValidatorListHeader, ValidatorStakeInfo},
+    state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
 };
 
-use crate::{errors::StewardError, Config, Delegation};
+use crate::{
+    constants::{STAKE_STATUS_OFFSET, U64_SIZE, VEC_SIZE_BYTES},
+    errors::StewardError,
+    Config, Delegation, StewardStateAccount, StewardStateEnum,
+};
+
+/// Checks called before any cranking state function. Note that expected_state is optional -
+/// this is due to ComputeScores handling it's own state check.
+pub fn state_checks(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+    expected_state: Option<StewardStateEnum>,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    if let Some(expected_state) = expected_state {
+        require!(
+            state_account.state.state_tag == expected_state,
+            StewardError::InvalidState
+        );
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
+        state_account.state.validators_for_immediate_removal.count() == 0,
+        StewardError::ValidatorsNeedToBeRemoved
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
+
+pub fn remove_validator_check(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
+
+pub fn add_validator_check(
+    clock: &Clock,
+    config: &Config,
+    state_account: &StewardStateAccount,
+    validator_list_account_info: &AccountInfo,
+) -> Result<()> {
+    if config.is_paused() {
+        return Err(StewardError::StateMachinePaused.into());
+    }
+
+    require!(
+        clock.epoch == state_account.state.current_epoch,
+        StewardError::EpochMaintenanceNotComplete
+    );
+
+    require!(
+        state_account.state.validators_for_immediate_removal.count() == 0,
+        StewardError::ValidatorsNeedToBeRemoved
+    );
+
+    // Ensure we have a 1-1 mapping between the number of validators
+    let validators_in_list = get_validator_list_length(validator_list_account_info)?;
+    require!(
+        state_account.state.num_pool_validators as usize
+            + state_account.state.validators_added as usize
+            == validators_in_list,
+        StewardError::ListStateMismatch
+    );
+
+    Ok(())
+}
 
 pub fn get_stake_pool_address(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
     Ok(config.stake_pool)
 }
 
-pub fn get_config_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+pub fn get_validator_list(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
-    Ok(config.authority)
+    Ok(config.validator_list)
+}
+
+pub fn get_config_admin(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.admin)
+}
+
+pub fn get_config_blacklist_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.blacklist_authority)
+}
+
+pub fn get_config_parameter_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.parameters_authority)
 }
 
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {
@@ -40,8 +160,6 @@ pub fn get_target_lamports(delegation: &Delegation, stake_pool_lamports: u64) ->
         .ok_or_else(|| StewardError::ArithmeticError.into())
 }
 
-const VEC_SIZE_BYTES: usize = 4;
-
 /// Utility to efficiently extract stake lamports and transient stake from a validator list.
 /// Frankenstein of spl_stake_pool::big_vec::BigVec::deserialize_slice
 /// and spl_stake_pool::state::ValidatorStakeInfo::active_lamports_greater_than
@@ -53,11 +171,11 @@ pub fn stake_lamports_at_validator_list_index(
     let active_start_index =
         VEC_SIZE_BYTES.saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN));
     let active_end_index = active_start_index
-        .checked_add(8)
+        .checked_add(U64_SIZE)
         .ok_or(StewardError::ArithmeticError)?;
     let transient_start_index = active_end_index;
     let transient_end_index = transient_start_index
-        .checked_add(8)
+        .checked_add(U64_SIZE)
         .ok_or(StewardError::ArithmeticError)?;
     let slice = &validator_list.data[active_start_index..active_end_index];
     let active_stake_lamport_pod = pod_from_bytes::<PodU64>(slice).unwrap();
@@ -84,6 +202,50 @@ pub fn get_validator_stake_info_at_index(
         .ok_or(StewardError::ValidatorNotInList)?;
 
     Ok(validator_stake_info)
+}
+
+pub fn check_validator_list_has_stake_status_other_than(
+    validator_list_account_info: &AccountInfo,
+    flags: &[StakeStatus],
+) -> Result<bool> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+
+    for index in 0..validator_list.len() as usize {
+        let stake_status_index = VEC_SIZE_BYTES
+            .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+            .checked_add(STAKE_STATUS_OFFSET)
+            .ok_or(StewardError::ArithmeticError)?;
+
+        let stake_status = validator_list.data[stake_status_index];
+
+        let mut has_flag = false;
+        for flag in flags.iter() {
+            if stake_status == *flag as u8 {
+                has_flag = true;
+            }
+        }
+
+        if !has_flag {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> Result<usize> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+    Ok(validator_list.len() as usize)
 }
 
 /// A boolean type stored as a u8.
@@ -184,6 +346,8 @@ impl IdlBuild for PreferredValidatorType {
     }
 }
 
+// Below are nice to haves for deserializing accounts but not strictly necessary for on-chain logic
+// A good amount of this is copied from anchor
 #[derive(Clone)]
 pub struct StakePool(spl_stake_pool::state::StakePool);
 
@@ -228,9 +392,6 @@ impl Deref for StakePool {
         &self.0
     }
 }
-
-// #[cfg(feature = "idl-build")]
-// impl anchor_lang::IdlBuild for StakePool {}
 
 #[derive(Clone)]
 pub struct ValidatorList(spl_stake_pool::state::ValidatorList);

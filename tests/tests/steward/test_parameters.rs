@@ -174,8 +174,8 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
 async fn test_update_parameters() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config(None).await;
-    fixture.initialize_steward_state().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
 
     _set_parameter(
         &fixture,
@@ -242,7 +242,8 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
-        padding0: [0; 6],
+        _padding_0: [0; 6],
+        _padding_1: [0; 32],
     });
 
     // First Valid Epoch

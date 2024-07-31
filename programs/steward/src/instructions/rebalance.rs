@@ -1,6 +1,7 @@
 use std::num::NonZeroU32;
 
 use anchor_lang::{
+    idl::*,
     prelude::*,
     solana_program::{
         program::invoke_signed,
@@ -8,6 +9,7 @@ use anchor_lang::{
         system_program, sysvar, vote,
     },
 };
+use borsh::BorshDeserialize;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
@@ -19,9 +21,13 @@ use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
     delegation::RebalanceType,
     errors::StewardError,
-    maybe_transition_and_emit,
-    utils::{deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index},
-    Config, Staker, StewardStateAccount,
+    events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
+    maybe_transition,
+    utils::{
+        deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
+        state_checks,
+    },
+    Config, StewardStateAccount, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -50,13 +56,6 @@ pub struct Rebalance<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = get_stake_pool_address(&config)?)]
     pub stake_pool: AccountInfo<'info>,
-
-    #[account(
-        mut,
-        seeds = [Staker::SEED, config.key().as_ref()],
-        bump = staker.bump
-    )]
-    pub staker: Account<'info, Staker>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
@@ -114,8 +113,7 @@ pub struct Rebalance<'info> {
     )]
     pub transient_stake_account: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(owner = vote::program::ID)]
+    /// CHECK: We check the owning program in the handler
     pub vote_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -140,61 +138,78 @@ pub struct Rebalance<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
-    let config = ctx.accounts.config.load()?;
-    let mut state_account = ctx.accounts.state_account.load_mut()?;
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
+    let config = ctx.accounts.config.load()?;
 
-    let validator_stake_info =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
-    require!(
-        validator_stake_info.vote_account_address == validator_history.vote_account,
-        StewardError::ValidatorNotInList
-    );
-    let transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
+    let rebalance_type: RebalanceType;
+    let transient_seed: u64;
 
-    if config.is_paused() {
-        return Err(StewardError::StateMachinePaused.into());
+    {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+        state_checks(
+            &clock,
+            &config,
+            &state_account,
+            &ctx.accounts.validator_list,
+            Some(StewardStateEnum::Rebalance),
+        )?;
+
+        let validator_stake_info =
+            get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+        require!(
+            validator_stake_info.vote_account_address == validator_history.vote_account,
+            StewardError::ValidatorNotInList
+        );
+
+        if ctx.accounts.vote_account.owner != &vote::program::ID
+            && !state_account
+                .state
+                .validators_to_remove
+                .get(validator_list_index)?
+        {
+            return Err(StewardError::ValidatorNeedsToBeMarkedForRemoval.into());
+        }
+
+        transient_seed = u64::from(validator_stake_info.transient_seed_suffix);
+
+        let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
+        let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
+
+        rebalance_type = {
+            let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
+            let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
+
+            let stake_pool_lamports_with_fixed_cost =
+                deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
+            let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+
+            state_account.state.rebalance(
+                clock.epoch,
+                validator_list_index,
+                &validator_list,
+                stake_pool_lamports_with_fixed_cost,
+                reserve_lamports_with_rent,
+                minimum_delegation,
+                stake_rent,
+                &config.parameters,
+            )?
+        };
     }
 
-    let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
-    let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
-
-    let result = {
-        let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
-        let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
-
-        let stake_pool_lamports_with_fixed_cost =
-            deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
-        let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
-
-        state_account.state.rebalance(
-            clock.epoch,
-            validator_list_index,
-            &validator_list,
-            stake_pool_lamports_with_fixed_cost,
-            reserve_lamports_with_rent,
-            minimum_delegation,
-            stake_rent,
-            &config.parameters,
-        )?
-    };
-
-    match result {
+    match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
                     &ctx.accounts.stake_pool_program.key(),
                     &ctx.accounts.stake_pool.key(),
-                    &ctx.accounts.staker.key(),
+                    &ctx.accounts.state_account.key(),
                     &ctx.accounts.withdraw_authority.key(),
                     &ctx.accounts.validator_list.key(),
                     &ctx.accounts.reserve_stake.key(),
@@ -205,7 +220,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 ),
                 &[
                     ctx.accounts.stake_pool.to_account_info(),
-                    ctx.accounts.staker.to_account_info(),
+                    ctx.accounts.state_account.to_account_info(),
                     ctx.accounts.withdraw_authority.to_owned(),
                     ctx.accounts.validator_list.to_account_info(),
                     ctx.accounts.reserve_stake.to_account_info(),
@@ -218,9 +233,9 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    Staker::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
-                    &[ctx.accounts.staker.bump],
+                    &[ctx.bumps.state_account],
                 ]],
             )?;
         }
@@ -229,7 +244,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 &spl_stake_pool::instruction::increase_validator_stake(
                     &ctx.accounts.stake_pool_program.key(),
                     &ctx.accounts.stake_pool.key(),
-                    &ctx.accounts.staker.key(),
+                    &ctx.accounts.state_account.key(),
                     &ctx.accounts.withdraw_authority.key(),
                     &ctx.accounts.validator_list.key(),
                     &ctx.accounts.reserve_stake.key(),
@@ -241,7 +256,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 ),
                 &[
                     ctx.accounts.stake_pool.to_account_info(),
-                    ctx.accounts.staker.to_account_info(),
+                    ctx.accounts.state_account.to_account_info(),
                     ctx.accounts.withdraw_authority.to_owned(),
                     ctx.accounts.validator_list.to_account_info(),
                     ctx.accounts.reserve_stake.to_account_info(),
@@ -256,21 +271,63 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    Staker::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
-                    &[ctx.accounts.staker.bump],
+                    &[ctx.bumps.state_account],
                 ]],
             )?;
         }
         RebalanceType::None => {}
     }
 
-    maybe_transition_and_emit(
-        &mut state_account.state,
-        &clock,
-        &config.parameters,
-        &epoch_schedule,
-    )?;
+    {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+        emit!(rebalance_to_event(
+            ctx.accounts.vote_account.key(),
+            clock.epoch as u16,
+            rebalance_type
+        ));
+
+        if let Some(event) = maybe_transition(
+            &mut state_account.state,
+            &clock,
+            &config.parameters,
+            &epoch_schedule,
+        )? {
+            emit!(event);
+        }
+    }
 
     Ok(())
+}
+
+fn rebalance_to_event(
+    vote_account: Pubkey,
+    epoch: u16,
+    rebalance_type: RebalanceType,
+) -> RebalanceEvent {
+    match rebalance_type {
+        RebalanceType::None => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::None,
+            increase_lamports: 0,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Increase(lamports) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Increase,
+            increase_lamports: lamports,
+            decrease_components: DecreaseComponents::default(),
+        },
+        RebalanceType::Decrease(decrease_components) => RebalanceEvent {
+            vote_account,
+            epoch,
+            rebalance_type_tag: RebalanceTypeTag::Decrease,
+            increase_lamports: 0,
+            decrease_components,
+        },
+    }
 }

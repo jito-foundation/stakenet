@@ -3,7 +3,8 @@ use crate::{
     constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
-    Delegation, StewardStateEnum,
+    utils::get_validator_list,
+    Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::ValidatorListHeader;
@@ -43,10 +44,8 @@ pub struct ReallocState<'info> {
 
     pub config: AccountLoader<'info, Config>,
 
-    /// CHECK: TODO add validator_list address to config
-    #[account(
-        owner = spl_stake_pool::ID,
-    )]
+    /// CHECK: We check against the Config
+    #[account(address = get_validator_list(&config)?)]
     pub validator_list: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
@@ -80,16 +79,19 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         state_account.state.yield_scores = [0; MAX_VALIDATORS];
         state_account.state.sorted_yield_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
         state_account.state.progress = BitMask::default();
-        state_account.state.current_epoch = clock.epoch;
+        state_account.state.current_epoch = 0; // will be set by epoch_maintenance
         state_account.state.next_cycle_epoch = clock
             .epoch
             .checked_add(config.parameters.num_epochs_between_scoring)
             .ok_or(StewardError::ArithmeticError)?;
         state_account.state.delegations = [Delegation::default(); MAX_VALIDATORS];
-        state_account.state.rebalance_completed = false.into();
         state_account.state.instant_unstake = BitMask::default();
         state_account.state.start_computing_scores_slot = clock.slot;
-        state_account.state._padding0 = [0; 6 + MAX_VALIDATORS * 8];
+        state_account.state.validators_to_remove = BitMask::default();
+        state_account.state.validators_for_immediate_removal = BitMask::default();
+        state_account.state.validators_added = 0;
+        state_account.state.clear_flags();
+        state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
     }
 
     Ok(())
