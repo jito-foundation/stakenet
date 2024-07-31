@@ -1,10 +1,8 @@
-# Running a Keeper Bot
+# Keeper Bot Quickstart
 
-The keeper bot keeps the
+Below are the steps to configuring and running the Stakenet Keeper Bot. We recommend running the docker container.
 
-## Raw
-
-## Docker
+## Setup
 
 ### Credentials
 
@@ -17,10 +15,14 @@ solana-keygen new -o ./credentials/keypair.json
 
 ### ENV
 
+In the root directory create a new folder named `config` and create a `.env` file inside of it
+
 ```bash
 mkdir config
 touch ./config/.env
 ```
+
+Then copy into the `.env` file the contents below. Everything should be set as-is, however consider replacing the `JSON_RPC_URL` and adjusting the `PRIORITY_FEES`
 
 ```.env
 # RPC URL for the cluster
@@ -91,4 +93,50 @@ RUN_STEWARD=true
 # Path to keypair used specifically for submitting permissioned transactions
 # For Jito Use Only ( For now )
 # ORACLE_AUTHORITY_KEYPAIR=
+```
+
+## Running Docker
+
+Once the setup is complete use the following commands to run/manage the docker container:
+
+> Note: We are running `Docker version 24.0.5, build ced0996`
+
+### Start Docker
+
+```bash
+docker compose --env-file config/.env up -d --build  validator-keeper --remove-orphans
+```
+
+### Stop Docker**
+
+```bash
+docker stop validator-keeper; docker rm validator-keeper;
+```
+
+### View Logs
+
+```bash
+docker logs validator-keeper -f
+```
+
+## Running Raw
+
+To run the keeper in terminal, build for release and run the program.
+
+### Build for Release
+
+```bash
+cargo build --release --bin validator-keeper
+```
+
+### Run Keeper
+
+```bash
+RUST_LOG=info cargo run --bin validator-keeper --
+```
+
+To see all available parameters run:
+
+```bash
+RUST_LOG=info cargo run --bin validator-keeper -- -h
 ```

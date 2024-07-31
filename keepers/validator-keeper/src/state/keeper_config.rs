@@ -63,7 +63,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value_t = jito_steward::id() 
+        default_value = "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8"
     )]
     pub steward_program_id: Pubkey,
 
@@ -71,7 +71,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value = "35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH"
+        default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
     )]
     pub steward_config: Pubkey,
 
@@ -95,33 +95,33 @@ pub struct Args {
     #[arg(long, env, default_value_t = Cluster::Mainnet)]
     pub cluster: Cluster,
 
-    /// Skip running the cluster history
+    /// Run running the cluster history
     #[arg(long, env, default_value = "true")]
     pub run_cluster_history: bool,
 
-    /// Skip MEV commission
+    /// Run MEV commission
     #[arg(long, env, default_value = "true")]
     pub run_copy_vote_accounts: bool,
 
-    /// Skip MEV commission
+    /// Run MEV commission
     #[arg(long, env, default_value = "true")]
     pub run_mev_commission: bool,
 
-    /// Skip MEV earned
+    /// Run MEV earned
     #[arg(long, env, default_value = "true")]
     pub run_mev_earned: bool,
 
-    /// Skip stake upload
+    /// Run stake upload
     /// NOTE: This is a permissioned operation and requires the oracle_authority_keypair
     #[arg(long, env, default_value = "false")]
     pub run_stake_upload: bool,
 
-    /// Skip gossip upload
+    /// Run gossip upload
     /// NOTE: This is a permissioned operation and requires the oracle_authority_keypair
     #[arg(long, env, default_value = "false")]
     pub run_gossip_upload: bool,
 
-    /// Skip stake upload
+    /// Run stake upload
     #[arg(long, env, default_value = "true")]
     pub run_steward: bool,
 
