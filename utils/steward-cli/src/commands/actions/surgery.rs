@@ -13,8 +13,7 @@ use crate::{
     commands::command_args::Surgery,
     utils::{
         accounts::{
-            get_steward_config_account, get_steward_state_account, get_steward_state_address,
-            get_validator_list_account,
+            get_steward_config_account, get_steward_state_address, get_validator_list_account,
         },
         transactions::configure_instruction,
     },
