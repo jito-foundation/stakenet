@@ -189,14 +189,14 @@ pub enum Commands {
     // Views
     ViewState(ViewState),
     ViewConfig(ViewConfig),
-    // ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewNextIndexToRemove(ViewNextIndexToRemove),
 
     // Actions
     InitConfig(InitConfig),
     UpdateConfig(UpdateConfig),
 
-    // InitState(InitState),
-    // ResetState(ResetState),
+    InitState(InitState),
+    ResetState(ResetState),
     Surgery(Surgery),
 
     RemoveBadValidators(RemoveBadValidators),
@@ -296,7 +296,15 @@ pub struct Surgery {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
+    #[arg(long)]
+    pub mark_for_removal: bool,
+
+    #[arg(long)]
+    pub immediate: bool,
+
+    #[arg(long)]
+    pub validator_list_index: usize,
+
     #[arg(long, default_value = "false")]
     pub submit_ix: bool,
 }

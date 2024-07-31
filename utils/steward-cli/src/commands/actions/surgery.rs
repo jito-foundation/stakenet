@@ -13,7 +13,8 @@ use crate::{
     commands::command_args::Surgery,
     utils::{
         accounts::{
-            get_all_steward_accounts, get_steward_state_account, get_steward_state_address,
+            get_steward_config_account, get_steward_state_account, get_steward_state_address,
+            get_validator_list_account,
         },
         transactions::configure_instruction,
     },
@@ -24,9 +25,21 @@ pub async fn command_surgery(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let validator_list_index: u64 = 0;
-    let mark_for_removal: u8 = 0xFF; // TRUE
-    let immediate: u8 = 0x00; // FALSE
+    let validator_list_index: u64 = args.validator_list_index as u64;
+    let mark_for_removal: u8 = {
+        if args.mark_for_removal {
+            0xFF // TRUE
+        } else {
+            0x00 // FALSE
+        }
+    };
+    let immediate: u8 = {
+        if args.immediate {
+            0xFF // TRUE
+        } else {
+            0x00 // FALSE
+        }
+    };
 
     let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
@@ -34,15 +47,24 @@ pub async fn command_surgery(
     let steward_config_address = args.permissioned_parameters.steward_config;
     let steward_state_address = get_steward_state_address(&program_id, &steward_config_address);
 
-    let steward_state_account =
-        get_steward_state_account(client, &program_id, &steward_config_address);
+    let steward_config_account =
+        get_steward_config_account(client, &steward_config_address).await?;
+    let validator_list_account =
+        get_validator_list_account(client, &steward_config_account.validator_list).await?;
 
     {
-        // CHECK index
+        println!("Submit: {}", args.submit_ix);
 
         println!("Validator list index: {}", validator_list_index);
         println!("Mark for removal: {}", mark_for_removal);
         println!("Immediate: {}", immediate);
+
+        let validator_to_mark = validator_list_account
+            .validators
+            .get(validator_list_index as usize)
+            .unwrap();
+
+        println!("Validator to mark: {:?}", validator_to_mark);
     }
 
     if args.submit_ix {
