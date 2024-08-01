@@ -20,6 +20,7 @@ pub struct KeeperConfig {
     pub run_flags: u32,
     pub full_startup: bool,
     pub no_pack: bool,
+    pub pay_for_new_accounts: bool,
     pub cool_down_range: u8,
 }
 
@@ -132,6 +133,10 @@ pub struct Args {
     /// DEBUGGING Don't smart pack instructions - it will be faster, but more expensive
     #[arg(long, env, default_value = "false")]
     pub no_pack: bool,
+
+    /// Pay for the creation of new accounts when needed
+    #[arg(long, env, default_value = "false")]
+    pub pay_for_new_accounts: bool,
 
     /// DEBUGGING Changes the random cool down range ( minutes )
     #[arg(long, env, default_value = "20")]

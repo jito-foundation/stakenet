@@ -127,7 +127,7 @@ cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $
 ## View State Per Validator
 
 ```bash
-cargo run -- --program-id sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --verbose --steward-config 35mMfFNiui7hcHy6xHTz11Q6YukbhH9qQgYR5dhWAQQH
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --verbose --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
 ## View Next Index To Remove

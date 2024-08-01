@@ -130,35 +130,40 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Creating missing accounts...");
-            match create_missing_accounts(&keeper_config, &keeper_state).await {
-                Ok(new_accounts_created) => {
-                    keeper_state
-                        .increment_update_run_for_epoch(KeeperOperations::CreateMissingAccounts);
+            if keeper_config.pay_for_new_accounts {
+                info!("Creating missing accounts...");
+                match create_missing_accounts(&keeper_config, &keeper_state).await {
+                    Ok(new_accounts_created) => {
+                        keeper_state.increment_update_run_for_epoch(
+                            KeeperOperations::CreateMissingAccounts,
+                        );
 
-                    let total_txs: usize = new_accounts_created.iter().map(|(_, txs)| txs).sum();
-                    keeper_state.increment_update_txs_for_epoch(
-                        KeeperOperations::CreateMissingAccounts,
-                        total_txs as u64,
-                    );
+                        let total_txs: usize =
+                            new_accounts_created.iter().map(|(_, txs)| txs).sum();
+                        keeper_state.increment_update_txs_for_epoch(
+                            KeeperOperations::CreateMissingAccounts,
+                            total_txs as u64,
+                        );
 
-                    new_accounts_created
-                        .iter()
-                        .for_each(|(operation, created_accounts)| {
-                            keeper_state.increment_creations_for_epoch((
-                                operation.clone(),
-                                *created_accounts as u64,
-                            ));
-                        });
-                }
-                Err(e) => {
-                    error!("Failed to create missing accounts: {:?}", e);
+                        new_accounts_created
+                            .iter()
+                            .for_each(|(operation, created_accounts)| {
+                                keeper_state.increment_creations_for_epoch((
+                                    operation.clone(),
+                                    *created_accounts as u64,
+                                ));
+                            });
+                    }
+                    Err(e) => {
+                        error!("Failed to create missing accounts: {:?}", e);
 
-                    keeper_state
-                        .increment_update_error_for_epoch(KeeperOperations::CreateMissingAccounts);
+                        keeper_state.increment_update_error_for_epoch(
+                            KeeperOperations::CreateMissingAccounts,
+                        );
 
-                    advance_tick(&mut tick);
-                    continue;
+                        advance_tick(&mut tick);
+                        continue;
+                    }
                 }
             }
 
@@ -320,6 +325,7 @@ async fn main() {
         run_flags,
         full_startup: args.full_startup,
         no_pack: args.no_pack,
+        pay_for_new_accounts: args.pay_for_new_accounts,
         cool_down_range: args.cool_down_range,
     };
 
