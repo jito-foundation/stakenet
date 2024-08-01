@@ -277,6 +277,8 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
 #[tokio::main]
 async fn main() {
+    info!("\n👋 Welcome to the Jito Stakenet Keeper!\n\n");
+
     dotenv().ok();
     env_logger::init();
     let args = Args::parse();
@@ -306,8 +308,6 @@ async fn main() {
         solana_net_utils::parse_host_port(&gossip_entrypoint)
             .expect("Failed to parse host and port from gossip entrypoint")
     });
-
-    info!("👋 Welcome to the Jito Stakenet Keeper!\n\n");
 
     let config = KeeperConfig {
         client,

@@ -18,10 +18,10 @@ pub struct KeeperConfig {
     pub steward_interval: u64,
     pub metrics_interval: u64,
     pub run_flags: u32,
+    pub cool_down_range: u8,
     pub full_startup: bool,
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
-    pub cool_down_range: u8,
 }
 
 #[derive(Parser, Debug)]

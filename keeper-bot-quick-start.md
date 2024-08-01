@@ -1,4 +1,4 @@
-# Keeper Bot Quickstart
+# Keeper Bot Quick-start
 
 Below are the steps to configuring and running the Stakenet Keeper Bot. We recommend running the docker container.
 
@@ -79,6 +79,9 @@ RUN_STEWARD=true
 
 # Running with no_pack set to true skips packing the instructions and will cost more
 # NO_PACK=false
+
+# Pay for new accounts when necessary
+# PAY_FOR_NEW_ACCOUNTS=false
 
 # Max time in minutes to wait after any fire cycle
 # COOL_DOWN_RANGE=20
