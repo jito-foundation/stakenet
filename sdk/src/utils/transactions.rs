@@ -234,7 +234,7 @@ async fn find_ix_per_tx(
     let compute = response
         .value
         .units_consumed
-        .unwrap_or(DEFAULT_COMPUTE_LIMIT as u64);
+        .unwrap_or(DEFAULT_COMPUTE_LIMIT);
 
     let serialized_size = Packet::from_data(None, &test_tx).unwrap().meta().size;
 
@@ -580,6 +580,7 @@ pub async fn pack_instructions(
     Ok(result)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn parallel_execute_instructions(
     client: &Arc<RpcClient>,
     instructions: &[Instruction],

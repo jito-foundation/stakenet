@@ -6136,7 +6136,6 @@ dependencies = [
  "futures",
  "futures-util",
  "jito-steward",
- "keeper-core",
  "log",
  "solana-account-decoder",
  "solana-clap-utils",
@@ -6144,10 +6143,13 @@ dependencies = [
  "solana-metrics",
  "solana-program",
  "solana-sdk",
+ "spl-pod",
  "spl-stake-pool",
+ "stakenet-sdk",
  "thiserror",
  "tokio",
  "validator-history",
+ "validator-keeper",
 ]
 
 [[package]]

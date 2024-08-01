@@ -19,8 +19,6 @@ pub async fn command_view_config(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    all_steward_accounts.stake_pool_account.staker;
-
     // let mut output = String::new(); // Initialize the string directly
     _print_default_config(
         &all_steward_accounts.config_address,
