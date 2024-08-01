@@ -1,15 +1,14 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
 use jito_steward::utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
-use solana_sdk::account::Account;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
+use solana_sdk::stake::state::StakeStateV2;
 use solana_sdk::vote::state::VoteState;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
 use spl_stake_pool::instruction::{
@@ -40,7 +39,7 @@ pub fn _get_update_stake_pool_ixs(
     stake_pool: &StakePool,
     validator_list: &ValidatorList,
     stake_pool_address: &Pubkey,
-    all_vote_accounts: HashMap<Pubkey, Option<Account>>,
+    all_validator_accounts: &AllValidatorAccounts,
     no_merge: bool,
     epoch: u64,
 ) -> (Vec<Instruction>, Vec<Instruction>, Vec<Instruction>) {
@@ -94,7 +93,8 @@ pub fn _get_update_stake_pool_ixs(
         .validators
         .iter()
         .find(|validator_info| {
-            let raw_vote_account = all_vote_accounts
+            let raw_vote_account = all_validator_accounts
+                .all_vote_account_map
                 .get(&validator_info.vote_account_address)
                 .expect("Vote account not found");
 
@@ -115,24 +115,44 @@ pub fn _get_update_stake_pool_ixs(
         .expect("Need at least one okay validator");
 
     for validator_info in validator_list.validators.iter() {
-        let raw_vote_account = all_vote_accounts
+        let raw_vote_account = all_validator_accounts
+            .all_vote_account_map
             .get(&validator_info.vote_account_address)
             .expect("Vote account not found");
 
-        let mut should_deactivate = false;
+        let raw_stake_account = all_validator_accounts
+            .all_stake_account_map
+            .get(&validator_info.vote_account_address)
+            .expect("Stake account not found");
 
-        if raw_vote_account.is_none() {
-            should_deactivate = true;
+        let should_deactivate = if raw_vote_account.is_none() || raw_stake_account.is_none() {
+            true
         } else {
+            let stake_account =
+                StakeStateV2::deserialize(&mut raw_stake_account.clone().unwrap().data.as_slice())
+                    .expect("Could not deserialize stake account");
+
             let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
                 .expect("Could not deserialize vote account");
 
             let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-            if latest_epoch <= epoch - 5 {
-                should_deactivate = true;
+            match stake_account {
+                StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                    if stake.delegation.deactivation_epoch != std::u64::MAX {
+                        false
+                    } else if latest_epoch <= epoch - 5 {
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => {
+                    println!("🔶 Error: Stake account is not StakeStateV2::Stake");
+                    false
+                }
             }
-        }
+        };
 
         if should_deactivate {
             let stake_account =
@@ -182,12 +202,12 @@ async fn _update_pool(
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut stats = SubmitStats::default();
 
-    let (update_ixs, _deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
+    let (update_ixs, deactivate_delinquent_ixs, cleanup_ixs) = _get_update_stake_pool_ixs(
         &spl_stake_pool::ID,
         &all_steward_accounts.stake_pool_account,
         &all_steward_accounts.validator_list_account,
         &all_steward_accounts.stake_pool_address,
-        all_validator_accounts.all_vote_account_map.clone(),
+        all_validator_accounts,
         false,
         epoch,
     );
@@ -200,19 +220,19 @@ async fn _update_pool(
 
     stats.combine(&update_stats);
 
-    //TODO fix
-    // println!("Deactivating Delinquent");
-    // let deactivate_txs_to_run = package_instructions(
-    //     &deactivate_delinquent_ixs,
-    //     1,
-    //     priority_fee,
-    //     Some(1_400_000),
-    //     None,
-    // );
-    // let update_stats =
-    //     submit_packaged_transactions(client, deactivate_txs_to_run, payer, Some(50), None).await?;
+    // TODO fix
+    println!("Deactivating Delinquent");
+    let deactivate_txs_to_run = package_instructions(
+        &deactivate_delinquent_ixs,
+        1,
+        priority_fee,
+        Some(1_400_000),
+        None,
+    );
+    let update_stats =
+        submit_packaged_transactions(client, deactivate_txs_to_run, payer, Some(50), None).await?;
 
-    // stats.combine(&update_stats);
+    stats.combine(&update_stats);
 
     println!("Cleaning Pool");
     let cleanup_txs_to_run =
