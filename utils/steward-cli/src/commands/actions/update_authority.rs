@@ -55,7 +55,7 @@ pub async fn command_update_authority(
         program_id,
         accounts: jito_steward::accounts::SetNewAuthority {
             config: steward_config,
-            new_authority: new_authority,
+            new_authority,
             admin: authority.pubkey(),
         }
         .to_account_metas(None),

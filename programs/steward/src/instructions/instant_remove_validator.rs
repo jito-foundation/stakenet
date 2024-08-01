@@ -12,6 +12,7 @@ use spl_stake_pool::state::StakeStatus;
 #[derive(Accounts)]
 pub struct InstantRemoveValidator<'info> {
     pub config: AccountLoader<'info, Config>,
+
     #[account(
         mut,
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],

@@ -62,6 +62,7 @@ If manual intervention is required, the following spl-stake-pool instructions ar
 */
 #[program]
 pub mod steward {
+
     use super::*;
 
     /* Initialization instructions */
@@ -189,6 +190,21 @@ pub mod steward {
     /// Resets steward state account to its initial state.
     pub fn reset_steward_state(ctx: Context<ResetStewardState>) -> Result<()> {
         instructions::reset_steward_state::handler(ctx)
+    }
+
+    /// Admin to mark or unmark validator for removal and unstuck the machine
+    pub fn admin_mark_for_removal(
+        ctx: Context<AdminMarkForRemoval>,
+        validator_list_index: u64,
+        mark_for_removal: u8,
+        immediate: u8,
+    ) -> Result<()> {
+        instructions::admin_mark_for_removal::handler(
+            ctx,
+            validator_list_index as usize,
+            mark_for_removal != 0,
+            immediate != 0,
+        )
     }
 
     /// Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).

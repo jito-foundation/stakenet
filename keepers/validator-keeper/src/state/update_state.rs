@@ -14,11 +14,11 @@ use stakenet_sdk::utils::{
         get_all_validator_history_accounts, get_cluster_history_address,
         get_validator_history_address,
     },
+    helpers::get_balance_with_retry,
     instructions::get_create_validator_history_instructions,
     transactions::{
         get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
     },
-    utils::get_balance_with_retry,
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 

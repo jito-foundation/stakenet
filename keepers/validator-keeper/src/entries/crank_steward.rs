@@ -24,7 +24,7 @@ use stakenet_sdk::utils::accounts::{
     get_cluster_history_address, get_stake_address, get_steward_state_account,
     get_transient_stake_address,
 };
-use stakenet_sdk::utils::utils::{check_stake_accounts, get_unprogressed_validators};
+use stakenet_sdk::utils::helpers::{check_stake_accounts, get_unprogressed_validators};
 use stakenet_sdk::utils::{
     accounts::get_validator_history_address,
     transactions::{
@@ -107,10 +107,7 @@ pub fn _get_update_stake_pool_ixs(
 
             let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-            if latest_epoch == epoch || latest_epoch == epoch - 1 {
-                return true;
-            }
-            return false;
+            latest_epoch == epoch || latest_epoch == epoch - 1
         })
         .expect("Need at least one okay validator");
 
@@ -141,10 +138,8 @@ pub fn _get_update_stake_pool_ixs(
                 StakeStateV2::Stake(_meta, stake, _stake_flags) => {
                     if stake.delegation.deactivation_epoch != std::u64::MAX {
                         false
-                    } else if latest_epoch <= epoch - 5 {
-                        true
                     } else {
-                        false
+                        latest_epoch <= epoch - 5
                     }
                 }
                 _ => {
@@ -156,7 +151,7 @@ pub fn _get_update_stake_pool_ixs(
 
         if should_deactivate {
             let stake_account =
-                get_stake_address(&validator_info.vote_account_address, &stake_pool_address);
+                get_stake_address(&validator_info.vote_account_address, stake_pool_address);
 
             let ix = deactivate_delinquent_stake(
                 &stake_account,

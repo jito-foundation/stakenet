@@ -122,6 +122,51 @@
       ]
     },
     {
+      "name": "admin_mark_for_removal",
+      "docs": [
+        "Admin to mark or unmark validator for removal and unstuck the machine"
+      ],
+      "discriminator": [
+        213,
+        225,
+        98,
+        245,
+        9,
+        15,
+        154,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        },
+        {
+          "name": "mark_for_removal",
+          "type": "u8"
+        },
+        {
+          "name": "immediate",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "auto_add_validator_to_pool",
       "docs": [
         "Adds a validator to the pool if it has a validator history account, matches stake_minimum, and is not yet in the pool"
@@ -2771,10 +2816,10 @@
             }
           },
           {
-            "name": "validators_to_remove",
+            "name": "validators_for_immediate_removal",
             "docs": [
-              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
-              "This is cleaned up in the next epoch"
+              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This happens when a validator is able to be removed within the same epoch as it was marked"
             ],
             "type": {
               "defined": {
@@ -2783,10 +2828,10 @@
             }
           },
           {
-            "name": "validators_for_immediate_removal",
+            "name": "validators_to_remove",
             "docs": [
-              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
-              "This happens when a validator is able to be removed within the same epoch as it was marked"
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
             ],
             "type": {
               "defined": {
