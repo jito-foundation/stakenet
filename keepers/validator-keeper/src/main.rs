@@ -286,6 +286,8 @@ async fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
+    info!("{}\n\n", args.to_string());
+
     set_host_id(format!("{}", args.cluster));
 
     let client = Arc::new(RpcClient::new_with_timeout(

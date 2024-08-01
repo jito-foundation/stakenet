@@ -1,3 +1,5 @@
+use std::fmt;
+
 use clap::{arg, command, Parser};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -141,4 +143,63 @@ pub struct Args {
     /// DEBUGGING Changes the random cool down range ( minutes )
     #[arg(long, env, default_value = "20")]
     pub cool_down_range: u8,
+}
+
+impl fmt::Display for Args {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Stakenet Keeper Configuration:\n\
+            -------------------------------\n\
+            JSON RPC URL: {}\n\
+            Gossip Entrypoint: {:?}\n\
+            Keypair Path: {:?}\n\
+            Oracle Authority Keypair Path: {:?}\n\
+            Validator History Program ID: {}\n\
+            Tip Distribution Program ID: {}\n\
+            Steward Program ID: {}\n\
+            Steward Config: {}\n\
+            Validator History Interval: {} seconds\n\
+            Steward Interval: {} seconds\n\
+            Metrics Interval: {} seconds\n\
+            Priority Fees: {} microlamports\n\
+            Cluster: {:?}\n\
+            Run Cluster History: {}\n\
+            Run Copy Vote Accounts: {}\n\
+            Run MEV Commission: {}\n\
+            Run MEV Earned: {}\n\
+            Run Stake Upload: {}\n\
+            Run Gossip Upload: {}\n\
+            Run Steward: {}\n\
+            Full Startup: {}\n\
+            No Pack: {}\n\
+            Pay for New Accounts: {}\n\
+            Cool Down Range: {} minutes\n\
+            -------------------------------",
+            self.json_rpc_url,
+            self.gossip_entrypoint,
+            self.keypair,
+            self.oracle_authority_keypair,
+            self.validator_history_program_id,
+            self.tip_distribution_program_id,
+            self.steward_program_id,
+            self.steward_config,
+            self.validator_history_interval,
+            self.steward_interval,
+            self.metrics_interval,
+            self.priority_fees,
+            self.cluster,
+            self.run_cluster_history,
+            self.run_copy_vote_accounts,
+            self.run_mev_commission,
+            self.run_mev_earned,
+            self.run_stake_upload,
+            self.run_gossip_upload,
+            self.run_steward,
+            self.full_startup,
+            self.no_pack,
+            self.pay_for_new_accounts,
+            self.cool_down_range
+        )
+    }
 }
