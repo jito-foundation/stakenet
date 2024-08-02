@@ -58,6 +58,7 @@ RUN_COPY_VOTE_ACCOUNTS=true
 RUN_MEV_COMMISSION=true
 RUN_MEV_EARNED=true
 RUN_STEWARD=true
+RUN_EMIT_METRICS=true
 
 ################# DEBUGGING AND JITO USE ONLY #################
 
