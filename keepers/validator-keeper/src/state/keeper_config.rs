@@ -128,6 +128,10 @@ pub struct Args {
     #[arg(long, env, default_value = "true")]
     pub run_steward: bool,
 
+    /// Run emit metrics
+    #[arg(long, env, default_value = "true")]
+    pub run_emit_metrics: bool,
+
     /// Run with the startup flag set to true
     #[arg(long, env, default_value = "true")]
     pub full_startup: bool,
@@ -171,6 +175,7 @@ impl fmt::Display for Args {
             Run Stake Upload: {}\n\
             Run Gossip Upload: {}\n\
             Run Steward: {}\n\
+            Run Emit Metrics: {}\n\
             Full Startup: {}\n\
             No Pack: {}\n\
             Pay for New Accounts: {}\n\
@@ -196,6 +201,7 @@ impl fmt::Display for Args {
             self.run_stake_upload,
             self.run_gossip_upload,
             self.run_steward,
+            self.run_emit_metrics,
             self.full_startup,
             self.no_pack,
             self.pay_for_new_accounts,

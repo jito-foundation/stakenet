@@ -48,6 +48,9 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_steward {
         run_flags = set_flag(run_flags, KeeperOperations::Steward);
     }
+    if args.run_emit_metrics {
+        run_flags = set_flag(run_flags, KeeperOperations::EmitMetrics);
+    }
 
     run_flags
 }

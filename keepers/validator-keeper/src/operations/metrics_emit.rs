@@ -16,7 +16,7 @@ use validator_history::ValidatorHistoryEntry;
 use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
-    KeeperOperations::EmitHistory
+    KeeperOperations::EmitMetrics
 }
 
 fn _should_run() -> bool {

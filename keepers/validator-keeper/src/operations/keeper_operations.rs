@@ -37,7 +37,7 @@ pub enum KeeperOperations {
     MevEarned,
     MevCommission,
     Steward,
-    EmitHistory,
+    EmitMetrics,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -217,17 +217,17 @@ impl KeeperOperations {
             // EMIT HISTORY
             (
                 "num-emit-metrics-runs",
-                runs_for_epoch[KeeperOperations::EmitHistory as usize],
+                runs_for_epoch[KeeperOperations::EmitMetrics as usize],
                 i64
             ),
             (
                 "num-emit-metrics-errors",
-                errors_for_epoch[KeeperOperations::EmitHistory as usize],
+                errors_for_epoch[KeeperOperations::EmitMetrics as usize],
                 i64
             ),
             (
                 "num-emit-metrics-txs",
-                txs_for_epoch[KeeperOperations::EmitHistory as usize],
+                txs_for_epoch[KeeperOperations::EmitMetrics as usize],
                 i64
             ),
             // STEWARD
