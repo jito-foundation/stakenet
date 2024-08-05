@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use spl_stake_pool::big_vec::BigVec;
 
+use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
 use crate::{
     errors::StewardError,
@@ -250,6 +251,7 @@ impl UnstakeState {
         // either to the target or to the previous balance before the deposit, whichever is lower in terms of total lamports unstaked
         if current_lamports > state.validator_lamport_balances[index]
             && self.stake_deposit_unstake_total < self.stake_deposit_unstake_cap
+            && state.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT
         {
             let lamports_above_target = current_lamports
                 .checked_sub(target_lamports)

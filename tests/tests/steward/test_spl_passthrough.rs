@@ -5,7 +5,7 @@ use anchor_lang::{
     AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    constants::MAX_VALIDATORS,
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS},
     derive_steward_state_address,
     utils::{StakePool, ValidatorList},
     Config, Delegation, StewardStateAccount, StewardStateEnum,
@@ -300,7 +300,7 @@ async fn _increase_and_check_stake(
 
     let state_account_before: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
-    let lamports_before_increase = *state_account_before
+    let _lamports_before_increase = *state_account_before
         .state
         .validator_lamport_balances
         .get(validator_list_index)
@@ -354,10 +354,7 @@ async fn _increase_and_check_stake(
         .get(validator_list_index)
         .expect("Lamport balance out of bounds");
 
-    assert_eq!(
-        lamports_after_increase,
-        lamports_before_increase + lamports_to_stake
-    );
+    assert_eq!(lamports_after_increase, LAMPORT_BALANCE_DEFAULT);
 }
 
 async fn _increase_and_check_additional_stake(
@@ -386,7 +383,7 @@ async fn _increase_and_check_additional_stake(
 
     let state_account_before: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
-    let lamports_before_increase = *state_account_before
+    let _lamports_before_increase = *state_account_before
         .state
         .validator_lamport_balances
         .get(validator_list_index)
@@ -447,10 +444,7 @@ async fn _increase_and_check_additional_stake(
         .get(validator_list_index)
         .expect("Lamport balance out of bounds");
 
-    assert_eq!(
-        lamports_after_increase,
-        lamports_before_increase + lamports_to_stake
-    );
+    assert_eq!(lamports_after_increase, LAMPORT_BALANCE_DEFAULT);
 }
 
 pub async fn _set_staker(fixture: &TestFixture, new_staker: Pubkey) {

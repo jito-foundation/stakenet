@@ -1,5 +1,5 @@
 use crate::{
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     state::{Config, StewardStateAccount},
     utils::{deserialize_stake_pool, get_config_admin, get_stake_pool_address},
@@ -47,6 +47,7 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
 
     state_account.state.state_tag = StewardStateEnum::ComputeScores;
     state_account.state.num_pool_validators = validator_list.len() as u64;
+    state_account.state.validator_lamport_balances = [LAMPORT_BALANCE_DEFAULT; MAX_VALIDATORS];
     state_account.state.scores = [0; MAX_VALIDATORS];
     state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
     state_account.state.yield_scores = [0; MAX_VALIDATORS];

@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use crate::{
     bitmask::BitMask,
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -901,6 +901,11 @@ impl StewardState {
                 In all cases where the current_lamports is now below the target or internal balance, we update the internal balance.
                 Otherwise, keep the internal balance the same to ensure we still see the stake deposit delta, until it can be unstaked.
                 */
+
+                if self.validator_lamport_balances[index] == LAMPORT_BALANCE_DEFAULT {
+                    self.validator_lamport_balances[index] = current_lamports;
+                }
+
                 self.validator_lamport_balances[index] = match (
                     current_lamports < self.validator_lamport_balances[index],
                     current_lamports < target_lamports,
@@ -1012,9 +1017,12 @@ impl StewardState {
                     }
                 }
                 RebalanceType::Increase(amount) => {
-                    self.validator_lamport_balances[index] = self.validator_lamport_balances[index]
-                        .checked_add(amount)
-                        .ok_or(StewardError::ArithmeticError)?;
+                    if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
+                        self.validator_lamport_balances[index] = self.validator_lamport_balances
+                            [index]
+                            .checked_add(amount)
+                            .ok_or(StewardError::ArithmeticError)?;
+                    }
                 }
                 RebalanceType::None => {}
             }
