@@ -859,12 +859,6 @@ impl StewardState {
                 .checked_add(stake_rent)
                 .ok_or(StewardError::ArithmeticError)?;
 
-            msg!("Reserve lamports before adjustment: {}", reserve_lamports);
-            msg!(
-                "Stake pool lamports before adjustment: {}",
-                stake_pool_lamports
-            );
-
             // Maximum increase amount is the total lamports in the reserve stake account minus (num_validators + 1) * stake_rent, which covers rent for all validators plus the transient rent
             let all_accounts_needed_reserve_for_rent = validator_list
                 .len()
@@ -947,6 +941,7 @@ impl StewardState {
                     self,
                     index,
                     unstake_state,
+                    current_lamports,
                     stake_pool_lamports,
                     validator_list,
                     minimum_delegation,
@@ -966,15 +961,6 @@ impl StewardState {
             } else {
                 RebalanceType::None
             };
-
-            msg!("Reserve lamports after adjustment: {}", reserve_lamports);
-            msg!(
-                "Stake pool lamports after adjustment: {}",
-                stake_pool_lamports
-            );
-            msg!("Rebalance Type: {:?}", rebalance);
-            msg!("Current Lamports: {}", current_lamports);
-            msg!("Target Lamports: {}", target_lamports);
 
             // Update internal state based on rebalance
             match rebalance {

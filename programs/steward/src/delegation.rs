@@ -26,6 +26,7 @@ pub fn decrease_stake_calculation(
     state: &StewardState,
     target_index: usize,
     mut unstake_state: UnstakeState,
+    current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
     stake_pool_lamports: u64,
     validator_list: &BigVec<'_>,
     minimum_delegation: u64,
@@ -55,6 +56,10 @@ pub fn decrease_stake_calculation(
 
         // ValidatorList includes base lamports in active_stake_lamports
         temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);
+
+        if temp_index == target_index {
+            temp_current_lamports = current_lamports;
+        }
 
         // For the current `temp` validator, calculate how much we can remove and what category it's coming from
         let unstake_amounts =
