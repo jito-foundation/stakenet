@@ -80,7 +80,6 @@ jobs:
         with:
           crate: anchor-cli
           version: "0.30.1"
-          # args: "--locked"
       - name: install solana toolsuite
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
