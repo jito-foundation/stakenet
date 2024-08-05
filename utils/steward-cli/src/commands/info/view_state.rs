@@ -372,7 +372,7 @@ fn _print_verbose_state(
     }
 
     println!("\nAll Ranked Validators ( {} ): \n", top_scores.len());
-    println!("{:<45} : {}\n", "Vote Account", "Score");
+    println!("{:<45} : Score\n", "Vote Account");
 
     top_scores.sort_by(|a, b| b.1.cmp(&a.1));
     top_scores.iter().for_each(|(vote_account, score)| {
