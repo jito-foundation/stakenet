@@ -58,6 +58,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
+          version: "0.1.45"
       - run: cargo +nightly-2024-02-04 udeps --all-features --all-targets --tests
 
   verified_build:
@@ -68,6 +69,8 @@ jobs:
         with:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-02-04
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
