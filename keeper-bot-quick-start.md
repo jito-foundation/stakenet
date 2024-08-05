@@ -60,7 +60,7 @@ RUN_MEV_EARNED=true
 RUN_STEWARD=true
 RUN_EMIT_METRICS=true
 
-################# DEBUGGING AND JITO USE ONLY #################
+################# DEBUGGING AND ORACLE USE ONLY #################
 
 # Interval to update Validator History Accounts (in seconds)
 # VALIDATOR_HISTORY_INTERVAL=300
@@ -71,7 +71,7 @@ RUN_EMIT_METRICS=true
 # Interval to emit metrics (in seconds)
 # METRICS_INTERVAL=60
 
-# For Jito Use Only ( For now )
+# For ORACLE_AUTHORITY operator
 # RUN_STAKE_UPLOAD=false
 # RUN_GOSSIP_UPLOAD=false
 
@@ -91,11 +91,10 @@ RUN_EMIT_METRICS=true
 # GOSSIP_ENTRYPOINT=
 
 # Metrics upload config
-# For Jito Use Only ( For now )
+# For uploading metrics to your private InfluxDB instance
 # SOLANA_METRICS_CONFIG=
 
 # Path to keypair used specifically for submitting permissioned transactions
-# For Jito Use Only ( For now )
 # ORACLE_AUTHORITY_KEYPAIR=
 ```
 
