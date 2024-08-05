@@ -252,7 +252,7 @@ pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> R
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
 #[zero_copy]
 pub struct U8Bool {
-    value: u8,
+    pub value: u8,
 }
 
 impl U8Bool {

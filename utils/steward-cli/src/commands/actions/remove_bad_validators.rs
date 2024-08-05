@@ -3,22 +3,23 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 
-use keeper_core::{get_multiple_accounts_batched, submit_transactions};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
+use stakenet_sdk::utils::transactions::{
+    get_multiple_accounts_batched, package_instructions, submit_transactions,
+};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program, sysvar,
 };
 
-use crate::{
-    commands::command_args::RemoveBadValidators,
-    utils::{
-        accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::package_instructions,
-    },
+use crate::commands::command_args::RemoveBadValidators;
+
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    transactions::print_base58_tx,
 };
 
 pub async fn command_remove_bad_validators(
@@ -147,11 +148,15 @@ pub async fn command_remove_bad_validators(
             .or(Some(256 * 1024)),
     );
 
-    println!("Submitting {} instructions", ixs_to_run.len());
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        txs_to_run.iter().for_each(|tx| print_base58_tx(tx));
+    } else {
+        println!("Submitting {} instructions", ixs_to_run.len());
 
-    let submit_stats = submit_transactions(client, txs_to_run, &arc_payer).await?;
+        let submit_stats = submit_transactions(client, txs_to_run, &arc_payer).await?;
 
-    println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {:?}", submit_stats);
+    }
 
     Ok(())
 }

@@ -146,6 +146,10 @@ pub struct TransactionParameters {
     /// Amount of instructions to process in a single transaction
     #[arg(long, env)]
     pub chunk_size: Option<usize>,
+
+    /// This will print out the raw TX instead of running it
+    #[arg(long, env, default_value = "false")]
+    pub print_tx: bool,
 }
 
 #[derive(Parser)]
@@ -192,18 +196,32 @@ pub enum Commands {
     ViewNextIndexToRemove(ViewNextIndexToRemove),
 
     // Actions
-    InitConfig(InitConfig),
+    InitSteward(InitSteward),
+    ReallocState(ReallocState),
+
+    SetStaker(SetStaker),
+    RevertStaker(RevertStaker),
+
+    UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
-
-    InitState(InitState),
     ResetState(ResetState),
-    Surgery(Surgery),
 
+    Pause(Pause),
+    Resume(Resume),
+
+    AddToBlacklist(AddToBlacklist),
+    RemoveFromBlacklist(RemoveFromBlacklist),
+
+    CloseSteward(CloseSteward),
     RemoveBadValidators(RemoveBadValidators),
+    ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
+    ManuallyCopyAllVoteAccounts(ManuallyCopyAllVoteAccounts),
+    ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
 
     // Cranks
+    CrankSteward(CrankSteward),
     CrankEpochMaintenance(CrankEpochMaintenance),
     CrankComputeScore(CrankComputeScore),
     CrankComputeDelegations(CrankComputeDelegations),
@@ -242,7 +260,7 @@ pub struct ViewNextIndexToRemove {
 
 #[derive(Parser)]
 #[command(about = "Initialize config account")]
-pub struct InitConfig {
+pub struct InitSteward {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
@@ -267,6 +285,37 @@ pub struct InitConfig {
 }
 
 #[derive(Parser)]
+#[command(about = "Updates authority account parameters")]
+pub struct UpdateAuthority {
+    #[command(subcommand)]
+    pub command: AuthoritySubcommand,
+}
+
+#[derive(Subcommand)]
+pub enum AuthoritySubcommand {
+    /// Manages blacklist authority
+    Blacklist {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages admin authority
+    Admin {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages parameters authority
+    Parameters {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+}
+#[derive(Parser)]
 #[command(about = "Updates config account parameters")]
 pub struct UpdateConfig {
     #[command(flatten)]
@@ -278,7 +327,7 @@ pub struct UpdateConfig {
 
 #[derive(Parser)]
 #[command(about = "Initialize state account")]
-pub struct InitState {
+pub struct ReallocState {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 }
@@ -291,22 +340,91 @@ pub struct ResetState {
 }
 
 #[derive(Parser)]
-#[command(about = "Mark the correct validator for removal")]
-pub struct Surgery {
+#[command(about = "Add to the blacklist")]
+pub struct AddToBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    #[arg(long)]
-    pub mark_for_removal: bool,
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_history_index_to_blacklist: u64,
+}
 
-    #[arg(long)]
-    pub immediate: bool,
+#[derive(Parser)]
+#[command(about = "Remove from the blacklist")]
+pub struct RemoveFromBlacklist {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
 
-    #[arg(long)]
-    pub validator_list_index: usize,
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_history_index_to_deblacklist: u64,
+}
 
-    #[arg(long, default_value = "false")]
-    pub submit_ix: bool,
+#[derive(Parser)]
+#[command(
+    about = "Closes the steward accounts and returns the staker to the authority calling this function"
+)]
+pub struct CloseSteward {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Transfers the Staker to the Steward State Account")]
+pub struct SetStaker {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Transfers the Staker to the calling authority")]
+pub struct RevertStaker {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Pause the steward program")]
+pub struct Pause {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Resume the steward program")]
+pub struct Resume {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Manually updates vote account per validator index")]
+pub struct ManuallyCopyVoteAccount {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index of validator list to update
+    #[arg(long, env)]
+    pub validator_index_to_update: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Manually updates all vote accounts")]
+pub struct ManuallyCopyAllVoteAccounts {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Removes validator from pool")]
+pub struct ManuallyRemoveValidator {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_index_to_remove: u64,
 }
 
 #[derive(Parser)]
@@ -324,7 +442,7 @@ pub struct AutoRemoveValidatorFromPool {
 
     /// Validator index of validator list to remove
     #[arg(long, env)]
-    pub validator_index_to_remove: usize,
+    pub validator_index_to_remove: u64,
 }
 
 #[derive(Parser)]
@@ -339,6 +457,13 @@ pub struct AutoAddValidatorFromPool {
 }
 
 // ---------- CRANKS ------------
+
+#[derive(Parser)]
+#[command(about = "Crank the entire Steward program")]
+pub struct CrankSteward {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+}
 
 #[derive(Parser)]
 #[command(about = "Run epoch maintenance - needs to be run at the start of each epoch")]

@@ -1,13 +1,13 @@
 use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
 use bytemuck::{bytes_of, Pod, Zeroable};
-use keeper_core::Address;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, instruction::Instruction, pubkey::Pubkey,
     signature::Signature,
 };
-
-use crate::{derive_validator_history_address, derive_validator_history_config_address};
+use stakenet_sdk::models::entries::Address;
+use stakenet_sdk::utils::accounts::get_validator_history_address;
+use stakenet_sdk::utils::accounts::get_validator_history_config_address;
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
@@ -30,8 +30,8 @@ impl GossipEntry {
         identity: &Pubkey,
         signer: &Pubkey,
     ) -> Self {
-        let validator_history_account = derive_validator_history_address(vote_account, program_id);
-        let config = derive_validator_history_config_address(program_id);
+        let validator_history_account = get_validator_history_address(vote_account, program_id);
+        let config = get_validator_history_config_address(program_id);
         Self {
             vote_account: *vote_account,
             validator_history_account,

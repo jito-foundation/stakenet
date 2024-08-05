@@ -3,12 +3,17 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::state::keeper_state::KeeperState;
+use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
+use spl_stake_pool::state::StakeStatus;
+
+use stakenet_sdk::utils::debug::{
+    format_simple_steward_state_string, format_steward_state_string, steward_state_to_state_code,
+};
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::EmitMetrics
@@ -18,25 +23,31 @@ fn _should_run() -> bool {
     true
 }
 
-async fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
-    emit_validator_history_metrics(keeper_state).await
+fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+    emit_validator_history_metrics(keeper_state)?;
+    emit_keeper_stats(keeper_state)?;
+    emit_steward_stats(keeper_state)?;
+    Ok(())
 }
 
-pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64, u64) {
+pub fn fire(
+    keeper_config: &KeeperConfig,
+    keeper_state: &KeeperState,
+) -> (KeeperOperations, u64, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
-        match _process(keeper_state).await {
+        match _process(keeper_state) {
             Ok(_) => {
                 runs_for_epoch += 1;
             }
             Err(e) => {
                 errors_for_epoch += 1;
-                error!("Failed to emit validator history metrics: {}", e);
+                error!("Failed to emit metrics: {}", e);
             }
         }
     }
@@ -45,11 +56,10 @@ pub async fn fire(keeper_state: &KeeperState) -> (KeeperOperations, u64, u64, u6
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
-pub async fn emit_validator_history_metrics(
+pub fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
-    let keeper_balance = keeper_state.keeper_balance;
     let get_vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_histories = &keeper_state
         .validator_history_map
@@ -152,9 +162,256 @@ pub async fn emit_validator_history_metrics(
         ),
     );
 
+    Ok(())
+}
+
+pub fn emit_keeper_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+    let keeper_balance = keeper_state.keeper_balance;
+
     datapoint_info!(
         "stakenet-keeper-stats",
         ("balance_lamports", keeper_balance, i64),
+    );
+
+    Ok(())
+}
+
+pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+    //    - Progress
+    // - Current State
+    // - Num pool validators
+    // - Validator List length
+    // - Validators added
+    //     - num_pool_validators ≠ validator list length
+    // - Validators removed
+    //     - Check ValidatorList Deactivating* state
+    //     - Marked to remove
+    // - Total activating stake
+    // - Total deactivating stake
+
+    if keeper_state.all_steward_accounts.is_none() {
+        return Ok(());
+    }
+
+    let steward_state = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .state_account
+        .state;
+
+    let reserve_stake = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .reserve_stake_account;
+
+    let stake_pool = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .stake_pool_account;
+
+    let state = steward_state.state_tag.to_string();
+    let progress_count = steward_state.progress.count();
+    let num_pool_validators = steward_state.num_pool_validators;
+    let current_epoch = steward_state.current_epoch;
+    let actual_epoch = keeper_state.epoch_info.epoch;
+    let validators_to_remove_count = steward_state.validators_to_remove.count();
+    let instant_unstake_count = steward_state.instant_unstake.count();
+    let stake_deposit_unstake_total = steward_state.stake_deposit_unstake_total;
+    let instant_unstake_total = steward_state.instant_unstake_total;
+    let scoring_unstake_total = steward_state.scoring_unstake_total;
+    let validators_added = steward_state.validators_added;
+    let next_cycle_epoch = steward_state.next_cycle_epoch;
+    let state_progress = format_steward_state_string(steward_state);
+    let simple_state_progress = format_simple_steward_state_string(steward_state);
+    let state_code = steward_state_to_state_code(steward_state);
+    let status_flags = steward_state.status_flags;
+
+    let validator_list_account = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .validator_list_account;
+    let validator_list_len = validator_list_account.validators.len();
+
+    let reserve_stake_lamports = reserve_stake.lamports;
+    let stake_pool_lamports = stake_pool.total_lamports;
+
+    let mut total_staked_lamports = 0;
+    let mut total_transient_lamports = 0;
+    let mut active_validators = 0;
+    let mut deactivating_validators = 0;
+    let mut ready_for_removal_validators = 0;
+    let mut deactivating_all_validators = 0;
+    let mut deactivating_transient_validators = 0;
+    validator_list_account
+        .clone()
+        .validators
+        .iter()
+        .for_each(|validator| {
+            total_staked_lamports += u64::from(validator.active_stake_lamports);
+            total_transient_lamports += u64::from(validator.transient_stake_lamports);
+
+            match StakeStatus::try_from(validator.status).unwrap() {
+                StakeStatus::Active => {
+                    active_validators += 1;
+                }
+                StakeStatus::DeactivatingTransient => {
+                    deactivating_transient_validators += 1;
+                }
+                StakeStatus::ReadyForRemoval => {
+                    ready_for_removal_validators += 1;
+                }
+                StakeStatus::DeactivatingValidator => {
+                    deactivating_validators += 1;
+                }
+                StakeStatus::DeactivatingAll => {
+                    deactivating_all_validators += 1;
+                }
+            }
+        });
+
+    let mut non_zero_score_count = 0;
+    for i in 0..steward_state.num_pool_validators {
+        if let Some(score) = steward_state.scores.get(i as usize) {
+            if *score != 0 {
+                non_zero_score_count += 1;
+            }
+        }
+    }
+
+    datapoint_info!(
+        "steward-stats",
+        ("state", state, String),
+        ("state_progress", state_progress, String),
+        ("simple_state_progress", simple_state_progress, String),
+        ("state_code", state_code, i64),
+        ("status_flags", status_flags, i64),
+        ("progress_count", progress_count, i64),
+        ("num_pool_validators", num_pool_validators, i64),
+        ("current_epoch", current_epoch, i64),
+        ("actual_epoch", actual_epoch, i64),
+        (
+            "validators_to_remove_count",
+            validators_to_remove_count,
+            i64
+        ),
+        (
+            "stake_deposit_unstake_total",
+            stake_deposit_unstake_total,
+            i64
+        ),
+        ("scoring_unstake_total", scoring_unstake_total, i64),
+        ("instant_unstake_count", instant_unstake_count, i64),
+        ("instant_unstake_total", instant_unstake_total, i64),
+        ("validators_added", validators_added, i64),
+        ("next_cycle_epoch", next_cycle_epoch, i64),
+        ("validator_list_len", validator_list_len, i64),
+        ("stake_pool_lamports", stake_pool_lamports, i64),
+        ("reserve_stake_lamports", reserve_stake_lamports, i64),
+        ("total_staked_lamports", total_staked_lamports, i64),
+        ("total_transient_lamports", total_transient_lamports, i64),
+        ("active_validators", active_validators, i64),
+        ("deactivating_validators", deactivating_validators, i64),
+        (
+            "ready_for_removal_validators",
+            ready_for_removal_validators,
+            i64
+        ),
+        (
+            "deactivating_all_validators",
+            deactivating_all_validators,
+            i64
+        ),
+        (
+            "deactivating_transient_validators",
+            deactivating_transient_validators,
+            i64
+        ),
+        ("non_zero_score_count", non_zero_score_count, i64),
+    );
+
+    let parameters = &keeper_state
+        .all_steward_accounts
+        .as_ref()
+        .unwrap()
+        .config_account
+        .parameters;
+
+    let mev_commission_range = parameters.mev_commission_range;
+    let epoch_credits_range = parameters.epoch_credits_range;
+    let commission_range = parameters.commission_range;
+    let mev_commission_bps_threshold = parameters.mev_commission_bps_threshold;
+    let scoring_delinquency_threshold_ratio = parameters.scoring_delinquency_threshold_ratio;
+    let instant_unstake_delinquency_threshold_ratio =
+        parameters.instant_unstake_delinquency_threshold_ratio;
+    let commission_threshold = parameters.commission_threshold;
+    let historical_commission_threshold = parameters.historical_commission_threshold;
+    let num_delegation_validators = parameters.num_delegation_validators;
+    let scoring_unstake_cap_bps = parameters.scoring_unstake_cap_bps;
+    let instant_unstake_cap_bps = parameters.instant_unstake_cap_bps;
+    let stake_deposit_unstake_cap_bps = parameters.stake_deposit_unstake_cap_bps;
+    let compute_score_slot_range = parameters.compute_score_slot_range;
+    let instant_unstake_epoch_progress = parameters.instant_unstake_epoch_progress;
+    let instant_unstake_inputs_epoch_progress = parameters.instant_unstake_inputs_epoch_progress;
+    let num_epochs_between_scoring = parameters.num_epochs_between_scoring;
+    let minimum_stake_lamports = parameters.minimum_stake_lamports;
+    let minimum_voting_epochs = parameters.minimum_voting_epochs;
+
+    datapoint_info!(
+        "steward-config",
+        ("mev_commission_range", mev_commission_range, i64),
+        ("epoch_credits_range", epoch_credits_range, i64),
+        ("commission_range", commission_range, i64),
+        (
+            "mev_commission_bps_threshold",
+            mev_commission_bps_threshold,
+            i64
+        ),
+        (
+            "scoring_delinquency_threshold_ratio",
+            scoring_delinquency_threshold_ratio,
+            f64
+        ),
+        (
+            "instant_unstake_delinquency_threshold_ratio",
+            instant_unstake_delinquency_threshold_ratio,
+            f64
+        ),
+        ("commission_threshold", commission_threshold, i64),
+        (
+            "historical_commission_threshold",
+            historical_commission_threshold,
+            i64
+        ),
+        ("num_delegation_validators", num_delegation_validators, i64),
+        ("scoring_unstake_cap_bps", scoring_unstake_cap_bps, i64),
+        ("instant_unstake_cap_bps", instant_unstake_cap_bps, i64),
+        (
+            "stake_deposit_unstake_cap_bps",
+            stake_deposit_unstake_cap_bps,
+            i64
+        ),
+        ("compute_score_slot_range", compute_score_slot_range, i64),
+        (
+            "instant_unstake_epoch_progress",
+            instant_unstake_epoch_progress,
+            f64
+        ),
+        (
+            "instant_unstake_inputs_epoch_progress",
+            instant_unstake_inputs_epoch_progress,
+            f64
+        ),
+        (
+            "num_epochs_between_scoring",
+            num_epochs_between_scoring,
+            i64
+        ),
+        ("minimum_stake_lamports", minimum_stake_lamports, i64),
+        ("minimum_voting_epochs", minimum_voting_epochs, i64)
     );
 
     Ok(())

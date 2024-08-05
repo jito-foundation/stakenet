@@ -5,8 +5,6 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use crate::state::keeper_state::KeeperState;
-use crate::KeeperError;
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
@@ -16,10 +14,14 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::StakeUpload
@@ -38,13 +40,15 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     update_stake_history(
         client,
         keypair,
         program_id,
         priority_fee_in_microlamports,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -55,14 +59,15 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
 
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch);
+    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch)
+        && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(
@@ -71,6 +76,7 @@ pub async fn fire(
             program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -105,7 +111,8 @@ pub async fn update_stake_history(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -123,8 +130,7 @@ pub async fn update_stake_history(
         get_stake_rank_map_and_superminority_count(vote_accounts);
 
     if max_vote_account_epoch != epoch_info.epoch {
-        //TODO Go through with custom errors
-        return Err(Box::new(KeeperError::Custom("EpochMismatch".into())));
+        return Err(JitoTransactionError::Custom("EpochMismatch".into()));
     }
 
     let entries_to_update = vote_accounts
@@ -159,6 +165,7 @@ pub async fn update_stake_history(
         keypair,
         priority_fee_in_microlamports,
         None,
+        no_pack,
     )
     .await;
 

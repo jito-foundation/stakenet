@@ -122,6 +122,51 @@
       ]
     },
     {
+      "name": "admin_mark_for_removal",
+      "docs": [
+        "Admin to mark or unmark validator for removal and unstuck the machine"
+      ],
+      "discriminator": [
+        213,
+        225,
+        98,
+        245,
+        9,
+        15,
+        154,
+        63
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        },
+        {
+          "name": "mark_for_removal",
+          "type": "u8"
+        },
+        {
+          "name": "immediate",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "auto_add_validator_to_pool",
       "docs": [
         "Adds a validator to the pool if it has a validator history account, matches stake_minimum, and is not yet in the pool"

@@ -9,14 +9,12 @@ use validator_history::id as validator_history_id;
 
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 
-use crate::{
-    commands::command_args::CrankComputeInstantUnstake,
-    utils::{
-        accounts::{
-            get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
-        },
-        transactions::{package_instructions, submit_packaged_transactions},
+use crate::commands::command_args::CrankComputeInstantUnstake;
+use stakenet_sdk::utils::{
+    accounts::{
+        get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
     },
+    transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
 
 pub async fn command_crank_compute_instant_unstake(
@@ -46,24 +44,24 @@ pub async fn command_crank_compute_instant_unstake(
         }
     }
 
-    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators as usize)
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {
             let has_been_scored = steward_accounts
                 .state_account
                 .state
                 .progress
-                .get(validator_index)
+                .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
             if has_been_scored {
                 None
             } else {
                 let vote_account = steward_accounts.validator_list_account.validators
-                    [validator_index]
+                    [validator_index as usize]
                     .vote_account_address;
                 let history_account =
                     get_validator_history_address(&vote_account, &validator_history_program_id);
 
-                Some((validator_index, vote_account, history_account))
+                Some((validator_index as usize, vote_account, history_account))
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
@@ -107,12 +105,21 @@ pub async fn command_crank_compute_instant_unstake(
             .heap_size,
     );
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    if args
+        .permissionless_parameters
+        .transaction_parameters
+        .print_tx
+    {
+        txs_to_run.iter().for_each(|tx| print_base58_tx(tx));
+    } else {
+        println!("Submitting {} instructions", ixs_to_run.len());
+        println!("Submitting {} transactions", txs_to_run.len());
 
-    let submit_stats = submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+        let submit_stats =
+            submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-    println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {:?}", submit_stats);
+    }
 
     Ok(())
 }

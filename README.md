@@ -1,10 +1,14 @@
-# Validator History Program
+# Stakenet
 
 ## About
 
+Jito StakeNet is a decentralized Solana stake pool manager, blending Validator History and Steward Programs for secure, transparent validator management and autonomous stake operations.
+
+## Validator History Program
+
 The Validator History Program, a component of Jito StakeNet, is an on-chain record of verified Solana validator data, storing up to 512 epochs of history per validator. It takes fields accessible to the solana runtime like validator performance history, validator commission, MEV commission, as well as Gossip data like validator IP, version, and client type, and stores them all in a single account. It also contains some fields that currently require permissioned upload but are easily verifiable with a getVoteAccounts call, like total active stake per validator, stake rank, and superminority status. All these fields are stored in a single account per validator, the ValidatorHistory account. This enables all these disparate fields to be easily composed with in on chain programs, with a long lookback period and ease of access through the single account.
 
-## Structure
+### Structure
 
 The main Anchor program is in `programs/validator-history`.
 
@@ -22,43 +26,51 @@ Note that this is a `zero_copy` account, which allows us to initialize a lot of 
 
 `Config`: Tracks admin authorities as well as global program metadata.
 
-## Test
+## Steward Program
 
-Tests are in `tests/` written with solana-program-test.
+Harnessing on-chain validator metrics and network data, the Steward Program employs advanced algorithms to evaluate and rank validators. Automated keepers then execute a state machine to optimally allocate stake, maximizing network security and efficiency.
 
-All tests can be run by running:
-```shell
-./run_tests.sh
-```
+On-chain Steward accounts for JitoSOL:
 
-## Build
+| Account         | Address                                     |
+|-----------------|---------------------------------------------|
+| Program         | Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 |
+| Steward Config  | jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv |
+| Steward State   | 9BAmGVLGxzqct6bkgjWmKSv3BFB6iKYXNBQp8GWG1LDY|
+| Authority       | 9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6|
+
+## Build and Test
+
+### Build
 
 `anchor build --program-name validator_history` (regular anchor build)
 `solana-verify build --library-name validator_history` (solana verified build)
 
-## Verify
+### Verify
 
 Verify with [solana-verifiable-build](https://github.com/Ellipsis-Labs/solana-verifiable-build):
 
 `solana-verify verify-from-repo -um --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa https://github.com/jito-foundation/stakenet`
 
+### Test
+
+Tests are in `tests/` written with solana-program-test.
+
+All tests can be run by running ( root directory ):
+
+```shell
+./run_tests.sh
+```
+
 ## Running Keeper
 
-Run as binary:
+Check out the [Keeper Bot Quick Start](./keeper-bot-quick-start.md)
 
-Build: `cargo b -r --package validator-keeper`
+## CLIs
 
-Run: `./target/release/validator-keeper --json-rpc-url <YOUR RPC> --cluster mainnet --tip-distribution-program-id F2Zu7QZiTYUhPd7u9ukRVwxh7B71oA3NMJcHuCHc29P2 --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa --interval 600 --keypair <YOUR KEYPAIR>`
+### Validator History
 
-Run as docker container (need to set environment variables in config/.env file):
-
-`docker compose --env-file config/.env up -d --build  validator-keeper`
-
-Metrics for running can be sent to your influx server if you set the SOLANA_METRICS_CONFIG env var.
-
-## CLI
-
-The CLI can be used to see the status of on-chain validator history data.
+This CLI can be used to see the status of on-chain validator history data.
 
 Build: `cargo b -r --package validator-history-cli`
 
@@ -69,3 +81,43 @@ To see the current epoch state of all validator history accounts:
 To see the historical state of a single validator history account:
 
 `./target/release/validator-history-cli --json-rpc-url <YOUR RPC URL> history <VOTE ACCOUNT>`
+
+### Steward
+
+This CLI can be used to see the status of on-chain steward data.
+
+Build:
+
+```bash
+cargo b -r --package steward-cli
+```
+
+To view the config:
+
+```bash
+./target/release/steward-cli --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-config --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+```
+
+To view the state:
+(Note: This fetches a lot of accounts, you may want to use your own RPC)
+
+```bash
+./target/release/steward-cli --json-rpc-url YOUR_RPC view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+```
+
+To see the state of each validator in the context of the steward add `--verbose`
+
+```bash
+./target/release/steward-cli --json-rpc-url YOUR_RPC view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --verbose
+```
+
+> TIP: To use your own RPC configured in your solana config, use the following:
+> `--json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}')`
+
+To see all of the available commands:
+
+```bash
+./target/release/steward-cli -h
+```
+
+To see more info on the Steward CLI check out the [CLI notes](./utils/steward-cli/steward_cli_notes.md)

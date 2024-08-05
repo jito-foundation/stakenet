@@ -7,14 +7,82 @@ use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
     vote::program::id as get_vote_program_id,
 };
+use stakenet_sdk::{
+    models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
+    utils::accounts::get_validator_history_address,
+};
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-use crate::{
-    derive_validator_history_address,
-    operations::keeper_operations::{KeeperCreates, KeeperOperations},
-};
+use crate::operations::keeper_operations::{KeeperCreates, KeeperOperations};
+
+pub struct StewardProgressFlags {
+    pub flags: u8,
+}
+
+pub enum StewardProgressFlag {
+    ComputeScores = 0x01 << 0,
+    ComputeDelegations = 0x01 << 1,
+    EpochMaintenance = 0x01 << 2,
+    PreLoopIdle = 0x01 << 3,
+    ComputeInstantUnstakes = 0x01 << 4,
+    Rebalance = 0x01 << 5,
+    PostLoopIdle = 0x01 << 6,
+}
+
+impl StewardProgressFlags {
+    // Set a flag
+    pub fn set_flag(&mut self, flag: StewardProgressFlag) {
+        self.flags |= flag as u8;
+    }
+
+    pub fn clean_flags(&mut self) {
+        self.flags = 0;
+    }
+
+    // Unset a flag
+    pub fn unset_flag(&mut self, flag: StewardProgressFlag) {
+        self.flags &= !(flag as u8);
+    }
+
+    // Check if a flag is set
+    pub fn has_flag(&self, flag: StewardProgressFlag) -> bool {
+        self.flags & (flag as u8) != 0
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct KeeperFlags {
+    pub flags: u8,
+}
+
+pub enum KeeperFlag {
+    Startup = 0x01 << 0,
+    RerunVote = 0x01 << 1,
+}
+
+impl KeeperFlags {
+    // Set a flag
+    pub fn set_flag(&mut self, flag: KeeperFlag) {
+        self.flags |= flag as u8;
+    }
+
+    pub fn clean_flags(&mut self) {
+        self.flags = 0;
+    }
+
+    // Unset a flag
+    pub fn unset_flag(&mut self, flag: KeeperFlag) {
+        self.flags &= !(flag as u8);
+    }
+
+    // Check if a flag is set
+    pub fn check_flag(&self, flag: KeeperFlag) -> bool {
+        self.flags & (flag as u8) != 0
+    }
+}
 
 pub struct KeeperState {
+    pub keeper_flags: KeeperFlags,
     pub epoch_info: EpochInfo,
 
     // Tally array of runs and errors indexed by their respective KeeperOperations
@@ -42,12 +110,13 @@ pub struct KeeperState {
 
     pub cluster_history: ClusterHistory,
     pub keeper_balance: u64,
+
+    pub all_steward_accounts: Option<Box<AllStewardAccounts>>,
+    pub all_steward_validator_accounts: Option<Box<AllValidatorAccounts>>,
+    pub all_active_validator_accounts: Option<Box<AllValidatorAccounts>>,
+    pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
         let index = operation as usize;
         self.runs_for_epoch[index] += 1;
@@ -90,6 +159,24 @@ impl KeeperState {
         self.txs_for_epoch[index] = txs_for_epoch;
     }
 
+    pub fn set_runs_errors_txs_and_flags_for_epoch(
+        &mut self,
+        (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch, flags): (
+            KeeperOperations,
+            u64,
+            u64,
+            u64,
+            KeeperFlags,
+        ),
+    ) {
+        let index = operation as usize;
+        self.runs_for_epoch[index] = runs_for_epoch;
+        self.errors_for_epoch[index] = errors_for_epoch;
+        self.txs_for_epoch[index] = txs_for_epoch;
+
+        self.keeper_flags = flags;
+    }
+
     pub fn increment_creations_for_epoch(
         &mut self,
         (operation, created_accounts_for_epoch): (KeeperCreates, u64),
@@ -101,7 +188,7 @@ impl KeeperState {
     pub fn get_history_pubkeys(&self, program_id: &Pubkey) -> HashSet<Pubkey> {
         self.all_history_vote_account_map
             .keys()
-            .map(|vote_account| derive_validator_history_address(vote_account, program_id))
+            .map(|vote_account| get_validator_history_address(vote_account, program_id))
             .collect()
     }
 
@@ -202,6 +289,7 @@ impl KeeperState {
 impl Default for KeeperState {
     fn default() -> Self {
         Self {
+            keeper_flags: KeeperFlags { flags: 0 },
             epoch_info: EpochInfo {
                 epoch: 0,
                 slot_index: 0,
@@ -222,6 +310,10 @@ impl Default for KeeperState {
             current_epoch_tip_distribution_map: HashMap::new(),
             cluster_history: ClusterHistory::zeroed(),
             keeper_balance: 0,
+            all_steward_accounts: None,
+            all_steward_validator_accounts: None,
+            all_active_validator_accounts: None,
+            steward_progress_flags: StewardProgressFlags { flags: 0 },
         }
     }
 }

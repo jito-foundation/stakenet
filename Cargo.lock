@@ -2597,22 +2597,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keeper-core"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap 4.4.18",
- "futures",
- "log",
- "solana-client",
- "solana-metrics",
- "solana-program",
- "solana-sdk",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6113,6 +6097,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "stakenet-sdk"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "bincode",
+ "clap 4.4.18",
+ "futures",
+ "jito-steward",
+ "jito-tip-distribution",
+ "log",
+ "solana-account-decoder",
+ "solana-client",
+ "solana-metrics",
+ "solana-program",
+ "solana-sdk",
+ "spl-pod",
+ "spl-stake-pool",
+ "thiserror",
+ "tokio",
+ "validator-history",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6129,7 +6136,6 @@ dependencies = [
  "futures",
  "futures-util",
  "jito-steward",
- "keeper-core",
  "log",
  "solana-account-decoder",
  "solana-clap-utils",
@@ -6137,10 +6143,13 @@ dependencies = [
  "solana-metrics",
  "solana-program",
  "solana-sdk",
+ "spl-pod",
  "spl-stake-pool",
+ "stakenet-sdk",
  "thiserror",
  "tokio",
  "validator-history",
+ "validator-keeper",
 ]
 
 [[package]]
@@ -7068,12 +7077,14 @@ dependencies = [
  "anchor-lang",
  "bytemuck",
  "clap 4.4.18",
+ "dotenv",
  "env_logger 0.10.2",
  "futures",
  "futures-util",
+ "jito-steward",
  "jito-tip-distribution",
- "keeper-core",
  "log",
+ "rand 0.8.5",
  "solana-account-decoder",
  "solana-clap-utils",
  "solana-client",
@@ -7083,6 +7094,8 @@ dependencies = [
  "solana-program",
  "solana-sdk",
  "solana-streamer",
+ "spl-stake-pool",
+ "stakenet-sdk",
  "thiserror",
  "tokio",
  "validator-history",

@@ -13,10 +13,11 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{commands::command_args::InitConfig, utils::transactions::configure_instruction};
+use crate::commands::command_args::InitSteward;
+use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
-pub async fn command_init_config(
-    args: InitConfig,
+pub async fn command_init_steward(
+    args: InitSteward,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
@@ -75,7 +76,7 @@ pub async fn command_init_config(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let ixs = configure_instruction(
+    let configured_ix = configure_instruction(
         &[init_ix],
         args.transaction_parameters.priority_fee,
         args.transaction_parameters.compute_limit,
@@ -83,18 +84,22 @@ pub async fn command_init_config(
     );
 
     let transaction = Transaction::new_signed_with_payer(
-        &ixs,
+        &configured_ix,
         Some(&authority.pubkey()),
         &[&authority, &steward_config, &staker_keypair],
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
 
-    println!("Signature: {}", signature);
-    println!("Steward Config: {}", steward_config.pubkey());
+        println!("Signature: {}", signature);
+        println!("Steward Config: {}", steward_config.pubkey());
+    }
 
     Ok(())
 }

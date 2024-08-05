@@ -2,10 +2,18 @@ use anyhow::Result;
 use clap::Parser;
 use commands::{
     actions::{
+        add_to_blacklist::command_add_to_blacklist,
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
-        remove_bad_validators::command_remove_bad_validators, reset_state::command_reset_state,
-        surgery::command_surgery, update_config::command_update_config,
+        close_steward::command_close_steward,
+        manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
+        manually_copy_vote_accounts::command_manually_copy_vote_account,
+        manually_remove_validator::command_manually_remove_validator, pause::command_pause,
+        remove_bad_validators::command_remove_bad_validators,
+        remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
+        resume::command_resume, revert_staker::command_revert_staker,
+        set_staker::command_set_staker, update_authority::command_update_authority,
+        update_config::command_update_config,
     },
     command_args::{Args, Commands},
     cranks::{
@@ -13,21 +21,20 @@ use commands::{
         compute_instant_unstake::command_crank_compute_instant_unstake,
         compute_score::command_crank_compute_score,
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
-        rebalance::command_crank_rebalance,
+        rebalance::command_crank_rebalance, steward::command_crank_steward,
     },
     info::{
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_state::command_view_state,
     },
-    init::{init_state::command_init_state, init_steward::command_init_config},
+    init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
 use dotenv::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use std::{sync::Arc, time::Duration};
 
 pub mod commands;
-pub mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,8 +44,9 @@ async fn main() -> Result<()> {
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
     ));
+
     let program_id = args.program_id;
-    let _ = match args.commands {
+    let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
@@ -46,12 +54,30 @@ async fn main() -> Result<()> {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
 
+        // --- Helpers ---
+        Commands::ManuallyCopyVoteAccount(args) => {
+            command_manually_copy_vote_account(args, &client, program_id).await
+        }
+
         // --- Actions ---
-        Commands::InitConfig(args) => command_init_config(args, &client, program_id).await,
+        Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
+        Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
-        Commands::InitState(args) => command_init_state(args, &client, program_id).await,
+        Commands::UpdateAuthority(args) => {
+            command_update_authority(args, &client, program_id).await
+        }
+        Commands::SetStaker(args) => command_set_staker(args, &client, program_id).await,
+        Commands::RevertStaker(args) => command_revert_staker(args, &client, program_id).await,
+        Commands::Pause(args) => command_pause(args, &client, program_id).await,
+        Commands::Resume(args) => command_resume(args, &client, program_id).await,
+        Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
-        Commands::Surgery(args) => command_surgery(args, &client, program_id).await,
+        Commands::ManuallyRemoveValidator(args) => {
+            command_manually_remove_validator(args, &client, program_id).await
+        }
+        Commands::ManuallyCopyAllVoteAccounts(args) => {
+            command_manually_copy_all_vote_accounts(args, &client, program_id).await
+        }
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
         }
@@ -61,8 +87,13 @@ async fn main() -> Result<()> {
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, program_id).await
         }
+        Commands::AddToBlacklist(args) => command_add_to_blacklist(args, &client, program_id).await,
+        Commands::RemoveFromBlacklist(args) => {
+            command_remove_from_blacklist(args, &client, program_id).await
+        }
 
         // --- Cranks ---
+        Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
         Commands::CrankEpochMaintenance(args) => {
             command_crank_epoch_maintenance(args, &client, program_id).await
         }
@@ -78,6 +109,16 @@ async fn main() -> Result<()> {
         }
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
+
+    match result {
+        Ok(_) => {
+            println!("\n✅ DONE\n");
+        }
+        Err(e) => {
+            eprintln!("\n❌ Error: \n\n{:?}\n", e);
+            std::process::exit(1);
+        }
+    }
 
     Ok(())
 }

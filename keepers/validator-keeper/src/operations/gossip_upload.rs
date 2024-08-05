@@ -4,16 +4,15 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::start_spy_server;
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use bytemuck::{bytes_of, Pod, Zeroable};
-use keeper_core::{submit_transactions, SubmitStats};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
 use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
+use solana_gossip::gossip_service::make_gossip_node;
 use solana_metrics::datapoint_error;
 use solana_sdk::signature::Signable;
 use solana_sdk::{
@@ -22,7 +21,10 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use std::net::IpAddr;
+use solana_streamer::socket::SocketAddrSpace;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_transactions;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLockReadGuard;
 use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
@@ -30,7 +32,7 @@ use tokio::time::sleep;
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::GossipUpload
@@ -68,7 +70,7 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let entrypoint = &keeper_config
         .gossip_entrypoint
         .expect("Entry point not set");
@@ -77,9 +79,10 @@ pub async fn fire(
 
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch);
+    let should_run = _should_run(&keeper_state.epoch_info, runs_for_epoch)
+        && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(
@@ -185,6 +188,7 @@ fn build_gossip_entry(
     // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
+            println!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
         }
         Some(vec![GossipEntry::new(
@@ -199,6 +203,7 @@ fn build_gossip_entry(
         let mut entries = vec![];
         if let Some(entry) = crds.get::<&CrdsValue>(&legacy_contact_info_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -213,6 +218,7 @@ fn build_gossip_entry(
 
         if let Some(entry) = crds.get::<&CrdsValue>(&version_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -225,6 +231,7 @@ fn build_gossip_entry(
             ))
         } else if let Some(entry) = crds.get::<&CrdsValue>(&legacy_version_key) {
             if !check_entry_valid(entry, validator_history, validator_identity) {
+                println!("Invalid entry for validator {}", validator_vote_pubkey);
                 return None;
             }
             entries.push(GossipEntry::new(
@@ -236,6 +243,7 @@ fn build_gossip_entry(
                 &keypair.pubkey(),
             ))
         }
+
         Some(entries)
     }
 }
@@ -251,19 +259,24 @@ pub async fn upload_gossip_values(
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
 
-    let gossip_port = 0;
-
-    let spy_socket_addr = SocketAddr::new(
-        IpAddr::from_str("0.0.0.0").expect("Invalid IP"),
-        gossip_port,
-    );
+    // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-    let (_gossip_service, cluster_info) = start_spy_server(
-        *entrypoint,
-        gossip_port,
-        spy_socket_addr,
-        keypair,
+
+    let gossip_ip = solana_net_utils::get_public_ip_addr(entrypoint)?;
+    let gossip_addr = SocketAddr::new(
+        gossip_ip,
+        solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
+            .expect("unable to find an available gossip port"),
+    );
+
+    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
+        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+        Some(entrypoint),
         exit.clone(),
+        Some(&gossip_addr),
+        0,
+        true,
+        SocketAddrSpace::Global,
     );
 
     // Wait for all active validators to be received

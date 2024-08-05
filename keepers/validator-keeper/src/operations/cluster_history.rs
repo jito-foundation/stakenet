@@ -4,11 +4,9 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::derive_cluster_history_address;
 use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{submit_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -18,9 +16,13 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::{
+    models::{errors::JitoTransactionExecutionError, submit_stats::SubmitStats},
+    utils::{accounts::get_cluster_history_address, transactions::submit_transactions},
+};
 use std::sync::Arc;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::ClusterHistory
@@ -38,7 +40,7 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     update_cluster_info(client, keypair, program_id, priority_fee_in_microlamports).await
 }
 
@@ -48,16 +50,17 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
 
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run(epoch_info, runs_for_epoch);
+    let should_run =
+        _should_run(epoch_info, runs_for_epoch) && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(client, keypair, program_id, priority_fee_in_microlamports).await {
@@ -91,7 +94,7 @@ pub fn get_update_cluster_info_instructions(
     keypair: &Pubkey,
     priority_fee_in_microlamports: u64,
 ) -> Vec<Instruction> {
-    let cluster_history_account = derive_cluster_history_address(program_id);
+    let cluster_history_account = get_cluster_history_address(program_id);
 
     let priority_fee_ix = compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
         priority_fee_in_microlamports,
@@ -123,7 +126,7 @@ pub async fn update_cluster_info(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let ixs = get_update_cluster_info_instructions(
         program_id,
         &keypair.pubkey(),

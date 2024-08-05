@@ -6,6 +6,10 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    transactions::{configure_instruction, print_base58_tx},
+};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
@@ -13,13 +17,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::AutoRemoveValidatorFromPool,
-    utils::{
-        accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::configure_instruction,
-    },
-};
+use crate::commands::command_args::AutoRemoveValidatorFromPool;
 
 pub async fn command_auto_remove_validator_from_pool(
     args: AutoRemoveValidatorFromPool,
@@ -39,8 +37,8 @@ pub async fn command_auto_remove_validator_from_pool(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let vote_account =
-        steward_accounts.validator_list_account.validators[validator_index].vote_account_address;
+    let vote_account = steward_accounts.validator_list_account.validators[validator_index as usize]
+        .vote_account_address;
     let history_account =
         get_validator_history_address(&vote_account, &validator_history_program_id);
 
@@ -55,7 +53,7 @@ pub async fn command_auto_remove_validator_from_pool(
         &spl_stake_pool::id(),
         &vote_account,
         &steward_accounts.stake_pool_address,
-        steward_accounts.validator_list_account.validators[validator_index]
+        steward_accounts.validator_list_account.validators[validator_index as usize]
             .transient_seed_suffix
             .into(),
     );
@@ -83,7 +81,7 @@ pub async fn command_auto_remove_validator_from_pool(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AutoRemoveValidatorFromPool {
-            validator_list_index: validator_index as u64,
+            validator_list_index: validator_index,
         }
         .data(),
     };
@@ -107,11 +105,15 @@ pub async fn command_auto_remove_validator_from_pool(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await
-        .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    if args.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

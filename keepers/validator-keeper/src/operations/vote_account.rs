@@ -4,12 +4,10 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
-use crate::state::keeper_state::KeeperState;
-use crate::KeeperError;
+use crate::state::keeper_state::{KeeperFlag, KeeperFlags, KeeperState};
 use crate::{
     entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
 };
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -17,11 +15,15 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::VoteAccount
@@ -40,13 +42,15 @@ async fn _process(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     update_vote_accounts(
         client,
         keypair,
         program_id,
         priority_fee_in_microlamports,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -54,18 +58,23 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-) -> (KeeperOperations, u64, u64, u64) {
+) -> (KeeperOperations, u64, u64, u64, KeeperFlags) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
 
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run(epoch_info, runs_for_epoch);
+    let should_run = (_should_run(epoch_info, runs_for_epoch)
+        || keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote))
+        && check_flag(keeper_config.run_flags, operation);
+
+    let mut keeper_flags = keeper_state.keeper_flags;
+    keeper_flags.unset_flag(KeeperFlag::RerunVote);
 
     if should_run {
         match _process(
@@ -74,6 +83,7 @@ pub async fn fire(
             program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -96,7 +106,13 @@ pub async fn fire(
         };
     }
 
-    (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
+    (
+        operation,
+        runs_for_epoch,
+        errors_for_epoch,
+        txs_for_epoch,
+        keeper_flags,
+    )
 }
 
 // SPECIFIC TO THIS OPERATION
@@ -106,20 +122,25 @@ pub async fn update_vote_accounts(
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     let validator_history_map = &keeper_state.validator_history_map;
     let epoch_info = &keeper_state.epoch_info;
 
     // Update all open vote accounts, less the ones that have been recently updated
     let mut vote_accounts_to_update = keeper_state.get_all_open_vote_accounts();
-    vote_accounts_to_update.retain(|vote_account| {
-        !vote_account_uploaded_recently(
-            validator_history_map,
-            vote_account,
-            epoch_info.epoch,
-            epoch_info.absolute_slot,
-        )
-    });
+    if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup)
+        && !keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote)
+    {
+        vote_accounts_to_update.retain(|vote_account| {
+            !vote_account_uploaded_recently(
+                validator_history_map,
+                vote_account,
+                epoch_info.epoch,
+                epoch_info.absolute_slot,
+            )
+        });
+    }
 
     let entries = vote_accounts_to_update
         .iter()
@@ -137,6 +158,7 @@ pub async fn update_vote_accounts(
         keypair,
         priority_fee_in_microlamports,
         Some(300_000),
+        no_pack,
     )
     .await;
 

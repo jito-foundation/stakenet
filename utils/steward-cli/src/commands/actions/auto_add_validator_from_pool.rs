@@ -6,6 +6,10 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::find_stake_program_address;
+use stakenet_sdk::utils::{
+    accounts::{get_all_steward_accounts, get_validator_history_address},
+    transactions::{configure_instruction, print_base58_tx},
+};
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
@@ -13,13 +17,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::AutoAddValidatorFromPool,
-    utils::{
-        accounts::{get_all_steward_accounts, get_validator_history_address},
-        transactions::configure_instruction,
-    },
-};
+use crate::commands::command_args::AutoAddValidatorFromPool;
 
 pub async fn command_auto_add_validator_from_pool(
     args: AutoAddValidatorFromPool,
@@ -97,11 +95,19 @@ pub async fn command_auto_add_validator_from_pool(
         blockhash,
     );
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await
-        .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    if args
+        .permissionless_parameters
+        .transaction_parameters
+        .print_tx
+    {
+        print_base58_tx(&configured_ix)
+    } else {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&transaction)
+            .await?;
+
+        println!("Signature: {}", signature);
+    }
 
     Ok(())
 }

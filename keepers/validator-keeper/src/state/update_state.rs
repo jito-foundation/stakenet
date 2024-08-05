@@ -2,20 +2,27 @@ use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
-use keeper_core::{
-    get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
-};
+
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
     account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
+
+use stakenet_sdk::utils::{
+    accounts::{
+        get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
+        get_all_validator_history_accounts, get_cluster_history_address,
+        get_validator_history_address,
+    },
+    helpers::get_balance_with_retry,
+    instructions::get_create_validator_history_instructions,
+    transactions::{
+        get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_transactions,
+    },
+};
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
-use crate::{
-    derive_cluster_history_address, derive_validator_history_address, get_balance_with_retry,
-    get_create_validator_history_instructions, get_validator_history_accounts_with_retry,
-    operations::keeper_operations::{KeeperCreates, KeeperOperations},
-};
+use crate::operations::keeper_operations::{KeeperCreates, KeeperOperations};
 
 use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 
@@ -24,7 +31,7 @@ pub async fn pre_create_update(
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let keypair = &keeper_config.keypair;
 
     // Update Epoch
@@ -68,7 +75,7 @@ pub async fn create_missing_accounts(
     keeper_state: &KeeperState,
 ) -> Result<Vec<(KeeperCreates, usize)>, Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let keypair = &keeper_config.keypair;
 
     let mut created_accounts_for_epoch = vec![];
@@ -90,11 +97,12 @@ pub async fn post_create_update(
     keeper_state: &mut KeeperState,
 ) -> Result<(), Box<dyn Error>> {
     let client = &keeper_config.client;
-    let program_id = &keeper_config.program_id;
+    let validator_history_program_id = &keeper_config.validator_history_program_id;
     let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
 
     // Update Validator History Accounts
-    keeper_state.validator_history_map = get_validator_history_map(client, program_id).await?;
+    keeper_state.validator_history_map =
+        get_validator_history_map(client, validator_history_program_id).await?;
 
     // Get all history vote accounts
     keeper_state.all_history_vote_account_map =
@@ -117,6 +125,36 @@ pub async fn post_create_update(
         keeper_state.epoch_info.epoch,
     )
     .await?;
+
+    keeper_state.all_steward_accounts = Some(
+        get_all_steward_accounts(
+            &keeper_config.client,
+            &keeper_config.steward_program_id,
+            &keeper_config.steward_config,
+        )
+        .await?,
+    );
+
+    keeper_state.all_steward_validator_accounts = Some(
+        get_all_steward_validator_accounts(
+            &keeper_config.client,
+            keeper_state.all_steward_accounts.as_ref().unwrap(),
+            validator_history_program_id,
+        )
+        .await?,
+    );
+
+    let all_get_vote_accounts: Vec<RpcVoteAccountInfo> =
+        keeper_state.vote_account_map.values().cloned().collect();
+
+    keeper_state.all_active_validator_accounts = Some(
+        get_all_validator_accounts(
+            &keeper_config.client,
+            &all_get_vote_accounts,
+            validator_history_program_id,
+        )
+        .await?,
+    );
 
     Ok(())
 }
@@ -144,7 +182,7 @@ async fn get_cluster_history(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
 ) -> Result<ClusterHistory, Box<dyn Error>> {
-    let cluster_history_address = derive_cluster_history_address(program_id);
+    let cluster_history_address = get_cluster_history_address(program_id);
     let cluster_history_account = client.get_account(&cluster_history_address).await?;
     let cluster_history =
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())?;
@@ -156,8 +194,7 @@ async fn get_validator_history_map(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
 ) -> Result<HashMap<Pubkey, ValidatorHistory>, Box<dyn Error>> {
-    let validator_histories =
-        get_validator_history_accounts_with_retry(client, *program_id).await?;
+    let validator_histories = get_all_validator_history_accounts(client, *program_id).await?;
 
     let validator_history_map = HashMap::from_iter(
         validator_histories
@@ -257,7 +294,7 @@ async fn create_missing_validator_history_accounts(
 
     let all_history_addresses = &vote_accounts
         .iter()
-        .map(|vote_pubkey| derive_validator_history_address(vote_pubkey, program_id))
+        .map(|vote_pubkey| get_validator_history_address(vote_pubkey, program_id))
         .collect::<Vec<Pubkey>>();
 
     let history_accounts = get_multiple_accounts_batched(all_history_addresses, client).await?;

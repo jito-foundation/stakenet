@@ -5,24 +5,26 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 
 use crate::state::keeper_state::KeeperState;
-use crate::KeeperError;
 use crate::{
     entries::mev_commission_entry::ValidatorMevCommissionEntry, state::keeper_config::KeeperConfig,
 };
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::state::TipDistributionAccount;
-use keeper_core::{submit_instructions, SubmitStats, UpdateInstruction};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
+use stakenet_sdk::models::entries::UpdateInstruction;
+use stakenet_sdk::models::errors::JitoTransactionError;
+use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
-use super::keeper_operations::KeeperOperations;
+use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::MevEarned
@@ -39,7 +41,8 @@ async fn _process(
     tip_distribution_program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     update_mev_earned(
         client,
         keypair,
@@ -47,6 +50,7 @@ async fn _process(
         priority_fee_in_microlamports,
         tip_distribution_program_id,
         keeper_state,
+        no_pack,
     )
     .await
 }
@@ -57,15 +61,15 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
-    let program_id = &keeper_config.program_id;
+    let program_id = &keeper_config.validator_history_program_id;
     let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let operation = _get_operation();
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-        keeper_state.copy_runs_errors_and_txs_for_epoch(operation.clone());
+        keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(
@@ -75,6 +79,7 @@ pub async fn fire(
             tip_distribution_program_id,
             priority_fee_in_microlamports,
             keeper_state,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -110,7 +115,8 @@ pub async fn update_mev_earned(
     priority_fee_in_microlamports: u64,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
-) -> Result<SubmitStats, KeeperError> {
+    no_pack: bool,
+) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let validator_history_map = &keeper_state.validator_history_map;
     let previous_epoch_tip_distribution_map = &keeper_state.previous_epoch_tip_distribution_map;
@@ -160,6 +166,7 @@ pub async fn update_mev_earned(
         keypair,
         priority_fee_in_microlamports,
         None,
+        no_pack,
     )
     .await;
 

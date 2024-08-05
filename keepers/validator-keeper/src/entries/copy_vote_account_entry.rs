@@ -1,7 +1,7 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
-use keeper_core::{Address, UpdateInstruction};
 use solana_sdk::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
+use stakenet_sdk::models::entries::{Address, UpdateInstruction};
 use validator_history::Config;
 use validator_history::ValidatorHistory;
 
