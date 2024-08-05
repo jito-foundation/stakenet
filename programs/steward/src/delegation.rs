@@ -23,6 +23,7 @@ pub enum RebalanceType {
 ///
 /// Unstaking is calculated this way because stake account balances can change at any time from users' stake withdrawals and deposits,
 /// and this ensures that unstaking is done fairly at the time of the rebalance. In addition, these instructions can run in any order.
+#[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
     state: &StewardState,
     target_index: usize,

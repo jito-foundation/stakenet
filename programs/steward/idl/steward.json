@@ -1271,6 +1271,36 @@
       "args": []
     },
     {
+      "name": "reset_validator_lamport_balances",
+      "docs": [
+        "Reset validator_lamport_balances to default"
+      ],
+      "discriminator": [
+        69,
+        111,
+        124,
+        69,
+        69,
+        29,
+        96,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "steward_state",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "resume_steward",
       "docs": [
         "Resumes the steward, allowing state transitions to continue"
