@@ -551,9 +551,10 @@ impl StewardState {
             .set(num_pool_validators, false)?;
 
         if marked_for_regular_removal {
-            self.validators_to_remove.set(index, false)?;
+            self.validators_to_remove.set(num_pool_validators, false)?;
         } else {
-            self.validators_for_immediate_removal.set(index, false)?;
+            self.validators_for_immediate_removal
+                .set(num_pool_validators, false)?;
         }
 
         Ok(())

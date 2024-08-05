@@ -1,6 +1,6 @@
 # Keeper Bot Quick-start
 
-Below are the steps to configuring and running the Stakenet Keeper Bot. We recommend running the docker container.
+Below are the steps to configuring and running the Stakenet Keeper Bot. We recommend running it as a docker container.
 
 ## Setup
 
