@@ -27,7 +27,7 @@ services:
       - METRICS_INTERVAL=${METRICS_INTERVAL}
       - RUN_STAKE_UPLOAD=${RUN_STAKE_UPLOAD}
       - RUN_GOSSIP_UPLOAD=${RUN_GOSSIP_UPLOAD}
-      - RUN_EMIT_METRICS=${RUN_EMIT_METRICS}
+      - RUN_EMIT_METRICS=false
       - FULL_STARTUP=${FULL_STARTUP}
       - NO_PACK=${NO_PACK}
       - PAY_FOR_NEW_ACCOUNTS=${PAY_FOR_NEW_ACCOUNTS}
@@ -61,4 +61,6 @@ services:
       - RUN_STAKE_UPLOAD=false
       - RUN_GOSSIP_UPLOAD=false
       - RUN_EMIT_METRICS=true
+    volumes:
+      - ./credentials:/credentials
     restart: on-failure:5
