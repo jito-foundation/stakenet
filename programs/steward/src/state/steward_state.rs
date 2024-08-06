@@ -975,8 +975,11 @@ impl StewardState {
                     stake_deposit_unstake_lamports,
                     total_unstake_lamports,
                 }) => {
-                    self.validator_lamport_balances[index] = self.validator_lamport_balances[index]
-                        .saturating_sub(total_unstake_lamports);
+                    if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
+                        self.validator_lamport_balances[index] = self.validator_lamport_balances
+                            [index]
+                            .saturating_sub(total_unstake_lamports);
+                    }
 
                     self.scoring_unstake_total = self
                         .scoring_unstake_total
