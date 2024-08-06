@@ -6142,6 +6142,7 @@ dependencies = [
  "solana-metrics",
  "solana-program",
  "solana-sdk",
+ "solana-transaction-status",
  "spl-pod",
  "spl-stake-pool",
  "thiserror",
