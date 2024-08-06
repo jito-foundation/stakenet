@@ -122,31 +122,33 @@ pub fn _get_update_stake_pool_ixs(
             .get(&validator_info.vote_account_address)
             .expect("Stake account not found");
 
-        let should_deactivate = if raw_vote_account.is_none() || raw_stake_account.is_none() {
-            true
-        } else {
-            let stake_account =
-                StakeStateV2::deserialize(&mut raw_stake_account.clone().unwrap().data.as_slice())
-                    .expect("Could not deserialize stake account");
+        let should_deactivate = match (raw_vote_account, raw_stake_account) {
+            (None, Some(_)) => true,
+            (Some(raw_vote_account), Some(raw_stake_account)) => {
+                let stake_account =
+                    StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
+                        .expect("Could not deserialize stake account");
 
-            let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
-                .expect("Could not deserialize vote account");
+                let vote_account = VoteState::deserialize(&raw_vote_account.data)
+                    .expect("Could not deserialize vote account");
 
-            let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+                let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-            match stake_account {
-                StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                    if stake.delegation.deactivation_epoch != std::u64::MAX {
+                match stake_account {
+                    StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                        if stake.delegation.deactivation_epoch != std::u64::MAX {
+                            false
+                        } else {
+                            latest_epoch <= epoch - 5
+                        }
+                    }
+                    _ => {
+                        println!("🔶 Error: Stake account is not StakeStateV2::Stake");
                         false
-                    } else {
-                        latest_epoch <= epoch - 5
                     }
                 }
-                _ => {
-                    println!("🔶 Error: Stake account is not StakeStateV2::Stake");
-                    false
-                }
             }
+            (_, None) => false,
         };
 
         if should_deactivate {
