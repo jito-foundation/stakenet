@@ -205,6 +205,7 @@ pub enum Commands {
     UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
     ResetState(ResetState),
+    ResetValidatorLamportBalances(ResetValidatorLamportBalances),
 
     Pause(Pause),
     Resume(Resume),
@@ -335,6 +336,13 @@ pub struct ReallocState {
 #[derive(Parser)]
 #[command(about = "Reset steward state")]
 pub struct ResetState {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Reset steward state")]
+pub struct ResetValidatorLamportBalances {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 }

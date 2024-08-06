@@ -299,7 +299,10 @@ fn _print_verbose_state(
         formatted_string += &format!("Transient Stake Account: {:?}\n", transient_stake_address);
         formatted_string += &format!(
             "Validator Lamports: {:?}\n",
-            u64::from(validator.active_stake_lamports)
+            steward_state_account
+                .state
+                .validator_lamport_balances
+                .get(index)
         );
         formatted_string += &format!("Index: {:?}\n", index);
 

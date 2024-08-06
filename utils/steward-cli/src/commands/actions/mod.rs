@@ -9,6 +9,7 @@ pub mod pause;
 pub mod remove_bad_validators;
 pub mod remove_from_blacklist;
 pub mod reset_state;
+pub mod reset_validator_lamport_balances;
 pub mod resume;
 pub mod revert_staker;
 pub mod set_staker;
