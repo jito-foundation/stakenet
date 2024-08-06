@@ -23,6 +23,7 @@ solana-client = "1.18"
 solana-metrics = "1.18"
 solana-program = "1.18"
 solana-sdk = "1.18"
+solana-transaction-status = "1.18"
 spl-pod = "0.1.0"
 spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
 thiserror = "1.0.37"

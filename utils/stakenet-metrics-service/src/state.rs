@@ -13,6 +13,7 @@ use stakenet_sdk::utils::accounts::{
     get_all_steward_accounts, get_all_steward_validator_accounts, get_all_validator_accounts,
     get_all_validator_history_accounts, get_cluster_history_address,
 };
+use stakenet_sdk::utils::helpers::get_balance_with_retry;
 use stakenet_sdk::utils::transactions::{
     get_multiple_accounts_batched, get_vote_accounts_with_retry,
 };
@@ -30,6 +31,7 @@ pub struct MetricsConfig {
     pub tip_distribution_program_id: Pubkey,
     pub steward_program_id: Pubkey,
     pub steward_config: Pubkey,
+    pub keeper_pubkey: Pubkey,
     pub metrics_interval: Duration,
     pub cluster: Cluster,
 }
@@ -62,7 +64,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
+        default_value = "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8"
     )]
     pub steward_program_id: Pubkey,
 
@@ -73,6 +75,12 @@ pub struct Args {
         default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
     )]
     pub steward_config: Pubkey,
+
+    /// Steward config account
+    #[arg(long, env)]
+    pub keeper_pubkey: Pubkey,
+
+    /// Keeper account pubkey
 
     /// Interval to emit metrics (default 60 sec)
     #[arg(long, env, default_value = "60")]
@@ -128,6 +136,9 @@ impl MetricsState {
 
         // Update Cluster History
         self.cluster_history = get_cluster_history(&client, validator_history_program_id).await?;
+
+        // Update Keeper Balance
+        self.keeper_balance = get_balance_with_retry(client, config.keeper_pubkey).await?;
 
         // Update Validator History Accounts
         self.validator_history_map =
