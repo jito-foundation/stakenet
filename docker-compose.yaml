@@ -3,7 +3,7 @@ services:
   validator-keeper:
     build:
       context: .
-      target: validator-history
+      target: stakenet-services
     container_name: validator-keeper
     environment:
       - RUST_LOG=${RUST_LOG:-info}
@@ -36,3 +36,22 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
+    command: ./validator-keeper
+
+  stakenet-metrics-service:
+    build:
+      context: .
+      target: stakenet-services
+    container_name: stakenet-metrics-service
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
+      - JSON_RPC_URL=${JSON_RPC_URL}
+      - CLUSTER=${CLUSTER}
+      - VALIDATOR_HISTORY_PROGRAM_ID=${VALIDATOR_HISTORY_PROGRAM_ID}
+      - TIP_DISTRIBUTION_PROGRAM_ID=${TIP_DISTRIBUTION_PROGRAM_ID}
+      - STEWARD_PROGRAM_ID=${STEWARD_PROGRAM_ID}
+      - STEWARD_CONFIG=${STEWARD_CONFIG}
+      - METRICS_INTERVAL=${METRICS_INTERVAL}
+    restart: on-failure:5
+    command: ./stakenet-metrics-service
