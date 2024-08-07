@@ -9,6 +9,7 @@ use solana_program::instruction::Instruction;
 
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
+use solana_sdk::transaction::Transaction;
 use solana_sdk::vote::state::VoteState;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
 use spl_stake_pool::instruction::{
@@ -219,6 +220,13 @@ async fn _update_pool(
 
     // TODO fix
     println!("Deactivating Delinquent");
+    // for ix in deactivate_delinquent_ixs {
+    //     let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer]);
+    //     let tx = client
+    //         .send_and_confirm_transaction_with_spinner_and_config(&tx)
+    //         .await?;
+    //     stats.add_tx(&tx);
+    // }
     let deactivate_txs_to_run = package_instructions(
         &deactivate_delinquent_ixs,
         1,
@@ -495,11 +503,7 @@ async fn _handle_delinquent_validators(
     let bad_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-            if !check.has_history
-                || !check.has_stake_account
-                || check.is_deactivated
-                || !check.has_vote_account
-            {
+            if !check.has_history || check.is_deactivated || !check.has_vote_account {
                 Some(*vote_account)
             } else {
                 None

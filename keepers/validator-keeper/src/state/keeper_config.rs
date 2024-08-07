@@ -66,7 +66,7 @@ pub struct Args {
     #[arg(
         long,
         env,
-        default_value = "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8"
+        default_value = "sssh4zkKhX8jXTNQz1xDHyGpygzgu2UhcRcUvZihBjP"
     )]
     pub steward_program_id: Pubkey,
 
