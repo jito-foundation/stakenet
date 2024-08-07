@@ -9,6 +9,7 @@ use solana_program::instruction::Instruction;
 
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
+use solana_sdk::transaction::Transaction;
 use solana_sdk::vote::state::VoteState;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
 use spl_stake_pool::instruction::{
@@ -122,31 +123,33 @@ pub fn _get_update_stake_pool_ixs(
             .get(&validator_info.vote_account_address)
             .expect("Stake account not found");
 
-        let should_deactivate = if raw_vote_account.is_none() || raw_stake_account.is_none() {
-            true
-        } else {
-            let stake_account =
-                StakeStateV2::deserialize(&mut raw_stake_account.clone().unwrap().data.as_slice())
-                    .expect("Could not deserialize stake account");
+        let should_deactivate = match (raw_vote_account, raw_stake_account) {
+            (None, Some(_)) => true,
+            (Some(raw_vote_account), Some(raw_stake_account)) => {
+                let stake_account =
+                    StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
+                        .expect("Could not deserialize stake account");
 
-            let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
-                .expect("Could not deserialize vote account");
+                let vote_account = VoteState::deserialize(&raw_vote_account.data)
+                    .expect("Could not deserialize vote account");
 
-            let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+                let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-            match stake_account {
-                StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                    if stake.delegation.deactivation_epoch != std::u64::MAX {
+                match stake_account {
+                    StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                        if stake.delegation.deactivation_epoch != std::u64::MAX {
+                            false
+                        } else {
+                            latest_epoch <= epoch - 5
+                        }
+                    }
+                    _ => {
+                        println!("🔶 Error: Stake account is not StakeStateV2::Stake");
                         false
-                    } else {
-                        latest_epoch <= epoch - 5
                     }
                 }
-                _ => {
-                    println!("🔶 Error: Stake account is not StakeStateV2::Stake");
-                    false
-                }
             }
+            (_, None) => false,
         };
 
         if should_deactivate {
@@ -217,6 +220,13 @@ async fn _update_pool(
 
     // TODO fix
     println!("Deactivating Delinquent");
+    // for ix in deactivate_delinquent_ixs {
+    //     let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer]);
+    //     let tx = client
+    //         .send_and_confirm_transaction_with_spinner_and_config(&tx)
+    //         .await?;
+    //     stats.add_tx(&tx);
+    // }
     let deactivate_txs_to_run = package_instructions(
         &deactivate_delinquent_ixs,
         1,
@@ -493,11 +503,7 @@ async fn _handle_delinquent_validators(
     let bad_vote_accounts = checks
         .iter()
         .filter_map(|(vote_account, check)| {
-            if !check.has_history
-                || !check.has_stake_account
-                || check.is_deactivated
-                || !check.has_vote_account
-            {
+            if !check.has_history || check.is_deactivated || !check.has_vote_account {
                 Some(*vote_account)
             } else {
                 None

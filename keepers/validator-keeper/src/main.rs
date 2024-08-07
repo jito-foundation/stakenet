@@ -249,7 +249,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // ---------------------- EMIT ---------------------------------
 
         if should_fire(tick, metrics_interval) {
-            info!("Emitting metrics...");
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
@@ -257,6 +256,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         if should_emit(tick, &intervals) {
+            info!("Emitting metrics...");
             keeper_state.emit();
 
             KeeperOperations::emit(
@@ -332,6 +332,8 @@ async fn main() {
         no_pack: args.no_pack,
         pay_for_new_accounts: args.pay_for_new_accounts,
         cool_down_range: args.cool_down_range,
+        tx_retry_count: args.tx_retry_count,
+        tx_confirmation_seconds: args.tx_confirmation_seconds,
     };
 
     run_keeper(config).await;

@@ -220,6 +220,8 @@ pub enum Commands {
     ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
+    InstantRemoveValidator(InstantRemoveValidator),
+    UpdateValidatorListBalance(UpdateValidatorListBalance),
 
     // Cranks
     CrankSteward(CrankSteward),
@@ -436,6 +438,17 @@ pub struct ManuallyRemoveValidator {
 }
 
 #[derive(Parser)]
+#[command(about = "Instantly removes validator from pool")]
+pub struct InstantRemoveValidator {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index of validator list to remove
+    #[arg(long, env)]
+    pub validator_index_to_remove: u64,
+}
+
+#[derive(Parser)]
 #[command(about = "Removes bad validators from the pool")]
 pub struct RemoveBadValidators {
     #[command(flatten)]
@@ -462,6 +475,20 @@ pub struct AutoAddValidatorFromPool {
     /// Validator vote account to add
     #[arg(long, env)]
     pub vote_account: Pubkey,
+}
+
+#[derive(Parser)]
+#[command(about = "Updates validator list balance (spl_stake_pool command) for a single validator")]
+pub struct UpdateValidatorListBalance {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Validator index in the validator list
+    #[arg(long, env)]
+    pub validator_list_index: u32,
+
+    #[arg(long, env, default_value_t = false)]
+    pub no_merge: bool,
 }
 
 // ---------- CRANKS ------------

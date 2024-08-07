@@ -1,6 +1,8 @@
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
-use jito_steward::{utils::ValidatorList, Config, StewardStateAccount};
+use jito_steward::{
+    constants::LAMPORT_BALANCE_DEFAULT, utils::ValidatorList, Config, StewardStateAccount,
+};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{account::Account, pubkey::Pubkey};
 use spl_stake_pool::{
@@ -298,36 +300,60 @@ fn _print_verbose_state(
         formatted_string += &format!("Stake Account: {:?}\n", stake_address);
         formatted_string += &format!("Transient Stake Account: {:?}\n", transient_stake_address);
         formatted_string += &format!(
-            "Validator Lamports: {:?}\n",
-            steward_state_account
+            "Internal Validator Lamports: {}\n",
+            match steward_state_account
                 .state
                 .validator_lamport_balances
                 .get(index)
+            {
+                Some(&LAMPORT_BALANCE_DEFAULT) | None => "Unset".to_string(),
+                Some(&lamports) => lamports.to_string(),
+            }
         );
-        formatted_string += &format!("Index: {:?}\n", index);
+        formatted_string += &format!("Index: {}\n", index);
 
         formatted_string += &format!(
-            "Marked for removal: {:?}\n",
-            steward_state_account.state.validators_to_remove.get(index)
+            "Marked for removal: {}\n",
+            steward_state_account
+                .state
+                .validators_to_remove
+                .get(index)
+                .unwrap_or_default()
         );
         formatted_string += &format!(
-            "Is Instant Unstake: {:?}\n",
-            steward_state_account.state.instant_unstake.get(index)
+            "Marked for immediate removal: {}\n",
+            steward_state_account
+                .state
+                .validators_for_immediate_removal
+                .get(index)
+                .unwrap_or_default()
         );
         formatted_string += &format!(
-            "Score: {:?}\n",
-            steward_state_account.state.scores.get(index)
+            "Is Instant Unstake: {}\n",
+            steward_state_account
+                .state
+                .instant_unstake
+                .get(index)
+                .unwrap_or_default()
         );
         formatted_string += &format!(
-            "Yield Score: {:?}\n",
-            steward_state_account.state.yield_scores.get(index)
+            "Score: {}\n",
+            steward_state_account.state.scores.get(index).unwrap_or(&0)
+        );
+        formatted_string += &format!(
+            "Yield Score: {}\n",
+            steward_state_account
+                .state
+                .yield_scores
+                .get(index)
+                .unwrap_or(&0)
         );
         formatted_string += &format!("Score Index: {:?}\n", score_index);
         formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
 
         if let Some(history_info) = history_info {
             formatted_string += &format!(
-                "\nValidator History Index: {:?}\n",
+                "\nValidator History Index: {}\n",
                 format!("{:?}", history_info.index)
             );
 
