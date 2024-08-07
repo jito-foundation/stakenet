@@ -405,9 +405,9 @@ pub async fn parallel_execute_transactions(
                 continue; // Skip transactions that have already been confirmed
             }
 
-            if idx % 50 == 0 {
+            if idx % 20 == 0 {
                 // Need to avoid spamming the rpc or lots of transactions will get dropped
-                sleep(Duration::from_secs(3)).await;
+                sleep(Duration::from_secs(1)).await;
             }
 
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
@@ -431,6 +431,7 @@ pub async fn parallel_execute_transactions(
                             submitted_signatures.insert(tx.signatures[0], idx);
                         }
                         Some(_) => {
+                            info!("Transaction error: {:?}", e);
                             match e.kind {
                                 solana_client::client_error::ClientErrorKind::Io(e) => {
                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
