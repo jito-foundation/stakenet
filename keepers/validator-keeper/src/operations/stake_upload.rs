@@ -34,6 +34,7 @@ fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -113,6 +114,7 @@ pub async fn fire(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_stake_history(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,

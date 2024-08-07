@@ -352,19 +352,13 @@ fn _print_verbose_state(
         formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
 
         if let Some(history_info) = history_info {
-            formatted_string += &format!(
-                "\nValidator History Index: {}\n",
-                format!("{:?}", history_info.index)
-            );
+            formatted_string += &format!("\nValidator History Index: {}\n", history_info.index);
 
             formatted_string += &format!(
-                "Is blacklisted: {:?}\n",
-                format!(
-                    "{:?}",
-                    config_account
-                        .validator_history_blacklist
-                        .get_unsafe(history_info.index as usize)
-                )
+                "Is blacklisted: {}\n",
+                config_account
+                    .validator_history_blacklist
+                    .get_unsafe(history_info.index as usize)
             );
         }
 

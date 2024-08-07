@@ -44,6 +44,8 @@ fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
+
+#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -255,6 +257,7 @@ fn build_gossip_entry(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn upload_gossip_values(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,

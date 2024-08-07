@@ -32,6 +32,7 @@ fn _should_run() -> bool {
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -112,6 +113,7 @@ pub async fn fire(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_mev_commission(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,

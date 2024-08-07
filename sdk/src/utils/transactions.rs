@@ -684,6 +684,7 @@ pub async fn submit_transactions(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn submit_instructions(
     client: &Arc<RpcClient>,
     instructions: Vec<Instruction>,
