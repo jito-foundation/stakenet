@@ -44,7 +44,6 @@ fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         || (epoch_info.slot_index > epoch_info.slots_in_epoch / 2 && runs_for_epoch < 2)
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
-
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -52,6 +51,8 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
@@ -60,6 +61,8 @@ async fn _process(
         priority_fee_in_microlamports,
         entrypoint,
         keeper_state,
+        retry_count,
+        confirmation_time,
     )
     .await
 }
@@ -76,6 +79,8 @@ pub async fn fire(
         .expect("Entry point not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+    let retry_count = keeper_config.tx_retry_count;
+    let confirmation_time = keeper_config.tx_confirmation_seconds;
 
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
@@ -92,6 +97,8 @@ pub async fn fire(
             priority_fee_in_microlamports,
             entrypoint,
             keeper_state,
+            retry_count,
+            confirmation_time,
         )
         .await
         {
@@ -255,6 +262,8 @@ pub async fn upload_gossip_values(
     priority_fee_in_microlamports: u64,
     entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -314,7 +323,14 @@ pub async fn upload_gossip_values(
         .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
         .collect::<Vec<_>>();
 
-    let submit_result = submit_transactions(client, update_transactions, keypair).await;
+    let submit_result = submit_transactions(
+        client,
+        update_transactions,
+        keypair,
+        retry_count,
+        confirmation_time,
+    )
+    .await;
 
     submit_result.map_err(|e| e.into())
 }

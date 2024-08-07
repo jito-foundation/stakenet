@@ -662,6 +662,8 @@ pub async fn submit_transactions(
     client: &Arc<RpcClient>,
     transactions: Vec<Vec<Instruction>>,
     keypair: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let tx_slice = transactions
@@ -669,7 +671,9 @@ pub async fn submit_transactions(
         .map(|t| t.as_slice())
         .collect::<Vec<_>>();
 
-    match parallel_execute_transactions(client, &tx_slice, keypair, 100, 30).await {
+    match parallel_execute_transactions(client, &tx_slice, keypair, retry_count, confirmation_time)
+        .await
+    {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
             stats.errors = results.len() as u64 - stats.successes;
@@ -685,6 +689,8 @@ pub async fn submit_instructions(
     instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
     max_cu_per_tx: Option<u32>,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
@@ -693,8 +699,8 @@ pub async fn submit_instructions(
         client,
         &instructions,
         keypair,
-        100,
-        20,
+        retry_count,
+        confirmation_time,
         priority_fee_in_microlamports,
         max_cu_per_tx,
         no_pack,

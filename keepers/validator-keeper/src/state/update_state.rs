@@ -81,9 +81,15 @@ pub async fn create_missing_accounts(
     let mut created_accounts_for_epoch = vec![];
 
     // Create Missing Accounts
-    let new_validator_history_accounts =
-        create_missing_validator_history_accounts(client, keypair, program_id, keeper_state)
-            .await?;
+    let new_validator_history_accounts = create_missing_validator_history_accounts(
+        client,
+        keypair,
+        program_id,
+        keeper_state,
+        keeper_config.tx_retry_count,
+        keeper_config.tx_confirmation_seconds,
+    )
+    .await?;
     created_accounts_for_epoch.push((
         KeeperCreates::CreateValidatorHistory,
         new_validator_history_accounts,
@@ -286,6 +292,8 @@ async fn create_missing_validator_history_accounts(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     keeper_state: &KeeperState,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<usize, Box<dyn Error>> {
     let vote_accounts = &keeper_state
         .vote_account_map
@@ -319,7 +327,14 @@ async fn create_missing_validator_history_accounts(
 
     let accounts_created = create_transactions.len();
 
-    submit_transactions(client, create_transactions, keypair).await?;
+    submit_transactions(
+        client,
+        create_transactions,
+        keypair,
+        retry_count,
+        confirmation_time,
+    )
+    .await?;
 
     Ok(accounts_created)
 }

@@ -38,6 +38,8 @@ async fn _process(
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    retry_count: u16,
+    confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
@@ -47,6 +49,8 @@ async fn _process(
         program_id,
         tip_distribution_program_id,
         keeper_state,
+        retry_count,
+        confirmation_time,
         priority_fee_in_microlamports,
         no_pack,
     )
@@ -76,6 +80,8 @@ pub async fn fire(
             program_id,
             tip_distribution_program_id,
             keeper_state,
+            keeper_config.tx_retry_count,
+            keeper_config.tx_confirmation_seconds,
             priority_fee_in_microlamports,
             keeper_config.no_pack,
         )
@@ -112,6 +118,8 @@ pub async fn update_mev_commission(
     program_id: &Pubkey,
     tip_distribution_program_id: &Pubkey,
     keeper_state: &KeeperState,
+    retry_count: u16,
+    confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
@@ -148,6 +156,8 @@ pub async fn update_mev_commission(
         update_instructions,
         keypair,
         priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
         None,
         no_pack,
     )
