@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use crate::{
     bitmask::BitMask,
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -859,12 +859,6 @@ impl StewardState {
                 .checked_add(stake_rent)
                 .ok_or(StewardError::ArithmeticError)?;
 
-            msg!("Reserve lamports before adjustment: {}", reserve_lamports);
-            msg!(
-                "Stake pool lamports before adjustment: {}",
-                stake_pool_lamports
-            );
-
             // Maximum increase amount is the total lamports in the reserve stake account minus (num_validators + 1) * stake_rent, which covers rent for all validators plus the transient rent
             let all_accounts_needed_reserve_for_rent = validator_list
                 .len()
@@ -907,6 +901,11 @@ impl StewardState {
                 In all cases where the current_lamports is now below the target or internal balance, we update the internal balance.
                 Otherwise, keep the internal balance the same to ensure we still see the stake deposit delta, until it can be unstaked.
                 */
+
+                if self.validator_lamport_balances[index] == LAMPORT_BALANCE_DEFAULT {
+                    self.validator_lamport_balances[index] = current_lamports;
+                }
+
                 self.validator_lamport_balances[index] = match (
                     current_lamports < self.validator_lamport_balances[index],
                     current_lamports < target_lamports,
@@ -947,6 +946,7 @@ impl StewardState {
                     self,
                     index,
                     unstake_state,
+                    current_lamports,
                     stake_pool_lamports,
                     validator_list,
                     minimum_delegation,
@@ -967,15 +967,6 @@ impl StewardState {
                 RebalanceType::None
             };
 
-            msg!("Reserve lamports after adjustment: {}", reserve_lamports);
-            msg!(
-                "Stake pool lamports after adjustment: {}",
-                stake_pool_lamports
-            );
-            msg!("Rebalance Type: {:?}", rebalance);
-            msg!("Current Lamports: {}", current_lamports);
-            msg!("Target Lamports: {}", target_lamports);
-
             // Update internal state based on rebalance
             match rebalance {
                 RebalanceType::Decrease(DecreaseComponents {
@@ -984,8 +975,11 @@ impl StewardState {
                     stake_deposit_unstake_lamports,
                     total_unstake_lamports,
                 }) => {
-                    self.validator_lamport_balances[index] = self.validator_lamport_balances[index]
-                        .saturating_sub(total_unstake_lamports);
+                    if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
+                        self.validator_lamport_balances[index] = self.validator_lamport_balances
+                            [index]
+                            .saturating_sub(total_unstake_lamports);
+                    }
 
                     self.scoring_unstake_total = self
                         .scoring_unstake_total
@@ -1026,9 +1020,12 @@ impl StewardState {
                     }
                 }
                 RebalanceType::Increase(amount) => {
-                    self.validator_lamport_balances[index] = self.validator_lamport_balances[index]
-                        .checked_add(amount)
-                        .ok_or(StewardError::ArithmeticError)?;
+                    if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
+                        self.validator_lamport_balances[index] = self.validator_lamport_balances
+                            [index]
+                            .checked_add(amount)
+                            .ok_or(StewardError::ArithmeticError)?;
+                    }
                 }
                 RebalanceType::None => {}
             }

@@ -207,6 +207,13 @@ pub mod steward {
         )
     }
 
+    /// Reset validator_lamport_balances to default
+    pub fn reset_validator_lamport_balances(
+        ctx: Context<ResetValidatorLamportBalances>,
+    ) -> Result<()> {
+        instructions::reset_validator_lamport_balances::handler(ctx)
+    }
+
     /// Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).
     /// Config is not closed as it is a Keypair, so lamports can simply be withdrawn.
     /// Reclaims lamports to authority

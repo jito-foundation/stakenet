@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
@@ -31,17 +30,6 @@ pub async fn command_crank_compute_score(
     let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
-
-    match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::ComputeScores => { /* Continue */ }
-        _ => {
-            println!(
-                "State account is not in ComputeScores state: {}",
-                steward_accounts.state_account.state.state_tag
-            );
-            return Ok(());
-        }
-    }
 
     let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {

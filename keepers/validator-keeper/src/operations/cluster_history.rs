@@ -40,8 +40,18 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
-    update_cluster_info(client, keypair, program_id, priority_fee_in_microlamports).await
+    update_cluster_info(
+        client,
+        keypair,
+        program_id,
+        priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
+    )
+    .await
 }
 
 pub async fn fire(
@@ -52,6 +62,8 @@ pub async fn fire(
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+    let retry_count = keeper_config.tx_retry_count;
+    let confirmation_time = keeper_config.tx_confirmation_seconds;
 
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
@@ -63,7 +75,16 @@ pub async fn fire(
         _should_run(epoch_info, runs_for_epoch) && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
-        match _process(client, keypair, program_id, priority_fee_in_microlamports).await {
+        match _process(
+            client,
+            keypair,
+            program_id,
+            priority_fee_in_microlamports,
+            retry_count,
+            confirmation_time,
+        )
+        .await
+        {
             Ok(stats) => {
                 for message in stats.results.iter() {
                     if let Err(e) = message {
@@ -126,6 +147,8 @@ pub async fn update_cluster_info(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let ixs = get_update_cluster_info_instructions(
         program_id,
@@ -133,5 +156,5 @@ pub async fn update_cluster_info(
         priority_fee_in_microlamports,
     );
 
-    submit_transactions(client, vec![ixs], keypair).await
+    submit_transactions(client, vec![ixs], keypair, retry_count, confirmation_time).await
 }

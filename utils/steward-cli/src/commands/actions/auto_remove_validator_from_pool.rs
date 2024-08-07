@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use stakenet_sdk::utils::{
@@ -13,8 +13,8 @@ use stakenet_sdk::utils::{
 use validator_history::id as validator_history_id;
 
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, stake, system_program,
-    transaction::Transaction,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, stake, system_program, transaction::Transaction,
 };
 
 use crate::commands::command_args::AutoRemoveValidatorFromPool;
@@ -109,7 +109,14 @@ pub async fn command_auto_remove_validator_from_pool(
         print_base58_tx(&configured_ix)
     } else {
         let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
+            .send_and_confirm_transaction_with_spinner_and_config(
+                &transaction,
+                CommitmentConfig::default(),
+                RpcSendTransactionConfig {
+                    skip_preflight: true,
+                    ..Default::default()
+                },
+            )
             .await?;
 
         println!("Signature: {}", signature);

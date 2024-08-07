@@ -4,7 +4,7 @@
 // is that the config, stake pool address, staker, signer, and sometimes state account match up.
 // Otherwise these instructions are intented to be minimally restrictive.
 
-use crate::constants::MAX_VALIDATORS;
+use crate::constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS};
 use crate::errors::StewardError;
 use crate::state::Config;
 use crate::utils::{
@@ -400,9 +400,11 @@ pub fn increase_validator_stake_handler(
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
         // Set the balance
-        *balance = balance
-            .checked_add(lamports)
-            .ok_or(StewardError::ArithmeticError)?;
+        if *balance != LAMPORT_BALANCE_DEFAULT {
+            *balance = balance
+                .checked_add(lamports)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
     }
 
     invoke_signed(
@@ -521,9 +523,11 @@ pub fn decrease_validator_stake_handler(
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
         // Set the balance
-        *balance = balance
-            .checked_sub(lamports)
-            .ok_or(StewardError::ArithmeticError)?;
+        if *balance != LAMPORT_BALANCE_DEFAULT {
+            *balance = balance
+                .checked_sub(lamports)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
     }
 
     invoke_signed(
@@ -641,9 +645,11 @@ pub fn increase_additional_validator_stake_handler(
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
         // Set the balance
-        *balance = balance
-            .checked_add(lamports)
-            .ok_or(StewardError::ArithmeticError)?;
+        if *balance != LAMPORT_BALANCE_DEFAULT {
+            *balance = balance
+                .checked_add(lamports)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
     }
 
     invoke_signed(
@@ -765,9 +771,11 @@ pub fn decrease_additional_validator_stake_handler(
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
         // Set the balance
-        *balance = balance
-            .checked_sub(lamports)
-            .ok_or(StewardError::ArithmeticError)?;
+        if *balance != LAMPORT_BALANCE_DEFAULT {
+            *balance = balance
+                .checked_sub(lamports)
+                .ok_or(StewardError::ArithmeticError)?;
+        }
     }
 
     invoke_signed(

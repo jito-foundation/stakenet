@@ -153,7 +153,7 @@ pub async fn command_remove_bad_validators(
     } else {
         println!("Submitting {} instructions", ixs_to_run.len());
 
-        let submit_stats = submit_transactions(client, txs_to_run, &arc_payer).await?;
+        let submit_stats = submit_transactions(client, txs_to_run, &arc_payer, 20, 30).await?;
 
         println!("Submit stats: {:?}", submit_stats);
     }

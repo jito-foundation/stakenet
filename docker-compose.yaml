@@ -36,3 +36,33 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
+
+  metrics-only:
+    build:
+      context: .
+      target: validator-history
+    container_name: metrics-only
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
+      - JSON_RPC_URL=${JSON_RPC_URL}
+      - CLUSTER=${CLUSTER}
+      - KEYPAIR=${KEYPAIR}
+      - VALIDATOR_HISTORY_PROGRAM_ID=${VALIDATOR_HISTORY_PROGRAM_ID}
+      - TIP_DISTRIBUTION_PROGRAM_ID=${TIP_DISTRIBUTION_PROGRAM_ID}
+      - STEWARD_PROGRAM_ID=${STEWARD_PROGRAM_ID}
+      - STEWARD_CONFIG=${STEWARD_CONFIG}
+      - METRICS_INTERVAL=${METRICS_INTERVAL}
+      - STEWARD_INTERVAL=1000000000000
+      - VALIDATOR_HISTORY_INTERVAL=1000000000000
+      - RUN_CLUSTER_HISTORY=false
+      - RUN_COPY_VOTE_ACCOUNTS=false
+      - RUN_MEV_COMMISSION=false
+      - RUN_MEV_EARNED=false
+      - RUN_STEWARD=false
+      - RUN_STAKE_UPLOAD=false
+      - RUN_GOSSIP_UPLOAD=false
+      - RUN_EMIT_METRICS=true
+    volumes:
+      - ./credentials:/credentials
+    restart: on-failure:5

@@ -36,11 +36,14 @@ fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
     keeper_state: &KeeperState,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
@@ -49,6 +52,8 @@ async fn _process(
         keypair,
         program_id,
         priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
         keeper_state,
         no_pack,
     )
@@ -63,6 +68,8 @@ pub async fn fire(
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
+    let retry_count = keeper_config.tx_retry_count;
+    let confirmation_time = keeper_config.tx_confirmation_seconds;
 
     let operation = _get_operation();
     let epoch_info = &keeper_state.epoch_info;
@@ -82,6 +89,8 @@ pub async fn fire(
             keypair,
             program_id,
             priority_fee_in_microlamports,
+            retry_count,
+            confirmation_time,
             keeper_state,
             keeper_config.no_pack,
         )
@@ -116,11 +125,14 @@ pub async fn fire(
 }
 
 // SPECIFIC TO THIS OPERATION
+#[allow(clippy::too_many_arguments)]
 pub async fn update_vote_accounts(
     rpc_client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
     keeper_state: &KeeperState,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
@@ -157,6 +169,8 @@ pub async fn update_vote_accounts(
         update_instructions,
         keypair,
         priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
         Some(300_000),
         no_pack,
     )

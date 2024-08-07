@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use spl_stake_pool::big_vec::BigVec;
 
+use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
 use crate::{
     errors::StewardError,
@@ -22,10 +23,12 @@ pub enum RebalanceType {
 ///
 /// Unstaking is calculated this way because stake account balances can change at any time from users' stake withdrawals and deposits,
 /// and this ensures that unstaking is done fairly at the time of the rebalance. In addition, these instructions can run in any order.
+#[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
     state: &StewardState,
     target_index: usize,
     mut unstake_state: UnstakeState,
+    current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
     stake_pool_lamports: u64,
     validator_list: &BigVec<'_>,
     minimum_delegation: u64,
@@ -55,6 +58,10 @@ pub fn decrease_stake_calculation(
 
         // ValidatorList includes base lamports in active_stake_lamports
         temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);
+
+        if temp_index == target_index {
+            temp_current_lamports = current_lamports;
+        }
 
         // For the current `temp` validator, calculate how much we can remove and what category it's coming from
         let unstake_amounts =
@@ -245,6 +252,7 @@ impl UnstakeState {
         // either to the target or to the previous balance before the deposit, whichever is lower in terms of total lamports unstaked
         if current_lamports > state.validator_lamport_balances[index]
             && self.stake_deposit_unstake_total < self.stake_deposit_unstake_cap
+            && state.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT
         {
             let lamports_above_target = current_lamports
                 .checked_sub(target_lamports)

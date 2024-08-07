@@ -557,7 +557,6 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
     );
-    println!("NEED Error: {:?}", res);
 
     assert!(res.is_ok());
     assert!(
@@ -997,6 +996,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1017,6 +1017,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1048,6 +1049,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1082,6 +1084,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1114,6 +1117,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1143,6 +1147,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         3000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1184,6 +1189,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1206,6 +1212,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1235,6 +1242,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1253,16 +1261,20 @@ fn test_decrease_stake_calculation() {
     });
 
     // Test: minimum delegation and stake rent exempt from total lamports unstaked
-    // Same scenario as above, just leaves minimum_delegation + stake_rent on the validator
+    // Same scenario as above, ignoring minimum delegation and stake rent on target validator,
+    // as current_lamports already adjusted for minimum delegation
     let unstake_state = UnstakeState {
         stake_deposit_unstake_cap: 2500 * LAMPORTS_PER_SOL,
         ..Default::default()
     };
 
+    let current_lamports = u64::from(validator_list[2].active_stake_lamports);
+
     let result = decrease_stake_calculation(
         &state,
         2,
         unstake_state,
+        current_lamports,
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         100 * LAMPORTS_PER_SOL,
@@ -1274,8 +1286,8 @@ fn test_decrease_stake_calculation() {
                 == DecreaseComponents {
                     scoring_unstake_lamports: 0,
                     instant_unstake_lamports: 0,
-                    stake_deposit_unstake_lamports: 850 * LAMPORTS_PER_SOL,
-                    total_unstake_lamports: 850 * LAMPORTS_PER_SOL,
+                    stake_deposit_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                 },
         _ => false,
     });
@@ -1300,6 +1312,7 @@ fn test_decrease_stake_calculation() {
         &state,
         2,
         unstake_state,
+        u64::from(validator_list[2].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,
@@ -1333,6 +1346,7 @@ fn test_decrease_stake_calculation() {
         &state,
         0,
         unstake_state,
+        u64::from(validator_list[0].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         100 * LAMPORTS_PER_SOL,
@@ -1346,6 +1360,7 @@ fn test_decrease_stake_calculation() {
         &state,
         3,
         UnstakeState::default(),
+        u64::from(validator_list[2].active_stake_lamports), // validator doesn't exist but include reasonable value
         5000 * LAMPORTS_PER_SOL,
         &validator_list_bigvec,
         0,

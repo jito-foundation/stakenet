@@ -8,6 +8,7 @@ pub const MAX_VALIDATORS: usize = 5_000;
 pub const BASIS_POINTS_MAX: u16 = 10_000;
 pub const COMMISSION_MAX: u8 = 100;
 pub const SORTED_INDEX_DEFAULT: u16 = u16::MAX;
+pub const LAMPORT_BALANCE_DEFAULT: u64 = u64::MAX;
 // Need at least 1% of slots remaining (4320 slots) to execute steps in state machine
 pub const EPOCH_PROGRESS_MAX: f64 = 0.99;
 // Cannot go more than 100 epochs without scoring

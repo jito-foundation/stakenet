@@ -14,6 +14,8 @@ pub struct KeeperConfig {
     pub steward_program_id: Pubkey,
     pub steward_config: Pubkey,
     pub priority_fee_in_microlamports: u64,
+    pub tx_retry_count: u16,
+    pub tx_confirmation_seconds: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
     pub validator_history_interval: u64,
@@ -94,6 +96,12 @@ pub struct Args {
     #[arg(long, env, default_value = "20000")]
     pub priority_fees: u64,
 
+    #[arg(long, env, default_value = "50")]
+    pub tx_retry_count: u16,
+
+    #[arg(long, env, default_value = "30")]
+    pub tx_confirmation_seconds: u64,
+
     /// Cluster to specify
     #[arg(long, env, default_value_t = Cluster::Mainnet)]
     pub cluster: Cluster,
@@ -167,6 +175,8 @@ impl fmt::Display for Args {
             Steward Interval: {} seconds\n\
             Metrics Interval: {} seconds\n\
             Priority Fees: {} microlamports\n\
+            Retry Count: {}\n\
+            Confirmation Seconds: {}\n\
             Cluster: {:?}\n\
             Run Cluster History: {}\n\
             Run Copy Vote Accounts: {}\n\
@@ -193,6 +203,8 @@ impl fmt::Display for Args {
             self.steward_interval,
             self.metrics_interval,
             self.priority_fees,
+            self.tx_retry_count,
+            self.tx_confirmation_seconds,
             self.cluster,
             self.run_cluster_history,
             self.run_copy_vote_accounts,

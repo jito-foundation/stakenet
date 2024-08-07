@@ -4,7 +4,9 @@ use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use log::*;
-use solana_client::rpc_response::{Response, RpcSimulateTransactionResult, RpcVoteAccountInfo};
+use solana_client::rpc_response::{
+    Response, RpcResult, RpcSimulateTransactionResult, RpcVoteAccountInfo,
+};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_metrics::datapoint_error;
 use solana_program::hash::Hash;
@@ -17,6 +19,7 @@ use solana_sdk::{
     instruction::Instruction, packet::Packet, pubkey::Pubkey, signature::Keypair,
     signature::Signature, signer::Signer, transaction::Transaction,
 };
+use solana_transaction_status::TransactionStatus;
 use tokio::task;
 use tokio::time::sleep;
 
@@ -197,6 +200,19 @@ pub async fn get_vote_accounts_with_retry(
     }
 }
 
+pub async fn get_signature_statuses_with_retry(
+    client: &RpcClient,
+    signatures: &[Signature],
+) -> RpcResult<Vec<Option<TransactionStatus>>> {
+    for _ in 1..4 {
+        if let Ok(result) = client.get_signature_statuses(signatures).await {
+            return Ok(result);
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    }
+    client.get_signature_statuses(signatures).await
+}
+
 async fn find_ix_per_tx(
     client: &Arc<RpcClient>,
     instruction: &Instruction,
@@ -264,14 +280,17 @@ async fn parallel_confirm_transactions(
     let confirmation_futures: Vec<_> = signatures_to_confirm
         .chunks(SIG_STATUS_BATCH_SIZE)
         .map(|sig_batch| async move {
-            match client.get_signature_statuses(sig_batch).await {
+            match get_signature_statuses_with_retry(client, sig_batch).await {
                 Ok(sig_batch_response) => sig_batch_response
                     .value
                     .iter()
                     .enumerate()
                     .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
                     .collect::<Vec<_>>(),
-                Err(_) => vec![],
+                Err(e) => {
+                    info!("Failed getting signature statuses: {}", e);
+                    vec![]
+                }
             }
         })
         .collect();
@@ -643,6 +662,8 @@ pub async fn submit_transactions(
     client: &Arc<RpcClient>,
     transactions: Vec<Vec<Instruction>>,
     keypair: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let tx_slice = transactions
@@ -650,7 +671,9 @@ pub async fn submit_transactions(
         .map(|t| t.as_slice())
         .collect::<Vec<_>>();
 
-    match parallel_execute_transactions(client, &tx_slice, keypair, 100, 20).await {
+    match parallel_execute_transactions(client, &tx_slice, keypair, retry_count, confirmation_time)
+        .await
+    {
         Ok(results) => {
             stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
             stats.errors = results.len() as u64 - stats.successes;
@@ -661,11 +684,14 @@ pub async fn submit_transactions(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn submit_instructions(
     client: &Arc<RpcClient>,
     instructions: Vec<Instruction>,
     keypair: &Arc<Keypair>,
     priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
     max_cu_per_tx: Option<u32>,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
@@ -674,8 +700,8 @@ pub async fn submit_instructions(
         client,
         &instructions,
         keypair,
-        100,
-        20,
+        retry_count,
+        confirmation_time,
         priority_fee_in_microlamports,
         max_cu_per_tx,
         no_pack,

@@ -6,14 +6,17 @@ use commands::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
+        instant_remove_validator::command_instant_remove_validator,
         manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
         manually_remove_validator::command_manually_remove_validator, pause::command_pause,
         remove_bad_validators::command_remove_bad_validators,
         remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
+        reset_validator_lamport_balances::command_reset_validator_lamport_balances,
         resume::command_resume, revert_staker::command_revert_staker,
         set_staker::command_set_staker, update_authority::command_update_authority,
         update_config::command_update_config,
+        update_validator_list_balance::command_update_validator_list_balance,
     },
     command_args::{Args, Commands},
     cranks::{
@@ -72,11 +75,17 @@ async fn main() -> Result<()> {
         Commands::Resume(args) => command_resume(args, &client, program_id).await,
         Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        Commands::ResetValidatorLamportBalances(args) => {
+            command_reset_validator_lamport_balances(args, &client, program_id).await
+        }
         Commands::ManuallyRemoveValidator(args) => {
             command_manually_remove_validator(args, &client, program_id).await
         }
         Commands::ManuallyCopyAllVoteAccounts(args) => {
             command_manually_copy_all_vote_accounts(args, &client, program_id).await
+        }
+        Commands::InstantRemoveValidator(args) => {
+            command_instant_remove_validator(args, &client, program_id).await
         }
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
@@ -90,6 +99,9 @@ async fn main() -> Result<()> {
         Commands::AddToBlacklist(args) => command_add_to_blacklist(args, &client, program_id).await,
         Commands::RemoveFromBlacklist(args) => {
             command_remove_from_blacklist(args, &client, program_id).await
+        }
+        Commands::UpdateValidatorListBalance(args) => {
+            command_update_validator_list_balance(&client, args, program_id).await
         }
 
         // --- Cranks ---

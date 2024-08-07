@@ -115,8 +115,8 @@ pub fn emit_validator_history_metrics(
     let mut cluster_history_blocks: i64 = 0;
     let cluster_history_entry = cluster_history.history.last();
     if let Some(cluster_history) = cluster_history_entry {
-        // Looking for previous epoch to be updated
-        if cluster_history.epoch as u64 == epoch_info.epoch - 1 {
+        // Looking for current epoch to be updated, implies previous is complete as well
+        if cluster_history.epoch as u64 == epoch_info.epoch {
             cluster_history_blocks = 1;
         }
     }
