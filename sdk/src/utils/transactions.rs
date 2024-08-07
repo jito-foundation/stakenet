@@ -281,14 +281,32 @@ async fn parallel_confirm_transactions(
         .chunks(SIG_STATUS_BATCH_SIZE)
         .map(|sig_batch| async move {
             match get_signature_statuses_with_retry(client, sig_batch).await {
-                Ok(sig_batch_response) => sig_batch_response
-                    .value
-                    .iter()
-                    .enumerate()
-                    .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
-                    .collect::<Vec<_>>(),
+                Ok(sig_batch_response) => {
+                    let res = sig_batch_response
+                        .value
+                        .iter()
+                        .enumerate()
+                        .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
+                        .collect::<Vec<_>>();
+                    let count = res
+                        .iter()
+                        .map(|(_, status)| if status.is_some() { 1 } else { 0 })
+                        .sum::<usize>();
+                    println!(
+                        "Got {} confirmations for {} transactions",
+                        count,
+                        sig_batch.len()
+                    );
+                    info!(
+                        "Got {} confirmations for {} transactions",
+                        count,
+                        sig_batch.len()
+                    );
+                    res
+                }
                 Err(e) => {
-                    info!("Failed getting signature statuses: {}", e);
+                    info!("Failed getting signature statuses: {:?}", e);
+                    println!("Failed getting signature statuses: {:?}", e);
                     vec![]
                 }
             }
@@ -298,15 +316,37 @@ async fn parallel_confirm_transactions(
     let results = futures::future::join_all(confirmation_futures).await;
 
     let mut confirmed_signatures: HashSet<Signature> = HashSet::new();
+    let mut none_count = 0;
+    let mut err_count = 0;
+    let mut unsatisfied_commitement_count = 0;
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
                 if status.satisfies_commitment(client.commitment()) && status.err.is_none() {
                     confirmed_signatures.insert(*sig);
                 }
+
+                if status.err.is_some() {
+                    err_count += 1;
+                }
+
+                if !status.satisfies_commitment(client.commitment()) {
+                    unsatisfied_commitement_count += 1;
+                }
+            } else {
+                none_count += 1;
             }
         }
     }
+
+    println!(
+        "None count: {} Err count: {} Unsatisfied commitment count: {}",
+        none_count, err_count, unsatisfied_commitement_count
+    );
+    info!(
+        "None count: {} Err count: {} Unsatisfied commitment count: {}",
+        none_count, err_count, unsatisfied_commitement_count
+    );
 
     info!(
         "{} transactions submitted, {} confirmed",
