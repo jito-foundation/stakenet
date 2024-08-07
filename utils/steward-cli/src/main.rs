@@ -12,6 +12,7 @@ use commands::{
         manually_remove_validator::command_manually_remove_validator, pause::command_pause,
         remove_bad_validators::command_remove_bad_validators,
         remove_from_blacklist::command_remove_from_blacklist, reset_state::command_reset_state,
+        reset_validator_lamport_balances::command_reset_validator_lamport_balances,
         resume::command_resume, revert_staker::command_revert_staker,
         set_staker::command_set_staker, update_authority::command_update_authority,
         update_config::command_update_config,
@@ -74,6 +75,9 @@ async fn main() -> Result<()> {
         Commands::Resume(args) => command_resume(args, &client, program_id).await,
         Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        Commands::ResetValidatorLamportBalances(args) => {
+            command_reset_validator_lamport_balances(args, &client, program_id).await
+        }
         Commands::ManuallyRemoveValidator(args) => {
             command_manually_remove_validator(args, &client, program_id).await
         }
