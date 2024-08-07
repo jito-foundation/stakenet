@@ -43,7 +43,7 @@ pub async fn command_crank_rebalance(
         }
     }
 
-    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators - 100)
+    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {
             let has_been_rebalanced = steward_accounts
                 .state_account

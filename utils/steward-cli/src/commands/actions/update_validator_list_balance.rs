@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_sdk::{
-    pubkey::Pubkey,
-    signature::{read_keypair_file, Keypair},
-    signer::Signer,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
 use spl_stake_pool::instruction::update_validator_list_balance;
 use stakenet_sdk::utils::accounts::get_all_steward_accounts;
@@ -22,15 +21,9 @@ pub async fn command_update_validator_list_balance(
             .expect("Failed reading keypair file ( Payer )"),
     );
 
-    let priority_fee = args
-        .permissionless_parameters
-        .transaction_parameters
-        .priority_fee;
-
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let config = args.permissionless_parameters.steward_config;
     let stake_pool = all_steward_accounts.stake_pool_address;
     let validator_list = all_steward_accounts.validator_list_address;
 
@@ -51,7 +44,7 @@ pub async fn command_update_validator_list_balance(
     );
 
     let recent_blockhash = client.get_latest_blockhash().await?;
-    let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
+    let transaction = Transaction::new_signed_with_payer(
         &[instruction],
         Some(&payer.pubkey()),
         &[&*payer],
@@ -61,11 +54,8 @@ pub async fn command_update_validator_list_balance(
     let signature = client
         .send_and_confirm_transaction_with_spinner_and_config(
             &transaction,
-            solana_sdk::commitment_config::CommitmentConfig::confirmed(),
-            RpcSendTransactionConfig {
-                skip_preflight: false,
-                ..Default::default()
-            },
+            CommitmentConfig::confirmed(),
+            RpcSendTransactionConfig::default(),
         )
         .await?;
 

@@ -470,7 +470,7 @@ pub struct AutoAddValidatorFromPool {
 }
 
 #[derive(Parser)]
-#[command(about = "Updates validator list balance. spl_stake_pool command")]
+#[command(about = "Updates validator list balance (spl_stake_pool command) for a single validator")]
 pub struct UpdateValidatorListBalance {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,

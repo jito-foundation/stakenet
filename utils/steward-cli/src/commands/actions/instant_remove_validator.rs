@@ -76,10 +76,7 @@ pub async fn command_instant_remove_validator(
             .send_and_confirm_transaction_with_spinner_and_config(
                 &transaction,
                 CommitmentConfig::default(),
-                RpcSendTransactionConfig {
-                    skip_preflight: true,
-                    ..Default::default()
-                },
+                RpcSendTransactionConfig::default(),
             )
             .await?;
 

@@ -70,11 +70,6 @@ pub async fn command_crank_epoch_maintenance(
         blockhash,
     );
 
-    println!(
-        "Simulation result: {:?}",
-        client.simulate_transaction(&transaction).await
-    );
-
     if args.transaction_parameters.print_tx {
         print_base58_tx(&configured_ix)
     } else {
