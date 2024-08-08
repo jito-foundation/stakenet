@@ -39,7 +39,8 @@ pub fn handler(
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     let clock = Clock::get()?;
-    let validators_to_remove = state_account.state.validators_for_immediate_removal.count();
+    let validators_for_immediate_removal =
+        state_account.state.validators_for_immediate_removal.count();
     let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
 
     require!(
@@ -64,7 +65,8 @@ pub fn handler(
 
     let total_deactivating = stake_status_tally.deactivating_all
         + stake_status_tally.deactivating_transient
-        + stake_status_tally.deactivating_validator;
+        + stake_status_tally.deactivating_validator
+        + stake_status_tally.ready_for_removal;
 
     require!(
         total_deactivating == state_account.state.validators_to_remove.count() as u64,
@@ -79,7 +81,7 @@ pub fn handler(
     require!(
         state_account.state.num_pool_validators as usize
             + state_account.state.validators_added as usize
-            - validators_to_remove
+            - validators_for_immediate_removal
             == validators_in_list,
         StewardError::ListStateMismatch
     );
