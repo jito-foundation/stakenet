@@ -64,4 +64,6 @@ pub enum StewardError {
     VoteAccountDoesNotMatch,
     #[msg("Validator needs to be marked for removal")]
     ValidatorNeedsToBeMarkedForRemoval,
+    #[msg("Invalid stake state")]
+    InvalidStakeState,
 }
