@@ -4,6 +4,7 @@ use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use log::*;
+use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_client::rpc_response::{
     Response, RpcResult, RpcSimulateTransactionResult, RpcVoteAccountInfo,
 };
@@ -322,7 +323,7 @@ async fn parallel_confirm_transactions(
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
-                if status.satisfies_commitment() && status.err.is_none() {
+                if status.satisfies_commitment(CommitmentConfig::confirmed()) && status.err.is_none() {
                     confirmed_signatures.insert(*sig);
                 }
 
@@ -410,8 +411,14 @@ pub async fn parallel_execute_transactions(
                 sleep(Duration::from_secs(1)).await;
             }
 
+            client.simulate_transaction(transaction)
+
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
-            match client.send_transaction(tx).await {
+            match client.send_transaction_with_config(tx, 
+            RpcSendTransactionConfig {
+                skip_preflight: true,
+                ..Default::default()
+            }).await {
                 Ok(signature) => {
                     debug!("🟨 Submitted: {:?}", signature);
                     println!("🟨 Submitted: {:?}", signature);
