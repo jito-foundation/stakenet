@@ -205,12 +205,12 @@ pub async fn get_signature_statuses_with_retry(
     signatures: &[Signature],
 ) -> RpcResult<Vec<Option<TransactionStatus>>> {
     for _ in 1..4 {
-        if let Ok(result) = client.get_signature_statuses(signatures).await {
+        if let Ok(result) = client.get_signature_statuses_with_history(signatures).await {
             return Ok(result);
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
-    client.get_signature_statuses(signatures).await
+    client.get_signature_statuses_with_history(signatures).await
 }
 
 async fn find_ix_per_tx(
@@ -322,7 +322,7 @@ async fn parallel_confirm_transactions(
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
-                if status.satisfies_commitment(client.commitment()) && status.err.is_none() {
+                if status.satisfies_commitment() && status.err.is_none() {
                     confirmed_signatures.insert(*sig);
                 }
 
@@ -330,7 +330,7 @@ async fn parallel_confirm_transactions(
                     err_count += 1;
                 }
 
-                if !status.satisfies_commitment(client.commitment()) {
+                if !status.satisfies_commitment(CommitmentConfig::confirmed()) {
                     unsatisfied_commitement_count += 1;
                 }
             } else {
