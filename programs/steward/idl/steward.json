@@ -1810,6 +1810,11 @@
       "code": 6029,
       "name": "ValidatorNeedsToBeMarkedForRemoval",
       "msg": "Validator needs to be marked for removal"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidStakeState",
+      "msg": "Invalid stake state"
     }
   ],
   "types": [

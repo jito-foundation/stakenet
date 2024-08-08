@@ -1,13 +1,12 @@
 use crate::{
     errors::StewardError,
     utils::{
-        check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
-        get_stake_pool_address, get_validator_list, get_validator_list_length,
+        deserialize_stake_pool, get_stake_pool_address, get_validator_list,
+        get_validator_list_length, tally_stake_status,
     },
     Config, StewardStateAccount,
 };
 use anchor_lang::prelude::*;
-use spl_stake_pool::state::StakeStatus;
 
 #[derive(Accounts)]
 pub struct InstantRemoveValidator<'info> {
@@ -40,7 +39,8 @@ pub fn handler(
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     let clock = Clock::get()?;
-    let validators_to_remove = state_account.state.validators_for_immediate_removal.count();
+    let validators_for_immediate_removal =
+        state_account.state.validators_for_immediate_removal.count();
     let validators_in_list = get_validator_list_length(&ctx.accounts.validator_list)?;
 
     require!(
@@ -61,23 +61,27 @@ pub fn handler(
         StewardError::ValidatorNotInList
     );
 
-    // Ensure there are no validators in the list that have not been removed, that should be
+    let stake_status_tally = tally_stake_status(&ctx.accounts.validator_list)?;
+
+    let total_deactivating = stake_status_tally.deactivating_all
+        + stake_status_tally.deactivating_transient
+        + stake_status_tally.deactivating_validator
+        + stake_status_tally.ready_for_removal;
+
     require!(
-        !check_validator_list_has_stake_status_other_than(
-            &ctx.accounts.validator_list,
-            &[
-                StakeStatus::Active,
-                StakeStatus::DeactivatingAll,
-                StakeStatus::DeactivatingTransient
-            ]
-        )?,
+        total_deactivating == state_account.state.validators_to_remove.count() as u64,
         StewardError::ValidatorsHaveNotBeenRemoved
+    );
+
+    require!(
+        stake_status_tally.ready_for_removal == 0,
+        StewardError::ValidatorsNeedToBeRemoved
     );
 
     require!(
         state_account.state.num_pool_validators as usize
             + state_account.state.validators_added as usize
-            - validators_to_remove
+            - validators_for_immediate_removal
             == validators_in_list,
         StewardError::ListStateMismatch
     );

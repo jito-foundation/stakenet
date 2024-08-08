@@ -204,6 +204,78 @@ pub fn get_validator_stake_info_at_index(
     Ok(validator_stake_info)
 }
 
+pub struct StakeStatusTally {
+    pub active: u64,
+    pub deactivating_transient: u64,
+    pub ready_for_removal: u64,
+    pub deactivating_validator: u64,
+    pub deactivating_all: u64,
+}
+
+pub fn tally_stake_status(validator_list_account_info: &AccountInfo) -> Result<StakeStatusTally> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+
+    let mut tally = StakeStatusTally {
+        active: 0,
+        deactivating_transient: 0,
+        ready_for_removal: 0,
+        deactivating_validator: 0,
+        deactivating_all: 0,
+    };
+
+    for index in 0..validator_list.len() as usize {
+        let stake_status_index = VEC_SIZE_BYTES
+            .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+            .checked_add(STAKE_STATUS_OFFSET)
+            .ok_or(StewardError::ArithmeticError)?;
+
+        let stake_status = validator_list.data[stake_status_index];
+
+        match stake_status {
+            x if x == StakeStatus::Active as u8 => {
+                tally.active = tally
+                    .active
+                    .checked_add(1)
+                    .ok_or(StewardError::ArithmeticError)?;
+            }
+            x if x == StakeStatus::DeactivatingTransient as u8 => {
+                tally.deactivating_transient = tally
+                    .deactivating_transient
+                    .checked_add(1)
+                    .ok_or(StewardError::ArithmeticError)?;
+            }
+            x if x == StakeStatus::ReadyForRemoval as u8 => {
+                tally.ready_for_removal = tally
+                    .ready_for_removal
+                    .checked_add(1)
+                    .ok_or(StewardError::ArithmeticError)?;
+            }
+            x if x == StakeStatus::DeactivatingValidator as u8 => {
+                tally.deactivating_validator = tally
+                    .deactivating_validator
+                    .checked_add(1)
+                    .ok_or(StewardError::ArithmeticError)?;
+            }
+            x if x == StakeStatus::DeactivatingAll as u8 => {
+                tally.deactivating_all = tally
+                    .deactivating_all
+                    .checked_add(1)
+                    .ok_or(StewardError::ArithmeticError)?;
+            }
+            _ => {
+                return Err(StewardError::InvalidStakeState.into());
+            }
+        }
+    }
+
+    Ok(tally)
+}
+
 pub fn check_validator_list_has_stake_status_other_than(
     validator_list_account_info: &AccountInfo,
     flags: &[StakeStatus],
