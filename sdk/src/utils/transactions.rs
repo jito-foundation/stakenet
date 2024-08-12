@@ -282,32 +282,14 @@ async fn parallel_confirm_transactions(
         .chunks(SIG_STATUS_BATCH_SIZE)
         .map(|sig_batch| async move {
             match get_signature_statuses_with_retry(client, sig_batch).await {
-                Ok(sig_batch_response) => {
-                    let res = sig_batch_response
-                        .value
-                        .iter()
-                        .enumerate()
-                        .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
-                        .collect::<Vec<_>>();
-                    let count = res
-                        .iter()
-                        .map(|(_, status)| if status.is_some() { 1 } else { 0 })
-                        .sum::<usize>();
-                    println!(
-                        "Got {} confirmations for {} transactions",
-                        count,
-                        sig_batch.len()
-                    );
-                    info!(
-                        "Got {} confirmations for {} transactions",
-                        count,
-                        sig_batch.len()
-                    );
-                    res
-                }
+                Ok(sig_batch_response) => sig_batch_response
+                    .value
+                    .iter()
+                    .enumerate()
+                    .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
+                    .collect::<Vec<_>>(),
                 Err(e) => {
                     info!("Failed getting signature statuses: {:?}", e);
-                    println!("Failed getting signature statuses: {:?}", e);
                     vec![]
                 }
             }
@@ -317,37 +299,18 @@ async fn parallel_confirm_transactions(
     let results = futures::future::join_all(confirmation_futures).await;
 
     let mut confirmed_signatures: HashSet<Signature> = HashSet::new();
-    let mut none_count = 0;
-    let mut err_count = 0;
-    let mut unsatisfied_commitement_count = 0;
+
     for result_batch in results.iter() {
         for (sig, result) in result_batch {
             if let Some(status) = result {
-                if status.satisfies_commitment(CommitmentConfig::confirmed()) && status.err.is_none() {
+                if status.satisfies_commitment(CommitmentConfig::confirmed())
+                    && status.err.is_none()
+                {
                     confirmed_signatures.insert(*sig);
                 }
-
-                if status.err.is_some() {
-                    err_count += 1;
-                }
-
-                if !status.satisfies_commitment(CommitmentConfig::confirmed()) {
-                    unsatisfied_commitement_count += 1;
-                }
-            } else {
-                none_count += 1;
             }
         }
     }
-
-    println!(
-        "None count: {} Err count: {} Unsatisfied commitment count: {}",
-        none_count, err_count, unsatisfied_commitement_count
-    );
-    info!(
-        "None count: {} Err count: {} Unsatisfied commitment count: {}",
-        none_count, err_count, unsatisfied_commitement_count
-    );
 
     info!(
         "{} transactions submitted, {} confirmed",
@@ -411,14 +374,8 @@ pub async fn parallel_execute_transactions(
                 sleep(Duration::from_secs(1)).await;
             }
 
-            client.simulate_transaction(transaction)
-
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
-            match client.send_transaction_with_config(tx, 
-            RpcSendTransactionConfig {
-                skip_preflight: true,
-                ..Default::default()
-            }).await {
+            match client.send_transaction(tx).await {
                 Ok(signature) => {
                     debug!("🟨 Submitted: {:?}", signature);
                     println!("🟨 Submitted: {:?}", signature);
@@ -438,7 +395,6 @@ pub async fn parallel_execute_transactions(
                             submitted_signatures.insert(tx.signatures[0], idx);
                         }
                         Some(_) => {
-                            info!("Transaction error: {:?}", e);
                             match e.kind {
                                 solana_client::client_error::ClientErrorKind::Io(e) => {
                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
