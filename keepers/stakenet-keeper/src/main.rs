@@ -10,9 +10,7 @@ use rand::Rng;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::signature::read_keypair_file;
-use std::{sync::Arc, time::Duration};
-use tokio::time::sleep;
-use validator_keeper::{
+use stakenet_keeper::{
     operations::{
         self,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
@@ -23,6 +21,8 @@ use validator_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
+use std::{sync::Arc, time::Duration};
+use tokio::time::sleep;
 
 fn set_run_flags(args: &Args) -> u32 {
     let mut run_flags = 0;
