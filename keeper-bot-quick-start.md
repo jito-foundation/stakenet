@@ -120,16 +120,16 @@ docker stop stakenet-keeper; docker rm stakenet-keeper;
 
 ## Run from Dockerhub
 
-This image is available on Dockerhub at: (TODO)
+This image is available on Dockerhub at: https://hub.docker.com/r/jitolabs/stakenet-keeper
 
 ```bash
-docker pull <repository>/<image-name>:<tag>
+docker pull jitolabs/stakenet-keeper:latest
 docker run -d \
   --name stakenet-keeper \
   --env-file .env \
   -v $(pwd)/credentials:/credentials \
   --restart on-failure:5 \
-  <repository>/<image-name>:<tag>
+  jitolabs/stakenet-keeper:latest
 ```
 
 ## Running as Binary
