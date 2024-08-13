@@ -10,13 +10,13 @@ COPY . .
 
 RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
     --mount=type=cache,mode=0777,target=/usr/local/cargo/registry \
-	cargo build --release --bin validator-keeper
+	cargo build --release --bin stakenet-keeper
 
 #########
 
 FROM debian:buster as validator-history
 RUN apt-get update && apt-get install -y ca-certificates
-ENV APP="validator-keeper"
+ENV APP="stakenet-keeper"
 
 COPY --from=builder /usr/src/app/target/release/$APP ./$APP
 

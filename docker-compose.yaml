@@ -1,10 +1,10 @@
 version: "3"
 services:
-  validator-keeper:
+  stakenet-keeper:
     build:
       context: .
       target: validator-history
-    container_name: validator-keeper
+    container_name: stakenet-keeper
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}

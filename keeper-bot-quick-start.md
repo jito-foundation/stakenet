@@ -15,18 +15,17 @@ solana-keygen new -o ./credentials/keypair.json
 
 ### ENV
 
-In the root directory create a new folder named `config` and create a `.env` file inside of it
+In the root directory create `.env` file
 
 ```bash
-mkdir config
-touch ./config/.env
+touch .env
 ```
 
-Then copy into the `.env` file the contents below. Everything should be set as-is, however consider replacing the `JSON_RPC_URL` and adjusting the `PRIORITY_FEES`
+Then copy into the `.env` file the contents below. Everything should be set as-is, however you will need to include a `JSON_RPC_URL` that can handle getProgramAccounts calls.
 
-```.env
+```bash
 # RPC URL for the cluster
-JSON_RPC_URL=https://api.mainnet-beta.solana.com
+JSON_RPC_URL="INCLUDE YOUR RPC URL HERE"
 
 # Cluster to specify (mainnet, testnet, devnet)
 CLUSTER=mainnet
@@ -34,7 +33,7 @@ CLUSTER=mainnet
 # Log levels
 RUST_LOG="info,solana_gossip=error,solana_metrics=info"
 
-# Path to keypair used to pay for account creation and execute transactions
+# Path to keypair used to execute tranasactions
 KEYPAIR=./credentials/keypair.json
 
 # Validator history program ID (Pubkey as base58 string)
@@ -46,11 +45,17 @@ TIP_DISTRIBUTION_PROGRAM_ID=4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7
 # Steward program ID
 STEWARD_PROGRAM_ID=Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8
 
-# Steward config account
+# Steward config account for JitoSOL
 STEWARD_CONFIG=jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 
 # Priority Fees in microlamports
 PRIORITY_FEES=20000
+
+# Retry count
+TX_RETRY_COUNT=100
+
+# Confirmation time after submission
+TX_CONFIRMATION_SECONDS=30
 
 # Run flags (true/false)
 RUN_CLUSTER_HISTORY=true
@@ -58,47 +63,38 @@ RUN_COPY_VOTE_ACCOUNTS=true
 RUN_MEV_COMMISSION=true
 RUN_MEV_EARNED=true
 RUN_STEWARD=true
-RUN_EMIT_METRICS=true
-
-################# DEBUGGING AND ORACLE USE ONLY #################
+RUN_EMIT_METRICS=false
 
 # Interval to update Validator History Accounts (in seconds)
-# VALIDATOR_HISTORY_INTERVAL=300
+VALIDATOR_HISTORY_INTERVAL=300
 
 # Interval to run steward (in seconds)
-# STEWARD_INTERVAL=301
+STEWARD_INTERVAL=301
 
 # Interval to emit metrics (in seconds)
-# METRICS_INTERVAL=60
+METRICS_INTERVAL=60
 
-# For ORACLE_AUTHORITY operator
-# RUN_STAKE_UPLOAD=false
-# RUN_GOSSIP_UPLOAD=false
+# For Oracle Authority Only
+RUN_STAKE_UPLOAD=false
+RUN_GOSSIP_UPLOAD=false
 
 # Run with the startup flag set to true
-# FULL_STARTUP=true
+FULL_STARTUP=true
 
 # Running with no_pack set to true skips packing the instructions and will cost more
-# NO_PACK=false
+NO_PACK=false
 
 # Pay for new accounts when necessary
-# PAY_FOR_NEW_ACCOUNTS=false
+PAY_FOR_NEW_ACCOUNTS=false
 
 # Max time in minutes to wait after any fire cycle
-# COOL_DOWN_RANGE=20
+COOL_DOWN_RANGE=20
 
-# Gossip entrypoint in the form of URL:PORT
-# GOSSIP_ENTRYPOINT=
-
-# Metrics upload config
-# For uploading metrics to your private InfluxDB instance
-# SOLANA_METRICS_CONFIG=
-
-# Path to keypair used specifically for submitting permissioned transactions
-# ORACLE_AUTHORITY_KEYPAIR=
+# Metrics upload influx server (optional)
+SOLANA_METRICS_CONFIG=""
 ```
 
-## Running Docker
+## Running Docker image from source
 
 Once the setup is complete use the following commands to run/manage the docker container:
 
@@ -107,39 +103,53 @@ Once the setup is complete use the following commands to run/manage the docker c
 ### Start Docker
 
 ```bash
-docker compose --env-file config/.env up -d --build  validator-keeper --remove-orphans
-```
-
-### Stop Docker**
-
-```bash
-docker stop validator-keeper; docker rm validator-keeper;
+docker compose --env-file .env up -d --build  stakenet-keeper --remove-orphans
 ```
 
 ### View Logs
 
 ```bash
-docker logs validator-keeper -f
+docker logs stakenet-keeper -f
 ```
 
-## Running Raw
+### Stop Docker\*\*
+
+```bash
+docker stop stakenet-keeper; docker rm stakenet-keeper;
+```
+
+## Run from Dockerhub
+
+This image is available on Dockerhub at: (TODO)
+
+```bash
+docker pull <repository>/<image-name>:<tag>
+docker run -d \
+  --name stakenet-keeper \
+  --env-file .env \
+  -v $(pwd)/credentials:/credentials \
+  --restart on-failure:5 \
+  <repository>/<image-name>:<tag>
+```
+
+## Running as Binary
 
 To run the keeper in terminal, build for release and run the program.
 
 ### Build for Release
 
 ```bash
-cargo build --release --bin validator-keeper
+cargo build --release --bin stakenet-keeper
 ```
 
 ### Run Keeper
 
 ```bash
-RUST_LOG=info cargo run --bin validator-keeper --
+RUST_LOG=info ./target/release/stakenet-keeper
 ```
 
 To see all available parameters run:
 
 ```bash
-RUST_LOG=info cargo run --bin validator-keeper -- -h
+RUST_LOG=info ./target/release/stakenet-keeper -h
 ```

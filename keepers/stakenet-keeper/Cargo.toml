@@ -1,5 +1,5 @@
 [package]
-name = "validator-keeper"
+name = "stakenet-keeper"
 version = "0.1.0"
 edition = "2021"
 description = "Script to keep validator history accounts up to date"

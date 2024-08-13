@@ -25,4 +25,4 @@ stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
-validator-keeper = { path = "../../keepers/validator-keeper" }
+stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
