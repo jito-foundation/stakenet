@@ -37,6 +37,9 @@ pub enum StewardErrorCodes {
     InvalidState = 0xA2,                        // Don't Raise Flag
     IndexesDontMatch = 0xA3,                    // Raise Flag
     VoteHistoryNotRecentEnough = 0xA4,          // Don't Raise Flag
+    AutoRemoveStakeAccountClosed = 0xA5,        // Don't Raise Flag
+    StakePoolNotUpdated = 0xA6,                 // Don't Raise Flag
+    ValidatorsNotRemovedYet = 0xA7,             // Don't Raise Flag
 }
 
 pub async fn fire(
@@ -80,6 +83,21 @@ pub async fn fire(
                                     s if s.contains("VoteHistoryNotRecentEnough") => {
                                         keeper_flags.set_flag(KeeperFlag::RerunVote);
                                         StewardErrorCodes::VoteHistoryNotRecentEnough as i64
+                                    }
+                                    s if s.contains("AutoRemoveValidatorFromPool")
+                                        && s.contains("ConstraintOwner") =>
+                                    {
+                                        StewardErrorCodes::AutoRemoveStakeAccountClosed as i64
+                                    }
+                                    s if s.contains("UpdateStakePoolBalance")
+                                        && s.contains("0x10") =>
+                                    {
+                                        StewardErrorCodes::StakePoolNotUpdated as i64
+                                    }
+                                    s if s.contains("AutoAddValidator")
+                                        && s.contains("ValidatorsNeedToBeRemoved") =>
+                                    {
+                                        StewardErrorCodes::ValidatorsNotRemovedYet as i64
                                     }
                                     _ => {
                                         StewardErrorCodes::UnknownRpcSimulateTransactionResult
