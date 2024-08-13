@@ -4,7 +4,6 @@ use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use log::*;
-use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_client::rpc_response::{
     Response, RpcResult, RpcSimulateTransactionResult, RpcVoteAccountInfo,
 };
