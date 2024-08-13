@@ -21,8 +21,8 @@ solana-program = "1.18"
 solana-sdk = "1.18"
 spl-pod = "0.1.0"
 spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
+stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
-stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
