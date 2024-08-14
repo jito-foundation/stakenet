@@ -1,7 +1,8 @@
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::LAMPORT_BALANCE_DEFAULT, utils::ValidatorList, Config, StewardStateAccount,
+    constants::LAMPORT_BALANCE_DEFAULT, utils::ValidatorList, Config, Delegation,
+    StewardStateAccount,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{account::Account, pubkey::Pubkey};
@@ -30,7 +31,7 @@ pub async fn command_view_state(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    if args.verbose {
+    if args.verbose || args.vote_account.is_some() {
         let vote_accounts: Vec<Pubkey> = all_steward_accounts
             .validator_list_account
             .validators
@@ -67,6 +68,7 @@ pub async fn command_view_state(
             &all_steward_accounts.config_account,
             &all_steward_accounts.validator_list_account,
             &all_history_map,
+            args.vote_account,
         );
     } else {
         _print_default_state(
@@ -250,15 +252,45 @@ fn _print_default_state(
     println!("{}", formatted_string)
 }
 
+fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usize> {
+    // For all validators from index 0 to num_pool_validators, we want to determine an overall rank with primary key of score, and secondary key of yield score, both descending.
+    // The final vector created will be a vector of length num_pool_validators, with the index being the rank, and the value being the index of the validator in the steward list.
+
+    let state = &steward_state_account.state;
+    let num_pool_validators = state.num_pool_validators as usize;
+
+    // (index, score, yield_score)
+    let mut sorted_validator_indices: Vec<(usize, u32, u32)> = (0..num_pool_validators)
+        .map(|i| (i, state.scores[i], state.yield_scores[i]))
+        .collect();
+
+    // Sorts based on score (descending) and yield_score (descending)
+    sorted_validator_indices.sort_by(|a, b| {
+        b.1.cmp(&a.1) // Compare scores (descending)
+            .then_with(|| b.2.cmp(&a.2)) // If scores are equal, compare yield_scores (descending)
+    });
+
+    // final ranking vector
+    let mut ranks: Vec<usize> = vec![0; num_pool_validators];
+    for (rank, (index, _, _)) in sorted_validator_indices.into_iter().enumerate() {
+        ranks[index] = rank;
+    }
+
+    ranks
+}
+
 fn _print_verbose_state(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
     validator_list_account: &ValidatorList,
     validator_histories: &HashMap<Pubkey, Option<Account>>,
+    maybe_vote_account: Option<Pubkey>,
 ) {
     let mut formatted_string;
 
     let mut top_scores: Vec<(Pubkey, u32)> = vec![];
+
+    let overall_ranks = compute_overall_ranks(steward_state_account);
 
     for (index, validator) in validator_list_account.validators.iter().enumerate() {
         let history_info = validator_histories
@@ -268,7 +300,14 @@ fn _print_verbose_state(
                 ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
             });
 
+        if let Some(vote_account) = maybe_vote_account {
+            if vote_account != validator.vote_account_address {
+                continue;
+            }
+        }
+
         let vote_account = validator.vote_account_address;
+
         let (stake_address, _) = find_stake_program_address(
             &spl_stake_pool::id(),
             &vote_account,
@@ -283,24 +322,100 @@ fn _print_verbose_state(
             validator.transient_seed_suffix.into(),
         );
 
-        let score_index = steward_state_account
-            .state
-            .sorted_score_indices
-            .iter()
-            .position(|&i| i == index as u16);
-        let yield_score_index = steward_state_account
-            .state
-            .sorted_yield_score_indices
-            .iter()
-            .position(|&i| i == index as u16);
+        // let score_index = steward_state_account
+        //     .state
+        //     .sorted_score_indices
+        //     .iter()
+        //     .position(|&i| i == index as u16);
+        // let yield_score_index = steward_state_account
+        //     .state
+        //     .sorted_yield_score_indices
+        //     .iter()
+        //     .position(|&i| i == index as u16);
+
+        let score = steward_state_account.state.scores.get(index);
+
+        let eligibility_criteria = match score {
+            Some(0) => "No",
+            Some(_) => "Yes",
+            None => "N/A",
+        };
 
         formatted_string = String::new();
 
         formatted_string += &format!("Vote Account: {:?}\n", vote_account);
         formatted_string += &format!("Stake Account: {:?}\n", stake_address);
         formatted_string += &format!("Transient Stake Account: {:?}\n", transient_stake_address);
+        formatted_string += &format!("Steward List Index: {}\n", index);
+
+        let overall_rank_str = match overall_ranks.get(index) {
+            Some(rank) => (rank + 1).to_string(),
+            None => "N/A".into(),
+        };
+
+        formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
+        formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
         formatted_string += &format!(
-            "Internal Validator Lamports: {}\n",
+            "Yield Score: {}\n",
+            steward_state_account
+                .state
+                .yield_scores
+                .get(index)
+                .unwrap_or(&0)
+        );
+        formatted_string += &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
+
+        formatted_string += &format!(
+            "Target Delegation Percent: {:.1}%\n",
+            steward_state_account
+                .state
+                .delegations
+                .get(index)
+                .unwrap_or(&Delegation::default())
+                .numerator as f64
+                / steward_state_account
+                    .state
+                    .delegations
+                    .get(index)
+                    .unwrap_or(&Delegation::default())
+                    .denominator as f64
+                * 100.0
+        );
+
+        formatted_string += "\n";
+
+        formatted_string += &format!(
+            "Is Instant Unstake: {}\n",
+            steward_state_account
+                .state
+                .instant_unstake
+                .get(index)
+                .unwrap_or_default()
+        );
+
+        if let Some(history_info) = history_info {
+            formatted_string += &format!(
+                "Is blacklisted: {}\n",
+                config_account
+                    .validator_history_blacklist
+                    .get_unsafe(history_info.index as usize)
+            );
+            formatted_string += &format!("\nValidator History Index: {}\n", history_info.index);
+        }
+
+        formatted_string += "\n";
+        formatted_string += &format!(
+            "Active Lamports: {:?} ({:.2} ◎)\n",
+            u64::from(validator.active_stake_lamports),
+            u64::from(validator.active_stake_lamports) as f64 / 10f64.powf(9.),
+        );
+        formatted_string += &format!(
+            "Transient Lamports: {:?} ({:.2} ◎)\n",
+            u64::from(validator.transient_stake_lamports),
+            u64::from(validator.transient_stake_lamports) as f64 / 10f64.powf(9.),
+        );
+        formatted_string += &format!(
+            "Steward Internal Lamports: {}\n",
             match steward_state_account
                 .state
                 .validator_lamport_balances
@@ -310,8 +425,14 @@ fn _print_verbose_state(
                 Some(&lamports) => lamports.to_string(),
             }
         );
-        formatted_string += &format!("Index: {}\n", index);
-
+        let status = match StakeStatus::try_from(validator.status).unwrap() {
+            StakeStatus::Active => "🟩 Active",
+            StakeStatus::DeactivatingAll => "🟨 Deactivating All",
+            StakeStatus::DeactivatingTransient => "🟨 Deactivating Transient",
+            StakeStatus::DeactivatingValidator => "🟥 Deactivating Validator",
+            StakeStatus::ReadyForRemoval => "🟥 Ready for Removal",
+        };
+        formatted_string += &format!("Status: {}\n", status);
         formatted_string += &format!(
             "Marked for removal: {}\n",
             steward_state_account
@@ -328,60 +449,6 @@ fn _print_verbose_state(
                 .get(index)
                 .unwrap_or_default()
         );
-        formatted_string += &format!(
-            "Is Instant Unstake: {}\n",
-            steward_state_account
-                .state
-                .instant_unstake
-                .get(index)
-                .unwrap_or_default()
-        );
-        formatted_string += &format!(
-            "Score: {}\n",
-            steward_state_account.state.scores.get(index).unwrap_or(&0)
-        );
-        formatted_string += &format!(
-            "Yield Score: {}\n",
-            steward_state_account
-                .state
-                .yield_scores
-                .get(index)
-                .unwrap_or(&0)
-        );
-        formatted_string += &format!("Score Index: {:?}\n", score_index);
-        formatted_string += &format!("Yield Score Index: {:?}\n", yield_score_index);
-
-        if let Some(history_info) = history_info {
-            formatted_string += &format!("\nValidator History Index: {}\n", history_info.index);
-
-            formatted_string += &format!(
-                "Is blacklisted: {}\n",
-                config_account
-                    .validator_history_blacklist
-                    .get_unsafe(history_info.index as usize)
-            );
-        }
-
-        formatted_string += "\n";
-        formatted_string += &format!(
-            "Active Lamports: {:?} ({:.2} ◎)\n",
-            u64::from(validator.active_stake_lamports),
-            u64::from(validator.active_stake_lamports) as f64 / 10f64.powf(9.),
-        );
-        formatted_string += &format!(
-            "Transient Lamports: {:?} ({:.2} ◎)\n",
-            u64::from(validator.transient_stake_lamports),
-            u64::from(validator.transient_stake_lamports) as f64 / 10f64.powf(9.),
-        );
-
-        let status = match StakeStatus::try_from(validator.status).unwrap() {
-            StakeStatus::Active => "🟩 Active",
-            StakeStatus::DeactivatingAll => "🟨 Deactivating All",
-            StakeStatus::DeactivatingTransient => "🟨 Deactivating Transient",
-            StakeStatus::DeactivatingValidator => "🟥 Deactivating Validator",
-            StakeStatus::ReadyForRemoval => "🟥 Ready for Removal",
-        };
-        formatted_string += &format!("Status: {}\n", status);
 
         formatted_string += "\n";
 
@@ -394,24 +461,24 @@ fn _print_verbose_state(
         println!("{}", formatted_string);
     }
 
-    println!("\nAll Ranked Validators ( {} ): \n", top_scores.len());
-    println!("{:<45} : Score\n", "Vote Account");
+    if maybe_vote_account.is_none() {
+        println!("\nAll Ranked Validators ( {} ): \n", top_scores.len());
+        println!("{:<45} : Score\n", "Vote Account");
 
-    top_scores.sort_by(|a, b| b.1.cmp(&a.1));
-    top_scores.iter().for_each(|(vote_account, score)| {
-        let formatted_score =
-            format!("{}", score)
-                .chars()
-                .rev()
-                .enumerate()
-                .fold(String::new(), |acc, (i, c)| {
+        top_scores.sort_by(|a, b| b.1.cmp(&a.1));
+        top_scores.iter().for_each(|(vote_account, score)| {
+            let formatted_score = format!("{}", score).chars().rev().enumerate().fold(
+                String::new(),
+                |acc, (i, c)| {
                     if i > 0 && i % 3 == 0 {
                         format!("{}_{}", c, acc)
                     } else {
                         format!("{}{}", c, acc)
                     }
-                });
-        let vote_account = format!("{:?}", vote_account);
-        println!("{:<45} : {}", vote_account, formatted_score);
-    });
+                },
+            );
+            let vote_account = format!("{:?}", vote_account);
+            println!("{:<45} : {}", vote_account, formatted_score);
+        });
+    }
 }
