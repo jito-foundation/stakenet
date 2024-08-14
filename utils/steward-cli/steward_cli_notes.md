@@ -44,7 +44,7 @@ Overall Rank: 441
 Score: 0
 Yield Score: 912832510
 Passing Eligibility Criteria: No
-Target Delegation Ratio: 0.0%
+Target Delegation Percent: 0.0%
 
 Is Instant Unstake: false
 Is blacklisted: false
