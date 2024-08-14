@@ -9,7 +9,7 @@ use solana_sdk::{account::Account, pubkey::Pubkey};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, state::StakeStatus,
 };
-use std::{collections::HashMap, fmt::format, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 
 use crate::commands::command_args::ViewState;

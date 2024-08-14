@@ -34,25 +34,39 @@ cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $
 Displays state of a single Validator.
 
 `Vote Account`: Validator's vote account address
+
 `Stake Account`: Validator's stake account from this stake pool
+
 `Transient Stake Account`: Validator's transient stake account used for activating/deactivating stake
+
 `Steward List Index`: Position in the Steward list, 1-1 with spl-stake-pool `ValidatorList`
+
 `Overall Rank`: Validator's rank among all validators, indicating priority for stake if Target is nonzero, and priority for unstaking if target is zero
+
 `Passing Eligibility Criteria`: Indicates if validator meets binary eligibility requirements
+
 `Score`: Validator's overall score
+
 `Yield Score`: Validator's relative yield score
+
 `Target Delegation Ratio`: Share of the stake pool TVL this validator is targeted to receive. Not a guaranteed amount - dependent on staking and unstaking priority.
 
 `Is Instant Unstake`: Indicates if this validator should be immediately unstaked
+
 `Is blacklisted`: Indicates if validator is blacklisted from the pool
 
 `Validator History Index`: Position in the validator history
 
 `Active Lamports`: Amount of actively staked lamports
+
 `Transient Lamports`: Amount of lamports in transient state
+
 `Steward Internal Lamports`: Steward's internal tracking of stake used to detect user deposits
+
 `Status`: Validator's `StakeStatus` in the spl-stake-pool `ValidatorList` account
+
 `Marked for removal`: Indicates if validator is flagged for removal next epoch
+
 `Marked for immediate removal`: Indicates if validator is flagged for immediate removal
 
 ### View State of All Validators
