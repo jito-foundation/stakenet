@@ -366,19 +366,20 @@ fn _print_verbose_state(
         formatted_string += &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
 
         formatted_string += &format!(
-            "Target Delegation Ratio: {} / {} \n",
+            "Target Delegation Percent: {:.1}%\n",
             steward_state_account
                 .state
                 .delegations
                 .get(index)
                 .unwrap_or(&Delegation::default())
-                .numerator,
-            steward_state_account
-                .state
-                .delegations
-                .get(index)
-                .unwrap_or(&Delegation::default())
-                .denominator,
+                .numerator as f64
+                / steward_state_account
+                    .state
+                    .delegations
+                    .get(index)
+                    .unwrap_or(&Delegation::default())
+                    .denominator as f64
+                * 100.0
         );
 
         formatted_string += "\n";

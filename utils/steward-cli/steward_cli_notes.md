@@ -75,7 +75,7 @@ Marked for immediate removal: false
 
 `Yield Score`: Validator's relative yield score
 
-`Target Delegation Ratio`: Share of the stake pool TVL this validator is targeted to receive. Not a guaranteed amount - dependent on staking and unstaking priority.
+`Target Delegation Percent`: Share of the stake pool TVL this validator is targeted to receive. Not a guaranteed amount - dependent on staking and unstaking priority.
 
 `Is Instant Unstake`: Indicates if this validator should be immediately unstaked
 
