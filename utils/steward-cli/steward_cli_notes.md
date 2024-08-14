@@ -19,19 +19,45 @@ cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-confi
 
 ### View State
 
+Displays high level Steward internal operations including current state, total number of validators in the pool, next cycle epoch, etc.
+
 ```bash
 cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
-Displays high level Steward internal operations including current state, total number of validators in the pool, next cycle epoch, etc.
-
 ### View State of Single Validator
+
+Displays state of a single Validator.
 
 ```bash
 cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --vote-account J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
 ```
 
-Displays state of a single Validator.
+Output:
+
+```
+Vote Account: J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
+Stake Account: 6PAY8LEswawgCGnzB3tKGJBtELUwDpeMfDCiNpCyNt8q
+Transient Stake Account: C2AurJCKxp5Q8DbaZ84aiSUiKKazqgRVsUiTiihqNYui
+Steward List Index: 3
+Overall Rank: 441
+Score: 0
+Yield Score: 912832510
+Passing Eligibility Criteria: No
+Target Delegation Ratio: 0 / 1
+
+Is Instant Unstake: false
+Is blacklisted: false
+
+Validator History Index: 321
+
+Active Lamports: 3398839 (0.00 ◎)
+Transient Lamports: 0 (0.00 ◎)
+Steward Internal Lamports: 114590
+Status: 🟩 Active
+Marked for removal: false
+Marked for immediate removal: false
+```
 
 `Vote Account`: Validator's vote account address
 
