@@ -243,6 +243,10 @@ pub struct ViewState {
     /// Views the steward state for all validators in the pool
     #[arg(short, long)]
     pub verbose: bool,
+
+    /// Optional vote account to view the state of
+    #[arg(long)]
+    pub vote_account: Option<Pubkey>,
 }
 
 #[derive(Parser)]
