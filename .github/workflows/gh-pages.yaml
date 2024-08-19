@@ -1,7 +1,7 @@
 name: Build Jekyll site
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "docs"]
 
 permissions:
   contents: read
