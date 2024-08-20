@@ -13,8 +13,8 @@ The core operations of the Steward Program are permissionless such that any cran
 
 ## Table of Contents
 
-1. [Terminology](./terminology.md)
-2. [Program Overview](program-overview.md)
+1. [Program Overview](program-overview.md)
+2. [Terminology](./terminology.md)
 3. [Parameters](parameters.md)
 4. [StakeNet UI](./ui.md) (work in progress)
 5. Developers
