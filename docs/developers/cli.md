@@ -16,7 +16,7 @@ title: Parameters
 
 # CLI Commands
 
-Build CLI binary:
+Build CLI binary from `/stakenet` directory:
 
 ```bash
 cargo build -p steward-cli --release
@@ -25,6 +25,8 @@ cargo build -p steward-cli --release
 ## Permissionless Commands
 
 ### View Config
+
+Displays all parameters of this Steward configuration.
 
 ```bash
 ./target/release/steward-cli --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-config --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv

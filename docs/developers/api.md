@@ -11,7 +11,7 @@ This endpoint allows you to retrieve various events related to the Steward progr
 
 ### Endpoint
 
-GET https://kobe.mainnet.jito.network/api/v1/steward_events
+`GET https://kobe.mainnet.jito.network/api/v1/steward_events`
 
 ### Parameters
 
@@ -41,7 +41,7 @@ Updates to overall state:
 
 ### Example Request: Get a validator's scores
 
-GET https://kobe.mainnet.jito.network/api/v1/steward_events?vote_account=J1to3PQfXidUUhprQWgdKkQAMWPJAEqSJ7amkBDE9qhF&event_type=ScoreComponents
+`GET https://kobe.mainnet.jito.network/api/v1/steward_events?vote_account=J1to3PQfXidUUhprQWgdKkQAMWPJAEqSJ7amkBDE9qhF&event_type=ScoreComponents`
 
 ```json
 {
