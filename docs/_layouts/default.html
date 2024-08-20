@@ -7,6 +7,8 @@
 
     {% seo %}
     <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    <!-- <link rel="stylesheet" href="{{ site.baseurl }}/assets/css/style.css"> -->
+
     {% include head-custom.html %}
 
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
@@ -17,6 +19,9 @@
     {% if site.title and site.title != page.title %}
     <h1><a href="{{ "/" | absolute_url }}">{{ site.title }}</a></h1>
     {% endif %}
+    <div class="sidebar">
+        {% include toc.html %}
+    </div>
 
     {{ content }}
 
