@@ -13,27 +13,12 @@ The core operations of the Steward Program are permissionless such that any cran
 
 ## Table of Contents
 
-1. [Program Overview](program-overview.md)
-2. [State Machine](state-machine.md)
-3. [Validator Management](validator-management.md)
-4. [Admin Abilities](admin-abilities.md)
-5. [Parameters](parameters.md)
-
-6. Validators
-
-   - [Scoring System](validators/scoring-system.md)
-   - [Instant Unstaking](validators/instant-unstaking.md)
-   - [Eligibility Criteria](validators/eligibility-criteria.md)
-
-7. Developers
-
+1. [Terminology](./terminology.md)
+2. [Program Overview](program-overview.md)
+3. [Parameters](parameters.md)
+4. [Command-line interface](./cli.md)
+5. [Events API](./api.md)
+6. [StakeNet UI](./ui.md)
+7. Advanced
    - [SPL Stake Pool Internals](developers/spl-stake-pool-internals.md)
    - [Validator States](developers/validator-states.md)
-   - [Program Architecture](developers/program-architecture.md)
-   - [Integration Guide](developers/integration-guide.md)
-
-8. [Appendix](appendix.md)
-
-For validators interested in understanding how they are scored and managed within the Steward Program, please refer to the Validators section.
-
-For developers interested in the technical details of the Steward Program, please refer to the Developers section.

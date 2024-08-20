@@ -1,8 +1,8 @@
 ---
 layout: default
-title: Scoring System
+title: Rebalance System
 ---
 
-# Scoring System
+# Rebalance System
 
-[In-depth explanation of the scoring system with visuals goes here]
+[In-depth explanation of the rebalance system in progress. For now, see Program Overview.]
