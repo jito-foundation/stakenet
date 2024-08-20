@@ -5,7 +5,7 @@ title: SPL Stake Pool Internals
 
 # SPL Stake Pool: Overview
 
-The SPL Stake Pool program allows users to delegate stake to multiple validators while maintaining liquidity through pool tokens.
+The [SPL Stake Pool program](https://github.com/solana-labs/solana-program-library/tree/master/stake-pool) allows users to delegate stake to multiple validators while maintaining liquidity through pool tokens.
 Thorough documentation of the SPL Stake Pool program can be found [here](https://spl.solana.com/stake-pool/overview). This is meant to be a quick primer, and the Advanced Concepts section contains nuances relevant to the Steward program.
 
 ## Key Accounts
@@ -126,55 +126,6 @@ When keeping track of all lamports in the pool, it's important to note the rent 
    ```
 
 The Stake Pool always ensures that any stake account it creates or manages has sufficient lamports to remain rent-exempt.
-
-## Validator Removal Process in Stake Pool
-
-The removal of a validator from the stake pool involves several state transitions, driven by two main operations: `RemoveValidatorFromPool` and subsequent `UpdateValidatorListBalance` calls.
-
-### State Transitions
-
-```
-Active -> DeactivatingValidator -> ReadyForRemoval
-   or
-Active -> DeactivatingAll -> DeactivatingTransient -> ReadyForRemoval
-```
-
-### Process Overview
-
-1. **Removal Initiation** (`RemoveValidatorFromPool`):
-
-   - Sets status to `DeactivatingValidator` or `DeactivatingAll` (if transient stake exists)
-   - Deactivates the validator's stake account
-
-2. **Stake Deactivation** (`UpdateValidatorListBalance`):
-
-   - Occurs over subsequent epochs
-   - Merges deactivated stakes into the reserve
-   - Updates validator status based on deactivation progress
-
-3. **Final Removal** (`CleanupRemovedValidatorEntries`):
-   - Removes validators with `ReadyForRemoval` status from the list
-
-### Key State Transitions
-
-- `DeactivatingValidator` -> `ReadyForRemoval`:
-  When validator stake is fully deactivated and merged
-
-- `DeactivatingAll` -> `DeactivatingTransient`:
-  When validator stake is deactivated, but transient stake remains
-
-- `DeactivatingTransient` -> `ReadyForRemoval`:
-  When both validator and transient stakes are deactivated and merged
-
-### Implementation Notes
-
-- Status updates occur in `UpdateValidatorListBalance`
-- Separate handling for validator and transient stakes
-- Use of `PodStakeStatus` for efficient status management
-
-Note that this process may span multiple epochs, ensuring all stake is properly deactivated and reclaimed before final removal.
-
----
 
 ## Validator Removal Process
 
