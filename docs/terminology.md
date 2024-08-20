@@ -1,23 +1,35 @@
 ---
-title: Jito (Re)staking Terminology
+layout: default
+title: StakeNet Terminology
 ---
 
-# Terminology
+**Steward Program**: An Anchor program designed to manage the staking authority for a SPL Stake Pool, selecting and managing validators based on performance metrics.
 
-- **Node**: A piece of software running the required protocols as specified by the node consensus network.
-- **Node Consensus Network (NCN)**: A set of nodes running software for the same network, working together to achieve
-  consensus and provide services.
-- **Operator**: An entity that manages one or more nodes in the node consensus network.
-- **Vault**: A smart contract that securely holds staked assets and delegates them to operators.
-- **Vault Receipt Token (VRT)**: A tokenized representation of staked assets inside a vault, allowing for liquidity and
-  composability.
-- **Staking**: The process of locking up assets as collateral to support network operations and earn rewards.
-- **(Re)staking**: The process of staking already-staked assets, such as liquid staking tokens to participate in
-  additional networks or services.
-- **Slashing**: A penalty mechanism where a portion of staked assets is forfeited if an operator misbehaves or fails to
-  meet performance requirements.
-- **Delegation**: The act of assigning staked assets to specific operators within the network.
-- **Multi-Asset Staking**: The ability to stake various types of SPL tokens, not limited to native blockchain tokens.
-- **Liquid Staking**: A form of staking that provides liquidity to Solana stakers.
-- **SPL Token**: Solana Program Library Token, a standard for creating and managing tokens on the Solana blockchain.
-- **Epoch**: A fixed period in the blockchain during which staking rewards are calculated and distributed.
+**SPL Stake Pool**: A Solana program that allows for the creation of stake pools, enabling users to delegate their stake to multiple validators through a single pool and receive a Liquid Staking Token (LST) representing their stake.
+
+**Validator History Program**:
+A Solana program that maintains historical performance data for validators. It records and stores various metrics over time on-chain.
+
+**Delegation**: The amount of stake targeted to a specific validator by the Steward Program.
+
+**State Machine**: The core logic of the Steward Program that manages different operational states and transitions between them.
+
+**Cycle**: A period of time (currently 10 epochs) in the Steward Program during which validators are selected and delegations are managed. The scores and validator selections are fixed for the duration of a cycle.
+
+**Validator Score**: A numerical representation of a validator's performance and desirability within the Steward Program.
+
+**Yield Score**: A component of the validator score that represents the validator's efficiency in generating rewards for delegators, taking into account factors like epoch credits and commission.
+
+**Rebalancing**: The process of adjusting stake allocations among validators to maintain desired proportions or react to performance changes.
+
+**Instant Unstaking**: A process that allows for immediate removal of staked SOL under certain conditions from a validator, bypassing usual rebalancing.
+
+**Blacklist**: A list of validators that are excluded from receiving delegations through the Steward Program.
+
+**Delinquency**: A state where a validator is not its duties adequately, often measured by missed vote opportunities. In the context of the Steward Program, this is measured by voting less than a specific threshold in a given epoch.
+
+**Epoch Credits**: A measure of a validator's performance, representing the number of times it has correctly voted on blocks in a given epoch. Directly impacts validator staking rewards. Also known as Vote Credits.
+
+**Commission**: The percentage of rewards that a validator keeps for itself before distributing the remainder to its delegators.
+
+**Superminority**: The highest-staked validators in the network who collectively hold more than 33.3% of the stake.
