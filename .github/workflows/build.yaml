@@ -147,15 +147,6 @@ jobs:
         with:
           name: jito_steward_test.so
           path: target/test/
-      - name: Debug - List contents of target/deploy
-        run: ls -la target/deploy
-        shell: bash
-      - name: Debug - List contents of target/test
-        run: ls -la target/test
-        shell: bash
-      - name: Debug - List all artifacts
-        run: find target -name "*.so"
-        shell: bash
       - name: Rename test artifact to jito_steward.so
         run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
         shell: bash
