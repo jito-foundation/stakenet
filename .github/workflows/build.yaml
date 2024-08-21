@@ -146,8 +146,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: jito_steward_test.so
-          path: target/deploy/
+          path: target/test/
       - name: Debug - List contents of target/deploy
+        run: ls -la target/deploy
+        shell: bash
+      - name: Debug - List contents of target/test
         run: ls -la target/deploy
         shell: bash
       - name: Debug - List all artifacts
