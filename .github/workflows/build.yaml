@@ -157,7 +157,7 @@ jobs:
         run: find target -name "*.so"
         shell: bash
       - name: Rename test artifact to jito_steward.so
-        run: mv ./target/deploy/jito_steward_test.so ./target/deploy/jito_steward.so
+        run: mv ./target/test/jito_steward_test.so ./target/deploy/jito_steward.so
         shell: bash
       - name: cargo test
         run: cargo test --package tests --all-features --color auto
