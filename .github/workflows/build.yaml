@@ -95,6 +95,9 @@ jobs:
 
       - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
 
+      # create build for tests
+      - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test
+
       # upload the IDL and verified build
       - name: Upload validator_history.so
         uses: actions/upload-artifact@v4
@@ -107,6 +110,11 @@ jobs:
         with:
           name: jito_steward.so
           path: target/deploy/jito_steward.so
+      - name: Upload test jito_steward.so
+        uses: actions/upload-artifact@v4
+        with:
+          name: jito_steward_test.so
+          path: target/test/jito_steward.so
       - name: Upload Validator History IDL
         uses: actions/upload-artifact@v4
         with:
@@ -137,8 +145,11 @@ jobs:
           path: target/deploy/
       - uses: actions/download-artifact@v4
         with:
-          name: jito_steward.so
+          name: jito_steward_test.so
           path: target/deploy/
+      - name: Rename test artifact to jito_steward.so
+        run: mv target/deploy/jito_steward_test.so target/deploy/jito_steward.so
+        shell: bash
       - name: cargo test
         run: cargo test --package tests --all-features --color auto
         shell: bash
