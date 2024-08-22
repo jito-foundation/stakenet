@@ -23,6 +23,6 @@ The core operations of the Steward Program are permissionless such that any cran
    - [Running a Keeper](developers/keeper-bot-quick-start.md)
 6. Advanced Concepts
    - [SPL Stake Pool Internals](advanced/spl-stake-pool-internals.md)
-   - [Validator States](advanced/managing-validator-states.md)
+   - [Validator States](advanced/validator-states.md)
 7. [Governance](./governance.md)
 8. [Validator FAQ](./faq.md) (work in progress)
