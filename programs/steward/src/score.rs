@@ -5,7 +5,9 @@ use anchor_lang::{
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 use crate::{
-    constants::{BASIS_POINTS_MAX, COMMISSION_MAX, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH},
+    constants::{
+        BASIS_POINTS_MAX, COMMISSION_MAX, EPOCH_DEFAULT, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
+    },
     errors::StewardError::{self, ArithmeticError},
     Config,
 };
@@ -22,20 +24,44 @@ pub struct ScoreComponents {
     /// If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0
     pub mev_commission_score: f64,
 
+    /// Max MEV commission observed
+    pub max_mev_commission: u16,
+
+    /// Epoch of max MEV commission
+    pub max_mev_commission_epoch: u16,
+
     /// If validator is blacklisted, score is 0.0, else 1.0
     pub blacklisted_score: f64,
 
     /// If validator is not in the superminority, score is 1.0, else 0.0
     pub superminority_score: f64,
 
+    /// Epoch when superminority was detected
+    pub superminority_epoch: u16,
+
     /// If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
     pub delinquency_score: f64,
+
+    /// Ratio that failed delinquency check
+    pub delinquency_ratio: f64,
+
+    /// Epoch when delinquency was detected
+    pub delinquency_epoch: u16,
 
     /// If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
     pub running_jito_score: f64,
 
+    /// Last epoch without MEV commission
+    pub last_non_jito_epoch: u16,
+
     /// If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0
     pub commission_score: f64,
+
+    /// Max commission observed
+    pub max_commission: u8,
+
+    /// Epoch of max commission
+    pub max_commission_epoch: u16,
 
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
@@ -64,25 +90,29 @@ pub fn validator_score(
             .ok_or(ArithmeticError)?,
         current_epoch,
     );
-    let max_mev_commission = mev_commission_window
+    let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
-        .filter_map(|&i| i)
-        .max()
-        .unwrap_or(BASIS_POINTS_MAX);
+        .enumerate()
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .max_by_key(|&(commission, _)| commission)
+        .unwrap_or((BASIS_POINTS_MAX, current_epoch));
 
-    let mev_commission_score: f64 = if max_mev_commission <= params.mev_commission_bps_threshold {
+    let mev_commission_score = if max_mev_commission <= params.mev_commission_bps_threshold {
         1.0
     } else {
         0.0
     };
 
     /////// Running Jito ///////
-    let running_jito = mev_commission_window.iter().any(|i| i.is_some());
-    let running_jito_score: f64 = if running_jito { 1.0 } else { 0.0 };
+    let (running_jito_score, last_non_jito_epoch) =
+        if mev_commission_window.iter().any(|i| i.is_some()) {
+            (1.0, EPOCH_DEFAULT)
+        } else {
+            (0.0, current_epoch - params.mev_commission_range)
+        };
 
     /////// Vote Credits Ratio, Delinquency ///////
 
-    // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_start = current_epoch
         .checked_sub(params.epoch_credits_range)
         .ok_or(ArithmeticError)?;
@@ -99,28 +129,28 @@ pub fn validator_score(
         .history
         .total_blocks_range(epoch_credits_start, epoch_credits_end);
 
-    // Get average of total blocks in window, ignoring values where upload was missed
     let average_blocks = total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / total_blocks_window.iter().filter(|i| i.is_some()).count() as f64;
 
-    // Delinquency heuristic
-    let excessive_delinquency_threshold = epoch_credits_window
+    let mut delinquency_score = 1.0;
+    let mut delinquency_ratio = 1.0;
+    let mut delinquency_epoch = EPOCH_DEFAULT;
+
+    for (i, (maybe_credits, maybe_blocks)) in epoch_credits_window
         .iter()
         .zip(total_blocks_window.iter())
-        .any(|(maybe_credits, maybe_blocks)| {
-            // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
-            // If total blocks are None, then keeper missed an upload and validator should not be punished.
-            maybe_blocks.map_or(false, |total_blocks| {
-                (maybe_credits.unwrap_or(0) as f64 / total_blocks as f64)
-                    < params.scoring_delinquency_threshold_ratio
-            })
-        });
-
-    let delinquency_score: f64 = if !excessive_delinquency_threshold {
-        1.0
-    } else {
-        0.0
-    };
+        .enumerate()
+    {
+        if let (Some(credits), Some(blocks)) = (maybe_credits, maybe_blocks) {
+            let ratio = *credits as f64 / *blocks as f64;
+            if ratio < params.scoring_delinquency_threshold_ratio {
+                delinquency_score = 0.0;
+                delinquency_ratio = ratio;
+                delinquency_epoch = epoch_credits_start + i as u16;
+                break;
+            }
+        }
+    }
 
     /////// Commission ///////
 
@@ -130,18 +160,19 @@ pub fn validator_score(
             .ok_or(ArithmeticError)?,
         current_epoch,
     );
-    let commission_u8 = commission_window
+    let (max_commission, max_commission_epoch) = commission_window
         .iter()
-        .filter_map(|&i| i)
-        .max()
-        .unwrap_or(0);
+        .enumerate()
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .max_by_key(|&(commission, _)| commission)
+        .unwrap_or((0, current_epoch));
 
-    let commission_score = if commission_u8 <= params.commission_threshold {
+    let commission_score = if max_commission <= params.commission_threshold {
         1.0
     } else {
         0.0
     };
-    let commission = commission_u8 as f64 / COMMISSION_MAX as f64;
+    let commission = max_commission as f64 / COMMISSION_MAX as f64;
 
     /////// Historical Commission ///////
 
@@ -153,7 +184,7 @@ pub fn validator_score(
         .max()
         .unwrap_or(0);
 
-    let historical_commission_score: f64 =
+    let historical_commission_score =
         if historical_commission_max <= params.historical_commission_threshold {
             1.0
         } else {
@@ -161,37 +192,40 @@ pub fn validator_score(
         };
 
     /////// Superminority ///////
-    /*
-        If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
-        the stake oracle to call UpdateStakeHistory.
-        If epoch credits is not set, we iterate through last `commission_range` epochs to find the latest superminority flag.
-        If no entry is found, we assume the validator is not a superminority validator.
-    */
-    let is_superminority = if validator.history.epoch_credits_latest().is_some() {
-        if let Some(superminority) = validator.history.superminority_latest() {
-            superminority == 1
+    let (superminority_score, superminority_epoch) =
+        if validator.history.epoch_credits_latest().is_some() {
+            if let Some(superminority) = validator.history.superminority_latest() {
+                if superminority == 1 {
+                    (0.0, current_epoch)
+                } else {
+                    (1.0, EPOCH_DEFAULT)
+                }
+            } else {
+                return Err(StewardError::StakeHistoryNotRecentEnough.into());
+            }
         } else {
-            return Err(StewardError::StakeHistoryNotRecentEnough.into());
-        }
-    } else {
-        let superminority_window = validator.history.superminority_range(
-            current_epoch
-                .checked_sub(params.commission_range)
-                .ok_or(ArithmeticError)?,
-            current_epoch,
-        );
+            let superminority_window = validator.history.superminority_range(
+                current_epoch
+                    .checked_sub(params.commission_range)
+                    .ok_or(ArithmeticError)?,
+                current_epoch,
+            );
 
-        let status = superminority_window
-            .iter()
-            .rev()
-            .filter_map(|&i| i)
-            .next()
-            .unwrap_or(0)
-            == 1;
-        status
-    };
+            let (status, epoch) = superminority_window
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(i, &superminority)| {
+                    superminority.map(|s| (s, current_epoch - i as u16))
+                })
+                .unwrap_or((0, current_epoch));
 
-    let superminority_score = if !is_superminority { 1.0 } else { 0.0 };
+            if status == 1 {
+                (0.0, epoch)
+            } else {
+                (1.0, EPOCH_DEFAULT)
+            }
+        };
 
     /////// Blacklist ///////
     let blacklisted_score = if config
@@ -220,11 +254,19 @@ pub fn validator_score(
         score,
         yield_score,
         mev_commission_score,
+        max_mev_commission,
+        max_mev_commission_epoch,
         blacklisted_score,
         superminority_score,
+        superminority_epoch,
         delinquency_score,
+        delinquency_ratio,
+        delinquency_epoch,
         running_jito_score,
+        last_non_jito_epoch,
         commission_score,
+        max_commission,
+        max_commission_epoch,
         historical_commission_score,
         vote_credits_ratio: average_vote_credits / average_blocks,
         vote_account: validator.vote_account,
@@ -253,6 +295,24 @@ pub struct InstantUnstakeComponents {
     pub vote_account: Pubkey,
 
     pub epoch: u16,
+
+    /// Latest epoch credits
+    pub epoch_credits_latest: u64,
+
+    /// Latest vote account slot
+    pub vote_account_latest_slot: u64,
+
+    /// Latest total blocks
+    pub total_blocks_latest: u32,
+
+    /// Cluster history slot index
+    pub cluster_history_slot_index: u64,
+
+    /// Commission value
+    pub commission: u8,
+
+    /// MEV commission value
+    pub mev_commission: u16,
 }
 
 /// Method to calculate if a validator should be unstaked instantly this epoch.
@@ -273,11 +333,12 @@ pub fn instant_unstake_validator(
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
-    let blocks_produced_rate = cluster
+    let total_blocks_latest = cluster
         .history
         .total_blocks_latest()
-        .ok_or(StewardError::ClusterHistoryNotRecentEnough)? as f64
-        / cluster_history_slot_index as f64;
+        .ok_or(StewardError::ClusterHistoryNotRecentEnough)?;
+
+    let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
 
     let vote_account_latest_slot = validator
         .history
@@ -288,8 +349,8 @@ pub fn instant_unstake_validator(
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
-    let vote_credits_rate = validator.history.epoch_credits_latest().unwrap_or(0) as f64
-        / validator_history_slot_index as f64;
+    let epoch_credits_latest = validator.history.epoch_credits_latest().unwrap_or(0);
+    let vote_credits_rate = epoch_credits_latest as f64 / validator_history_slot_index as f64;
 
     let delinquency_check = if blocks_produced_rate > 0. {
         (vote_credits_rate / blocks_produced_rate)
@@ -336,5 +397,11 @@ pub fn instant_unstake_validator(
         is_blacklisted,
         vote_account: validator.vote_account,
         epoch: current_epoch,
+        epoch_credits_latest: epoch_credits_latest as u64,
+        vote_account_latest_slot,
+        total_blocks_latest,
+        cluster_history_slot_index,
+        commission,
+        mev_commission: mev_commission_bps,
     })
 }

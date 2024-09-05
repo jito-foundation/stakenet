@@ -1,5 +1,6 @@
 use anchor_lang::idl::types::*;
 use anchor_lang::idl::*;
+use anchor_lang::prelude::msg;
 use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
 use validator_history::utils::cast_epoch;
@@ -328,6 +329,7 @@ impl Parameters {
 
     /// Validate reasonable bounds on parameters
     pub fn validate(&self, current_epoch: u64, slots_per_epoch: u64) -> Result<()> {
+        msg!("In validate parameters");
         // Cannot evaluate epochs before VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH or beyond the CircBuf length
         let window_max = current_epoch
             .checked_sub(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH)
