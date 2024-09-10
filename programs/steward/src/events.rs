@@ -98,9 +98,8 @@ impl IdlBuild for RebalanceTypeTag {
     }
 }
 
-
 /// Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.
-/// Because the event discriminator is based on struct name, it's important to rename the struct if 
+/// Because the event discriminator is based on struct name, it's important to rename the struct if
 /// fields are changed.
 #[event]
 #[derive(Debug, PartialEq)]
@@ -120,7 +119,7 @@ pub struct ScoreComponents {
 }
 
 /// Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.
-/// Because the event discriminator is based on struct name, it's important to rename the struct if 
+/// Because the event discriminator is based on struct name, it's important to rename the struct if
 /// fields are changed.
 #[event]
 #[derive(Debug, PartialEq, Eq)]

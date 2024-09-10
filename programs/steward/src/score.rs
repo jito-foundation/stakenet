@@ -102,12 +102,11 @@ pub fn validator_score(
     };
 
     /////// Running Jito ///////
-    let running_jito_score =
-        if mev_commission_window.iter().any(|i| i.is_some()) {
-            1.0
-        } else {
-            0.0
-        };
+    let running_jito_score = if mev_commission_window.iter().any(|i| i.is_some()) {
+        1.0
+    } else {
+        0.0
+    };
 
     /////// Vote Credits Ratio, Delinquency ///////
 
