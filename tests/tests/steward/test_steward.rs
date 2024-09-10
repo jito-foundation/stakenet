@@ -294,13 +294,13 @@ async fn test_blacklist() {
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::AddValidatorToBlacklist {
+        accounts: jito_steward::accounts::AddValidatorsToBlacklist {
             config: fixture.steward_config.pubkey(),
             authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::AddValidatorToBlacklist {
-            validator_history_blacklist: 0,
+        data: jito_steward::instruction::AddValidatorsToBlacklist {
+            validator_history_blacklist: vec![0],
         }
         .data(),
     };
@@ -321,13 +321,13 @@ async fn test_blacklist() {
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::RemoveValidatorFromBlacklist {
+        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
             config: fixture.steward_config.pubkey(),
             authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::RemoveValidatorFromBlacklist {
-            validator_history_blacklist: 0,
+        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+            validator_history_blacklist: vec![0],
         }
         .data(),
     };

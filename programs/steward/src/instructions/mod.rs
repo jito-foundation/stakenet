@@ -1,5 +1,5 @@
 #![allow(ambiguous_glob_reexports)]
-pub mod add_validator_to_blacklist;
+pub mod add_validators_to_blacklist;
 pub mod admin_mark_for_removal;
 pub mod auto_add_validator_to_pool;
 pub mod auto_remove_validator_from_pool;
@@ -14,7 +14,7 @@ pub mod instant_remove_validator;
 pub mod pause_steward;
 pub mod realloc_state;
 pub mod rebalance;
-pub mod remove_validator_from_blacklist;
+pub mod remove_validators_from_blacklist;
 pub mod reset_steward_state;
 pub mod reset_validator_lamport_balances;
 pub mod resume_steward;
@@ -22,7 +22,7 @@ pub mod set_new_authority;
 pub mod spl_passthrough;
 pub mod update_parameters;
 
-pub use add_validator_to_blacklist::*;
+pub use add_validators_to_blacklist::*;
 pub use admin_mark_for_removal::*;
 pub use auto_add_validator_to_pool::*;
 pub use auto_remove_validator_from_pool::*;
@@ -37,7 +37,7 @@ pub use instant_remove_validator::*;
 pub use pause_steward::*;
 pub use realloc_state::*;
 pub use rebalance::*;
-pub use remove_validator_from_blacklist::*;
+pub use remove_validators_from_blacklist::*;
 pub use reset_steward_state::*;
 pub use reset_validator_lamport_balances::*;
 pub use resume_steward::*;
