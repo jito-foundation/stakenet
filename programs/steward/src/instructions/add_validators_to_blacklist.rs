@@ -12,10 +12,15 @@ pub struct AddValidatorsToBlacklist<'info> {
 
 // Removes ability for validator to receive delegation. Score will be set to 0 and instant unstaking will occur.
 // Index is the index of the validator from ValidatorHistory.
-pub fn handler(ctx: Context<AddValidatorsToBlacklist>, validator_history_indices: &[u32]) -> Result<()> {
+pub fn handler(
+    ctx: Context<AddValidatorsToBlacklist>,
+    validator_history_indices: &[u32],
+) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     for index in validator_history_indices {
-        config.validator_history_blacklist.set(*index as usize, true)?;
+        config
+            .validator_history_blacklist
+            .set(*index as usize, true)?;
     }
     Ok(())
 }

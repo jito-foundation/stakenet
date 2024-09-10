@@ -23,13 +23,13 @@ pub async fn command_add_to_blacklist(
 
     let ix = Instruction {
         program_id,
-        accounts: jito_steward::accounts::AddValidatorToBlacklist {
+        accounts: jito_steward::accounts::AddValidatorsToBlacklist {
             config: args.permissioned_parameters.steward_config,
             authority: authority.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::AddValidatorToBlacklist {
-            validator_history_blacklist: args.validator_history_index_to_blacklist as u32,
+        data: jito_steward::instruction::AddValidatorsToBlacklist {
+            validator_history_blacklist: vec![args.validator_history_index_to_blacklist as u32],
         }
         .data(),
     };

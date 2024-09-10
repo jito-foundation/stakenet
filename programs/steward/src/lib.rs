@@ -166,7 +166,7 @@ pub mod steward {
     /// Adds the validators to the blacklist. They will be instant unstaked and never receive delegations. Each u32 is a ValidatorHistory index.
     pub fn add_validators_to_blacklist(
         ctx: Context<AddValidatorsToBlacklist>,
-        validator_history_blacklist: Vec<u32>
+        validator_history_blacklist: Vec<u32>,
     ) -> Result<()> {
         instructions::add_validators_to_blacklist::handler(ctx, &validator_history_blacklist)
     }
@@ -174,7 +174,7 @@ pub mod steward {
     /// Removes the validators from the blacklist. Each u32 is a ValidatorHistory index.
     pub fn remove_validators_from_blacklist(
         ctx: Context<RemoveValidatorsFromBlacklist>,
-        validator_history_blacklist: Vec<u32>
+        validator_history_blacklist: Vec<u32>,
     ) -> Result<()> {
         instructions::remove_validators_from_blacklist::handler(ctx, &validator_history_blacklist)
     }

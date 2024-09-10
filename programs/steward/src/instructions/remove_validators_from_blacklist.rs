@@ -18,7 +18,9 @@ pub fn handler(
 ) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
     for index in validator_history_indices {
-        config.validator_history_blacklist.set(*index as usize, false)?;
+        config
+            .validator_history_blacklist
+            .set(*index as usize, false)?;
     }
     Ok(())
 }
