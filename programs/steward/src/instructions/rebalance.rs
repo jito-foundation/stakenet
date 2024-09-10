@@ -153,17 +153,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 
-        // Transitions to Idle before doing rebalance if RESET_TO_IDLE is set
-        if let Some(event) = maybe_transition(
-            &mut state_account.state,
-            &clock,
-            &config.parameters,
-            &epoch_schedule,
-        )? {
-            emit!(event);
-            return Ok(());
-        }
-
         state_checks(
             &clock,
             &config,

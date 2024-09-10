@@ -42,17 +42,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
 
-    // Transitions to Idle before doing compute_instant_unstake if RESET_TO_IDLE is set
-    if let Some(event) = maybe_transition(
-        &mut state_account.state,
-        &clock,
-        &config.parameters,
-        &epoch_schedule,
-    )? {
-        emit!(event);
-        return Ok(());
-    }
-
     state_checks(
         &clock,
         &config,
