@@ -110,6 +110,7 @@ pub fn validator_score(
 
     /////// Vote Credits Ratio, Delinquency ///////
 
+    // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_start = current_epoch
         .checked_sub(params.epoch_credits_range)
         .ok_or(ArithmeticError)?;
@@ -126,9 +127,11 @@ pub fn validator_score(
         .history
         .total_blocks_range(epoch_credits_start, epoch_credits_end);
 
+    // Get average of total blocks in window, ignoring values where upload was missed
     let average_blocks = total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / total_blocks_window.iter().filter(|i| i.is_some()).count() as f64;
 
+    // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1.0;
     let mut delinquency_ratio = 1.0;
     let mut delinquency_epoch = EPOCH_DEFAULT;
@@ -190,6 +193,12 @@ pub fn validator_score(
         };
 
     /////// Superminority ///////
+    /*
+        If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
+        the stake oracle to call UpdateStakeHistory.
+        If epoch credits is not set, we iterate through last `commission_range` epochs to find the latest superminority flag.
+        If no entry is found, we assume the validator is not a superminority validator.
+    */
     let (superminority_score, superminority_epoch) =
         if validator.history.epoch_credits_latest().is_some() {
             if let Some(superminority) = validator.history.superminority_latest() {
@@ -296,8 +305,8 @@ pub struct InstantUnstakeComponentsV2 {
     /// Latest epoch credits
     pub epoch_credits_latest: u64,
 
-    /// Latest vote account slot
-    pub vote_account_latest_slot: u64,
+    /// Latest vote account update slot
+    pub vote_account_last_update_slot: u64,
 
     /// Latest total blocks
     pub total_blocks_latest: u32,
@@ -337,12 +346,12 @@ pub fn instant_unstake_validator(
 
     let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
 
-    let vote_account_latest_slot = validator
+    let vote_account_last_update_slot = validator
         .history
         .vote_account_last_update_slot_latest()
         .ok_or(StewardError::VoteHistoryNotRecentEnough)?;
 
-    let validator_history_slot_index = vote_account_latest_slot
+    let validator_history_slot_index = vote_account_last_update_slot
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
@@ -395,7 +404,7 @@ pub fn instant_unstake_validator(
         vote_account: validator.vote_account,
         epoch: current_epoch,
         epoch_credits_latest: epoch_credits_latest as u64,
-        vote_account_latest_slot,
+        vote_account_last_update_slot,
         total_blocks_latest,
         cluster_history_slot_index,
         commission,

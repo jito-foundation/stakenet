@@ -575,21 +575,21 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: false,
-            delinquency_check: false,
-            commission_check: false,
-            mev_commission_check: false,
-            is_blacklisted: false,
-            vote_account: good_validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 1000,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 0,
-            mev_commission: 0
-        }
+             InstantUnstakeComponentsV2 {
+                instant_unstake: false,
+                delinquency_check: false,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: good_validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
+            }
     );
 
     // Is blacklisted
@@ -607,22 +607,22 @@ fn test_instant_unstake() {
 
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: true,
-            delinquency_check: false,
-            commission_check: false,
-            mev_commission_check: false,
-            is_blacklisted: true,
-            vote_account: good_validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 1000,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 0,
-            mev_commission: 0
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: true,
+                delinquency_check: false,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: true,
+                vote_account: good_validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
+            }
     );
     config.validator_history_blacklist.reset();
 
@@ -637,22 +637,22 @@ fn test_instant_unstake() {
 
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: true,
-            delinquency_check: true,
-            commission_check: true,
-            mev_commission_check: true,
-            is_blacklisted: false,
-            vote_account: bad_validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 200,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 99,
-            mev_commission: 10000
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: true,
+                delinquency_check: true,
+                commission_check: true,
+                mev_commission_check: true,
+                is_blacklisted: false,
+                vote_account: bad_validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 200,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 99,
+                mev_commission: 10000
+            }
     );
 
     // Errors
@@ -667,7 +667,7 @@ fn test_instant_unstake() {
         current_epoch,
     );
 
-    assert_eq!(res, Err(StewardError::ClusterHistoryNotRecentEnough.into()));
+    assert_eq!(res , Err(StewardError::ClusterHistoryNotRecentEnough.into()));
 
     let cluster_history = default_fixture.cluster_history;
     let mut validator = validators[0];
@@ -684,22 +684,22 @@ fn test_instant_unstake() {
 
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: true,
-            delinquency_check: true,
-            commission_check: false,
-            mev_commission_check: false,
-            is_blacklisted: false,
-            vote_account: validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 0,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 0,
-            mev_commission: 0
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: true,
+                delinquency_check: true,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 0,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
+            }
     );
 
     let mut validator = validators[0];
@@ -717,7 +717,7 @@ fn test_instant_unstake() {
         current_epoch,
     );
 
-    assert_eq!(res, Err(StewardError::VoteHistoryNotRecentEnough.into()));
+    assert_eq!(res , Err(StewardError::VoteHistoryNotRecentEnough.into()));
 
     // Not sure how commission would be unset with epoch credits set but test anyway
     let mut validator = validators[0];
@@ -731,22 +731,22 @@ fn test_instant_unstake() {
     );
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: true,
-            delinquency_check: false,
-            commission_check: true,
-            mev_commission_check: false,
-            is_blacklisted: false,
-            vote_account: validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 1000,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 100,
-            mev_commission: 0
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: true,
+                delinquency_check: false,
+                commission_check: true,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 100,
+                mev_commission: 0
+            }
     );
 
     let mut validator = validators[0];
@@ -761,22 +761,22 @@ fn test_instant_unstake() {
     );
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: false,
-            delinquency_check: false,
-            commission_check: false,
-            mev_commission_check: false,
-            is_blacklisted: false,
-            vote_account: validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 1000,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 1000,
-            cluster_history_slot_index: 999,
-            commission: 0,
-            mev_commission: 0
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: false,
+                delinquency_check: false,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
+            }
     );
 
     // Try to break it
@@ -791,22 +791,22 @@ fn test_instant_unstake() {
     );
     assert!(res.is_ok());
     assert_eq!(
-        res.unwrap(),
-        InstantUnstakeComponentsV2 {
-            instant_unstake: false,
-            delinquency_check: false,
-            commission_check: false,
-            mev_commission_check: false,
-            is_blacklisted: false,
-            vote_account: good_validator.vote_account,
-            epoch: current_epoch,
-            epoch_credits_latest: 1000,
-            vote_account_latest_slot: start_slot + 999,
-            total_blocks_latest: 0,
-            cluster_history_slot_index: 999,
-            commission: 0,
-            mev_commission: 0
-        }
+        res.unwrap()
+            , InstantUnstakeComponentsV2 {
+                instant_unstake: false,
+                delinquency_check: false,
+                commission_check: false,
+                mev_commission_check: false,
+                is_blacklisted: false,
+                vote_account: good_validator.vote_account,
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_last_update_slot: start_slot + 999,
+                total_blocks_latest: 0,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
+            }
     );
 }
 
