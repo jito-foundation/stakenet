@@ -164,7 +164,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             return Ok(());
         }
 
-
         state_checks(
             &clock,
             &config,
