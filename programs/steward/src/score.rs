@@ -14,7 +14,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponents {
+pub struct ScoreComponentsV2 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -51,9 +51,6 @@ pub struct ScoreComponents {
     /// If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
     pub running_jito_score: f64,
 
-    /// Last epoch without MEV commission
-    pub last_non_jito_epoch: u16,
-
     /// If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0
     pub commission_score: f64,
 
@@ -80,7 +77,7 @@ pub fn validator_score(
     cluster: &ClusterHistory,
     config: &Config,
     current_epoch: u16,
-) -> Result<ScoreComponents> {
+) -> Result<ScoreComponentsV2> {
     let params = &config.parameters;
 
     /////// MEV Commission ///////
@@ -92,6 +89,7 @@ pub fn validator_score(
     );
     let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
+        .rev()
         .enumerate()
         .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
         .max_by_key(|&(commission, _)| commission)
@@ -104,11 +102,11 @@ pub fn validator_score(
     };
 
     /////// Running Jito ///////
-    let (running_jito_score, last_non_jito_epoch) =
+    let running_jito_score =
         if mev_commission_window.iter().any(|i| i.is_some()) {
-            (1.0, EPOCH_DEFAULT)
+            1.0
         } else {
-            (0.0, current_epoch - params.mev_commission_range)
+            0.0
         };
 
     /////// Vote Credits Ratio, Delinquency ///////
@@ -162,6 +160,7 @@ pub fn validator_score(
     );
     let (max_commission, max_commission_epoch) = commission_window
         .iter()
+        .rev()
         .enumerate()
         .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
         .max_by_key(|&(commission, _)| commission)
@@ -250,7 +249,7 @@ pub fn validator_score(
         * running_jito_score
         * yield_score;
 
-    Ok(ScoreComponents {
+    Ok(ScoreComponentsV2 {
         score,
         yield_score,
         mev_commission_score,
@@ -263,7 +262,6 @@ pub fn validator_score(
         delinquency_ratio,
         delinquency_epoch,
         running_jito_score,
-        last_non_jito_epoch,
         commission_score,
         max_commission,
         max_commission_epoch,
@@ -276,7 +274,7 @@ pub fn validator_score(
 
 #[event]
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstantUnstakeComponents {
+pub struct InstantUnstakeComponentsV2 {
     /// Aggregate of all checks
     pub instant_unstake: bool,
 
@@ -323,7 +321,7 @@ pub fn instant_unstake_validator(
     config: &Config,
     epoch_start_slot: u64,
     current_epoch: u16,
-) -> Result<InstantUnstakeComponents> {
+) -> Result<InstantUnstakeComponentsV2> {
     let params = &config.parameters;
 
     /////// Delinquency ///////
@@ -389,7 +387,7 @@ pub fn instant_unstake_validator(
 
     let instant_unstake =
         delinquency_check || commission_check || mev_commission_check || is_blacklisted;
-    Ok(InstantUnstakeComponents {
+    Ok(InstantUnstakeComponentsV2 {
         instant_unstake,
         delinquency_check,
         commission_check,

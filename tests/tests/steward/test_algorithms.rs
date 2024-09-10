@@ -9,7 +9,7 @@ use jito_steward::{
     events::DecreaseComponents,
     insert_sorted_index,
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponents, ScoreComponents,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2, ScoreComponentsV2,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -43,12 +43,12 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -56,11 +56,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16
@@ -75,7 +74,7 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -88,11 +87,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -105,7 +103,7 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -118,28 +116,28 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
     );
+    // Test high mev commission outside of range
     let mut validator = good_validator;
     validator.history.arr[9].mev_commission = 1001;
     let components =
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -147,11 +145,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -168,12 +165,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 0.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -181,11 +178,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -200,12 +196,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 0.0,
             superminority_epoch: current_epoch as u16,
@@ -213,11 +209,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -233,12 +228,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -246,11 +241,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -267,12 +261,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
-            max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission: 10000,
+            max_mev_commission_epoch: 20,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -280,11 +274,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 0.0,
-            last_non_jito_epoch: 9,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 0,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -298,12 +291,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -311,7 +304,6 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 0.0,
             max_commission: 11,
@@ -337,12 +329,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -350,11 +342,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -366,12 +357,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -379,11 +370,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 0.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -402,12 +392,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -415,11 +405,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 0.88,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -433,12 +422,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -446,11 +435,10 @@ fn test_compute_score() {
             delinquency_ratio: 0.0,
             delinquency_epoch: 10,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 0.95,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -469,12 +457,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -482,11 +470,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 0.9,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -503,12 +490,12 @@ fn test_compute_score() {
         validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
     assert_eq!(
         components,
-        ScoreComponents {
+        ScoreComponentsV2 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
             max_mev_commission: 0,
-            max_mev_commission_epoch: EPOCH_DEFAULT,
+            max_mev_commission_epoch: 10,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             superminority_epoch: EPOCH_DEFAULT,
@@ -516,11 +503,10 @@ fn test_compute_score() {
             delinquency_ratio: 1.0,
             delinquency_epoch: EPOCH_DEFAULT,
             running_jito_score: 1.0,
-            last_non_jito_epoch: EPOCH_DEFAULT,
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             max_commission: 0,
-            max_commission_epoch: EPOCH_DEFAULT,
+            max_commission_epoch: 10,
             historical_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
@@ -587,16 +573,22 @@ fn test_instant_unstake() {
     );
 
     assert!(res.is_ok());
-    assert!(
-        res.unwrap()
-            == InstantUnstakeComponents {
+    assert_eq!(
+        res.unwrap(),
+             InstantUnstakeComponentsV2 {
                 instant_unstake: false,
                 delinquency_check: false,
                 commission_check: false,
                 mev_commission_check: false,
                 is_blacklisted: false,
                 vote_account: good_validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
             }
     );
 
@@ -614,16 +606,22 @@ fn test_instant_unstake() {
     );
 
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: true,
                 delinquency_check: false,
                 commission_check: false,
                 mev_commission_check: false,
                 is_blacklisted: true,
                 vote_account: good_validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
             }
     );
     config.validator_history_blacklist.reset();
@@ -638,16 +636,22 @@ fn test_instant_unstake() {
     );
 
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: true,
                 delinquency_check: true,
                 commission_check: true,
                 mev_commission_check: true,
                 is_blacklisted: false,
                 vote_account: bad_validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 200,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 99,
+                mev_commission: 10000
             }
     );
 
@@ -663,7 +667,7 @@ fn test_instant_unstake() {
         current_epoch,
     );
 
-    assert!(res == Err(StewardError::ClusterHistoryNotRecentEnough.into()));
+    assert_eq!(res , Err(StewardError::ClusterHistoryNotRecentEnough.into()));
 
     let cluster_history = default_fixture.cluster_history;
     let mut validator = validators[0];
@@ -679,16 +683,22 @@ fn test_instant_unstake() {
     );
 
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: true,
                 delinquency_check: true,
                 commission_check: false,
                 mev_commission_check: false,
                 is_blacklisted: false,
                 vote_account: validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 0,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
             }
     );
 
@@ -707,7 +717,7 @@ fn test_instant_unstake() {
         current_epoch,
     );
 
-    assert!(res == Err(StewardError::VoteHistoryNotRecentEnough.into()));
+    assert_eq!(res , Err(StewardError::VoteHistoryNotRecentEnough.into()));
 
     // Not sure how commission would be unset with epoch credits set but test anyway
     let mut validator = validators[0];
@@ -720,16 +730,22 @@ fn test_instant_unstake() {
         current_epoch,
     );
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: true,
                 delinquency_check: false,
                 commission_check: true,
                 mev_commission_check: false,
                 is_blacklisted: false,
                 vote_account: validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 100,
+                mev_commission: 0
             }
     );
 
@@ -744,16 +760,22 @@ fn test_instant_unstake() {
         current_epoch,
     );
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: false,
                 delinquency_check: false,
                 commission_check: false,
                 mev_commission_check: false,
                 is_blacklisted: false,
                 vote_account: validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 1000,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
             }
     );
 
@@ -768,16 +790,22 @@ fn test_instant_unstake() {
         current_epoch,
     );
     assert!(res.is_ok());
-    assert!(
+    assert_eq!(
         res.unwrap()
-            == InstantUnstakeComponents {
+            , InstantUnstakeComponentsV2 {
                 instant_unstake: false,
                 delinquency_check: false,
                 commission_check: false,
                 mev_commission_check: false,
                 is_blacklisted: false,
                 vote_account: good_validator.vote_account,
-                epoch: current_epoch
+                epoch: current_epoch,
+                epoch_credits_latest: 1000,
+                vote_account_latest_slot: start_slot + 999,
+                total_blocks_latest: 0,
+                cluster_history_slot_index: 999,
+                commission: 0,
+                mev_commission: 0
             }
     );
 }
