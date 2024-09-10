@@ -63,6 +63,12 @@ pub struct ScoreComponentsV2 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
+    /// Max historical commission observed
+    pub max_historical_commission: u8,
+
+    /// Epoch of max historical commission
+    pub max_historical_commission_epoch: u16,
+
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
     pub vote_credits_ratio: f64,
@@ -141,8 +147,11 @@ pub fn validator_score(
         .zip(total_blocks_window.iter())
         .enumerate()
     {
-        if let (Some(credits), Some(blocks)) = (maybe_credits, maybe_blocks) {
-            let ratio = *credits as f64 / *blocks as f64;
+        if let Some(blocks) = maybe_blocks {
+            // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
+            // If total blocks are None, then keeper missed an upload and validator should not be punished.
+            let credits = maybe_credits.unwrap_or(0);
+            let ratio = credits as f64 / *blocks as f64;
             if ratio < params.scoring_delinquency_threshold_ratio {
                 delinquency_score = 0.0;
                 delinquency_ratio = ratio;
@@ -176,17 +185,18 @@ pub fn validator_score(
     let commission = max_commission as f64 / COMMISSION_MAX as f64;
 
     /////// Historical Commission ///////
-
-    let historical_commission_max = validator
+    let (max_historical_commission, max_historical_commission_epoch) = validator
         .history
         .commission_range(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16, current_epoch)
         .iter()
-        .filter_map(|&i| i)
-        .max()
-        .unwrap_or(0);
+        .rev()
+        .enumerate()
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .max_by_key(|&(commission, _)| commission)
+        .unwrap_or((0, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16));
 
     let historical_commission_score =
-        if historical_commission_max <= params.historical_commission_threshold {
+        if max_historical_commission <= params.historical_commission_threshold {
             1.0
         } else {
             0.0
@@ -222,9 +232,10 @@ pub fn validator_score(
                 .iter()
                 .enumerate()
                 .rev()
-                .find_map(|(i, &superminority)| {
+                .filter_map(|(i, &superminority)| {
                     superminority.map(|s| (s, current_epoch - i as u16))
                 })
+                .next()
                 .unwrap_or((0, current_epoch));
 
             if status == 1 {
@@ -274,6 +285,8 @@ pub fn validator_score(
         max_commission,
         max_commission_epoch,
         historical_commission_score,
+        max_historical_commission,
+        max_historical_commission_epoch,
         vote_credits_ratio: average_vote_credits / average_blocks,
         vote_account: validator.vote_account,
         epoch: current_epoch,

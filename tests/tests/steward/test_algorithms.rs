@@ -61,6 +61,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -92,6 +94,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -121,6 +125,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -150,6 +156,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -183,6 +191,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -214,6 +224,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -246,6 +258,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -279,6 +293,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 0,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -309,6 +325,8 @@ fn test_compute_score() {
             max_commission: 11,
             max_commission_epoch: current_epoch as u16,
             historical_commission_score: 0.0,
+            max_historical_commission: 11,
+            max_historical_commission_epoch: current_epoch as u16,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -347,6 +365,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 1.0,
+            max_historical_commission: 14,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -375,6 +395,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 0.0,
+            max_historical_commission: 16,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -410,6 +432,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -440,6 +464,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -475,6 +501,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
@@ -508,6 +536,8 @@ fn test_compute_score() {
             max_commission: 0,
             max_commission_epoch: 10,
             historical_commission_score: 1.0,
+            max_historical_commission: 0,
+            max_historical_commission_epoch: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16
         }
