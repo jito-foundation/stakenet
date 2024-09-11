@@ -329,7 +329,7 @@ async fn test_blacklist() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
-            validator_history_blacklist: vec![0, 4],
+            validator_history_blacklist: vec![4, 0],
         }
         .data(),
     };
