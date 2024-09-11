@@ -127,7 +127,7 @@ pub fn validator_score(
             &mev_commission_window,
             current_epoch,
             params.mev_commission_bps_threshold,
-        );
+        )?;
 
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
         calculate_epoch_credits(
@@ -201,14 +201,16 @@ fn calculate_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
-) -> (f64, u16, u16, f64) {
+) -> Result<(f64, u16, u16, f64)> {
     let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
         .rev()
         .enumerate()
-        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch.checked_sub(i as u16))))
         .max_by_key(|&(commission, _)| commission)
-        .unwrap_or((BASIS_POINTS_MAX, current_epoch));
+        .unwrap_or((BASIS_POINTS_MAX, Some(current_epoch)));
+
+    let max_mev_commission_epoch = max_mev_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let mev_commission_score = if max_mev_commission <= mev_commission_bps_threshold {
         1.0
@@ -223,12 +225,12 @@ fn calculate_mev_commission(
         0.0
     };
 
-    (
+    Ok((
         mev_commission_score,
         max_mev_commission,
         max_mev_commission_epoch,
         running_jito_score,
-    )
+    ))
 }
 
 /// Calculates the vote credits ratio and delinquency score for the validator
@@ -370,9 +372,13 @@ fn calculate_superminority(
             .iter()
             .enumerate()
             .rev()
-            .filter_map(|(i, &superminority)| superminority.map(|s| (s, current_epoch - i as u16)))
+            .filter_map(|(i, &superminority)| {
+                superminority.map(|s| (s, current_epoch.checked_sub(i as u16)))
+            })
             .next()
-            .unwrap_or((0, current_epoch));
+            .unwrap_or((0, Some(current_epoch)));
+
+        let epoch = epoch.ok_or(StewardError::ArithmeticError)?;
 
         if status == 1 {
             Ok((0.0, epoch))
