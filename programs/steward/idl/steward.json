@@ -2430,6 +2430,9 @@
           },
           {
             "name": "details",
+            "docs": [
+              "Details about why a given check was calculated"
+            ],
             "type": {
               "defined": {
                 "name": "InstantUnstakeDetails"
@@ -2887,6 +2890,9 @@
           },
           {
             "name": "details",
+            "docs": [
+              "Details about why a given score was calculated"
+            ],
             "type": {
               "defined": {
                 "name": "ScoreDetails"

@@ -315,11 +315,12 @@ fn calculate_historical_commission(
         .iter()
         .rev()
         .enumerate()
-        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch.checked_sub( i as u16))))
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch.checked_sub(i as u16))))
         .max_by_key(|&(commission, _)| commission)
         .unwrap_or((0, Some(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16)));
 
-    let max_historical_commission_epoch = max_historical_commission_epoch.ok_or(StewardError::ArithmeticError)?;
+    let max_historical_commission_epoch =
+        max_historical_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let historical_commission_score =
         if max_historical_commission <= historical_commission_threshold {
