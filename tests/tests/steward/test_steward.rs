@@ -300,7 +300,7 @@ async fn test_blacklist() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddValidatorsToBlacklist {
-            validator_history_blacklist: vec![0],
+            validator_history_blacklist: vec![0, 4, 8],
         }
         .data(),
     };
@@ -318,6 +318,8 @@ async fn test_blacklist() {
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
     assert!(config.validator_history_blacklist.get(0).unwrap());
+    assert!(config.validator_history_blacklist.get(4).unwrap());
+    assert!(config.validator_history_blacklist.get(8).unwrap());
 
     let ix = Instruction {
         program_id: jito_steward::id(),
@@ -327,7 +329,7 @@ async fn test_blacklist() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
-            validator_history_blacklist: vec![0],
+            validator_history_blacklist: vec![0, 4],
         }
         .data(),
     };
@@ -344,9 +346,79 @@ async fn test_blacklist() {
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
     assert!(!config.validator_history_blacklist.get(0).unwrap());
+    assert!(!config.validator_history_blacklist.get(4).unwrap());
+    assert!(config.validator_history_blacklist.get(8).unwrap());
+}
+
+
+#[tokio::test]
+async fn test_blacklist_edge_cases() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_stake_pool().await;
+    fixture.initialize_steward(None).await;
+
+    // Test empty blacklist should not change anything
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
+            config: fixture.steward_config.pubkey(),
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+            validator_history_blacklist: vec![],
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    assert!(config.validator_history_blacklist.is_empty());
+
+
+    // Test deactivating a validator that is not in the blacklist shouldn't break anything
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
+            config: fixture.steward_config.pubkey(),
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+            validator_history_blacklist: vec![1],
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // assert nothing changed
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    assert!(config.validator_history_blacklist.is_empty());
+
 
     drop(fixture);
 }
+
 
 #[tokio::test]
 async fn test_set_new_authority() {
