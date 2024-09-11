@@ -350,7 +350,6 @@ async fn test_blacklist() {
     assert!(config.validator_history_blacklist.get(8).unwrap());
 }
 
-
 #[tokio::test]
 async fn test_blacklist_edge_cases() {
     let fixture = TestFixture::new().await;
@@ -386,7 +385,6 @@ async fn test_blacklist_edge_cases() {
         .await;
     assert!(config.validator_history_blacklist.is_empty());
 
-
     // Test deactivating a validator that is not in the blacklist shouldn't break anything
     let ix = Instruction {
         program_id: jito_steward::id(),
@@ -415,10 +413,8 @@ async fn test_blacklist_edge_cases() {
         .await;
     assert!(config.validator_history_blacklist.is_empty());
 
-
     drop(fixture);
 }
-
 
 #[tokio::test]
 async fn test_set_new_authority() {
