@@ -50,6 +50,7 @@ pub struct ScoreComponentsV2 {
 
     pub epoch: u16,
 
+    /// Details about why a given score was calculated
     pub details: ScoreDetails,
 }
 
@@ -140,14 +141,14 @@ pub fn validator_score(
         &commission_window,
         current_epoch,
         params.commission_threshold,
-    );
+    )?;
 
     let (historical_commission_score, max_historical_commission, max_historical_commission_epoch) =
         calculate_historical_commission(
             validator,
             current_epoch,
             params.historical_commission_threshold,
-        );
+        )?;
 
     let (superminority_score, superminority_epoch) =
         calculate_superminority(validator, current_epoch, params.commission_range)?;
@@ -281,15 +282,17 @@ fn calculate_commission(
     commission_window: &[Option<u8>],
     current_epoch: u16,
     commission_threshold: u8,
-) -> (f64, u8, u16) {
+) -> Result<(f64, u8, u16)> {
     /////// Commission ///////
     let (max_commission, max_commission_epoch) = commission_window
         .iter()
         .rev()
         .enumerate()
-        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch.checked_sub(i as u16))))
         .max_by_key(|&(commission, _)| commission)
-        .unwrap_or((0, current_epoch));
+        .unwrap_or((0, Some(current_epoch)));
+
+    let max_commission_epoch = max_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let commission_score = if max_commission <= commission_threshold {
         1.0
@@ -297,7 +300,7 @@ fn calculate_commission(
         0.0
     };
 
-    (commission_score, max_commission, max_commission_epoch)
+    Ok((commission_score, max_commission, max_commission_epoch))
 }
 
 /// Checks if validator has commission above a threshold in any epoch in their history
@@ -305,16 +308,18 @@ fn calculate_historical_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     historical_commission_threshold: u8,
-) -> (f64, u8, u16) {
+) -> Result<(f64, u8, u16)> {
     let (max_historical_commission, max_historical_commission_epoch) = validator
         .history
         .commission_range(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16, current_epoch)
         .iter()
         .rev()
         .enumerate()
-        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch - i as u16)))
+        .filter_map(|(i, &commission)| commission.map(|c| (c, current_epoch.checked_sub( i as u16))))
         .max_by_key(|&(commission, _)| commission)
-        .unwrap_or((0, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16));
+        .unwrap_or((0, Some(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16)));
+
+    let max_historical_commission_epoch = max_historical_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let historical_commission_score =
         if max_historical_commission <= historical_commission_threshold {
@@ -323,11 +328,11 @@ fn calculate_historical_commission(
             0.0
         };
 
-    (
+    Ok((
         historical_commission_score,
         max_historical_commission,
         max_historical_commission_epoch,
-    )
+    ))
 }
 
 /// Checks if validator is in the top 1/3 of validators by stake for the current epoch
@@ -410,6 +415,7 @@ pub struct InstantUnstakeComponentsV2 {
 
     pub epoch: u16,
 
+    /// Details about why a given check was calculated
     pub details: InstantUnstakeDetails,
 }
 
