@@ -135,7 +135,7 @@ pub fn validator_score(
             &total_blocks_window,
             epoch_credits_start,
             params.scoring_delinquency_threshold_ratio,
-        );
+        )?;
 
     let (commission_score, max_commission, max_commission_epoch) = calculate_commission(
         &commission_window,
@@ -239,7 +239,7 @@ fn calculate_epoch_credits(
     total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
-) -> (f64, f64, f64, u16) {
+) -> Result<(f64, f64, f64, u16)> {
     let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / epoch_credits_window.len() as f64;
 
@@ -265,18 +265,20 @@ fn calculate_epoch_credits(
             if ratio < scoring_delinquency_threshold_ratio {
                 delinquency_score = 0.0;
                 delinquency_ratio = ratio;
-                delinquency_epoch = epoch_credits_start + i as u16;
+                delinquency_epoch = epoch_credits_start
+                    .checked_add(i as u16)
+                    .ok_or(StewardError::ArithmeticError)?;
                 break;
             }
         }
     }
 
-    (
+    Ok((
         average_vote_credits / average_blocks,
         delinquency_score,
         delinquency_ratio,
         delinquency_epoch,
-    )
+    ))
 }
 
 /// Finds max commission in the last `commission_range` epochs
