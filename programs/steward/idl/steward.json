@@ -8,39 +8,6 @@
   },
   "instructions": [
     {
-      "name": "add_validator_to_blacklist",
-      "docs": [
-        "Adds the validator at `index` to the blacklist. It will be instant unstaked and never receive delegations"
-      ],
-      "discriminator": [
-        18,
-        30,
-        248,
-        201,
-        28,
-        196,
-        137,
-        118
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "validator_history_blacklist",
-          "type": "u32"
-        }
-      ]
-    },
-    {
       "name": "add_validator_to_pool",
       "docs": [
         "Passthrough spl-stake-pool: Add a validator to the pool"
@@ -117,6 +84,41 @@
           "name": "validator_seed",
           "type": {
             "option": "u32"
+          }
+        }
+      ]
+    },
+    {
+      "name": "add_validators_to_blacklist",
+      "docs": [
+        "Adds the validators to the blacklist. They will be instant unstaked and never receive delegations. Each u32 is a ValidatorHistory index."
+      ],
+      "discriminator": [
+        204,
+        81,
+        61,
+        86,
+        100,
+        92,
+        226,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_history_blacklist",
+          "type": {
+            "vec": "u32"
           }
         }
       ]
@@ -1134,39 +1136,6 @@
       ]
     },
     {
-      "name": "remove_validator_from_blacklist",
-      "docs": [
-        "Removes the validator at `index` from the blacklist"
-      ],
-      "discriminator": [
-        253,
-        48,
-        101,
-        237,
-        109,
-        14,
-        153,
-        208
-      ],
-      "accounts": [
-        {
-          "name": "config",
-          "writable": true
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "validator_history_blacklist",
-          "type": "u32"
-        }
-      ]
-    },
-    {
       "name": "remove_validator_from_pool",
       "docs": [
         "Passthrough spl-stake-pool: Remove a validator from the pool"
@@ -1230,6 +1199,41 @@
         {
           "name": "validator_list_index",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "remove_validators_from_blacklist",
+      "docs": [
+        "Removes the validators from the blacklist. Each u32 is a ValidatorHistory index."
+      ],
+      "discriminator": [
+        233,
+        114,
+        77,
+        164,
+        159,
+        209,
+        137,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_history_blacklist",
+          "type": {
+            "vec": "u32"
+          }
         }
       ]
     },

@@ -23,13 +23,13 @@ pub async fn command_remove_from_blacklist(
 
     let ix = Instruction {
         program_id,
-        accounts: jito_steward::accounts::RemoveValidatorFromBlacklist {
+        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
             config: args.permissioned_parameters.steward_config,
             authority: authority.pubkey(),
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::RemoveValidatorFromBlacklist {
-            validator_history_blacklist: args.validator_history_index_to_deblacklist as u32,
+        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+            validator_history_blacklist: vec![args.validator_history_index_to_deblacklist as u32],
         }
         .data(),
     };

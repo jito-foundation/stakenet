@@ -163,20 +163,20 @@ pub mod steward {
         instructions::resume_steward::handler(ctx)
     }
 
-    /// Adds the validator at `index` to the blacklist. It will be instant unstaked and never receive delegations
-    pub fn add_validator_to_blacklist(
-        ctx: Context<AddValidatorToBlacklist>,
-        validator_history_blacklist: u32,
+    /// Adds the validators to the blacklist. They will be instant unstaked and never receive delegations. Each u32 is a ValidatorHistory index.
+    pub fn add_validators_to_blacklist(
+        ctx: Context<AddValidatorsToBlacklist>,
+        validator_history_blacklist: Vec<u32>,
     ) -> Result<()> {
-        instructions::add_validator_to_blacklist::handler(ctx, validator_history_blacklist)
+        instructions::add_validators_to_blacklist::handler(ctx, &validator_history_blacklist)
     }
 
-    /// Removes the validator at `index` from the blacklist
-    pub fn remove_validator_from_blacklist(
-        ctx: Context<RemoveValidatorFromBlacklist>,
-        validator_history_blacklist: u32,
+    /// Removes the validators from the blacklist. Each u32 is a ValidatorHistory index.
+    pub fn remove_validators_from_blacklist(
+        ctx: Context<RemoveValidatorsFromBlacklist>,
+        validator_history_blacklist: Vec<u32>,
     ) -> Result<()> {
-        instructions::remove_validator_from_blacklist::handler(ctx, validator_history_blacklist)
+        instructions::remove_validators_from_blacklist::handler(ctx, &validator_history_blacklist)
     }
 
     /// For parameters that are present in args, the instruction checks that they are within sensible bounds and saves them to config struct
