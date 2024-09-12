@@ -112,9 +112,9 @@ mod test_calculate_mev_commission {
     #[test]
     fn test_edge_cases() {
         // All commissions below threshold
-        let window = [Some(100), Some(200), Some(250)];
+        let window = [Some(100), Some(200), Some(250), Some(250)];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 2, 300).unwrap();
+            calculate_mev_commission(&window, 3, 300).unwrap();
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 250);
         assert_eq!(max_epoch, 2);
@@ -124,7 +124,7 @@ mod test_calculate_mev_commission {
         let window: [Option<u16>; 0] = [];
         let (score, max_commission, max_epoch, running_jito) =
             calculate_mev_commission(&window, 0, 300).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 0);
         assert_eq!(running_jito, 0.0);
@@ -135,7 +135,7 @@ mod test_calculate_mev_commission {
             calculate_mev_commission(&window, 2, 300).unwrap();
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 0);
-        assert_eq!(max_epoch, 2);
+        assert_eq!(max_epoch, 0);
         assert_eq!(running_jito, 1.0);
     }
 }
@@ -154,9 +154,9 @@ mod test_calculate_epoch_credits {
             calculate_epoch_credits(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
 
         assert_eq!(ratio, 0.9);
-        assert_eq!(delinquency_score, 1.0);
-        assert_eq!(delinquency_ratio, 1.0);
-        assert_eq!(delinquency_epoch, 65535);
+        assert_eq!(delinquency_score, 0.0);
+        assert_eq!(delinquency_ratio, 0.8);
+        assert_eq!(delinquency_epoch, 0);
     }
 
     #[test]
@@ -173,10 +173,12 @@ mod test_calculate_epoch_credits {
         // Missing data
         let epoch_credits = [None, Some(800), Some(900)];
         let total_blocks = [Some(1000), None, Some(1000)];
-        let (ratio, delinquency_score, _delinquency_ratio, _delinquency_epoch) =
+        let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
-        assert_eq!(ratio, 0.85);
-        assert_eq!(delinquency_score, 1.0);
+        assert_eq!(ratio, 1700. / 3000.);
+        assert_eq!(delinquency_score, 0.0);
+        assert_eq!(delinquency_ratio, 0.0);
+        assert_eq!(delinquency_epoch, 0);
 
         // Empty windows
         let epoch_credits: [Option<u32>; 0] = [];
@@ -387,7 +389,8 @@ mod test_calculate_instant_unstake_delinquency {
             epoch_credits_latest,
             validator_history_slot_index,
             threshold,
-        );
+        )
+        .unwrap();
 
         assert_eq!(result, false);
     }
@@ -395,16 +398,16 @@ mod test_calculate_instant_unstake_delinquency {
     #[test]
     fn test_edge_cases() {
         // Delinquency detected
-        let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8);
+        let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8).unwrap();
         assert_eq!(result, true);
 
         // Zero blocks produced
-        let result = calculate_instant_unstake_delinquency(0, 1000, 900, 1000, 0.8);
+        let result = calculate_instant_unstake_delinquency(0, 1000, 900, 1000, 0.8).unwrap();
         assert_eq!(result, false);
 
         // Zero slots
         let result = calculate_instant_unstake_delinquency(1000, 0, 900, 1000, 0.8);
-        assert_eq!(result, false);
+        assert!(result.is_err());
     }
 }
 

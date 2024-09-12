@@ -240,6 +240,10 @@ pub fn calculate_epoch_credits(
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
 ) -> Result<(f64, f64, f64, u16)> {
+    if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / epoch_credits_window.len() as f64;
 
@@ -313,6 +317,10 @@ pub fn calculate_historical_commission(
     current_epoch: u16,
     historical_commission_threshold: u8,
 ) -> Result<(f64, u8, u16)> {
+    if validator.history.is_empty() {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let (max_historical_commission, max_historical_commission_epoch) = validator
         .history
         .commission_range(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16, current_epoch)
@@ -489,7 +497,7 @@ pub fn instant_unstake_validator(
         epoch_credits_latest,
         validator_history_slot_index,
         params.instant_unstake_delinquency_threshold_ratio,
-    );
+    )?;
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
         validator,
@@ -531,14 +539,21 @@ pub fn calculate_instant_unstake_delinquency(
     epoch_credits_latest: u32,
     validator_history_slot_index: u64,
     instant_unstake_delinquency_threshold_ratio: f64,
-) -> bool {
+) -> Result<bool> {
+    if cluster_history_slot_index == 0 || validator_history_slot_index == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
     let vote_credits_rate = epoch_credits_latest as f64 / validator_history_slot_index as f64;
 
     if blocks_produced_rate > 0. {
-        (vote_credits_rate / blocks_produced_rate) < instant_unstake_delinquency_threshold_ratio
+        Ok(
+            (vote_credits_rate / blocks_produced_rate)
+                < instant_unstake_delinquency_threshold_ratio,
+        )
     } else {
-        false
+        Ok(false)
     }
 }
 
