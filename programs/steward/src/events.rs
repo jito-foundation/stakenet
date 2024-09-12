@@ -97,3 +97,38 @@ impl IdlBuild for RebalanceTypeTag {
         })
     }
 }
+
+/// Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.
+/// Because the event discriminator is based on struct name, it's important to rename the struct if
+/// fields are changed.
+#[event]
+#[derive(Debug, PartialEq)]
+pub struct ScoreComponents {
+    pub score: f64,
+    pub yield_score: f64,
+    pub mev_commission_score: f64,
+    pub blacklisted_score: f64,
+    pub superminority_score: f64,
+    pub delinquency_score: f64,
+    pub running_jito_score: f64,
+    pub commission_score: f64,
+    pub historical_commission_score: f64,
+    pub vote_credits_ratio: f64,
+    pub vote_account: Pubkey,
+    pub epoch: u16,
+}
+
+/// Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.
+/// Because the event discriminator is based on struct name, it's important to rename the struct if
+/// fields are changed.
+#[event]
+#[derive(Debug, PartialEq, Eq)]
+pub struct InstantUnstakeComponents {
+    pub instant_unstake: bool,
+    pub delinquency_check: bool,
+    pub commission_check: bool,
+    pub mev_commission_check: bool,
+    pub is_blacklisted: bool,
+    pub vote_account: Pubkey,
+    pub epoch: u16,
+}

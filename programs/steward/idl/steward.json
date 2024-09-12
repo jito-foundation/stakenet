@@ -1625,6 +1625,19 @@
       ]
     },
     {
+      "name": "InstantUnstakeComponentsV2",
+      "discriminator": [
+        138,
+        62,
+        181,
+        14,
+        9,
+        48,
+        109,
+        47
+      ]
+    },
+    {
       "name": "RebalanceEvent",
       "discriminator": [
         120,
@@ -1648,6 +1661,19 @@
         2,
         217,
         251
+      ]
+    },
+    {
+      "name": "ScoreComponentsV2",
+      "discriminator": [
+        140,
+        182,
+        108,
+        49,
+        246,
+        38,
+        247,
+        181
       ]
     },
     {
@@ -2319,6 +2345,47 @@
     },
     {
       "name": "InstantUnstakeComponents",
+      "docs": [
+        "Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.",
+        "Because the event discriminator is based on struct name, it's important to rename the struct if",
+        "fields are changed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "instant_unstake",
+            "type": "bool"
+          },
+          {
+            "name": "delinquency_check",
+            "type": "bool"
+          },
+          {
+            "name": "commission_check",
+            "type": "bool"
+          },
+          {
+            "name": "mev_commission_check",
+            "type": "bool"
+          },
+          {
+            "name": "is_blacklisted",
+            "type": "bool"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstantUnstakeComponentsV2",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2363,6 +2430,67 @@
           },
           {
             "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "details",
+            "docs": [
+              "Details about why a given check was calculated"
+            ],
+            "type": {
+              "defined": {
+                "name": "InstantUnstakeDetails"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InstantUnstakeDetails",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch_credits_latest",
+            "docs": [
+              "Latest epoch credits"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vote_account_last_update_slot",
+            "docs": [
+              "Latest vote account update slot"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_blocks_latest",
+            "docs": [
+              "Latest total blocks"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "cluster_history_slot_index",
+            "docs": [
+              "Cluster history slot index"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "commission",
+            "docs": [
+              "Commission value"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "mev_commission",
+            "docs": [
+              "MEV commission value"
+            ],
             "type": "u16"
           }
         ]
@@ -2621,6 +2749,67 @@
     },
     {
       "name": "ScoreComponents",
+      "docs": [
+        "Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.",
+        "Because the event discriminator is based on struct name, it's important to rename the struct if",
+        "fields are changed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "score",
+            "type": "f64"
+          },
+          {
+            "name": "yield_score",
+            "type": "f64"
+          },
+          {
+            "name": "mev_commission_score",
+            "type": "f64"
+          },
+          {
+            "name": "blacklisted_score",
+            "type": "f64"
+          },
+          {
+            "name": "superminority_score",
+            "type": "f64"
+          },
+          {
+            "name": "delinquency_score",
+            "type": "f64"
+          },
+          {
+            "name": "running_jito_score",
+            "type": "f64"
+          },
+          {
+            "name": "commission_score",
+            "type": "f64"
+          },
+          {
+            "name": "historical_commission_score",
+            "type": "f64"
+          },
+          {
+            "name": "vote_credits_ratio",
+            "type": "f64"
+          },
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreComponentsV2",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2701,6 +2890,88 @@
           },
           {
             "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "details",
+            "docs": [
+              "Details about why a given score was calculated"
+            ],
+            "type": {
+              "defined": {
+                "name": "ScoreDetails"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScoreDetails",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_mev_commission",
+            "docs": [
+              "Max MEV commission observed"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_mev_commission_epoch",
+            "docs": [
+              "Epoch of max MEV commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "superminority_epoch",
+            "docs": [
+              "Epoch when superminority was detected"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "delinquency_ratio",
+            "docs": [
+              "Ratio that failed delinquency check"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "delinquency_epoch",
+            "docs": [
+              "Epoch when delinquency was detected"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_commission",
+            "docs": [
+              "Max commission observed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "max_commission_epoch",
+            "docs": [
+              "Epoch of max commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_historical_commission",
+            "docs": [
+              "Max historical commission observed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "max_historical_commission_epoch",
+            "docs": [
+              "Epoch of max historical commission"
+            ],
             "type": "u16"
           }
         ]
