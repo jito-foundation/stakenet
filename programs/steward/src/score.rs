@@ -197,7 +197,7 @@ pub fn validator_score(
 
 /// Finds max MEV commission in the last `mev_commission_range` epochs and determines if it is above a threshold.
 /// Also determines if validator has had a MEV commission in the last 10 epochs to ensure they are running jito-solana
-fn calculate_mev_commission(
+pub fn calculate_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
@@ -234,7 +234,7 @@ fn calculate_mev_commission(
 }
 
 /// Calculates the vote credits ratio and delinquency score for the validator
-fn calculate_epoch_credits(
+pub fn calculate_epoch_credits(
     epoch_credits_window: &[Option<u32>],
     total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
@@ -282,7 +282,7 @@ fn calculate_epoch_credits(
 }
 
 /// Finds max commission in the last `commission_range` epochs
-fn calculate_commission(
+pub fn calculate_commission(
     commission_window: &[Option<u8>],
     current_epoch: u16,
     commission_threshold: u8,
@@ -308,7 +308,7 @@ fn calculate_commission(
 }
 
 /// Checks if validator has commission above a threshold in any epoch in their history
-fn calculate_historical_commission(
+pub fn calculate_historical_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     historical_commission_threshold: u8,
@@ -341,7 +341,7 @@ fn calculate_historical_commission(
 }
 
 /// Checks if validator is in the top 1/3 of validators by stake for the current epoch
-fn calculate_superminority(
+pub fn calculate_superminority(
     validator: &ValidatorHistory,
     current_epoch: u16,
     commission_range: u16,
@@ -391,7 +391,7 @@ fn calculate_superminority(
 }
 
 /// Checks if validator is blacklisted using the validator history index in the config's blacklist
-fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
+pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
     if config
         .validator_history_blacklist
         .get(validator_index as usize)?
@@ -525,7 +525,7 @@ pub fn instant_unstake_validator(
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
-fn calculate_instant_unstake_delinquency(
+pub fn calculate_instant_unstake_delinquency(
     total_blocks_latest: u32,
     cluster_history_slot_index: u64,
     epoch_credits_latest: u32,
@@ -543,7 +543,7 @@ fn calculate_instant_unstake_delinquency(
 }
 
 /// Calculates if the validator should be unstaked due to MEV commission
-fn calculate_instant_unstake_mev_commission(
+pub fn calculate_instant_unstake_mev_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
@@ -562,7 +562,7 @@ fn calculate_instant_unstake_mev_commission(
 }
 
 /// Calculates if the validator should be unstaked due to commission
-fn calculate_instant_unstake_commission(
+pub fn calculate_instant_unstake_commission(
     validator: &ValidatorHistory,
     commission_threshold: u8,
 ) -> (bool, u8) {
@@ -575,7 +575,7 @@ fn calculate_instant_unstake_commission(
 }
 
 /// Checks if the validator is blacklisted
-fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32) -> Result<bool> {
+pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32) -> Result<bool> {
     config
         .validator_history_blacklist
         .get(validator_index as usize)
