@@ -467,18 +467,18 @@ mod test_calculate_instant_unstake_delinquency {
         )
         .unwrap();
 
-        assert_eq!(result, false);
+        assert!(!result);
 
         // Delinquency detected
         let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8).unwrap();
-        assert_eq!(result, true);
+        assert!(result);
     }
 
     #[test]
     fn test_edge_cases() {
         // Zero blocks produced
         let result = calculate_instant_unstake_delinquency(0, 1000, 900, 1000, 0.8).unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
 
         // Zero slots
         let result = calculate_instant_unstake_delinquency(1000, 0, 900, 1000, 0.8);
@@ -499,7 +499,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
 
-        assert_eq!(check, true);
+        assert!(check);
         assert_eq!(commission, 500);
     }
 
@@ -514,7 +514,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
 
-        assert_eq!(check, false);
+        assert!(!check);
         assert_eq!(commission, 200);
 
         // No MEV commission data
@@ -522,7 +522,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 0, threshold);
 
-        assert_eq!(check, false);
+        assert!(!check);
         assert_eq!(commission, 0);
 
         // Only one epoch of data
@@ -535,7 +535,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 1, threshold);
 
-        assert_eq!(check, true);
+        assert!(check);
         assert_eq!(commission, 400);
 
         // Threshold at exactly the highest commission
@@ -546,7 +546,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 4, threshold);
 
-        assert_eq!(check, false);
+        assert!(!check);
         assert_eq!(commission, 500);
     }
 }
@@ -563,7 +563,7 @@ mod test_calculate_instant_unstake_commission {
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
 
-        assert_eq!(check, true);
+        assert!(check);
         assert_eq!(commission, 5);
     }
 
@@ -575,7 +575,7 @@ mod test_calculate_instant_unstake_commission {
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
 
-        assert_eq!(check, false);
+        assert!(!check);
         assert_eq!(commission, 5);
 
         // No commission data
@@ -584,7 +584,7 @@ mod test_calculate_instant_unstake_commission {
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
 
-        assert_eq!(check, true);
+        assert!(check);
         assert_eq!(commission, COMMISSION_MAX);
 
         // Only one epoch of data
@@ -598,7 +598,7 @@ mod test_calculate_instant_unstake_commission {
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
 
-        assert_eq!(check, false);
+        assert!(!check);
         assert_eq!(commission, 3);
     }
 }
@@ -613,10 +613,10 @@ mod test_calculate_instant_unstake_blacklist {
         config.validator_history_blacklist.set(5, true).unwrap();
 
         let result = calculate_instant_unstake_blacklist(&config, 5).unwrap();
-        assert_eq!(result, true);
+        assert!(result);
 
         let result = calculate_instant_unstake_blacklist(&config, 6).unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     /* single line fn, no edge cases */
