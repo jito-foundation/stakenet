@@ -1,6 +1,6 @@
 use jito_steward::{score::*, Config, LargeBitMask, Parameters};
 use solana_sdk::pubkey::Pubkey;
-use validator_history::{CircBuf, CircBufCluster, ClusterHistory, ValidatorHistory};
+use validator_history::{CircBuf, ValidatorHistory};
 
 // Fixtures
 
