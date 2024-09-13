@@ -520,15 +520,20 @@ mod test_calculate_instant_unstake_mev_commission {
         // No MEV commission data
         let validator = create_validator_history(&[u16::MAX], &[5], &[1000], &[0]);
         let (check, commission) =
-            calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
+            calculate_instant_unstake_mev_commission(&validator, 0, threshold);
 
         assert_eq!(check, false);
         assert_eq!(commission, 0);
 
         // Only one epoch of data
-        let validator = create_validator_history(&[400], &[5], &[1000], &[0]);
+        let validator = create_validator_history(
+            &[u16::MAX, 400],
+            &[u8::MAX, 5],
+            &[u32::MAX, 1000],
+            &[u8::MAX, 0],
+        );
         let (check, commission) =
-            calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
+            calculate_instant_unstake_mev_commission(&validator, 1, threshold);
 
         assert_eq!(check, true);
         assert_eq!(commission, 400);
@@ -539,7 +544,7 @@ mod test_calculate_instant_unstake_mev_commission {
         let threshold = 500;
 
         let (check, commission) =
-            calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
+            calculate_instant_unstake_mev_commission(&validator, 4, threshold);
 
         assert_eq!(check, false);
         assert_eq!(commission, 500);
