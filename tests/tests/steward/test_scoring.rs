@@ -68,28 +68,6 @@ fn create_validator_history(
     }
 }
 
-#[allow(dead_code)]
-fn create_cluster_history(total_blocks: &[u32]) -> ClusterHistory {
-    let mut history = CircBufCluster::default();
-    for (i, &blocks) in total_blocks.iter().enumerate() {
-        history.push(validator_history::ClusterHistoryEntry {
-            epoch: i as u16,
-            total_blocks: blocks,
-            ..Default::default()
-        });
-    }
-    ClusterHistory {
-        history,
-        struct_version: 0,
-        bump: 0,
-        _padding0: [0; 7],
-        cluster_history_last_update_slot: 0,
-        _padding1: [0; 232],
-    }
-}
-
-// Tests
-
 mod test_calculate_mev_commission {
     use jito_steward::score::calculate_mev_commission;
 
