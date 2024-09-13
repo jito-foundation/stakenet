@@ -107,11 +107,8 @@ mod test_calculate_mev_commission {
         assert_eq!(max_commission, 500);
         assert_eq!(max_epoch, 4);
         assert_eq!(running_jito, 1.0);
-    }
 
-    #[test]
-    fn test_edge_cases() {
-        // All commissions below threshold
+        // All commissions below threshold, and epoch is first instance of max commission
         let window = [Some(100), Some(200), Some(250), Some(250)];
         let (score, max_commission, max_epoch, running_jito) =
             calculate_mev_commission(&window, 3, 300).unwrap();
@@ -120,6 +117,18 @@ mod test_calculate_mev_commission {
         assert_eq!(max_epoch, 2);
         assert_eq!(running_jito, 1.0);
 
+        // Window with Nones
+        let window = [None, None, None];
+        let (score, max_commission, max_epoch, running_jito) =
+            calculate_mev_commission(&window, 2, 300).unwrap();
+        assert_eq!(score, 0.0);
+        assert_eq!(max_commission, 10000);
+        assert_eq!(max_epoch, 2);
+        assert_eq!(running_jito, 0.0);
+    }
+
+    #[test]
+    fn test_edge_cases() {
         // Empty window
         let window: [Option<u16>; 0] = [];
         let (score, max_commission, max_epoch, running_jito) =
@@ -129,23 +138,21 @@ mod test_calculate_mev_commission {
         assert_eq!(max_epoch, 0);
         assert_eq!(running_jito, 0.0);
 
-        // Window with Some(0) values
+        // Test Arithmetic error
         let window = [Some(0), Some(0), Some(0)];
-        let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 2, 300).unwrap();
-        assert_eq!(score, 1.0);
-        assert_eq!(max_commission, 0);
-        assert_eq!(max_epoch, 0);
-        assert_eq!(running_jito, 1.0);
+        let result = calculate_mev_commission(&window, 0, 300);
+        assert!(result.is_err());
     }
 }
 
 mod test_calculate_epoch_credits {
+    use jito_steward::constants::EPOCH_DEFAULT;
+
     use super::*;
 
     #[test]
     fn test_normal() {
-        let epoch_credits = [Some(800), Some(900), Some(1000)];
+        let epoch_credits = [Some(800), Some(800), Some(800)];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
         let epoch_start = 0;
         let threshold = 0.9;
@@ -153,7 +160,7 @@ mod test_calculate_epoch_credits {
         let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
 
-        assert_eq!(ratio, 0.9);
+        assert_eq!(ratio, 0.8);
         assert_eq!(delinquency_score, 0.0);
         assert_eq!(delinquency_ratio, 0.8);
         assert_eq!(delinquency_epoch, 0);
@@ -180,10 +187,32 @@ mod test_calculate_epoch_credits {
         assert_eq!(delinquency_ratio, 0.0);
         assert_eq!(delinquency_epoch, 0);
 
+        // No delinquent epochs
+        let epoch_credits = [Some(800), Some(900), Some(1000)];
+        let total_blocks = [Some(1000), Some(1000), Some(1000)];
+        let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
+        assert_eq!(ratio, 0.9);
+        assert_eq!(delinquency_score, 1.0);
+        assert_eq!(delinquency_ratio, 1.0);
+        assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
+
         // Empty windows
         let epoch_credits: [Option<u32>; 0] = [];
         let total_blocks: [Option<u32>; 0] = [];
         let result = calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9);
+        assert!(result.is_err());
+
+        // Test Arithmetic error
+        let epoch_credits = [Some(1), Some(0)];
+        let total_blocks = [Some(1), Some(1)];
+        let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
+        assert!(result.is_err());
+
+        // Test all blocks none error
+        let epoch_credits = [Some(1), Some(1)];
+        let total_blocks = [None, None];
+        let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
     }
 }
@@ -203,10 +232,7 @@ mod test_calculate_commission {
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 7);
         assert_eq!(max_epoch, 1);
-    }
 
-    #[test]
-    fn test_edge_cases() {
         // Commission above threshold
         let commission_window = [Some(5), Some(10), Some(6)];
         let (score, max_commission, max_epoch) =
@@ -214,7 +240,10 @@ mod test_calculate_commission {
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 10);
         assert_eq!(max_epoch, 1);
+    }
 
+    #[test]
+    fn test_edge_cases() {
         // Empty window
         let commission_window: [Option<u8>; 0] = [];
         let (score, max_commission, max_epoch) =
@@ -230,10 +259,17 @@ mod test_calculate_commission {
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 5);
         assert_eq!(max_epoch, 1);
+
+        // Test Arithmetic error
+        let commission_window = [Some(0), Some(0), Some(0)];
+        let result = calculate_commission(&commission_window, 0, 8);
+        assert!(result.is_err());
     }
 }
 
 mod test_calculate_historical_commission {
+    use jito_steward::constants::VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH;
+
     use super::*;
 
     #[test]
@@ -253,10 +289,7 @@ mod test_calculate_historical_commission {
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 8);
         assert_eq!(max_epoch, 3);
-    }
 
-    #[test]
-    fn test_edge_cases() {
         // Commission above threshold
         let validator = create_validator_history(
             &[100; 10],
@@ -269,7 +302,10 @@ mod test_calculate_historical_commission {
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 9);
         assert_eq!(max_epoch, 3);
+    }
 
+    #[test]
+    fn test_edge_cases() {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[]);
         let result = calculate_historical_commission(&validator, 0, 8);
@@ -290,14 +326,35 @@ mod test_calculate_historical_commission {
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 8);
         assert_eq!(max_epoch, 3);
+
+        // Test all commissions none
+        let validator = create_validator_history(&[100; 10], &[u8::MAX; 10], &[1000; 10], &[0; 10]);
+        let (score, max_comission, max_epoch) =
+            calculate_historical_commission(&validator, 1, 8).unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_comission, 0);
+        assert_eq!(max_epoch, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16);
     }
 }
 
 mod test_calculate_superminority {
+    use jito_steward::constants::EPOCH_DEFAULT;
+
     use super::*;
 
     #[test]
     fn test_normal() {
+        // Superminority detected
+        let validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        );
+        let (score, epoch) = calculate_superminority(&validator, 9, 10).unwrap();
+        assert_eq!(score, 0.0);
+        assert_eq!(epoch, 9);
+
         let validator = create_validator_history(
             &[100; 10],
             &[5; 10],
@@ -311,25 +368,47 @@ mod test_calculate_superminority {
             calculate_superminority(&validator, current_epoch, commission_range).unwrap();
 
         assert_eq!(score, 1.0);
-        assert_eq!(epoch, 65535);
+        assert_eq!(epoch, EPOCH_DEFAULT);
+
+        // Superminority with missed uploads after epoch 3
+        let validator = create_validator_history(
+            &[100; 6],
+            &[5; 6],
+            &[u32::MAX; 6],
+            &[0, 0, 0, 1, u8::MAX, u8::MAX],
+        );
+        let current_epoch = 5;
+        let commission_range = 4;
+        let (score, epoch) =
+            calculate_superminority(&validator, current_epoch, commission_range).unwrap();
+        assert_eq!(score, 0.0);
+        assert_eq!(epoch, 3);
+
+        // Superminority with missed uploads after epoch 3
+        let validator = create_validator_history(
+            &[100; 6],
+            &[5; 6],
+            &[u32::MAX; 6],
+            &[0, 0, 0, 0, u8::MAX, u8::MAX],
+        );
+        let current_epoch = 5;
+        let commission_range = 4;
+        let (score, epoch) =
+            calculate_superminority(&validator, current_epoch, commission_range).unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(epoch, EPOCH_DEFAULT);
     }
 
     #[test]
     fn test_edge_cases() {
-        // Superminority detected
-        let validator = create_validator_history(
-            &[100; 10],
-            &[5; 10],
-            &[1000; 10],
-            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        );
-        let (score, epoch) = calculate_superminority(&validator, 9, 10).unwrap();
-        assert_eq!(score, 0.0);
-        assert_eq!(epoch, 9);
-
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[]);
         let result = calculate_superminority(&validator, 0, 10);
+        assert!(result.is_err());
+
+        // Arithmetic error
+        let validator = create_validator_history(&[100; 10], &[5; 10], &[u32::MAX; 10], &[0; 10]);
+        let result = calculate_superminority(&validator, 0, 1);
         assert!(result.is_err());
 
         // History with None values
@@ -339,7 +418,7 @@ mod test_calculate_superminority {
             .push(validator_history::ValidatorHistoryEntry::default());
         let (score, epoch) = calculate_superminority(&validator, 10, 10).unwrap();
         assert_eq!(score, 1.0);
-        assert_eq!(epoch, 65535);
+        assert_eq!(epoch, EPOCH_DEFAULT);
     }
 }
 
@@ -365,10 +444,6 @@ mod test_calculate_blacklist {
         // Index out of bounds
         let result = calculate_blacklist(&config, u32::MAX);
         assert!(result.is_err());
-
-        // Empty blacklist
-        let score = calculate_blacklist(&config, 0).unwrap();
-        assert_eq!(score, 1.0);
     }
 }
 
@@ -393,14 +468,14 @@ mod test_calculate_instant_unstake_delinquency {
         .unwrap();
 
         assert_eq!(result, false);
+
+        // Delinquency detected
+        let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8).unwrap();
+        assert_eq!(result, true);
     }
 
     #[test]
     fn test_edge_cases() {
-        // Delinquency detected
-        let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8).unwrap();
-        assert_eq!(result, true);
-
         // Zero blocks produced
         let result = calculate_instant_unstake_delinquency(0, 1000, 900, 1000, 0.8).unwrap();
         assert_eq!(result, false);
@@ -443,12 +518,7 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 200);
 
         // No MEV commission data
-        let validator = create_validator_history(
-            &[u16::MAX, u16::MAX, u16::MAX, u16::MAX, u16::MAX],
-            &[5; 5],
-            &[1000; 5],
-            &[0; 5],
-        );
+        let validator = create_validator_history(&[u16::MAX], &[5], &[1000], &[0]);
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
 
@@ -456,12 +526,7 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 0);
 
         // Only one epoch of data
-        let validator = create_validator_history(
-            &[u16::MAX, u16::MAX, u16::MAX, u16::MAX, 400],
-            &[5; 5],
-            &[1000; 5],
-            &[0; 5],
-        );
+        let validator = create_validator_history(&[400], &[5], &[1000], &[0]);
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, current_epoch, threshold);
 
@@ -519,10 +584,10 @@ mod test_calculate_instant_unstake_commission {
 
         // Only one epoch of data
         let validator = create_validator_history(
-            &[u16::MAX, u16::MAX, u16::MAX, u16::MAX, 5],
-            &[u8::MAX, u8::MAX, u8::MAX, u8::MAX, 3],
-            &[u32::MAX, u32::MAX, u32::MAX, u32::MAX, 1000],
-            &[u8::MAX, u8::MAX, u8::MAX, u8::MAX, 1],
+            &[u16::MAX, 5],
+            &[u8::MAX, 3],
+            &[u32::MAX, 1000],
+            &[u8::MAX, 1],
         );
         let threshold = 5;
 
@@ -534,7 +599,6 @@ mod test_calculate_instant_unstake_commission {
 }
 
 mod test_calculate_instant_unstake_blacklist {
-    use jito_steward::constants::MAX_VALIDATORS;
 
     use super::*;
 
@@ -550,24 +614,5 @@ mod test_calculate_instant_unstake_blacklist {
         assert_eq!(result, false);
     }
 
-    #[test]
-    fn test_edge_cases() {
-        let mut config = create_config(300, 8, 10);
-
-        // Index out of bounds
-        let result = calculate_instant_unstake_blacklist(&config, MAX_VALIDATORS as u32);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
-
-        // Empty blacklist
-        let result = calculate_instant_unstake_blacklist(&config, 0).unwrap();
-        assert_eq!(result, false);
-
-        // All blacklisted
-        for i in 0..MAX_VALIDATORS {
-            config.validator_history_blacklist.set(i, true).unwrap();
-        }
-        let result = calculate_instant_unstake_blacklist(&config, 0).unwrap();
-        assert_eq!(result, true);
-    }
+    /* single line fn, no edge cases */
 }

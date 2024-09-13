@@ -247,9 +247,14 @@ pub fn calculate_epoch_credits(
     let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / epoch_credits_window.len() as f64;
 
+    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
+    if nonzero_blocks == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks = total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64
-        / total_blocks_window.iter().filter(|i| i.is_some()).count() as f64;
+    let average_blocks =
+        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1.0;
@@ -263,7 +268,7 @@ pub fn calculate_epoch_credits(
     {
         if let Some(blocks) = maybe_blocks {
             // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
-            // If total blocks are None, then keeper missed an upload and validator should not be punished.
+            // If total blocks are None, then keepers missed an upload and validator should not be punished.
             let credits = maybe_credits.unwrap_or(0);
             let ratio = credits as f64 / *blocks as f64;
             if ratio < scoring_delinquency_threshold_ratio {
@@ -380,8 +385,8 @@ pub fn calculate_superminority(
 
         let (status, epoch) = superminority_window
             .iter()
-            .enumerate()
             .rev()
+            .enumerate()
             .filter_map(|(i, &superminority)| {
                 superminority.map(|s| (s, current_epoch.checked_sub(i as u16)))
             })
