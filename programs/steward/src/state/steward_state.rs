@@ -537,24 +537,32 @@ impl StewardState {
             }
         }
 
+        // If index is greater than or equal to num_pool_validators, we are removing a validator that is not in the pool
+        // so nothing was shifted above, however we still want to clear the values there
+        let index_to_clear = if index >= num_pool_validators {
+            index
+        } else {
+            num_pool_validators
+        };
+
         // Clear values on empty last index
-        self.validator_lamport_balances[num_pool_validators] = 0;
-        self.scores[num_pool_validators] = 0;
-        self.yield_scores[num_pool_validators] = 0;
-        self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.delegations[num_pool_validators] = Delegation::default();
-        self.instant_unstake.set(num_pool_validators, false)?;
-        self.progress.set(num_pool_validators, false)?;
-        self.validators_to_remove.set(num_pool_validators, false)?;
+        self.validator_lamport_balances[index_to_clear] = LAMPORT_BALANCE_DEFAULT;
+        self.scores[index_to_clear] = 0;
+        self.yield_scores[index_to_clear] = 0;
+        self.sorted_score_indices[index_to_clear] = SORTED_INDEX_DEFAULT;
+        self.sorted_yield_score_indices[index_to_clear] = SORTED_INDEX_DEFAULT;
+        self.delegations[index_to_clear] = Delegation::default();
+        self.instant_unstake.set(index_to_clear, false)?;
+        self.progress.set(index_to_clear, false)?;
+        self.validators_to_remove.set(index_to_clear, false)?;
         self.validators_for_immediate_removal
-            .set(num_pool_validators, false)?;
+            .set(index_to_clear, false)?;
 
         if marked_for_regular_removal {
-            self.validators_to_remove.set(num_pool_validators, false)?;
+            self.validators_to_remove.set(index_to_clear, false)?;
         } else {
             self.validators_for_immediate_removal
-                .set(num_pool_validators, false)?;
+                .set(index_to_clear, false)?;
         }
 
         Ok(())
