@@ -197,7 +197,7 @@ pub fn validator_score(
 
 /// Finds max MEV commission in the last `mev_commission_range` epochs and determines if it is above a threshold.
 /// Also determines if validator has had a MEV commission in the last 10 epochs to ensure they are running jito-solana
-fn calculate_mev_commission(
+pub fn calculate_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
@@ -234,18 +234,27 @@ fn calculate_mev_commission(
 }
 
 /// Calculates the vote credits ratio and delinquency score for the validator
-fn calculate_epoch_credits(
+pub fn calculate_epoch_credits(
     epoch_credits_window: &[Option<u32>],
     total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
 ) -> Result<(f64, f64, f64, u16)> {
+    if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
         / epoch_credits_window.len() as f64;
 
+    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
+    if nonzero_blocks == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks = total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64
-        / total_blocks_window.iter().filter(|i| i.is_some()).count() as f64;
+    let average_blocks =
+        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1.0;
@@ -259,7 +268,7 @@ fn calculate_epoch_credits(
     {
         if let Some(blocks) = maybe_blocks {
             // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
-            // If total blocks are None, then keeper missed an upload and validator should not be punished.
+            // If total blocks are None, then keepers missed an upload and validator should not be punished.
             let credits = maybe_credits.unwrap_or(0);
             let ratio = credits as f64 / *blocks as f64;
             if ratio < scoring_delinquency_threshold_ratio {
@@ -282,7 +291,7 @@ fn calculate_epoch_credits(
 }
 
 /// Finds max commission in the last `commission_range` epochs
-fn calculate_commission(
+pub fn calculate_commission(
     commission_window: &[Option<u8>],
     current_epoch: u16,
     commission_threshold: u8,
@@ -308,11 +317,15 @@ fn calculate_commission(
 }
 
 /// Checks if validator has commission above a threshold in any epoch in their history
-fn calculate_historical_commission(
+pub fn calculate_historical_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     historical_commission_threshold: u8,
 ) -> Result<(f64, u8, u16)> {
+    if validator.history.is_empty() {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let (max_historical_commission, max_historical_commission_epoch) = validator
         .history
         .commission_range(VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16, current_epoch)
@@ -341,7 +354,7 @@ fn calculate_historical_commission(
 }
 
 /// Checks if validator is in the top 1/3 of validators by stake for the current epoch
-fn calculate_superminority(
+pub fn calculate_superminority(
     validator: &ValidatorHistory,
     current_epoch: u16,
     commission_range: u16,
@@ -372,8 +385,8 @@ fn calculate_superminority(
 
         let (status, epoch) = superminority_window
             .iter()
-            .enumerate()
             .rev()
+            .enumerate()
             .filter_map(|(i, &superminority)| {
                 superminority.map(|s| (s, current_epoch.checked_sub(i as u16)))
             })
@@ -391,7 +404,7 @@ fn calculate_superminority(
 }
 
 /// Checks if validator is blacklisted using the validator history index in the config's blacklist
-fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
+pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
     if config
         .validator_history_blacklist
         .get(validator_index as usize)?
@@ -489,7 +502,7 @@ pub fn instant_unstake_validator(
         epoch_credits_latest,
         validator_history_slot_index,
         params.instant_unstake_delinquency_threshold_ratio,
-    );
+    )?;
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
         validator,
@@ -525,25 +538,32 @@ pub fn instant_unstake_validator(
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
-fn calculate_instant_unstake_delinquency(
+pub fn calculate_instant_unstake_delinquency(
     total_blocks_latest: u32,
     cluster_history_slot_index: u64,
     epoch_credits_latest: u32,
     validator_history_slot_index: u64,
     instant_unstake_delinquency_threshold_ratio: f64,
-) -> bool {
+) -> Result<bool> {
+    if cluster_history_slot_index == 0 || validator_history_slot_index == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
     let vote_credits_rate = epoch_credits_latest as f64 / validator_history_slot_index as f64;
 
     if blocks_produced_rate > 0. {
-        (vote_credits_rate / blocks_produced_rate) < instant_unstake_delinquency_threshold_ratio
+        Ok(
+            (vote_credits_rate / blocks_produced_rate)
+                < instant_unstake_delinquency_threshold_ratio,
+        )
     } else {
-        false
+        Ok(false)
     }
 }
 
 /// Calculates if the validator should be unstaked due to MEV commission
-fn calculate_instant_unstake_mev_commission(
+pub fn calculate_instant_unstake_mev_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
@@ -562,7 +582,7 @@ fn calculate_instant_unstake_mev_commission(
 }
 
 /// Calculates if the validator should be unstaked due to commission
-fn calculate_instant_unstake_commission(
+pub fn calculate_instant_unstake_commission(
     validator: &ValidatorHistory,
     commission_threshold: u8,
 ) -> (bool, u8) {
@@ -575,7 +595,7 @@ fn calculate_instant_unstake_commission(
 }
 
 /// Checks if the validator is blacklisted
-fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32) -> Result<bool> {
+pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32) -> Result<bool> {
     config
         .validator_history_blacklist
         .get(validator_index as usize)

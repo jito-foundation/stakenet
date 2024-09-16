@@ -112,7 +112,6 @@ pub struct CircBuf {
     pub arr: [ValidatorHistoryEntry; MAX_ITEMS],
 }
 
-#[cfg(test)]
 impl Default for CircBuf {
     fn default() -> Self {
         Self {
@@ -789,7 +788,6 @@ pub struct CircBufCluster {
     pub arr: [ClusterHistoryEntry; MAX_ITEMS],
 }
 
-#[cfg(test)]
 impl Default for CircBufCluster {
     fn default() -> Self {
         Self {
