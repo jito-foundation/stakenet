@@ -460,7 +460,7 @@ impl StewardState {
     }
 
     /// Update internal state when a validator is removed from the pool
-    pub fn remove_validator(&mut self, index: usize) -> Result<()> {
+    pub fn remove_validator(&mut self, index: usize, validator_list_len: usize) -> Result<()> {
         let marked_for_regular_removal = self.validators_to_remove.get(index)?;
         let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
 
@@ -494,6 +494,11 @@ impl StewardState {
             self.instant_unstake
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
+        }
+
+        // For state that can be valid past num_pool_validators, we still need to shift the values
+        for i in index..validator_list_len {
+            let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.validators_to_remove
                 .set(i, self.validators_to_remove.get(next_i)?)?;
             self.validators_for_immediate_removal
@@ -537,33 +542,18 @@ impl StewardState {
             }
         }
 
-        // If index is greater than or equal to num_pool_validators, we are removing a validator that is not in the pool
-        // so nothing was shifted above, however we still want to clear the values there
-        let index_to_clear = if index >= num_pool_validators {
-            index
-        } else {
-            num_pool_validators
-        };
-
         // Clear values on empty last index
-        self.validator_lamport_balances[index_to_clear] = LAMPORT_BALANCE_DEFAULT;
-        self.scores[index_to_clear] = 0;
-        self.yield_scores[index_to_clear] = 0;
-        self.sorted_score_indices[index_to_clear] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[index_to_clear] = SORTED_INDEX_DEFAULT;
-        self.delegations[index_to_clear] = Delegation::default();
-        self.instant_unstake.set(index_to_clear, false)?;
-        self.progress.set(index_to_clear, false)?;
-        self.validators_to_remove.set(index_to_clear, false)?;
+        self.validator_lamport_balances[num_pool_validators] = LAMPORT_BALANCE_DEFAULT;
+        self.scores[num_pool_validators] = 0;
+        self.yield_scores[num_pool_validators] = 0;
+        self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.delegations[num_pool_validators] = Delegation::default();
+        self.instant_unstake.set(num_pool_validators, false)?;
+        self.progress.set(num_pool_validators, false)?;
+        self.validators_to_remove.set(validator_list_len, false)?;
         self.validators_for_immediate_removal
-            .set(index_to_clear, false)?;
-
-        if marked_for_regular_removal {
-            self.validators_to_remove.set(index_to_clear, false)?;
-        } else {
-            self.validators_for_immediate_removal
-                .set(index_to_clear, false)?;
-        }
+            .set(validator_list_len, false)?;
 
         Ok(())
     }
