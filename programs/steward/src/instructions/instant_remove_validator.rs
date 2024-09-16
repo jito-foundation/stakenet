@@ -88,7 +88,7 @@ pub fn handler(
 
     state_account
         .state
-        .remove_validator(validator_index_to_remove)?;
+        .remove_validator(validator_index_to_remove, validators_in_list)?;
 
     Ok(())
 }
