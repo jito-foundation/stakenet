@@ -1,5 +1,5 @@
-use anchor_lang::idl::types::*;
-use anchor_lang::idl::*;
+#[cfg(feature = "idl-build")]
+use anchor_lang::idl::{types::*, *};
 use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
 use validator_history::utils::cast_epoch;
@@ -37,7 +37,7 @@ pub struct UpdateParametersArgs {
     pub minimum_voting_epochs: Option<u64>,
 }
 
-// #[cfg(feature = "idl-build")]
+#[cfg(feature = "idl-build")]
 impl IdlBuild for UpdateParametersArgs {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {

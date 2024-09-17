@@ -124,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jito_steward.json
-          path: programs/steward/idl/jito_steward.json
+          path: programs/steward/idl/steward.json
 
   # tests run on verified build
   test:
