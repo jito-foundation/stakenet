@@ -1238,9 +1238,6 @@ impl Default for StateMachineFixtures {
 
         let epoch_schedule = EpochSchedule::default();
 
-        // TODO support both types
-        // let epoch_schedule = EpochSchedule::custom(1000, 1000, false);
-
         let clock = Clock {
             epoch: current_epoch,
             slot: epoch_schedule.get_last_slot_in_epoch(current_epoch),
@@ -1264,6 +1261,7 @@ impl Default for StateMachineFixtures {
                 commission: 0,
                 mev_commission: 0,
                 is_superminority: 0,
+                activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
                 ..ValidatorHistoryEntry::default()
             });
@@ -1283,6 +1281,7 @@ impl Default for StateMachineFixtures {
                 commission: 99,
                 mev_commission: 10000,
                 is_superminority: 1,
+                activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
                 ..ValidatorHistoryEntry::default()
             });
@@ -1302,6 +1301,7 @@ impl Default for StateMachineFixtures {
                 commission: 5,
                 mev_commission: 500,
                 is_superminority: 0,
+                activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
                 ..ValidatorHistoryEntry::default()
             });

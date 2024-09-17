@@ -620,6 +620,8 @@ fn test_instant_unstake() {
         .parameters
         .instant_unstake_delinquency_threshold_ratio = 0.25;
     let start_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
+    let end_slot = epoch_schedule.get_last_slot_in_epoch(current_epoch);
+    let slot_index = end_slot - start_slot;
     let current_epoch = current_epoch as u16;
 
     // Non-instant-unstake validator
@@ -646,9 +648,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -681,9 +683,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -713,9 +715,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 200,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 99,
                 mev_commission: 10000
             }
@@ -762,9 +764,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 0,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -811,9 +813,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 100,
                 mev_commission: 0
             }
@@ -843,9 +845,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -875,9 +877,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 0,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }

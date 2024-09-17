@@ -159,6 +159,80 @@ async fn _auto_add_validator(fixture: &TestFixture, extra_accounts: &ExtraValida
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+async fn _auto_remove_validator(
+    fixture: &TestFixture,
+    extra_accounts: &ExtraValidatorAccounts,
+    index: u64,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AutoRemoveValidator {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            stake_account: extra_accounts.stake_account_address,
+            withdraw_authority: extra_accounts.withdraw_authority,
+            validator_history_account: extra_accounts.validator_history_address,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            transient_stake_account: extra_accounts.transient_stake_account_address,
+            vote_account: extra_accounts.vote_account,
+            stake_history: solana_sdk::sysvar::stake_history::id(),
+            stake_config: stake::config::ID,
+            stake_program: stake::program::id(),
+            stake_pool_program: spl_stake_pool::id(),
+            system_program: system_program::id(),
+            rent: solana_sdk::sysvar::rent::id(),
+            clock: solana_sdk::sysvar::clock::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AutoRemoveValidatorFromPool {
+            validator_list_index: index,
+        }
+        .data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+async fn _instant_remove_validator(fixture: &TestFixture, index: usize) {
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::InstantRemoveValidator {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::InstantRemoveValidator {
+            validator_index_to_remove: index as u64,
+        }
+        .data(),
+    };
+    let blockhash = fixture
+        .ctx
+        .borrow_mut()
+        .get_new_latest_blockhash()
+        .await
+        .unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
 async fn _crank_compute_score(
     fixture: &TestFixture,
     unit_test_fixtures: &StateMachineFixtures,
@@ -241,7 +315,7 @@ async fn _crank_idle(fixture: &TestFixture) {
 
 async fn _crank_compute_instant_unstake(
     fixture: &TestFixture,
-    unit_test_fixtures: &StateMachineFixtures,
+    _unit_test_fixtures: &StateMachineFixtures,
     extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
     indices: &[usize],
 ) {
@@ -454,6 +528,7 @@ async fn test_cycle() {
 
     let unit_test_fixtures = StateMachineFixtures::default();
 
+    // Note that these parameters are overriden in initialize_steward, just included here for completeness
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
 
     fixture_accounts.validators = (0..3)
@@ -504,6 +579,8 @@ async fn test_cycle() {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
         .await;
+    fixture.realloc_steward_state().await;
+
     let steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let mut extra_validator_accounts = vec![];
@@ -526,13 +603,12 @@ async fn test_cycle() {
         })
     }
 
+    _crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds to validator list
     for i in 0..unit_test_fixtures.validators.len() {
         let extra_accounts = &extra_validator_accounts[i];
         _auto_add_validator(&fixture, extra_accounts).await;
     }
-
-    _crank_epoch_maintenance(&fixture, None).await;
 
     _crank_compute_score(
         &fixture,
@@ -639,7 +715,7 @@ async fn test_cycle() {
 }
 
 #[tokio::test]
-async fn test_remove_validator_next_epoch() {
+async fn test_remove_validator_mid_epoch() {
     /*
       Tests that a validator removed at an arbitrary point in the cycle is not included in the current cycle's consideration,
       even though it is still in the validator list, and the next epoch, it is removed from the validator list.
@@ -697,6 +773,7 @@ async fn test_remove_validator_next_epoch() {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
         .await;
+    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -718,13 +795,13 @@ async fn test_remove_validator_next_epoch() {
         })
     }
 
+    _crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds validators 2 and 3
     for i in 0..3 {
         let extra_accounts = &extra_validator_accounts[i];
         _auto_add_validator(&fixture, extra_accounts).await;
     }
 
-    _crank_epoch_maintenance(&fixture, None).await;
     _crank_compute_score(
         &fixture,
         &unit_test_fixtures,
@@ -784,8 +861,8 @@ async fn test_remove_validator_next_epoch() {
         state.state_tag,
         jito_steward::StewardStateEnum::ComputeInstantUnstake
     ));
-    assert_eq!(state.validators_to_remove.count(), 1);
-    assert_eq!(state.validators_to_remove.get(2).unwrap(), true);
+    assert_eq!(state.validators_for_immediate_removal.count(), 1);
+    assert_eq!(state.validators_for_immediate_removal.get(2).unwrap(), true);
     assert_eq!(state.num_pool_validators, 3);
 
     let validator_list: ValidatorList = fixture
@@ -799,7 +876,32 @@ async fn test_remove_validator_next_epoch() {
     assert!(validator_list.validators.len() == 3);
     println!("Stake Status: {:?}", validator_list.validators[2].status);
 
-    // Still need to crank?
+    // crank stake pool to remove validator from list
+    _crank_stake_pool(&fixture).await;
+
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    assert!(validator_list
+        .validators
+        .iter()
+        .find(|v| v.vote_account_address == extra_validator_accounts[2].vote_account)
+        .is_none());
+    assert!(validator_list.validators.len() == 2);
+
+    _instant_remove_validator(&fixture, 2).await;
+    let state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    let state = state_account.state;
+    assert!(matches!(
+        state.state_tag,
+        jito_steward::StewardStateEnum::ComputeInstantUnstake
+    ));
+    assert_eq!(state.validators_to_remove.count(), 0);
+    assert_eq!(state.validators_for_immediate_removal.count(), 0);
+    assert_eq!(state.num_pool_validators, 2);
+
+    // Compute instant unstake transitions to Rebalance
     _crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -812,7 +914,7 @@ async fn test_remove_validator_next_epoch() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0, 1, 2],
+        &[0, 1],
     )
     .await;
 
@@ -828,7 +930,7 @@ async fn test_remove_validator_next_epoch() {
         .is_none());
     assert!(validator_list.validators.len() == 2);
 
-    _crank_epoch_maintenance(&fixture, Some(&[2])).await;
+    _crank_epoch_maintenance(&fixture, None).await;
     let state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
@@ -837,6 +939,7 @@ async fn test_remove_validator_next_epoch() {
         jito_steward::StewardStateEnum::Idle
     ));
     assert_eq!(state.validators_to_remove.count(), 0);
+    assert_eq!(state.validators_for_immediate_removal.count(), 0);
     assert_eq!(state.num_pool_validators, 2);
 
     drop(fixture);
@@ -902,6 +1005,7 @@ async fn test_add_validator_next_cycle() {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         }))
         .await;
+    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -923,13 +1027,13 @@ async fn test_add_validator_next_cycle() {
         })
     }
 
+    _crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds validators 2 and 3
     for i in 0..2 {
         let extra_accounts = &extra_validator_accounts[i];
         _auto_add_validator(&fixture, extra_accounts).await;
     }
 
-    _crank_epoch_maintenance(&fixture, None).await;
     _crank_compute_score(
         &fixture,
         &unit_test_fixtures,

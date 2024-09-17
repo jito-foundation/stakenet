@@ -6,11 +6,11 @@ use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
 use crate::utils::{
     deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
-    remove_validator_check,
+    remove_validator_check, stake_is_inactive_without_history, stake_is_usable_by_pool,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{clock::Epoch, program::invoke_signed, stake, sysvar, vote};
+use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
 use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
 use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::state::StakeStatus;
@@ -266,24 +266,4 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
     }
 
     Ok(())
-}
-
-// CHECKS FROM spl_stake_pool::processor::update_validator_list_balance
-
-/// Checks if a stake account can be managed by the pool
-fn stake_is_usable_by_pool(
-    meta: &stake::state::Meta,
-    expected_authority: &Pubkey,
-    expected_lockup: &stake::state::Lockup,
-) -> bool {
-    meta.authorized.staker == *expected_authority
-        && meta.authorized.withdrawer == *expected_authority
-        && meta.lockup == *expected_lockup
-}
-
-/// Checks if a stake account is active, without taking into account cooldowns
-fn stake_is_inactive_without_history(stake: &stake::state::Stake, epoch: Epoch) -> bool {
-    stake.delegation.deactivation_epoch < epoch
-        || (stake.delegation.activation_epoch == epoch
-            && stake.delegation.deactivation_epoch == epoch)
 }
