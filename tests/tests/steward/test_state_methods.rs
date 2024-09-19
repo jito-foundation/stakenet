@@ -8,7 +8,7 @@
 
 use anchor_lang::{error::Error, AnchorSerialize};
 use jito_steward::{
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
     Delegation, StewardStateEnum,
@@ -749,5 +749,88 @@ fn test_rebalance() {
         Err(e) => {
             assert_eq!(e, Error::from(StewardError::InvalidState));
         }
+    }
+}
+
+#[test]
+fn test_rebalance_default_lamports() {
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+    let mut validator_list = fixtures.validator_list.clone();
+
+    // Case 1: Lamports default, has transient stake
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    validator_list[0].transient_stake_lamports = 1000.into();
+    let validator_list_bigvec = BigVec {
+        data: &mut validator_list.try_to_vec().unwrap(),
+    };
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        3000 * LAMPORTS_PER_SOL,
+        0,
+        u64::from(validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    println!("{:?}", res);
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
+
+    // Case 2: Lamports not default, no transient stake
+    let mut state = fixtures.state;
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+    validator_list[0].transient_stake_lamports = 0.into();
+    let validator_list_bigvec = BigVec {
+        data: &mut validator_list.try_to_vec().unwrap(),
+    };
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        1000 * LAMPORTS_PER_SOL,
+        u64::from(validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    assert!(res.is_ok());
+    println!("{:?}", res);
+    if let RebalanceType::Increase(increase_amount) = res.unwrap() {
+        assert_eq!(
+            state.validator_lamport_balances[0],
+            1000 * LAMPORTS_PER_SOL + increase_amount
+        );
+    } else {
+        panic!("Expected RebalanceType::Increase");
     }
 }
