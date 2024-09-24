@@ -1,4 +1,4 @@
-use std::{path::PathBuf, thread::sleep, time::Duration};
+use std::{path::PathBuf, str::FromStr, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
@@ -40,6 +40,7 @@ enum Commands {
     ClusterHistoryStatus,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    GetIndex(GetIndex),
 }
 
 #[derive(Parser)]
@@ -107,6 +108,13 @@ struct BackfillClusterHistory {
     /// Number of blocks in epoch
     #[arg(short, long, env)]
     blocks_in_epoch: u32,
+}
+
+#[derive(Parser)]
+#[command(about = "Get validator history index")]
+struct GetIndex {
+    /// Validator to get index for
+    validator: Pubkey,
 }
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
@@ -391,6 +399,76 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
 
     validator_histories.sort_by(|a, b| a.index.cmp(&b.index));
 
+    let target_validators = vec![
+        Pubkey::from_str("HTtwGKgQgsQCAFDPBgN7LabHTMEkUpmTnFqEo5cBcquR").unwrap(),
+        Pubkey::from_str("We11J5D4iXcNbdMwCZX2o9RRkwaWBo1AGLADfubmeTb").unwrap(),
+        Pubkey::from_str("F5b1wSUtpaYDnpjLQonCZC7iyFvizLcNqTactZbwSEXK").unwrap(),
+        Pubkey::from_str("C6uqzABsRPmFd14iL9Ej36AbddVxXPJWV6jwbLZYdYJM").unwrap(),
+        Pubkey::from_str("4PTVcstjs4s89uETGapnjTNPDa4XfHF9kLUu8WCeYNQb").unwrap(),
+        Pubkey::from_str("GSXjVH8Hgfg1kJQbi4KD8P1Zme8ir3E4S3dF7cWL4UKs").unwrap(),
+        Pubkey::from_str("4PNoTwgsAaxeq8G1MKhWn7WGsm4KTtfm3Vae3quvcDEs").unwrap(),
+        Pubkey::from_str("8guXF5HQVU4g71ZCnn6aEJxQyb59NaEc4XCGjF5arsiH").unwrap(),
+        Pubkey::from_str("5ni6KoVM62cRJNfFFKGdiyDfYbKWWAGZ21cfGZcj1y66").unwrap(),
+        Pubkey::from_str("Bg65CcoUn4X6k2nxbrEAZ9ZT74hsBdD4Fw8ZfSr8gKjH").unwrap(),
+        Pubkey::from_str("KXMGa7fRW78c6VVND6YwPbR9sEu8V3q9QL3ctLDioAT").unwrap(),
+        Pubkey::from_str("2cRtnW1f6b8GSTWENTr2pQ1Bobz9QmCdq1oVyCmSmV1n").unwrap(),
+        Pubkey::from_str("C6DEs3i448uhrsWMMnWYq7WsxkujcgADrCJQ4AMJ8ipj").unwrap(),
+        Pubkey::from_str("GREENr9zSeapgunqdMeTg8MCh2cDDn2y3py1mBGUzJYe").unwrap(),
+        Pubkey::from_str("5WPxGiB6zBXNJp8JN3WhSKDuTY3ZBX6dBDcbtVMQAJLX").unwrap(),
+        Pubkey::from_str("A3MC4K2pxLXTEHVN5HFF9ikjiauGP7ioZws9FYsucAWF").unwrap(),
+        Pubkey::from_str("2wTzvCfVGJuGUTvRD5qMtmxAaVJE43suTN31enfW44yb").unwrap(),
+        Pubkey::from_str("7QahdHiCFvYpFc1hMSY5E3GKw4SvKhENBcwGJfuqf7mA").unwrap(),
+        Pubkey::from_str("A9bYZWk2Sb3PYfE1itJb6q4D5xPbtaY7rAvgzLAnwumr").unwrap(),
+        Pubkey::from_str("GZCv21mPm7HNwiC5Hq3j1DXz4njDQownDAfN7xziXbjN").unwrap(),
+        Pubkey::from_str("FMKT6kHBkmPf3LjZV5tpo3oR4m32rF8nF8JtC3WWcWoN").unwrap(),
+        Pubkey::from_str("HQuUQmerqwvBRFo1moWgNPpcc43EJxGUQZmgrrmqA9sA").unwrap(),
+        Pubkey::from_str("CzmqDuqEpfnkptuLAcikmJrhCnhFXo8aUBj6Rto1SPAc").unwrap(),
+        Pubkey::from_str("CT2CzbiNRz8ccgWQZR4BN7cpm3rDyWyQxUf5MNbMom7n").unwrap(),
+        Pubkey::from_str("F2bcoVhE2he5DCruN4PKkWAriNXs2VWty94n9CCdWZ8s").unwrap(),
+        Pubkey::from_str("8vT4MgBeZQmYN44DXwHd2BLM7Z6io186nJk3FQEwy58f").unwrap(),
+        Pubkey::from_str("5FaFPTcpDpgzrzf7NPP3YzXBPMCCwUjvKUWzvGHA3tqW").unwrap(),
+        Pubkey::from_str("7tr5vUb3j36k4p9bs2tr1GwRFoSsEWd4LEut8e8HJZEv").unwrap(),
+        Pubkey::from_str("Y3JVETZQq3Be8zwKAassXVHnz23xt4V7MRFEsNPYyh8").unwrap(),
+        Pubkey::from_str("EkPjdWCtnzinzkNpV1pCjaw4py5tDj8ihATUG3tkLWNN").unwrap(),
+        Pubkey::from_str("Eajfs6oXGGkvjYsxkQZZJcDCLLkUajaHizfgg2xTsqyd").unwrap(),
+        Pubkey::from_str("GB44NXtM7zGm6QnzQjzHZcRKSswkJbox8aJsKiXGbFJr").unwrap(),
+        Pubkey::from_str("97QujuhmyxD19CpgdyNAcJXvKi6oDeyRPdNep6uXBbA4").unwrap(),
+        Pubkey::from_str("AE6xdVD5e92ZgevjWAamoF5kuAu88AvmUv4RRdBcoyz3").unwrap(),
+        Pubkey::from_str("P4f3F3VfMhKvpGQXg2MuvLfWmZui41gvcH9XKtYDiFX").unwrap(),
+        Pubkey::from_str("DM8eVQwKYpFUq4MAC1XEeZMjV4T34LfvGkK9vca55GaY").unwrap(),
+        Pubkey::from_str("462gkiydfX1ks7bzS71j4k5uLZaonTzcz5mfJpgLGe9k").unwrap(),
+        Pubkey::from_str("2PEyBgsPYBQ8pMdXQtEaPGNqWQHE9GCnmV2tTVN4GMru").unwrap(),
+        Pubkey::from_str("ASrBTnxfvt8uY164wRrM9xXP925yoHzoRBnVYU5s7DEs").unwrap(),
+        Pubkey::from_str("EXrWdDxFaE3Sfsbh3TV5ToGhMqu53xrmeoVdvn467jUH").unwrap(),
+        Pubkey::from_str("8ygeLBNceokp2HfjUdg3pzii8MaqmHpAuuh3S5yvJVph").unwrap(),
+        Pubkey::from_str("GYMMgjX69RYVxN9wYNgE8YnjoZwVyencKFhWnd5hWGx6").unwrap(),
+        Pubkey::from_str("6SQJfKXxqacQpYmCNtqvabV6kfHrPGqXm9q2iH7zsied").unwrap(),
+        Pubkey::from_str("5eafxmzReWy8vWRmBcor4oShtQgDwHR3CGGPrfcxdU75").unwrap(),
+        Pubkey::from_str("BJ3wS8o4eowhNTbWHZiE3vgin4da1aWiGwcAmpvtc8aN").unwrap(),
+        Pubkey::from_str("BfbkjGQJjfA8DDD6Pkkdc9c2okMQ2pzrg7qpbiYs7TGC").unwrap(),
+        Pubkey::from_str("AZu19pqPb66L5stguwCDEaGoKHBXDr2xzyPyoWxmx3MU").unwrap(),
+        Pubkey::from_str("NomaDtKz3VQi85XssD6jpprLF5FPWghbAB1SSdWV1VN").unwrap(),
+        Pubkey::from_str("HsUhGC6yKwr8kLC5gdqVLrDfKsGCd2ZAXiabP1WojuzA").unwrap(),
+        Pubkey::from_str("9jVU1ET9Xxqnrsqjw8FGxmHgcXs6Hbj1HECckWqn2LUD").unwrap(),
+        Pubkey::from_str("13dy8pb1z2wqnHFGxN8Mv4kbfA1TbSEhTBjHfuJ51X41").unwrap(),
+    ];
+
+    for vote_key in target_validators {
+        let validator_history = validator_histories
+            .iter()
+            .find(|vh| vh.vote_account == vote_key)
+            .unwrap();
+        let validator_history_pda = Pubkey::find_program_address(
+            &[ValidatorHistory::SEED, vote_key.as_ref()],
+            &validator_history::ID,
+        )
+        .0;
+
+        println!(
+            "{},{},https://solscan.io/account/{}#data",
+            validator_history_pda, validator_history.index, validator_history_pda
+        );
+    }
     // For each validator history account, print out the status
     println!("Epoch {} Report", epoch);
     let mut ips = 0;
@@ -590,6 +668,23 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
+fn command_get_index(args: GetIndex, client: RpcClient) {
+    let (validator_history_pda, _) = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, args.validator.as_ref()],
+        &validator_history::ID,
+    );
+
+    let validator_history_account = client
+        .get_account(&validator_history_pda)
+        .expect("Failed to get validator history account");
+
+    let validator_history =
+        ValidatorHistory::try_deserialize(&mut validator_history_account.data.as_slice())
+            .expect("Failed to deserialize validator history account");
+
+    println!("{},{}", validator_history_pda, validator_history.index);
+}
+
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
@@ -599,6 +694,7 @@ fn main() {
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
+        Commands::GetIndex(args) => command_get_index(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
     };
 }
