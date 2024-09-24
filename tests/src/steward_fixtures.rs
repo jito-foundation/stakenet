@@ -22,6 +22,7 @@ use jito_steward::{
 use solana_program_test::*;
 use solana_sdk::{
     account::Account,
+    compute_budget::ComputeBudgetInstruction,
     epoch_schedule::EpochSchedule,
     hash::Hash,
     instruction::Instruction,
@@ -29,7 +30,11 @@ use solana_sdk::{
     rent::Rent,
     signature::Keypair,
     signer::Signer,
-    stake::state::{Lockup, StakeStateV2},
+    stake::{
+        self,
+        state::{Lockup, StakeStateV2},
+    },
+    system_program, sysvar,
     transaction::Transaction,
 };
 use spl_stake_pool::{
@@ -640,6 +645,510 @@ impl TestFixture {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
         }
     }
+}
+
+pub struct ExtraValidatorAccounts {
+    pub vote_account: Pubkey,
+    pub validator_history_address: Pubkey,
+    pub stake_account_address: Pubkey,
+    pub transient_stake_account_address: Pubkey,
+    pub withdraw_authority: Pubkey,
+}
+
+pub async fn crank_stake_pool(fixture: &TestFixture) {
+    let stake_pool: StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    let (initial_ixs, final_ixs) = spl_stake_pool::instruction::update_stake_pool(
+        &spl_stake_pool::id(),
+        &stake_pool.as_ref(),
+        &validator_list.as_ref(),
+        &fixture.stake_pool_meta.stake_pool,
+        false,
+    );
+
+    let tx = Transaction::new_signed_with_payer(
+        &initial_ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let tx = Transaction::new_signed_with_payer(
+        &final_ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Option<&[usize]>) {
+    let ctx = &fixture.ctx;
+    // Epoch Maintenence
+    if let Some(indices) = remove_indices {
+        for i in indices {
+            let ix = Instruction {
+                program_id: jito_steward::id(),
+                accounts: jito_steward::accounts::EpochMaintenance {
+                    config: fixture.steward_config.pubkey(),
+                    state_account: fixture.steward_state,
+                    validator_list: fixture.stake_pool_meta.validator_list,
+                    stake_pool: fixture.stake_pool_meta.stake_pool,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::EpochMaintenance {
+                    validator_index_to_remove: Some(*i as u64),
+                }
+                .data(),
+            };
+            let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+            let tx = Transaction::new_signed_with_payer(
+                &[ix],
+                Some(&fixture.keypair.pubkey()),
+                &[&fixture.keypair],
+                blockhash,
+            );
+            fixture.submit_transaction_assert_success(tx).await;
+        }
+    } else {
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::EpochMaintenance {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::EpochMaintenance {
+                validator_index_to_remove: None,
+            }
+            .data(),
+        };
+
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+}
+
+pub async fn auto_add_validator(fixture: &TestFixture, extra_accounts: &ExtraValidatorAccounts) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AutoAddValidator {
+            validator_history_account: extra_accounts.validator_history_address,
+            steward_state: fixture.steward_state,
+            config: fixture.steward_config.pubkey(),
+            stake_pool_program: spl_stake_pool::id(),
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            withdraw_authority: extra_accounts.withdraw_authority,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_account: extra_accounts.stake_account_address,
+            vote_account: extra_accounts.vote_account,
+            rent: solana_sdk::sysvar::rent::id(),
+            clock: solana_sdk::sysvar::clock::id(),
+            stake_history: solana_sdk::sysvar::stake_history::id(),
+            stake_config: stake::config::ID,
+            system_program: system_program::id(),
+            stake_program: stake::program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn auto_remove_validator(
+    fixture: &TestFixture,
+    extra_accounts: &ExtraValidatorAccounts,
+    index: u64,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AutoRemoveValidator {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            stake_account: extra_accounts.stake_account_address,
+            withdraw_authority: extra_accounts.withdraw_authority,
+            validator_history_account: extra_accounts.validator_history_address,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            transient_stake_account: extra_accounts.transient_stake_account_address,
+            vote_account: extra_accounts.vote_account,
+            stake_history: solana_sdk::sysvar::stake_history::id(),
+            stake_config: stake::config::ID,
+            stake_program: stake::program::id(),
+            stake_pool_program: spl_stake_pool::id(),
+            system_program: system_program::id(),
+            rent: solana_sdk::sysvar::rent::id(),
+            clock: solana_sdk::sysvar::clock::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AutoRemoveValidatorFromPool {
+            validator_list_index: index,
+        }
+        .data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::InstantRemoveValidator {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::InstantRemoveValidator {
+            validator_index_to_remove: index as u64,
+        }
+        .data(),
+    };
+    let blockhash = fixture
+        .ctx
+        .borrow_mut()
+        .get_new_latest_blockhash()
+        .await
+        .unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_compute_score(
+    fixture: &TestFixture,
+    unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+
+    for &i in indices {
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::ComputeScore {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                validator_history: extra_validator_accounts[i].validator_history_address,
+                cluster_history: fixture.cluster_history_account,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::ComputeScore {
+                validator_list_index: i as u64,
+            }
+            .data(),
+        };
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+}
+
+pub async fn crank_compute_delegations(fixture: &TestFixture) {
+    let ctx = &fixture.ctx;
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::ComputeDelegations {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::ComputeDelegations {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_idle(fixture: &TestFixture) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::Idle {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::Idle {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_compute_instant_unstake(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+
+    for &i in indices {
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::ComputeInstantUnstake {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                validator_history: extra_validator_accounts[i].validator_history_address,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                cluster_history: fixture.cluster_history_account,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::ComputeInstantUnstake {
+                validator_list_index: i as u64,
+            }
+            .data(),
+        };
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+}
+
+pub async fn crank_rebalance(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+
+    for &i in indices {
+        let extra_accounts = &extra_validator_accounts[i];
+
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::Rebalance {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                validator_history: extra_accounts.validator_history_address,
+                stake_pool_program: spl_stake_pool::id(),
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+                withdraw_authority: extra_accounts.withdraw_authority,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                reserve_stake: fixture.stake_pool_meta.reserve,
+                stake_account: extra_accounts.stake_account_address,
+                transient_stake_account: extra_accounts.transient_stake_account_address,
+                vote_account: extra_accounts.vote_account,
+                system_program: system_program::id(),
+                stake_program: stake::program::id(),
+                rent: solana_sdk::sysvar::rent::id(),
+                clock: solana_sdk::sysvar::clock::id(),
+                stake_history: solana_sdk::sysvar::stake_history::id(),
+                stake_config: stake::config::ID,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::Rebalance {
+                validator_list_index: i as u64,
+            }
+            .data(),
+        };
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+}
+
+pub async fn copy_vote_account(
+    fixture: &TestFixture,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    index: usize,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: extra_validator_accounts[index].validator_history_address,
+            vote_account: extra_validator_accounts[index].vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn update_stake_history(
+    fixture: &TestFixture,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    index: usize,
+    epoch: u64,
+    lamports: u64,
+    rank: u32,
+    is_superminority: bool,
+) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::UpdateStakeHistory {
+            validator_history_account: extra_validator_accounts[index].validator_history_address,
+            vote_account: extra_validator_accounts[index].vote_account,
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::UpdateStakeHistory {
+            epoch,
+            is_superminority,
+            lamports,
+            rank,
+        }
+        .data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn copy_cluster_info(fixture: &TestFixture) {
+    let ctx = &fixture.ctx;
+
+    let ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyClusterInfo {
+            cluster_history_account: fixture.cluster_history_account,
+            slot_history: sysvar::slot_history::id(),
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyClusterInfo {}.data(),
+    };
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::request_heap_frame(1024 * 256),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ix,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_validator_history_accounts(
+    fixture: &TestFixture,
+    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    indices: &[usize],
+) {
+    let clock: Clock = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .unwrap();
+    for &i in indices {
+        fixture
+            .ctx
+            .borrow_mut()
+            .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 1000);
+        copy_vote_account(&fixture, &extra_validator_accounts, i).await;
+        // only field that's relevant to score is is_superminority
+        update_stake_history(
+            &fixture,
+            &extra_validator_accounts,
+            i,
+            clock.epoch,
+            1_000_000,
+            1_000,
+            false,
+        )
+        .await;
+    }
+    copy_cluster_info(&fixture).await;
 }
 
 pub struct ValidatorEntry {
