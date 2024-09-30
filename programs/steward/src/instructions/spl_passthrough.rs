@@ -9,11 +9,13 @@ use crate::errors::StewardError;
 use crate::state::Config;
 use crate::utils::{
     deserialize_stake_pool, get_config_admin, get_stake_pool_address,
-    get_validator_stake_info_at_index,
+    get_validator_stake_info_at_index, stake_is_inactive_without_history, stake_is_usable_by_pool,
 };
 use crate::StewardStateAccount;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
+use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
+use spl_pod::solana_program::stake::state::StakeStateV2;
 use spl_stake_pool::find_stake_program_address;
 use spl_stake_pool::instruction::PreferredValidatorType;
 use spl_stake_pool::state::{StakeStatus, ValidatorListHeader};
@@ -180,9 +182,9 @@ pub fn remove_validator_from_pool_handler(
     ctx: Context<RemoveValidatorFromPool>,
     validator_list_index: usize,
 ) -> Result<()> {
+    let epoch = Clock::get()?.epoch;
     {
         let state_account = ctx.accounts.state_account.load_mut()?;
-        let epoch = Clock::get()?.epoch;
 
         // Should not be able to remove a validator if update is not complete
         require!(
@@ -245,12 +247,37 @@ pub fn remove_validator_from_pool_handler(
 
         let stake_status = StakeStatus::try_from(validator_stake_info.status)?;
 
+        let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
+
         match stake_status {
             StakeStatus::Active => {
                 // Should never happen
                 return Err(StewardError::ValidatorMarkedActive.into());
             }
-            StakeStatus::DeactivatingValidator | StakeStatus::ReadyForRemoval => {
+            StakeStatus::DeactivatingValidator => {
+                let stake_account_data = &mut ctx.accounts.stake_account.data.borrow_mut();
+                let (meta, stake) =
+                    match try_from_slice_unchecked::<StakeStateV2>(stake_account_data)? {
+                        StakeStateV2::Stake(meta, stake, _stake_flags) => (meta, stake),
+                        _ => return Err(StewardError::StakeStateIsNotStake.into()),
+                    };
+
+                if stake_is_usable_by_pool(
+                    &meta,
+                    ctx.accounts.withdraw_authority.key,
+                    &stake_pool.lockup,
+                ) && stake_is_inactive_without_history(&stake, epoch)
+                {
+                    state_account
+                        .state
+                        .mark_validator_for_immediate_removal(validator_list_index)?;
+                } else {
+                    state_account
+                        .state
+                        .mark_validator_for_removal(validator_list_index)?;
+                }
+            }
+            StakeStatus::ReadyForRemoval => {
                 state_account
                     .state
                     .mark_validator_for_immediate_removal(validator_list_index)?;

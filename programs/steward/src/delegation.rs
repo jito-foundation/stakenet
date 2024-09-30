@@ -241,7 +241,7 @@ impl UnstakeState {
         })
     }
 
-    fn stake_deposit_unstake(
+    pub fn stake_deposit_unstake(
         &self,
         state: &StewardState,
         index: usize,
@@ -276,7 +276,7 @@ impl UnstakeState {
         Ok(0)
     }
 
-    fn instant_unstake(
+    pub fn instant_unstake(
         &self,
         state: &StewardState,
         index: usize,
@@ -303,7 +303,7 @@ impl UnstakeState {
         Ok(0)
     }
 
-    fn scoring_unstake(&self, current_lamports: u64, target_lamports: u64) -> Result<u64> {
+    pub fn scoring_unstake(&self, current_lamports: u64, target_lamports: u64) -> Result<u64> {
         // If there are additional lamports to unstake on this validator and the total unstaked lamports is below the cap, destake to the target
         if self.scoring_unstake_total < self.scoring_unstake_cap {
             let lamports_above_target = current_lamports

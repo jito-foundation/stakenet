@@ -85,7 +85,7 @@ pub fn handler(
         if let Some(validator_index_to_remove) = validator_index_to_remove {
             state_account
                 .state
-                .remove_validator(validator_index_to_remove, validators_in_list)?;
+                .remove_validator(validator_index_to_remove)?;
         }
     }
 
