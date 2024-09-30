@@ -11,7 +11,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
-    Delegation, StewardStateEnum,
+    Delegation, StewardState, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
@@ -835,12 +835,7 @@ fn test_rebalance_default_lamports() {
     }
 }
 
-// TODO
-#[test]
-fn test_remove_validator() {
-    // Setup: create steward state based off StewardStateFixtures
-    // mark index 1 to removal
-    let fixtures = StateMachineFixtures::default();
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState {
     let mut state = fixtures.state;
     // Set values for all of the values that are gonna get shifted
     state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
@@ -855,6 +850,15 @@ fn test_remove_validator() {
     state.instant_unstake.set(0, true).unwrap();
     state.instant_unstake.set(1, false).unwrap();
     state.instant_unstake.set(2, true).unwrap();
+
+    state
+}
+#[test]
+fn test_remove_validator() {
+    // Setup: create steward state based off StewardStateFixtures
+    // mark index 1 to removal
+    let fixtures = StateMachineFixtures::default();
+    let mut state = _test_remove_validator_setup(&fixtures);
 
     // test basic case - remove validator_to_remove
     state.validators_to_remove.set(1, true).unwrap();
@@ -867,20 +871,7 @@ fn test_remove_validator() {
     assert!(state.delegations[1] == Delegation::new(2, 1));
 
     // test basic case - remove immediate_removal validator
-    let mut state = fixtures.state;
-    // Set values for all of the values that are gonna get shifted
-    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
-    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.delegations[0..3].copy_from_slice(&[
-        Delegation::new(0, 1),
-        Delegation::new(1, 1),
-        Delegation::new(2, 1),
-    ]);
-    state.instant_unstake.reset();
-    state.instant_unstake.set(0, true).unwrap();
-    state.instant_unstake.set(1, false).unwrap();
-    state.instant_unstake.set(2, true).unwrap();
+    let mut state = _test_remove_validator_setup(&fixtures);
 
     state.validators_for_immediate_removal.set(1, true).unwrap();
     let res = state.remove_validator(1);
@@ -894,20 +885,8 @@ fn test_remove_validator() {
     // Setup: mark an index for removal that's higher than num_pool_validators
     // Remember this is always gonna be run after actual removals have taken place, so could validator_list_len be kind of a red herring? do we need to go further?
 
-    let mut state = fixtures.state;
-    // Set values for all of the values that are gonna get shifted
-    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
-    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.delegations[0..3].copy_from_slice(&[
-        Delegation::new(0, 1),
-        Delegation::new(1, 1),
-        Delegation::new(2, 1),
-    ]);
-    state.instant_unstake.reset();
-    state.instant_unstake.set(0, true).unwrap();
-    state.instant_unstake.set(1, false).unwrap();
-    state.instant_unstake.set(2, true).unwrap();
+    let mut state = _test_remove_validator_setup(&fixtures);
+
     state.validators_for_immediate_removal.set(3, true).unwrap();
     state.validators_for_immediate_removal.set(4, true).unwrap();
     state.validators_added = 2;

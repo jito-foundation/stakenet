@@ -228,6 +228,4 @@ async fn test_epoch_maintenance_removes_validators() {
     assert!(state.validators_to_remove.is_empty());
     assert!(state.validators_for_immediate_removal.is_empty());
     assert!(state.has_flag(EPOCH_MAINTENANCE));
-
-    println!("Woo");
 }
