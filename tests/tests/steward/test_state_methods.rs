@@ -834,3 +834,110 @@ fn test_rebalance_default_lamports() {
         panic!("Expected RebalanceType::Increase");
     }
 }
+
+// TODO
+#[test]
+fn test_remove_validator() {
+    // Setup: create steward state based off StewardStateFixtures
+    // mark index 1 to removal
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+    // Set values for all of the values that are gonna get shifted
+    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
+    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(0, 1),
+        Delegation::new(1, 1),
+        Delegation::new(2, 1),
+    ]);
+    state.instant_unstake.reset();
+    state.instant_unstake.set(0, true).unwrap();
+    state.instant_unstake.set(1, false).unwrap();
+    state.instant_unstake.set(2, true).unwrap();
+
+    // test basic case - remove validator_to_remove
+    state.validators_to_remove.set(1, true).unwrap();
+    state.remove_validator(1);
+    assert_eq!(state.num_pool_validators, 2);
+    // Assert that values were shifted left
+    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.scores[1], 2);
+    assert!(state.delegations[1] == Delegation::new(2, 1));
+
+    // test basic case - remove immediate_removal validator
+    let mut state = fixtures.state;
+    // Set values for all of the values that are gonna get shifted
+    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
+    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(0, 1),
+        Delegation::new(1, 1),
+        Delegation::new(2, 1),
+    ]);
+    state.instant_unstake.reset();
+    state.instant_unstake.set(0, true).unwrap();
+    state.instant_unstake.set(1, false).unwrap();
+    state.instant_unstake.set(2, true).unwrap();
+
+    state.validators_for_immediate_removal.set(1, true).unwrap();
+    let res = state.remove_validator(1);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, 2);
+    // Assert that values were shifted left
+    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.scores[1], 2);
+    assert!(state.delegations[1] == Delegation::new(2, 1));
+
+    // Setup: mark an index for removal that's higher than num_pool_validators
+    // Remember this is always gonna be run after actual removals have taken place, so could validator_list_len be kind of a red herring? do we need to go further?
+
+    let mut state = fixtures.state;
+    // Set values for all of the values that are gonna get shifted
+    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
+    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(0, 1),
+        Delegation::new(1, 1),
+        Delegation::new(2, 1),
+    ]);
+    state.instant_unstake.reset();
+    state.instant_unstake.set(0, true).unwrap();
+    state.instant_unstake.set(1, false).unwrap();
+    state.instant_unstake.set(2, true).unwrap();
+    state.validators_for_immediate_removal.set(3, true).unwrap();
+    state.validators_for_immediate_removal.set(4, true).unwrap();
+    state.validators_added = 2;
+    // both validators were removed from pool and now the validator list is down to 3
+    state.remove_validator(3);
+
+    assert_eq!(state.num_pool_validators, 3);
+    assert_eq!(state.validators_for_immediate_removal.get(3).unwrap(), true);
+    assert_eq!(
+        state.validators_for_immediate_removal.get(4).unwrap(),
+        false
+    );
+}
+
+#[test]
+fn test_remove_validator_fails() {
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+
+    // Test fails if validator not marked to remove
+    state.validators_for_immediate_removal.reset();
+    let res = state.remove_validator(0);
+    assert!(res.is_err());
+    assert!(res == Err(Error::from(StewardError::ValidatorNotMarkedForRemoval)));
+
+    // Test fails out of bounds
+    state
+        .validators_for_immediate_removal
+        .set(state.num_pool_validators as usize, true)
+        .unwrap();
+    let res = state.remove_validator(state.num_pool_validators as usize);
+    assert!(res.is_err());
+    assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
+}

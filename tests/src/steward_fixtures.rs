@@ -862,9 +862,45 @@ pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+pub async fn manual_remove_validator(
+    fixture: &TestFixture,
+    index: usize,
+    mark_for_removal: bool,
+    immediate: bool,
+) {
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AdminMarkForRemoval {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AdminMarkForRemoval {
+            validator_list_index: index as u64,
+            mark_for_removal: if mark_for_removal { 1 } else { 0 },
+            immediate: if immediate { 1 } else { 0 },
+        }
+        .data(),
+    };
+    let blockhash = fixture
+        .ctx
+        .borrow_mut()
+        .get_new_latest_blockhash()
+        .await
+        .unwrap();
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
 pub async fn crank_compute_score(
     fixture: &TestFixture,
-    unit_test_fixtures: &StateMachineFixtures,
+    _unit_test_fixtures: &StateMachineFixtures,
     extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
     indices: &[usize],
 ) {

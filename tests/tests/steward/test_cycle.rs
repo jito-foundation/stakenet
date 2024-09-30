@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 
 use anchor_lang::{
-    solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
+    solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
-use jito_steward::{
-    utils::{StakePool, ValidatorList},
-    StewardStateAccount, UpdateParametersArgs,
-};
+use jito_steward::{utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
-    signature::Keypair, signer::Signer, system_program, transaction::Transaction,
+    clock::Clock, epoch_schedule::EpochSchedule, signature::Keypair, signer::Signer,
+    system_program, transaction::Transaction,
 };
 use tests::steward_fixtures::{
     auto_add_validator, crank_compute_delegations, crank_compute_instant_unstake,
@@ -80,7 +77,7 @@ async fn test_cycle() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {

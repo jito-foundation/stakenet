@@ -243,12 +243,14 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
                 }
             }
             StakeStatus::ReadyForRemoval => {
+                // Should never happen but this is logical action
                 marked_for_immediate_removal = true;
                 state_account
                     .state
                     .mark_validator_for_immediate_removal(validator_list_index)?;
             }
             StakeStatus::DeactivatingAll | StakeStatus::DeactivatingTransient => {
+                // DeactivatingTransient should not be possible but this is the logical action
                 marked_for_immediate_removal = false;
                 state_account
                     .state
