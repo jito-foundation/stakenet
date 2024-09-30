@@ -202,7 +202,7 @@ async fn test_cycle() {
     assert_eq!(state.scoring_unstake_total, 0);
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
-    assert_eq!(state.validators_to_remove.is_empty(), true);
+    assert!(state.validators_to_remove.is_empty());
     // assert_eq!(state.status_flags, 3); // TODO
 
     // All other values are reset
@@ -272,8 +272,12 @@ async fn test_remove_validator_mid_epoch() {
     fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
-    for i in 0..unit_test_fixtures.validators.len() {
-        let vote_account = unit_test_fixtures.validator_list[i].vote_account_address;
+    for vote_account in unit_test_fixtures
+        .validator_list
+        .iter()
+        .take(unit_test_fixtures.validators.len())
+        .map(|v| v.vote_account_address)
+    {
         let (validator_history_address, _) = Pubkey::find_program_address(
             &[ValidatorHistory::SEED, vote_account.as_ref()],
             &validator_history::id(),
@@ -293,8 +297,7 @@ async fn test_remove_validator_mid_epoch() {
 
     crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds validators 2 and 3
-    for i in 0..3 {
-        let extra_accounts = &extra_validator_accounts[i];
+    for extra_accounts in extra_validator_accounts.iter().take(3) {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
@@ -358,7 +361,7 @@ async fn test_remove_validator_mid_epoch() {
         jito_steward::StewardStateEnum::ComputeInstantUnstake
     ));
     assert_eq!(state.validators_for_immediate_removal.count(), 1);
-    assert_eq!(state.validators_for_immediate_removal.get(2).unwrap(), true);
+    assert!(state.validators_for_immediate_removal.get(2).unwrap());
     assert_eq!(state.num_pool_validators, 3);
 
     let validator_list: ValidatorList = fixture
@@ -367,8 +370,7 @@ async fn test_remove_validator_mid_epoch() {
     assert!(validator_list
         .validators
         .iter()
-        .find(|v| v.vote_account_address == extra_validator_accounts[2].vote_account)
-        .is_some());
+        .any(|v| v.vote_account_address == extra_validator_accounts[2].vote_account));
     assert!(validator_list.validators.len() == 3);
     println!("Stake Status: {:?}", validator_list.validators[2].status);
 
@@ -378,11 +380,10 @@ async fn test_remove_validator_mid_epoch() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    assert!(validator_list
+    assert!(!validator_list
         .validators
         .iter()
-        .find(|v| v.vote_account_address == extra_validator_accounts[2].vote_account)
-        .is_none());
+        .any(|v| v.vote_account_address == extra_validator_accounts[2].vote_account));
     assert!(validator_list.validators.len() == 2);
 
     instant_remove_validator(&fixture, 2).await;
@@ -419,11 +420,10 @@ async fn test_remove_validator_mid_epoch() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    assert!(validator_list
+    assert!(!validator_list
         .validators
         .iter()
-        .find(|v| v.vote_account_address == extra_validator_accounts[2].vote_account)
-        .is_none());
+        .any(|v| v.vote_account_address == extra_validator_accounts[2].vote_account));
     assert!(validator_list.validators.len() == 2);
 
     crank_epoch_maintenance(&fixture, None).await;
@@ -547,8 +547,7 @@ async fn test_add_validator_next_cycle() {
     assert!(validator_list
         .validators
         .iter()
-        .find(|v| v.vote_account_address == extra_validator_accounts[2].vote_account)
-        .is_some());
+        .any(|v| v.vote_account_address == extra_validator_accounts[2].vote_account));
     assert!(validator_list.validators.len() == 3);
 
     // Ensure that num_pool_validators isn't updated but validators_added is
@@ -618,7 +617,7 @@ async fn test_add_validator_next_cycle() {
     ));
 
     assert_eq!(state.validators_added, 0);
-    assert_eq!(state.validators_to_remove.is_empty(), true);
+    assert!(state.validators_to_remove.is_empty());
     assert_eq!(state.num_pool_validators, 3);
 
     // Ensure we can crank the new validator

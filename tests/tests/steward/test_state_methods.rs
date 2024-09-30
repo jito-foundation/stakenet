@@ -858,7 +858,8 @@ fn test_remove_validator() {
 
     // test basic case - remove validator_to_remove
     state.validators_to_remove.set(1, true).unwrap();
-    state.remove_validator(1);
+    let res = state.remove_validator(1);
+    assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
     assert_eq!(state.yield_scores[1], 2);
@@ -911,14 +912,12 @@ fn test_remove_validator() {
     state.validators_for_immediate_removal.set(4, true).unwrap();
     state.validators_added = 2;
     // both validators were removed from pool and now the validator list is down to 3
-    state.remove_validator(3);
+    let res = state.remove_validator(3);
+    assert!(res.is_ok());
 
     assert_eq!(state.num_pool_validators, 3);
-    assert_eq!(state.validators_for_immediate_removal.get(3).unwrap(), true);
-    assert_eq!(
-        state.validators_for_immediate_removal.get(4).unwrap(),
-        false
-    );
+    assert!(state.validators_for_immediate_removal.get(3).unwrap());
+    assert!(!state.validators_for_immediate_removal.get(4).unwrap());
 }
 
 #[test]

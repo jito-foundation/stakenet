@@ -308,7 +308,6 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     (fixture, vote_account)
 }
 
-// TODO
 #[tokio::test]
 async fn test_auto_remove_validator_states() {
     /*

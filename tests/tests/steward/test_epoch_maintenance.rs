@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::collections::HashMap;
 
 use anchor_lang::{
@@ -53,7 +54,7 @@ async fn _epoch_maintenance_setup() -> (
     // Setup pool and steward
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = Box::new(StateMachineFixtures::default());
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     // Note that these parameters are overriden in initialize_steward, just included here for completeness
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
@@ -129,8 +130,10 @@ async fn _epoch_maintenance_setup() -> (
 
     crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds to validator list
-    for i in 0..unit_test_fixtures.validators.len() {
-        let extra_accounts = &extra_validator_accounts[i];
+    for extra_accounts in extra_validator_accounts
+        .iter()
+        .take(unit_test_fixtures.validators.len())
+    {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
@@ -148,7 +151,8 @@ async fn _epoch_maintenance_setup() -> (
 #[tokio::test]
 async fn test_epoch_maintenance_fails_status_check() {
     // Setup pool and steward
-    let (fixture, _unit_test_fixtures, _extra_validator_accounts) = _epoch_maintenance_setup().await;
+    let (fixture, _unit_test_fixtures, _extra_validator_accounts) =
+        _epoch_maintenance_setup().await;
 
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
@@ -173,7 +177,8 @@ async fn test_epoch_maintenance_fails_status_check() {
 #[tokio::test]
 async fn test_epoch_maintenance_fails_invariant_check() {
     // Setup pool and steward
-    let (fixture, _unit_test_fixtures, _extra_validator_accounts) = _epoch_maintenance_setup().await;
+    let (fixture, _unit_test_fixtures, _extra_validator_accounts) =
+        _epoch_maintenance_setup().await;
 
     // Mark validator to remove without actually removing it from list
     manual_remove_validator(&fixture, 0, true, false).await;
@@ -188,7 +193,8 @@ async fn test_epoch_maintenance_fails_invariant_check() {
 #[tokio::test]
 async fn test_epoch_maintenance_removes_validators() {
     // Setup pool and steward
-    let (fixture, _unit_test_fixtures, _extra_validator_accounts) = _epoch_maintenance_setup().await;
+    let (fixture, _unit_test_fixtures, _extra_validator_accounts) =
+        _epoch_maintenance_setup().await;
 
     // Mark validator to remove with admin fn (delayed removal)
     manual_remove_validator(&fixture, 0, true, false).await;
@@ -219,8 +225,8 @@ async fn test_epoch_maintenance_removes_validators() {
     let state = &state_account.state;
     assert_eq!(state.validators_added, 2);
     assert_eq!(state.current_epoch, clock.epoch);
-    assert_eq!(state.validators_to_remove.is_empty(), true);
-    assert_eq!(state.validators_for_immediate_removal.is_empty(), true);
+    assert!(state.validators_to_remove.is_empty());
+    assert!(state.validators_for_immediate_removal.is_empty());
     assert!(state.has_flag(EPOCH_MAINTENANCE));
 
     println!("Woo");

@@ -664,8 +664,8 @@ pub async fn crank_stake_pool(fixture: &TestFixture) {
         .await;
     let (initial_ixs, final_ixs) = spl_stake_pool::instruction::update_stake_pool(
         &spl_stake_pool::id(),
-        &stake_pool.as_ref(),
-        &validator_list.as_ref(),
+        stake_pool.as_ref(),
+        validator_list.as_ref(),
         &fixture.stake_pool_meta.stake_pool,
         false,
     );
@@ -901,7 +901,7 @@ pub async fn manual_remove_validator(
 pub async fn crank_compute_score(
     fixture: &TestFixture,
     _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     indices: &[usize],
 ) {
     let ctx = &fixture.ctx;
@@ -981,7 +981,7 @@ pub async fn crank_idle(fixture: &TestFixture) {
 pub async fn crank_compute_instant_unstake(
     fixture: &TestFixture,
     _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     indices: &[usize],
 ) {
     let ctx = &fixture.ctx;
@@ -1016,7 +1016,7 @@ pub async fn crank_compute_instant_unstake(
 pub async fn crank_rebalance(
     fixture: &TestFixture,
     _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     indices: &[usize],
 ) {
     let ctx = &fixture.ctx;
@@ -1064,7 +1064,7 @@ pub async fn crank_rebalance(
 
 pub async fn copy_vote_account(
     fixture: &TestFixture,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     index: usize,
 ) {
     let ctx = &fixture.ctx;
@@ -1091,7 +1091,7 @@ pub async fn copy_vote_account(
 
 pub async fn update_stake_history(
     fixture: &TestFixture,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     index: usize,
     epoch: u64,
     lamports: u64,
@@ -1171,11 +1171,11 @@ pub async fn crank_validator_history_accounts(
             .ctx
             .borrow_mut()
             .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 1000);
-        copy_vote_account(&fixture, &extra_validator_accounts, i).await;
+        copy_vote_account(fixture, extra_validator_accounts, i).await;
         // only field that's relevant to score is is_superminority
         update_stake_history(
-            &fixture,
-            &extra_validator_accounts,
+            fixture,
+            extra_validator_accounts,
             i,
             clock.epoch,
             1_000_000,
@@ -1184,7 +1184,7 @@ pub async fn crank_validator_history_accounts(
         )
         .await;
     }
-    copy_cluster_info(&fixture).await;
+    copy_cluster_info(fixture).await;
 }
 
 pub struct ValidatorEntry {
@@ -1234,8 +1234,8 @@ impl Default for FixtureDefaultAccounts {
 
         let steward_config_keypair = Keypair::new();
         let steward_config = Config {
-            stake_pool: stake_pool_meta.stake_pool.clone(),
-            validator_list: stake_pool_meta.validator_list.clone(),
+            stake_pool: stake_pool_meta.stake_pool,
+            validator_list: stake_pool_meta.validator_list,
             blacklist_authority: keypair.pubkey(),
             parameters_authority: keypair.pubkey(),
             admin: keypair.pubkey(),
@@ -1294,7 +1294,6 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             oracle_authority: keypair.pubkey(),
             tip_distribution_program: jito_tip_distribution::id(),
-            ..Default::default()
         };
         let cluster_history = cluster_history_default();
 
@@ -1327,7 +1326,7 @@ impl FixtureDefaultAccounts {
                 .0;
                 (
                     validator_history_address,
-                    serialized_validator_history_account(ve.validator_history.clone()),
+                    serialized_validator_history_account(ve.validator_history),
                 )
             })
             .collect::<Vec<_>>();
@@ -1807,7 +1806,7 @@ impl Default for StateMachineFixtures {
                 mev_commission: 0,
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
-                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
+                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1827,7 +1826,7 @@ impl Default for StateMachineFixtures {
                 mev_commission: 10000,
                 is_superminority: 1,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
-                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
+                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1847,7 +1846,7 @@ impl Default for StateMachineFixtures {
                 mev_commission: 500,
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
-                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
+                vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 ..ValidatorHistoryEntry::default()
             });
         }
