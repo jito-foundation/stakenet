@@ -271,7 +271,7 @@ async fn _auto_remove_validator_tx(
                 transient_stake_account,
                 vote_account,
                 stake_history: sysvar::stake_history::id(),
-                stake_config: stake::config::id(),
+                stake_config: stake::config::ID,
                 stake_program: stake::program::id(),
                 stake_pool_program: spl_stake_pool::id(),
                 system_program: solana_program::system_program::id(),
@@ -361,7 +361,7 @@ async fn test_auto_remove_validator_states() {
                 stake: 1_000_000_000,
                 activation_epoch: 0,
                 deactivation_epoch: current_epoch - 1,
-                warmup_cooldown_rate: 0.0,
+                ..Default::default()
             },
             credits_observed: 0,
         },
@@ -439,7 +439,7 @@ async fn test_auto_remove_validator_states() {
                 stake: 1_000_000_000,
                 activation_epoch: 0,
                 deactivation_epoch: current_epoch - 1,
-                warmup_cooldown_rate: 0.0,
+                ..Default::default()
             },
             credits_observed: 0,
         },
@@ -509,7 +509,7 @@ async fn test_auto_remove_validator_states() {
                 stake: 1_000_000_000,
                 activation_epoch: 0,
                 deactivation_epoch: current_epoch - 1,
-                warmup_cooldown_rate: 0.0,
+                ..Default::default()
             },
             credits_observed: 0,
         },
