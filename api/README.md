@@ -79,7 +79,7 @@ curl http://localhost:7001/api/v1/validator_history/{vote_account}?epoch=500
 #### Get latest history by vote_account:
 
 ```
-curl http://localhost:7001/api/v1/validator_history/{vote_account}?epoch=500
+curl http://localhost:7001/api/v1/validator_history/{vote_account}/latest
 ```
 
 ## Tips for Developers
