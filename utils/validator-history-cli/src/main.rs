@@ -50,13 +50,13 @@ struct InitConfig {
     keypair_path: PathBuf,
 
     /// Tip distribution program ID (Pubkey as base58 string)
-    #[arg(short, long, env)]
+    #[arg(long, env)]
     tip_distribution_program_id: Pubkey,
 
     /// New tip distribution authority (Pubkey as base58 string)
     ///
     /// If not provided, the initial keypair will be the authority
-    #[arg(short, long, env, required(false))]
+    #[arg(long, env, required(false))]
     tip_distribution_authority: Option<Pubkey>,
 
     // New stake authority (Pubkey as base58 string)
