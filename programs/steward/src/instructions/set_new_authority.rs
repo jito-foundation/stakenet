@@ -1,5 +1,7 @@
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
+#[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 use borsh::{BorshDeserialize, BorshSerialize};
 
@@ -20,6 +22,7 @@ impl AuthorityType {
 }
 
 // Implement IdlBuild for AuthorityType
+#[cfg(feature = "idl-build")]
 impl IdlBuild for AuthorityType {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {

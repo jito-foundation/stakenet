@@ -1,6 +1,8 @@
 use std::ops::{Deref, Not};
 
-use anchor_lang::{idl::types::*, prelude::*};
+#[cfg(feature = "idl-build")]
+use anchor_lang::idl::types::*;
+use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
 use spl_stake_pool::{
@@ -394,6 +396,7 @@ impl From<spl_stake_pool::instruction::PreferredValidatorType> for PreferredVali
     }
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for PreferredValidatorType {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {

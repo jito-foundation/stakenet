@@ -1,3 +1,4 @@
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
     IdlBuild,
@@ -70,6 +71,7 @@ pub enum RebalanceTypeTag {
     Decrease,
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for RebalanceTypeTag {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {

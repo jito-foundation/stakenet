@@ -1,7 +1,6 @@
 use std::num::NonZeroU32;
 
 use anchor_lang::{
-    idl::*,
     prelude::*,
     solana_program::{
         program::invoke_signed,
