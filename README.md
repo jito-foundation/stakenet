@@ -39,6 +39,16 @@ On-chain Steward accounts for JitoSOL:
 | Steward State   | 9BAmGVLGxzqct6bkgjWmKSv3BFB6iKYXNBQp8GWG1LDY|
 | Authority       | 9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6|
 
+
+# Audits
+
+| Program | Date | Commit |
+|---------|------|--------|
+| Steward | [2024-07-29](security-audits/jito_steward_audit.pdf) | [f4ea93a](https://github.com/jito-foundation/stakenet/commit/f4ea93a) |
+| Validator History | [2024-01-12](security-audits/jito_validator_history_audit.pdf) | [fc34c25](https://github.com/jito-foundation/stakenet/commit/fc34c25) |
+
+
+
 ## Build and Test
 
 ### Build
