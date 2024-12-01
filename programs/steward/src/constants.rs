@@ -20,3 +20,6 @@ pub const COMPUTE_SCORE_SLOT_RANGE_MIN: u64 = 100;
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 520;
 #[cfg(not(feature = "mainnet-beta"))]
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 0;
+pub const TVC_FEATURE_PUBKEY: &str = "tvcF6b1TRz353zKuhBjinZkKzjmihXmBAHJdjNYw1sQ";
+pub const TVC_MAINNET_ACTIVATION_EPOCH: u64 = 704;
+pub const TVC_TESTNET_ACTIVATION_EPOCH: u64 = 705;

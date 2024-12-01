@@ -600,6 +600,7 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
+        tvc_activation_epoch: u64,
     ) -> Result<Option<ScoreComponentsV2>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
@@ -681,7 +682,13 @@ impl StewardState {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            let score = validator_score(validator, cluster, config, current_epoch as u16)?;
+            let score = validator_score(
+                validator,
+                cluster,
+                config,
+                current_epoch as u16,
+                tvc_activation_epoch,
+            )?;
 
             self.scores[index] = (score.score * 1_000_000_000.) as u32;
             self.yield_scores[index] = (score.yield_score * 1_000_000_000.) as u32;
@@ -756,6 +763,7 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
+        tvc_activation_epoch: u64,
     ) -> Result<Option<InstantUnstakeComponentsV2>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
@@ -809,6 +817,7 @@ impl StewardState {
                 config,
                 first_slot,
                 clock.epoch as u16,
+                tvc_activation_epoch,
             )?;
 
             self.instant_unstake
