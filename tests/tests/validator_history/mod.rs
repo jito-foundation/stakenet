@@ -4,3 +4,5 @@ mod test_initialize;
 mod test_mev_commission;
 mod test_stake;
 mod test_vote_account;
+
+mod test_state;
