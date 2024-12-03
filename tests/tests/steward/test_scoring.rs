@@ -125,12 +125,17 @@ mod test_calculate_mev_commission {
 
 mod test_calculate_epoch_credits {
     use jito_steward::constants::EPOCH_DEFAULT;
+    use validator_history::constants::TVC_MULTIPLIER;
 
     use super::*;
 
     #[test]
     fn test_normal() {
-        let epoch_credits = [Some(800), Some(800), Some(800)];
+        let epoch_credits = [
+            Some(800 * TVC_MULTIPLIER),
+            Some(800 * TVC_MULTIPLIER),
+            Some(800 * TVC_MULTIPLIER),
+        ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
         let epoch_start = 0;
         let threshold = 0.9;
@@ -147,7 +152,11 @@ mod test_calculate_epoch_credits {
     #[test]
     fn test_edge_cases() {
         // Delinquency detected
-        let epoch_credits = [Some(700), Some(800), Some(850)];
+        let epoch_credits = [
+            Some(700 * TVC_MULTIPLIER),
+            Some(800 * TVC_MULTIPLIER),
+            Some(850 * TVC_MULTIPLIER),
+        ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
         let (_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
@@ -156,7 +165,7 @@ mod test_calculate_epoch_credits {
         assert_eq!(delinquency_epoch, 0);
 
         // Missing data
-        let epoch_credits = [None, Some(800), Some(900)];
+        let epoch_credits = [None, Some(800 * TVC_MULTIPLIER), Some(900 * TVC_MULTIPLIER)];
         let total_blocks = [Some(1000), None, Some(1000)];
         let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
@@ -166,7 +175,11 @@ mod test_calculate_epoch_credits {
         assert_eq!(delinquency_epoch, 0);
 
         // No delinquent epochs
-        let epoch_credits = [Some(800), Some(900), Some(1000)];
+        let epoch_credits = [
+            Some(800 * TVC_MULTIPLIER),
+            Some(900 * TVC_MULTIPLIER),
+            Some(1000 * TVC_MULTIPLIER),
+        ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
         let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
@@ -182,7 +195,7 @@ mod test_calculate_epoch_credits {
         assert!(result.is_err());
 
         // Test Arithmetic error
-        let epoch_credits = [Some(1), Some(0)];
+        let epoch_credits = [Some(TVC_MULTIPLIER), Some(0)];
         let total_blocks = [Some(1), Some(1)];
         let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
@@ -426,13 +439,15 @@ mod test_calculate_blacklist {
 }
 
 mod test_calculate_instant_unstake_delinquency {
+    use validator_history::constants::TVC_MULTIPLIER;
+
     use super::*;
 
     #[test]
     fn test_normal() {
         let total_blocks_latest = 1000;
         let cluster_history_slot_index = 1000;
-        let epoch_credits_latest = 900;
+        let epoch_credits_latest = 900 * TVC_MULTIPLIER;
         let validator_history_slot_index = 1000;
         let threshold = 0.8;
 
@@ -454,12 +469,33 @@ mod test_calculate_instant_unstake_delinquency {
 
     #[test]
     fn test_edge_cases() {
+        let total_blocks_latest = 0;
+        let cluster_history_slot_index = 1000;
+        let epoch_credits_latest = 900 * TVC_MULTIPLIER;
+        let validator_history_slot_index = 1000;
+        let threshold = 0.8;
+
         // Zero blocks produced
-        let result = calculate_instant_unstake_delinquency(0, 1000, 900, 1000, 0.8).unwrap();
+        let result = calculate_instant_unstake_delinquency(
+            total_blocks_latest,
+            cluster_history_slot_index,
+            epoch_credits_latest,
+            validator_history_slot_index,
+            threshold,
+        )
+        .unwrap();
         assert!(!result);
 
         // Zero slots
-        let result = calculate_instant_unstake_delinquency(1000, 0, 900, 1000, 0.8);
+        let total_blocks_latest = 1000;
+        let cluster_history_slot_index = 0;
+        let result = calculate_instant_unstake_delinquency(
+            total_blocks_latest,
+            cluster_history_slot_index,
+            epoch_credits_latest,
+            validator_history_slot_index,
+            threshold,
+        );
         assert!(result.is_err());
     }
 }

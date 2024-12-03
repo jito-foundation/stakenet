@@ -3,7 +3,9 @@ use std::fmt::Display;
 
 use crate::{
     bitmask::BitMask,
-    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{
+        LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
+    },
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -600,7 +602,6 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-        tvc_activation_epoch: u64,
     ) -> Result<Option<ScoreComponentsV2>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
@@ -687,7 +688,7 @@ impl StewardState {
                 cluster,
                 config,
                 current_epoch as u16,
-                tvc_activation_epoch,
+                TVC_ACTIVATION_EPOCH,
             )?;
 
             self.scores[index] = (score.score * 1_000_000_000.) as u32;
@@ -763,7 +764,6 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-        tvc_activation_epoch: u64,
     ) -> Result<Option<InstantUnstakeComponentsV2>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
@@ -817,7 +817,7 @@ impl StewardState {
                 config,
                 first_slot,
                 clock.epoch as u16,
-                tvc_activation_epoch,
+                TVC_ACTIVATION_EPOCH,
             )?;
 
             self.instant_unstake

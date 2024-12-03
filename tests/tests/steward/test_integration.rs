@@ -27,8 +27,8 @@ use tests::steward_fixtures::{
     validator_history_default, TestFixture,
 };
 use validator_history::{
-    ClusterHistory, ClusterHistoryEntry, Config as ValidatorHistoryConfig, ValidatorHistory,
-    ValidatorHistoryEntry,
+    constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
+    Config as ValidatorHistoryConfig, ValidatorHistory, ValidatorHistoryEntry,
 };
 
 #[tokio::test]
@@ -198,7 +198,7 @@ async fn test_compute_scores() {
     for i in 0..=512 {
         validator_history.history.push(ValidatorHistoryEntry {
             epoch: i,
-            epoch_credits: 1000,
+            epoch_credits: 1000 * TVC_MULTIPLIER,
             activated_stake_lamports: 100_000_000_000_000,
             commission: 0,
             mev_commission: 0,
@@ -343,10 +343,10 @@ async fn test_compute_scores() {
         steward_state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ));
-    assert!(steward_state_account.state.scores[0] == 1_000_000_000);
-    assert!(steward_state_account.state.yield_scores[0] == 1_000_000_000);
-    assert!(steward_state_account.state.sorted_score_indices[0] == 0);
-    assert!(steward_state_account.state.sorted_yield_score_indices[0] == 0);
+    assert_eq!(steward_state_account.state.scores[0], 1_000_000_000);
+    assert_eq!(steward_state_account.state.yield_scores[0], 1_000_000_000);
+    assert_eq!(steward_state_account.state.sorted_score_indices[0], 0);
+    assert_eq!(steward_state_account.state.sorted_yield_score_indices[0], 0);
     assert!(steward_state_account.state.progress.get(0).unwrap());
     assert!(!steward_state_account.state.progress.get(1).unwrap());
 
@@ -515,7 +515,7 @@ async fn test_compute_instant_unstake() {
     let mut validator_history = validator_history_default(vote_account, 0);
     validator_history.history.push(ValidatorHistoryEntry {
         epoch: clock.epoch as u16,
-        epoch_credits: 1000,
+        epoch_credits: 1000 * TVC_MULTIPLIER,
         activated_stake_lamports: 100_000_000_000_000,
         commission: 100, // This is the condition causing instant unstake
         mev_commission: 0,

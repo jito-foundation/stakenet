@@ -30,8 +30,10 @@ use spl_stake_pool::{
     state::{Fee, StakeStatus, ValidatorList as SPLValidatorList, ValidatorStakeInfo},
 };
 use validator_history::{
-    self, constants::MAX_ALLOC_BYTES, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
-    ValidatorHistory, ValidatorHistoryEntry,
+    self,
+    constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
+    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, ValidatorHistory,
+    ValidatorHistoryEntry,
 };
 
 pub struct StakePoolMetadata {
@@ -881,12 +883,18 @@ impl Default for StateMachineFixtures {
         let vote_account_2 = Pubkey::new_unique();
         let vote_account_3 = Pubkey::new_unique();
 
+        ////////
+        ////////
+        //////// TODO: update the vote credits to 8x higher here
+        ////////
+        ////////
+
         // First one: Good validator
         let mut validator_history_1 = validator_history_default(vote_account_1, 0);
         for i in 0..=20 {
             validator_history_1.history.push(ValidatorHistoryEntry {
                 epoch: i,
-                epoch_credits: 1000,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
                 commission: 0,
                 mev_commission: 0,
                 is_superminority: 0,
@@ -900,7 +908,7 @@ impl Default for StateMachineFixtures {
         for i in 0..=20 {
             validator_history_2.history.push(ValidatorHistoryEntry {
                 epoch: i,
-                epoch_credits: 200,
+                epoch_credits: 200 * TVC_MULTIPLIER,
                 commission: 99,
                 mev_commission: 10000,
                 is_superminority: 1,
@@ -914,7 +922,7 @@ impl Default for StateMachineFixtures {
         for i in 0..=20 {
             validator_history_3.history.push(ValidatorHistoryEntry {
                 epoch: i,
-                epoch_credits: 1000,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
                 commission: 5,
                 mev_commission: 500,
                 is_superminority: 0,

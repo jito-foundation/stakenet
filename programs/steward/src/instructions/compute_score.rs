@@ -1,10 +1,6 @@
-use std::str::FromStr;
-
 use anchor_lang::prelude::*;
-use spl_pod::solana_program::{clock::Epoch, feature::Feature};
 
 use crate::{
-    constants::{TVC_FEATURE_PUBKEY, TVC_MAINNET_ACTIVATION_EPOCH},
     errors::StewardError,
     maybe_transition,
     utils::{
@@ -38,11 +34,6 @@ pub struct ComputeScore<'info> {
         bump
     )]
     pub cluster_history: AccountLoader<'info, ClusterHistory>,
-
-    #[account(
-        address = Pubkey::from_str(TVC_FEATURE_PUBKEY).unwrap()
-    )]
-    pub maybe_tvc_feature_account: Option<AccountInfo<'info>>,
 }
 
 pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Result<()> {
@@ -53,19 +44,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     let validator_list = &ctx.accounts.validator_list;
     let clock: Clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
-
-    let tvc_activation_epoch = {
-        if let Some(tvc_feature_account) = ctx.accounts.maybe_tvc_feature_account.as_ref() {
-            let activation_slot = Feature::from_account_info(tvc_feature_account)?.activated_at;
-            if let Some(activation_slot) = activation_slot {
-                epoch_schedule.get_epoch(activation_slot)
-            } else {
-                TVC_MAINNET_ACTIVATION_EPOCH
-            }
-        } else {
-            TVC_MAINNET_ACTIVATION_EPOCH
-        }
-    };
 
     // We don't check the state here because we force it below
     state_checks(&clock, &config, &state_account, validator_list, None)?;
@@ -111,7 +89,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         &cluster_history,
         &config,
         num_pool_validators as u64,
-        tvc_activation_epoch,
     )? {
         emit!(score);
     }

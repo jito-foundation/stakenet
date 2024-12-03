@@ -274,7 +274,7 @@ pub fn calculate_epoch_credits(
             // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
             // If total blocks are None, then keepers missed an upload and validator should not be punished.
             let credits = maybe_credits.unwrap_or(0);
-            let ratio = credits as f64 / *blocks as f64;
+            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
             if ratio < scoring_delinquency_threshold_ratio {
                 delinquency_score = 0.0;
                 delinquency_ratio = ratio;

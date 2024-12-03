@@ -1,12 +1,10 @@
 use crate::{
-    constants::TVC_MAINNET_ACTIVATION_EPOCH,
     errors::StewardError,
     maybe_transition,
     utils::{get_validator_list, get_validator_stake_info_at_index, state_checks},
     Config, StewardStateAccount, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
-use spl_pod::solana_program::feature::Feature;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 #[derive(Accounts)]
@@ -33,8 +31,6 @@ pub struct ComputeInstantUnstake<'info> {
         bump
     )]
     pub cluster_history: AccountLoader<'info, ClusterHistory>,
-
-    pub maybe_tvc_feature_account: Option<AccountInfo<'info>>,
 }
 
 pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize) -> Result<()> {
@@ -45,19 +41,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
-
-    let tvc_activation_epoch = {
-        if let Some(tvc_feature_account) = ctx.accounts.maybe_tvc_feature_account.as_ref() {
-            let activation_slot = Feature::from_account_info(tvc_feature_account)?.activated_at;
-            if let Some(activation_slot) = activation_slot {
-                epoch_schedule.get_epoch(activation_slot)
-            } else {
-                TVC_MAINNET_ACTIVATION_EPOCH
-            }
-        } else {
-            TVC_MAINNET_ACTIVATION_EPOCH
-        }
-    };
 
     // Transitions to Idle before doing compute_instant_unstake if RESET_TO_IDLE is set
     if let Some(event) = maybe_transition(
@@ -92,7 +75,6 @@ pub fn handler(ctx: Context<ComputeInstantUnstake>, validator_list_index: usize)
         validator_list_index,
         &cluster,
         &config,
-        tvc_activation_epoch,
     )? {
         emit!(instant_unstake);
     }

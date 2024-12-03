@@ -21,5 +21,9 @@ pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 520;
 #[cfg(not(feature = "mainnet-beta"))]
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 0;
 pub const TVC_FEATURE_PUBKEY: &str = "tvcF6b1TRz353zKuhBjinZkKzjmihXmBAHJdjNYw1sQ";
-pub const TVC_MAINNET_ACTIVATION_EPOCH: u64 = 704;
-pub const TVC_TESTNET_ACTIVATION_EPOCH: u64 = 705;
+#[cfg(feature = "mainnet-beta")]
+pub const TVC_ACTIVATION_EPOCH: u64 = 704;
+#[cfg(all(not(feature = "mainnet-beta"), feature = "testnet"))]
+pub const TVC_ACTIVATION_EPOCH: u64 = 705;
+#[cfg(all(not(feature = "mainnet-beta"), not(feature = "testnet")))]
+pub const TVC_ACTIVATION_EPOCH: u64 = 0;
