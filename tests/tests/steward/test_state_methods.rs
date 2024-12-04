@@ -8,10 +8,10 @@
 
 use anchor_lang::{error::Error, AnchorSerialize};
 use jito_steward::{
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
-    Delegation, StewardStateEnum,
+    Delegation, StewardState, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
@@ -750,4 +750,172 @@ fn test_rebalance() {
             assert_eq!(e, Error::from(StewardError::InvalidState));
         }
     }
+}
+
+#[test]
+fn test_rebalance_default_lamports() {
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+    let mut validator_list = fixtures.validator_list.clone();
+
+    // Case 1: Lamports default, has transient stake
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    validator_list[0].transient_stake_lamports = 1000.into();
+    let validator_list_bigvec = BigVec {
+        data: &mut validator_list.try_to_vec().unwrap(),
+    };
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        3000 * LAMPORTS_PER_SOL,
+        0,
+        u64::from(validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    println!("{:?}", res);
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
+
+    // Case 2: Lamports not default, no transient stake
+    let mut state = fixtures.state;
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+    validator_list[0].transient_stake_lamports = 0.into();
+    let validator_list_bigvec = BigVec {
+        data: &mut validator_list.try_to_vec().unwrap(),
+    };
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        1000 * LAMPORTS_PER_SOL,
+        u64::from(validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    assert!(res.is_ok());
+    println!("{:?}", res);
+    if let RebalanceType::Increase(increase_amount) = res.unwrap() {
+        assert_eq!(
+            state.validator_lamport_balances[0],
+            1000 * LAMPORTS_PER_SOL + increase_amount
+        );
+    } else {
+        panic!("Expected RebalanceType::Increase");
+    }
+}
+
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState {
+    let mut state = fixtures.state;
+    // Set values for all of the values that are gonna get shifted
+    state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
+    state.scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(0, 1),
+        Delegation::new(1, 1),
+        Delegation::new(2, 1),
+    ]);
+    state.instant_unstake.reset();
+    state.instant_unstake.set(0, true).unwrap();
+    state.instant_unstake.set(1, false).unwrap();
+    state.instant_unstake.set(2, true).unwrap();
+
+    state
+}
+#[test]
+fn test_remove_validator() {
+    // Setup: create steward state based off StewardStateFixtures
+    // mark index 1 to removal
+    let fixtures = StateMachineFixtures::default();
+    let mut state = _test_remove_validator_setup(&fixtures);
+
+    // test basic case - remove validator_to_remove
+    state.validators_to_remove.set(1, true).unwrap();
+    let res = state.remove_validator(1);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, 2);
+    // Assert that values were shifted left
+    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.scores[1], 2);
+    assert!(state.delegations[1] == Delegation::new(2, 1));
+
+    // test basic case - remove immediate_removal validator
+    let mut state = _test_remove_validator_setup(&fixtures);
+
+    state.validators_for_immediate_removal.set(1, true).unwrap();
+    let res = state.remove_validator(1);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, 2);
+    // Assert that values were shifted left
+    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.scores[1], 2);
+    assert!(state.delegations[1] == Delegation::new(2, 1));
+
+    // Setup: mark an index for removal that's higher than num_pool_validators
+    // Remember this is always gonna be run after actual removals have taken place, so could validator_list_len be kind of a red herring? do we need to go further?
+
+    let mut state = _test_remove_validator_setup(&fixtures);
+
+    state.validators_for_immediate_removal.set(3, true).unwrap();
+    state.validators_for_immediate_removal.set(4, true).unwrap();
+    state.validators_added = 2;
+    // both validators were removed from pool and now the validator list is down to 3
+    let res = state.remove_validator(3);
+    assert!(res.is_ok());
+
+    assert_eq!(state.num_pool_validators, 3);
+    assert!(state.validators_for_immediate_removal.get(3).unwrap());
+    assert!(!state.validators_for_immediate_removal.get(4).unwrap());
+}
+
+#[test]
+fn test_remove_validator_fails() {
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+
+    // Test fails if validator not marked to remove
+    state.validators_for_immediate_removal.reset();
+    let res = state.remove_validator(0);
+    assert!(res.is_err());
+    assert!(res == Err(Error::from(StewardError::ValidatorNotMarkedForRemoval)));
+
+    // Test fails out of bounds
+    state
+        .validators_for_immediate_removal
+        .set(state.num_pool_validators as usize, true)
+        .unwrap();
+    let res = state.remove_validator(state.num_pool_validators as usize);
+    assert!(res.is_err());
+    assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
 }

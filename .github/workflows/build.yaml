@@ -75,6 +75,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: solana-verify
+          version: "0.2.11"
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -156,7 +157,7 @@ jobs:
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
-          RUST_MIN_STACK: 5000000
+          RUST_MIN_STACK: 10000000
 
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality
