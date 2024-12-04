@@ -1,5 +1,4 @@
-
-se validator_history::constants::TVC_MULTIPLIER;
+use validator_history::constants::TVC_MULTIPLIER;
 use validator_history::state::CircBuf;
 use validator_history::ValidatorHistoryEntry;
 
