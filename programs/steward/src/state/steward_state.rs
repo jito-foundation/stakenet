@@ -15,8 +15,12 @@ use crate::{
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
 };
+
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
-use anchor_lang::{prelude::*, IdlBuild};
+use anchor_lang::prelude::*;
+#[cfg(feature = "idl-build")]
+use anchor_lang::IdlBuild;
 
 use bytemuck::{Pod, Zeroable};
 use spl_stake_pool::big_vec::BigVec;
@@ -192,6 +196,7 @@ impl Display for StewardStateEnum {
     }
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for StewardStateEnum {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
