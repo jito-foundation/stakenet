@@ -75,7 +75,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: solana-verify
-          version: "0.2.14"
+          version: "0.2.11"
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
