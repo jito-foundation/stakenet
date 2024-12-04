@@ -5,7 +5,11 @@ use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use spl_pod::solana_program::clock::Epoch;
-use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
+use spl_pod::{
+    bytemuck::pod_from_bytes,
+    primitives::PodU64,
+    solana_program::{program_pack::Pack, stake},
+};
 use spl_stake_pool::{
     big_vec::BigVec,
     state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
