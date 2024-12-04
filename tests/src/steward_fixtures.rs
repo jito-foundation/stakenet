@@ -1156,7 +1156,7 @@ pub async fn copy_cluster_info(fixture: &TestFixture) {
 
 pub async fn crank_validator_history_accounts(
     fixture: &TestFixture,
-    extra_validator_accounts: &Vec<ExtraValidatorAccounts>,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
     indices: &[usize],
 ) {
     let clock: Clock = fixture
