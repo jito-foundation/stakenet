@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 use std::collections::HashMap;
 
 use anchor_lang::{
@@ -101,8 +102,7 @@ async fn test_cycle() {
 
     crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds to validator list
-    for i in 0..unit_test_fixtures.validators.len() {
-        let extra_accounts = &extra_validator_accounts[i];
+    for extra_accounts in extra_validator_accounts.iter() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
@@ -525,8 +525,7 @@ async fn test_add_validator_next_cycle() {
 
     crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds validators 2 and 3
-    for i in 0..2 {
-        let extra_accounts = &extra_validator_accounts[i];
+    for extra_accounts in extra_validator_accounts.iter().take(2) {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 

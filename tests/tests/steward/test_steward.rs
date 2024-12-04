@@ -1,3 +1,4 @@
+#![allow(clippy::await_holding_refcell_ref)]
 /// Basic integration test
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
