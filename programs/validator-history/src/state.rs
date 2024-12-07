@@ -275,7 +275,7 @@ impl CircBuf {
         field_latest!(self, epoch_credits)
     }
 
-    /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 8x higher
+    /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 16x higher
     /// for every epoch starting at `tvc_activation_epoch`
     pub fn epoch_credits_latest_normalized(
         &self,
