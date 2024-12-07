@@ -1,7 +1,7 @@
 // Unit tests for scoring, instant unstake, and delegation methods
 use anchor_lang::AnchorSerialize;
 use jito_steward::{
-    constants::{EPOCH_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH},
+    constants::{EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH},
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -717,6 +717,8 @@ fn test_instant_unstake() {
         .parameters
         .instant_unstake_delinquency_threshold_ratio = 0.25;
     let start_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
+    let end_slot = epoch_schedule.get_last_slot_in_epoch(current_epoch);
+    let slot_index = end_slot - start_slot;
     let current_epoch = current_epoch as u16;
 
     // Non-instant-unstake validator
@@ -746,7 +748,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -782,7 +784,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -815,7 +817,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 200 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 99,
                 mev_commission: 10000
             }
@@ -864,9 +866,9 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 0,
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -917,7 +919,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 100,
                 mev_commission: 0
             }
@@ -950,7 +952,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 1000,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -983,7 +985,7 @@ fn test_instant_unstake() {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: start_slot + 999,
                 total_blocks_latest: 0,
-                cluster_history_slot_index: 999,
+                cluster_history_slot_index: slot_index,
                 commission: 0,
                 mev_commission: 0
             }
@@ -1699,4 +1701,44 @@ fn test_decrease_stake_calculation() {
         Err(e) => e == StewardError::ValidatorIndexOutOfBounds.into(),
         _ => false,
     });
+}
+
+#[test]
+fn test_decrease_stake_default_lamports() {
+    // Given internal lamport balance set to default, test that no changes happen when doing stake deposit unstake
+
+    let mut state = StateMachineFixtures::default().state;
+
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+
+    let mut unstake_state = UnstakeState {
+        stake_deposit_unstake_total: 0,
+        stake_deposit_unstake_cap: 1000 * LAMPORTS_PER_SOL,
+        ..Default::default()
+    };
+
+    let test_cases = vec![
+        // current_lamports, target_lamports
+        (1500 * LAMPORTS_PER_SOL, 1000 * LAMPORTS_PER_SOL),
+        (3000 * LAMPORTS_PER_SOL, 500 * LAMPORTS_PER_SOL),
+    ];
+
+    for (current_lamports, target_lamports) in test_cases {
+        let result = unstake_state
+            .stake_deposit_unstake(&state, 0, current_lamports, target_lamports)
+            .unwrap();
+
+        assert_eq!(result, 0, "Expected 0 unstake lamports, but got {}", result);
+    }
+
+    // Test when stake_deposit_unstake_total reaches stake_deposit_unstake_cap
+    unstake_state.stake_deposit_unstake_total = unstake_state.stake_deposit_unstake_cap;
+    let result = unstake_state
+        .stake_deposit_unstake(&state, 0, 2000 * LAMPORTS_PER_SOL, 1000 * LAMPORTS_PER_SOL)
+        .unwrap();
+    assert_eq!(
+        result, 0,
+        "Expected 0 unstake lamports when cap is reached, but got {}",
+        result
+    );
 }

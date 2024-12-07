@@ -4,7 +4,12 @@ use std::ops::{Deref, Not};
 use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
-use spl_pod::{bytemuck::pod_from_bytes, primitives::PodU64, solana_program::program_pack::Pack};
+use spl_pod::solana_program::clock::Epoch;
+use spl_pod::{
+    bytemuck::pod_from_bytes,
+    primitives::PodU64,
+    solana_program::{program_pack::Pack, stake},
+};
 use spl_stake_pool::{
     big_vec::BigVec,
     state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
@@ -310,6 +315,26 @@ pub fn check_validator_list_has_stake_status_other_than(
     }
 
     Ok(false)
+}
+
+/// Checks if a stake account can be managed by the pool
+/// FROM spl_stake_pool::processor::update_validator_list_balance
+pub fn stake_is_usable_by_pool(
+    meta: &stake::state::Meta,
+    expected_authority: &Pubkey,
+    expected_lockup: &stake::state::Lockup,
+) -> bool {
+    meta.authorized.staker == *expected_authority
+        && meta.authorized.withdrawer == *expected_authority
+        && meta.lockup == *expected_lockup
+}
+
+/// Checks if a stake account is active, without taking into account cooldowns
+/// FROM spl_stake_pool::processor::update_validator_list_balance
+pub fn stake_is_inactive_without_history(stake: &stake::state::Stake, epoch: Epoch) -> bool {
+    stake.delegation.deactivation_epoch < epoch
+        || (stake.delegation.activation_epoch == epoch
+            && stake.delegation.deactivation_epoch == epoch)
 }
 
 pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> Result<usize> {

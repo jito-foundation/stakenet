@@ -467,7 +467,7 @@ impl StewardState {
     }
 
     /// Update internal state when a validator is removed from the pool
-    pub fn remove_validator(&mut self, index: usize, validator_list_len: usize) -> Result<()> {
+    pub fn remove_validator(&mut self, index: usize) -> Result<()> {
         let marked_for_regular_removal = self.validators_to_remove.get(index)?;
         let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
 
@@ -476,8 +476,16 @@ impl StewardState {
             StewardError::ValidatorNotMarkedForRemoval
         );
 
+        let num_pool_validators = self.num_pool_validators as usize;
+        let num_pool_validators_plus_added = num_pool_validators + self.validators_added as usize;
+
+        require!(
+            index < num_pool_validators_plus_added,
+            StewardError::ValidatorIndexOutOfBounds
+        );
+
         // If the validator was marked for removal in the current cycle, decrement validators_added
-        if index >= self.num_pool_validators as usize {
+        if index >= num_pool_validators {
             self.validators_added = self
                 .validators_added
                 .checked_sub(1)
@@ -488,8 +496,6 @@ impl StewardState {
                 .checked_sub(1)
                 .ok_or(StewardError::ArithmeticError)?;
         }
-
-        let num_pool_validators = self.num_pool_validators as usize;
 
         // Shift all validator state to the left
         for i in index..num_pool_validators {
@@ -504,7 +510,7 @@ impl StewardState {
         }
 
         // For state that can be valid past num_pool_validators, we still need to shift the values
-        for i in index..validator_list_len {
+        for i in index..num_pool_validators_plus_added {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.validators_to_remove
                 .set(i, self.validators_to_remove.get(next_i)?)?;
@@ -558,9 +564,10 @@ impl StewardState {
         self.delegations[num_pool_validators] = Delegation::default();
         self.instant_unstake.set(num_pool_validators, false)?;
         self.progress.set(num_pool_validators, false)?;
-        self.validators_to_remove.set(validator_list_len, false)?;
+        self.validators_to_remove
+            .set(num_pool_validators_plus_added, false)?;
         self.validators_for_immediate_removal
-            .set(validator_list_len, false)?;
+            .set(num_pool_validators_plus_added, false)?;
 
         Ok(())
     }

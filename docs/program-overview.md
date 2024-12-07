@@ -145,7 +145,7 @@ At the start of the next cycle, we move back to Compute Scores, and all those pi
 
 ### Adding Validators
 
-The JitoSOL pool aims to have as many active validators as possible. Validators are added permissionlessly if they meet the following criteria:
+The JitoSOL pool aims to have as many active validators as possible in the pool, meaning they are able to get scored and considered for delegation. This does NOT mean they are guaranteed stake (see the State Machine section above for how validators receive stake). Validators are added permissionlessly if they meet the following criteria:
 
 - At least 5 epochs of voting.
 - Minimum SOL stake of 5000.
