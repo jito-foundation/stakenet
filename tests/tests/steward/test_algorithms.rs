@@ -1,7 +1,9 @@
 // Unit tests for scoring, instant unstake, and delegation methods
 use anchor_lang::AnchorSerialize;
 use jito_steward::{
-    constants::{EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH},
+    constants::{
+        EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
+    },
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -746,7 +748,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
                 commission: 0,
@@ -782,7 +784,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
                 commission: 0,
@@ -815,7 +817,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 200 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
                 commission: 99,
@@ -917,7 +919,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
                 commission: 100,
@@ -950,7 +952,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
                 commission: 0,
@@ -983,7 +985,7 @@ fn test_instant_unstake() {
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
-                vote_account_last_update_slot: start_slot + 999,
+                vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 0,
                 cluster_history_slot_index: slot_index,
                 commission: 0,
