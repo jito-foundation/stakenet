@@ -45,8 +45,10 @@ use spl_stake_pool::{
     },
 };
 use validator_history::{
-    self, constants::MAX_ALLOC_BYTES, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
-    ValidatorHistory, ValidatorHistoryEntry,
+    self,
+    constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
+    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, ValidatorHistory,
+    ValidatorHistoryEntry,
 };
 
 pub struct StakePoolMetadata {
@@ -1779,29 +1781,27 @@ impl Default for StateMachineFixtures {
         };
 
         // Setup Sysvars: Clock, EpochSchedule
-
         let epoch_schedule = EpochSchedule::default();
-
         let clock = Clock {
             epoch: current_epoch,
             slot: epoch_schedule.get_last_slot_in_epoch(current_epoch),
             ..Clock::default()
         };
 
-        // Setup ValidatorHistory accounts
-        let vote_address_1 = Pubkey::new_unique();
-        let vote_address_2 = Pubkey::new_unique();
-        let vote_address_3 = Pubkey::new_unique();
+        // Setup vote account addresses
+        let vote_account_1 = Pubkey::new_unique();
+        let vote_account_2 = Pubkey::new_unique();
+        let vote_account_3 = Pubkey::new_unique();
 
         // First one: Good validator
-        let mut validator_history_1 = validator_history_default(vote_address_1, 0);
+        let mut validator_history_1 = validator_history_default(vote_account_1, 0);
         let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
 
         for i in 0..=20 {
             epoch_credits.push((i, (i + 1) * 1000, i * 1000));
             validator_history_1.history.push(ValidatorHistoryEntry {
                 epoch: i as u16,
-                epoch_credits: 1000,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
                 commission: 0,
                 mev_commission: 0,
                 is_superminority: 0,
@@ -1810,18 +1810,18 @@ impl Default for StateMachineFixtures {
                 ..ValidatorHistoryEntry::default()
             });
         }
-        let vote_account_1 =
-            new_vote_state_versions(vote_address_1, vote_address_1, 0, Some(epoch_credits));
+        let vote_account_1_state =
+            new_vote_state_versions(vote_account_1, vote_account_1, 0, Some(epoch_credits));
 
         // Second one: Bad validator
-        let mut validator_history_2 = validator_history_default(vote_address_2, 1);
+        let mut validator_history_2 = validator_history_default(vote_account_2, 1);
         let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
         for i in 0..=20 {
             epoch_credits.push((i, (i + 1) * 200, i * 200));
 
             validator_history_2.history.push(ValidatorHistoryEntry {
                 epoch: i as u16,
-                epoch_credits: 200,
+                epoch_credits: 200 * TVC_MULTIPLIER,
                 commission: 99,
                 mev_commission: 10000,
                 is_superminority: 1,
@@ -1830,18 +1830,18 @@ impl Default for StateMachineFixtures {
                 ..ValidatorHistoryEntry::default()
             });
         }
-        let vote_account_2 =
-            new_vote_state_versions(vote_address_2, vote_address_2, 99, Some(epoch_credits));
+        let vote_account_2_state =
+            new_vote_state_versions(vote_account_2, vote_account_2, 99, Some(epoch_credits));
 
         // Third one: Good validator
-        let mut validator_history_3 = validator_history_default(vote_address_3, 2);
+        let mut validator_history_3 = validator_history_default(vote_account_3, 2);
         let mut epoch_credits: Vec<(u64, u64, u64)> = vec![];
         for i in 0..=20 {
             epoch_credits.push((i, (i + 1) * 1000, i * 1000));
 
             validator_history_3.history.push(ValidatorHistoryEntry {
                 epoch: i as u16,
-                epoch_credits: 1000,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
                 commission: 5,
                 mev_commission: 500,
                 is_superminority: 0,
@@ -1850,8 +1850,8 @@ impl Default for StateMachineFixtures {
                 ..ValidatorHistoryEntry::default()
             });
         }
-        let vote_account_3 =
-            new_vote_state_versions(vote_address_3, vote_address_3, 5, Some(epoch_credits));
+        let vote_account_3_state =
+            new_vote_state_versions(vote_account_3, vote_account_3, 5, Some(epoch_credits));
 
         // Setup ClusterHistory
         let mut cluster_history = cluster_history_default();
@@ -1920,7 +1920,11 @@ impl Default for StateMachineFixtures {
                 validator_history_2,
                 validator_history_3,
             ],
-            vote_accounts: vec![vote_account_1, vote_account_2, vote_account_3],
+            vote_accounts: vec![
+                vote_account_1_state,
+                vote_account_2_state,
+                vote_account_3_state,
+            ],
             cluster_history,
             config,
             validator_list,

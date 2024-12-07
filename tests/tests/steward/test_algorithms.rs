@@ -1,7 +1,9 @@
 // Unit tests for scoring, instant unstake, and delegation methods
 use anchor_lang::AnchorSerialize;
 use jito_steward::{
-    constants::{EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT},
+    constants::{
+        EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
+    },
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -17,7 +19,7 @@ use jito_steward::{
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
-use validator_history::{ClusterHistoryEntry, ValidatorHistoryEntry};
+use validator_history::{constants::TVC_MULTIPLIER, ClusterHistoryEntry, ValidatorHistoryEntry};
 
 #[test]
 fn test_compute_score() {
@@ -40,6 +42,7 @@ fn test_compute_score() {
         &cluster_history,
         &config,
         current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -75,8 +78,14 @@ fn test_compute_score() {
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().mev_commission = 1001;
 
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -108,8 +117,14 @@ fn test_compute_score() {
 
     let mut validator = good_validator;
     validator.history.arr[11].mev_commission = 1001;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -141,8 +156,14 @@ fn test_compute_score() {
     // Test high mev commission outside of range
     let mut validator = good_validator;
     validator.history.arr[9].mev_commission = 1001;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -178,8 +199,14 @@ fn test_compute_score() {
         .validator_history_blacklist
         .set(validator.index as usize, true)
         .unwrap();
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -213,8 +240,14 @@ fn test_compute_score() {
     // superminority score
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().is_superminority = 1;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -249,8 +282,14 @@ fn test_compute_score() {
     for i in 0..19 {
         validator.history.arr_mut()[i].is_superminority = 1;
     }
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -286,8 +325,14 @@ fn test_compute_score() {
         validator.history.arr_mut()[i].mev_commission =
             ValidatorHistoryEntry::default().mev_commission;
     }
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -320,8 +365,14 @@ fn test_compute_score() {
     // commission
     let mut validator = good_validator;
     validator.history.last_mut().unwrap().commission = 11;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -362,8 +413,14 @@ fn test_compute_score() {
     // commission above regular threshold, below historical threshold, outside of regular threshold window
     validator.history.arr[0].commission = 14;
 
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -394,8 +451,14 @@ fn test_compute_score() {
     );
 
     validator.history.arr[0].commission = 16;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -430,11 +493,17 @@ fn test_compute_score() {
 
     // average vote credits + average blocks
     for i in 0..=20 {
-        validator.history.arr_mut()[i].epoch_credits = 880;
+        validator.history.arr_mut()[i].epoch_credits = 880 * TVC_MULTIPLIER;
         cluster_history.history.arr_mut()[i].total_blocks = 1000;
     }
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -467,8 +536,14 @@ fn test_compute_score() {
     // delinquency
     let mut validator = good_validator;
     validator.history.arr[10].epoch_credits = 0;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -506,8 +581,14 @@ fn test_compute_score() {
     cluster_history.history.arr[10].total_blocks = ClusterHistoryEntry::default().total_blocks;
     cluster_history.history.arr[11].total_blocks = ClusterHistoryEntry::default().total_blocks;
 
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -543,8 +624,14 @@ fn test_compute_score() {
     assert_eq!(current_epoch, 20);
     validator.history.arr[current_epoch as usize].epoch_credits = 0;
     cluster_history.history.arr[current_epoch as usize].total_blocks = 0;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV2 {
@@ -587,15 +674,27 @@ fn test_compute_score() {
     validator.history.arr[current_epoch as usize - 2].is_superminority =
         ValidatorHistoryEntry::default().is_superminority;
     validator.history.arr[current_epoch as usize - 3].is_superminority = 1;
-    let components =
-        validator_score(&validator, &cluster_history, &config, current_epoch as u16).unwrap();
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
     assert!(components.superminority_score == 0.0);
 
     // Test error: superminority should exist if epoch credits exist
     let mut validator = good_validator;
     validator.history.arr[current_epoch as usize].is_superminority =
         ValidatorHistoryEntry::default().is_superminority;
-    let res = validator_score(&validator, &cluster_history, &config, current_epoch as u16);
+    let res = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    );
     assert!(res == Err(StewardError::StakeHistoryNotRecentEnough.into()));
 }
 
@@ -633,6 +732,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -647,7 +747,7 @@ fn test_instant_unstake() {
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 1000,
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
@@ -668,6 +768,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -682,7 +783,7 @@ fn test_instant_unstake() {
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 1000,
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
@@ -700,6 +801,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -714,7 +816,7 @@ fn test_instant_unstake() {
             vote_account: bad_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 200,
+                epoch_credits_latest: 200 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
@@ -734,6 +836,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert_eq!(res, Err(StewardError::ClusterHistoryNotRecentEnough.into()));
@@ -749,6 +852,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -786,6 +890,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
 
     assert_eq!(res, Err(StewardError::VoteHistoryNotRecentEnough.into()));
@@ -799,6 +904,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -812,7 +918,7 @@ fn test_instant_unstake() {
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 1000,
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
@@ -831,6 +937,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -844,7 +951,7 @@ fn test_instant_unstake() {
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 1000,
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 1000,
                 cluster_history_slot_index: slot_index,
@@ -863,6 +970,7 @@ fn test_instant_unstake() {
         &config,
         start_slot,
         current_epoch,
+        TVC_ACTIVATION_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -876,7 +984,7 @@ fn test_instant_unstake() {
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
-                epoch_credits_latest: 1000,
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
                 vote_account_last_update_slot: end_slot,
                 total_blocks_latest: 0,
                 cluster_history_slot_index: slot_index,

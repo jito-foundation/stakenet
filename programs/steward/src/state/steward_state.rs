@@ -3,7 +3,9 @@ use std::fmt::Display;
 
 use crate::{
     bitmask::BitMask,
-    constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::{
+        LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
+    },
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
@@ -688,7 +690,13 @@ impl StewardState {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            let score = validator_score(validator, cluster, config, current_epoch as u16)?;
+            let score = validator_score(
+                validator,
+                cluster,
+                config,
+                current_epoch as u16,
+                TVC_ACTIVATION_EPOCH,
+            )?;
 
             self.scores[index] = (score.score * 1_000_000_000.) as u32;
             self.yield_scores[index] = (score.yield_score * 1_000_000_000.) as u32;
@@ -816,6 +824,7 @@ impl StewardState {
                 config,
                 first_slot,
                 clock.epoch as u16,
+                TVC_ACTIVATION_EPOCH,
             )?;
 
             self.instant_unstake

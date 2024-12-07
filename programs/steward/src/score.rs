@@ -3,7 +3,7 @@ use anchor_lang::IdlBuild;
 use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
 };
-use validator_history::{ClusterHistory, ValidatorHistory};
+use validator_history::{constants::TVC_MULTIPLIER, ClusterHistory, ValidatorHistory};
 
 use crate::{
     constants::{
@@ -90,6 +90,7 @@ pub fn validator_score(
     cluster: &ClusterHistory,
     config: &Config,
     current_epoch: u16,
+    tvc_activation_epoch: u64,
 ) -> Result<ScoreComponentsV2> {
     let params = &config.parameters;
 
@@ -107,9 +108,11 @@ pub fn validator_score(
     // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
 
-    let epoch_credits_window = validator
-        .history
-        .epoch_credits_range(epoch_credits_start, epoch_credits_end);
+    let normalized_epoch_credits_window = validator.history.epoch_credits_range_normalized(
+        epoch_credits_start,
+        epoch_credits_end,
+        tvc_activation_epoch,
+    );
 
     let total_blocks_window = cluster
         .history
@@ -132,7 +135,7 @@ pub fn validator_score(
 
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
         calculate_epoch_credits(
-            &epoch_credits_window,
+            &normalized_epoch_credits_window,
             &total_blocks_window,
             epoch_credits_start,
             params.scoring_delinquency_threshold_ratio,
@@ -271,7 +274,7 @@ pub fn calculate_epoch_credits(
             // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
             // If total blocks are None, then keepers missed an upload and validator should not be punished.
             let credits = maybe_credits.unwrap_or(0);
-            let ratio = credits as f64 / *blocks as f64;
+            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
             if ratio < scoring_delinquency_threshold_ratio {
                 delinquency_score = 0.0;
                 delinquency_ratio = ratio;
@@ -283,8 +286,11 @@ pub fn calculate_epoch_credits(
         }
     }
 
+    let normalized_vote_credits_ratio =
+        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
+
     Ok((
-        average_vote_credits / average_blocks,
+        normalized_vote_credits_ratio,
         delinquency_score,
         delinquency_ratio,
         delinquency_epoch,
@@ -471,6 +477,7 @@ pub fn instant_unstake_validator(
     config: &Config,
     epoch_start_slot: u64,
     current_epoch: u16,
+    tvc_activation_epoch: u64,
 ) -> Result<InstantUnstakeComponentsV2> {
     let params = &config.parameters;
 
@@ -494,7 +501,10 @@ pub fn instant_unstake_validator(
         .checked_sub(epoch_start_slot)
         .ok_or(StewardError::ArithmeticError)?;
 
-    let epoch_credits_latest = validator.history.epoch_credits_latest().unwrap_or(0);
+    let epoch_credits_latest = validator
+        .history
+        .epoch_credits_latest_normalized(current_epoch as u64, tvc_activation_epoch)
+        .unwrap_or(0);
 
     /////// Component calculations ///////
     let delinquency_check = calculate_instant_unstake_delinquency(
@@ -555,7 +565,7 @@ pub fn calculate_instant_unstake_delinquency(
 
     if blocks_produced_rate > 0. {
         Ok(
-            (vote_credits_rate / blocks_produced_rate)
+            (vote_credits_rate / (blocks_produced_rate * (TVC_MULTIPLIER as f64)))
                 < instant_unstake_delinquency_threshold_ratio,
         )
     } else {

@@ -20,3 +20,10 @@ pub const COMPUTE_SCORE_SLOT_RANGE_MIN: u64 = 100;
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 520;
 #[cfg(not(feature = "mainnet-beta"))]
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 0;
+pub const TVC_FEATURE_PUBKEY: &str = "tvcF6b1TRz353zKuhBjinZkKzjmihXmBAHJdjNYw1sQ";
+#[cfg(feature = "mainnet-beta")]
+pub const TVC_ACTIVATION_EPOCH: u64 = 703;
+#[cfg(all(not(feature = "mainnet-beta"), feature = "testnet"))]
+pub const TVC_ACTIVATION_EPOCH: u64 = 705;
+#[cfg(all(not(feature = "mainnet-beta"), not(feature = "testnet")))]
+pub const TVC_ACTIVATION_EPOCH: u64 = 0;

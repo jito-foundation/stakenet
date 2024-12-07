@@ -1,5 +1,6 @@
 use {
     crate::{
+        constants::TVC_MULTIPLIER,
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
         utils::{cast_epoch, find_insert_position, get_max_epoch, get_min_epoch},
@@ -274,8 +275,47 @@ impl CircBuf {
         field_latest!(self, epoch_credits)
     }
 
+    /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 16x higher
+    /// for every epoch starting at `tvc_activation_epoch`
+    pub fn epoch_credits_latest_normalized(
+        &self,
+        current_epoch: u64,
+        tvc_activation_epoch: u64,
+    ) -> Option<u32> {
+        self.epoch_credits_latest().map(|credits| {
+            if current_epoch < tvc_activation_epoch {
+                credits.saturating_mul(TVC_MULTIPLIER)
+            } else {
+                credits
+            }
+        })
+    }
+
     pub fn epoch_credits_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
         field_range!(self, start_epoch, end_epoch, epoch_credits, u32)
+    }
+
+    /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 8x higher
+    /// for every epoch starting at `tvc_activation_epoch`
+    pub fn epoch_credits_range_normalized(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+        tvc_activation_epoch: u64,
+    ) -> Vec<Option<u32>> {
+        field_range!(self, start_epoch, end_epoch, epoch_credits, u32)
+            .into_iter()
+            .zip(start_epoch..=end_epoch)
+            .map(|(maybe_credits, epoch)| {
+                maybe_credits.map(|credits| {
+                    if (epoch as u64) < tvc_activation_epoch {
+                        credits.saturating_mul(TVC_MULTIPLIER)
+                    } else {
+                        credits
+                    }
+                })
+            })
+            .collect()
     }
 
     pub fn superminority_latest(&self) -> Option<u8> {
