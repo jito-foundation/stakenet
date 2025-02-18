@@ -5,13 +5,20 @@ use {
         errors::ValidatorHistoryError,
         utils::{cast_epoch, find_insert_position, get_max_epoch, get_min_epoch},
     },
-    anchor_lang::prelude::*,
+    anchor_lang::{
+        prelude::*,
+        solana_program::{pubkey, pubkey::Pubkey},
+    },
     borsh::{BorshDeserialize, BorshSerialize},
+    bytemuck::{Pod, Zeroable},
     std::{cmp::Ordering, collections::HashMap, mem::size_of, net::IpAddr},
     type_layout::TypeLayout,
 };
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 104);
+
+static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
+static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[account]
 #[derive(Default)]
@@ -37,6 +44,30 @@ impl Config {
 }
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
+
+#[derive(BorshSerialize, Copy, Clone, Default, PartialEq)]
+#[repr(u8)]
+pub enum MerkleRootUploadAuthority {
+    #[default]
+    Other,
+    OldJitoLabs,
+    TipRouter,
+}
+
+unsafe impl Zeroable for MerkleRootUploadAuthority {}
+unsafe impl Pod for MerkleRootUploadAuthority {}
+
+impl MerkleRootUploadAuthority {
+    pub fn from_pubkey(tda_authority: &Pubkey) -> Self {
+        if tda_authority.eq(&JITO_LABS_AUTHORITY) {
+            Self::OldJitoLabs
+        } else if tda_authority.eq(&TIP_ROUTER_AUTHORITY) {
+            Self::TipRouter
+        } else {
+            Self::Other
+        }
+    }
+}
 
 #[derive(BorshSerialize, TypeLayout)]
 #[zero_copy]
@@ -64,7 +95,9 @@ pub struct ValidatorHistoryEntry {
     pub vote_account_last_update_slot: u64,
     // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
-    pub padding1: [u8; 84],
+    /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
+    pub merkle_root_upload_authority: MerkleRootUploadAuthority,
+    pub padding1: [u8; 83],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -89,7 +122,8 @@ impl Default for ValidatorHistoryEntry {
             rank: u32::MAX,
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
-            padding1: [u8::MAX; 84],
+            merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
+            padding1: [u8::MAX; 83],
         }
     }
 }
@@ -388,12 +422,14 @@ impl ValidatorHistory {
         epoch: u16,
         commission: u16,
         mev_earned: u32,
+        merkle_root_upload_authority: MerkleRootUploadAuthority,
     ) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
                     entry.mev_earned = mev_earned;
                     entry.mev_commission = commission;
+                    entry.merkle_root_upload_authority = merkle_root_upload_authority;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -405,6 +441,7 @@ impl ValidatorHistory {
                     {
                         entry.mev_earned = mev_earned;
                         entry.mev_commission = commission;
+                        entry.merkle_root_upload_authority = merkle_root_upload_authority;
                     }
                     return Ok(());
                 }
@@ -415,6 +452,7 @@ impl ValidatorHistory {
             epoch,
             mev_commission: commission,
             mev_earned,
+            merkle_root_upload_authority,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

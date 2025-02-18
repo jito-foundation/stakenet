@@ -1,10 +1,15 @@
 #![allow(clippy::await_holding_refcell_ref)]
+use std::str::FromStr;
+
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
+use test_case::test_case;
 use tests::validator_history_fixtures::{new_tip_distribution_account, TestFixture};
-use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{
+    Config, MerkleRootUploadAuthority, ValidatorHistory, ValidatorHistoryEntry,
+};
 
 #[tokio::test]
 async fn test_mev_commission() {
@@ -23,7 +28,7 @@ async fn test_mev_commission() {
     // No MEV earned
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(fixture.vote_account, 42, None).into(),
+        &new_tip_distribution_account(fixture.vote_account, 42, None, Pubkey::default()).into(),
     );
 
     // update mev commission
@@ -58,10 +63,20 @@ async fn test_mev_commission() {
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].mev_commission == 42);
     assert!(account.history.arr[0].mev_earned == ValidatorHistoryEntry::default().mev_earned);
+    assert!(
+        account.history.arr[0].merkle_root_upload_authority
+            == ValidatorHistoryEntry::default().merkle_root_upload_authority
+    );
 
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(fixture.vote_account, 42, Some(123_236_567_899)).into(),
+        &new_tip_distribution_account(
+            fixture.vote_account,
+            42,
+            Some(123_236_567_899),
+            Pubkey::default(),
+        )
+        .into(),
     );
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
@@ -195,7 +210,7 @@ async fn test_mev_commission_fail() {
             .0;
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(new_vote_account, 42, Some(123456)).into(),
+        &new_tip_distribution_account(new_vote_account, 42, Some(123456), Pubkey::default()).into(),
     );
 
     // test update mev commission with wrong validator's TDA
@@ -280,4 +295,61 @@ async fn test_change_tip_distribution_authority() {
     fixture
         .submit_transaction_assert_error(transaction, "ConstraintHasOne.")
         .await;
+}
+
+#[test_case(Pubkey::from_str("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib").unwrap(), MerkleRootUploadAuthority::OldJitoLabs ; "when TDA upload authority is OldJito")]
+#[test_case(Pubkey::from_str("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt").unwrap(), MerkleRootUploadAuthority::TipRouter ; "when TDA upload authority is TipRouter")]
+#[tokio::test]
+async fn test_old_jito_merkle_root_upload_authority(
+    merkle_root_upload_authority: Pubkey,
+    expected_val: MerkleRootUploadAuthority,
+) {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    let epoch = 0;
+    let tip_distribution_account = derive_tip_distribution_account_address(
+        &jito_tip_distribution::id(),
+        &fixture.vote_account,
+        epoch,
+    )
+    .0;
+
+    ctx.borrow_mut().set_account(
+        &tip_distribution_account,
+        &new_tip_distribution_account(fixture.vote_account, 42, None, merkle_root_upload_authority)
+            .into(),
+    );
+
+    // update mev commission
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyTipDistributionAccount { epoch }.data(),
+        accounts: validator_history::accounts::CopyTipDistributionAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            config: fixture.validator_history_config,
+            tip_distribution_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    // assert values, mev earned default
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert!(account.history.arr[0].merkle_root_upload_authority == expected_val);
 }
