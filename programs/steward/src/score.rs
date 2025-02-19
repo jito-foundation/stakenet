@@ -45,7 +45,7 @@ pub struct ScoreComponentsV3 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
-    /// If user is using TipRouter authority, OR OldJito authority prior to TipRouter only 
+    /// If user is using TipRouter authority, OR OldJito authority prior to TipRouter only
     /// activation epoch, then score is 1.0, else 0.0
     pub merkle_root_upload_authority_score: f64,
 
@@ -165,7 +165,8 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
-    let merkle_root_upload_authority_score = calculate_merkle_root_authoirty(validator, config, current_epoch)?;
+    let merkle_root_upload_authority_score =
+        calculate_merkle_root_authoirty(validator, config, current_epoch)?;
 
     /////// Formula ///////
 

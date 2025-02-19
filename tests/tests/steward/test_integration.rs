@@ -27,7 +27,9 @@ use tests::steward_fixtures::{
     validator_history_default, TestFixture,
 };
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry, Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory, ValidatorHistoryEntry
+    constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
+    Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
+    ValidatorHistoryEntry,
 };
 
 #[tokio::test]

@@ -45,7 +45,10 @@ use spl_stake_pool::{
     },
 };
 use validator_history::{
-    self, constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER}, CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, MerkleRootUploadAuthority, ValidatorHistory, ValidatorHistoryEntry
+    self,
+    constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
+    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    ValidatorHistory, ValidatorHistoryEntry,
 };
 
 pub struct StakePoolMetadata {
@@ -1778,7 +1781,7 @@ impl Default for StateMachineFixtures {
             validator_history_blacklist: LargeBitMask::default(),
             _padding: [0; 1020],
             _padding0: [0; 1],
-            tip_router_upload_auth_epoch_cutoff: 0,
+            tip_router_upload_auth_epoch_cutoff: 21,
         };
 
         // Setup Sysvars: Clock, EpochSchedule
