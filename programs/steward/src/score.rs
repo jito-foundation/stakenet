@@ -45,7 +45,7 @@ pub struct ScoreComponentsV3 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
-    /// If user is using TipRouter authority, OR OldJito authority prior to TipRouter only
+    /// If validator is using TipRouter authority, OR OldJito authority prior to TipRouter only
     /// activation epoch, then score is 1.0, else 0.0
     pub merkle_root_upload_authority_score: f64,
 
