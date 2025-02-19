@@ -637,7 +637,11 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
 }
 
 /// Checks if the validator is using allowed Tip Distribution merkle root upload authority
-pub fn calculate_instant_unstake_merkle_root_upload_auth(validator: &ValidatorHistory, config: &Config, current_epoch: u16) -> Result<bool> {
+pub fn calculate_instant_unstake_merkle_root_upload_auth(
+    validator: &ValidatorHistory,
+    config: &Config,
+    current_epoch: u16,
+) -> Result<bool> {
     if let Some(merkle_root_upload_authority) =
         validator.history.merkle_root_upload_authority_latest()
     {

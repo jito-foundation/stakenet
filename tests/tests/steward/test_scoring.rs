@@ -739,7 +739,9 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(!score);
 
         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
@@ -747,14 +749,18 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(score);
         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
         validator.history.push(ValidatorHistoryEntry {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(score);
 
         // Test after TipRouter only config switch
@@ -764,7 +770,9 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(!score);
 
         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
@@ -772,7 +780,9 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(!score);
 
         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
@@ -780,7 +790,9 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(score);
     }
 
@@ -791,7 +803,9 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
         let mut config = create_config(300, 8, 10);
         config.tip_router_upload_auth_epoch_cutoff = 800;
         let current_epoch = 800;
-        let score = calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch).unwrap();
+        let score =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
         assert!(!score);
     }
 }
