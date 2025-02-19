@@ -439,22 +439,9 @@ pub fn calculate_merkle_root_authoirty(
     config: &Config,
     current_epoch: u16,
 ) -> Result<f64> {
-    if let Some(merkle_root_upload_authority) =
-        validator.history.merkle_root_upload_authority_latest()
-    {
-        match merkle_root_upload_authority {
-            MerkleRootUploadAuthority::OldJitoLabs => {
-                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff {
-                    Ok(0.0)
-                } else {
-                    Ok(1.0)
-                }
-            }
-            MerkleRootUploadAuthority::TipRouter => Ok(1.0),
-            _ => Ok(0.0),
-        }
+    if calculate_instant_unstake_merkle_root_upload_auth(validator, config, current_epoch)? {
+        Ok(1.0)
     } else {
-        // Default to 0 if empty history?
         Ok(0.0)
     }
 }
@@ -647,4 +634,26 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
     config
         .validator_history_blacklist
         .get(validator_index as usize)
+}
+
+/// Checks if the validator is using allowed Tip Distribution merkle root upload authority
+pub fn calculate_instant_unstake_merkle_root_upload_auth(validator: &ValidatorHistory, config: &Config, current_epoch: u16) -> Result<bool> {
+    if let Some(merkle_root_upload_authority) =
+        validator.history.merkle_root_upload_authority_latest()
+    {
+        match merkle_root_upload_authority {
+            MerkleRootUploadAuthority::OldJitoLabs => {
+                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff {
+                    Ok(false)
+                } else {
+                    Ok(true)
+                }
+            }
+            MerkleRootUploadAuthority::TipRouter => Ok(true),
+            _ => Ok(false),
+        }
+    } else {
+        // Default to 0 if empty history?
+        Ok(false)
+    }
 }
