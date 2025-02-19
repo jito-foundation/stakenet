@@ -3,7 +3,9 @@ use anchor_lang::IdlBuild;
 use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
 };
-use validator_history::{constants::TVC_MULTIPLIER, ClusterHistory, ValidatorHistory};
+use validator_history::{
+    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
+};
 
 use crate::{
     constants::{
@@ -158,6 +160,8 @@ pub fn validator_score(
         calculate_superminority(validator, current_epoch, params.commission_range)?;
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
+
+    // TODO: Add MerkleRootAuthorityScore
 
     /////// Formula ///////
 
@@ -418,6 +422,32 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
     {
         Ok(0.0)
     } else {
+        Ok(1.0)
+    }
+}
+
+/// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
+pub fn calculate_merkle_root_authoirty(
+    validator: &ValidatorHistory,
+    config: &Config,
+    current_epoch: u64,
+) -> Result<f64> {
+    if let Some(merkle_root_upload_authority) =
+        validator.history.merkle_root_upload_authority_latest()
+    {
+        match merkle_root_upload_authority {
+            MerkleRootUploadAuthority::OldJitoLabs => {
+                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff {
+                    Ok(0.0)
+                } else {
+                    Ok(1.0)
+                }
+            }
+            MerkleRootUploadAuthority::TipRouter => Ok(1.0),
+            _ => Ok(0.0),
+        }
+    } else {
+        // Default to 1 if empty history?
         Ok(1.0)
     }
 }

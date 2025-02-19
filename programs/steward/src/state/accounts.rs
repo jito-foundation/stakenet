@@ -44,8 +44,15 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
+    /// Required for 8 byte alignment
+    pub _padding0: [u8; 7],
+
+    /// The epoch after which validators must be using TipRouter upload authority for tip
+    /// distribution
+    pub tip_router_upload_auth_epoch_cutoff: u64,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 1023],
+    pub _padding: [u8; 1008],
 }
 
 impl Config {

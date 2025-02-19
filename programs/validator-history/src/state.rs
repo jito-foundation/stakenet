@@ -45,10 +45,11 @@ impl Config {
 
 static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 
-#[derive(BorshSerialize, Copy, Clone, Default, PartialEq)]
+#[derive(BorshSerialize, Copy, Clone, Debug, Default, PartialEq)]
 #[repr(u8)]
 pub enum MerkleRootUploadAuthority {
     #[default]
+    Empty,
     Other,
     OldJitoLabs,
     TipRouter,
@@ -307,6 +308,10 @@ impl CircBuf {
 
     pub fn epoch_credits_latest(&self) -> Option<u32> {
         field_latest!(self, epoch_credits)
+    }
+
+    pub fn merkle_root_upload_authority_latest(&self) -> Option<MerkleRootUploadAuthority> {
+        field_latest!(self, merkle_root_upload_authority)
     }
 
     /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 16x higher

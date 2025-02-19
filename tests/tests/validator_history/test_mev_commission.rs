@@ -64,8 +64,7 @@ async fn test_mev_commission() {
     assert!(account.history.arr[0].mev_commission == 42);
     assert!(account.history.arr[0].mev_earned == ValidatorHistoryEntry::default().mev_earned);
     assert!(
-        account.history.arr[0].merkle_root_upload_authority
-            == ValidatorHistoryEntry::default().merkle_root_upload_authority
+        account.history.arr[0].merkle_root_upload_authority == MerkleRootUploadAuthority::Other
     );
 
     ctx.borrow_mut().set_account(
