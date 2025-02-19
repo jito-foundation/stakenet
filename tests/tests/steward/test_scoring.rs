@@ -28,9 +28,9 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        _padding0: [0; 7],
+        _padding0: [0; 1],
         tip_router_upload_auth_epoch_cutoff: 0,
-        _padding: [0; 1008],
+        _padding: [0; 1020],
     }
 }
 
@@ -515,7 +515,7 @@ mod test_calculate_merkle_root_authoirty {
         config.tip_router_upload_auth_epoch_cutoff = 800;
         let current_epoch = 800;
         let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
     }
 }
 

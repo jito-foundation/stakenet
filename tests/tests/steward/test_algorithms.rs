@@ -12,7 +12,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV2,
-        InstantUnstakeDetails, ScoreComponentsV2, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -47,7 +47,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -58,6 +58,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -88,7 +89,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -99,6 +100,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -127,7 +129,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -138,6 +140,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -166,7 +169,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -177,6 +180,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -209,7 +213,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -220,6 +224,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -250,7 +255,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -261,6 +266,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -292,7 +298,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -303,6 +309,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -335,7 +342,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -346,6 +353,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -375,7 +383,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
@@ -386,6 +394,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 0.0,
             historical_commission_score: 0.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -423,7 +432,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -434,6 +443,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -461,7 +471,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -472,6 +482,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 0.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -506,7 +517,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
@@ -517,6 +528,7 @@ fn test_compute_score() {
             vote_credits_ratio: 0.88,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -546,7 +558,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
@@ -557,6 +569,7 @@ fn test_compute_score() {
             vote_credits_ratio: 0.95,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -591,7 +604,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
@@ -602,6 +615,7 @@ fn test_compute_score() {
             vote_credits_ratio: 0.9,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -634,7 +648,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -645,6 +659,7 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {

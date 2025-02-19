@@ -12,7 +12,7 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, StateTransition},
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2, ScoreComponentsV2,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2, ScoreComponentsV3,
     },
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
@@ -609,7 +609,7 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-    ) -> Result<Option<ScoreComponentsV2>> {
+    ) -> Result<Option<ScoreComponentsV3>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;

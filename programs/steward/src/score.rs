@@ -17,7 +17,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV2 {
+pub struct ScoreComponentsV3 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -44,6 +44,10 @@ pub struct ScoreComponentsV2 {
 
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
+
+    /// If user is using TipRouter authority, OR OldJito authority prior to TipRouter only 
+    /// activation epoch, then score is 1.0, else 0.0
+    pub merkle_root_upload_authority_score: f64,
 
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
@@ -93,7 +97,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV2> {
+) -> Result<ScoreComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -161,7 +165,7 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
-    // TODO: Add MerkleRootAuthorityScore
+    let merkle_root_upload_authority_score = calculate_merkle_root_authoirty(validator, config, current_epoch)?;
 
     /////// Formula ///////
 
@@ -174,9 +178,10 @@ pub fn validator_score(
         * superminority_score
         * delinquency_score
         * running_jito_score
-        * yield_score;
+        * yield_score
+        * merkle_root_upload_authority_score;
 
-    Ok(ScoreComponentsV2 {
+    Ok(ScoreComponentsV3 {
         score,
         yield_score,
         mev_commission_score,
@@ -186,6 +191,7 @@ pub fn validator_score(
         running_jito_score,
         commission_score,
         historical_commission_score,
+        merkle_root_upload_authority_score,
         vote_credits_ratio,
         vote_account: validator.vote_account,
         epoch: current_epoch,
@@ -430,7 +436,7 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
 pub fn calculate_merkle_root_authoirty(
     validator: &ValidatorHistory,
     config: &Config,
-    current_epoch: u64,
+    current_epoch: u16,
 ) -> Result<f64> {
     if let Some(merkle_root_upload_authority) =
         validator.history.merkle_root_upload_authority_latest()
@@ -447,8 +453,8 @@ pub fn calculate_merkle_root_authoirty(
             _ => Ok(0.0),
         }
     } else {
-        // Default to 1 if empty history?
-        Ok(1.0)
+        // Default to 0 if empty history?
+        Ok(0.0)
     }
 }
 
