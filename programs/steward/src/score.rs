@@ -448,7 +448,7 @@ pub fn calculate_merkle_root_authoirty(
 
 #[event]
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstantUnstakeComponentsV2 {
+pub struct InstantUnstakeComponentsV3 {
     /// Aggregate of all checks
     pub instant_unstake: bool,
 
@@ -463,6 +463,9 @@ pub struct InstantUnstakeComponentsV2 {
 
     /// Checks if validator was added to blacklist
     pub is_blacklisted: bool,
+
+    /// Checks if validator has an unacceptable merkle root upload authority
+    pub is_bad_merkle_root_upload_authority: bool,
 
     pub vote_account: Pubkey,
 
@@ -502,7 +505,7 @@ pub fn instant_unstake_validator(
     epoch_start_slot: u64,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<InstantUnstakeComponentsV2> {
+) -> Result<InstantUnstakeComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared calculations ///////
@@ -550,15 +553,22 @@ pub fn instant_unstake_validator(
 
     let is_blacklisted = calculate_instant_unstake_blacklist(config, validator.index)?;
 
-    let instant_unstake =
-        delinquency_check || commission_check || mev_commission_check || is_blacklisted;
+    let is_bad_merkle_root_upload_authority =
+        calculate_instant_unstake_merkle_root_upload_auth(validator, config, current_epoch)?;
 
-    Ok(InstantUnstakeComponentsV2 {
+    let instant_unstake = delinquency_check
+        || commission_check
+        || mev_commission_check
+        || is_blacklisted
+        || is_bad_merkle_root_upload_authority;
+
+    Ok(InstantUnstakeComponentsV3 {
         instant_unstake,
         delinquency_check,
         commission_check,
         mev_commission_check,
         is_blacklisted,
+        is_bad_merkle_root_upload_authority,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: InstantUnstakeDetails {

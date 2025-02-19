@@ -11,7 +11,7 @@ use jito_steward::{
     events::DecreaseComponents,
     insert_sorted_index,
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
         InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
@@ -937,12 +937,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -973,12 +974,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: true,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1006,12 +1008,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: true,
             commission_check: true,
             mev_commission_check: true,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: bad_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1057,12 +1060,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: true,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1108,12 +1112,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: false,
             commission_check: true,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1141,12 +1146,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1174,13 +1180,52 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
+            epoch: current_epoch,
+            details: InstantUnstakeDetails {
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
+                vote_account_last_update_slot: end_slot,
+                total_blocks_latest: 0,
+                cluster_history_slot_index: slot_index,
+                commission: 0,
+                mev_commission: 0
+            }
+        }
+    );
+
+    // Instant unstake true when bad merkle root upload authority
+    let mut validator = validators[0];
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .merkle_root_upload_authority = MerkleRootUploadAuthority::Other;
+    let res = instant_unstake_validator(
+        &validator,
+        &cluster_history,
+        &config,
+        start_slot,
+        current_epoch,
+        TVC_ACTIVATION_EPOCH,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap(),
+        InstantUnstakeComponentsV3 {
+            instant_unstake: true,
+            delinquency_check: false,
+            commission_check: false,
+            mev_commission_check: false,
+            is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: true,
+            vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
