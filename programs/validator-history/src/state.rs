@@ -1,3 +1,9 @@
+#[cfg(feature = "idl-build")]
+use anchor_lang::idl::{
+    types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
+    IdlBuild,
+};
+
 use {
     crate::{
         constants::TVC_MULTIPLIER,
@@ -67,6 +73,39 @@ impl MerkleRootUploadAuthority {
         } else {
             Self::Other
         }
+    }
+}
+
+#[cfg(feature = "idl-build")]
+impl IdlBuild for MerkleRootUploadAuthority {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "MerkleRootUploadAuthority".to_string(),
+            ty: IdlTypeDefTy::Enum {
+                variants: vec![
+                    IdlEnumVariant {
+                        name: "Empty".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "Other".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "OldJitoLabs".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "TipRouter".to_string(),
+                        fields: None,
+                    },
+                ],
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
     }
 }
 
