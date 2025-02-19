@@ -440,9 +440,9 @@ pub fn calculate_merkle_root_authoirty(
     current_epoch: u16,
 ) -> Result<f64> {
     if calculate_instant_unstake_merkle_root_upload_auth(validator, config, current_epoch)? {
-        Ok(1.0)
-    } else {
         Ok(0.0)
+    } else {
+        Ok(1.0)
     }
 }
 
@@ -648,16 +648,16 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
         match merkle_root_upload_authority {
             MerkleRootUploadAuthority::OldJitoLabs => {
                 if current_epoch >= config.tip_router_upload_auth_epoch_cutoff {
-                    Ok(false)
-                } else {
                     Ok(true)
+                } else {
+                    Ok(false)
                 }
             }
-            MerkleRootUploadAuthority::TipRouter => Ok(true),
-            _ => Ok(false),
+            MerkleRootUploadAuthority::TipRouter => Ok(false),
+            _ => Ok(true),
         }
     } else {
         // Default to 0 if empty history?
-        Ok(false)
+        Ok(true)
     }
 }
