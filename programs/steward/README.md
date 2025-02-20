@@ -55,6 +55,7 @@ The following metrics are used to calculate the `score` and `yield_score`:
 - `superminority_score`: If validator is not in the superminority, score is 1.0, else 0.0
 - `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
 - `running_jito_score`: If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
+- `merkle_root_upload_authority_score`: If validator is using TipRouter Tip Distribution merkle root upload authority (OR OldJito authority prior to TipRouter only activation epoch) then score is 1.0, else 0.0
 
 > Note: All data comes from the `ValidatorHistory` account for each validator.
 
@@ -71,6 +72,7 @@ let score = mev_commission_score
     * delinquency_score
     * running_jito_score
     * yield_score
+    * merkle_root_upload_authority_score
 ```
 
 As a validator, in order to receive a high score for JitoSOL, you must meet these binary eligibility criteria, and return a high rate of rewards to your stakers. The eligibility criteria ensure that we're delegating to validators that meet some important properties for decentralization, Solana network health, operator quality, and MEV sharing. The yield score is an objective way to compare validators' relative yield and ensure we're returning a competitive APY to JitoSOL holders, which in turn attracts more stake to delegate to validators.
@@ -79,7 +81,7 @@ In this version 0 of the score formula, there is no weighting of any factor abov
 
 For a breakdown of the formulas used for each score, see the Appendix.
 
-Take a look at the implementation in [score.rs](./src/score.rs#L14)
+Take a look at the implementation in [score.rs](./src/score.rs#L175)
 
 ### Compute Delegations
 
@@ -103,15 +105,16 @@ The following criteria are used to determine if a validator should be instantly 
 - `commission_check`: Checks if validator has increased commission > `commission_threshold`
 - `mev_commission_check`: Checks if validator has increased MEV commission > `mev_commission_bps_threshold`
 - `is_blacklisted`: Checks if validator was added to blacklist blacklisted
+- `is_bad_merkle_root_upload_authority`: Checks if validator has an unacceptable Tip Distribution merkle root upload authority
 
 If any of these criteria are true, we mark the validator for instant unstaking:
 
 ```rust
 let instant_unstake =
-    delinquency_check || commission_check || mev_commission_check || is_blacklisted;
+    delinquency_check || commission_check || mev_commission_check || is_blacklisted || is_bad_merkle_root_upload_authority;
 ```
 
-Take a look at the implementation in [score.rs](./src/score.rs#L212)
+Take a look at the implementation in [score.rs](./src/score.rs#L559)
 
 ### Rebalance
 
@@ -315,6 +318,18 @@ $`
 
 $`
 \displaylines{
+\text{merkle\_root\_upload\_authority\_score} = 
+\begin{cases} 
+1.0 & \text{if Tip Distribution merkle root upload authority is acceptable in current epoch} \\
+0.0 & \text{otherwise}
+\end{cases}
+}
+`$
+
+---
+
+$`
+\displaylines{
 \text{superminority\_score} = 
 \begin{cases} 
 0.0 & \text{if in superminority in current epoch} \\
@@ -351,6 +366,6 @@ Note: Yield score is a relative measure of the yield returned to stakers by the 
 
 $`
 \displaylines{
-\text{final\_score} = \text{mev\_commission\_score} \times \text{commission\_score} \times \text{historical\_commission\_score} \times \text{blacklisted\_score} \times \text{superminority\_score} \times \text{delinquency\_score} \times \text{running\_jito\_score} \times \text{yield\_score}
+\text{final\_score} = \text{mev\_commission\_score} \times \text{commission\_score} \times \text{historical\_commission\_score} \times \text{blacklisted\_score} \times \text{merkle\_root\_upload\_authority\_score} \times \text{superminority\_score} \times \text{delinquency\_score} \times \text{running\_jito\_score} \times \text{yield\_score}
 }
 `$

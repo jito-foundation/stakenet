@@ -47,8 +47,8 @@ use spl_stake_pool::{
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
-    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, ValidatorHistory,
-    ValidatorHistoryEntry,
+    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    ValidatorHistory, ValidatorHistoryEntry,
 };
 
 pub struct StakePoolMetadata {
@@ -1243,8 +1243,10 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             validator_history_blacklist: LargeBitMask::default(),
             parameters: Parameters::default(),
-            _padding: [0; 1023],
+            _padding0: [0; 1],
+            _padding: [0; 1020],
             paused: false.into(),
+            tip_router_upload_auth_epoch_cutoff: 0,
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1777,7 +1779,9 @@ impl Default for StateMachineFixtures {
             parameters_authority: Pubkey::new_unique(),
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
-            _padding: [0; 1023],
+            _padding: [0; 1020],
+            _padding0: [0; 1],
+            tip_router_upload_auth_epoch_cutoff: 21,
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -1807,6 +1811,7 @@ impl Default for StateMachineFixtures {
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1827,6 +1832,7 @@ impl Default for StateMachineFixtures {
                 is_superminority: 1,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1847,6 +1853,7 @@ impl Default for StateMachineFixtures {
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
