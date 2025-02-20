@@ -19,7 +19,7 @@ testnet = []
 cpi = ["no-entrypoint"]
 default = ["custom-heap"]
 custom-heap = []
-idl-build = ["anchor-lang/idl-build", "no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "validator-history/idl-build", "no-entrypoint"]
 
 [dependencies]
 anchor-lang = "0.30.0"
