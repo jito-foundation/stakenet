@@ -4,6 +4,7 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::rpc_config::RpcGetVoteAccountsConfig;
 use solana_program::instruction::Instruction;
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use validator_history::id as validator_history_id;
@@ -64,6 +65,32 @@ pub async fn command_crank_rebalance(
             }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
+
+    let mut count = 0;
+    println!("vote, validator, stake");
+    for data in &validators_to_run {
+        let validator_info = steward_accounts.validator_list_account.validators[data.0];
+        let stake: u64 = validator_info.active_stake_lamports.into();
+
+        let config = RpcGetVoteAccountsConfig {
+            vote_pubkey: Some(validator_info.vote_account_address.to_string()),
+            ..RpcGetVoteAccountsConfig::default()
+        };
+
+        let status = client.get_vote_accounts_with_config(config).await?;
+
+        println!(
+            "{:?}, {}, {}",
+            validator_info.vote_account_address,
+            status.current[0].clone().node_pubkey,
+            stake
+        );
+        count += 1;
+    }
+
+    println!("Rebalancing Validators {}", count);
+
+    return Ok(());
 
     let ixs_to_run = validators_to_run
         .iter()

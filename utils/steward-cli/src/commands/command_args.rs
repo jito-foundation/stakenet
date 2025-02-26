@@ -303,23 +303,29 @@ pub enum AuthoritySubcommand {
     /// Manages blacklist authority
     Blacklist {
         #[command(flatten)]
-        permissioned_parameters: PermissionedParameters,
+        permissioned_parameters: PermissionlessParameters,
         #[arg(long, env)]
         new_authority: Pubkey,
+        #[arg(long, env)]
+        old_authority: Pubkey,
     },
     /// Manages admin authority
     Admin {
         #[command(flatten)]
-        permissioned_parameters: PermissionedParameters,
+        permissioned_parameters: PermissionlessParameters,
         #[arg(long, env)]
         new_authority: Pubkey,
+        #[arg(long, env)]
+        old_authority: Pubkey,
     },
     /// Manages parameters authority
     Parameters {
         #[command(flatten)]
-        permissioned_parameters: PermissionedParameters,
+        permissioned_parameters: PermissionlessParameters,
         #[arg(long, env)]
         new_authority: Pubkey,
+        #[arg(long, env)]
+        old_authority: Pubkey,
     },
 }
 #[derive(Parser)]

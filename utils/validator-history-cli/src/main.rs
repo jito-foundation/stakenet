@@ -9,7 +9,8 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
+    transaction::Transaction,
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -39,6 +40,7 @@ enum Commands {
     CrankerStatus(CrankerStatus),
     ClusterHistoryStatus,
     History(History),
+    AllHistory(AllHistory),
     BackfillClusterHistory(BackfillClusterHistory),
 }
 
@@ -88,6 +90,14 @@ struct History {
     /// Validator to get history for
     validator: Pubkey,
 
+    /// Start epoch
+    #[arg(short, long, env)]
+    start_epoch: Option<u64>,
+}
+
+#[derive(Parser)]
+#[command(about = "Get all validator history")]
+struct AllHistory {
     /// Start epoch
     #[arg(short, long, env)]
     start_epoch: Option<u64>,
@@ -514,6 +524,125 @@ fn command_history(args: History, client: RpcClient) {
     }
 }
 
+fn command_all_history(args: AllHistory, client: RpcClient) {
+    let gpa_config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            0,
+            ValidatorHistory::discriminator().into(),
+        ))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+    let mut validator_history_accounts = client
+        .get_program_accounts_with_config(&validator_history::ID, gpa_config)
+        .unwrap();
+
+    let validator_histories = validator_history_accounts
+        .iter_mut()
+        .filter_map(|(_, account)| {
+            ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+        })
+        .collect::<Vec<_>>();
+
+    let mut paladin_histories = validator_histories
+        .iter()
+        .filter(|history| {
+            history
+                .history
+                .arr
+                .iter()
+                .any(|entry| entry.epoch == 744 && entry.client_type == 4)
+        })
+        .collect::<Vec<_>>();
+
+    paladin_histories.sort_by(|a, b| {
+        b.history
+            .arr
+            .iter()
+            .find(|entry| entry.epoch == 744)
+            .unwrap()
+            .activated_stake_lamports
+            .cmp(
+                &a.history
+                    .arr
+                    .iter()
+                    .find(|entry| entry.epoch == 744)
+                    .unwrap()
+                    .activated_stake_lamports,
+            )
+    });
+
+    println!("Validator Histories {}", paladin_histories.len());
+    println!("vote account, stake ( sol ), epoch");
+    let mut total_lamports = 0;
+    for history in paladin_histories {
+        let last_entry = history
+            .history
+            .arr
+            .iter()
+            .find(|entry| entry.epoch == 744)
+            .unwrap();
+        let vote_account = history.vote_account;
+        let stake = last_entry.activated_stake_lamports;
+        let sol: f64 = lamports_to_sol(stake);
+        let epoch = last_entry.epoch;
+
+        println!("{}, {}, {}", vote_account, sol, epoch);
+        total_lamports += stake;
+    }
+    println!("Total Stake: {}", total_lamports);
+    println!("Total Stake SOL: {}", lamports_to_sol(total_lamports));
+
+    // // Get single validator history account and display all epochs of history
+    // let (validator_history_pda, _) = Pubkey::find_program_address(
+    //     &[ValidatorHistory::SEED, args.validator.as_ref()],
+    //     &validator_history::ID,
+    // );
+    // let validator_history_account = client
+    //     .get_account(&validator_history_pda)
+    //     .expect("Failed to get validator history account");
+    // let validator_history =
+    //     ValidatorHistory::try_deserialize(&mut validator_history_account.data.as_slice())
+    //         .expect("Failed to deserialize validator history account");
+    // let start_epoch = args.start_epoch.unwrap_or_else(|| {
+    //     validator_history
+    //         .history
+    //         .arr
+    //         .iter()
+    //         .filter_map(|entry| {
+    //             if entry.epoch > 0 {
+    //                 Some(entry.epoch as u64)
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .min()
+    //         .unwrap_or(0)
+    // });
+    // let current_epoch = client
+    //     .get_epoch_info()
+    //     .expect("Failed to get epoch info")
+    //     .epoch;
+    // println!(
+    //     "History for validator {} | Validator History Account {}",
+    //     args.validator, validator_history_pda
+    // );
+    // for epoch in start_epoch..=current_epoch {
+    //     match get_entry(validator_history, epoch) {
+    //         Some(entry) => {
+    //             println!("Epoch: {} | {}", epoch, formatted_entry(entry));
+    //         }
+    //         None => {
+    //             println!("Epoch {}:\tNo history", epoch);
+    //             continue;
+    //         }
+    //     }
+    // }
+}
+
 fn command_cluster_history(client: RpcClient) {
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
@@ -599,6 +728,7 @@ fn main() {
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
+        Commands::AllHistory(args) => command_all_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
     };
 }
