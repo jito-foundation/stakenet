@@ -138,21 +138,22 @@ pub fn _get_update_stake_pool_ixs(
                         stake_account,
                         vote_account
                     );
-                    return false;
-                }
-                let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+                    false
+                } else {
+                    let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-                match stake_account {
-                    StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                        if stake.delegation.deactivation_epoch != std::u64::MAX {
-                            false
-                        } else {
-                            latest_epoch <= epoch - 5
+                    match stake_account {
+                        StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                            if stake.delegation.deactivation_epoch != std::u64::MAX {
+                                false
+                            } else {
+                                latest_epoch <= epoch - 5
+                            }
                         }
-                    }
-                    _ => {
-                        println!("🔶 Error: Stake account is not StakeStateV2::Stake");
-                        false
+                        _ => {
+                            println!("🔶 Error: Stake account is not StakeStateV2::Stake");
+                            false
+                        }
                     }
                 }
             }
