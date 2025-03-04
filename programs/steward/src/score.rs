@@ -657,7 +657,7 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
     {
         match merkle_root_upload_authority {
             MerkleRootUploadAuthority::OldJitoLabs => {
-                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff {
+                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff.into() {
                     Ok(true)
                 } else {
                     Ok(false)

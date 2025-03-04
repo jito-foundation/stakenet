@@ -28,9 +28,8 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        _padding0: [0; 1],
-        tip_router_upload_auth_epoch_cutoff: 0,
-        _padding: [0; 1020],
+        tip_router_upload_auth_epoch_cutoff: 0.into(),
+        _padding: [0; 1021],
     }
 }
 
@@ -454,7 +453,7 @@ mod test_calculate_merkle_root_authoirty {
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
         );
         let mut config = create_config(300, 8, 10);
-        config.tip_router_upload_auth_epoch_cutoff = 800;
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let mut current_epoch = 3;
 
         // When using MerkleRootUploadAuthority::Other it should be a 0 score always
@@ -512,7 +511,7 @@ mod test_calculate_merkle_root_authoirty {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[]);
         let mut config = create_config(300, 8, 10);
-        config.tip_router_upload_auth_epoch_cutoff = 800;
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let current_epoch = 800;
         let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 0.0);
@@ -731,7 +730,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
         );
         let mut config = create_config(300, 8, 10);
-        config.tip_router_upload_auth_epoch_cutoff = 800;
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let mut current_epoch = 3;
 
         // When using MerkleRootUploadAuthority::Other it should be a 0 score always
@@ -801,7 +800,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[]);
         let mut config = create_config(300, 8, 10);
-        config.tip_router_upload_auth_epoch_cutoff = 800;
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let current_epoch = 800;
         let is_instant_unstake =
             calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)

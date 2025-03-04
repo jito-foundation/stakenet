@@ -761,7 +761,6 @@ fn test_compute_score() {
     );
 
     // test merkle_root_upload_authority is OldJito at tip_router_upload_auth_epoch_cutoff
-    println!("current epoch {}", current_epoch);
     let mut validator = good_validator;
     validator
         .history
@@ -772,7 +771,7 @@ fn test_compute_score() {
         &validator,
         &cluster_history,
         &config,
-        config.tip_router_upload_auth_epoch_cutoff - 1,
+        u16::from(config.tip_router_upload_auth_epoch_cutoff) - 1,
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
@@ -791,7 +790,7 @@ fn test_compute_score() {
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
-            epoch: config.tip_router_upload_auth_epoch_cutoff - 1,
+            epoch: u16::from(config.tip_router_upload_auth_epoch_cutoff) - 1,
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 10,
@@ -817,7 +816,7 @@ fn test_compute_score() {
         &validator,
         &cluster_history,
         &config,
-        config.tip_router_upload_auth_epoch_cutoff,
+        config.tip_router_upload_auth_epoch_cutoff.into(),
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
@@ -836,7 +835,7 @@ fn test_compute_score() {
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 0.0,
             vote_account: validator.vote_account,
-            epoch: config.tip_router_upload_auth_epoch_cutoff,
+            epoch: config.tip_router_upload_auth_epoch_cutoff.into(),
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 11,
@@ -862,7 +861,7 @@ fn test_compute_score() {
         &validator,
         &cluster_history,
         &config,
-        config.tip_router_upload_auth_epoch_cutoff,
+        config.tip_router_upload_auth_epoch_cutoff.into(),
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
@@ -881,7 +880,7 @@ fn test_compute_score() {
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
-            epoch: config.tip_router_upload_auth_epoch_cutoff,
+            epoch: config.tip_router_upload_auth_epoch_cutoff.into(),
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 11,

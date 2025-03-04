@@ -1243,10 +1243,9 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             validator_history_blacklist: LargeBitMask::default(),
             parameters: Parameters::default(),
-            _padding0: [0; 1],
-            _padding: [0; 1020],
+            _padding: [0; 1021],
             paused: false.into(),
-            tip_router_upload_auth_epoch_cutoff: 0,
+            tip_router_upload_auth_epoch_cutoff: 0.into(),
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1779,9 +1778,8 @@ impl Default for StateMachineFixtures {
             parameters_authority: Pubkey::new_unique(),
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
-            _padding: [0; 1020],
-            _padding0: [0; 1],
-            tip_router_upload_auth_epoch_cutoff: 21,
+            _padding: [0; 1021],
+            tip_router_upload_auth_epoch_cutoff: 21.into(),
         };
 
         // Setup Sysvars: Clock, EpochSchedule
