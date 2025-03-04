@@ -166,7 +166,7 @@ pub fn validator_score(
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
     let merkle_root_upload_authority_score =
-        calculate_merkle_root_authoirty(validator, config, current_epoch)?;
+        calculate_merkle_root_authority(validator, config, current_epoch)?;
 
     /////// Formula ///////
 
@@ -434,7 +434,7 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_merkle_root_authoirty(
+pub fn calculate_merkle_root_authority(
     validator: &ValidatorHistory,
     config: &Config,
     current_epoch: u16,

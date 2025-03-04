@@ -760,7 +760,7 @@ fn test_compute_score() {
         }
     );
 
-    // test merkle_root_upload_authority is OldJito at tip_router_upload_auth_epoch_cutoff
+    // test merkle_root_upload_authority is OldJito before tip_router_upload_auth_epoch_cutoff
     let mut validator = good_validator;
     validator
         .history

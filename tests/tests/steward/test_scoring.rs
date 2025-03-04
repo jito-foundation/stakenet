@@ -461,7 +461,7 @@ mod test_calculate_merkle_root_authoirty {
             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 0.0);
 
         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
@@ -469,14 +469,14 @@ mod test_calculate_merkle_root_authoirty {
             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 1.0);
         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
         validator.history.push(ValidatorHistoryEntry {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 1.0);
 
         // Test after TipRouter only config switch
@@ -486,7 +486,7 @@ mod test_calculate_merkle_root_authoirty {
             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 0.0);
 
         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
@@ -494,7 +494,7 @@ mod test_calculate_merkle_root_authoirty {
             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 0.0);
 
         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
@@ -502,7 +502,7 @@ mod test_calculate_merkle_root_authoirty {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 1.0);
     }
 
@@ -513,7 +513,7 @@ mod test_calculate_merkle_root_authoirty {
         let mut config = create_config(300, 8, 10);
         config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let current_epoch = 800;
-        let score = calculate_merkle_root_authoirty(&validator, &config, current_epoch).unwrap();
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
         assert_eq!(score, 0.0);
     }
 }
