@@ -514,7 +514,7 @@ mod test_calculate_merkle_root_authoirty {
         config.tip_router_upload_auth_epoch_cutoff = 800.into();
         let current_epoch = 800;
         let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 1.0);
     }
 }
 
@@ -805,6 +805,6 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
         let is_instant_unstake =
             calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
                 .unwrap();
-        assert!(is_instant_unstake);
+        assert!(!is_instant_unstake);
     }
 }

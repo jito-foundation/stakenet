@@ -667,7 +667,9 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
             _ => Ok(true),
         }
     } else {
-        // Default to 0 if empty history?
-        Ok(true)
+        // Default to false (score 1) to be conservative. There are plenty of other mechanisms
+        // that prevent a validator with no history from getting stake, so we don't want this to be
+        // the hidden linchpin
+        Ok(false)
     }
 }
