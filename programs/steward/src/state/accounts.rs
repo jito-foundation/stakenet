@@ -2,16 +2,19 @@ use std::mem::size_of;
 
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
-use spl_pod::primitives::PodU16;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
+use crate::{
+    parameters::Parameters,
+    utils::{PodU16, U8Bool},
+    LargeBitMask, StewardState,
+};
 
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
 /// squat a config address for another party's stake pool.
 #[account(zero_copy)]
-#[derive(TypeLayout)]
+#[derive(BorshSerialize, TypeLayout)]
 pub struct Config {
     /// SPL Stake Pool address that this program is managing
     pub stake_pool: Pubkey,
@@ -51,22 +54,6 @@ pub struct Config {
 
     /// Padding for future governance parameters
     pub _padding: [u8; 1021],
-}
-
-impl BorshSerialize for Config {
-    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        self.stake_pool.serialize(writer)?;
-        self.validator_list.serialize(writer)?;
-        self.admin.serialize(writer)?;
-        self.parameters_authority.serialize(writer)?;
-        self.blacklist_authority.serialize(writer)?;
-        self.validator_history_blacklist.serialize(writer)?;
-        self.parameters.serialize(writer)?;
-        self.paused.serialize(writer)?;
-        let cutoff: u16 = self.tip_router_upload_auth_epoch_cutoff.into();
-        cutoff.serialize(writer)?;
-        self._padding.serialize(writer)
-    }
 }
 
 impl Config {
