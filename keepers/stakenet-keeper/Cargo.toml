@@ -5,7 +5,7 @@ edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = "0.30.1"
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"] }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenv = "0.15.0"
