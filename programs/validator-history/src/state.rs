@@ -134,7 +134,14 @@ pub struct ValidatorHistoryEntry {
     pub vote_account_last_update_slot: u64,
     // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
-    pub padding1: [u8; 84],
+    // Priority Fees earned and transferred to the distribution account, stored as 1/100th SOL.
+    // priority_fees_earned = 100 means 1.00 SOL earned
+    pub priority_fees_earned: u32,
+    // The total priority fees the validator earned for the epoch.
+    pub total_priority_fees: u64,
+    // Priority Fee commission in basis points
+    pub priority_fee_commission: u16,
+    pub padding1: [u8; 70],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -159,7 +166,10 @@ impl Default for ValidatorHistoryEntry {
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
             merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
-            padding1: [u8::MAX; 84],
+            priority_fees_earned: u32::MAX,
+            total_priority_fees: u64::MAX,
+            priority_fee_commission: u16::MAX,
+            padding1: [u8::MAX; 70],
         }
     }
 }
@@ -535,6 +545,35 @@ impl ValidatorHistory {
             activated_stake_lamports: stake,
             rank,
             is_superminority: is_superminority as u8,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+        Ok(())
+    }
+
+    pub fn set_total_priority_fees(&mut self, epoch: u16, total_priority_fees: u64) -> Result<()> {
+        // Only one authority for upload here, so any epoch can be updated in case of missed upload
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.total_priority_fees = total_priority_fees;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    for entry in self.history.arr_mut().iter_mut() {
+                        if entry.epoch == epoch {
+                            entry.total_priority_fees = total_priority_fees;
+                            return Ok(());
+                        }
+                    }
+                    return Err(ValidatorHistoryError::EpochOutOfRange.into());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            total_priority_fees,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

@@ -11,6 +11,7 @@ pub mod realloc_validator_history_account;
 pub mod set_new_admin;
 pub mod set_new_oracle_authority;
 pub mod set_new_tip_distribution_program;
+pub mod update_priority_fee_history;
 pub mod update_stake_history;
 
 pub use backfill_total_blocks::*;
@@ -26,4 +27,5 @@ pub use realloc_validator_history_account::*;
 pub use set_new_admin::*;
 pub use set_new_oracle_authority::*;
 pub use set_new_tip_distribution_program::*;
+pub use update_priority_fee_history::*;
 pub use update_stake_history::*;

@@ -120,4 +120,12 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_backfill_total_blocks(ctx, epoch, blocks_in_epoch)
     }
+
+    pub fn update_priority_fee_history(
+        ctx: Context<UpdatePriorityFeeHistory>,
+        epoch: u64,
+        lamports: u64,
+    ) -> Result<()> {
+        handle_update_priority_fee_history(ctx, epoch, lamports)
+    }
 }
