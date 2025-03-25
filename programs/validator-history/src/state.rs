@@ -124,9 +124,8 @@ pub struct ValidatorHistoryEntry {
     pub client_type: u8,
     pub version: ClientVersion,
     pub ip: [u8; 4],
-    // Required so that `rank` is aligned such that curr_offset % 4 == 0 (u32 field.alignment) as per https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
-    // without it - `rank` would have offset 27, and the compiler would add an implicit padding byte after `is_superminority` and before `rank`
-    pub padding0: u8,
+    /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
+    pub merkle_root_upload_authority: MerkleRootUploadAuthority,
     // 0 if not a superminority validator, 1 if superminority validator
     pub is_superminority: u8,
     // rank of validator by stake amount
@@ -135,9 +134,7 @@ pub struct ValidatorHistoryEntry {
     pub vote_account_last_update_slot: u64,
     // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
-    /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
-    pub merkle_root_upload_authority: MerkleRootUploadAuthority,
-    pub padding1: [u8; 83],
+    pub padding1: [u8; 84],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -157,13 +154,12 @@ impl Default for ValidatorHistoryEntry {
                 patch: u16::MAX,
             },
             ip: [u8::MAX; 4],
-            padding0: u8::MAX,
             is_superminority: u8::MAX,
             rank: u32::MAX,
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
             merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
-            padding1: [u8::MAX; 83],
+            padding1: [u8::MAX; 84],
         }
     }
 }
