@@ -8,10 +8,9 @@ use {
         },
         AccountSerialize, InstructionData, ToAccountMetas,
     },
-    jito_tip_distribution::{
-        sdk::derive_tip_distribution_account_address,
-        state::{MerkleRoot, TipDistributionAccount},
-    },
+    jito_priority_fee_distribution::state::{MerkleRoot as PfMerkleRoot, PriorityFeeDistributionAccount},
+    jito_tip_distribution::state::{MerkleRoot, TipDistributionAccount},
+    jito_tip_distribution_sdk::derive_tip_distribution_account_address,
     solana_program_test::*,
     solana_sdk::{
         account::Account, instruction::Instruction, signature::Keypair, signer::Signer,
@@ -45,6 +44,11 @@ impl TestFixture {
         // make sure the program is compiled and SBF_OUT_DIR is set correctly when running this!
         let mut program = ProgramTest::new("validator_history", validator_history::ID, None);
         program.add_program("jito_tip_distribution", jito_tip_distribution::id(), None);
+        program.add_program(
+            "jito_priority_fee_distribution",
+            jito_priority_fee_distribution::id(),
+            None,
+        );
 
         let epoch = 0;
         let vote_account = Pubkey::new_unique();
@@ -377,6 +381,33 @@ pub fn new_tip_distribution_account(
         lamports: 1000000,
         data,
         owner: jito_tip_distribution::id(),
+        ..Account::default()
+    }
+}
+
+pub fn new_priority_fee_distribution_account(
+    vote_account: Pubkey,
+    priority_fee_commission_bps: u16,
+    priority_fees_earned: Option<u64>,
+    merkle_root_upload_authority: Pubkey,
+) -> Account {
+    let merkle_root = priority_fees_earned.map(|max_total_claim| PfMerkleRoot {
+        max_total_claim,
+        ..Default::default()
+    });
+    let tda = PriorityFeeDistributionAccount {
+        validator_vote_account: vote_account,
+        validator_commission_bps: priority_fee_commission_bps,
+        merkle_root,
+        merkle_root_upload_authority,
+        ..PriorityFeeDistributionAccount::default()
+    };
+    let mut data = vec![];
+    tda.try_serialize(&mut data).unwrap();
+    Account {
+        lamports: 1000000,
+        data,
+        owner: jito_priority_fee_distribution::id(),
         ..Account::default()
     }
 }

@@ -510,6 +510,45 @@ impl ValidatorHistory {
         Ok(())
     }
 
+    pub fn set_priority_fee_commission(
+        &mut self,
+        epoch: u16,
+        commission: u16,
+        priority_fees_earned: u32,
+    ) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.priority_fees_earned = priority_fees_earned;
+                    entry.priority_fee_commission = commission;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    if let Some(entry) = self
+                        .history
+                        .arr_mut()
+                        .iter_mut()
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.priority_fees_earned = priority_fees_earned;
+                        entry.priority_fee_commission = commission;
+                    }
+                    return Ok(());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            priority_fee_commission: commission,
+            priority_fees_earned,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+
+        Ok(())
+    }
+
     pub fn set_stake(
         &mut self,
         epoch: u16,

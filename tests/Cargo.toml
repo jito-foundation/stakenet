@@ -26,7 +26,9 @@ cfg-if = "1.0.0"
 ed25519-dalek = "1.0.1"
 futures = "0.3.25"
 jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
-jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
+jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
+jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
+jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
 rand = "0.7.3"
 rand_chacha = "0.3.1"
 semver = "1.0.17"

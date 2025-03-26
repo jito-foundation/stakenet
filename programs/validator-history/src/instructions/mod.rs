@@ -1,6 +1,7 @@
 pub mod backfill_total_blocks;
 pub mod copy_cluster_info;
 pub mod copy_gossip_contact_info;
+pub mod copy_priority_fee_distribution;
 pub mod copy_tip_distribution_account;
 pub mod copy_vote_account;
 pub mod initialize_cluster_history_account;
@@ -17,6 +18,7 @@ pub mod update_stake_history;
 pub use backfill_total_blocks::*;
 pub use copy_cluster_info::*;
 pub use copy_gossip_contact_info::*;
+pub use copy_priority_fee_distribution::*;
 pub use copy_tip_distribution_account::*;
 pub use copy_vote_account::*;
 pub use initialize_cluster_history_account::*;

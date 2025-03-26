@@ -128,4 +128,11 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_update_priority_fee_history(ctx, epoch, lamports)
     }
+
+    pub fn copy_priority_fee_distribution(
+        ctx: Context<CopyPriorityFeeDistribution>,
+        epoch: u64,
+    ) -> Result<()> {
+        handle_copy_priority_fee_distribution_account(ctx, epoch)
+    }
 }
