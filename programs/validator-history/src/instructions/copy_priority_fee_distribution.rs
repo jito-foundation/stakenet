@@ -74,7 +74,11 @@ pub fn handle_copy_priority_fee_distribution_account(
         ValidatorHistoryEntry::default().priority_fees_earned
     };
 
-    validator_history_account.set_priority_fee_commission(epoch, commission_bps, priority_fees_earned)?;
+    validator_history_account.set_priority_fee_commission(
+        epoch,
+        commission_bps,
+        priority_fees_earned,
+    )?;
 
     Ok(())
 }

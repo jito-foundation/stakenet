@@ -26,7 +26,13 @@ pub fn handle_realloc_config_account(
     _ctx: Context<ReallocConfigAccount>,
     new_size: u64,
 ) -> Result<()> {
-    require!(new_size <= MAX_CONFIG_SIZE, ValidatorHistoryError::AccountFullySized);
-    require!(new_size as usize >= Config::SIZE, ValidatorHistoryError::DeallocNotAllowed);
+    require!(
+        new_size <= MAX_CONFIG_SIZE,
+        ValidatorHistoryError::AccountFullySized
+    );
+    require!(
+        new_size as usize >= Config::SIZE,
+        ValidatorHistoryError::DeallocNotAllowed
+    );
     Ok(())
 }

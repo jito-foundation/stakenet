@@ -8,7 +8,9 @@ use {
         },
         AccountSerialize, InstructionData, ToAccountMetas,
     },
-    jito_priority_fee_distribution::state::{MerkleRoot as PfMerkleRoot, PriorityFeeDistributionAccount},
+    jito_priority_fee_distribution::state::{
+        MerkleRoot as PfMerkleRoot, PriorityFeeDistributionAccount,
+    },
     jito_tip_distribution::state::{MerkleRoot, TipDistributionAccount},
     jito_tip_distribution_sdk::derive_tip_distribution_account_address,
     solana_program_test::*,

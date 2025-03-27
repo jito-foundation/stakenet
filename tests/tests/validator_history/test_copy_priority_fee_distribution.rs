@@ -7,9 +7,7 @@ use tests::{
     priority_fee_distribution_helpers::derive_priority_fee_distribution_account_address,
     validator_history_fixtures::{new_priority_fee_distribution_account, TestFixture},
 };
-use validator_history::{
-    Config, ValidatorHistory, ValidatorHistoryEntry,
-};
+use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
 
 #[tokio::test]
 async fn test_priority_fee_commission() {
@@ -28,7 +26,8 @@ async fn test_priority_fee_commission() {
     // No PriorityFees earned
     ctx.borrow_mut().set_account(
         &distribution_account,
-        &new_priority_fee_distribution_account(fixture.vote_account, 42, None, Pubkey::default()).into(),
+        &new_priority_fee_distribution_account(fixture.vote_account, 42, None, Pubkey::default())
+            .into(),
     );
 
     // update priority fee commission
@@ -62,7 +61,10 @@ async fn test_priority_fee_commission() {
     assert!(account.history.idx == 0);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].priority_fee_commission == 42);
-    assert!(account.history.arr[0].priority_fees_earned == ValidatorHistoryEntry::default().priority_fees_earned);
+    assert!(
+        account.history.arr[0].priority_fees_earned
+            == ValidatorHistoryEntry::default().priority_fees_earned
+    );
 
     ctx.borrow_mut().set_account(
         &distribution_account,
@@ -157,12 +159,21 @@ async fn test_priority_fee_commission_fail() {
         .await;
 
     let new_vote_account = Pubkey::new_unique();
-    let distribution_account =
-        derive_priority_fee_distribution_account_address(&jito_priority_fee_distribution::id(), &new_vote_account, 1)
-            .0;
+    let distribution_account = derive_priority_fee_distribution_account_address(
+        &jito_priority_fee_distribution::id(),
+        &new_vote_account,
+        1,
+    )
+    .0;
     ctx.borrow_mut().set_account(
         &distribution_account,
-        &new_priority_fee_distribution_account(new_vote_account, 42, Some(123456), Pubkey::default()).into(),
+        &new_priority_fee_distribution_account(
+            new_vote_account,
+            42,
+            Some(123456),
+            Pubkey::default(),
+        )
+        .into(),
     );
 
     // test update Priority Fee commission with wrong validator's TDA
