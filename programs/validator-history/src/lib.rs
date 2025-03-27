@@ -139,4 +139,10 @@ pub mod validator_history {
     pub fn realloc_config_account(ctx: Context<ReallocConfigAccount>, new_size: u64) -> Result<()> {
         handle_realloc_config_account(ctx, new_size)
     }
+
+    pub fn set_new_priority_fee_oracle_authority(
+        ctx: Context<SetNewPriorityFeeOracleAuthority>,
+    ) -> Result<()> {
+        handle_set_new_priority_fee_oracle_authority(ctx)
+    }
 }

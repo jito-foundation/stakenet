@@ -21,7 +21,7 @@ use {
     type_layout::TypeLayout,
 };
 
-static_assertions::const_assert_eq!(size_of::<Config>(), 104);
+static_assertions::const_assert_eq!(size_of::<Config>(), 136);
 
 static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
 static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
@@ -42,6 +42,10 @@ pub struct Config {
     pub counter: u32,
 
     pub bump: u8,
+
+    pub padding0: [u8; 3],
+
+    pub priority_fee_oracle_authority: Pubkey,
 }
 
 impl Config {
