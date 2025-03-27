@@ -10,16 +10,19 @@ pub struct ReallocConfigAccount<'info> {
     #[account(
         mut,
         realloc = new_size as usize,
-        realloc::payer = signer,
+        // REVIEW: Is it acceptable for the admin to be the payer here? Or separate signer 
+        //  preferred?
+        realloc::payer = admin,
         // any new memory allocated during reallocation is set to zero.
         realloc::zero = true,
+        has_one = admin,
         seeds = [Config::SEED],
         bump
     )]
     pub config_account: Account<'info, Config>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub admin: Signer<'info>,
 }
 
 pub fn handle_realloc_config_account(

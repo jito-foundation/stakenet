@@ -1,9 +1,13 @@
 use anchor_lang::{system_program, InstructionData, ToAccountMetas};
 use solana_program_test::*;
 
-use solana_sdk::{instruction::Instruction, signature::Signer, transaction::Transaction};
+use solana_sdk::{
+    instruction::Instruction,
+    signature::{Keypair, Signer},
+    transaction::Transaction,
+};
 use test_case::test_case;
-use tests::validator_history_fixtures::TestFixture;
+use tests::validator_history_fixtures::{system_account, TestFixture};
 use validator_history::Config;
 
 #[tokio::test]
@@ -33,7 +37,7 @@ async fn test_realloc_config_happy_path() {
         accounts: validator_history::accounts::ReallocConfigAccount {
             config_account: fixture.validator_history_config,
             system_program: system_program::ID,
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -88,7 +92,7 @@ async fn test_realloc_config_bad_sizes(new_size: u64, expected_error: &str) {
         accounts: validator_history::accounts::ReallocConfigAccount {
             config_account: fixture.validator_history_config,
             system_program: system_program::ID,
-            signer: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -102,5 +106,41 @@ async fn test_realloc_config_bad_sizes(new_size: u64, expected_error: &str) {
     );
     fixture
         .submit_transaction_assert_error(transaction, expected_error)
+        .await;
+}
+
+#[tokio::test]
+async fn test_realloc_bad_admin() {
+    // init fixture
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+
+    // attempt update with wrong authority
+    let new_authority = Keypair::new();
+    ctx.borrow_mut()
+        .set_account(&new_authority.pubkey(), &system_account(10000000).into());
+
+    let new_size = 500;
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::ReallocConfigAccount { new_size }.data(),
+        accounts: validator_history::accounts::ReallocConfigAccount {
+            config_account: fixture.validator_history_config,
+            system_program: system_program::ID,
+            admin: new_authority.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&new_authority.pubkey()),
+        &[&new_authority],
+        blockhash,
+    );
+    fixture
+        .submit_transaction_assert_error(transaction, "ConstraintHasOne")
         .await;
 }
