@@ -135,4 +135,11 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_copy_priority_fee_distribution_account(ctx, epoch)
     }
+
+    pub fn realloc_config_account(
+        ctx: Context<ReallocConfigAccount>,
+        new_size: u64,
+    ) -> Result<()> {
+        handle_realloc_config_account(ctx, new_size)
+    }
 }
