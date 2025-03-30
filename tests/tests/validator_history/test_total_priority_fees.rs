@@ -26,14 +26,14 @@ async fn test_priority_fee_history_basic_update() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            oracle_authority: fixture.keypair.pubkey(),
+            priority_fee_oracle_authority: fixture.priority_fee_oracle_keypair.pubkey(),
         }
         .to_account_metas(None),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&fixture.priority_fee_oracle_keypair.pubkey()),
+        &[&fixture.priority_fee_oracle_keypair],
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(transaction).await;
@@ -63,14 +63,14 @@ async fn test_priority_fee_history_basic_update() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            oracle_authority: fixture.keypair.pubkey(),
+            priority_fee_oracle_authority: fixture.priority_fee_oracle_keypair.pubkey(),
         }
         .to_account_metas(None),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&fixture.priority_fee_oracle_keypair.pubkey()),
+        &[&fixture.priority_fee_oracle_keypair],
         ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(transaction).await;
@@ -112,7 +112,7 @@ async fn test_priority_fee_history_wrong_authority() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            oracle_authority: new_authority.pubkey(),
+            priority_fee_oracle_authority: new_authority.pubkey(),
         }
         .to_account_metas(None),
     };
@@ -155,14 +155,14 @@ async fn test_priority_fee_history_future_epoch() {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
             config: fixture.validator_history_config,
-            oracle_authority: fixture.keypair.pubkey(),
+            priority_fee_oracle_authority: fixture.priority_fee_oracle_keypair.pubkey(),
         }
         .to_account_metas(None),
     };
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&fixture.priority_fee_oracle_keypair.pubkey()),
+        &[&fixture.priority_fee_oracle_keypair],
         ctx.borrow().last_blockhash,
     );
     fixture

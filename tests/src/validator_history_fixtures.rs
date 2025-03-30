@@ -31,6 +31,7 @@ pub struct TestFixture {
     pub validator_history_config: Pubkey,
     pub tip_distribution_account: Pubkey,
     pub keypair: Keypair,
+    pub priority_fee_oracle_keypair: Keypair,
 }
 
 impl TestFixture {
@@ -78,6 +79,7 @@ impl TestFixture {
         )
         .0;
         let keypair = Keypair::new();
+        let priority_fee_oracle_keypair = Keypair::new();
 
         program.add_account(
             vote_account,
@@ -85,6 +87,7 @@ impl TestFixture {
         );
         program.add_account(keypair.pubkey(), system_account(100_000_000_000));
         program.add_account(identity_pubkey, system_account(100_000_000_000));
+        program.add_account(priority_fee_oracle_keypair.pubkey(), system_account(100_000_000_000));
 
         let ctx = Rc::new(RefCell::new(program.start_with_context().await));
 
@@ -97,6 +100,7 @@ impl TestFixture {
             vote_account,
             tip_distribution_account,
             keypair,
+            priority_fee_oracle_keypair,
         }
     }
 
@@ -156,6 +160,28 @@ impl TestFixture {
         {
             panic!("Error: {}", e);
         }
+
+        self.set_priority_fee_oracle_authority().await;
+    }
+
+    pub async fn set_priority_fee_oracle_authority(&self) {
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::SetNewPriorityFeeOracleAuthority {
+                config: self.validator_history_config,
+                new_priority_fee_oracle_authority: self.priority_fee_oracle_keypair.pubkey(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::SetNewPriorityFeeOracleAuthority {}.data(),
+        };
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(transaction).await;
     }
 
     pub async fn initialize_validator_history_account(&self) {

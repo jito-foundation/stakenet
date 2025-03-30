@@ -21,11 +21,11 @@ pub struct UpdatePriorityFeeHistory<'info> {
     #[account(
       seeds = [Config::SEED],
       bump = config.bump,
-      has_one = oracle_authority
+      has_one = priority_fee_oracle_authority
   )]
     pub config: Account<'info, Config>,
 
-    pub oracle_authority: Signer<'info>,
+    pub priority_fee_oracle_authority: Signer<'info>,
 }
 
 pub fn handle_update_priority_fee_history(
