@@ -125,8 +125,9 @@ pub mod validator_history {
         ctx: Context<UpdatePriorityFeeHistory>,
         epoch: u64,
         lamports: u64,
+        priority_fee_tips: u64,
     ) -> Result<()> {
-        handle_update_priority_fee_history(ctx, epoch, lamports)
+        handle_update_priority_fee_history(ctx, epoch, lamports, priority_fee_tips)
     }
 
     pub fn copy_priority_fee_distribution(

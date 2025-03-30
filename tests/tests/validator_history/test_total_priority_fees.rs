@@ -14,12 +14,14 @@ async fn test_priority_fee_history_basic_update() {
     fixture.initialize_validator_history_account().await;
 
     // update priority_fee history
-    let total_priority_fees: u64 = 20000;
+    let total_priority_fees: u64 = 200_000_000_000;
+    let priority_fee_tips: u64 = 123_236_567_899;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
             epoch: 0,
             lamports: total_priority_fees,
+            priority_fee_tips,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -48,15 +50,19 @@ async fn test_priority_fee_history_basic_update() {
         account.history.arr[0].total_priority_fees,
         total_priority_fees
     );
+    assert_eq!(account.history.arr[0].priority_fee_tips, 12324); // fixed point representation
+    assert_eq!((account.history.arr[0].priority_fee_tips as f64 / 100.0), 123.24_f64);
 
     // sleep 2 epochs, wait again
     fixture.advance_num_epochs(2).await;
 
+    let priority_fee_tips: u64 = 123_336_567_899;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
             epoch: 2,
             lamports: total_priority_fees + 1,
+            priority_fee_tips,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -85,6 +91,8 @@ async fn test_priority_fee_history_basic_update() {
         account.history.arr[1].total_priority_fees,
         total_priority_fees + 1
     );
+    assert_eq!(account.history.arr[1].priority_fee_tips, 12334);
+    assert_eq!((account.history.arr[1].priority_fee_tips as f64 / 100.0), 123.34_f64);
 }
 
 #[tokio::test]
@@ -101,11 +109,13 @@ async fn test_priority_fee_history_wrong_authority() {
         .set_account(&new_authority.pubkey(), &system_account(10000000).into());
 
     let total_priority_fees = 1000;
+    let priority_fee_tips: u64 = 123_236_567_899;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
             epoch: 0,
             lamports: total_priority_fees,
+            priority_fee_tips,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -144,11 +154,13 @@ async fn test_priority_fee_history_future_epoch() {
         .expect("Failed getting clock");
     // attempt update with future epoch
     let total_priority_fees = 1000;
+    let priority_fee_tips: u64 = 123_236_567_899;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
             epoch: clock.epoch + 1,
             lamports: total_priority_fees,
+            priority_fee_tips,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
