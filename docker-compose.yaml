@@ -4,7 +4,6 @@ services:
     build:
       context: .
       target: validator-history
-    container_name: stakenet-keeper
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -36,6 +35,8 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
+    deploy:
+      replicas: 2
 
   metrics-only:
     build:
