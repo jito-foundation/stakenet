@@ -28,9 +28,9 @@ jobs:
               --ignore RUSTSEC-2024-0344 \
               --ignore RUSTSEC-2024-0421 \
               --ignore RUSTSEC-2025-0022 \
-              --ignore RUSTSEC-2025-0009 \ # TODO(JIT-2364): Remove
-              --ignore RUSTSEC-2025-0004 \ # TODO(JIT-2364): Remove
-              --ignore RUSTSEC-2024-0357   # TODO(JIT-2364): Remove
+              --ignore RUSTSEC-2025-0009 \
+              --ignore RUSTSEC-2025-0004 \
+              --ignore RUSTSEC-2024-0357
 
   lint:
     name: lint
