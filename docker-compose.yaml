@@ -35,8 +35,6 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
-    deploy:
-      replicas: 2
 
   metrics-only:
     build:
