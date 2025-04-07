@@ -299,7 +299,7 @@ async fn main() {
         .trim()
         .to_string();
 
-    set_host_id(format!("{}_{}", args.cluster, hostname));
+    set_host_id(format!("stakenet-keeper_{}_{}", args.cluster, hostname));
 
     let client = Arc::new(RpcClient::new_with_timeout(
         args.json_rpc_url.clone(),
