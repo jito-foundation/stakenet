@@ -4,7 +4,11 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
+use crate::{
+    parameters::Parameters,
+    utils::{PodU16, U8Bool},
+    LargeBitMask, StewardState,
+};
 
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
@@ -44,8 +48,12 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
+    /// The epoch after which validators must be using TipRouter upload authority for tip
+    /// distribution
+    pub tip_router_upload_auth_epoch_cutoff: PodU16,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 1023],
+    pub _padding: [u8; 1021],
 }
 
 impl Config {

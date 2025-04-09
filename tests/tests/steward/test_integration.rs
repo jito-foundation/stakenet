@@ -28,7 +28,8 @@ use tests::steward_fixtures::{
 };
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
-    Config as ValidatorHistoryConfig, ValidatorHistory, ValidatorHistoryEntry,
+    Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
+    ValidatorHistoryEntry,
 };
 
 #[tokio::test]
@@ -204,6 +205,7 @@ async fn test_compute_scores() {
             mev_commission: 0,
             is_superminority: 0,
             vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i.into()),
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..ValidatorHistoryEntry::default()
         });
     }

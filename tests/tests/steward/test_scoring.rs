@@ -28,7 +28,8 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        _padding: [0; 1023],
+        tip_router_upload_auth_epoch_cutoff: 0.into(),
+        _padding: [0; 1021],
     }
 }
 
@@ -438,6 +439,85 @@ mod test_calculate_blacklist {
     }
 }
 
+mod test_calculate_merkle_root_authoirty {
+    use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
+
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        );
+        let mut config = create_config(300, 8, 10);
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
+        let mut current_epoch = 3;
+
+        // When using MerkleRootUploadAuthority::Other it should be a 0 score always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 0.0);
+
+        // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 1.0);
+        // MerkleRootUploadAuthority::TipRouter returns score of 1 always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 1.0);
+
+        // Test after TipRouter only config switch
+        current_epoch = 800;
+        // When using MerkleRootUploadAuthority::Other it should be a 0 score always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 0.0);
+
+        // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 0.0);
+
+        // MerkleRootUploadAuthority::TipRouter returns score of 1 always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history
+        let validator = create_validator_history(&[], &[], &[], &[]);
+        let mut config = create_config(300, 8, 10);
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
+        let current_epoch = 800;
+        let score = calculate_merkle_root_authority(&validator, &config, current_epoch).unwrap();
+        assert_eq!(score, 1.0);
+    }
+}
+
 mod test_calculate_instant_unstake_delinquency {
     use validator_history::constants::TVC_MULTIPLIER;
 
@@ -634,4 +714,97 @@ mod test_calculate_instant_unstake_blacklist {
     }
 
     /* single line fn, no edge cases */
+}
+
+mod test_calculate_instant_unstake_merkle_root_upload_auth {
+    use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
+
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        );
+        let mut config = create_config(300, 8, 10);
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
+        let mut current_epoch = 3;
+
+        // When using MerkleRootUploadAuthority::Other it should be a 0 score always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(is_instant_unstake);
+
+        // MerkleRootUploadAuthority::OldJitoLabs should not instant unstake prior to config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(!is_instant_unstake);
+        // MerkleRootUploadAuthority::TipRouter should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(!is_instant_unstake);
+
+        // Test after TipRouter only config switch
+        current_epoch = 800;
+        // When using MerkleRootUploadAuthority::Other should instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(is_instant_unstake);
+
+        // MerkleRootUploadAuthority::OldJitoLabs should instant unstake **after** config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(is_instant_unstake);
+
+        // MerkleRootUploadAuthority::TipRouter should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(!is_instant_unstake);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history
+        let validator = create_validator_history(&[], &[], &[], &[]);
+        let mut config = create_config(300, 8, 10);
+        config.tip_router_upload_auth_epoch_cutoff = 800.into();
+        let current_epoch = 800;
+        let is_instant_unstake =
+            calculate_instant_unstake_merkle_root_upload_auth(&validator, &config, current_epoch)
+                .unwrap();
+        assert!(!is_instant_unstake);
+    }
 }

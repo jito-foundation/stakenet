@@ -358,6 +358,7 @@ pub fn new_tip_distribution_account(
     vote_account: Pubkey,
     mev_commission_bps: u16,
     mev_earned: Option<u64>,
+    merkle_root_upload_authority: Pubkey,
 ) -> Account {
     let merkle_root = mev_earned.map(|max_total_claim| MerkleRoot {
         max_total_claim,
@@ -367,6 +368,7 @@ pub fn new_tip_distribution_account(
         validator_vote_account: vote_account,
         validator_commission_bps: mev_commission_bps,
         merkle_root,
+        merkle_root_upload_authority,
         ..TipDistributionAccount::default()
     };
     let mut data = vec![];

@@ -382,6 +382,26 @@ impl From<U8Bool> for bool {
     }
 }
 
+/// A u16 stored as [u8; 2]
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
+#[zero_copy]
+pub struct PodU16 {
+    pub value: [u8; 2],
+}
+impl From<u16> for PodU16 {
+    fn from(val: u16) -> Self {
+        Self {
+            value: val.to_le_bytes(),
+        }
+    }
+}
+
+impl From<PodU16> for u16 {
+    fn from(val: PodU16) -> Self {
+        Self::from_le_bytes(val.value)
+    }
+}
+
 pub fn deserialize_stake_pool(
     account_info: &AccountInfo,
 ) -> Result<spl_stake_pool::state::StakePool> {
