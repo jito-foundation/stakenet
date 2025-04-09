@@ -145,7 +145,11 @@ pub struct ValidatorHistoryEntry {
     pub total_priority_fees: u64,
     // Priority Fee commission in basis points
     pub priority_fee_commission: u16,
-    pub padding1: [u8; 70],
+    // The number of leader slots the validator had during the epoch
+    pub total_leader_slots: u16,
+    // The final number of blocks the validator produced during an epoch
+    pub blocks_produced: u16,
+    pub padding1: [u8; 66],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -173,7 +177,9 @@ impl Default for ValidatorHistoryEntry {
             priority_fee_tips: u32::MAX,
             total_priority_fees: u64::MAX,
             priority_fee_commission: u16::MAX,
-            padding1: [u8::MAX; 70],
+            total_leader_slots: u16::MAX,
+            blocks_produced: u16::MAX,
+            padding1: [u8::MAX; 66],
         }
     }
 }
@@ -518,11 +524,13 @@ impl ValidatorHistory {
         &mut self,
         epoch: u16,
         commission: u16,
+        priority_fee_tips: u32,
     ) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
                     entry.priority_fee_commission = commission;
+                    entry.priority_fee_tips = priority_fee_tips;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -533,6 +541,7 @@ impl ValidatorHistory {
                         .find(|entry| entry.epoch == epoch)
                     {
                         entry.priority_fee_commission = commission;
+                        entry.priority_fee_tips = priority_fee_tips;
                     }
                     return Ok(());
                 }
@@ -542,6 +551,7 @@ impl ValidatorHistory {
         let entry = ValidatorHistoryEntry {
             epoch,
             priority_fee_commission: commission,
+            priority_fee_tips,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);
@@ -590,20 +600,28 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    pub fn set_total_priority_fees(&mut self, epoch: u16, total_priority_fees: u64, priority_fee_tips: u32) -> Result<()> {
+    pub fn set_total_priority_fees(
+        &mut self,
+        epoch: u16,
+        total_priority_fees: u64,
+        total_leader_slots: u16,
+        blocks_produced: u16,
+    ) -> Result<()> {
         // Only one authority for upload here, so any epoch can be updated in case of missed upload
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
                     entry.total_priority_fees = total_priority_fees;
-                    entry.priority_fee_tips = priority_fee_tips;
+                    entry.total_leader_slots = total_leader_slots;
+                    entry.blocks_produced = blocks_produced;
                     return Ok(());
                 }
                 Ordering::Greater => {
                     for entry in self.history.arr_mut().iter_mut() {
                         if entry.epoch == epoch {
                             entry.total_priority_fees = total_priority_fees;
-                            entry.priority_fee_tips = priority_fee_tips;
+                            entry.total_leader_slots = total_leader_slots;
+                            entry.blocks_produced = blocks_produced;
                             return Ok(());
                         }
                     }
@@ -615,7 +633,8 @@ impl ValidatorHistory {
         let entry = ValidatorHistoryEntry {
             epoch,
             total_priority_fees,
-            priority_fee_tips,
+            total_leader_slots,
+            blocks_produced,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

@@ -1,7 +1,7 @@
 use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
-    utils::{cast_epoch, fixed_point_sol},
+    utils::cast_epoch,
 };
 use anchor_lang::{prelude::*, solana_program::vote};
 
@@ -31,8 +31,9 @@ pub struct UpdatePriorityFeeHistory<'info> {
 pub fn handle_update_priority_fee_history(
     ctx: Context<UpdatePriorityFeeHistory>,
     epoch: u64,
-    lamports: u64,
-    priority_fee_tips: u64,
+    total_priority_fees: u64,
+    total_leader_slots: u16,
+    blocks_produced: u16,
 ) -> Result<()> {
     let mut validator_history_account: std::cell::RefMut<'_, ValidatorHistory> =
         ctx.accounts.validator_history_account.load_mut()?;
@@ -43,10 +44,12 @@ pub fn handle_update_priority_fee_history(
     }
     let epoch = cast_epoch(epoch)?;
 
-    // REVIEW: Should we be converting and storing tips as u32 like MEV?
-    let converted_tips = fixed_point_sol(priority_fee_tips);
-
-    validator_history_account.set_total_priority_fees(epoch, lamports, converted_tips)?;
+    validator_history_account.set_total_priority_fees(
+        epoch,
+        total_priority_fees,
+        total_leader_slots,
+        blocks_produced,
+    )?;
 
     Ok(())
 }

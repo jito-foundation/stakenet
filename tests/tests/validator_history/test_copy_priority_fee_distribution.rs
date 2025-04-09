@@ -87,12 +87,12 @@ async fn test_priority_fee_commission() {
 
     fixture.submit_transaction_assert_success(transaction).await;
 
-    // assert Priority Fee earned was not updated. NOTE; the oracle will update this information,
-    //  using actualized priority fee data from the Tip Router NCN merkle tree.
+    // assert Priority Fee earned no longer default
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    assert_eq!(account.history.arr[0].priority_fee_tips, ValidatorHistoryEntry::default().priority_fee_tips);
+    assert!(account.history.arr[0].priority_fee_tips == 12324); // fixed point representation
+    assert!((account.history.arr[0].priority_fee_tips as f64 / 100.0) == 123.24_f64);
 }
 
 #[tokio::test]

@@ -3,7 +3,8 @@ use anchor_lang::{prelude::*, solana_program::vote};
 use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
-    utils::cast_epoch,
+    utils::{cast_epoch, fixed_point_sol},
+    ValidatorHistoryEntry,
 };
 
 use jito_priority_fee_distribution::{
@@ -66,9 +67,17 @@ pub fn handle_copy_priority_fee_distribution_account(
     let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut tda_data)?;
     let commission_bps = distribution_account.validator_commission_bps;
 
+    // if the merkle_root has been uploaded pull the mev_earned for the epoch
+    let priority_fees_earned = if let Some(merkle_root) = distribution_account.merkle_root {
+        fixed_point_sol(merkle_root.max_total_claim)
+    } else {
+        ValidatorHistoryEntry::default().priority_fee_tips
+    };
+
     validator_history_account.set_priority_fee_commission(
         epoch,
         commission_bps,
+        priority_fees_earned,
     )?;
 
     Ok(())

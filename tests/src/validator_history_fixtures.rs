@@ -87,7 +87,10 @@ impl TestFixture {
         );
         program.add_account(keypair.pubkey(), system_account(100_000_000_000));
         program.add_account(identity_pubkey, system_account(100_000_000_000));
-        program.add_account(priority_fee_oracle_keypair.pubkey(), system_account(100_000_000_000));
+        program.add_account(
+            priority_fee_oracle_keypair.pubkey(),
+            system_account(100_000_000_000),
+        );
 
         let ctx = Rc::new(RefCell::new(program.start_with_context().await));
 

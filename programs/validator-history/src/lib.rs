@@ -124,10 +124,17 @@ pub mod validator_history {
     pub fn update_priority_fee_history(
         ctx: Context<UpdatePriorityFeeHistory>,
         epoch: u64,
-        lamports: u64,
-        priority_fee_tips: u64,
+        total_priority_fees: u64,
+        total_leader_slots: u16,
+        blocks_produced: u16,
     ) -> Result<()> {
-        handle_update_priority_fee_history(ctx, epoch, lamports, priority_fee_tips)
+        handle_update_priority_fee_history(
+            ctx,
+            epoch,
+            total_priority_fees,
+            total_leader_slots,
+            blocks_produced,
+        )
     }
 
     pub fn copy_priority_fee_distribution(
