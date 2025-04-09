@@ -314,6 +314,18 @@ impl TestFixture {
         dif_slots
     }
 
+    pub async fn get_slot(&self) -> u64 {
+        let clock: Clock = self
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .expect("Failed getting clock");
+
+        clock.slot
+    }
+
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
         let mut ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx

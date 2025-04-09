@@ -37,9 +37,10 @@ pub fn handle_update_priority_fee_history(
 ) -> Result<()> {
     let mut validator_history_account: std::cell::RefMut<'_, ValidatorHistory> =
         ctx.accounts.validator_history_account.load_mut()?;
+    let clock = Clock::get()?;
 
     // Cannot set stake for future epochs
-    if epoch > Clock::get()?.epoch {
+    if epoch > clock.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
     let epoch = cast_epoch(epoch)?;
@@ -49,6 +50,7 @@ pub fn handle_update_priority_fee_history(
         total_priority_fees,
         total_leader_slots,
         blocks_produced,
+        clock.slot,
     )?;
 
     Ok(())

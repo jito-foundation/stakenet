@@ -1,3 +1,5 @@
+use std::u64;
+
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
@@ -149,7 +151,10 @@ pub struct ValidatorHistoryEntry {
     pub total_leader_slots: u16,
     // The final number of blocks the validator produced during an epoch
     pub blocks_produced: u16,
-    pub padding1: [u8; 66],
+    pub padding0: [u8; 2],
+    // The last slot the block data was last updated at
+    pub block_data_updated_at_slot: u64,
+    pub padding1: [u8; 56],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -179,7 +184,9 @@ impl Default for ValidatorHistoryEntry {
             priority_fee_commission: u16::MAX,
             total_leader_slots: u16::MAX,
             blocks_produced: u16::MAX,
-            padding1: [u8::MAX; 66],
+            padding0: [u8::MAX, 2],
+            block_data_updated_at_slot: u64::MAX,
+            padding1: [u8::MAX; 56],
         }
     }
 }
@@ -606,6 +613,7 @@ impl ValidatorHistory {
         total_priority_fees: u64,
         total_leader_slots: u16,
         blocks_produced: u16,
+        slot: u64,
     ) -> Result<()> {
         // Only one authority for upload here, so any epoch can be updated in case of missed upload
         if let Some(entry) = self.history.last_mut() {
@@ -614,6 +622,7 @@ impl ValidatorHistory {
                     entry.total_priority_fees = total_priority_fees;
                     entry.total_leader_slots = total_leader_slots;
                     entry.blocks_produced = blocks_produced;
+                    entry.block_data_updated_at_slot = slot;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -622,6 +631,7 @@ impl ValidatorHistory {
                             entry.total_priority_fees = total_priority_fees;
                             entry.total_leader_slots = total_leader_slots;
                             entry.blocks_produced = blocks_produced;
+                            entry.block_data_updated_at_slot = slot;
                             return Ok(());
                         }
                     }
@@ -635,6 +645,7 @@ impl ValidatorHistory {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
+            block_data_updated_at_slot: slot,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);
