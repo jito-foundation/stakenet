@@ -34,6 +34,7 @@ pub fn handle_update_priority_fee_history(
     total_priority_fees: u64,
     total_leader_slots: u16,
     blocks_produced: u16,
+    current_slot: u64,
 ) -> Result<()> {
     let mut validator_history_account: std::cell::RefMut<'_, ValidatorHistory> =
         ctx.accounts.validator_history_account.load_mut()?;
@@ -50,7 +51,7 @@ pub fn handle_update_priority_fee_history(
         total_priority_fees,
         total_leader_slots,
         blocks_produced,
-        clock.slot,
+        current_slot,
     )?;
 
     Ok(())

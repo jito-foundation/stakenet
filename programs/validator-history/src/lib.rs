@@ -127,6 +127,7 @@ pub mod validator_history {
         total_priority_fees: u64,
         total_leader_slots: u16,
         blocks_produced: u16,
+        current_slot: u64,
     ) -> Result<()> {
         handle_update_priority_fee_history(
             ctx,
@@ -134,6 +135,7 @@ pub mod validator_history {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
+            current_slot,
         )
     }
 

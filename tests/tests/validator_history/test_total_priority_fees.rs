@@ -17,6 +17,7 @@ async fn test_priority_fee_history_basic_update() {
     let total_priority_fees: u64 = 200_000_000_000;
     let total_leader_slots: u16 = 1234;
     let blocks_produced: u16 = 1234;
+    let current_slot = 4567;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
@@ -24,6 +25,7 @@ async fn test_priority_fee_history_basic_update() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
+            current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -57,13 +59,16 @@ async fn test_priority_fee_history_basic_update() {
         total_leader_slots
     );
     assert_eq!(account.history.arr[0].blocks_produced, blocks_produced);
-    let current_slot = fixture.get_slot().await;
-    assert_eq!(account.history.arr[0].block_data_updated_at_slot, current_slot);
+    assert_eq!(
+        account.history.arr[0].block_data_updated_at_slot,
+        current_slot
+    );
 
     // sleep 2 epochs, wait again
     fixture.advance_num_epochs(2).await;
     let total_leader_slots: u16 = 4321;
     let blocks_produced: u16 = 4321;
+    let current_slot = 9876;
 
     let instruction = Instruction {
         program_id: validator_history::id(),
@@ -72,6 +77,7 @@ async fn test_priority_fee_history_basic_update() {
             total_priority_fees: total_priority_fees + 1,
             total_leader_slots,
             blocks_produced,
+            current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -105,8 +111,10 @@ async fn test_priority_fee_history_basic_update() {
         total_leader_slots
     );
     assert_eq!(account.history.arr[1].blocks_produced, blocks_produced);
-    let current_slot = fixture.get_slot().await;
-    assert_eq!(account.history.arr[1].block_data_updated_at_slot, current_slot);
+    assert_eq!(
+        account.history.arr[1].block_data_updated_at_slot,
+        current_slot
+    );
 }
 
 #[tokio::test]
@@ -125,6 +133,7 @@ async fn test_priority_fee_history_wrong_authority() {
     let total_priority_fees = 1000;
     let total_leader_slots: u16 = 1234;
     let blocks_produced: u16 = 1234;
+    let current_slot: u64 = 1234;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
@@ -132,6 +141,7 @@ async fn test_priority_fee_history_wrong_authority() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
+            current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -172,6 +182,7 @@ async fn test_priority_fee_history_future_epoch() {
     let total_priority_fees = 1000;
     let total_leader_slots: u16 = 1234;
     let blocks_produced: u16 = 1234;
+    let current_slot: u64 = 1234;
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::UpdatePriorityFeeHistory {
@@ -179,6 +190,7 @@ async fn test_priority_fee_history_future_epoch() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
+            current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
