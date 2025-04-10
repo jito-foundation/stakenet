@@ -2,7 +2,7 @@
 use std::str::FromStr;
 
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
-use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
+use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
 use test_case::test_case;

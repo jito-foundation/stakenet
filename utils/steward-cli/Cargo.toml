@@ -5,7 +5,7 @@ edition = "2021"
 description = "CLI to manage the steward program"
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = "0.30.1"
 anyhow = "1.0.86"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenv = "0.15.0"

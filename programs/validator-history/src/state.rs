@@ -1,3 +1,5 @@
+use std::u64;
+
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
@@ -21,7 +23,7 @@ use {
     type_layout::TypeLayout,
 };
 
-static_assertions::const_assert_eq!(size_of::<Config>(), 104);
+static_assertions::const_assert_eq!(size_of::<Config>(), 136);
 
 static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
 static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
@@ -42,6 +44,10 @@ pub struct Config {
     pub counter: u32,
 
     pub bump: u8,
+
+    pub padding0: [u8; 3],
+
+    pub priority_fee_oracle_authority: Pubkey,
 }
 
 impl Config {
@@ -134,7 +140,21 @@ pub struct ValidatorHistoryEntry {
     pub vote_account_last_update_slot: u64,
     // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
-    pub padding1: [u8; 84],
+    // Priority Fee tips that were transferred to the distribution account, stored as 1/100th SOL.
+    // priority_fee_tips = 100 means 1.00 SOL earned
+    pub priority_fee_tips: u32,
+    // The total priority fees the validator earned for the epoch.
+    pub total_priority_fees: u64,
+    // Priority Fee commission in basis points
+    pub priority_fee_commission: u16,
+    // The number of leader slots the validator had during the epoch
+    pub total_leader_slots: u16,
+    // The final number of blocks the validator produced during an epoch
+    pub blocks_produced: u16,
+    pub padding0: [u8; 2],
+    // The last slot the block data was last updated at
+    pub block_data_updated_at_slot: u64,
+    pub padding1: [u8; 56],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -159,7 +179,14 @@ impl Default for ValidatorHistoryEntry {
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
             merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
-            padding1: [u8::MAX; 84],
+            priority_fee_tips: u32::MAX,
+            total_priority_fees: u64::MAX,
+            priority_fee_commission: u16::MAX,
+            total_leader_slots: u16::MAX,
+            blocks_produced: u16::MAX,
+            padding0: [u8::MAX, 2],
+            block_data_updated_at_slot: u64::MAX,
+            padding1: [u8::MAX; 56],
         }
     }
 }
@@ -500,6 +527,45 @@ impl ValidatorHistory {
         Ok(())
     }
 
+    pub fn set_priority_fee_commission(
+        &mut self,
+        epoch: u16,
+        commission: u16,
+        priority_fee_tips: u32,
+    ) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.priority_fee_commission = commission;
+                    entry.priority_fee_tips = priority_fee_tips;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    if let Some(entry) = self
+                        .history
+                        .arr_mut()
+                        .iter_mut()
+                        .find(|entry| entry.epoch == epoch)
+                    {
+                        entry.priority_fee_commission = commission;
+                        entry.priority_fee_tips = priority_fee_tips;
+                    }
+                    return Ok(());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            priority_fee_commission: commission,
+            priority_fee_tips,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+
+        Ok(())
+    }
+
     pub fn set_stake(
         &mut self,
         epoch: u16,
@@ -535,6 +601,51 @@ impl ValidatorHistory {
             activated_stake_lamports: stake,
             rank,
             is_superminority: is_superminority as u8,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+        Ok(())
+    }
+
+    pub fn set_total_priority_fees(
+        &mut self,
+        epoch: u16,
+        total_priority_fees: u64,
+        total_leader_slots: u16,
+        blocks_produced: u16,
+        slot: u64,
+    ) -> Result<()> {
+        // Only one authority for upload here, so any epoch can be updated in case of missed upload
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.total_priority_fees = total_priority_fees;
+                    entry.total_leader_slots = total_leader_slots;
+                    entry.blocks_produced = blocks_produced;
+                    entry.block_data_updated_at_slot = slot;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    for entry in self.history.arr_mut().iter_mut() {
+                        if entry.epoch == epoch {
+                            entry.total_priority_fees = total_priority_fees;
+                            entry.total_leader_slots = total_leader_slots;
+                            entry.blocks_produced = blocks_produced;
+                            entry.block_data_updated_at_slot = slot;
+                            return Ok(());
+                        }
+                    }
+                    return Err(ValidatorHistoryError::EpochOutOfRange.into());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            total_priority_fees,
+            total_leader_slots,
+            blocks_produced,
+            block_data_updated_at_slot: slot,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);
