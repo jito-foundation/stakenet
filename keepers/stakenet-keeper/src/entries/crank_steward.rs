@@ -108,8 +108,7 @@ pub fn _get_update_stake_pool_ixs(
             let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
             latest_epoch == epoch || latest_epoch == epoch - 1
-        })
-        .expect("Need at least one okay validator");
+        });
 
     for validator_info in validator_list.validators.iter() {
         let raw_vote_account = all_validator_accounts
@@ -160,14 +159,14 @@ pub fn _get_update_stake_pool_ixs(
             (_, None) => false,
         };
 
-        if should_deactivate {
+        if should_deactivate && reference_vote_account.is_some() {
             let stake_account =
                 get_stake_address(&validator_info.vote_account_address, stake_pool_address);
 
             let ix = deactivate_delinquent_stake(
                 &stake_account,
                 &validator_info.vote_account_address,
-                &reference_vote_account.vote_account_address,
+                &reference_vote_account.unwrap().vote_account_address,
             );
 
             deactivate_delinquent_instructions.push(ix);
