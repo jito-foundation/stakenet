@@ -1,6 +1,7 @@
 use std::fmt;
 
 use clap::{arg, command, Parser};
+use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use stakenet_sdk::models::cluster::Cluster;
@@ -21,11 +22,13 @@ pub struct KeeperConfig {
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
+    pub block_metadata_interval: u64,
     pub run_flags: u32,
     pub cool_down_range: u8,
     pub full_startup: bool,
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
+    pub sqlite_connection: Arc<Connection>,
 }
 
 #[derive(Parser, Debug)]
@@ -159,6 +162,14 @@ pub struct Args {
     /// DEBUGGING Changes the random cool down range ( minutes )
     #[arg(long, env, default_value = "20")]
     pub cool_down_range: u8,
+
+    /// Interval to update block metadata in local SQLite file (default 17280 sec, which is ~1/10 of an epoch)
+    #[arg(long, env, default_value = "17280")]
+    pub block_metadata_interval: u64,
+
+    /// Path to the local SQLite file
+    #[arg(long, env, default_value = "./block_keeper.db3")]
+    pub sqlite_path: PathBuf,
 }
 
 impl fmt::Display for Args {
@@ -194,6 +205,8 @@ impl fmt::Display for Args {
             No Pack: {}\n\
             Pay for New Accounts: {}\n\
             Cool Down Range: {} minutes\n\
+            Block Metadata Interval: {} seconds\n\
+            SQLite path: {:?}\n\
             Region: {}\n\
             -------------------------------",
             self.json_rpc_url,
@@ -223,6 +236,8 @@ impl fmt::Display for Args {
             self.no_pack,
             self.pay_for_new_accounts,
             self.cool_down_range,
+            self.block_metadata_interval,
+            self.sqlite_path,
             self.region,
         )
     }

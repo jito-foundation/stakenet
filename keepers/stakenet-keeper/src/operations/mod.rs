@@ -1,3 +1,4 @@
+pub mod block_metadata;
 pub mod cluster_history;
 pub mod gossip_upload;
 pub mod keeper_operations;

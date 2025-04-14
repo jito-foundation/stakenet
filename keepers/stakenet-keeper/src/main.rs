@@ -7,12 +7,14 @@ use clap::Parser;
 use dotenv::dotenv;
 use log::*;
 use rand::Rng;
+use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::signature::read_keypair_file;
 use stakenet_keeper::{
     operations::{
         self,
+        block_metadata::db::create_sqlite_tables,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
@@ -95,11 +97,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
+    let block_metadata_interval = keeper_config.block_metadata_interval;
 
     let intervals = vec![
         validator_history_interval,
         metrics_interval,
         steward_interval,
+        block_metadata_interval,
     ];
 
     // Stateful data
@@ -246,6 +250,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
         }
 
+        // PRIORITY FEE BLOCK METADATA
+        if should_fire(tick, block_metadata_interval) {
+            info!("Updating priority fee block metadata...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::block_metadata::operations::fire(&keeper_config, &keeper_state).await,
+            );
+        }
+
         // ---------------------- EMIT ---------------------------------
 
         if should_fire(tick, metrics_interval) {
@@ -319,11 +331,17 @@ async fn main() {
                     .expect("Failed reading stake keypair file"),
             )
         });
+    // REVIEW: Should keeper load a second keypair for the priority_fee_oracle_authority? Or will it
+    // be set to the same oracle authority for now?
 
     let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
         solana_net_utils::parse_host_port(&gossip_entrypoint)
             .expect("Failed to parse host and port from gossip entrypoint")
     });
+
+    let conn = Connection::open(args.sqlite_path.clone()).unwrap();
+    // Set up the SQLite DB
+    create_sqlite_tables(&conn);
 
     let config = KeeperConfig {
         client,
@@ -338,6 +356,7 @@ async fn main() {
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
         steward_interval: args.steward_interval,
+        block_metadata_interval: args.block_metadata_interval,
         run_flags,
         full_startup: args.full_startup,
         no_pack: args.no_pack,
@@ -345,6 +364,7 @@ async fn main() {
         cool_down_range: args.cool_down_range,
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
+        sqlite_connection: Arc::new(conn),
     };
 
     run_keeper(config).await;
