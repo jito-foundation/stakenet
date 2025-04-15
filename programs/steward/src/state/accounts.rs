@@ -4,11 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{
-    parameters::Parameters,
-    utils::U8Bool,
-    LargeBitMask, StewardState,
-};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
