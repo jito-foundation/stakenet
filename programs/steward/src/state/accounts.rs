@@ -6,7 +6,7 @@ use type_layout::TypeLayout;
 
 use crate::{
     parameters::Parameters,
-    utils::{PodU16, U8Bool},
+    utils::U8Bool,
     LargeBitMask, StewardState,
 };
 
@@ -48,12 +48,8 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
-    /// The epoch after which validators must be using TipRouter upload authority for tip
-    /// distribution
-    pub tip_router_upload_auth_epoch_cutoff: PodU16,
-
     /// Padding for future governance parameters
-    pub _padding: [u8; 1021],
+    pub _padding: [u8; 1023],
 }
 
 impl Config {
