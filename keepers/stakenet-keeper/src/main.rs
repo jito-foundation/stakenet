@@ -252,6 +252,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
+                keeper_config.cluster.to_string(),
             ));
         }
 
@@ -345,6 +346,7 @@ async fn main() {
         cool_down_range: args.cool_down_range,
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
+        cluster: args.cluster,
     };
 
     run_keeper(config).await;
