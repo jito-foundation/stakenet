@@ -703,8 +703,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             ..Default::default()
         });
         let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator)
-                .unwrap();
+            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
         assert!(is_instant_unstake);
 
         // MerkleRootUploadAuthority::OldJitoLabs should never instant unstake
@@ -713,8 +712,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             ..Default::default()
         });
         let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator)
-                .unwrap();
+            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
         assert!(!is_instant_unstake);
         // MerkleRootUploadAuthority::TipRouter should never instant unstake
         validator.history.push(ValidatorHistoryEntry {
@@ -722,8 +720,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             ..Default::default()
         });
         let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator)
-                .unwrap();
+            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
         assert!(!is_instant_unstake);
     }
 
@@ -732,8 +729,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[]);
         let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator)
-                .unwrap();
+            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
         assert!(!is_instant_unstake);
     }
 }

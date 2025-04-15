@@ -165,8 +165,7 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
-    let merkle_root_upload_authority_score =
-        calculate_merkle_root_authority(validator)?;
+    let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
     /////// Formula ///////
 
@@ -434,9 +433,7 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_merkle_root_authority(
-    validator: &ValidatorHistory,
-) -> Result<f64> {
+pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
     if calculate_instant_unstake_merkle_root_upload_auth(validator)? {
         Ok(0.0)
     } else {
@@ -646,7 +643,7 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
 
 /// Checks if the validator is using allowed Tip Distribution merkle root upload authority
 pub fn calculate_instant_unstake_merkle_root_upload_auth(
-    validator: &ValidatorHistory
+    validator: &ValidatorHistory,
 ) -> Result<bool> {
     if let Some(merkle_root_upload_authority) =
         validator.history.merkle_root_upload_authority_latest()
