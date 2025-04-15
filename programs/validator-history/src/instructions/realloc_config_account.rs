@@ -1,41 +1,40 @@
-use crate::{errors::ValidatorHistoryError, Config};
-use anchor_lang::prelude::*;
-
-/// separate max config size since it's not zero copy
-const MAX_CONFIG_SIZE: u64 = 1_000;
+use crate::Config;
+use anchor_lang::{prelude::*, system_program};
 
 #[derive(Accounts)]
-#[instruction(new_size: u64)]
 pub struct ReallocConfigAccount<'info> {
     #[account(
         mut,
-        realloc = new_size as usize,
-        // REVIEW: Is it acceptable for the admin to be the payer here? Or separate signer 
-        //  preferred?
-        realloc::payer = admin,
-        // any new memory allocated during reallocation is set to zero.
-        realloc::zero = true,
-        has_one = admin,
         seeds = [Config::SEED],
+        owner = crate::ID,
         bump
     )]
-    pub config_account: Account<'info, Config>,
+    pub config_account: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
-    pub admin: Signer<'info>,
+    pub payer: Signer<'info>,
 }
 
-pub fn handle_realloc_config_account(
-    _ctx: Context<ReallocConfigAccount>,
-    new_size: u64,
-) -> Result<()> {
-    require!(
-        new_size <= MAX_CONFIG_SIZE,
-        ValidatorHistoryError::AccountFullySized
-    );
-    require!(
-        new_size as usize >= Config::SIZE,
-        ValidatorHistoryError::DeallocNotAllowed
-    );
+pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
+    let new_size = Config::SIZE;
+    let current_lamports = ctx.accounts.config_account.lamports();
+    let rent = Rent::get()?;
+    let new_lamports = rent.minimum_balance(new_size);
+
+    // Transfer lamports if needed (from payer to account)
+    if new_lamports > current_lamports {
+        let lamports_diff = new_lamports - current_lamports;
+        let cpi_accounts = system_program::Transfer {
+            from: ctx.accounts.payer.to_account_info(),
+            to: ctx.accounts.config_account.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.system_program.to_account_info();
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        system_program::transfer(cpi_ctx, lamports_diff)?;
+    }
+
+    // Call realloc
+    ctx.accounts.config_account.realloc(new_size, true)?;
+
     Ok(())
 }

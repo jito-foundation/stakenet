@@ -146,8 +146,8 @@ pub mod validator_history {
         handle_copy_priority_fee_distribution_account(ctx, epoch)
     }
 
-    pub fn realloc_config_account(ctx: Context<ReallocConfigAccount>, new_size: u64) -> Result<()> {
-        handle_realloc_config_account(ctx, new_size)
+    pub fn realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
+        handle_realloc_config_account(ctx)
     }
 
     pub fn set_new_priority_fee_oracle_authority(

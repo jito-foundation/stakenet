@@ -6707,6 +6707,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "bincode",
+ "borsh 0.10.3",
  "bv",
  "bytemuck",
  "cfg-if",

@@ -23,13 +23,12 @@ use {
     type_layout::TypeLayout,
 };
 
-static_assertions::const_assert_eq!(size_of::<Config>(), 136);
+static_assertions::const_assert_eq!(size_of::<Config>(), 392);
 
 static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
 static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[account]
-#[derive(Default)]
 pub struct Config {
     // This program is used to distribute MEV + track which validators are running jito-solana for a given epoch
     pub tip_distribution_program: Pubkey,
@@ -48,6 +47,23 @@ pub struct Config {
     pub padding0: [u8; 3],
 
     pub priority_fee_oracle_authority: Pubkey,
+
+    pub reserve: [u8; 256],
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            tip_distribution_program: Default::default(),
+            admin: Default::default(),
+            oracle_authority: Default::default(),
+            counter: Default::default(),
+            bump: Default::default(),
+            padding0: Default::default(),
+            priority_fee_oracle_authority: Default::default(),
+            reserve: [0u8; 256],
+        }
+    }
 }
 
 impl Config {
