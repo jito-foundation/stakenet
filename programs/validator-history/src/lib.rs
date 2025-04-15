@@ -146,7 +146,9 @@ pub mod validator_history {
         handle_copy_priority_fee_distribution_account(ctx, epoch)
     }
 
-    pub fn realloc_config_account<'info>(ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>) -> Result<()> {
+    pub fn realloc_config_account<'info>(
+        ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>,
+    ) -> Result<()> {
         handle_realloc_config_account(ctx)
     }
 

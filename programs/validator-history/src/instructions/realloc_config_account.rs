@@ -15,7 +15,9 @@ pub struct ReallocConfigAccount<'info> {
     pub payer: Signer<'info>,
 }
 
-pub fn handle_realloc_config_account<'info>(ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>) -> Result<()> {
+pub fn handle_realloc_config_account<'info>(
+    ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>,
+) -> Result<()> {
     // TODO: Block instruction if no size change
 
     let new_size = Config::SIZE;
@@ -37,7 +39,6 @@ pub fn handle_realloc_config_account<'info>(ctx: Context<'_, '_, '_, 'info, Real
 
     // Call realloc
     ctx.accounts.config_account.realloc(new_size, true)?;
-
 
     // REVIEW: We could make this more readable by deserializing the entire account and writing it.
     //  It's not hot code so efficiency probably does not matter
