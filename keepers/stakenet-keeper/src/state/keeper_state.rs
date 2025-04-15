@@ -115,6 +115,7 @@ pub struct KeeperState {
     pub all_steward_validator_accounts: Option<Box<AllValidatorAccounts>>,
     pub all_active_validator_accounts: Option<Box<AllValidatorAccounts>>,
     pub steward_progress_flags: StewardProgressFlags,
+    pub cluster: String,
 }
 impl KeeperState {
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
@@ -282,6 +283,7 @@ impl KeeperState {
                 self.current_epoch_tip_distribution_map.len() as i64,
                 i64
             ),
+            ("cluster", self.cluster.as_str(), String),
         )
     }
 }
@@ -314,6 +316,7 @@ impl Default for KeeperState {
             all_steward_validator_accounts: None,
             all_active_validator_accounts: None,
             steward_progress_flags: StewardProgressFlags { flags: 0 },
+            cluster: String::from("mainnet"),
         }
     }
 }

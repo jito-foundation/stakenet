@@ -417,6 +417,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState, cluster: String) -> Result
         ),
         ("minimum_stake_lamports", minimum_stake_lamports, i64),
         ("minimum_voting_epochs", minimum_voting_epochs, i64),
+        ("cluster", cluster, String),
     );
 
     Ok(())

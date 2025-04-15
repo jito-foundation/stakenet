@@ -104,6 +104,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
     // Stateful data
     let mut keeper_state = KeeperState::default();
+    keeper_state.cluster = keeper_config.cluster.to_string();
 
     let smallest_interval = intervals.iter().min().unwrap();
     let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
