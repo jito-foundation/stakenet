@@ -1,4 +1,4 @@
-use crate::Config;
+use crate::{errors::ValidatorHistoryError, Config};
 use anchor_lang::{prelude::*, system_program};
 
 #[derive(Accounts)]
@@ -15,12 +15,14 @@ pub struct ReallocConfigAccount<'info> {
     pub payer: Signer<'info>,
 }
 
-pub fn handle_realloc_config_account<'info>(
-    ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>,
-) -> Result<()> {
-    // TODO: Block instruction if no size change
-
+pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
     let new_size = Config::SIZE;
+    // Block instruction if no size change
+    require!(
+        new_size != ctx.accounts.config_account.data_len(),
+        ValidatorHistoryError::NoReallocNeeded
+    );
+
     let current_lamports = ctx.accounts.config_account.lamports();
     let rent = Rent::get()?;
     let new_lamports = rent.minimum_balance(new_size);

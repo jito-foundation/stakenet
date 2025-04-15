@@ -107,3 +107,33 @@ async fn test_realloc_config_happy_path() {
         config_after.priority_fee_oracle_authority
     );
 }
+
+#[tokio::test]
+async fn test_realloc_fails_when_size_doesnt_change() {
+    // init fixture
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::ReallocConfigAccount {}.data(),
+        accounts: validator_history::accounts::ReallocConfigAccount {
+            config_account: fixture.validator_history_config,
+            system_program: system_program::ID,
+            payer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture
+        .submit_transaction_assert_error(transaction, "NoReallocNeeded")
+        .await;
+}

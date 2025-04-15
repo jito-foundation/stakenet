@@ -32,4 +32,6 @@ pub enum ValidatorHistoryError {
     EpochTooLarge,
     #[msg("Inserting duplicate epoch")]
     DuplicateEpoch,
+    #[msg("Account already sized properly")]
+    NoReallocNeeded,
 }
