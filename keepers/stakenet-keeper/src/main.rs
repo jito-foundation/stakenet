@@ -265,9 +265,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 &keeper_state.runs_for_epoch,
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
+                keeper_config.cluster.to_string(),
             );
 
-            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
+            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch, keeper_state.cluster.to_string());
         }
 
         // ---------- CLEAR STARTUP ----------
