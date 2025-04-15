@@ -452,12 +452,12 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                     ranks += 1;
                 }
                 if entry.mev_commission != default.mev_commission {
-                println!(
-                    "{}.\tVote Account: {} | {}",
-                    validator_history.index,
-                    validator_history.vote_account,
-                    formatted_entry(entry)
-                );
+                    println!(
+                        "{}.\tVote Account: {} | {}",
+                        validator_history.index,
+                        validator_history.vote_account,
+                        formatted_entry(entry)
+                    );
                 }
             }
             None => {
@@ -543,9 +543,12 @@ fn command_view_config(client: RpcClient) {
     println!("📚 Accounts 📚");
     println!("Admin: {}", config.admin);
     println!("Oracle Authority: {}", config.oracle_authority);
-    println!("Tip Distribution Program: {}", config.tip_distribution_program);
+    println!(
+        "Tip Distribution Program: {}",
+        config.tip_distribution_program
+    );
     println!("Config Account: {}", config_pda);
-    println!(""); 
+    println!("");
     println!("↺ State ↺");
     println!("Validator History Account Counter: {}", config.counter);
 }
