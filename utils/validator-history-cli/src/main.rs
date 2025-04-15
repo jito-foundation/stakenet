@@ -538,8 +538,7 @@ fn command_view_config(client: RpcClient) {
         .expect("Failed to get validator history account");
     let config = Config::try_deserialize(&mut config_account.data.as_slice())
         .expect("Failed to deserialize validator history account");
-    println!("------- Config -------");
-    println!("");
+    println!("------- Config -------\n");
     println!("📚 Accounts 📚");
     println!("Admin: {}", config.admin);
     println!("Oracle Authority: {}", config.oracle_authority);
@@ -547,10 +546,9 @@ fn command_view_config(client: RpcClient) {
         "Tip Distribution Program: {}",
         config.tip_distribution_program
     );
-    println!("Config Account: {}", config_pda);
-    println!("");
+    println!("Config Account: {}\n", config_pda);
     println!("↺ State ↺");
-    println!("Validator History Account Counter: {}", config.counter);
+    println!("Validator History Account Counter: {}\n", config.counter);
 }
 
 fn command_cluster_history(client: RpcClient) {
