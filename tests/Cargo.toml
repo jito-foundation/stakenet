@@ -40,5 +40,6 @@ solana-version = "1.18"
 spl-associated-token-account = "2.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
 spl-token = "4.0"
+test-case = "3.3.1"
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
 validator-history-vote-state = { path = "../utils/vote-state" }

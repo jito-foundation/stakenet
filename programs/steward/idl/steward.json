@@ -1625,16 +1625,16 @@
       ]
     },
     {
-      "name": "InstantUnstakeComponentsV2",
+      "name": "InstantUnstakeComponentsV3",
       "discriminator": [
-        138,
-        62,
-        181,
-        14,
-        9,
-        48,
-        109,
-        47
+        5,
+        64,
+        24,
+        200,
+        42,
+        152,
+        222,
+        172
       ]
     },
     {
@@ -1664,16 +1664,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV2",
+      "name": "ScoreComponentsV3",
       "discriminator": [
-        140,
-        182,
-        108,
-        49,
-        246,
-        38,
-        247,
-        181
+        255,
+        128,
+        115,
+        82,
+        192,
+        199,
+        160,
+        185
       ]
     },
     {
@@ -2385,7 +2385,7 @@
       }
     },
     {
-      "name": "InstantUnstakeComponentsV2",
+      "name": "InstantUnstakeComponentsV3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2421,6 +2421,13 @@
             "name": "is_blacklisted",
             "docs": [
               "Checks if validator was added to blacklist"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "is_bad_merkle_root_upload_authority",
+            "docs": [
+              "Checks if validator has an unacceptable merkle root upload authority"
             ],
             "type": "bool"
           },
@@ -2519,6 +2526,26 @@
                 313
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerkleRootUploadAuthority",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Empty"
+          },
+          {
+            "name": "Other"
+          },
+          {
+            "name": "OldJitoLabs"
+          },
+          {
+            "name": "TipRouter"
           }
         ]
       }
@@ -2809,7 +2836,7 @@
       }
     },
     {
-      "name": "ScoreComponentsV2",
+      "name": "ScoreComponentsV3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2873,6 +2900,13 @@
             "name": "historical_commission_score",
             "docs": [
               "If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "merkle_root_upload_authority_score",
+            "docs": [
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
             ],
             "type": "f64"
           },
@@ -3540,8 +3574,15 @@
             }
           },
           {
-            "name": "padding0",
-            "type": "u8"
+            "name": "merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
           },
           {
             "name": "is_superminority",

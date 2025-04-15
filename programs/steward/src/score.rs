@@ -3,7 +3,9 @@ use anchor_lang::IdlBuild;
 use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
 };
-use validator_history::{constants::TVC_MULTIPLIER, ClusterHistory, ValidatorHistory};
+use validator_history::{
+    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
+};
 
 use crate::{
     constants::{
@@ -15,7 +17,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV2 {
+pub struct ScoreComponentsV3 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -42,6 +44,9 @@ pub struct ScoreComponentsV2 {
 
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
+
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
+    pub merkle_root_upload_authority_score: f64,
 
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
@@ -91,7 +96,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV2> {
+) -> Result<ScoreComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -159,6 +164,8 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
+    let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
+
     /////// Formula ///////
 
     let yield_score = vote_credits_ratio * (1. - max_commission as f64 / COMMISSION_MAX as f64);
@@ -170,9 +177,10 @@ pub fn validator_score(
         * superminority_score
         * delinquency_score
         * running_jito_score
-        * yield_score;
+        * yield_score
+        * merkle_root_upload_authority_score;
 
-    Ok(ScoreComponentsV2 {
+    Ok(ScoreComponentsV3 {
         score,
         yield_score,
         mev_commission_score,
@@ -182,6 +190,7 @@ pub fn validator_score(
         running_jito_score,
         commission_score,
         historical_commission_score,
+        merkle_root_upload_authority_score,
         vote_credits_ratio,
         vote_account: validator.vote_account,
         epoch: current_epoch,
@@ -422,9 +431,18 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
     }
 }
 
+/// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
+pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
+    if calculate_instant_unstake_merkle_root_upload_auth(validator)? {
+        Ok(0.0)
+    } else {
+        Ok(1.0)
+    }
+}
+
 #[event]
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstantUnstakeComponentsV2 {
+pub struct InstantUnstakeComponentsV3 {
     /// Aggregate of all checks
     pub instant_unstake: bool,
 
@@ -439,6 +457,9 @@ pub struct InstantUnstakeComponentsV2 {
 
     /// Checks if validator was added to blacklist
     pub is_blacklisted: bool,
+
+    /// Checks if validator has an unacceptable merkle root upload authority
+    pub is_bad_merkle_root_upload_authority: bool,
 
     pub vote_account: Pubkey,
 
@@ -478,7 +499,7 @@ pub fn instant_unstake_validator(
     epoch_start_slot: u64,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<InstantUnstakeComponentsV2> {
+) -> Result<InstantUnstakeComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared calculations ///////
@@ -526,15 +547,22 @@ pub fn instant_unstake_validator(
 
     let is_blacklisted = calculate_instant_unstake_blacklist(config, validator.index)?;
 
-    let instant_unstake =
-        delinquency_check || commission_check || mev_commission_check || is_blacklisted;
+    let is_bad_merkle_root_upload_authority =
+        calculate_instant_unstake_merkle_root_upload_auth(validator)?;
 
-    Ok(InstantUnstakeComponentsV2 {
+    let instant_unstake = delinquency_check
+        || commission_check
+        || mev_commission_check
+        || is_blacklisted
+        || is_bad_merkle_root_upload_authority;
+
+    Ok(InstantUnstakeComponentsV3 {
         instant_unstake,
         delinquency_check,
         commission_check,
         mev_commission_check,
         is_blacklisted,
+        is_bad_merkle_root_upload_authority,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: InstantUnstakeDetails {
@@ -610,4 +638,24 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
     config
         .validator_history_blacklist
         .get(validator_index as usize)
+}
+
+/// Checks if the validator is using allowed Tip Distribution merkle root upload authority
+pub fn calculate_instant_unstake_merkle_root_upload_auth(
+    validator: &ValidatorHistory,
+) -> Result<bool> {
+    if let Some(merkle_root_upload_authority) =
+        validator.history.merkle_root_upload_authority_latest()
+    {
+        match merkle_root_upload_authority {
+            MerkleRootUploadAuthority::OldJitoLabs => Ok(false),
+            MerkleRootUploadAuthority::TipRouter => Ok(false),
+            _ => Ok(true),
+        }
+    } else {
+        // Default to false (score 1) to be conservative. There are plenty of other mechanisms
+        // that prevent a validator with no history from getting stake, so we don't want this to be
+        // the hidden linchpin
+        Ok(false)
+    }
 }
