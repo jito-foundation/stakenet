@@ -162,7 +162,7 @@ pub fn emit_validator_history_metrics(
             get_vote_accounts_voting,
             i64
         ),
-        ("cluster", cluster, String),
+        "cluster" => cluster,
     );
 
     Ok(())
@@ -174,7 +174,7 @@ pub fn emit_keeper_stats(keeper_state: &KeeperState, cluster: String) -> Result<
     datapoint_info!(
         "stakenet-keeper-stats",
         ("balance_lamports", keeper_balance, i64),
-        ("cluster", cluster, String),
+        "cluster" => cluster,
     );
 
     Ok(())
@@ -335,7 +335,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState, cluster: String) -> Result
             i64
         ),
         ("non_zero_score_count", non_zero_score_count, i64),
-        ("cluster", cluster, String),
+        "cluster" => cluster,
     );
 
     let parameters = &keeper_state
@@ -417,7 +417,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState, cluster: String) -> Result
         ),
         ("minimum_stake_lamports", minimum_stake_lamports, i64),
         ("minimum_voting_epochs", minimum_voting_epochs, i64),
-        ("cluster", cluster, String),
+        "cluster" => cluster,
     );
 
     Ok(())
