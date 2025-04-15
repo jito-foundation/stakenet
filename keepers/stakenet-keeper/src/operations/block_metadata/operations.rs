@@ -176,6 +176,7 @@ async fn update_block_metadata(
         )
         .await;
     }
+    // TODO: Handle case where epoch is more than 1 above
 
     // If current epoch != last epoch, then we should run a second time with the next
     //  epoch's information
@@ -372,6 +373,7 @@ pub async fn aggregate_information(
             }
             Err(err) => match err {
                 BlockMetadataKeeperError::SkippedBlock => {
+                    // TODO: Add some redundancy to check with other RPCs and validate block was skipped.
                     increment_leader_info(&mut res, leader, epoch, 1, 0, 0);
                 }
                 _ => return Err(err),
