@@ -38,8 +38,10 @@ enum Commands {
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
     ClusterHistoryStatus,
+    ViewConfig,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    UpdateOracleAuthority(UpdateOracleAuthority),
 }
 
 #[derive(Parser)]
@@ -107,6 +109,18 @@ struct BackfillClusterHistory {
     /// Number of blocks in epoch
     #[arg(short, long, env)]
     blocks_in_epoch: u32,
+}
+
+#[derive(Parser)]
+#[command(about = "Update oracle authority")]
+struct UpdateOracleAuthority {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+
+    /// New oracle authority (Pubkey as base58 string)
+    #[arg(long, env)]
+    oracle_authority: Pubkey,
 }
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
@@ -437,12 +451,14 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 if entry.rank != default.rank {
                     ranks += 1;
                 }
+                if entry.mev_commission != default.mev_commission {
                 println!(
                     "{}.\tVote Account: {} | {}",
                     validator_history.index,
                     validator_history.vote_account,
                     formatted_entry(entry)
                 );
+                }
             }
             None => {
                 println!(
@@ -512,6 +528,26 @@ fn command_history(args: History, client: RpcClient) {
             }
         }
     }
+}
+
+fn command_view_config(client: RpcClient) {
+    // Get single validator history account and display all epochs of history
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let config_account = client
+        .get_account(&config_pda)
+        .expect("Failed to get validator history account");
+    let config = Config::try_deserialize(&mut config_account.data.as_slice())
+        .expect("Failed to deserialize validator history account");
+    println!("------- Config -------");
+    println!("");
+    println!("📚 Accounts 📚");
+    println!("Admin: {}", config.admin);
+    println!("Oracle Authority: {}", config.oracle_authority);
+    println!("Tip Distribution Program: {}", config.tip_distribution_program);
+    println!("Config Account: {}", config_pda);
+    println!(""); 
+    println!("↺ State ↺");
+    println!("Validator History Account Counter: {}", config.counter);
 }
 
 fn command_cluster_history(client: RpcClient) {
@@ -590,6 +626,39 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
+fn command_update_oracle_authority(args: UpdateOracleAuthority, client: RpcClient) {
+    // Update oracle authority for config account
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+
+    let mut instructions = vec![];
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    instructions.push(Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::SetNewOracleAuthority {
+            config: config_pda,
+            new_oracle_authority: args.oracle_authority,
+            admin: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::SetNewOracleAuthority {}.data(),
+    });
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
@@ -598,7 +667,9 @@ fn main() {
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::ClusterHistoryStatus => command_cluster_history(client),
+        Commands::ViewConfig => command_view_config(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
+        Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
     };
 }
