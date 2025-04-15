@@ -92,7 +92,10 @@ async fn test_priority_fee_commission() {
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    assert_eq!(account.history.arr[0].priority_fee_tips, priority_fees_earned);
+    assert_eq!(
+        account.history.arr[0].priority_fee_tips,
+        priority_fees_earned
+    );
 }
 
 #[tokio::test]

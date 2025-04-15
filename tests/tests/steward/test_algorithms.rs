@@ -760,7 +760,7 @@ fn test_compute_score() {
         }
     );
 
-    // test merkle_root_upload_authority is OldJito before tip_router_upload_auth_epoch_cutoff
+    // test merkle_root_upload_authority is OldJito
     let mut validator = good_validator;
     validator
         .history
@@ -771,7 +771,7 @@ fn test_compute_score() {
         &validator,
         &cluster_history,
         &config,
-        u16::from(config.tip_router_upload_auth_epoch_cutoff) - 1,
+        current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
@@ -790,7 +790,7 @@ fn test_compute_score() {
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
-            epoch: u16::from(config.tip_router_upload_auth_epoch_cutoff) - 1,
+            epoch: current_epoch as u16,
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 10,
@@ -805,52 +805,7 @@ fn test_compute_score() {
         }
     );
 
-    // test merkle_root_upload_authority is OldJito at tip_router_upload_auth_epoch_cutoff
-    let mut validator = good_validator;
-    validator
-        .history
-        .last_mut()
-        .unwrap()
-        .merkle_root_upload_authority = MerkleRootUploadAuthority::OldJitoLabs;
-    let components = validator_score(
-        &validator,
-        &cluster_history,
-        &config,
-        config.tip_router_upload_auth_epoch_cutoff.into(),
-        TVC_ACTIVATION_EPOCH,
-    )
-    .unwrap();
-    assert_eq!(
-        components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0526315789473684,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0526315789473684,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 0.0,
-            vote_account: validator.vote_account,
-            epoch: config.tip_router_upload_auth_epoch_cutoff.into(),
-            details: ScoreDetails {
-                max_mev_commission: 0,
-                max_mev_commission_epoch: 11,
-                superminority_epoch: EPOCH_DEFAULT,
-                delinquency_ratio: 1.0,
-                delinquency_epoch: EPOCH_DEFAULT,
-                max_commission: 0,
-                max_commission_epoch: 11,
-                max_historical_commission: 0,
-                max_historical_commission_epoch: 0,
-            }
-        }
-    );
-
-    // test merkle_root_upload_authority is TipRouter at tip_router_upload_auth_epoch_cutoff
+    // test merkle_root_upload_authority is TipRouter
     let mut validator = good_validator;
     validator
         .history
@@ -861,34 +816,34 @@ fn test_compute_score() {
         &validator,
         &cluster_history,
         &config,
-        config.tip_router_upload_auth_epoch_cutoff.into(),
+        current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
     assert_eq!(
         components,
         ScoreComponentsV3 {
-            score: 1.0526315789473684,
-            yield_score: 1.0526315789473684,
+            score: 1.0,
+            yield_score: 1.0,
             mev_commission_score: 1.0,
             blacklisted_score: 1.0,
             superminority_score: 1.0,
             delinquency_score: 1.0,
             running_jito_score: 1.0,
-            vote_credits_ratio: 1.0526315789473684,
+            vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
             vote_account: validator.vote_account,
-            epoch: config.tip_router_upload_auth_epoch_cutoff.into(),
+            epoch: current_epoch as u16,
             details: ScoreDetails {
                 max_mev_commission: 0,
-                max_mev_commission_epoch: 11,
+                max_mev_commission_epoch: 10,
                 superminority_epoch: EPOCH_DEFAULT,
                 delinquency_ratio: 1.0,
                 delinquency_epoch: EPOCH_DEFAULT,
                 max_commission: 0,
-                max_commission_epoch: 11,
+                max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
             }

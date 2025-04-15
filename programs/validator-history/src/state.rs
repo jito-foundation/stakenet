@@ -1,5 +1,3 @@
-use std::u64;
-
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},

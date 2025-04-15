@@ -45,8 +45,7 @@ pub struct ScoreComponentsV3 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
-    /// If validator is using TipRouter authority, OR OldJito authority prior to TipRouter only
-    /// activation epoch, then score is 1.0, else 0.0
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
     pub merkle_root_upload_authority_score: f64,
 
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
@@ -165,8 +164,7 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
-    let merkle_root_upload_authority_score =
-        calculate_merkle_root_authority(validator, config, current_epoch)?;
+    let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
     /////// Formula ///////
 
@@ -434,12 +432,8 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_merkle_root_authority(
-    validator: &ValidatorHistory,
-    config: &Config,
-    current_epoch: u16,
-) -> Result<f64> {
-    if calculate_instant_unstake_merkle_root_upload_auth(validator, config, current_epoch)? {
+pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
+    if calculate_instant_unstake_merkle_root_upload_auth(validator)? {
         Ok(0.0)
     } else {
         Ok(1.0)
@@ -554,7 +548,7 @@ pub fn instant_unstake_validator(
     let is_blacklisted = calculate_instant_unstake_blacklist(config, validator.index)?;
 
     let is_bad_merkle_root_upload_authority =
-        calculate_instant_unstake_merkle_root_upload_auth(validator, config, current_epoch)?;
+        calculate_instant_unstake_merkle_root_upload_auth(validator)?;
 
     let instant_unstake = delinquency_check
         || commission_check
@@ -649,20 +643,12 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
 /// Checks if the validator is using allowed Tip Distribution merkle root upload authority
 pub fn calculate_instant_unstake_merkle_root_upload_auth(
     validator: &ValidatorHistory,
-    config: &Config,
-    current_epoch: u16,
 ) -> Result<bool> {
     if let Some(merkle_root_upload_authority) =
         validator.history.merkle_root_upload_authority_latest()
     {
         match merkle_root_upload_authority {
-            MerkleRootUploadAuthority::OldJitoLabs => {
-                if current_epoch >= config.tip_router_upload_auth_epoch_cutoff.into() {
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
+            MerkleRootUploadAuthority::OldJitoLabs => Ok(false),
             MerkleRootUploadAuthority::TipRouter => Ok(false),
             _ => Ok(true),
         }
