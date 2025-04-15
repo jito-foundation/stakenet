@@ -26,7 +26,7 @@ pub struct KeeperConfig {
     pub full_startup: bool,
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
-    pub cluster: Cluster,
+    pub cluster_name: String,
 }
 
 #[derive(Parser, Debug)]

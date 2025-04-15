@@ -23,17 +23,17 @@ fn _should_run() -> bool {
     true
 }
 
-fn _process(keeper_state: &KeeperState, cluster: String) -> Result<(), Box<dyn std::error::Error>> {
-    emit_validator_history_metrics(keeper_state, cluster.clone())?;
-    emit_keeper_stats(keeper_state, cluster.clone())?;
-    emit_steward_stats(keeper_state, cluster.clone())?;
+fn _process(keeper_state: &KeeperState, cluster: &str) -> Result<(), Box<dyn std::error::Error>> {
+    emit_validator_history_metrics(keeper_state, cluster)?;
+    emit_keeper_stats(keeper_state, cluster)?;
+    emit_steward_stats(keeper_state, cluster)?;
     Ok(())
 }
 
 pub fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-    cluster: String,
+    cluster: &str,
 ) -> (KeeperOperations, u64, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, txs_for_epoch) =
@@ -59,7 +59,7 @@ pub fn fire(
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 pub fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
-    cluster: String,
+    cluster: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
     let get_vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
@@ -168,7 +168,10 @@ pub fn emit_validator_history_metrics(
     Ok(())
 }
 
-pub fn emit_keeper_stats(keeper_state: &KeeperState, cluster: String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn emit_keeper_stats(
+    keeper_state: &KeeperState,
+    cluster: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let keeper_balance = keeper_state.keeper_balance;
 
     datapoint_info!(
@@ -180,7 +183,10 @@ pub fn emit_keeper_stats(keeper_state: &KeeperState, cluster: String) -> Result<
     Ok(())
 }
 
-pub fn emit_steward_stats(keeper_state: &KeeperState, cluster: String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn emit_steward_stats(
+    keeper_state: &KeeperState,
+    cluster: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     //    - Progress
     // - Current State
     // - Num pool validators

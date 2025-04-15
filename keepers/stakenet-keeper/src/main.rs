@@ -104,7 +104,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
     // Stateful data
     let mut keeper_state = KeeperState::default();
-    keeper_state.cluster = keeper_config.cluster.to_string();
+    keeper_state.set_cluster_name(&keeper_config.cluster_name);
 
     let smallest_interval = intervals.iter().min().unwrap();
     let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
@@ -253,7 +253,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
-                keeper_config.cluster.to_string(),
+                keeper_config.cluster_name.as_str(),
             ));
         }
 
@@ -265,10 +265,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 &keeper_state.runs_for_epoch,
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
-                keeper_config.cluster.to_string(),
+                keeper_config.cluster_name.as_str(),
             );
 
-            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch, keeper_state.cluster.to_string());
+            KeeperCreates::emit(
+                &keeper_state.created_accounts_for_epoch,
+                &keeper_state.cluster_name,
+            );
         }
 
         // ---------- CLEAR STARTUP ----------
@@ -348,7 +351,7 @@ async fn main() {
         cool_down_range: args.cool_down_range,
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
-        cluster: args.cluster,
+        cluster_name: args.cluster.to_string(),
     };
 
     run_keeper(config).await;

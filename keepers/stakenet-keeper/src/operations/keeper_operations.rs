@@ -8,7 +8,7 @@ pub enum KeeperCreates {
 impl KeeperCreates {
     pub const LEN: usize = 1;
 
-    pub fn emit(created_accounts_for_epoch: &[u64; KeeperCreates::LEN], cluster: String) {
+    pub fn emit(created_accounts_for_epoch: &[u64; KeeperCreates::LEN], cluster: &str) {
         let aggregate_creates = created_accounts_for_epoch.iter().sum::<u64>();
 
         datapoint_info!(
@@ -60,7 +60,7 @@ impl KeeperOperations {
         runs_for_epoch: &[u64; KeeperOperations::LEN],
         errors_for_epoch: &[u64; KeeperOperations::LEN],
         txs_for_epoch: &[u64; KeeperOperations::LEN],
-        cluster: String,
+        cluster: &str,
     ) {
         let aggregate_actions = runs_for_epoch.iter().sum::<u64>();
         let aggregate_errors = errors_for_epoch.iter().sum::<u64>();
