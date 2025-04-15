@@ -102,4 +102,5 @@ async fn test_realloc_config_happy_path() {
     assert_eq!(old_config.oracle_authority, config_after.oracle_authority);
     assert_eq!(old_config.bump, config_after.bump);
     assert_eq!(old_config.counter, config_after.counter);
+    assert_eq!(old_config.oracle_authority, config_after.priority_fee_oracle_authority);
 }

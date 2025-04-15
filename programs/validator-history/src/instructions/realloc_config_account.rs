@@ -15,7 +15,9 @@ pub struct ReallocConfigAccount<'info> {
     pub payer: Signer<'info>,
 }
 
-pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
+pub fn handle_realloc_config_account<'info>(ctx: Context<'_, '_, '_, 'info, ReallocConfigAccount<'info>>) -> Result<()> {
+    // TODO: Block instruction if no size change
+
     let new_size = Config::SIZE;
     let current_lamports = ctx.accounts.config_account.lamports();
     let rent = Rent::get()?;
@@ -35,6 +37,17 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
 
     // Call realloc
     ctx.accounts.config_account.realloc(new_size, true)?;
+
+
+    // REVIEW: We could make this more readable by deserializing the entire account and writing it.
+    //  It's not hot code so efficiency probably does not matter
+    // Set the priority_fee_oracle_authority if not already set
+    let mut data = ctx.accounts.config_account.try_borrow_mut_data()?;
+    let priority_fee_oracle_authority: Pubkey = Pubkey::try_from_slice(&data[112..144])?;
+    if priority_fee_oracle_authority.eq(&Pubkey::default()) {
+        let oracle_authority: Pubkey = Pubkey::try_from_slice(&data[72..104])?;
+        data[112..144].clone_from_slice(&oracle_authority.to_bytes());
+    }
 
     Ok(())
 }
