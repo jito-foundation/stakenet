@@ -2251,18 +2251,6 @@
             }
           },
           {
-            "name": "tip_router_upload_auth_epoch_cutoff",
-            "docs": [
-              "The epoch after which validators must be using TipRouter upload authority for tip",
-              "distribution"
-            ],
-            "type": {
-              "defined": {
-                "name": "PodU16"
-              }
-            }
-          },
-          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -2270,7 +2258,7 @@
             "type": {
               "array": [
                 "u8",
-                1021
+                1023
               ]
             }
           }
@@ -2713,30 +2701,6 @@
               "array": [
                 "u64",
                 32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "PodU16",
-      "docs": [
-        "A u16 stored as [u8; 2]"
-      ],
-      "serialization": "bytemuck",
-      "repr": {
-        "kind": "c"
-      },
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "value",
-            "type": {
-              "array": [
-                "u8",
-                2
               ]
             }
           }

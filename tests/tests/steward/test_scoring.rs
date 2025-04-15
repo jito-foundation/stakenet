@@ -28,8 +28,7 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        tip_router_upload_auth_epoch_cutoff: 0.into(),
-        _padding: [0; 1021],
+        _padding: [0; 1023],
     }
 }
 
