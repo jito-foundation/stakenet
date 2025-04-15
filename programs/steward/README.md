@@ -55,7 +55,7 @@ The following metrics are used to calculate the `score` and `yield_score`:
 - `superminority_score`: If validator is not in the superminority, score is 1.0, else 0.0
 - `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
 - `running_jito_score`: If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
-- `merkle_root_upload_authority_score`: If validator is using TipRouter Tip Distribution merkle root upload authority (OR OldJito authority prior to TipRouter only activation epoch) then score is 1.0, else 0.0
+- `merkle_root_upload_authority_score`: If validator is using TipRouter or OldJito Tip Distribution merkle root upload authority then score is 1.0, else 0.0
 
 > Note: All data comes from the `ValidatorHistory` account for each validator.
 
@@ -81,7 +81,7 @@ In this version 0 of the score formula, there is no weighting of any factor abov
 
 For a breakdown of the formulas used for each score, see the Appendix.
 
-Take a look at the implementation in [score.rs](./src/score.rs#L175)
+Take a look at the implementation in [score.rs](./src/score.rs#L174)
 
 ### Compute Delegations
 
@@ -114,7 +114,7 @@ let instant_unstake =
     delinquency_check || commission_check || mev_commission_check || is_blacklisted || is_bad_merkle_root_upload_authority;
 ```
 
-Take a look at the implementation in [score.rs](./src/score.rs#L559)
+Take a look at the implementation in [score.rs](./src/score.rs#L554)
 
 ### Rebalance
 
