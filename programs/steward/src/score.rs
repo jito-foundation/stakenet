@@ -45,8 +45,7 @@ pub struct ScoreComponentsV3 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
-    /// If validator is using TipRouter authority, OR OldJito authority prior to TipRouter only
-    /// activation epoch, then score is 1.0, else 0.0
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
     pub merkle_root_upload_authority_score: f64,
 
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs

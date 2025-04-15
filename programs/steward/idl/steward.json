@@ -2906,8 +2906,7 @@
           {
             "name": "merkle_root_upload_authority_score",
             "docs": [
-              "If validator is using TipRouter authority, OR OldJito authority prior to TipRouter only",
-              "activation epoch, then score is 1.0, else 0.0"
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
             ],
             "type": "f64"
           },
