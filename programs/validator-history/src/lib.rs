@@ -125,8 +125,8 @@ pub mod validator_history {
         ctx: Context<UpdatePriorityFeeHistory>,
         epoch: u64,
         total_priority_fees: u64,
-        total_leader_slots: u16,
-        blocks_produced: u16,
+        total_leader_slots: u32,
+        blocks_produced: u32,
         current_slot: u64,
     ) -> Result<()> {
         handle_update_priority_fee_history(

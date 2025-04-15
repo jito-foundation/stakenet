@@ -156,21 +156,21 @@ pub struct ValidatorHistoryEntry {
     pub vote_account_last_update_slot: u64,
     // MEV earned, stored as 1/100th SOL. mev_earned = 100 means 1.00 SOL earned
     pub mev_earned: u32,
-    // Priority Fee tips that were transferred to the distribution account, stored as 1/100th SOL.
-    // priority_fee_tips = 100 means 1.00 SOL earned
-    pub priority_fee_tips: u32,
-    // The total priority fees the validator earned for the epoch.
-    pub total_priority_fees: u64,
     // Priority Fee commission in basis points
     pub priority_fee_commission: u16,
-    // The number of leader slots the validator had during the epoch
-    pub total_leader_slots: u16,
-    // The final number of blocks the validator produced during an epoch
-    pub blocks_produced: u16,
     pub padding0: [u8; 2],
+    // Priority Fee tips that were transferred to the distribution account, stored as 1/100th SOL.
+    // priority_fee_tips = 100 means 1.00 SOL earned
+    pub priority_fee_tips: u64,
+    // The total priority fees the validator earned for the epoch.
+    pub total_priority_fees: u64,
+    // The number of leader slots the validator had during the epoch
+    pub total_leader_slots: u32,
+    // The final number of blocks the validator produced during an epoch
+    pub blocks_produced: u32,
     // The last slot the block data was last updated at
     pub block_data_updated_at_slot: u64,
-    pub padding1: [u8; 56],
+    pub padding1: [u8; 48],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -195,14 +195,14 @@ impl Default for ValidatorHistoryEntry {
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
             merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
-            priority_fee_tips: u32::MAX,
+            priority_fee_tips: u64::MAX,
             total_priority_fees: u64::MAX,
             priority_fee_commission: u16::MAX,
-            total_leader_slots: u16::MAX,
-            blocks_produced: u16::MAX,
+            total_leader_slots: u32::MAX,
+            blocks_produced: u32::MAX,
             padding0: [u8::MAX, 2],
             block_data_updated_at_slot: u64::MAX,
-            padding1: [u8::MAX; 56],
+            padding1: [u8::MAX; 48],
         }
     }
 }
@@ -543,11 +543,11 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    pub fn set_priority_fee_commission(
+    pub fn set_priority_fees_earned_and_commission(
         &mut self,
         epoch: u16,
         commission: u16,
-        priority_fee_tips: u32,
+        priority_fee_tips: u64,
     ) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
@@ -623,12 +623,12 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    pub fn set_total_priority_fees(
+    pub fn set_total_priority_fees_and_block_metadata(
         &mut self,
         epoch: u16,
         total_priority_fees: u64,
-        total_leader_slots: u16,
-        blocks_produced: u16,
+        total_leader_slots: u32,
+        blocks_produced: u32,
         slot: u64,
     ) -> Result<()> {
         // Only one authority for upload here, so any epoch can be updated in case of missed upload

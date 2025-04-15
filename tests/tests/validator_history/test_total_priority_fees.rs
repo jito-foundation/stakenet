@@ -15,8 +15,8 @@ async fn test_priority_fee_history_basic_update() {
 
     // update priority_fee history
     let total_priority_fees: u64 = 200_000_000_000;
-    let total_leader_slots: u16 = 1234;
-    let blocks_produced: u16 = 1234;
+    let total_leader_slots: u32 = 1234;
+    let blocks_produced: u32 = 1234;
     let current_slot = 4567;
     let instruction = Instruction {
         program_id: validator_history::id(),
@@ -66,8 +66,8 @@ async fn test_priority_fee_history_basic_update() {
 
     // sleep 2 epochs, wait again
     fixture.advance_num_epochs(2).await;
-    let total_leader_slots: u16 = 4321;
-    let blocks_produced: u16 = 4321;
+    let total_leader_slots: u32 = 4321;
+    let blocks_produced: u32 = 4321;
     let current_slot = 9876;
 
     let instruction = Instruction {
@@ -131,8 +131,8 @@ async fn test_priority_fee_history_wrong_authority() {
         .set_account(&new_authority.pubkey(), &system_account(10000000).into());
 
     let total_priority_fees = 1000;
-    let total_leader_slots: u16 = 1234;
-    let blocks_produced: u16 = 1234;
+    let total_leader_slots: u32 = 1234;
+    let blocks_produced: u32 = 1234;
     let current_slot: u64 = 1234;
     let instruction = Instruction {
         program_id: validator_history::id(),
@@ -180,8 +180,8 @@ async fn test_priority_fee_history_future_epoch() {
         .expect("Failed getting clock");
     // attempt update with future epoch
     let total_priority_fees = 1000;
-    let total_leader_slots: u16 = 1234;
-    let blocks_produced: u16 = 1234;
+    let total_leader_slots: u32 = 1234;
+    let blocks_produced: u32 = 1234;
     let current_slot: u64 = 1234;
     let instruction = Instruction {
         program_id: validator_history::id(),

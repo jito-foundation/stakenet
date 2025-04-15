@@ -17,6 +17,7 @@ async fn test_priority_fee_commission() {
     fixture.initialize_validator_history_account().await;
 
     let epoch = 0;
+    let priority_fees_earned: u64 = 123_236_567_899;
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
         &fixture.vote_account,
@@ -71,7 +72,7 @@ async fn test_priority_fee_commission() {
         &new_priority_fee_distribution_account(
             fixture.vote_account,
             42,
-            Some(123_236_567_899),
+            Some(priority_fees_earned),
             Pubkey::default(),
         )
         .into(),
@@ -91,8 +92,7 @@ async fn test_priority_fee_commission() {
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    assert!(account.history.arr[0].priority_fee_tips == 12324); // fixed point representation
-    assert!((account.history.arr[0].priority_fee_tips as f64 / 100.0) == 123.24_f64);
+    assert_eq!(account.history.arr[0].priority_fee_tips, priority_fees_earned);
 }
 
 #[tokio::test]

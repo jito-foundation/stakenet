@@ -9,6 +9,7 @@ pub struct ReallocConfigAccount<'info> {
         owner = crate::ID,
         bump
     )]
+    /// CHECK: Handled with owner and seeds
     pub config_account: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
