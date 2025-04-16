@@ -54,25 +54,25 @@ impl Address for PriorityFeeAndBlockMetadataEntry {
     }
 }
 
-// impl UpdateInstruction for PriorityFeeAndBlockMetadataEntry {
-//     fn update_instruction(&self) -> Instruction {
-//         Instruction {
-//             program_id: self.program_id,
-//             accounts: validator_history::accounts::UpdatePriorityFeeHistory {
-//                 validator_history_account: self.validator_history_account,
-//                 vote_account: self.vote_account,
-//                 config: self.config,
-//                 priority_fee_oracle_authority: self.priority_fee_oracle_authority,
-//             }
-//             .to_account_metas(None),
-//             data: validator_history::instruction::UpdatePriorityFeeHistory {
-//                 epoch: self.epoch,
-//                 total_priority_fees: self.total_priority_fees,
-//                 total_leader_slots: self.total_leader_slots,
-//                 blocks_produced: self.blocks_produced,
-//                 current_slot: self.current_slot,
-//             }
-//             .data(),
-//         }
-//     }
-// }
+impl UpdateInstruction for PriorityFeeAndBlockMetadataEntry {
+    fn update_instruction(&self) -> Instruction {
+        Instruction {
+            program_id: self.program_id,
+            accounts: validator_history::accounts::UpdatePriorityFeeHistory {
+                validator_history_account: self.validator_history_account,
+                vote_account: self.vote_account,
+                config: self.config,
+                priority_fee_oracle_authority: self.priority_fee_oracle_authority,
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::UpdatePriorityFeeHistory {
+                epoch: self.epoch,
+                total_priority_fees: self.total_priority_fees,
+                total_leader_slots: self.total_leader_slots,
+                blocks_produced: self.blocks_produced,
+                current_slot: self.current_slot,
+            }
+            .data(),
+        }
+    }
+}

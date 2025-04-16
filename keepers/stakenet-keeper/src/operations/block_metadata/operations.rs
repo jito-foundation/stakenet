@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::prelude::EpochSchedule;
 use log::debug;
@@ -12,14 +12,21 @@ use solana_metrics::datapoint_error;
 use solana_sdk::{
     clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT},
     commitment_config::CommitmentConfig,
-    epoch_info::EpochInfo,
+    instruction::Instruction,
+    pubkey::Pubkey,
+    signature::Keypair,
+    signer::Signer,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
-use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::{
+    models::{entries::UpdateInstruction, submit_stats::SubmitStats},
+    utils::transactions::submit_instructions,
+};
 
 use crate::{
+    entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry,
     operations::{
         block_metadata::db::{
             batch_insert_leader_block_data, fetch_block_keeper_metadata,
@@ -43,8 +50,8 @@ fn _should_run() -> bool {
 #[derive(Debug, Default)]
 pub struct AggregateBlockInfo {
     pub epoch: u64,
-    pub leader_slots: u16,
-    pub blocks_produced: u16,
+    pub leader_slots: u32,
+    pub blocks_produced: u32,
     pub priority_fees: i64,
 }
 
@@ -57,7 +64,7 @@ impl AggregateBlockInfo {
             priority_fees: 0,
         }
     }
-    pub fn increment_data(&mut self, leader_slots: u16, blocks_produced: u16, priority_fees: i64) {
+    pub fn increment_data(&mut self, leader_slots: u32, blocks_produced: u32, priority_fees: i64) {
         self.leader_slots += leader_slots;
         self.blocks_produced += blocks_produced;
         self.priority_fees += priority_fees;
@@ -73,8 +80,11 @@ pub async fn fire(
     let client = &keeper_config.client;
     let sqlite_connection = &keeper_config.sqlite_connection;
     let block_metadata_interval = keeper_config.block_metadata_interval;
-    let epoch_info = &keeper_state.epoch_info;
-    let identity_to_vote_map = &keeper_state.identity_to_vote_map;
+    let program_id = &keeper_config.validator_history_program_id;
+    let priority_fee_oracle_authority_keypair = keeper_config
+        .priority_fee_oracle_authority_keypair
+        .as_ref()
+        .unwrap();
 
     let operation = _get_operation();
     let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
@@ -85,10 +95,15 @@ pub async fn fire(
     if should_run {
         match _process(
             client,
-            epoch_info,
             sqlite_connection,
             block_metadata_interval,
-            identity_to_vote_map,
+            keeper_state,
+            program_id,
+            priority_fee_oracle_authority_keypair,
+            keeper_config.tx_retry_count,
+            keeper_config.tx_confirmation_seconds,
+            keeper_config.priority_fee_in_microlamports,
+            keeper_config.no_pack,
         )
         .await
         {
@@ -122,34 +137,50 @@ pub async fn fire(
 
 async fn _process(
     client: &Arc<RpcClient>,
-    epoch_info: &EpochInfo,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
-    identity_to_vote_map: &HashMap<String, String>,
+    keeper_state: &KeeperState,
+    program_id: &Pubkey,
+    priority_fee_oracle_authority_keypair: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
+    priority_fee_in_microlamports: u64,
+    no_pack: bool,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
-        epoch_info,
         sqlite_connection,
         block_metadata_interval,
-        identity_to_vote_map,
+        keeper_state,
+        program_id,
+        priority_fee_oracle_authority_keypair,
+        retry_count,
+        confirmation_time,
+        priority_fee_in_microlamports,
+        no_pack,
     )
     .await
 }
 
 async fn update_block_metadata(
     client: &Arc<RpcClient>,
-    epoch_info: &EpochInfo,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
-    identity_to_vote_map: &HashMap<String, String>,
+    keeper_state: &KeeperState,
+    program_id: &Pubkey,
+    priority_fee_oracle_authority_keypair: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
+    priority_fee_in_microlamports: u64,
+    no_pack: bool,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+    let epoch_info = &keeper_state.epoch_info;
+    let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     // TODO: Put EpochSchedule into KeeperState to avoid unncessary calls
-    let epoch_schedule = client.get_epoch_schedule().await.unwrap();
+    let epoch_schedule = client.get_epoch_schedule().await?;
     let current_finalized_slot = client
         .get_slot_with_commitment(CommitmentConfig::finalized())
-        .await
-        .unwrap();
+        .await?;
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch);
     let next_epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch + 1);
 
@@ -177,10 +208,11 @@ async fn update_block_metadata(
     // Clamp the ending slot to make sure it's all from the same epoch
     let ending_slot = std::cmp::min(current_finalized_slot, next_epoch_starting_slot - 1);
 
-    let mut leader_block_metadatas_created: Vec<LeaderBlockMetadata> = vec![];
-    // Conditional is to avoid the case where
+    let mut instructions: Vec<Instruction> = vec![];
+    // Conditional to avoid case where the keeper last ran at the exact moment the previous
+    //  epoch finalized.
     if starting_slot < ending_slot {
-        let _leader_block_metadatas_created = handle_slots_for_epoch(
+        let _instructions = handle_slots_for_epoch(
             &client,
             &sqlite_connection,
             &epoch_schedule,
@@ -188,16 +220,18 @@ async fn update_block_metadata(
             block_keeper_metadata.epoch,
             starting_slot,
             ending_slot,
+            program_id,
+            &priority_fee_oracle_authority_keypair.pubkey(),
         )
         .await?;
-        leader_block_metadatas_created.extend(_leader_block_metadatas_created);
+        instructions.extend(_instructions);
     }
-    // TODO: Handle case where epoch is more than 1 above
+    // TODO: Handle case where current epoch is more than 1 above
 
     // If current epoch != last epoch, then we should run a second time with the next
     //  epoch's information
     if epoch_info.epoch != block_keeper_metadata.epoch {
-        let _leader_block_metadatas_created = handle_slots_for_epoch(
+        let _instructions = handle_slots_for_epoch(
             &client,
             &sqlite_connection,
             &epoch_schedule,
@@ -205,18 +239,26 @@ async fn update_block_metadata(
             block_keeper_metadata.epoch,
             next_epoch_starting_slot,
             current_finalized_slot,
+            program_id,
+            &priority_fee_oracle_authority_keypair.pubkey(),
         )
         .await?;
-        leader_block_metadatas_created.extend(_leader_block_metadatas_created);
+        instructions.extend(_instructions);
     }
 
-    // TODO: If block_keeper_metadata.epoch != current_epoch_info.epoch, we know the epoch has
-    // transitioned and we should submit the data to validator history for each validator
-    Ok(SubmitStats {
-        successes: 0,
-        errors: 0,
-        results: vec![],
-    })
+    // REVIEW: Do we want to submit the data intra epoch? Or just when an epoch is finalized?
+    let submit_result = submit_instructions(
+        client,
+        instructions,
+        priority_fee_oracle_authority_keypair,
+        priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
+        None,
+        no_pack,
+    )
+    .await;
+    Ok(submit_result?)
 }
 
 pub async fn handle_slots_for_epoch(
@@ -227,7 +269,9 @@ pub async fn handle_slots_for_epoch(
     epoch: u64,
     starting_slot: u64,
     ending_slot: u64,
-) -> Result<Vec<LeaderBlockMetadata>, BlockMetadataKeeperError> {
+    program_id: &Pubkey,
+    priority_fee_oracle_authority: &Pubkey,
+) -> Result<Vec<Instruction>, BlockMetadataKeeperError> {
     debug!(
         "Gathering data for slots: {} - {}",
         starting_slot, ending_slot
@@ -274,7 +318,28 @@ pub async fn handle_slots_for_epoch(
     // Update the block_keeper_metadata record
     upsert_block_keeper_metadata(&conn, epoch, ending_slot);
 
-    Ok(leader_block_metadatas)
+    let instructions = leader_block_metadatas
+        .iter()
+        .filter_map(|leader_block_metadata| {
+            let vote_key = Pubkey::from_str(&leader_block_metadata.vote_key).ok()?;
+
+            Some(
+                PriorityFeeAndBlockMetadataEntry::new(
+                    &vote_key,
+                    epoch,
+                    program_id,
+                    priority_fee_oracle_authority,
+                    leader_block_metadata.total_priority_fees.try_into().ok()?,
+                    leader_block_metadata.leader_slots,
+                    leader_block_metadata.blocks_produced,
+                    leader_block_metadata.block_data_last_update_slot,
+                )
+                .update_instruction(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    Ok(instructions)
 }
 
 pub fn get_updated_leader_block_metadatas(
@@ -349,8 +414,8 @@ fn increment_leader_info(
     leaders_map: &mut LeadersMap,
     leader: &String,
     epoch: u64,
-    leader_slots: u16,
-    blocks_produced: u16,
+    leader_slots: u32,
+    blocks_produced: u32,
     priority_fees: i64,
 ) {
     match leaders_map.get_mut(leader) {

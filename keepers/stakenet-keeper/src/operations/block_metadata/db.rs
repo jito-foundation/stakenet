@@ -20,10 +20,9 @@ impl BlockKeeperMetadata {
 pub struct LeaderBlockMetadata {
     pub vote_key: String,
     pub block_data_last_update_slot: u64,
-    // TODO: Consolidate the following data by using a nested struct with `AggregateBlockInfo`
     pub total_priority_fees: i64,
-    pub leader_slots: u16,
-    pub blocks_produced: u16,
+    pub leader_slots: u32,
+    pub blocks_produced: u32,
 }
 
 impl LeaderBlockMetadata {
@@ -44,8 +43,8 @@ impl LeaderBlockMetadata {
     pub fn new_and_increment_data(
         &self,
         total_priority_fees: i64,
-        leader_slots: u16,
-        blocks_produced: u16,
+        leader_slots: u32,
+        blocks_produced: u32,
         block_data_last_update_slot: u64,
     ) -> Self {
         Self {
