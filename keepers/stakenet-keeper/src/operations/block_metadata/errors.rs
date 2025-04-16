@@ -3,8 +3,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum BlockMetadataKeeperError {
-    #[error("SoloanaClientError error: {0}")]
-    SoloanaClientError(#[from] ClientError),
+    #[error("SolanaClientError error: {0}")]
+    SolanaClientError(#[from] ClientError),
     #[error(transparent)]
     RpcError(#[from] RpcError),
     #[error(transparent)]

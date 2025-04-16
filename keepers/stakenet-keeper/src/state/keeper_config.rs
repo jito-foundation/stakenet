@@ -29,6 +29,7 @@ pub struct KeeperConfig {
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
     pub sqlite_connection: Arc<Connection>,
+    pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
 }
 
 #[derive(Parser, Debug)]
@@ -49,6 +50,11 @@ pub struct Args {
     /// Path to keypair used specifically for submitting permissioned transactions
     #[arg(long, env)]
     pub oracle_authority_keypair: Option<PathBuf>,
+
+    /// Path to keypair used specifically for submitting permissioned transactions related to
+    /// priority fees and block metadata
+    #[arg(long, env)]
+    pub priority_fee_oracle_authority_keypair: Option<PathBuf>,
 
     /// Validator history program ID (Pubkey as base58 string)
     #[arg(
@@ -163,6 +169,10 @@ pub struct Args {
     #[arg(long, env, default_value = "20")]
     pub cool_down_range: u8,
 
+    /// Run block metadata keeper
+    #[arg(long, env, default_value = "true")]
+    pub run_block_metadata: bool,
+
     /// Interval to update block metadata in local SQLite file (default 17280 sec, which is ~1/10 of an epoch)
     #[arg(long, env, default_value = "17280")]
     pub block_metadata_interval: u64,
@@ -182,6 +192,7 @@ impl fmt::Display for Args {
             Gossip Entrypoint: {:?}\n\
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
+            Priority Fee Oracle Authority Keypair Path: {:?}\n\
             Validator History Program ID: {}\n\
             Tip Distribution Program ID: {}\n\
             Steward Program ID: {}\n\
@@ -205,6 +216,7 @@ impl fmt::Display for Args {
             No Pack: {}\n\
             Pay for New Accounts: {}\n\
             Cool Down Range: {} minutes\n\
+            Run Block Metadata {}\n\
             Block Metadata Interval: {} seconds\n\
             SQLite path: {:?}\n\
             Region: {}\n\
@@ -213,6 +225,7 @@ impl fmt::Display for Args {
             self.gossip_entrypoint,
             self.keypair,
             self.oracle_authority_keypair,
+            self.priority_fee_oracle_authority_keypair,
             self.validator_history_program_id,
             self.tip_distribution_program_id,
             self.steward_program_id,
@@ -236,6 +249,7 @@ impl fmt::Display for Args {
             self.no_pack,
             self.pay_for_new_accounts,
             self.cool_down_range,
+            self.run_block_metadata,
             self.block_metadata_interval,
             self.sqlite_path,
             self.region,

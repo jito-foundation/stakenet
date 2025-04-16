@@ -328,11 +328,18 @@ async fn main() {
         .map(|oracle_authority_keypair| {
             Arc::new(
                 read_keypair_file(oracle_authority_keypair)
-                    .expect("Failed reading stake keypair file"),
+                    .expect("Failed reading oracle_authority_keypair keypair file"),
             )
         });
-    // REVIEW: Should keeper load a second keypair for the priority_fee_oracle_authority? Or will it
-    // be set to the same oracle authority for now?
+
+    let priority_fee_oracle_authority_keypair =
+        args.priority_fee_oracle_authority_keypair
+            .map(|priority_fee_oracle_authority_keypair| {
+                Arc::new(
+                    read_keypair_file(priority_fee_oracle_authority_keypair)
+                        .expect("Failed reading priority_fee_oracle_authority_keypair file"),
+                )
+            });
 
     let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
         solana_net_utils::parse_host_port(&gossip_entrypoint)
@@ -365,6 +372,7 @@ async fn main() {
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
         sqlite_connection: Arc::new(conn),
+        priority_fee_oracle_authority_keypair,
     };
 
     run_keeper(config).await;

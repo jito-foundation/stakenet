@@ -360,15 +360,13 @@ pub async fn aggregate_information(
         match maybe_block_data {
             Ok(block) => {
                 // get the priority fee rewards for the block.
-                let maybe_block_rewards = block
+                let priority_fees = block
                     .rewards
                     .unwrap()
                     .into_iter()
-                    .find(|r| r.reward_type == Some(RewardType::Fee));
-                let priority_fees = match maybe_block_rewards {
-                    Some(block_reward) => block_reward.lamports,
-                    None => 0,
-                };
+                    .find(|r| r.reward_type == Some(RewardType::Fee))
+                    .map(|r| r.lamports)
+                    .unwrap_or(0);
                 increment_leader_info(&mut res, leader, epoch, 1, 1, priority_fees);
             }
             Err(err) => match err {
@@ -423,7 +421,7 @@ async fn get_block(
                 }
                 _ => return Err(BlockMetadataKeeperError::RpcError(client_rpc_err)),
             },
-            _ => return Err(BlockMetadataKeeperError::SoloanaClientError(err)),
+            _ => return Err(BlockMetadataKeeperError::SolanaClientError(err)),
         },
     };
     Ok(block)
