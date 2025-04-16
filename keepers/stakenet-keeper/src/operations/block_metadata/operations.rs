@@ -176,8 +176,7 @@ async fn update_block_metadata(
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
-    // TODO: Put EpochSchedule into KeeperState to avoid unncessary calls
-    let epoch_schedule = client.get_epoch_schedule().await?;
+    let epoch_schedule = &keeper_state.epoch_schedule;
     let current_finalized_slot = client
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;

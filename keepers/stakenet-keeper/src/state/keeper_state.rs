@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use anchor_lang::prelude::EpochSchedule;
 use bytemuck::Zeroable;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_metrics::datapoint_info;
@@ -84,6 +85,7 @@ impl KeeperFlags {
 pub struct KeeperState {
     pub keeper_flags: KeeperFlags,
     pub epoch_info: EpochInfo,
+    pub epoch_schedule: EpochSchedule,
 
     // Tally array of runs and errors indexed by their respective KeeperOperations
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
@@ -314,6 +316,7 @@ impl Default for KeeperState {
                 block_height: 0,
                 transaction_count: None,
             },
+            epoch_schedule: EpochSchedule::default(),
             runs_for_epoch: [0; KeeperOperations::LEN],
             errors_for_epoch: [0; KeeperOperations::LEN],
             txs_for_epoch: [0; KeeperOperations::LEN],

@@ -53,6 +53,13 @@ pub async fn pre_create_update(
         }
     }
 
+    match client.get_epoch_schedule().await {
+        Ok(epoch_schedule) => keeper_state.epoch_schedule = epoch_schedule,
+        Err(e) => {
+            return Err(Box::new(e));
+        }
+    }
+
     // Fetch Vote Accounts
     keeper_state.vote_account_map = get_vote_account_map(client).await?;
 
