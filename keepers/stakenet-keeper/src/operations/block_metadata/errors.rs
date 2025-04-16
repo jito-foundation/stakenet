@@ -15,4 +15,6 @@ pub enum BlockMetadataKeeperError {
     ErrorGettingLeaderSchedule,
     #[error("Block was skipped")]
     SkippedBlock,
+    #[error("Vote key not found for identity {0}")]
+    MissingVoteKey(String),
 }

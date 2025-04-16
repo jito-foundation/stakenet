@@ -25,7 +25,7 @@ use crate::{
             batch_insert_leader_block_data, fetch_block_keeper_metadata,
             upsert_block_keeper_metadata, BlockKeeperMetadata,
         },
-        keeper_operations::KeeperOperations,
+        keeper_operations::{check_flag, KeeperOperations},
     },
     state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
 };
@@ -34,6 +34,10 @@ use super::{db::LeaderBlockMetadata, errors::BlockMetadataKeeperError};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::GossipUpload
+}
+
+fn _should_run() -> bool {
+    true
 }
 
 #[derive(Debug, Default)]
@@ -70,40 +74,46 @@ pub async fn fire(
     let sqlite_connection = &keeper_config.sqlite_connection;
     let block_metadata_interval = keeper_config.block_metadata_interval;
     let epoch_info = &keeper_state.epoch_info;
+    let identity_to_vote_map = &keeper_state.identity_to_vote_map;
 
     let operation = _get_operation();
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
+
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    match _process(
-        client,
-        epoch_info,
-        sqlite_connection,
-        block_metadata_interval,
-    )
-    .await
-    {
-        Ok(stats) => {
-            for message in stats.results.iter().chain(stats.results.iter()) {
-                if let Err(e) = message {
-                    datapoint_error!(
-                        "block-metadata-keeper-error",
-                        ("error", e.to_string(), String),
-                    );
-                } else {
-                    txs_for_epoch += 1;
+    if should_run {
+        match _process(
+            client,
+            epoch_info,
+            sqlite_connection,
+            block_metadata_interval,
+            identity_to_vote_map,
+        )
+        .await
+        {
+            Ok(stats) => {
+                for message in stats.results.iter().chain(stats.results.iter()) {
+                    if let Err(e) = message {
+                        datapoint_error!(
+                            "block-metadata-keeper-error",
+                            ("error", e.to_string(), String),
+                        );
+                    } else {
+                        txs_for_epoch += 1;
+                    }
+                }
+                if stats.errors == 0 {
+                    runs_for_epoch += 1;
                 }
             }
-            if stats.errors == 0 {
-                runs_for_epoch += 1;
+            Err(e) => {
+                datapoint_error!(
+                    "block-metadata-keeper-error",
+                    ("error", e.to_string(), String),
+                );
+                errors_for_epoch += 1;
             }
-        }
-        Err(e) => {
-            datapoint_error!(
-                "block-metadata-keeper-error",
-                ("error", e.to_string(), String),
-            );
-            errors_for_epoch += 1;
         }
     }
 
@@ -115,12 +125,14 @@ async fn _process(
     epoch_info: &EpochInfo,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
+    identity_to_vote_map: &HashMap<String, String>,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
         epoch_info,
         sqlite_connection,
         block_metadata_interval,
+        identity_to_vote_map,
     )
     .await
 }
@@ -130,6 +142,7 @@ async fn update_block_metadata(
     epoch_info: &EpochInfo,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
+    identity_to_vote_map: &HashMap<String, String>,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     // TODO: Put EpochSchedule into KeeperState to avoid unncessary calls
     let epoch_schedule = client.get_epoch_schedule().await.unwrap();
@@ -170,11 +183,12 @@ async fn update_block_metadata(
             &client,
             &sqlite_connection,
             &epoch_schedule,
+            identity_to_vote_map,
             block_keeper_metadata.epoch,
             starting_slot,
             ending_slot,
         )
-        .await;
+        .await?;
     }
     // TODO: Handle case where epoch is more than 1 above
 
@@ -185,11 +199,12 @@ async fn update_block_metadata(
             &client,
             &sqlite_connection,
             &epoch_schedule,
+            identity_to_vote_map,
             block_keeper_metadata.epoch,
             next_epoch_starting_slot,
             current_finalized_slot,
         )
-        .await;
+        .await?;
     }
 
     // TODO: If block_keeper_metadata.epoch != current_epoch_info.epoch, we know the epoch has
@@ -205,10 +220,11 @@ pub async fn handle_slots_for_epoch(
     rpc_client: &RpcClient,
     conn: &Connection,
     epoch_schedule: &EpochSchedule,
+    identity_to_vote_map: &HashMap<String, String>,
     epoch: u64,
     starting_slot: u64,
     ending_slot: u64,
-) {
+) -> Result<(), BlockMetadataKeeperError> {
     debug!(
         "Gathering data for slots: {} - {}",
         starting_slot, ending_slot
@@ -222,7 +238,12 @@ pub async fn handle_slots_for_epoch(
         vec![None; DEFAULT_SLOTS_PER_EPOCH as usize];
     for (leader, slots) in rpc_leader_schedule.iter() {
         for relative_slot in slots {
-            relative_slot_leaders[*relative_slot] = Some(leader);
+            // Convert leader (identity pubkey) to be the vote_key
+            if let Some(vote_key) = identity_to_vote_map.get(leader) {
+                relative_slot_leaders[*relative_slot] = Some(vote_key);
+            } else {
+                return Err(BlockMetadataKeeperError::MissingVoteKey(leader.to_owned()));
+            }
         }
     }
 
@@ -236,8 +257,7 @@ pub async fn handle_slots_for_epoch(
         ending_slot,
         relative_slot_leaders,
     )
-    .await
-    .unwrap();
+    .await?;
 
     // Update the SQL lite DB with the aggregate information
     let leader_block_metadatas = get_updated_leader_block_metadatas(
@@ -246,11 +266,12 @@ pub async fn handle_slots_for_epoch(
         starting_slot - 1,
         ending_slot,
         aggregate_info,
-    )
-    .unwrap();
-    batch_insert_leader_block_data(&conn, leader_block_metadatas).unwrap();
+    )?;
+    batch_insert_leader_block_data(&conn, leader_block_metadatas)?;
     // Update the block_keeper_metadata record
     upsert_block_keeper_metadata(&conn, epoch, ending_slot);
+
+    Ok(())
 }
 
 pub fn get_updated_leader_block_metadatas(

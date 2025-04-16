@@ -53,6 +53,9 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_emit_metrics {
         run_flags = set_flag(run_flags, KeeperOperations::EmitMetrics);
     }
+    if args.run_block_metadata {
+        run_flags = set_flag(run_flags, KeeperOperations::BlockMetadataKeeper);
+    }
 
     run_flags
 }

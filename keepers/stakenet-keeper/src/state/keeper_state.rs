@@ -97,6 +97,8 @@ pub struct KeeperState {
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
     // All validator history entries fetched by get_validator_history_accounts - key'd by their vote_account pubkey
     pub validator_history_map: HashMap<Pubkey, ValidatorHistory>,
+    // Maps a Validator's identity address to their vote account address
+    pub identity_to_vote_map: HashMap<String, String>,
 
     // All vote accounts mapped and fetched from validator_history_map - key'd by their vote_account pubkey
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
@@ -117,6 +119,20 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
+    // REVIEW: We could put this into the get_vote_account_map function and reduce the iteration
+    pub fn update_identity_to_vote_map(&mut self) {
+        self.identity_to_vote_map = self
+            .vote_account_map
+            .values()
+            .map(|vote_account_info| {
+                (
+                    vote_account_info.node_pubkey.clone(),
+                    vote_account_info.vote_pubkey.clone(),
+                )
+            })
+            .collect();
+    }
+
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
         let index = operation as usize;
         self.runs_for_epoch[index] += 1;
@@ -304,6 +320,7 @@ impl Default for KeeperState {
             created_accounts_for_epoch: [0; KeeperCreates::LEN],
             vote_account_map: HashMap::new(),
             validator_history_map: HashMap::new(),
+            identity_to_vote_map: HashMap::new(),
             all_history_vote_account_map: HashMap::new(),
             all_get_vote_account_map: HashMap::new(),
             previous_epoch_tip_distribution_map: HashMap::new(),
