@@ -180,6 +180,11 @@ pub struct Args {
     /// Path to the local SQLite file
     #[arg(long, env, default_value = "./block_keeper.db3")]
     pub sqlite_path: PathBuf,
+
+    /// Solana JSON RPC URLs that can be used for fall back checks when information is not
+    /// available from the primary RPC
+    #[arg(long, env)]
+    pub redundant_rpc_urls: Option<Vec<String>>,
 }
 
 impl fmt::Display for Args {
@@ -220,6 +225,7 @@ impl fmt::Display for Args {
             Block Metadata Interval: {} seconds\n\
             SQLite path: {:?}\n\
             Region: {}\n\
+            Redundant RPC URLs: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoint,
@@ -253,6 +259,7 @@ impl fmt::Display for Args {
             self.block_metadata_interval,
             self.sqlite_path,
             self.region,
+            self.redundant_rpc_urls,
         )
     }
 }

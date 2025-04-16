@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use anchor_lang::prelude::EpochSchedule;
+use anchor_lang::prelude::{EpochSchedule, SlotHistory};
 use log::debug;
 use regex::Regex;
 use rusqlite::Connection;
@@ -16,6 +16,7 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::Keypair,
     signer::Signer,
+    slot_history,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
@@ -221,6 +222,7 @@ async fn update_block_metadata(
                 &sqlite_connection,
                 &epoch_schedule,
                 identity_to_vote_map,
+                &keeper_state.slot_history,
                 epoch,
                 starting_slot,
                 ending_slot,
@@ -251,6 +253,7 @@ pub async fn handle_slots_for_epoch(
     conn: &Connection,
     epoch_schedule: &EpochSchedule,
     identity_to_vote_map: &HashMap<String, String>,
+    slot_history: &SlotHistory,
     epoch: u64,
     starting_slot: u64,
     ending_slot: u64,
@@ -288,6 +291,7 @@ pub async fn handle_slots_for_epoch(
         starting_slot,
         ending_slot,
         relative_slot_leaders,
+        slot_history,
     )
     .await?;
 
@@ -434,13 +438,14 @@ pub async fn aggregate_information(
     starting_slot: u64,
     ending_slot: u64,
     slot_leaders: Vec<Option<&String>>,
+    slot_history: &SlotHistory,
 ) -> Result<LeadersMap, BlockMetadataKeeperError> {
     let mut res: LeadersMap = HashMap::new();
     // We use an inclusive range as the program relies on it being included
     for slot in starting_slot..=ending_slot {
         let relative_slot = slot - epoch_starting_slot;
         let leader = slot_leaders[relative_slot as usize].unwrap();
-        let maybe_block_data = get_block(client, slot).await;
+        let maybe_block_data = get_block(client, slot, slot_history).await;
         match maybe_block_data {
             Ok(block) => {
                 // get the priority fee rewards for the block.
@@ -469,6 +474,7 @@ pub async fn aggregate_information(
 async fn get_block(
     client: &RpcClient,
     slot: u64,
+    slot_history: &SlotHistory,
 ) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
     let block_res = client
         .get_block_with_config(
@@ -493,7 +499,18 @@ async fn get_block(
                 } => {
                     let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
                     if slot_skipped_regex.is_match(&message) {
-                        return Err(BlockMetadataKeeperError::SkippedBlock);
+                        match slot_history.check(slot) {
+                            slot_history::Check::Future => {
+                                return Err(BlockMetadataKeeperError::SlotInFuture(slot))
+                            }
+                            slot_history::Check::NotFound => {
+                                return Err(BlockMetadataKeeperError::SkippedBlock)
+                            }
+                            slot_history::Check::TooOld | slot_history::Check::Found => {
+                                // TODO: Should get_block be recursive, hmmm
+                                todo!("fallback to redundant RPCs")
+                            }
+                        }
                     }
                     return Err(BlockMetadataKeeperError::RpcError(
                         RpcError::RpcResponseError {

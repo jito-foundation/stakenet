@@ -1,11 +1,13 @@
 use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
-use anchor_lang::AccountDeserialize;
+use anchor_lang::{prelude::SlotHistory, AccountDeserialize};
+use bincode::deserialize;
 use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
 
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
-    account::Account, instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    account::Account, commitment_config::CommitmentConfig, instruction::Instruction,
+    pubkey::Pubkey, signature::Keypair, signer::Signer, sysvar,
 };
 
 use stakenet_sdk::utils::{
@@ -55,6 +57,19 @@ pub async fn pre_create_update(
 
     match client.get_epoch_schedule().await {
         Ok(epoch_schedule) => keeper_state.epoch_schedule = epoch_schedule,
+        Err(e) => {
+            return Err(Box::new(e));
+        }
+    }
+
+    match client
+        .get_account_with_commitment(&sysvar::slot_history::ID, CommitmentConfig::finalized())
+        .await
+    {
+        Ok(maybe_sysvar_history) => {
+            let account = maybe_sysvar_history.value.unwrap();
+            keeper_state.slot_history = deserialize::<SlotHistory>(&account.data).unwrap();
+        }
         Err(e) => {
             return Err(Box::new(e));
         }

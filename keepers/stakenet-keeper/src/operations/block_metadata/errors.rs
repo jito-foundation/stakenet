@@ -17,4 +17,6 @@ pub enum BlockMetadataKeeperError {
     SkippedBlock,
     #[error("Vote key not found for identity {0}")]
     MissingVoteKey(String),
+    #[error("Slot {0} not found. SlotHistory not up to date or slot in future")]
+    SlotInFuture(u64),
 }
