@@ -77,23 +77,28 @@ pub fn batch_insert_leader_block_data(
         .join(", ");
     let query = format!("INSERT INTO leader_block_metadata (vote_key, total_priority_fees, leader_slots, blocks_produced, block_data_last_update_slot) VALUES {}", data);
 
-    conn.execute(&query, ()).unwrap();
+    conn.execute(&query, ())?;
     Ok(())
 }
 
-pub fn fetch_block_keeper_metadata(conn: &Connection) -> Option<BlockKeeperMetadata> {
-    let mut res = conn
-        .prepare("SELECT id, slot, epoch FROM block_keeper_metadata WHERE id = 1 LIMIT 1")
-        .unwrap();
+pub fn fetch_block_keeper_metadata(
+    conn: &Connection,
+) -> Result<Option<BlockKeeperMetadata>, BlockMetadataKeeperError> {
+    let mut res =
+        conn.prepare("SELECT id, slot, epoch FROM block_keeper_metadata WHERE id = 1 LIMIT 1")?;
     let mut res = res.query([]).unwrap();
-    res.next().unwrap().map(|row| BlockKeeperMetadata {
+    Ok(res.next().unwrap().map(|row| BlockKeeperMetadata {
         id: row.get(0).unwrap(),
         slot: row.get(1).unwrap(),
         epoch: row.get(2).unwrap(),
-    })
+    }))
 }
 
-pub fn upsert_block_keeper_metadata(conn: &Connection, epoch: u64, slot: u64) {
+pub fn upsert_block_keeper_metadata(
+    conn: &Connection,
+    epoch: u64,
+    slot: u64,
+) -> Result<(), BlockMetadataKeeperError> {
     conn.execute(
         "INSERT INTO block_keeper_metadata (id, epoch, slot)
       VALUES (1, ?1, ?2) 
@@ -101,12 +106,12 @@ pub fn upsert_block_keeper_metadata(conn: &Connection, epoch: u64, slot: u64) {
           epoch = excluded.epoch,
           slot = excluded.slot",
         [epoch, slot],
-    )
-    .unwrap();
+    )?;
+    Ok(())
 }
 
 /// Create all necessary tables and indexes. Uses IF NOT EXISTS to be safe
-pub fn create_sqlite_tables(conn: &Connection) {
+pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeperError> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS block_keeper_metadata (
           id    INTEGER PRIMARY KEY,
@@ -114,8 +119,7 @@ pub fn create_sqlite_tables(conn: &Connection) {
           epoch INTEGER
       )",
         (),
-    )
-    .unwrap();
+    )?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS leader_block_metadata (
@@ -126,8 +130,7 @@ pub fn create_sqlite_tables(conn: &Connection) {
           block_data_last_update_slot INTEGER
       )",
         (),
-    )
-    .unwrap();
+    )?;
 
     // Create index on leader block metadata descending by block_data_last_update_slot
     conn.execute(
@@ -135,8 +138,12 @@ pub fn create_sqlite_tables(conn: &Connection) {
       ON leader_block_metadata (vote_key, block_data_last_update_slot DESC
       )",
         (),
-    )
-    .unwrap();
+    )?;
+    Ok(())
 }
 
-// TODO: Add function to drop all records prior to a given slot
+// Deletes all records prior to a given slot (non-inclusive)
+pub fn prune_prior_records(conn: &Connection, slot: u64) -> Result<(), BlockMetadataKeeperError> {
+    conn.execute("DELETE FROM leader_block_metadata WHERE slot < ?1", [slot])?;
+    Ok(())
+}

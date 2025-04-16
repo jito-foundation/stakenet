@@ -361,7 +361,7 @@ async fn main() {
 
     let conn = Connection::open(args.sqlite_path.clone()).unwrap();
     // Set up the SQLite DB
-    create_sqlite_tables(&conn);
+    create_sqlite_tables(&conn).expect("SQLite tables created");
 
     let config = KeeperConfig {
         client,

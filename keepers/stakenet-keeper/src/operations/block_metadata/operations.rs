@@ -30,7 +30,7 @@ use crate::{
     entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry,
     operations::{
         block_metadata::db::{
-            batch_insert_leader_block_data, fetch_block_keeper_metadata,
+            batch_insert_leader_block_data, fetch_block_keeper_metadata, prune_prior_records,
             upsert_block_keeper_metadata, BlockKeeperMetadata,
         },
         keeper_operations::{check_flag, KeeperOperations},
@@ -188,7 +188,7 @@ async fn update_block_metadata(
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch);
 
     // Gather the data for what slot & epoch the keeper last indexed
-    let maybe_block_keeper_metadata = fetch_block_keeper_metadata(sqlite_connection);
+    let maybe_block_keeper_metadata = fetch_block_keeper_metadata(sqlite_connection)?;
     let block_keeper_metadata = match maybe_block_keeper_metadata {
         Some(block_keeper_metadata) => block_keeper_metadata,
         None => {
@@ -250,6 +250,13 @@ async fn update_block_metadata(
         no_pack,
     )
     .await;
+
+    // Delete records older than 2 epochs
+    prune_prior_records(
+        sqlite_connection,
+        epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch - 2),
+    )?;
+
     Ok(submit_result?)
 }
 
@@ -312,7 +319,7 @@ pub async fn handle_slots_for_epoch(
     )?;
     batch_insert_leader_block_data(&conn, &leader_block_metadatas)?;
     // Update the block_keeper_metadata record
-    upsert_block_keeper_metadata(&conn, epoch, ending_slot);
+    upsert_block_keeper_metadata(&conn, epoch, ending_slot)?;
 
     let instructions = leader_block_metadatas
         .iter()
@@ -469,7 +476,6 @@ pub async fn aggregate_information(
             }
             Err(err) => match err {
                 BlockMetadataKeeperError::SkippedBlock => {
-                    // TODO: Add some redundancy to check with other RPCs and validate block was skipped.
                     increment_leader_info(&mut res, leader, epoch, 1, 0, 0);
                 }
                 _ => return Err(err),
