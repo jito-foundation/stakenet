@@ -11,7 +11,7 @@ pub struct SetNewPriorityFeeOracleAuthority<'info> {
         has_one = admin,
     )]
     pub config: Account<'info, Config>,
-    /// CHECK: fine since we are not deserializing account
+    /// CHECK: fine since we trust the admin
     pub new_priority_fee_oracle_authority: AccountInfo<'info>,
     pub admin: Signer<'info>,
 }

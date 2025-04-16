@@ -93,7 +93,7 @@ async fn test_realloc_config_happy_path() {
     assert!(config_account_data_after.len() > old_data.len());
     assert_eq!(config_account_data_after.len(), Config::SIZE as usize);
 
-    // Validate the config account data did not change
+    // Validate the old config account data did not change
     assert_eq!(
         old_config.tip_distribution_program,
         config_after.tip_distribution_program
@@ -102,6 +102,8 @@ async fn test_realloc_config_happy_path() {
     assert_eq!(old_config.oracle_authority, config_after.oracle_authority);
     assert_eq!(old_config.bump, config_after.bump);
     assert_eq!(old_config.counter, config_after.counter);
+
+    // Validate the, previously unset, priority_fee_oracle_authority is now set
     assert_eq!(
         old_config.oracle_authority,
         config_after.priority_fee_oracle_authority

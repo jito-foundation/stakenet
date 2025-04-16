@@ -8,21 +8,21 @@ use anchor_lang::{prelude::*, solana_program::vote};
 #[derive(Accounts)]
 pub struct UpdatePriorityFeeHistory<'info> {
     #[account(
-      mut,
-      seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
-      bump
-  )]
+        mut,
+        seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
+        bump
+    )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
 
-    /// CHECK: fine since we are not deserializing account
+    /// CHECK: We check the owning program in the handler
     #[account(owner = vote::program::ID.key())]
     pub vote_account: AccountInfo<'info>,
 
     #[account(
-      seeds = [Config::SEED],
-      bump = config.bump,
-      has_one = priority_fee_oracle_authority
-  )]
+        seeds = [Config::SEED],
+        bump = config.bump,
+        has_one = priority_fee_oracle_authority
+    )]
     pub config: Account<'info, Config>,
 
     pub priority_fee_oracle_authority: Signer<'info>,

@@ -106,7 +106,7 @@ async fn test_priority_fee_commission_fail() {
     fixture.initialize_validator_history_account().await;
     let epoch = 0;
 
-    // test update Priority Fee commission with uninitialized TDA
+    // test update Priority Fee commission with uninitialized PFDA
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
         &fixture.vote_account,
@@ -179,7 +179,7 @@ async fn test_priority_fee_commission_fail() {
         .into(),
     );
 
-    // test update Priority Fee commission with wrong validator's TDA
+    // test update Priority Fee commission with wrong validator's PFDA
     let instruction = Instruction {
         program_id: validator_history::id(),
         data: validator_history::instruction::CopyPriorityFeeDistribution { epoch }.data(),
