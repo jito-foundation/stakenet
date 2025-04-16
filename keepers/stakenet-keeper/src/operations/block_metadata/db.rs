@@ -138,3 +138,5 @@ pub fn create_sqlite_tables(conn: &Connection) {
     )
     .unwrap();
 }
+
+// TODO: Add function to drop all records prior to a given slot

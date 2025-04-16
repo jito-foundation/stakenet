@@ -182,7 +182,6 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch);
-    let next_epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch + 1);
 
     // Gather the data for what slot & epoch the keeper last indexed
     let maybe_block_keeper_metadata = fetch_block_keeper_metadata(sqlite_connection);
@@ -204,49 +203,36 @@ async fn update_block_metadata(
         }
     };
     debug!("block_keeper_metadata {:?}", block_keeper_metadata);
-    let starting_slot = block_keeper_metadata.slot + 1;
-    // Clamp the ending slot to make sure it's all from the same epoch
-    let ending_slot = std::cmp::min(current_finalized_slot, next_epoch_starting_slot - 1);
 
     let mut instructions: Vec<Instruction> = vec![];
-    // Conditional to avoid case where the keeper last ran at the exact moment the previous
-    //  epoch finalized.
-    if starting_slot < ending_slot {
-        let _instructions = handle_slots_for_epoch(
-            &client,
-            &sqlite_connection,
-            &epoch_schedule,
-            identity_to_vote_map,
-            block_keeper_metadata.epoch,
-            starting_slot,
-            ending_slot,
-            program_id,
-            &priority_fee_oracle_authority_keypair.pubkey(),
-        )
-        .await?;
-        instructions.extend(_instructions);
-    }
-    // TODO: Handle case where current epoch is more than 1 above
+    // Handle case where current epoch is above the last indexed in SQLlite
+    let epochs_diff = epoch_info.epoch - block_keeper_metadata.epoch;
+    let mut starting_slot = block_keeper_metadata.slot + 1;
+    for relative_epoch in 0..epochs_diff {
+        // For each epoch we are behind we need to generate the update instructions
+        let epoch = block_keeper_metadata.epoch + relative_epoch;
+        let epoch_ending_slot = epoch_schedule.get_last_slot_in_epoch(epoch);
 
-    // If current epoch != last epoch, then we should run a second time with the next
-    //  epoch's information
-    if epoch_info.epoch != block_keeper_metadata.epoch {
-        let _instructions = handle_slots_for_epoch(
-            &client,
-            &sqlite_connection,
-            &epoch_schedule,
-            identity_to_vote_map,
-            block_keeper_metadata.epoch,
-            next_epoch_starting_slot,
-            current_finalized_slot,
-            program_id,
-            &priority_fee_oracle_authority_keypair.pubkey(),
-        )
-        .await?;
-        instructions.extend(_instructions);
+        // Clamp the ending slot to make sure it's all from the same epoch
+        let ending_slot = std::cmp::min(current_finalized_slot, epoch_ending_slot);
+        // REVIEW: Do we want to submit the data intra epoch? Or just when an epoch is finalized?
+        instructions.extend(
+            handle_slots_for_epoch(
+                &client,
+                &sqlite_connection,
+                &epoch_schedule,
+                identity_to_vote_map,
+                epoch,
+                starting_slot,
+                ending_slot,
+                program_id,
+                &priority_fee_oracle_authority_keypair.pubkey(),
+            )
+            .await?,
+        );
+        starting_slot = ending_slot + 1;
     }
 
-    // REVIEW: Do we want to submit the data intra epoch? Or just when an epoch is finalized?
     let submit_result = submit_instructions(
         client,
         instructions,
@@ -406,6 +392,16 @@ pub fn get_updated_leader_block_metadatas(
             }
         })
         .collect();
+    // REVIEW: Here we are only creating LeaderBlockMetadata for those that came from the
+    //  newly aggregated information. This means that validator's that did not have a leader
+    //  slot in the aggregated range will not show up in this vector.
+    // IF we want to make sure all ValidatorHistoryEntries are updated with the same update
+    // slot, then we likely need to pull those other records in.
+    // IF transactions are submited only when an epoch is finalized, then we would also
+    // have to pull those records in.
+    //
+    // It probably makes the most sense to pull them in here, but worth a quick discussion
+    //  on TX submissions and leaving this here as a reminder.
 
     Ok(records)
 }
