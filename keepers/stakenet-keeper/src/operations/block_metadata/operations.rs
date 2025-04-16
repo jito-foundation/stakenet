@@ -98,6 +98,7 @@ pub async fn fire(
             client,
             sqlite_connection,
             block_metadata_interval,
+            &keeper_config.redundant_rpc_urls,
             keeper_state,
             program_id,
             priority_fee_oracle_authority_keypair,
@@ -140,6 +141,7 @@ async fn _process(
     client: &Arc<RpcClient>,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
@@ -152,6 +154,7 @@ async fn _process(
         client,
         sqlite_connection,
         block_metadata_interval,
+        maybe_redundant_rpc_urls,
         keeper_state,
         program_id,
         priority_fee_oracle_authority_keypair,
@@ -167,6 +170,7 @@ async fn update_block_metadata(
     client: &Arc<RpcClient>,
     sqlite_connection: &Arc<Connection>,
     block_metadata_interval: u64,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
@@ -222,6 +226,7 @@ async fn update_block_metadata(
                 &sqlite_connection,
                 &epoch_schedule,
                 identity_to_vote_map,
+                maybe_redundant_rpc_urls,
                 &keeper_state.slot_history,
                 epoch,
                 starting_slot,
@@ -253,6 +258,7 @@ pub async fn handle_slots_for_epoch(
     conn: &Connection,
     epoch_schedule: &EpochSchedule,
     identity_to_vote_map: &HashMap<String, String>,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     slot_history: &SlotHistory,
     epoch: u64,
     starting_slot: u64,
@@ -292,6 +298,7 @@ pub async fn handle_slots_for_epoch(
         ending_slot,
         relative_slot_leaders,
         slot_history,
+        maybe_redundant_rpc_urls,
     )
     .await?;
 
@@ -439,13 +446,15 @@ pub async fn aggregate_information(
     ending_slot: u64,
     slot_leaders: Vec<Option<&String>>,
     slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Result<LeadersMap, BlockMetadataKeeperError> {
     let mut res: LeadersMap = HashMap::new();
     // We use an inclusive range as the program relies on it being included
     for slot in starting_slot..=ending_slot {
         let relative_slot = slot - epoch_starting_slot;
         let leader = slot_leaders[relative_slot as usize].unwrap();
-        let maybe_block_data = get_block(client, slot, slot_history).await;
+        let maybe_block_data =
+            get_block(client, slot, slot_history, maybe_redundant_rpc_urls).await;
         match maybe_block_data {
             Ok(block) => {
                 // get the priority fee rewards for the block.
@@ -475,55 +484,68 @@ async fn get_block(
     client: &RpcClient,
     slot: u64,
     slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
-    let block_res = client
-        .get_block_with_config(
-            slot,
-            RpcBlockConfig {
-                encoding: Some(UiTransactionEncoding::Json),
-                transaction_details: Some(TransactionDetails::None),
-                rewards: Some(true),
-                commitment: Some(CommitmentConfig::finalized()),
-                max_supported_transaction_version: Some(0),
-            },
-        )
-        .await;
-    let block = match block_res {
-        Ok(block) => block,
-        Err(err) => match err.kind {
-            ClientErrorKind::RpcError(client_rpc_err) => match client_rpc_err {
-                RpcError::RpcResponseError {
-                    code,
-                    message,
-                    data,
-                } => {
-                    let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
-                    if slot_skipped_regex.is_match(&message) {
-                        match slot_history.check(slot) {
-                            slot_history::Check::Future => {
-                                return Err(BlockMetadataKeeperError::SlotInFuture(slot))
-                            }
-                            slot_history::Check::NotFound => {
-                                return Err(BlockMetadataKeeperError::SkippedBlock)
-                            }
-                            slot_history::Check::TooOld | slot_history::Check::Found => {
-                                // TODO: Should get_block be recursive, hmmm
-                                todo!("fallback to redundant RPCs")
+    let mut current_client = client;
+    let mut redundant_rpc_index = 0;
+    loop {
+        let block_res = current_client
+            .get_block_with_config(
+                slot,
+                RpcBlockConfig {
+                    encoding: Some(UiTransactionEncoding::Json),
+                    transaction_details: Some(TransactionDetails::None),
+                    rewards: Some(true),
+                    commitment: Some(CommitmentConfig::finalized()),
+                    max_supported_transaction_version: Some(0),
+                },
+            )
+            .await;
+        match block_res {
+            Ok(block) => return Ok(block),
+            Err(err) => match err.kind {
+                ClientErrorKind::RpcError(client_rpc_err) => match client_rpc_err {
+                    RpcError::RpcResponseError {
+                        code,
+                        message,
+                        data,
+                    } => {
+                        let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
+                        if slot_skipped_regex.is_match(&message) {
+                            match slot_history.check(slot) {
+                                slot_history::Check::Future => {
+                                    return Err(BlockMetadataKeeperError::SlotInFuture(slot))
+                                }
+                                slot_history::Check::NotFound => {
+                                    return Err(BlockMetadataKeeperError::SkippedBlock)
+                                }
+                                slot_history::Check::TooOld | slot_history::Check::Found => {
+                                    // REVIEW: Should we handle TooOld and Found differently?
+                                    if let Some(redundant_rpc_urls) = maybe_redundant_rpc_urls {
+                                        if redundant_rpc_index >= redundant_rpc_urls.len() {
+                                            return Err(BlockMetadataKeeperError::SkippedBlock);
+                                        }
+                                        current_client = &redundant_rpc_urls[redundant_rpc_index];
+                                        redundant_rpc_index += 1;
+                                        continue;
+                                    } else {
+                                        return Err(BlockMetadataKeeperError::SkippedBlock);
+                                    }
+                                }
                             }
                         }
+                        return Err(BlockMetadataKeeperError::RpcError(
+                            RpcError::RpcResponseError {
+                                code,
+                                message,
+                                data,
+                            },
+                        ));
                     }
-                    return Err(BlockMetadataKeeperError::RpcError(
-                        RpcError::RpcResponseError {
-                            code,
-                            message,
-                            data,
-                        },
-                    ));
-                }
-                _ => return Err(BlockMetadataKeeperError::RpcError(client_rpc_err)),
+                    _ => return Err(BlockMetadataKeeperError::RpcError(client_rpc_err)),
+                },
+                _ => return Err(BlockMetadataKeeperError::SolanaClientError(err)),
             },
-            _ => return Err(BlockMetadataKeeperError::SolanaClientError(err)),
-        },
-    };
-    Ok(block)
+        };
+    }
 }

@@ -30,6 +30,7 @@ pub struct KeeperConfig {
     pub pay_for_new_accounts: bool,
     pub sqlite_connection: Arc<Connection>,
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
+    pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
 }
 
 #[derive(Parser, Debug)]

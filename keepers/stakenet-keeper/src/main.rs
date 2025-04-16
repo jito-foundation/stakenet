@@ -355,6 +355,10 @@ async fn main() {
             .expect("Failed to parse host and port from gossip entrypoint")
     });
 
+    let redundant_rpc_urls = args
+        .redundant_rpc_urls
+        .map(|x| Arc::new(x.into_iter().map(|y| RpcClient::new(y)).collect()));
+
     let conn = Connection::open(args.sqlite_path.clone()).unwrap();
     // Set up the SQLite DB
     create_sqlite_tables(&conn);
@@ -382,6 +386,7 @@ async fn main() {
         tx_confirmation_seconds: args.tx_confirmation_seconds,
         sqlite_connection: Arc::new(conn),
         priority_fee_oracle_authority_keypair,
+        redundant_rpc_urls,
     };
 
     run_keeper(config).await;
