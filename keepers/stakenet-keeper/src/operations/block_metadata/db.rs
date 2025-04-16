@@ -60,7 +60,7 @@ impl LeaderBlockMetadata {
 
 pub fn batch_insert_leader_block_data(
     conn: &Connection,
-    records: Vec<LeaderBlockMetadata>,
+    records: &Vec<LeaderBlockMetadata>,
 ) -> Result<(), BlockMetadataKeeperError> {
     let data: String = records
         .iter()

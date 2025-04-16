@@ -177,9 +177,10 @@ async fn update_block_metadata(
     // Clamp the ending slot to make sure it's all from the same epoch
     let ending_slot = std::cmp::min(current_finalized_slot, next_epoch_starting_slot - 1);
 
+    let mut leader_block_metadatas_created: Vec<LeaderBlockMetadata> = vec![];
     // Conditional is to avoid the case where
     if starting_slot < ending_slot {
-        handle_slots_for_epoch(
+        let _leader_block_metadatas_created = handle_slots_for_epoch(
             &client,
             &sqlite_connection,
             &epoch_schedule,
@@ -189,13 +190,14 @@ async fn update_block_metadata(
             ending_slot,
         )
         .await?;
+        leader_block_metadatas_created.extend(_leader_block_metadatas_created);
     }
     // TODO: Handle case where epoch is more than 1 above
 
     // If current epoch != last epoch, then we should run a second time with the next
     //  epoch's information
     if epoch_info.epoch != block_keeper_metadata.epoch {
-        handle_slots_for_epoch(
+        let _leader_block_metadatas_created = handle_slots_for_epoch(
             &client,
             &sqlite_connection,
             &epoch_schedule,
@@ -205,6 +207,7 @@ async fn update_block_metadata(
             current_finalized_slot,
         )
         .await?;
+        leader_block_metadatas_created.extend(_leader_block_metadatas_created);
     }
 
     // TODO: If block_keeper_metadata.epoch != current_epoch_info.epoch, we know the epoch has
@@ -224,7 +227,7 @@ pub async fn handle_slots_for_epoch(
     epoch: u64,
     starting_slot: u64,
     ending_slot: u64,
-) -> Result<(), BlockMetadataKeeperError> {
+) -> Result<Vec<LeaderBlockMetadata>, BlockMetadataKeeperError> {
     debug!(
         "Gathering data for slots: {} - {}",
         starting_slot, ending_slot
@@ -267,11 +270,11 @@ pub async fn handle_slots_for_epoch(
         ending_slot,
         aggregate_info,
     )?;
-    batch_insert_leader_block_data(&conn, leader_block_metadatas)?;
+    batch_insert_leader_block_data(&conn, &leader_block_metadatas)?;
     // Update the block_keeper_metadata record
     upsert_block_keeper_metadata(&conn, epoch, ending_slot);
 
-    Ok(())
+    Ok(leader_block_metadatas)
 }
 
 pub fn get_updated_leader_block_metadatas(
