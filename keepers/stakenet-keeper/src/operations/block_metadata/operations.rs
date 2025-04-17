@@ -212,7 +212,7 @@ async fn update_block_metadata(
     // Handle case where current epoch is above the last indexed in SQLlite
     let epochs_diff = epoch_info.epoch - block_keeper_metadata.epoch;
     let mut starting_slot = block_keeper_metadata.slot + 1;
-    for relative_epoch in 0..epochs_diff {
+    for relative_epoch in 0..=epochs_diff {
         // For each epoch we are behind we need to generate the update instructions
         let epoch = block_keeper_metadata.epoch + relative_epoch;
         let epoch_ending_slot = epoch_schedule.get_last_slot_in_epoch(epoch);
