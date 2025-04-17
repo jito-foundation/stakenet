@@ -107,6 +107,51 @@
       "args": []
     },
     {
+      "name": "copy_priority_fee_distribution",
+      "discriminator": [
+        152,
+        174,
+        178,
+        77,
+        92,
+        83,
+        93,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account",
+          "docs": [
+            "Used to read validator commission."
+          ]
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "distribution_account",
+          "docs": [
+            "`owner = PRIORITY_FEE_DIST_PROGRAM_ID` here is sufficient."
+          ]
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "copy_tip_distribution_account",
       "discriminator": [
         208,
@@ -300,6 +345,34 @@
       "args": []
     },
     {
+      "name": "realloc_config_account",
+      "discriminator": [
+        55,
+        69,
+        118,
+        225,
+        163,
+        54,
+        79,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "config_account",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "realloc_validator_history_account",
       "discriminator": [
         196,
@@ -392,6 +465,33 @@
       "args": []
     },
     {
+      "name": "set_new_priority_fee_oracle_authority",
+      "discriminator": [
+        140,
+        74,
+        47,
+        78,
+        73,
+        165,
+        143,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "new_priority_fee_oracle_authority"
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "set_new_tip_distribution_program",
       "discriminator": [
         200,
@@ -417,6 +517,57 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "update_priority_fee_history",
+      "discriminator": [
+        238,
+        213,
+        116,
+        176,
+        1,
+        211,
+        52,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "priority_fee_oracle_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "total_priority_fees",
+          "type": "u64"
+        },
+        {
+          "name": "total_leader_slots",
+          "type": "u32"
+        },
+        {
+          "name": "blocks_produced",
+          "type": "u32"
+        },
+        {
+          "name": "current_slot",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "update_stake_history",
@@ -573,6 +724,11 @@
       "code": 6012,
       "name": "DuplicateEpoch",
       "msg": "Inserting duplicate epoch"
+    },
+    {
+      "code": 6013,
+      "name": "NoReallocNeeded",
+      "msg": "Account already sized properly"
     }
   ],
   "types": [
@@ -800,6 +956,28 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                3
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_oracle_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "reserve",
+            "type": {
+              "array": [
+                "u8",
+                256
+              ]
+            }
           }
         ]
       }
@@ -964,11 +1142,44 @@
             "type": "u32"
           },
           {
+            "name": "priority_fee_commission",
+            "type": "u16"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_tips",
+            "type": "u64"
+          },
+          {
+            "name": "total_priority_fees",
+            "type": "u64"
+          },
+          {
+            "name": "total_leader_slots",
+            "type": "u32"
+          },
+          {
+            "name": "blocks_produced",
+            "type": "u32"
+          },
+          {
+            "name": "block_data_updated_at_slot",
+            "type": "u64"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                84
+                48
               ]
             }
           }

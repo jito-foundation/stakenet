@@ -3601,11 +3601,44 @@
             "type": "u32"
           },
           {
+            "name": "priority_fee_commission",
+            "type": "u16"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_tips",
+            "type": "u64"
+          },
+          {
+            "name": "total_priority_fees",
+            "type": "u64"
+          },
+          {
+            "name": "total_leader_slots",
+            "type": "u32"
+          },
+          {
+            "name": "blocks_produced",
+            "type": "u32"
+          },
+          {
+            "name": "block_data_updated_at_slot",
+            "type": "u64"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                84
+                48
               ]
             }
           }

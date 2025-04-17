@@ -120,4 +120,39 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_backfill_total_blocks(ctx, epoch, blocks_in_epoch)
     }
+
+    pub fn update_priority_fee_history(
+        ctx: Context<UpdatePriorityFeeHistory>,
+        epoch: u64,
+        total_priority_fees: u64,
+        total_leader_slots: u32,
+        blocks_produced: u32,
+        current_slot: u64,
+    ) -> Result<()> {
+        handle_update_priority_fee_history(
+            ctx,
+            epoch,
+            total_priority_fees,
+            total_leader_slots,
+            blocks_produced,
+            current_slot,
+        )
+    }
+
+    pub fn copy_priority_fee_distribution(
+        ctx: Context<CopyPriorityFeeDistribution>,
+        epoch: u64,
+    ) -> Result<()> {
+        handle_copy_priority_fee_distribution_account(ctx, epoch)
+    }
+
+    pub fn realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
+        handle_realloc_config_account(ctx)
+    }
+
+    pub fn set_new_priority_fee_oracle_authority(
+        ctx: Context<SetNewPriorityFeeOracleAuthority>,
+    ) -> Result<()> {
+        handle_set_new_priority_fee_oracle_authority(ctx)
+    }
 }

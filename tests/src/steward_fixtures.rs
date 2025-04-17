@@ -1296,6 +1296,9 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             oracle_authority: keypair.pubkey(),
             tip_distribution_program: jito_tip_distribution::id(),
+            padding0: [0u8; 3],
+            priority_fee_oracle_authority: keypair.pubkey(),
+            reserve: [0u8; 256],
         };
         let cluster_history = cluster_history_default();
 
