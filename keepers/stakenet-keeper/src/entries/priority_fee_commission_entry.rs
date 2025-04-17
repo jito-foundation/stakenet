@@ -7,22 +7,22 @@ use stakenet_sdk::{
 };
 
 pub fn derive_priority_fee_distribution_account_address(
-  priority_fee_distribution_program_id: &Pubkey,
-  vote_pubkey: &Pubkey,
-  epoch: u64,
+    priority_fee_distribution_program_id: &Pubkey,
+    vote_pubkey: &Pubkey,
+    epoch: u64,
 ) -> (Pubkey, u8) {
-  Pubkey::find_program_address(
-      &[
-          PriorityFeeDistributionAccount::SEED,
-          vote_pubkey.to_bytes().as_ref(),
-          epoch.to_le_bytes().as_ref(),
-      ],
-      priority_fee_distribution_program_id,
-  )
+    Pubkey::find_program_address(
+        &[
+            PriorityFeeDistributionAccount::SEED,
+            vote_pubkey.to_bytes().as_ref(),
+            epoch.to_le_bytes().as_ref(),
+        ],
+        priority_fee_distribution_program_id,
+    )
 }
 
 #[derive(Clone)]
-pub struct PriorityFeeCommissionEntry {
+pub struct ValidatorPriorityFeeCommissionEntry {
     pub vote_account: Pubkey,
     pub priority_fee_distribution_account: Pubkey,
     pub validator_history_account: Pubkey,
@@ -32,7 +32,7 @@ pub struct PriorityFeeCommissionEntry {
     pub epoch: u64,
 }
 
-impl PriorityFeeCommissionEntry {
+impl ValidatorPriorityFeeCommissionEntry {
     pub fn new(
         vote_account: &Pubkey,
         epoch: u64,
@@ -41,11 +41,12 @@ impl PriorityFeeCommissionEntry {
         signer: &Pubkey,
     ) -> Self {
         let validator_history_account = get_validator_history_address(vote_account, program_id);
-        let (priority_fee_distribution_account, _) = derive_priority_fee_distribution_account_address(
-          priority_fee_distribution_program_id,
-            vote_account,
-            epoch,
-        );
+        let (priority_fee_distribution_account, _) =
+            derive_priority_fee_distribution_account_address(
+                priority_fee_distribution_program_id,
+                vote_account,
+                epoch,
+            );
         let config = get_validator_history_config_address(program_id);
 
         Self {
@@ -60,13 +61,13 @@ impl PriorityFeeCommissionEntry {
     }
 }
 
-impl Address for PriorityFeeCommissionEntry {
+impl Address for ValidatorPriorityFeeCommissionEntry {
     fn address(&self) -> Pubkey {
         self.validator_history_account
     }
 }
 
-impl UpdateInstruction for PriorityFeeCommissionEntry {
+impl UpdateInstruction for ValidatorPriorityFeeCommissionEntry {
     fn update_instruction(&self) -> Instruction {
         Instruction {
             program_id: self.program_id,

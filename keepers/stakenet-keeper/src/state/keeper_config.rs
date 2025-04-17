@@ -12,6 +12,7 @@ pub struct KeeperConfig {
     pub keypair: Arc<Keypair>,
     pub validator_history_program_id: Pubkey,
     pub tip_distribution_program_id: Pubkey,
+    pub priority_fee_distribution_program_id: Pubkey,
     pub steward_program_id: Pubkey,
     pub steward_config: Pubkey,
     pub priority_fee_in_microlamports: u64,
@@ -73,6 +74,16 @@ pub struct Args {
         default_value = "4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7"
     )]
     pub tip_distribution_program_id: Pubkey,
+
+    /// Priority Fee distribution program ID (Pubkey as base58 string)
+    #[arg(
+        short,
+        long,
+        env,
+        // TODO: Change this for actual deployment
+        default_value = "5DdB5ZuSR97rqgVHtjb4t1uz1auFEa2xQ32aAxjsJLEC"
+    )]
+    pub priority_fee_distribution_program_id: Pubkey,
 
     /// Steward program ID
     #[arg(
@@ -186,6 +197,10 @@ pub struct Args {
     /// available from the primary RPC
     #[arg(long, env)]
     pub redundant_rpc_urls: Option<Vec<String>>,
+
+    /// Run Priority Fee Commission
+    #[arg(long, env, default_value = "true")]
+    pub run_priority_fee_commission: bool,
 }
 
 impl fmt::Display for Args {
@@ -201,6 +216,7 @@ impl fmt::Display for Args {
             Priority Fee Oracle Authority Keypair Path: {:?}\n\
             Validator History Program ID: {}\n\
             Tip Distribution Program ID: {}\n\
+            Priority Fee Distribution Program ID: {}\n\
             Steward Program ID: {}\n\
             Steward Config: {}\n\
             Validator History Interval: {} seconds\n\
@@ -227,6 +243,7 @@ impl fmt::Display for Args {
             SQLite path: {:?}\n\
             Region: {}\n\
             Redundant RPC URLs: {:?}\n\
+            Run Priority Fee Commission: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoint,
@@ -235,6 +252,7 @@ impl fmt::Display for Args {
             self.priority_fee_oracle_authority_keypair,
             self.validator_history_program_id,
             self.tip_distribution_program_id,
+            self.priority_fee_distribution_program_id,
             self.steward_program_id,
             self.steward_config,
             self.validator_history_interval,
@@ -261,6 +279,7 @@ impl fmt::Display for Args {
             self.sqlite_path,
             self.region,
             self.redundant_rpc_urls,
+            self.run_priority_fee_commission,
         )
     }
 }

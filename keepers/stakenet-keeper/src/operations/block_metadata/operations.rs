@@ -516,14 +516,14 @@ async fn get_block(
                         message,
                         data,
                     } => {
-                        // These slot skipped errors come from RpcCustomError::SlotSkipped or 
-                        //  RpcCustomError::LongTermStorageSlotSkipped and may not always mean 
+                        // These slot skipped errors come from RpcCustomError::SlotSkipped or
+                        //  RpcCustomError::LongTermStorageSlotSkipped and may not always mean
                         //  there is no block for a given slot. The additional context are:
-                        //  "...or missing due to ledger jump to recent snapshot" 
+                        //  "...or missing due to ledger jump to recent snapshot"
                         //  "...or missing in long-term storage"
                         // Meaning they can arise from RPC issues or lack of history (limit ledger
-                        //  space, no big table) accesible  by an RPC. This is why we check 
-                        // SlotHistory and then follow up with redundant RPC checks. 
+                        //  space, no big table) accesible  by an RPC. This is why we check
+                        // SlotHistory and then follow up with redundant RPC checks.
                         let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
                         if slot_skipped_regex.is_match(&message) {
                             match slot_history.check(slot) {
