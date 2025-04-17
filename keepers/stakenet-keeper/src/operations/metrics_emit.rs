@@ -23,16 +23,17 @@ fn _should_run() -> bool {
     true
 }
 
-fn _process(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
-    emit_validator_history_metrics(keeper_state)?;
-    emit_keeper_stats(keeper_state)?;
-    emit_steward_stats(keeper_state)?;
+fn _process(keeper_state: &KeeperState, cluster: &str) -> Result<(), Box<dyn std::error::Error>> {
+    emit_validator_history_metrics(keeper_state, cluster)?;
+    emit_keeper_stats(keeper_state, cluster)?;
+    emit_steward_stats(keeper_state, cluster)?;
     Ok(())
 }
 
 pub fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
+    cluster: &str,
 ) -> (KeeperOperations, u64, u64, u64) {
     let operation = _get_operation();
     let (mut runs_for_epoch, mut errors_for_epoch, txs_for_epoch) =
@@ -41,7 +42,7 @@ pub fn fire(
     let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
-        match _process(keeper_state) {
+        match _process(keeper_state, cluster) {
             Ok(_) => {
                 runs_for_epoch += 1;
             }
@@ -58,6 +59,7 @@ pub fn fire(
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 pub fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
+    cluster: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
     let get_vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
@@ -160,23 +162,31 @@ pub fn emit_validator_history_metrics(
             get_vote_accounts_voting,
             i64
         ),
+        "cluster" => cluster,
     );
 
     Ok(())
 }
 
-pub fn emit_keeper_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+pub fn emit_keeper_stats(
+    keeper_state: &KeeperState,
+    cluster: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let keeper_balance = keeper_state.keeper_balance;
 
     datapoint_info!(
         "stakenet-keeper-stats",
         ("balance_lamports", keeper_balance, i64),
+        "cluster" => cluster,
     );
 
     Ok(())
 }
 
-pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std::error::Error>> {
+pub fn emit_steward_stats(
+    keeper_state: &KeeperState,
+    cluster: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     //    - Progress
     // - Current State
     // - Num pool validators
@@ -331,6 +341,7 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
             i64
         ),
         ("non_zero_score_count", non_zero_score_count, i64),
+        "cluster" => cluster,
     );
 
     let parameters = &keeper_state
@@ -411,7 +422,8 @@ pub fn emit_steward_stats(keeper_state: &KeeperState) -> Result<(), Box<dyn std:
             i64
         ),
         ("minimum_stake_lamports", minimum_stake_lamports, i64),
-        ("minimum_voting_epochs", minimum_voting_epochs, i64)
+        ("minimum_voting_epochs", minimum_voting_epochs, i64),
+        "cluster" => cluster,
     );
 
     Ok(())

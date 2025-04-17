@@ -63,6 +63,7 @@ services:
       - RUN_STAKE_UPLOAD=false
       - RUN_GOSSIP_UPLOAD=false
       - RUN_EMIT_METRICS=true
+      - REGION=${REGION}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
