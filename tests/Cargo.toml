@@ -26,10 +26,10 @@ bytemuck = { version = "1.13.1", features = ["derive", "min_const_generics"] }
 cfg-if = "1.0.0"
 ed25519-dalek = "1.0.1"
 futures = "0.3.25"
+jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
 jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
 jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
 jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
-jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
 rand = "0.7.3"
 rand_chacha = "0.3.1"
 semver = "1.0.17"
