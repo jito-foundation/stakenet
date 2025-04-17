@@ -144,6 +144,6 @@ pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeper
 
 // Deletes all records prior to a given slot (non-inclusive)
 pub fn prune_prior_records(conn: &Connection, slot: u64) -> Result<(), BlockMetadataKeeperError> {
-    conn.execute("DELETE FROM leader_block_metadata WHERE slot < ?1", [slot])?;
+    conn.execute("DELETE FROM leader_block_metadata WHERE block_data_last_update_slot < ?1", [slot])?;
     Ok(())
 }
