@@ -1,9 +1,3 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
-
 use crate::state::keeper_config::KeeperConfig;
 use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
