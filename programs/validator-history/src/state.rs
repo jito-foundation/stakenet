@@ -157,8 +157,7 @@ pub struct ValidatorHistoryEntry {
     // Priority Fee commission in basis points
     pub priority_fee_commission: u16,
     pub padding0: [u8; 2],
-    // Priority Fee tips that were transferred to the distribution account, stored as 1/100th SOL.
-    // priority_fee_tips = 100 means 1.00 SOL earned
+    // Priority Fee tips that were transferred to the distribution account in lamports
     pub priority_fee_tips: u64,
     // The total priority fees the validator earned for the epoch.
     pub total_priority_fees: u64,
