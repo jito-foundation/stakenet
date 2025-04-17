@@ -451,14 +451,12 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 if entry.rank != default.rank {
                     ranks += 1;
                 }
-                if entry.mev_commission != default.mev_commission {
-                    println!(
-                        "{}.\tVote Account: {} | {}",
-                        validator_history.index,
-                        validator_history.vote_account,
-                        formatted_entry(entry)
-                    );
-                }
+                println!(
+                    "{}.\tVote Account: {} | {}",
+                    validator_history.index,
+                    validator_history.vote_account,
+                    formatted_entry(entry)
+                );
             }
             None => {
                 println!(
