@@ -38,6 +38,7 @@ pub enum KeeperOperations {
     MevCommission,
     Steward,
     EmitMetrics,
+    BlockMetadataKeeper,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {

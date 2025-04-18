@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use anchor_lang::prelude::{EpochSchedule, SlotHistory};
 use bytemuck::Zeroable;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_metrics::datapoint_info;
@@ -84,6 +85,8 @@ impl KeeperFlags {
 pub struct KeeperState {
     pub keeper_flags: KeeperFlags,
     pub epoch_info: EpochInfo,
+    pub epoch_schedule: EpochSchedule,
+    pub slot_history: SlotHistory,
 
     // Tally array of runs and errors indexed by their respective KeeperOperations
     pub runs_for_epoch: [u64; KeeperOperations::LEN],
@@ -97,6 +100,8 @@ pub struct KeeperState {
     pub vote_account_map: HashMap<Pubkey, RpcVoteAccountInfo>,
     // All validator history entries fetched by get_validator_history_accounts - key'd by their vote_account pubkey
     pub validator_history_map: HashMap<Pubkey, ValidatorHistory>,
+    // Maps a Validator's identity address to their vote account address
+    pub identity_to_vote_map: HashMap<String, String>,
 
     // All vote accounts mapped and fetched from validator_history_map - key'd by their vote_account pubkey
     pub all_history_vote_account_map: HashMap<Pubkey, Option<Account>>,
@@ -117,6 +122,19 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
+    pub fn update_identity_to_vote_map(&mut self) {
+        self.identity_to_vote_map = self
+            .vote_account_map
+            .values()
+            .map(|vote_account_info| {
+                (
+                    vote_account_info.node_pubkey.clone(),
+                    vote_account_info.vote_pubkey.clone(),
+                )
+            })
+            .collect();
+    }
+
     pub fn increment_update_run_for_epoch(&mut self, operation: KeeperOperations) {
         let index = operation as usize;
         self.runs_for_epoch[index] += 1;
@@ -298,12 +316,15 @@ impl Default for KeeperState {
                 block_height: 0,
                 transaction_count: None,
             },
+            epoch_schedule: EpochSchedule::default(),
+            slot_history: SlotHistory::default(),
             runs_for_epoch: [0; KeeperOperations::LEN],
             errors_for_epoch: [0; KeeperOperations::LEN],
             txs_for_epoch: [0; KeeperOperations::LEN],
             created_accounts_for_epoch: [0; KeeperCreates::LEN],
             vote_account_map: HashMap::new(),
             validator_history_map: HashMap::new(),
+            identity_to_vote_map: HashMap::new(),
             all_history_vote_account_map: HashMap::new(),
             all_get_vote_account_map: HashMap::new(),
             previous_epoch_tip_distribution_map: HashMap::new(),

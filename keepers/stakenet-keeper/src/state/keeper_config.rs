@@ -1,6 +1,7 @@
 use std::fmt;
 
 use clap::{arg, command, Parser};
+use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use stakenet_sdk::models::cluster::Cluster;
@@ -21,11 +22,15 @@ pub struct KeeperConfig {
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
+    pub block_metadata_interval: u64,
     pub run_flags: u32,
     pub cool_down_range: u8,
     pub full_startup: bool,
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
+    pub sqlite_connection: Arc<Connection>,
+    pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
+    pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
 }
 
 #[derive(Parser, Debug)]
@@ -46,6 +51,11 @@ pub struct Args {
     /// Path to keypair used specifically for submitting permissioned transactions
     #[arg(long, env)]
     pub oracle_authority_keypair: Option<PathBuf>,
+
+    /// Path to keypair used specifically for submitting permissioned transactions related to
+    /// priority fees and block metadata
+    #[arg(long, env)]
+    pub priority_fee_oracle_authority_keypair: Option<PathBuf>,
 
     /// Validator history program ID (Pubkey as base58 string)
     #[arg(
@@ -159,6 +169,23 @@ pub struct Args {
     /// DEBUGGING Changes the random cool down range ( minutes )
     #[arg(long, env, default_value = "20")]
     pub cool_down_range: u8,
+
+    /// Run block metadata keeper
+    #[arg(long, env, default_value = "true")]
+    pub run_block_metadata: bool,
+
+    /// Interval to update block metadata in local SQLite file (default 17280 sec, which is ~1/10 of an epoch)
+    #[arg(long, env, default_value = "17280")]
+    pub block_metadata_interval: u64,
+
+    /// Path to the local SQLite file
+    #[arg(long, env, default_value = "./block_keeper.db3")]
+    pub sqlite_path: PathBuf,
+
+    /// Solana JSON RPC URLs that can be used for fall back checks when information is not
+    /// available from the primary RPC
+    #[arg(long, env)]
+    pub redundant_rpc_urls: Option<Vec<String>>,
 }
 
 impl fmt::Display for Args {
@@ -171,6 +198,7 @@ impl fmt::Display for Args {
             Gossip Entrypoint: {:?}\n\
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
+            Priority Fee Oracle Authority Keypair Path: {:?}\n\
             Validator History Program ID: {}\n\
             Tip Distribution Program ID: {}\n\
             Steward Program ID: {}\n\
@@ -194,12 +222,17 @@ impl fmt::Display for Args {
             No Pack: {}\n\
             Pay for New Accounts: {}\n\
             Cool Down Range: {} minutes\n\
+            Run Block Metadata {}\n\
+            Block Metadata Interval: {} seconds\n\
+            SQLite path: {:?}\n\
             Region: {}\n\
+            Redundant RPC URLs: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoint,
             self.keypair,
             self.oracle_authority_keypair,
+            self.priority_fee_oracle_authority_keypair,
             self.validator_history_program_id,
             self.tip_distribution_program_id,
             self.steward_program_id,
@@ -223,7 +256,11 @@ impl fmt::Display for Args {
             self.no_pack,
             self.pay_for_new_accounts,
             self.cool_down_range,
+            self.run_block_metadata,
+            self.block_metadata_interval,
+            self.sqlite_path,
             self.region,
+            self.redundant_rpc_urls,
         )
     }
 }
