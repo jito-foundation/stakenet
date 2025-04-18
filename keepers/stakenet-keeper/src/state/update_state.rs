@@ -78,12 +78,12 @@ pub async fn pre_create_update(
     // Fetch Vote Accounts
     keeper_state.vote_account_map = get_vote_account_map(client).await?;
 
+    // Update mapping of identity keypair to vote account
+    keeper_state.update_identity_to_vote_map();
+
     // Get all get vote accounts
     keeper_state.all_get_vote_account_map =
         get_all_get_vote_account_map(client, keeper_state).await?;
-
-    // Update mapping of identity keypair to vote account
-    keeper_state.update_identity_to_vote_map();
 
     // Update Cluster History
     keeper_state.cluster_history = get_cluster_history(client, program_id).await?;

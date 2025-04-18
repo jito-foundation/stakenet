@@ -122,7 +122,6 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
 }
 impl KeeperState {
-    // REVIEW: We could put this into the get_vote_account_map function and reduce the iteration
     pub fn update_identity_to_vote_map(&mut self) {
         self.identity_to_vote_map = self
             .vote_account_map
