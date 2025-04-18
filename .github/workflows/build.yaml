@@ -85,7 +85,15 @@ jobs:
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
+      - name: install deps  
+        run: sudo apt update && sudo apt install -y \
+              build-essential \
+              libssl-dev \
+              pkg-config \
+              clang \
+              llvm \
+              libclang-dev \
+              cmake
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
       - name: Check for diff on IDL
