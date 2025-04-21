@@ -56,6 +56,9 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_block_metadata {
         run_flags = set_flag(run_flags, KeeperOperations::BlockMetadataKeeper);
     }
+    if args.run_priority_fee_commission {
+        run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
+    }
 
     run_flags
 }
@@ -239,6 +242,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;
             }
+
+            info!("Updating priority fee commission...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            );
         }
 
         // STEWARD
@@ -368,6 +376,7 @@ async fn main() {
         keypair,
         validator_history_program_id: args.validator_history_program_id,
         tip_distribution_program_id: args.tip_distribution_program_id,
+        priority_fee_distribution_program_id: args.priority_fee_distribution_program_id,
         priority_fee_in_microlamports: args.priority_fees,
         steward_program_id: args.steward_program_id,
         steward_config: args.steward_config,

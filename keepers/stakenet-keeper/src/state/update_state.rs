@@ -2,7 +2,7 @@ use std::{collections::HashMap, error::Error, str::FromStr, sync::Arc};
 
 use anchor_lang::{prelude::SlotHistory, AccountDeserialize};
 use bincode::deserialize;
-use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
+use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_sdk::{
