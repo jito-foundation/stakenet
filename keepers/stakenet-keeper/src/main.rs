@@ -7,12 +7,14 @@ use clap::Parser;
 use dotenv::dotenv;
 use log::*;
 use rand::Rng;
+use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
 use solana_sdk::signature::read_keypair_file;
 use stakenet_keeper::{
     operations::{
         self,
+        block_metadata::db::create_sqlite_tables,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
@@ -50,6 +52,12 @@ fn set_run_flags(args: &Args) -> u32 {
     }
     if args.run_emit_metrics {
         run_flags = set_flag(run_flags, KeeperOperations::EmitMetrics);
+    }
+    if args.run_block_metadata {
+        run_flags = set_flag(run_flags, KeeperOperations::BlockMetadataKeeper);
+    }
+    if args.run_priority_fee_commission {
+        run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
 
     run_flags
@@ -95,11 +103,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
+    let block_metadata_interval = keeper_config.block_metadata_interval;
 
     let intervals = vec![
         validator_history_interval,
         metrics_interval,
         steward_interval,
+        block_metadata_interval,
     ];
 
     // Stateful data
@@ -232,6 +242,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;
             }
+
+            info!("Updating priority fee commission...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            );
         }
 
         // STEWARD
@@ -243,6 +258,20 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;
+            }
+        }
+
+        // PRIORITY FEE BLOCK METADATA
+        if should_fire(tick, block_metadata_interval) {
+            if keeper_config
+                .priority_fee_oracle_authority_keypair
+                .is_some()
+            {
+                info!("Updating priority fee block metadata...");
+                keeper_state.set_runs_errors_and_txs_for_epoch(
+                    operations::block_metadata::operations::fire(&keeper_config, &keeper_state)
+                        .await,
+                );
             }
         }
 
@@ -316,20 +345,38 @@ async fn main() {
         .map(|oracle_authority_keypair| {
             Arc::new(
                 read_keypair_file(oracle_authority_keypair)
-                    .expect("Failed reading stake keypair file"),
+                    .expect("Failed reading oracle_authority_keypair keypair file"),
             )
         });
+
+    let priority_fee_oracle_authority_keypair =
+        args.priority_fee_oracle_authority_keypair
+            .map(|priority_fee_oracle_authority_keypair| {
+                Arc::new(
+                    read_keypair_file(priority_fee_oracle_authority_keypair)
+                        .expect("Failed reading priority_fee_oracle_authority_keypair file"),
+                )
+            });
 
     let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
         solana_net_utils::parse_host_port(&gossip_entrypoint)
             .expect("Failed to parse host and port from gossip entrypoint")
     });
 
+    let redundant_rpc_urls = args
+        .redundant_rpc_urls
+        .map(|x| Arc::new(x.into_iter().map(|y| RpcClient::new(y)).collect()));
+
+    let conn = Connection::open(args.sqlite_path.clone()).unwrap();
+    // Set up the SQLite DB
+    create_sqlite_tables(&conn).expect("SQLite tables created");
+
     let config = KeeperConfig {
         client,
         keypair,
         validator_history_program_id: args.validator_history_program_id,
         tip_distribution_program_id: args.tip_distribution_program_id,
+        priority_fee_distribution_program_id: args.priority_fee_distribution_program_id,
         priority_fee_in_microlamports: args.priority_fees,
         steward_program_id: args.steward_program_id,
         steward_config: args.steward_config,
@@ -338,6 +385,7 @@ async fn main() {
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
         steward_interval: args.steward_interval,
+        block_metadata_interval: args.block_metadata_interval,
         run_flags,
         full_startup: args.full_startup,
         no_pack: args.no_pack,
@@ -345,6 +393,9 @@ async fn main() {
         cool_down_range: args.cool_down_range,
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
+        sqlite_connection: Arc::new(conn),
+        priority_fee_oracle_authority_keypair,
+        redundant_rpc_urls,
     };
 
     run_keeper(config).await;
