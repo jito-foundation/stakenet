@@ -1243,8 +1243,14 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             validator_history_blacklist: LargeBitMask::default(),
             parameters: Parameters::default(),
-            _padding: [0; 1023],
             paused: false.into(),
+            pf_lookback_epochs: u8::default(),
+            pf_lookback_offset: u8::default(),
+            _padding0: u8::default(),
+            pf_max_commission_bps: u16::default(),
+            pf_error_margin_bps: u16::default(),
+            pf_setting_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1780,7 +1786,13 @@ impl Default for StateMachineFixtures {
             parameters_authority: Pubkey::new_unique(),
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
-            _padding: [0; 1023],
+            pf_lookback_epochs: u8::default(),
+            pf_lookback_offset: u8::default(),
+            _padding0: u8::default(),
+            pf_max_commission_bps: u16::default(),
+            pf_error_margin_bps: u16::default(),
+            pf_setting_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         // Setup Sysvars: Clock, EpochSchedule

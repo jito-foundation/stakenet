@@ -6,6 +6,8 @@ use type_layout::TypeLayout;
 
 use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
+static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
+
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
 /// squat a config address for another party's stake pool.
@@ -44,8 +46,29 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
+    /// The number of epochs the priority fee distribution check should lookback
+    pub pf_lookback_epochs: u8,
+
+    /// The offset of epochs for the priority fee distribution. E.g. look at epochs from
+    /// (current_epoch - offset - pf_lookback_epochs) to (current_epoch - offset)
+    pub pf_lookback_offset: u8,
+
+    // REVIEW: Should we write a PodU16 that implements Borsh to remove this padding?
+    pub _padding0: u8,
+
+    /// The maximum validator commission before the validator scores 0.
+    /// E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,
+    /// then score = 0
+    pub pf_max_commission_bps: u16,
+
+    /// An error of margin for priority fee commission calculations
+    pub pf_error_margin_bps: u16,
+
+    /// The authority that can update the priority fee configs
+    pub pf_setting_authority: Pubkey,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 1023],
+    pub _padding: [u8; 984],
 }
 
 impl Config {
