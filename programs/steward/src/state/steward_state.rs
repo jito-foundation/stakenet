@@ -1,3 +1,4 @@
+#[cfg(feature = "idl-build")]
 use anchor_lang_idl_spec::{
     IdlDefinedFields, IdlEnumVariant, IdlField, IdlRepr, IdlReprModifier, IdlSerialization,
     IdlType, IdlTypeDef, IdlTypeDefTy,
@@ -22,8 +23,6 @@ use crate::{
     Config, Parameters,
 };
 
-// #[cfg(feature = "idl-build")]
-// use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
 #[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
