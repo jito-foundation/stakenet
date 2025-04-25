@@ -76,11 +76,11 @@ jobs:
         with:
           crate: solana-verify
           version: "0.2.11"
-      - name: Install anchor-cli from crates.io
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: anchor-cli
-          version: "0.30.1"
+      - run: wget https://github.com/solana-foundation/anchor/archive/refs/tags/v0.31.1.tar.gz
+      - run: tar -xzf v0.31.1.tar.gz
+      - run: cd anchor-0.31.1 && cargo build --release
+      - name: Put anchor on env PATH varible
+        run: echo "$(pwd)/anchor-0.31.1/target/release" >> $GITHUB_PATH
       - name: install solana toolsuite
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
