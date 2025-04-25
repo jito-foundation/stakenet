@@ -1,4 +1,4 @@
-FROM rust:1.75-slim-buster as builder
+FROM rust:1.85 as builder
 
 RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
 
