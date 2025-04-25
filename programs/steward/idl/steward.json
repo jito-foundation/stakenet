@@ -3271,6 +3271,11 @@
     },
     {
       "name": "StewardStateEnum",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c",
+        "packed": true
+      },
       "type": {
         "kind": "enum",
         "variants": [

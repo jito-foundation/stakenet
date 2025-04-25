@@ -1,3 +1,6 @@
+use anchor_lang_idl_spec::{
+    IdlEnumVariant, IdlRepr, IdlReprModifier, IdlSerialization, IdlTypeDef, IdlTypeDefTy,
+};
 use borsh::BorshSerialize;
 use std::fmt::Display;
 
@@ -18,8 +21,8 @@ use crate::{
     Config, Parameters,
 };
 
-#[cfg(feature = "idl-build")]
-use anchor_lang::idl::types::*;
+// #[cfg(feature = "idl-build")]
+// use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
 #[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
@@ -229,8 +232,11 @@ impl IdlBuild for StewardStateEnum {
             },
             docs: Default::default(),
             generics: Default::default(),
-            serialization: Default::default(),
-            repr: Default::default(),
+            serialization: IdlSerialization::Bytemuck,
+            repr: Some(IdlRepr::C(IdlReprModifier {
+                packed: true,
+                align: None,
+            })),
         })
     }
 }
