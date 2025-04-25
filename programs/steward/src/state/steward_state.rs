@@ -1,5 +1,6 @@
 use anchor_lang_idl_spec::{
-    IdlEnumVariant, IdlRepr, IdlReprModifier, IdlSerialization, IdlTypeDef, IdlTypeDefTy,
+    IdlDefinedFields, IdlEnumVariant, IdlField, IdlRepr, IdlReprModifier, IdlSerialization,
+    IdlType, IdlTypeDef, IdlTypeDefTy,
 };
 use borsh::BorshSerialize;
 use std::fmt::Display;
@@ -206,35 +207,18 @@ impl IdlBuild for StewardStateEnum {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "StewardStateEnum".to_string(),
-            ty: IdlTypeDefTy::Enum {
-                variants: vec![
-                    IdlEnumVariant {
-                        name: "ComputeScores".to_string(),
-                        fields: None,
-                    },
-                    IdlEnumVariant {
-                        name: "ComputeDelegations".to_string(),
-                        fields: None,
-                    },
-                    IdlEnumVariant {
-                        name: "Idle".to_string(),
-                        fields: None,
-                    },
-                    IdlEnumVariant {
-                        name: "ComputeInstantUnstake".to_string(),
-                        fields: None,
-                    },
-                    IdlEnumVariant {
-                        name: "Rebalance".to_string(),
-                        fields: None,
-                    },
-                ],
+            ty: IdlTypeDefTy::Struct {
+                fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                    name: "value".to_string(),
+                    docs: Vec::new(),
+                    ty: IdlType::U64,
+                }])),
             },
             docs: Default::default(),
             generics: Default::default(),
             serialization: IdlSerialization::Bytemuck,
             repr: Some(IdlRepr::C(IdlReprModifier {
-                packed: true,
+                packed: false,
                 align: None,
             })),
         })
