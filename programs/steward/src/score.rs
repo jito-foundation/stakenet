@@ -9,7 +9,8 @@ use validator_history::{
 
 use crate::{
     constants::{
-        BASIS_POINTS_MAX, COMMISSION_MAX, EPOCH_DEFAULT, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
+        BASIS_POINTS_MAX, BASIS_POINTS_MAX_U64, COMMISSION_MAX, EPOCH_DEFAULT,
+        VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
     },
     errors::StewardError::{self, ArithmeticError},
     Config,
@@ -92,11 +93,12 @@ pub struct ScoreDetails {
 
     /// Epoch of max historical commission
     pub max_historical_commission_epoch: u16,
-    // /// Max realized priority fee commission observed
-    // pub max_priority_fee_commission: u16,
 
-    // /// Epoch of realized priority fee commission
-    // pub max_priority_fee_commission_epoch: u16,
+    /// Max realized priority fee commission observed
+    pub max_priority_fee_commission: u16,
+
+    /// Epoch of realized priority fee commission
+    pub max_priority_fee_commission_epoch: u16,
 }
 
 pub fn validator_score(
@@ -175,8 +177,11 @@ pub fn validator_score(
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
-    let (priority_fee_commission_score, _, _) =
-        calculate_priority_fee_commission(config, validator, current_epoch)?;
+    let (
+        priority_fee_commission_score,
+        max_priority_fee_commission,
+        max_priority_fee_commission_epoch,
+    ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
     /////// Formula ///////
 
@@ -217,6 +222,8 @@ pub fn validator_score(
             max_commission_epoch,
             max_historical_commission,
             max_historical_commission_epoch,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
         },
         priority_fee_commission_score,
     })
@@ -475,22 +482,20 @@ pub fn calculate_priority_fee_commission(
         .zip(&total_priority_fees)
         .enumerate()
         .fold(
-            (0_u16, u16::MAX),
+            (0_u16, EPOCH_DEFAULT),
             |agg, (relative_epoch, (tips, total_fees))| {
-                let inverse_commission_bps =
-                    tips.unwrap_or(0)
-                        .checked_mul(10_000)
-                        .and_then(|scaled_tips| {
-                            scaled_tips.checked_div(total_fees.unwrap_or(u64::MAX))
-                        });
+                // The defaults for None values is BASIS_POINTS_MAX, so the default
+                // inverse_commission_bps is 0. This ensures the default max commission returned
+                // is BASIS_POINTS_MAX
+                let tips = tips.unwrap_or(BASIS_POINTS_MAX_U64);
+                let total_fees = total_fees.unwrap_or(BASIS_POINTS_MAX_U64);
+                let inverse_commission_bps = tips
+                    .checked_mul(BASIS_POINTS_MAX_U64)
+                    .and_then(|scaled_tips| scaled_tips.checked_div(total_fees))
+                    .unwrap_or(0);
                 let commission_bps: u16 = BASIS_POINTS_MAX
-                    .checked_sub(
-                        u16::try_from(
-                            inverse_commission_bps.unwrap_or(u64::from(BASIS_POINTS_MAX)),
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap();
+                    .checked_sub(u16::try_from(inverse_commission_bps).unwrap_or(0))
+                    .unwrap_or(BASIS_POINTS_MAX);
                 if agg.0 < commission_bps {
                     let max_commission_epoch: u16 =
                         start_epoch + u16::try_from(relative_epoch).unwrap();
