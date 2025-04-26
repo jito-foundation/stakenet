@@ -12,7 +12,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
-        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV4, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -50,7 +50,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -62,6 +62,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -92,7 +93,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -104,6 +105,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -132,7 +134,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -144,6 +146,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -172,7 +175,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -184,6 +187,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -216,7 +220,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -228,6 +232,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -258,7 +263,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -270,6 +275,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -301,7 +307,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -313,6 +319,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -345,7 +352,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -357,6 +364,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -386,7 +394,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
@@ -398,6 +406,7 @@ fn test_compute_score() {
             commission_score: 0.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -435,7 +444,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -447,6 +456,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -474,7 +484,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -486,6 +496,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -520,7 +531,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
@@ -532,6 +543,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -561,7 +573,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
@@ -573,6 +585,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -607,7 +620,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
@@ -619,6 +632,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -651,7 +665,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -663,6 +677,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -732,7 +747,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -744,6 +759,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 0.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -777,7 +793,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -789,6 +805,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -822,7 +839,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -834,6 +851,101 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 1
+    let mut validator = good_validator;
+    let end_epoch = current_epoch as usize - config.pf_lookback_offset as usize;
+    let start_epoch = end_epoch - config.pf_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 60;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV4 {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 0
+    let mut validator = good_validator;
+    let end_epoch = current_epoch as usize - config.pf_lookback_offset as usize;
+    let start_epoch = end_epoch - config.pf_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 10;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV4 {
+            score: 0.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 0.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {

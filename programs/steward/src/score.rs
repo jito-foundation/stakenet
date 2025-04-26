@@ -17,7 +17,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV3 {
+pub struct ScoreComponentsV4 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -58,6 +58,10 @@ pub struct ScoreComponentsV3 {
 
     /// Details about why a given score was calculated
     pub details: ScoreDetails,
+
+    /// If validator has realized priority fee commissions > config limits over a lookback range,
+    /// score 0.  
+    pub priority_fee_commission_score: f64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
@@ -96,7 +100,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV3> {
+) -> Result<ScoreComponentsV4> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -166,6 +170,9 @@ pub fn validator_score(
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
+    let priority_fee_commission_score =
+        calculate_priority_fee_commission(config, validator, current_epoch)?;
+
     /////// Formula ///////
 
     let yield_score = vote_credits_ratio * (1. - max_commission as f64 / COMMISSION_MAX as f64);
@@ -178,9 +185,10 @@ pub fn validator_score(
         * delinquency_score
         * running_jito_score
         * yield_score
-        * merkle_root_upload_authority_score;
+        * merkle_root_upload_authority_score
+        * priority_fee_commission_score;
 
-    Ok(ScoreComponentsV3 {
+    Ok(ScoreComponentsV4 {
         score,
         yield_score,
         mev_commission_score,
@@ -205,6 +213,7 @@ pub fn validator_score(
             max_historical_commission,
             max_historical_commission_epoch,
         },
+        priority_fee_commission_score
     })
 }
 
