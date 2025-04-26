@@ -340,9 +340,14 @@ mod test_calculate_historical_commission {
         assert_eq!(max_epoch, 3);
 
         // Test all commissions none
-        let validator =
-            create_validator_history(&[100; 10], &[u8::MAX; 10], &[1000; 10], &[0; 10], &[0; 10],
-                &[0; 10],);
+        let validator = create_validator_history(
+            &[100; 10],
+            &[u8::MAX; 10],
+            &[1000; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+        );
         let (score, max_comission, max_epoch) =
             calculate_historical_commission(&validator, 1, 8).unwrap();
         assert_eq!(score, 1.0);
@@ -429,16 +434,26 @@ mod test_calculate_superminority {
         assert!(result.is_err());
 
         // Arithmetic error
-        let validator =
-            create_validator_history(&[100; 10], &[5; 10], &[u32::MAX; 10], &[0; 10], &[0; 10],
-                &[0; 10],);
+        let validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[u32::MAX; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+        );
         let result = calculate_superminority(&validator, 0, 1);
         assert!(result.is_err());
 
         // History with None values
-        let mut validator =
-            create_validator_history(&[100; 10], &[5; 10], &[1000; 10], &[0; 10], &[0; 10],
-                &[0; 10],);
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+        );
         validator
             .history
             .push(validator_history::ValidatorHistoryEntry::default());
@@ -544,7 +559,7 @@ mod test_calculate_priority_fee_commission {
             &[threshold; 10],
             &[total_priority_fees; 10],
         );
-        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        let res = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
         assert_eq!(res, 1.0);
 
         // With > pf_lookback_epochs + offset and < 50% commission, score 1
@@ -556,7 +571,7 @@ mod test_calculate_priority_fee_commission {
             &[threshold; 12],
             &[total_priority_fees; 12],
         );
-        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        let res = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(res, 1.0);
         // With > pf_lookback_epochs and > 50% commission, score 0
         let validator = create_validator_history(
@@ -567,7 +582,7 @@ mod test_calculate_priority_fee_commission {
             &[threshold - 1; 12],
             &[total_priority_fees; 12],
         );
-        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        let res = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(res, 0.0);
     }
 
@@ -576,7 +591,45 @@ mod test_calculate_priority_fee_commission {
         // Empty history, score 1
         let config = create_config(300, 8, 10);
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
-        let score = calculate_priority_fee_commission(&config, &validator).unwrap();
+        let score = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
+        assert_eq!(score, 1.0);
+
+        // Case where middle epoch data is missing, score 1
+        let validator = create_validator_history(
+            &[u16::MAX; 12],
+            &[u8::MAX; 12],
+            &[u32::MAX; 12],
+            &[u8::MAX; 12],
+            &[
+                100,
+                100,
+                100,
+                100,
+                100,
+                u64::MAX,
+                u64::MAX,
+                100,
+                100,
+                100,
+                100,
+                100,
+            ],
+            &[
+                100,
+                100,
+                100,
+                100,
+                100,
+                u64::MAX,
+                u64::MAX,
+                100,
+                100,
+                100,
+                100,
+                100,
+            ],
+        );
+        let score = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
         assert_eq!(score, 1.0);
     }
 }
@@ -735,8 +788,14 @@ mod test_calculate_instant_unstake_commission {
 
     #[test]
     fn test_normal() {
-        let validator =
-            create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[1, 2, 3, 4, 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let threshold = 4;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -748,8 +807,14 @@ mod test_calculate_instant_unstake_commission {
     #[test]
     fn test_edge_cases() {
         // Commission at threshold
-        let validator =
-            create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[1, 2, 3, 4, 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -758,8 +823,14 @@ mod test_calculate_instant_unstake_commission {
         assert_eq!(commission, 5);
 
         // No commission data
-        let validator =
-            create_validator_history(&[5; 5], &[u8::MAX; 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[u8::MAX; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);

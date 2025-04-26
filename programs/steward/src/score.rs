@@ -444,9 +444,37 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
 pub fn calculate_priority_fee_commission(
     config: &Config,
     validator: &ValidatorHistory,
+    current_epoch: u16,
 ) -> Result<f64> {
-    // TODO: calculate average commission over the last X epochs.
-    todo!()
+    let end_epoch = current_epoch.saturating_sub(config.pf_lookback_offset.into());
+    let start_epoch = end_epoch.saturating_sub(config.pf_lookback_epochs.into());
+    let priority_fee_tips = validator
+        .history
+        .priority_fee_tips_range(start_epoch, end_epoch);
+    let total_priority_fees = validator
+        .history
+        .total_priority_fees_range(start_epoch, end_epoch);
+
+    // return score 1 when there's not enough history
+    if priority_fee_tips.first().is_none() || total_priority_fees.first().is_none() {
+        return Ok(1.0);
+    }
+
+    let agg_priority_fee_tips: u64 = priority_fee_tips.iter().fold(0, |agg, curr| {
+        agg.checked_add(curr.unwrap_or_default()).unwrap()
+    });
+
+    let agg_total_priority_fees: u64 = total_priority_fees.iter().fold(0, |agg, curr| {
+        agg.checked_add(curr.unwrap_or_default()).unwrap()
+    });
+
+    // Determine the threshold based on the aggregated total_priority_fees
+    let threshold = config.priority_fee_tip_threshold(agg_total_priority_fees);
+    if agg_priority_fee_tips >= threshold {
+        Ok(1.0)
+    } else {
+        Ok(0.0)
+    }
 }
 
 #[event]
