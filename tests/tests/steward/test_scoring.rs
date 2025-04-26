@@ -545,7 +545,7 @@ mod test_calculate_priority_fee_commission {
         let config = create_config(300, 8, 10);
         let total_priority_fees: u64 = 1_000;
         // uses a ceil div to ensure threshold is in favor of stakers
-        let threshold: u64 = ((u64::from(config.pf_max_commission_bps)
+        let threshold: u64 = ((10_000 - u64::from(config.pf_max_commission_bps)
             + u64::from(config.pf_error_margin_bps))
             * total_priority_fees
             + 9_999)

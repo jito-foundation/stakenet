@@ -87,7 +87,7 @@ impl Config {
 
     /// Determine the realized tip threshold for a validator given it's `total_priority_fees`
     pub fn priority_fee_tip_threshold(&self, total_priority_fees: u64) -> u64 {
-        ((u64::from(self.pf_max_commission_bps) + u64::from(self.pf_error_margin_bps))
+        ((10_000 - u64::from(self.pf_max_commission_bps) + u64::from(self.pf_error_margin_bps))
             * total_priority_fees
             + 9_999)
             / 10_000
