@@ -92,6 +92,11 @@ pub struct ScoreDetails {
 
     /// Epoch of max historical commission
     pub max_historical_commission_epoch: u16,
+    // /// Max realized priority fee commission observed
+    // pub max_priority_fee_commission: u16,
+
+    // /// Epoch of realized priority fee commission
+    // pub max_priority_fee_commission_epoch: u16,
 }
 
 pub fn validator_score(
@@ -170,7 +175,7 @@ pub fn validator_score(
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
-    let priority_fee_commission_score =
+    let (priority_fee_commission_score, _, _) =
         calculate_priority_fee_commission(config, validator, current_epoch)?;
 
     /////// Formula ///////
@@ -454,9 +459,9 @@ pub fn calculate_priority_fee_commission(
     config: &Config,
     validator: &ValidatorHistory,
     current_epoch: u16,
-) -> Result<f64> {
-    let end_epoch = current_epoch.saturating_sub(config.pf_lookback_offset.into());
-    let start_epoch = end_epoch.saturating_sub(config.pf_lookback_epochs.into());
+) -> Result<(f64, u16, u16)> {
+    let end_epoch: u16 = current_epoch.saturating_sub(config.pf_lookback_offset.into());
+    let start_epoch: u16 = end_epoch.saturating_sub(config.pf_lookback_epochs.into());
     let priority_fee_tips = validator
         .history
         .priority_fee_tips_range(start_epoch, end_epoch);
@@ -464,10 +469,50 @@ pub fn calculate_priority_fee_commission(
         .history
         .total_priority_fees_range(start_epoch, end_epoch);
 
+    // determine the highest priority fee commission
+    let (max_priority_fee_commission, max_priority_fee_commission_epoch) = priority_fee_tips
+        .iter()
+        .zip(&total_priority_fees)
+        .enumerate()
+        .fold(
+            (0_u16, u16::MAX),
+            |agg, (relative_epoch, (tips, total_fees))| {
+                let inverse_commission_bps =
+                    tips.unwrap_or(0)
+                        .checked_mul(10_000)
+                        .and_then(|scaled_tips| {
+                            scaled_tips.checked_div(total_fees.unwrap_or(u64::MAX))
+                        });
+                let commission_bps: u16 = BASIS_POINTS_MAX
+                    .checked_sub(
+                        u16::try_from(
+                            inverse_commission_bps.unwrap_or(u64::from(BASIS_POINTS_MAX)),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                if agg.0 < commission_bps {
+                    let max_commission_epoch: u16 =
+                        start_epoch + u16::try_from(relative_epoch).unwrap();
+                    (commission_bps, max_commission_epoch)
+                } else {
+                    agg
+                }
+            },
+        );
+
     // return score 1 when there's not enough history
     if priority_fee_tips.first().is_none() || total_priority_fees.first().is_none() {
-        return Ok(1.0);
+        return Ok((
+            1.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ));
     }
+
+    // REVIEW: This is handled through an aggregated commission. This leads to valdiators with a
+    // drastic change in stake and commission gets smoothed out. Should this scoring be done
+    // normalized by actual commission bps instead?
 
     let agg_priority_fee_tips: u64 = priority_fee_tips.iter().fold(0, |agg, curr| {
         agg.checked_add(curr.unwrap_or_default()).unwrap()
@@ -480,9 +525,17 @@ pub fn calculate_priority_fee_commission(
     // Determine the threshold based on the aggregated total_priority_fees
     let threshold = config.priority_fee_tip_threshold(agg_total_priority_fees);
     if agg_priority_fee_tips >= threshold {
-        Ok(1.0)
+        Ok((
+            1.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ))
     } else {
-        Ok(0.0)
+        Ok((
+            0.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ))
     }
 }
 

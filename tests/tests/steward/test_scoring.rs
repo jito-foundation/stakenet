@@ -559,8 +559,8 @@ mod test_calculate_priority_fee_commission {
             &[threshold; 10],
             &[total_priority_fees; 10],
         );
-        let res = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
-        assert_eq!(res, 1.0);
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
+        assert_eq!(score, 1.0);
 
         // With > pf_lookback_epochs + offset and < 50% commission, score 1
         let validator = create_validator_history(
@@ -571,8 +571,8 @@ mod test_calculate_priority_fee_commission {
             &[threshold; 12],
             &[total_priority_fees; 12],
         );
-        let res = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(res, 1.0);
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
         // With > pf_lookback_epochs and > 50% commission, score 0
         let validator = create_validator_history(
             &[0; 12],
@@ -582,8 +582,18 @@ mod test_calculate_priority_fee_commission {
             &[threshold - 1; 12],
             &[total_priority_fees; 12],
         );
-        let res = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(res, 0.0);
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        // With max commission and max commission epoch
+        let mut validator = create_validator_history(
+            &[0; 12], &[0; 12], &[0; 12], &[0; 12], &[60; 12], &[100; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = 10;
+        let (_, max_commission, max_commission_epoch) =
+            calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(max_commission, 9_000);
+        assert_eq!(max_commission_epoch, 5);
     }
 
     #[test]
@@ -591,7 +601,7 @@ mod test_calculate_priority_fee_commission {
         // Empty history, score 1
         let config = create_config(300, 8, 10);
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
-        let score = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
         assert_eq!(score, 1.0);
 
         // Case where middle epoch data is missing, score 1
@@ -629,7 +639,7 @@ mod test_calculate_priority_fee_commission {
                 100,
             ],
         );
-        let score = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
         assert_eq!(score, 1.0);
     }
 }
