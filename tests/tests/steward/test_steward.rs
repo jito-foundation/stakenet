@@ -940,12 +940,35 @@ async fn test_set_new_authority() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: new_authority.pubkey(),
+            admin: new_authority.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetPriorityFeeParameterAuthority,
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&new_authority.pubkey()),
+        &[&new_authority],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
     let config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
     assert!(config.admin == new_authority.pubkey());
     assert!(config.blacklist_authority == new_authority.pubkey());
     assert!(config.parameters_authority == new_authority.pubkey());
+    assert!(config.pf_setting_authority == new_authority.pubkey());
 
     // Try to transfer back with original authority
     let ix = Instruction {
@@ -976,6 +999,7 @@ async fn test_set_new_authority() {
     assert!(config.admin == fixture.keypair.pubkey());
     assert!(config.blacklist_authority == new_authority.pubkey());
     assert!(config.parameters_authority == new_authority.pubkey());
+    assert!(config.pf_setting_authority == new_authority.pubkey());
 
     drop(fixture);
 }

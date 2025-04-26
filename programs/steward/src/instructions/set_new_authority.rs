@@ -13,6 +13,7 @@ pub enum AuthorityType {
     SetAdmin = 0,
     SetBlacklistAuthority = 1,
     SetParametersAuthority = 2,
+    SetPriorityFeeParameterAuthority = 3,
 }
 
 impl AuthorityType {
@@ -49,6 +50,14 @@ impl IdlBuild for AuthorityType {
                         name: "SetParameterAuthority".to_string(),
                         fields: Some(IdlDefinedFields::Named(vec![IdlField {
                             name: "SetParameterAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
+                    IdlEnumVariant {
+                        name: "SetPriorityFeeParameterAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetPriorityFeeParameterAuthority".to_string(),
                             docs: Default::default(),
                             ty: IdlType::Option(Box::new(IdlType::U8)),
                         }])),
@@ -90,6 +99,9 @@ pub fn handler(ctx: Context<SetNewAuthority>, authority_type: AuthorityType) -> 
         }
         AuthorityType::SetParametersAuthority => {
             config.parameters_authority = ctx.accounts.new_authority.key();
+        }
+        AuthorityType::SetPriorityFeeParameterAuthority => {
+            config.pf_setting_authority = ctx.accounts.new_authority.key();
         }
     }
 
