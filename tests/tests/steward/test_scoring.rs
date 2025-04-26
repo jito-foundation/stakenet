@@ -28,11 +28,11 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        pf_lookback_epochs: u8::default(),
-        pf_lookback_offset: u8::default(),
+        pf_lookback_epochs: 10,
+        pf_lookback_offset: 2,
         _padding0: u8::default(),
-        pf_max_commission_bps: u16::default(),
-        pf_error_margin_bps: u16::default(),
+        pf_max_commission_bps: 5_000,
+        pf_error_margin_bps: 10,
         pf_setting_authority: Pubkey::new_unique(),
         _padding: [0; 984],
     }
@@ -43,13 +43,20 @@ fn create_validator_history(
     commissions: &[u8],
     epoch_credits: &[u32],
     superminority: &[u8],
+    priority_fee_tips: &[u64],
+    total_priority_fees: &[u64],
 ) -> ValidatorHistory {
     let mut history = CircBuf::default();
-    for (i, (((&mev, &comm), &credits), &super_min)) in mev_commissions
+    for (
+        i,
+        (((((&mev, &comm), &credits), &super_min), &priority_fee_tips), &total_priority_fees),
+    ) in mev_commissions
         .iter()
         .zip(commissions)
         .zip(epoch_credits)
         .zip(superminority)
+        .zip(priority_fee_tips)
+        .zip(total_priority_fees)
         .enumerate()
     {
         history.push(validator_history::ValidatorHistoryEntry {
@@ -58,6 +65,8 @@ fn create_validator_history(
             commission: comm,
             epoch_credits: credits,
             is_superminority: super_min,
+            priority_fee_tips,
+            total_priority_fees,
             ..Default::default()
         });
     }
@@ -276,6 +285,8 @@ mod test_calculate_historical_commission {
             &[5, 6, 7, 8, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
             &[0; 10],
+            &[0; 10],
+            &[0; 10],
         );
         let current_epoch = 9;
         let threshold = 8;
@@ -293,6 +304,8 @@ mod test_calculate_historical_commission {
             &[5, 6, 7, 9, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
             &[0; 10],
+            &[0; 10],
+            &[0; 10],
         );
         let (score, max_commission, max_epoch) =
             calculate_historical_commission(&validator, 9, 8).unwrap();
@@ -304,7 +317,7 @@ mod test_calculate_historical_commission {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
         let result = calculate_historical_commission(&validator, 0, 8);
         assert!(result.is_err());
 
@@ -313,6 +326,8 @@ mod test_calculate_historical_commission {
             &[100; 10],
             &[5, 6, 7, 8, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
+            &[0; 10],
+            &[0; 10],
             &[0; 10],
         );
         validator
@@ -325,7 +340,9 @@ mod test_calculate_historical_commission {
         assert_eq!(max_epoch, 3);
 
         // Test all commissions none
-        let validator = create_validator_history(&[100; 10], &[u8::MAX; 10], &[1000; 10], &[0; 10]);
+        let validator =
+            create_validator_history(&[100; 10], &[u8::MAX; 10], &[1000; 10], &[0; 10], &[0; 10],
+                &[0; 10],);
         let (score, max_comission, max_epoch) =
             calculate_historical_commission(&validator, 1, 8).unwrap();
         assert_eq!(score, 1.0);
@@ -347,6 +364,8 @@ mod test_calculate_superminority {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
         );
         let (score, epoch) = calculate_superminority(&validator, 9, 10).unwrap();
         assert_eq!(score, 0.0);
@@ -357,6 +376,8 @@ mod test_calculate_superminority {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            &[0; 10],
+            &[0; 10],
         );
         let current_epoch = 9;
         let commission_range = 10;
@@ -373,6 +394,8 @@ mod test_calculate_superminority {
             &[5; 6],
             &[u32::MAX; 6],
             &[0, 0, 0, 1, u8::MAX, u8::MAX],
+            &[0; 6],
+            &[0; 6],
         );
         let current_epoch = 5;
         let commission_range = 4;
@@ -387,6 +410,8 @@ mod test_calculate_superminority {
             &[5; 6],
             &[u32::MAX; 6],
             &[0, 0, 0, 0, u8::MAX, u8::MAX],
+            &[0; 6],
+            &[0; 6],
         );
         let current_epoch = 5;
         let commission_range = 4;
@@ -399,17 +424,21 @@ mod test_calculate_superminority {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
         let result = calculate_superminority(&validator, 0, 10);
         assert!(result.is_err());
 
         // Arithmetic error
-        let validator = create_validator_history(&[100; 10], &[5; 10], &[u32::MAX; 10], &[0; 10]);
+        let validator =
+            create_validator_history(&[100; 10], &[5; 10], &[u32::MAX; 10], &[0; 10], &[0; 10],
+                &[0; 10],);
         let result = calculate_superminority(&validator, 0, 1);
         assert!(result.is_err());
 
         // History with None values
-        let mut validator = create_validator_history(&[100; 10], &[5; 10], &[1000; 10], &[0; 10]);
+        let mut validator =
+            create_validator_history(&[100; 10], &[5; 10], &[1000; 10], &[0; 10], &[0; 10],
+                &[0; 10],);
         validator
             .history
             .push(validator_history::ValidatorHistoryEntry::default());
@@ -456,6 +485,8 @@ mod test_calculate_merkle_root_authoirty {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
         );
 
         // When using MerkleRootUploadAuthority::Other it should be a 0 score always
@@ -485,8 +516,67 @@ mod test_calculate_merkle_root_authoirty {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
         let score = calculate_merkle_root_authority(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+}
+
+mod test_calculate_priority_fee_commission {
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let config = create_config(300, 8, 10);
+        let total_priority_fees: u64 = 1_000;
+        // uses a ceil div to ensure threshold is in favor of stakers
+        let threshold: u64 = ((u64::from(config.pf_max_commission_bps)
+            + u64::from(config.pf_error_margin_bps))
+            * total_priority_fees
+            + 9_999)
+            / 10_000;
+        // With < pf_lookback_epochs + offset of history, score 1
+        let validator = create_validator_history(
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[threshold; 10],
+            &[total_priority_fees; 10],
+        );
+        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        assert_eq!(res, 1.0);
+
+        // With > pf_lookback_epochs + offset and < 50% commission, score 1
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[threshold; 12],
+            &[total_priority_fees; 12],
+        );
+        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        assert_eq!(res, 1.0);
+        // With > pf_lookback_epochs and > 50% commission, score 0
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[threshold - 1; 12],
+            &[total_priority_fees; 12],
+        );
+        let res = calculate_priority_fee_commission(&config, &validator).unwrap();
+        assert_eq!(res, 0.0);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history, score 1
+        let config = create_config(300, 8, 10);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
+        let score = calculate_priority_fee_commission(&config, &validator).unwrap();
         assert_eq!(score, 1.0);
     }
 }
@@ -558,8 +648,14 @@ mod test_calculate_instant_unstake_mev_commission {
 
     #[test]
     fn test_normal() {
-        let validator =
-            create_validator_history(&[100, 200, 300, 400, 500], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 400, 500],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let current_epoch = 4;
         let threshold = 300;
 
@@ -573,8 +669,14 @@ mod test_calculate_instant_unstake_mev_commission {
     #[test]
     fn test_edge_cases() {
         // MEV commission below threshold
-        let validator =
-            create_validator_history(&[100, 200, 300, 200, 100], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 200, 100],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let current_epoch = 4;
         let threshold = 300;
 
@@ -585,7 +687,7 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 200);
 
         // No MEV commission data
-        let validator = create_validator_history(&[u16::MAX], &[5], &[1000], &[0]);
+        let validator = create_validator_history(&[u16::MAX], &[5], &[1000], &[0], &[0], &[0]);
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 0, threshold);
 
@@ -598,6 +700,8 @@ mod test_calculate_instant_unstake_mev_commission {
             &[u8::MAX, 5],
             &[u32::MAX, 1000],
             &[u8::MAX, 0],
+            &[u64::MAX, 0],
+            &[u64::MAX, 0],
         );
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 1, threshold);
@@ -606,8 +710,14 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 400);
 
         // Threshold at exactly the highest commission
-        let validator =
-            create_validator_history(&[100, 200, 300, 400, 500], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 400, 500],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+        );
         let threshold = 500;
 
         let (check, commission) =
@@ -625,7 +735,8 @@ mod test_calculate_instant_unstake_commission {
 
     #[test]
     fn test_normal() {
-        let validator = create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5]);
+        let validator =
+            create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
         let threshold = 4;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -637,7 +748,8 @@ mod test_calculate_instant_unstake_commission {
     #[test]
     fn test_edge_cases() {
         // Commission at threshold
-        let validator = create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5]);
+        let validator =
+            create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -646,7 +758,8 @@ mod test_calculate_instant_unstake_commission {
         assert_eq!(commission, 5);
 
         // No commission data
-        let validator = create_validator_history(&[5; 5], &[u8::MAX; 5], &[1000; 5], &[0; 5]);
+        let validator =
+            create_validator_history(&[5; 5], &[u8::MAX; 5], &[1000; 5], &[0; 5], &[0; 5], &[0; 5]);
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -660,6 +773,8 @@ mod test_calculate_instant_unstake_commission {
             &[u8::MAX, 3],
             &[u32::MAX, 1000],
             &[u8::MAX, 1],
+            &[u64::MAX, 0],
+            &[u64::MAX, 0],
         );
         let threshold = 5;
 
@@ -701,6 +816,8 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
         );
 
         // When using MerkleRootUploadAuthority::Other should always instant unstake
@@ -733,7 +850,7 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
         let is_instant_unstake =
             calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
         assert!(!is_instant_unstake);

@@ -440,6 +440,15 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
     }
 }
 
+/// Checks if validator is maintaining < X% realized commission rates over some history of epochs
+pub fn calculate_priority_fee_commission(
+    config: &Config,
+    validator: &ValidatorHistory,
+) -> Result<f64> {
+    // TODO: calculate average commission over the last X epochs.
+    todo!()
+}
+
 #[event]
 #[derive(Debug, PartialEq, Eq)]
 pub struct InstantUnstakeComponentsV3 {

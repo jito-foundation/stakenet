@@ -46,6 +46,8 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
+    // REVIEW: Should these be in Parameters struct? They're 6 bytes and could fit in easily.
+    //  However, they require a different authority to update...
     /// The number of epochs the priority fee distribution check should lookback
     pub pf_lookback_epochs: u8,
 
