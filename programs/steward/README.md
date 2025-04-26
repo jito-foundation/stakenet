@@ -56,6 +56,7 @@ The following metrics are used to calculate the `score` and `yield_score`:
 - `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
 - `running_jito_score`: If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
 - `merkle_root_upload_authority_score`: If validator is using TipRouter or OldJito Tip Distribution merkle root upload authority then score is 1.0, else 0.0
+- `priority_fee_commission_score`: If validator's realized priority fee commission is < configured threshold over configured epoch range then score is 1.0, else 0.0
 
 > Note: All data comes from the `ValidatorHistory` account for each validator.
 
@@ -73,6 +74,7 @@ let score = mev_commission_score
     * running_jito_score
     * yield_score
     * merkle_root_upload_authority_score
+    * priority_fee_commission_score
 ```
 
 As a validator, in order to receive a high score for JitoSOL, you must meet these binary eligibility criteria, and return a high rate of rewards to your stakers. The eligibility criteria ensure that we're delegating to validators that meet some important properties for decentralization, Solana network health, operator quality, and MEV sharing. The yield score is an objective way to compare validators' relative yield and ensure we're returning a competitive APY to JitoSOL holders, which in turn attracts more stake to delegate to validators.
@@ -81,7 +83,7 @@ In this version 0 of the score formula, there is no weighting of any factor abov
 
 For a breakdown of the formulas used for each score, see the Appendix.
 
-Take a look at the implementation in [score.rs](./src/score.rs#L174)
+Take a look at the implementation in [score.rs](./src/score.rs#L180)
 
 ### Compute Delegations
 

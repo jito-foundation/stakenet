@@ -213,7 +213,7 @@ pub fn validator_score(
             max_historical_commission,
             max_historical_commission_epoch,
         },
-        priority_fee_commission_score
+        priority_fee_commission_score,
     })
 }
 
