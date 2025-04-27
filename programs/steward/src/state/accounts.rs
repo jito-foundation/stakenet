@@ -46,25 +46,9 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
-    // REVIEW: Should these be in Parameters struct? They're 6 bytes and could fit in easily.
-    //  However, they require a different authority to update...
-    /// The number of epochs the priority fee distribution check should lookback
-    pub pf_lookback_epochs: u8,
-
-    /// The offset of epochs for the priority fee distribution. E.g. look at epochs from
-    /// (current_epoch - offset - pf_lookback_epochs) to (current_epoch - offset)
-    pub pf_lookback_offset: u8,
-
-    // REVIEW: Should we write a PodU16 that implements Borsh to remove this padding?
-    pub _padding0: u8,
-
-    /// The maximum validator commission before the validator scores 0.
-    /// E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,
-    /// then score = 0
-    pub pf_max_commission_bps: u16,
-
-    /// An error of margin for priority fee commission calculations
-    pub pf_error_margin_bps: u16,
+    /// Required so that the struct is 8-byte aligned
+    /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
+    pub _padding_0: [u8; 7],
 
     /// The authority that can update the priority fee configs
     pub pf_setting_authority: Pubkey,
@@ -87,7 +71,8 @@ impl Config {
 
     /// Determine the realized tip threshold for a validator given it's `total_priority_fees`
     pub fn priority_fee_tip_threshold(&self, total_priority_fees: u64) -> u64 {
-        ((10_000 - u64::from(self.pf_max_commission_bps) + u64::from(self.pf_error_margin_bps))
+        ((10_000 - u64::from(self.parameters.pf_max_commission_bps)
+            + u64::from(self.parameters.pf_error_margin_bps))
             * total_priority_fees
             + 9_999)
             / 10_000

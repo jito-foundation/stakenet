@@ -467,8 +467,9 @@ pub fn calculate_priority_fee_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
-    let end_epoch: u16 = current_epoch.saturating_sub(config.pf_lookback_offset.into());
-    let start_epoch: u16 = end_epoch.saturating_sub(config.pf_lookback_epochs.into());
+    let params = &config.parameters;
+    let end_epoch: u16 = current_epoch.saturating_sub(params.pf_lookback_offset.into());
+    let start_epoch: u16 = end_epoch.saturating_sub(params.pf_lookback_epochs.into());
     let priority_fee_tips = validator
         .history
         .priority_fee_tips_range(start_epoch, end_epoch);

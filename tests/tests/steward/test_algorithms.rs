@@ -906,8 +906,8 @@ fn test_compute_score() {
 
     // Test permission fee commssion score 1
     let mut validator = good_validator;
-    let end_epoch = current_epoch as usize - config.pf_lookback_offset as usize;
-    let start_epoch = end_epoch - config.pf_lookback_epochs as usize;
+    let end_epoch = current_epoch as usize - config.parameters.pf_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.pf_lookback_epochs as usize;
     for i in start_epoch..=end_epoch {
         validator.history.arr_mut()[i].priority_fee_tips = 60;
         validator.history.arr_mut()[i].total_priority_fees = 100;
@@ -955,8 +955,8 @@ fn test_compute_score() {
 
     // Test permission fee commssion score 0
     let mut validator = good_validator;
-    let end_epoch = current_epoch as usize - config.pf_lookback_offset as usize;
-    let start_epoch = end_epoch - config.pf_lookback_epochs as usize;
+    let end_epoch = current_epoch as usize - config.parameters.pf_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.pf_lookback_epochs as usize;
     for i in start_epoch..=end_epoch {
         validator.history.arr_mut()[i].priority_fee_tips = 10;
         validator.history.arr_mut()[i].total_priority_fees = 100;

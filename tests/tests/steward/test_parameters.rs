@@ -242,7 +242,10 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
-        _padding_0: [0; 6],
+        pf_lookback_epochs: 10,
+        pf_lookback_offset: 2,
+        pf_max_commission_bps: 5_000,
+        pf_error_margin_bps: 10,
         _padding_1: [0; 32],
     });
 

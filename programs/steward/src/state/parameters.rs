@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{types::*, *};
 use anchor_lang::{prelude::Result, zero_copy};
@@ -144,6 +146,8 @@ impl IdlBuild for UpdateParametersArgs {
     }
 }
 
+static_assertions::const_assert_eq!(size_of::<Parameters>(), 352);
+
 #[derive(BorshSerialize, Default)]
 #[zero_copy]
 pub struct Parameters {
@@ -172,9 +176,20 @@ pub struct Parameters {
     /// Highest commission rate allowed in tracked history
     pub historical_commission_threshold: u8,
 
-    /// Required so that the struct is 8-byte aligned
-    /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
-    pub _padding_0: [u8; 6],
+    /// The number of epochs the priority fee distribution check should lookback
+    pub pf_lookback_epochs: u8,
+
+    /// The offset of epochs for the priority fee distribution. E.g. look at epochs from
+    /// (current_epoch - offset - pf_lookback_epochs) to (current_epoch - offset)
+    pub pf_lookback_offset: u8,
+
+    /// The maximum validator commission before the validator scores 0.
+    /// E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,
+    /// then score = 0
+    pub pf_max_commission_bps: u16,
+
+    /// An error of margin for priority fee commission calculations
+    pub pf_error_margin_bps: u16,
 
     /////// Delegation parameters ///////
     /// Number of validators to delegate to

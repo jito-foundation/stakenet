@@ -19,6 +19,10 @@ fn create_config(
             commission_range: 10,
             scoring_delinquency_threshold_ratio: 0.9,
             instant_unstake_delinquency_threshold_ratio: 0.8,
+            pf_lookback_epochs: 10,
+            pf_lookback_offset: 2,
+            pf_max_commission_bps: 5_000,
+            pf_error_margin_bps: 10,
             ..Default::default()
         },
         stake_pool: Pubkey::new_unique(),
@@ -28,11 +32,7 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        pf_lookback_epochs: 10,
-        pf_lookback_offset: 2,
-        _padding0: u8::default(),
-        pf_max_commission_bps: 5_000,
-        pf_error_margin_bps: 10,
+        _padding_0: [0u8; 7],
         pf_setting_authority: Pubkey::new_unique(),
         _padding: [0; 984],
     }
@@ -545,8 +545,8 @@ mod test_calculate_priority_fee_commission {
         let config = create_config(300, 8, 10);
         let total_priority_fees: u64 = 1_000;
         // uses a ceil div to ensure threshold is in favor of stakers
-        let threshold: u64 = ((10_000 - u64::from(config.pf_max_commission_bps)
-            + u64::from(config.pf_error_margin_bps))
+        let threshold: u64 = ((10_000 - u64::from(config.parameters.pf_max_commission_bps)
+            + u64::from(config.parameters.pf_error_margin_bps))
             * total_priority_fees
             + 9_999)
             / 10_000;
