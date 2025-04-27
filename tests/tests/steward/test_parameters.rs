@@ -5,20 +5,25 @@ use jito_steward::{
         BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN, EPOCH_PROGRESS_MAX,
         MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX,
     },
+    instructions::AuthorityType,
     Config, Parameters, UpdateParametersArgs,
 };
 use solana_program_test::*;
-use solana_sdk::{signer::Signer, transaction::Transaction};
+use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::TestFixture;
 
 // ---------- INTEGRATION TESTS ----------
-async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParametersArgs) {
+async fn _set_parameter(
+    fixture: &TestFixture,
+    update_parameters: &UpdateParametersArgs,
+    authority: &Keypair,
+) {
     let ctx = &fixture.ctx;
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::UpdateParameters {
             config: fixture.steward_config.pubkey(),
-            authority: fixture.keypair.pubkey(),
+            authority: authority.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::UpdateParameters {
@@ -28,8 +33,8 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
     };
     let tx = Transaction::new_signed_with_payer(
         &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&authority.pubkey()),
+        &[&authority],
         ctx.borrow().last_blockhash,
     );
 
@@ -168,6 +173,34 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
             "minimum_voting_epochs, does not match update"
         );
     }
+
+    if let Some(pf_lookback_epochs) = update_parameters.pf_lookback_epochs {
+        assert_eq!(
+            config.parameters.pf_lookback_epochs, pf_lookback_epochs,
+            "pf_lookback_epochs, does not match update"
+        );
+    }
+
+    if let Some(pf_lookback_offset) = update_parameters.pf_lookback_offset {
+        assert_eq!(
+            config.parameters.pf_lookback_offset, pf_lookback_offset,
+            "pf_lookback_offset, does not match update"
+        );
+    }
+
+    if let Some(pf_max_commission_bps) = update_parameters.pf_max_commission_bps {
+        assert_eq!(
+            config.parameters.pf_max_commission_bps, pf_max_commission_bps,
+            "pf_max_commission_bps, does not match update"
+        );
+    }
+
+    if let Some(pf_error_margin_bps) = update_parameters.pf_error_margin_bps {
+        assert_eq!(
+            config.parameters.pf_error_margin_bps, pf_error_margin_bps,
+            "pf_error_margin_bps, does not match update"
+        );
+    }
 }
 
 #[tokio::test]
@@ -182,6 +215,7 @@ async fn test_update_parameters() {
         &UpdateParametersArgs {
             ..UpdateParametersArgs::default()
         },
+        &fixture.keypair,
     )
     .await;
 
@@ -213,8 +247,59 @@ async fn test_update_parameters() {
             pf_max_commission_bps: None,
             pf_error_margin_bps: None,
         },
+        &fixture.keypair,
     )
     .await;
+
+    let priority_fee_authority_keypair = fixture
+        .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)
+        .await;
+
+    // Should pass when priority fee updates are changed with correct authority
+    _set_parameter(
+        &fixture,
+        &UpdateParametersArgs {
+            pf_lookback_epochs: Some(1),
+            pf_lookback_offset: Some(1),
+            pf_max_commission_bps: Some(1),
+            pf_error_margin_bps: Some(1),
+            ..UpdateParametersArgs::default()
+        },
+        &priority_fee_authority_keypair,
+    )
+    .await;
+
+    // Should error when priority fee updates are changed with incorrect authority
+    let update_params = UpdateParametersArgs {
+        pf_lookback_epochs: Some(1),
+        pf_lookback_offset: Some(1),
+        pf_max_commission_bps: Some(1),
+        pf_error_margin_bps: Some(1),
+        ..UpdateParametersArgs::default()
+    };
+    let ctx = &fixture.ctx;
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::UpdateParameters {
+            config: fixture.steward_config.pubkey(),
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::UpdateParameters {
+            update_parameters_args: update_params.clone(),
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(tx, "ConstraintAddress")
+        .await;
 
     drop(fixture);
 }

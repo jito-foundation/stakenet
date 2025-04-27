@@ -14,8 +14,8 @@ use anchor_lang::{
 use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
-    utils::StakePool,
-    utils::ValidatorList,
+    instructions::AuthorityType,
+    utils::{StakePool, ValidatorList},
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
     StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
 };
@@ -367,6 +367,34 @@ impl TestFixture {
             self.ctx.borrow().last_blockhash,
         );
         self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn set_new_authority(&self, authority_type: AuthorityType) -> Keypair {
+        let new_authority = Keypair::new();
+        self.ctx
+            .borrow_mut()
+            .set_account(&new_authority.pubkey(), &system_account(1_000_000).into());
+
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::SetNewAuthority {
+                config: self.steward_config.pubkey(),
+                new_authority: new_authority.pubkey(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::SetNewAuthority { authority_type }.data(),
+        };
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+
+        self.submit_transaction_assert_success(tx).await;
+
+        new_authority
     }
 
     pub async fn get_latest_blockhash(&self) -> Hash {
