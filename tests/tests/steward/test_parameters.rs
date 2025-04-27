@@ -208,6 +208,10 @@ async fn test_update_parameters() {
             num_epochs_between_scoring: Some(8),
             minimum_stake_lamports: Some(1),
             minimum_voting_epochs: Some(1),
+            pf_lookback_epochs: None,
+            pf_lookback_offset: None,
+            pf_max_commission_bps: None,
+            pf_error_margin_bps: None,
         },
     )
     .await;
@@ -895,4 +899,56 @@ fn test_num_epochs_between_scoring() {
         assert!(result.is_ok());
         assert_eq!(result.unwrap().num_epochs_between_scoring, new_value);
     }
+}
+
+#[test]
+fn test_priority_fee_settings() {
+        // Validate the values change
+        let expected_value: u8 = 1;
+        let update_parameters = UpdateParametersArgs {
+            pf_lookback_epochs: Some(expected_value),
+            pf_lookback_offset: Some(expected_value),
+            pf_max_commission_bps: Some(expected_value.into()),
+            pf_error_margin_bps: Some(expected_value.into()),
+            ..UpdateParametersArgs::default()
+        };
+        let result = _test_parameter(&update_parameters, None, None, None);
+        assert!(result.is_ok());
+        let new_params = & result.unwrap();
+        assert_eq!(new_params.pf_lookback_epochs, expected_value);
+        assert_eq!(new_params.pf_lookback_offset, expected_value);
+        assert_eq!(new_params.pf_max_commission_bps, u16::from(expected_value));
+        assert_eq!(new_params.pf_error_margin_bps, u16::from(expected_value));
+}
+
+#[test]
+fn test_mutually_exclusivity_of_priority_fee_settings() {
+    // result is ok if only priority fee settings are Some
+    let update_parameters = UpdateParametersArgs {
+        pf_lookback_epochs: Some(1),
+        pf_lookback_offset: Some(1),
+        pf_max_commission_bps: Some(1),
+        pf_error_margin_bps: Some(1),
+        ..UpdateParametersArgs::default()
+    };
+    let result = _test_parameter(&update_parameters, None, None, None);
+    assert!(result.is_ok());
+
+    // result is ok if only other settings are some
+    let update_parameters = UpdateParametersArgs {
+        mev_commission_range: Some(1),
+        ..UpdateParametersArgs::default()
+    };
+    let result = _test_parameter(&update_parameters, None, None, None);
+    assert!(result.is_ok());
+
+    // TODO: Write a more exhaustive test for all permutations
+    // test any over lap between priority fee settings and others
+    let update_parameters = UpdateParametersArgs {
+        mev_commission_range: Some(1),
+        pf_lookback_epochs: Some(1),
+        ..UpdateParametersArgs::default()
+    };
+    let result = _test_parameter(&update_parameters, None, None, None);
+    assert!(result.is_err());
 }

@@ -37,6 +37,11 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
+    // Priority fee parameters
+    pub pf_lookback_epochs: Option<u8>,
+    pub pf_lookback_offset: Option<u8>,
+    pub pf_max_commission_bps: Option<u16>,
+    pub pf_error_margin_bps: Option<u16>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -134,6 +139,26 @@ impl IdlBuild for UpdateParametersArgs {
                     IdlField {
                         name: "minimum_voting_epochs".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "pf_lookback_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "pf_lookback_offset".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "pf_max_commission_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "pf_error_margin_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
                         docs: Default::default(),
                     },
                 ])),
@@ -254,6 +279,10 @@ impl Parameters {
             num_epochs_between_scoring,
             minimum_stake_lamports,
             minimum_voting_epochs,
+            pf_lookback_epochs,
+            pf_lookback_offset,
+            pf_max_commission_bps,
+            pf_error_margin_bps,
         } = *args;
 
         let mut new_parameters = self;
