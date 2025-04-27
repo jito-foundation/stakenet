@@ -257,7 +257,12 @@ fn _test_parameter(
     let current_epoch = current_epoch.unwrap_or(512);
     let slots_per_epoch = slots_per_epoch.unwrap_or(432_000);
 
-    valid_parameters.get_valid_updated_parameters(update_parameters, current_epoch, slots_per_epoch)
+    valid_parameters.get_valid_updated_parameters(
+        update_parameters,
+        current_epoch,
+        slots_per_epoch,
+        false,
+    )
 }
 
 #[test]
@@ -903,22 +908,22 @@ fn test_num_epochs_between_scoring() {
 
 #[test]
 fn test_priority_fee_settings() {
-        // Validate the values change
-        let expected_value: u8 = 1;
-        let update_parameters = UpdateParametersArgs {
-            pf_lookback_epochs: Some(expected_value),
-            pf_lookback_offset: Some(expected_value),
-            pf_max_commission_bps: Some(expected_value.into()),
-            pf_error_margin_bps: Some(expected_value.into()),
-            ..UpdateParametersArgs::default()
-        };
-        let result = _test_parameter(&update_parameters, None, None, None);
-        assert!(result.is_ok());
-        let new_params = & result.unwrap();
-        assert_eq!(new_params.pf_lookback_epochs, expected_value);
-        assert_eq!(new_params.pf_lookback_offset, expected_value);
-        assert_eq!(new_params.pf_max_commission_bps, u16::from(expected_value));
-        assert_eq!(new_params.pf_error_margin_bps, u16::from(expected_value));
+    // Validate the values change
+    let expected_value: u8 = 1;
+    let update_parameters = UpdateParametersArgs {
+        pf_lookback_epochs: Some(expected_value),
+        pf_lookback_offset: Some(expected_value),
+        pf_max_commission_bps: Some(expected_value.into()),
+        pf_error_margin_bps: Some(expected_value.into()),
+        ..UpdateParametersArgs::default()
+    };
+    let result = _test_parameter(&update_parameters, None, None, None);
+    assert!(result.is_ok());
+    let new_params = &result.unwrap();
+    assert_eq!(new_params.pf_lookback_epochs, expected_value);
+    assert_eq!(new_params.pf_lookback_offset, expected_value);
+    assert_eq!(new_params.pf_max_commission_bps, u16::from(expected_value));
+    assert_eq!(new_params.pf_error_margin_bps, u16::from(expected_value));
 }
 
 #[test]

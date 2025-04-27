@@ -22,6 +22,7 @@ pub fn handler(
         update_parameters_args,
         current_epoch,
         max_slots_in_epoch,
+        false,
     )?;
 
     config.parameters = new_parameters;

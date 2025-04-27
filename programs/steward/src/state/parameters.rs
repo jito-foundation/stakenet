@@ -258,6 +258,7 @@ impl Parameters {
         args: &UpdateParametersArgs,
         current_epoch: u64,
         slots_per_epoch: u64,
+        is_init: bool,
     ) -> Result<Parameters> {
         // Updates parameters and validates them
         let UpdateParametersArgs {
@@ -285,21 +286,28 @@ impl Parameters {
             pf_error_margin_bps,
         } = *args;
 
+        let mut other_settings_changed = false;
+        let mut pf_settings_changed = false;
+
         let mut new_parameters = self;
 
         if let Some(mev_commission_range) = mev_commission_range {
+            other_settings_changed = true;
             new_parameters.mev_commission_range = mev_commission_range;
         }
 
         if let Some(epoch_credits_range) = epoch_credits_range {
+            other_settings_changed = true;
             new_parameters.epoch_credits_range = epoch_credits_range;
         }
 
         if let Some(commission_range) = commission_range {
+            other_settings_changed = true;
             new_parameters.commission_range = commission_range;
         }
 
         if let Some(scoring_delinquency_threshold_ratio) = scoring_delinquency_threshold_ratio {
+            other_settings_changed = true;
             new_parameters.scoring_delinquency_threshold_ratio =
                 scoring_delinquency_threshold_ratio;
         }
@@ -307,61 +315,100 @@ impl Parameters {
         if let Some(instant_unstake_delinquency_threshold_ratio) =
             instant_unstake_delinquency_threshold_ratio
         {
+            other_settings_changed = true;
             new_parameters.instant_unstake_delinquency_threshold_ratio =
                 instant_unstake_delinquency_threshold_ratio;
         }
 
         if let Some(mev_commission_bps_threshold) = mev_commission_bps_threshold {
+            other_settings_changed = true;
             new_parameters.mev_commission_bps_threshold = mev_commission_bps_threshold;
         }
 
         if let Some(commission_threshold) = commission_threshold {
+            other_settings_changed = true;
             new_parameters.commission_threshold = commission_threshold;
         }
 
         if let Some(historical_commission_threshold) = historical_commission_threshold {
+            other_settings_changed = true;
             new_parameters.historical_commission_threshold = historical_commission_threshold;
         }
 
         if let Some(num_delegation_validators) = num_delegation_validators {
+            other_settings_changed = true;
             new_parameters.num_delegation_validators = num_delegation_validators;
         }
 
         if let Some(scoring_unstake_cap_bps) = scoring_unstake_cap_bps {
+            other_settings_changed = true;
             new_parameters.scoring_unstake_cap_bps = scoring_unstake_cap_bps;
         }
 
         if let Some(instant_unstake_cap_bps) = instant_unstake_cap_bps {
+            other_settings_changed = true;
             new_parameters.instant_unstake_cap_bps = instant_unstake_cap_bps;
         }
 
         if let Some(stake_deposit_unstake_cap_bps) = stake_deposit_unstake_cap_bps {
+            other_settings_changed = true;
             new_parameters.stake_deposit_unstake_cap_bps = stake_deposit_unstake_cap_bps;
         }
 
         if let Some(instant_unstake_epoch_progress) = instant_unstake_epoch_progress {
+            other_settings_changed = true;
             new_parameters.instant_unstake_epoch_progress = instant_unstake_epoch_progress;
         }
 
         if let Some(vote_account_update_epoch_progress) = instant_unstake_inputs_epoch_progress {
+            other_settings_changed = true;
             new_parameters.instant_unstake_inputs_epoch_progress =
                 vote_account_update_epoch_progress;
         }
 
         if let Some(compute_score_slot_range) = compute_score_slot_range {
+            other_settings_changed = true;
             new_parameters.compute_score_slot_range = compute_score_slot_range;
         }
 
         if let Some(num_epochs_between_scoring) = num_epochs_between_scoring {
+            other_settings_changed = true;
             new_parameters.num_epochs_between_scoring = num_epochs_between_scoring;
         }
 
         if let Some(minimum_stake_lamports) = minimum_stake_lamports {
+            other_settings_changed = true;
             new_parameters.minimum_stake_lamports = minimum_stake_lamports;
         }
 
         if let Some(minimum_voting_epochs) = minimum_voting_epochs {
+            other_settings_changed = true;
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
+        }
+
+        if let Some(pf_lookback_epochs) = pf_lookback_epochs {
+            pf_settings_changed = true;
+            new_parameters.pf_lookback_epochs = pf_lookback_epochs;
+        }
+
+        if let Some(pf_lookback_offset) = pf_lookback_offset {
+            pf_settings_changed = true;
+            new_parameters.pf_lookback_offset = pf_lookback_offset;
+        }
+
+        if let Some(pf_max_commission_bps) = pf_max_commission_bps {
+            pf_settings_changed = true;
+            new_parameters.pf_max_commission_bps = pf_max_commission_bps;
+        }
+
+        if let Some(pf_error_margin_bps) = pf_error_margin_bps {
+            pf_settings_changed = true;
+            new_parameters.pf_error_margin_bps = pf_error_margin_bps;
+        }
+
+        // Updating the priority fee settings while changing other settings is not allowed
+        if !is_init && pf_settings_changed && other_settings_changed {
+            return Err(StewardError::InvalidParameterValue.into());
         }
 
         // Validation will throw an error if any of the parameters are invalid
