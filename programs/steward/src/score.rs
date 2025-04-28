@@ -18,7 +18,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV4 {
+pub struct ScoreComponentsV3 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -107,7 +107,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV4> {
+) -> Result<ScoreComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -198,7 +198,7 @@ pub fn validator_score(
         * merkle_root_upload_authority_score
         * priority_fee_commission_score;
 
-    Ok(ScoreComponentsV4 {
+    Ok(ScoreComponentsV3 {
         score,
         yield_score,
         mev_commission_score,

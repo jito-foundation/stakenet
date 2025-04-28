@@ -1664,16 +1664,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV3",
       "discriminator": [
-        117,
-        201,
-        193,
-        88,
-        0,
-        129,
-        58,
-        215
+        255,
+        128,
+        115,
+        82,
+        192,
+        199,
+        160,
+        185
       ]
     },
     {
@@ -2885,7 +2885,7 @@
       }
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV3",
       "type": {
         "kind": "struct",
         "fields": [

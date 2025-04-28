@@ -4,7 +4,10 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
+use crate::{
+    constants::BASIS_POINTS_MAX_U64, parameters::Parameters, utils::U8Bool, LargeBitMask,
+    StewardState,
+};
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
 
@@ -71,11 +74,12 @@ impl Config {
 
     /// Determine the realized tip threshold for a validator given it's `total_priority_fees`
     pub fn priority_fee_tip_threshold(&self, total_priority_fees: u64) -> u64 {
-        ((10_000 - u64::from(self.parameters.pf_max_commission_bps)
+        ((BASIS_POINTS_MAX_U64 - u64::from(self.parameters.pf_max_commission_bps)
             + u64::from(self.parameters.pf_error_margin_bps))
             * total_priority_fees
-            + 9_999)
-            / 10_000
+            + BASIS_POINTS_MAX_U64
+            - 1)
+            / BASIS_POINTS_MAX_U64
     }
 }
 

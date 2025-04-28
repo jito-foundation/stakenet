@@ -12,7 +12,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
-        InstantUnstakeDetails, ScoreComponentsV4, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -50,7 +50,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -95,7 +95,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -138,7 +138,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -181,7 +181,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -228,7 +228,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -273,7 +273,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -319,7 +319,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -366,7 +366,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -410,7 +410,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
@@ -462,7 +462,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -504,7 +504,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -553,7 +553,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
@@ -597,7 +597,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
@@ -646,7 +646,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
@@ -693,7 +693,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -777,7 +777,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -825,7 +825,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -873,7 +873,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -922,7 +922,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -971,7 +971,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
