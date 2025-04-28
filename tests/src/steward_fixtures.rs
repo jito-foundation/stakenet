@@ -1277,7 +1277,7 @@ impl Default for FixtureDefaultAccounts {
             parameters: Parameters::default(),
             paused: false.into(),
             _padding_0: [0u8; 7],
-            pf_setting_authority: Pubkey::new_unique(),
+            priority_fee_setting_authority: Pubkey::new_unique(),
             _padding: [0; 984],
         };
 
@@ -1800,10 +1800,10 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
-            pf_lookback_epochs: 10,
-            pf_lookback_offset: 2,
-            pf_max_commission_bps: 5_000,
-            pf_error_margin_bps: 10,
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
             _padding_1: [0; 32],
         };
 
@@ -1818,7 +1818,7 @@ impl Default for StateMachineFixtures {
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
             _padding_0: [0u8; 7],
-            pf_setting_authority: Pubkey::new_unique(),
+            priority_fee_setting_authority: Pubkey::new_unique(),
             _padding: [0; 984],
         };
 

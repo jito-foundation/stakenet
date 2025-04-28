@@ -101,7 +101,7 @@ pub fn handler(ctx: Context<SetNewAuthority>, authority_type: AuthorityType) -> 
             config.parameters_authority = ctx.accounts.new_authority.key();
         }
         AuthorityType::SetPriorityFeeParameterAuthority => {
-            config.pf_setting_authority = ctx.accounts.new_authority.key();
+            config.priority_fee_setting_authority = ctx.accounts.new_authority.key();
         }
     }
 

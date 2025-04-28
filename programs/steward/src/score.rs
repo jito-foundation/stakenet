@@ -9,8 +9,7 @@ use validator_history::{
 
 use crate::{
     constants::{
-        BASIS_POINTS_MAX, BASIS_POINTS_MAX_U64, COMMISSION_MAX, EPOCH_DEFAULT,
-        VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
+        BASIS_POINTS_MAX, COMMISSION_MAX, EPOCH_DEFAULT, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
     },
     errors::StewardError::{self, ArithmeticError},
     Config,
@@ -471,7 +470,7 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
     // to BASIS_POINTS_MAX
     let total_fees = total_fees.unwrap_or(u64::MAX);
     let inverse_commission_bps = tips
-        .checked_mul(BASIS_POINTS_MAX_U64)
+        .checked_mul(BASIS_POINTS_MAX as u64)
         .and_then(|scaled_tips| scaled_tips.checked_div(total_fees))
         .unwrap_or(0);
     BASIS_POINTS_MAX
@@ -504,14 +503,15 @@ pub fn calculate_priority_fee_commission(
             let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
 
             if max_priority_fee_commission < commission_bps {
-                let max_commission_epoch: u16 =
-                    start_epoch + u16::try_from(relative_epoch).unwrap();
+                let max_commission_epoch: u16 = start_epoch
+                    .checked_add(relative_epoch as u16)
+                    .ok_or(ArithmeticError)?;
                 max_priority_fee_commission = commission_bps;
                 max_priority_fee_commission_epoch = max_commission_epoch;
             }
-            commission_bps
+            Ok(commission_bps)
         })
-        .collect();
+        .collect::<Result<Vec<u16>>>()?;
 
     // return score 1 when there's not enough history. We assume both fields being None means the
     // priority fee data is non-existent for this epoch.
@@ -528,14 +528,14 @@ pub fn calculate_priority_fee_commission(
         .into_iter()
         .fold(0, |agg, val| agg.checked_add(u64::from(val)).unwrap());
     // We calculate the avg commission bps, rounding up to the nearest bp
-    let avg_commission: u16 = total_commission
-        .checked_add(num_epochs - 1)
+    let avg_commission = total_commission
+        .checked_add(num_epochs.checked_sub(1).ok_or(ArithmeticError)?)
         .ok_or(ArithmeticError)?
         .checked_div(num_epochs)
-        .and_then(|val| u16::try_from(val).ok())
         .ok_or(ArithmeticError)?;
+    let avg_commission: u16 = u16::try_from(avg_commission).map_err(|_| ArithmeticError)?;
 
-    let max_commission = config.max_avg_commission();
+    let max_commission = config.max_avg_commission()?;
 
     if avg_commission <= max_commission {
         Ok((

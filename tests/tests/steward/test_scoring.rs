@@ -19,10 +19,10 @@ fn create_config(
             commission_range: 10,
             scoring_delinquency_threshold_ratio: 0.9,
             instant_unstake_delinquency_threshold_ratio: 0.8,
-            pf_lookback_epochs: 10,
-            pf_lookback_offset: 2,
-            pf_max_commission_bps: 5_000,
-            pf_error_margin_bps: 10,
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
             ..Default::default()
         },
         stake_pool: Pubkey::new_unique(),
@@ -33,7 +33,7 @@ fn create_config(
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
         _padding_0: [0u8; 7],
-        pf_setting_authority: Pubkey::new_unique(),
+        priority_fee_setting_authority: Pubkey::new_unique(),
         _padding: [0; 984],
     }
 }
@@ -558,7 +558,7 @@ mod test_calculate_realized_commission_bps {
 }
 
 mod test_calculate_priority_fee_commission {
-    use jito_steward::constants::BASIS_POINTS_MAX_U64;
+    use jito_steward::constants::BASIS_POINTS_MAX;
 
     use super::*;
 
@@ -566,14 +566,15 @@ mod test_calculate_priority_fee_commission {
     fn test_normal() {
         let config = create_config(300, 8, 10);
         let total_priority_fees: u64 = 1_000_000_000;
-        let min_tips_required: u64 = (BASIS_POINTS_MAX_U64
+        let min_tips_required: u64 = (BASIS_POINTS_MAX as u64
             - u64::from(
-                config.parameters.pf_error_margin_bps + config.parameters.pf_max_commission_bps,
+                config.parameters.priority_fee_error_margin_bps
+                    + config.parameters.priority_fee_max_commission_bps,
             ))
             * total_priority_fees
-            / BASIS_POINTS_MAX_U64;
+            / BASIS_POINTS_MAX as u64;
 
-        // With < pf_lookback_epochs + offset of history, score 1
+        // With < priority_fee_lookback_epochs + offset of history, score 1
         let validator = create_validator_history(
             &[0; 10],
             &[0; 10],
@@ -585,7 +586,7 @@ mod test_calculate_priority_fee_commission {
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
         assert_eq!(score, 1.0);
 
-        // With > pf_lookback_epochs + offset and < 50% commission, score 1
+        // With > priority_fee_lookback_epochs + offset and < 50% commission, score 1
         let validator = create_validator_history(
             &[0; 12],
             &[0; 12],
@@ -596,7 +597,7 @@ mod test_calculate_priority_fee_commission {
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(score, 1.0);
-        // With > pf_lookback_epochs and > 50% commission, score 0
+        // With > priority_fee_lookback_epochs and > 50% commission, score 0
         let validator = create_validator_history(
             &[0; 12],
             &[0; 12],

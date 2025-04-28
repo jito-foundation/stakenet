@@ -5,8 +5,7 @@ use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
 use crate::{
-    parameters::Parameters, utils::U8Bool, LargeBitMask,
-    StewardState,
+    errors::StewardError, parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState,
 };
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
@@ -54,7 +53,7 @@ pub struct Config {
     pub _padding_0: [u8; 7],
 
     /// The authority that can update the priority fee configs
-    pub pf_setting_authority: Pubkey,
+    pub priority_fee_setting_authority: Pubkey,
 
     /// Padding for future governance parameters
     pub _padding: [u8; 984],
@@ -73,14 +72,18 @@ impl Config {
     }
 
     /// The maximum the average commission could be.
-    pub fn max_avg_commission(&self) -> u16 {
-        self.parameters.pf_max_commission_bps + self.parameters.pf_error_margin_bps
+    pub fn max_avg_commission(&self) -> Result<u16> {
+        self.parameters
+            .priority_fee_max_commission_bps
+            .checked_add(self.parameters.priority_fee_error_margin_bps)
+            .ok_or(StewardError::ArithmeticError.into())
     }
 
     pub fn priority_fee_epoch_range(&self, current_epoch: u16) -> (u16, u16) {
         let end_epoch: u16 =
-            current_epoch.saturating_sub(self.parameters.pf_lookback_offset.into());
-        let start_epoch: u16 = end_epoch.saturating_sub(self.parameters.pf_lookback_epochs.into());
+            current_epoch.saturating_sub(self.parameters.priority_fee_lookback_offset.into());
+        let start_epoch: u16 =
+            end_epoch.saturating_sub(self.parameters.priority_fee_lookback_epochs.into());
         (start_epoch, end_epoch)
     }
 }

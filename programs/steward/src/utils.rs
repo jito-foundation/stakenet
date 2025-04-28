@@ -154,7 +154,7 @@ pub fn get_config_parameter_authority(
         || update_parameters_args.pf_max_commission_bps.is_some()
         || update_parameters_args.pf_error_margin_bps.is_some()
     {
-        Ok(config.pf_setting_authority)
+        Ok(config.priority_fee_setting_authority)
     } else {
         Ok(config.parameters_authority)
     }

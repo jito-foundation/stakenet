@@ -176,28 +176,28 @@ async fn _set_parameter(
 
     if let Some(pf_lookback_epochs) = update_parameters.pf_lookback_epochs {
         assert_eq!(
-            config.parameters.pf_lookback_epochs, pf_lookback_epochs,
+            config.parameters.priority_fee_lookback_epochs, pf_lookback_epochs,
             "pf_lookback_epochs, does not match update"
         );
     }
 
     if let Some(pf_lookback_offset) = update_parameters.pf_lookback_offset {
         assert_eq!(
-            config.parameters.pf_lookback_offset, pf_lookback_offset,
+            config.parameters.priority_fee_lookback_offset, pf_lookback_offset,
             "pf_lookback_offset, does not match update"
         );
     }
 
     if let Some(pf_max_commission_bps) = update_parameters.pf_max_commission_bps {
         assert_eq!(
-            config.parameters.pf_max_commission_bps, pf_max_commission_bps,
+            config.parameters.priority_fee_max_commission_bps, pf_max_commission_bps,
             "pf_max_commission_bps, does not match update"
         );
     }
 
     if let Some(pf_error_margin_bps) = update_parameters.pf_error_margin_bps {
         assert_eq!(
-            config.parameters.pf_error_margin_bps, pf_error_margin_bps,
+            config.parameters.priority_fee_error_margin_bps, pf_error_margin_bps,
             "pf_error_margin_bps, does not match update"
         );
     }
@@ -331,10 +331,10 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
-        pf_lookback_epochs: 10,
-        pf_lookback_offset: 2,
-        pf_max_commission_bps: 5_000,
-        pf_error_margin_bps: 10,
+        priority_fee_lookback_epochs: 10,
+        priority_fee_lookback_offset: 2,
+        priority_fee_max_commission_bps: 5_000,
+        priority_fee_error_margin_bps: 10,
         _padding_1: [0; 32],
     });
 
@@ -1005,10 +1005,16 @@ fn test_priority_fee_settings() {
     let result = _test_parameter(&update_parameters, None, None, None);
     assert!(result.is_ok());
     let new_params = &result.unwrap();
-    assert_eq!(new_params.pf_lookback_epochs, expected_value);
-    assert_eq!(new_params.pf_lookback_offset, expected_value);
-    assert_eq!(new_params.pf_max_commission_bps, u16::from(expected_value));
-    assert_eq!(new_params.pf_error_margin_bps, u16::from(expected_value));
+    assert_eq!(new_params.priority_fee_lookback_epochs, expected_value);
+    assert_eq!(new_params.priority_fee_lookback_offset, expected_value);
+    assert_eq!(
+        new_params.priority_fee_max_commission_bps,
+        u16::from(expected_value)
+    );
+    assert_eq!(
+        new_params.priority_fee_error_margin_bps,
+        u16::from(expected_value)
+    );
 }
 
 #[test]

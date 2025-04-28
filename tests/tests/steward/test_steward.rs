@@ -968,7 +968,7 @@ async fn test_set_new_authority() {
     assert!(config.admin == new_authority.pubkey());
     assert!(config.blacklist_authority == new_authority.pubkey());
     assert!(config.parameters_authority == new_authority.pubkey());
-    assert!(config.pf_setting_authority == new_authority.pubkey());
+    assert!(config.priority_fee_setting_authority == new_authority.pubkey());
 
     // Try to transfer back with original authority
     let ix = Instruction {
@@ -999,7 +999,7 @@ async fn test_set_new_authority() {
     assert!(config.admin == fixture.keypair.pubkey());
     assert!(config.blacklist_authority == new_authority.pubkey());
     assert!(config.parameters_authority == new_authority.pubkey());
-    assert!(config.pf_setting_authority == new_authority.pubkey());
+    assert!(config.priority_fee_setting_authority == new_authority.pubkey());
 
     drop(fixture);
 }
