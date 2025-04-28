@@ -494,27 +494,28 @@ pub fn calculate_priority_fee_commission(
         .total_priority_fees_range(start_epoch, end_epoch);
 
     // determine the highest priority fee commission
-    let (max_priority_fee_commission, max_priority_fee_commission_epoch) = priority_fee_tips
+    let mut max_priority_fee_commission: u16 = 0;
+    let mut max_priority_fee_commission_epoch: u16 = EPOCH_DEFAULT;
+    let realized_commissions: Vec<u16> = priority_fee_tips
         .iter()
         .zip(&total_priority_fees)
         .enumerate()
-        .fold(
-            (0_u16, EPOCH_DEFAULT),
-            |agg, (relative_epoch, (tips, total_fees))| {
-                let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
-                if agg.0 < commission_bps {
-                    let max_commission_epoch: u16 =
-                        start_epoch + u16::try_from(relative_epoch).unwrap();
-                    (commission_bps, max_commission_epoch)
-                } else {
-                    agg
-                }
-            },
-        );
+        .map(|(relative_epoch, (tips, total_fees))| {
+            let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
+
+            if max_priority_fee_commission < commission_bps {
+                let max_commission_epoch: u16 =
+                    start_epoch + u16::try_from(relative_epoch).unwrap();
+                max_priority_fee_commission = commission_bps;
+                max_priority_fee_commission_epoch = max_commission_epoch;
+            }
+            commission_bps
+        })
+        .collect();
 
     // return score 1 when there's not enough history. We assume both fields being None means the
     // priority fee data is non-existent for this epoch.
-    if priority_fee_tips.first().is_none() && total_priority_fees.first().is_none() {
+    if priority_fee_tips[0].is_none() && total_priority_fees[0].is_none() {
         return Ok((
             1.0,
             max_priority_fee_commission,
@@ -522,26 +523,21 @@ pub fn calculate_priority_fee_commission(
         ));
     }
 
-    // REVIEW: This is handled through an aggregated commission. This leads to valdiators with a
-    // drastic change in stake and commission gets smoothed out. Should this scoring be done
-    // normalized by actual commission bps instead?
+    let num_epochs: u64 = realized_commissions.len() as u64;
+    let total_commission: u64 = realized_commissions
+        .into_iter()
+        .fold(0, |agg, val| agg.checked_add(u64::from(val)).unwrap());
+    // We calculate the avg commission bps, rounding up to the nearest bp
+    let avg_commission: u16 = total_commission
+        .checked_add(num_epochs - 1)
+        .ok_or(ArithmeticError)?
+        .checked_div(num_epochs)
+        .and_then(|val| u16::try_from(val).ok())
+        .ok_or(ArithmeticError)?;
 
-    let agg_priority_fee_tips: u64 = priority_fee_tips.iter().fold(0, |agg, curr| {
-        agg.checked_add(curr.unwrap_or_default()).unwrap()
-    });
+    let max_commission = config.max_avg_commission();
 
-    let agg_total_priority_fees: u64 = total_priority_fees.iter().fold(0, |agg, curr| {
-        agg.checked_add(curr.unwrap_or_default()).unwrap()
-    });
-
-    // Determine the threshold based on the aggregated total_priority_fees
-    let threshold = config.priority_fee_tip_threshold(agg_total_priority_fees);
-
-    println!(
-        "threshold {} | {} | {}",
-        threshold, agg_priority_fee_tips, agg_total_priority_fees
-    );
-    if agg_priority_fee_tips >= threshold {
+    if avg_commission <= max_commission {
         Ok((
             1.0,
             max_priority_fee_commission,

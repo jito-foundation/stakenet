@@ -5,7 +5,7 @@ use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
 use crate::{
-    constants::BASIS_POINTS_MAX_U64, parameters::Parameters, utils::U8Bool, LargeBitMask,
+    parameters::Parameters, utils::U8Bool, LargeBitMask,
     StewardState,
 };
 
@@ -72,14 +72,9 @@ impl Config {
         self.paused = paused.into();
     }
 
-    /// Determine the realized tip threshold for a validator given it's `total_priority_fees`
-    pub fn priority_fee_tip_threshold(&self, total_priority_fees: u64) -> u64 {
-        ((BASIS_POINTS_MAX_U64 - u64::from(self.parameters.pf_max_commission_bps)
-            + u64::from(self.parameters.pf_error_margin_bps))
-            * total_priority_fees
-            + BASIS_POINTS_MAX_U64
-            - 1)
-            / BASIS_POINTS_MAX_U64
+    /// The maximum the average commission could be.
+    pub fn max_avg_commission(&self) -> u16 {
+        self.parameters.pf_max_commission_bps + self.parameters.pf_error_margin_bps
     }
 
     pub fn priority_fee_epoch_range(&self, current_epoch: u16) -> (u16, u16) {
