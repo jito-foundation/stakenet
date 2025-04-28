@@ -537,19 +537,42 @@ mod test_calculate_merkle_root_authoirty {
     }
 }
 
+mod test_calculate_realized_commission_bps {
+    use jito_steward::constants::BASIS_POINTS_MAX;
+    use test_case::test_case;
+
+    use super::*;
+
+    #[test_case(None, Some(1_000_000), BASIS_POINTS_MAX ; "when tips is None")]
+    #[test_case(Some(1_000_000), None, BASIS_POINTS_MAX ; "when total_fees is None")]
+    #[test_case(Some(5_000_000), Some(10_000_000), 5_000 ; "when 50% commission")]
+    #[test_case(Some(4_000_001), Some(10_000_000), 6_000 ; "rounds up the commission")]
+    fn test_commisison_calculation(
+        tips: Option<u64>,
+        total_fees: Option<u64>,
+        expected_commission: u16,
+    ) {
+        let commisison = calculate_realized_commission_bps(&tips, &total_fees);
+        assert_eq!(commisison, expected_commission);
+    }
+}
+
 mod test_calculate_priority_fee_commission {
+    use jito_steward::constants::BASIS_POINTS_MAX_U64;
+
     use super::*;
 
     #[test]
     fn test_normal() {
         let config = create_config(300, 8, 10);
-        let total_priority_fees: u64 = 1_000;
+        let total_priority_fees: u64 = 1_000_000_000;
         // uses a ceil div to ensure threshold is in favor of stakers
         let threshold: u64 = ((10_000 - u64::from(config.parameters.pf_max_commission_bps)
             + u64::from(config.parameters.pf_error_margin_bps))
             * total_priority_fees
-            + 9_999)
-            / 10_000;
+            + BASIS_POINTS_MAX_U64
+            - 1)
+            / BASIS_POINTS_MAX_U64;
         // With < pf_lookback_epochs + offset of history, score 1
         let validator = create_validator_history(
             &[0; 10],
@@ -582,6 +605,19 @@ mod test_calculate_priority_fee_commission {
             &[threshold - 1; 12],
             &[total_priority_fees; 12],
         );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        // Missing priority_fee_tips should be counted as no tips were given to stakers
+        let mut validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[threshold; 12],
+            &[total_priority_fees; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(score, 0.0);
 

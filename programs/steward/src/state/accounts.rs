@@ -81,6 +81,13 @@ impl Config {
             - 1)
             / BASIS_POINTS_MAX_U64
     }
+
+    pub fn priority_fee_epoch_range(&self, current_epoch: u16) -> (u16, u16) {
+        let end_epoch: u16 =
+            current_epoch.saturating_sub(self.parameters.pf_lookback_offset.into());
+        let start_epoch: u16 = end_epoch.saturating_sub(self.parameters.pf_lookback_epochs.into());
+        (start_epoch, end_epoch)
+    }
 }
 
 #[derive(BorshSerialize)]

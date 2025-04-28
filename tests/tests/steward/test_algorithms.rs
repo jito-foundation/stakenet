@@ -2,7 +2,8 @@
 use anchor_lang::AnchorSerialize;
 use jito_steward::{
     constants::{
-        EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
+        BASIS_POINTS_MAX, EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT,
+        TVC_ACTIVATION_EPOCH,
     },
     delegation::{
         decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
@@ -20,7 +21,7 @@ use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    constants::TVC_MULTIPLIER, utils::cast_epoch, ClusterHistoryEntry, MerkleRootUploadAuthority,
     ValidatorHistoryEntry,
 };
 
@@ -75,8 +76,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -120,8 +123,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -163,8 +168,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -206,8 +213,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -253,8 +262,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -298,8 +309,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -344,8 +357,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -391,8 +406,10 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -435,8 +452,10 @@ fn test_compute_score() {
                 max_commission_epoch: current_epoch as u16,
                 max_historical_commission: 11,
                 max_historical_commission_epoch: current_epoch as u16,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -487,8 +506,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 14,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -529,8 +550,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 16,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -578,8 +601,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -622,8 +647,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -671,8 +698,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -718,8 +747,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -802,8 +833,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -850,8 +883,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );
@@ -898,8 +933,10 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: BASIS_POINTS_MAX,
+                max_priority_fee_commission_epoch: config
+                    .priority_fee_epoch_range(cast_epoch(current_epoch).unwrap())
+                    .0,
             }
         }
     );

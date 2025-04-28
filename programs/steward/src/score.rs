@@ -461,15 +461,31 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
     }
 }
 
+/// Given a validator's tips and total fees, determine their realized commission rate
+pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
+    // Default the tips to 0 because we assume the PFDA was not created and the validator is not
+    // distributing priority fees. This forces inverse_commission to 0 and commission to
+    // BASIS_POINTS_MAX
+    let tips = tips.unwrap_or(0);
+    // Default the total_fees to u64::MAX to force inverse_commission towards 0 and commission
+    // to BASIS_POINTS_MAX
+    let total_fees = total_fees.unwrap_or(u64::MAX);
+    let inverse_commission_bps = tips
+        .checked_mul(BASIS_POINTS_MAX_U64)
+        .and_then(|scaled_tips| scaled_tips.checked_div(total_fees))
+        .unwrap_or(0);
+    BASIS_POINTS_MAX
+        .checked_sub(u16::try_from(inverse_commission_bps).unwrap_or(0))
+        .unwrap_or(BASIS_POINTS_MAX)
+}
+
 /// Checks if validator is maintaining < X% realized commission rates over some history of epochs
 pub fn calculate_priority_fee_commission(
     config: &Config,
     validator: &ValidatorHistory,
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
-    let params = &config.parameters;
-    let end_epoch: u16 = current_epoch.saturating_sub(params.pf_lookback_offset.into());
-    let start_epoch: u16 = end_epoch.saturating_sub(params.pf_lookback_epochs.into());
+    let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
     let priority_fee_tips = validator
         .history
         .priority_fee_tips_range(start_epoch, end_epoch);
@@ -485,18 +501,7 @@ pub fn calculate_priority_fee_commission(
         .fold(
             (0_u16, EPOCH_DEFAULT),
             |agg, (relative_epoch, (tips, total_fees))| {
-                // The defaults for None values is BASIS_POINTS_MAX, so the default
-                // inverse_commission_bps is 0. This ensures the default max commission returned
-                // is BASIS_POINTS_MAX
-                let tips = tips.unwrap_or(BASIS_POINTS_MAX_U64);
-                let total_fees = total_fees.unwrap_or(BASIS_POINTS_MAX_U64);
-                let inverse_commission_bps = tips
-                    .checked_mul(BASIS_POINTS_MAX_U64)
-                    .and_then(|scaled_tips| scaled_tips.checked_div(total_fees))
-                    .unwrap_or(0);
-                let commission_bps: u16 = BASIS_POINTS_MAX
-                    .checked_sub(u16::try_from(inverse_commission_bps).unwrap_or(0))
-                    .unwrap_or(BASIS_POINTS_MAX);
+                let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
                 if agg.0 < commission_bps {
                     let max_commission_epoch: u16 =
                         start_epoch + u16::try_from(relative_epoch).unwrap();
@@ -507,8 +512,9 @@ pub fn calculate_priority_fee_commission(
             },
         );
 
-    // return score 1 when there's not enough history
-    if priority_fee_tips.first().is_none() || total_priority_fees.first().is_none() {
+    // return score 1 when there's not enough history. We assume both fields being None means the
+    // priority fee data is non-existent for this epoch.
+    if priority_fee_tips.first().is_none() && total_priority_fees.first().is_none() {
         return Ok((
             1.0,
             max_priority_fee_commission,
@@ -530,6 +536,11 @@ pub fn calculate_priority_fee_commission(
 
     // Determine the threshold based on the aggregated total_priority_fees
     let threshold = config.priority_fee_tip_threshold(agg_total_priority_fees);
+
+    println!(
+        "threshold {} | {} | {}",
+        threshold, agg_priority_fee_tips, agg_total_priority_fees
+    );
     if agg_priority_fee_tips >= threshold {
         Ok((
             1.0,
