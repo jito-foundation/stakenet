@@ -462,6 +462,10 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
 
 /// Given a validator's tips and total fees, determine their realized commission rate
 pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
+    // total_fees is 
+    if total_fees.is_none() {
+        return 0;
+    }
     // Default the tips to 0 because we assume the PFDA was not created and the validator is not
     // distributing priority fees. This forces inverse_commission to 0 and commission to
     // BASIS_POINTS_MAX
@@ -469,13 +473,16 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
     // Default the total_fees to u64::MAX to force inverse_commission towards 0 and commission
     // to BASIS_POINTS_MAX
     let total_fees = total_fees.unwrap_or(u64::MAX);
-    let inverse_commission_bps = tips
+
+    let validators_rake = total_fees.checked_sub(tips).unwrap_or(total_fees);
+    // We scale by BASIS_POINTS_MAX before division, so the output is in bps
+    let numerator = validators_rake
         .checked_mul(BASIS_POINTS_MAX as u64)
-        .and_then(|scaled_tips| scaled_tips.checked_div(total_fees))
         .unwrap_or(0);
-    BASIS_POINTS_MAX
-        .checked_sub(u16::try_from(inverse_commission_bps).unwrap_or(0))
-        .unwrap_or(BASIS_POINTS_MAX)
+    let commission = numerator
+        .checked_div(total_fees)
+        .unwrap_or(BASIS_POINTS_MAX as u64);
+    u16::try_from(commission).unwrap_or(BASIS_POINTS_MAX)
 }
 
 /// Checks if validator is maintaining < X% realized commission rates over some history of epochs
@@ -528,7 +535,8 @@ pub fn calculate_priority_fee_commission(
         .into_iter()
         .fold(0, |agg, val| agg.checked_add(u64::from(val)).unwrap());
     // We calculate the avg commission bps, rounding up to the nearest bp
-    let avg_commission = total_commission
+    let avg_commission: u64 = total_commission
+        // this addition of (denominator - 1) is used to round up if there is any remainder
         .checked_add(num_epochs.checked_sub(1).ok_or(ArithmeticError)?)
         .ok_or(ArithmeticError)?
         .checked_div(num_epochs)

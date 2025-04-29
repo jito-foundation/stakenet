@@ -544,9 +544,10 @@ mod test_calculate_realized_commission_bps {
     use super::*;
 
     #[test_case(None, Some(1_000_000), BASIS_POINTS_MAX ; "when tips is None")]
-    #[test_case(Some(1_000_000), None, BASIS_POINTS_MAX ; "when total_fees is None")]
+    #[test_case(Some(1_000_000), None, 0 ; "when total_fees is None")]
+    #[test_case(Some(0), Some(1_000_000), BASIS_POINTS_MAX ; "when tips are 0")]
     #[test_case(Some(5_000_000), Some(10_000_000), 5_000 ; "when 50% commission")]
-    #[test_case(Some(4_000_001), Some(10_000_000), 6_000 ; "rounds up the commission")]
+    #[test_case(Some(4_000_001), Some(10_000_000), 5_999 ; "rounds the commission down in favor of the validator")]
     fn test_commisison_calculation(
         tips: Option<u64>,
         total_fees: Option<u64>,
@@ -603,7 +604,7 @@ mod test_calculate_priority_fee_commission {
             &[0; 12],
             &[0; 12],
             &[0; 12],
-            &[min_tips_required - 1; 12],
+            &[min_tips_required - (total_priority_fees / BASIS_POINTS_MAX as u64); 12],
             &[total_priority_fees; 12],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
