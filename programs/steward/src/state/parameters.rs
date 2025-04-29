@@ -37,11 +37,6 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
-    // Priority fee parameters
-    pub pf_lookback_epochs: Option<u8>,
-    pub pf_lookback_offset: Option<u8>,
-    pub pf_max_commission_bps: Option<u16>,
-    pub pf_error_margin_bps: Option<u16>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -141,26 +136,6 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
-                    IdlField {
-                        name: "pf_lookback_epochs".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U8)),
-                        docs: Default::default(),
-                    },
-                    IdlField {
-                        name: "pf_lookback_offset".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U8)),
-                        docs: Default::default(),
-                    },
-                    IdlField {
-                        name: "pf_max_commission_bps".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U16)),
-                        docs: Default::default(),
-                    },
-                    IdlField {
-                        name: "pf_error_margin_bps".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U16)),
-                        docs: Default::default(),
-                    },
                 ])),
             },
             docs: Default::default(),
@@ -258,7 +233,6 @@ impl Parameters {
         args: &UpdateParametersArgs,
         current_epoch: u64,
         slots_per_epoch: u64,
-        is_init: bool,
     ) -> Result<Parameters> {
         // Updates parameters and validates them
         let UpdateParametersArgs {
@@ -280,34 +254,23 @@ impl Parameters {
             num_epochs_between_scoring,
             minimum_stake_lamports,
             minimum_voting_epochs,
-            pf_lookback_epochs,
-            pf_lookback_offset,
-            pf_max_commission_bps,
-            pf_error_margin_bps,
         } = *args;
-
-        let mut other_settings_changed = false;
-        let mut pf_settings_changed = false;
 
         let mut new_parameters = self;
 
         if let Some(mev_commission_range) = mev_commission_range {
-            other_settings_changed = true;
             new_parameters.mev_commission_range = mev_commission_range;
         }
 
         if let Some(epoch_credits_range) = epoch_credits_range {
-            other_settings_changed = true;
             new_parameters.epoch_credits_range = epoch_credits_range;
         }
 
         if let Some(commission_range) = commission_range {
-            other_settings_changed = true;
             new_parameters.commission_range = commission_range;
         }
 
         if let Some(scoring_delinquency_threshold_ratio) = scoring_delinquency_threshold_ratio {
-            other_settings_changed = true;
             new_parameters.scoring_delinquency_threshold_ratio =
                 scoring_delinquency_threshold_ratio;
         }
@@ -315,103 +278,100 @@ impl Parameters {
         if let Some(instant_unstake_delinquency_threshold_ratio) =
             instant_unstake_delinquency_threshold_ratio
         {
-            other_settings_changed = true;
             new_parameters.instant_unstake_delinquency_threshold_ratio =
                 instant_unstake_delinquency_threshold_ratio;
         }
 
         if let Some(mev_commission_bps_threshold) = mev_commission_bps_threshold {
-            other_settings_changed = true;
             new_parameters.mev_commission_bps_threshold = mev_commission_bps_threshold;
         }
 
         if let Some(commission_threshold) = commission_threshold {
-            other_settings_changed = true;
             new_parameters.commission_threshold = commission_threshold;
         }
 
         if let Some(historical_commission_threshold) = historical_commission_threshold {
-            other_settings_changed = true;
             new_parameters.historical_commission_threshold = historical_commission_threshold;
         }
 
         if let Some(num_delegation_validators) = num_delegation_validators {
-            other_settings_changed = true;
             new_parameters.num_delegation_validators = num_delegation_validators;
         }
 
         if let Some(scoring_unstake_cap_bps) = scoring_unstake_cap_bps {
-            other_settings_changed = true;
             new_parameters.scoring_unstake_cap_bps = scoring_unstake_cap_bps;
         }
 
         if let Some(instant_unstake_cap_bps) = instant_unstake_cap_bps {
-            other_settings_changed = true;
             new_parameters.instant_unstake_cap_bps = instant_unstake_cap_bps;
         }
 
         if let Some(stake_deposit_unstake_cap_bps) = stake_deposit_unstake_cap_bps {
-            other_settings_changed = true;
             new_parameters.stake_deposit_unstake_cap_bps = stake_deposit_unstake_cap_bps;
         }
 
         if let Some(instant_unstake_epoch_progress) = instant_unstake_epoch_progress {
-            other_settings_changed = true;
             new_parameters.instant_unstake_epoch_progress = instant_unstake_epoch_progress;
         }
 
         if let Some(vote_account_update_epoch_progress) = instant_unstake_inputs_epoch_progress {
-            other_settings_changed = true;
             new_parameters.instant_unstake_inputs_epoch_progress =
                 vote_account_update_epoch_progress;
         }
 
         if let Some(compute_score_slot_range) = compute_score_slot_range {
-            other_settings_changed = true;
             new_parameters.compute_score_slot_range = compute_score_slot_range;
         }
 
         if let Some(num_epochs_between_scoring) = num_epochs_between_scoring {
-            other_settings_changed = true;
             new_parameters.num_epochs_between_scoring = num_epochs_between_scoring;
         }
 
         if let Some(minimum_stake_lamports) = minimum_stake_lamports {
-            other_settings_changed = true;
             new_parameters.minimum_stake_lamports = minimum_stake_lamports;
         }
 
         if let Some(minimum_voting_epochs) = minimum_voting_epochs {
-            other_settings_changed = true;
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
         }
 
-        if let Some(pf_lookback_epochs) = pf_lookback_epochs {
-            pf_settings_changed = true;
-            new_parameters.priority_fee_lookback_epochs = pf_lookback_epochs;
-        }
-
-        if let Some(pf_lookback_offset) = pf_lookback_offset {
-            pf_settings_changed = true;
-            new_parameters.priority_fee_lookback_offset = pf_lookback_offset;
-        }
-
-        if let Some(pf_max_commission_bps) = pf_max_commission_bps {
-            pf_settings_changed = true;
-            new_parameters.priority_fee_max_commission_bps = pf_max_commission_bps;
-        }
-
-        if let Some(pf_error_margin_bps) = pf_error_margin_bps {
-            pf_settings_changed = true;
-            new_parameters.priority_fee_error_margin_bps = pf_error_margin_bps;
-        }
-
-        // Updating the priority fee settings while changing other settings is not allowed
-        if !is_init && pf_settings_changed && other_settings_changed {
-            return Err(StewardError::InvalidParameterValue.into());
-        }
-
         // Validation will throw an error if any of the parameters are invalid
+        new_parameters.validate(current_epoch, slots_per_epoch)?;
+
+        Ok(new_parameters)
+    }
+
+    pub fn get_updated_priority_fee_parameters(
+        self,
+        args: &UpdatePriorityFeeParametersArgs,
+        current_epoch: u64,
+        slots_per_epoch: u64,
+    ) -> Result<Self> {
+        let UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs,
+            priority_fee_lookback_offset,
+            priority_fee_max_commission_bps,
+            priority_fee_error_margin_bps,
+        } = *args;
+
+        let mut new_parameters = self;
+
+        if let Some(priority_fee_lookback_epochs) = priority_fee_lookback_epochs {
+            new_parameters.priority_fee_lookback_epochs = priority_fee_lookback_epochs;
+        }
+
+        if let Some(priority_fee_lookback_offset) = priority_fee_lookback_offset {
+            new_parameters.priority_fee_lookback_offset = priority_fee_lookback_offset;
+        }
+
+        if let Some(priority_fee_max_commission_bps) = priority_fee_max_commission_bps {
+            new_parameters.priority_fee_max_commission_bps = priority_fee_max_commission_bps;
+        }
+
+        if let Some(priority_fee_error_margin_bps) = priority_fee_error_margin_bps {
+            new_parameters.priority_fee_error_margin_bps = priority_fee_error_margin_bps;
+        }
+
         new_parameters.validate(current_epoch, slots_per_epoch)?;
 
         Ok(new_parameters)
@@ -503,5 +463,51 @@ impl Parameters {
         }
 
         Ok(())
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+pub struct UpdatePriorityFeeParametersArgs {
+    // Priority fee parameters
+    pub priority_fee_lookback_epochs: Option<u8>,
+    pub priority_fee_lookback_offset: Option<u8>,
+    pub priority_fee_max_commission_bps: Option<u16>,
+    pub priority_fee_error_margin_bps: Option<u16>,
+}
+
+#[cfg(feature = "idl-build")]
+impl IdlBuild for UpdatePriorityFeeParametersArgs {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "UpdateParametersArgs".to_string(),
+            ty: IdlTypeDefTy::Struct {
+                fields: Some(IdlDefinedFields::Named(vec![
+                    IdlField {
+                        name: "priority_fee_lookback_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_lookback_offset".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_max_commission_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_error_margin_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                ])),
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
     }
 }

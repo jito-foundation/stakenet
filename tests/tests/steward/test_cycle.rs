@@ -74,10 +74,6 @@ async fn test_cycle() {
             num_epochs_between_scoring: Some(2), // 2 epoch cycle
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-            pf_lookback_epochs: Some(10),
-            pf_lookback_offset: Some(2),
-            pf_max_commission_bps: Some(5_000),
-            pf_error_margin_bps: Some(10),
         }))
         .await;
     fixture.realloc_steward_state().await;
@@ -271,10 +267,6 @@ async fn test_remove_validator_mid_epoch() {
             num_epochs_between_scoring: Some(2), // 2 epoch cycle
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-            pf_lookback_epochs: Some(10),
-            pf_lookback_offset: Some(2),
-            pf_max_commission_bps: Some(5_000),
-            pf_error_margin_bps: Some(10),
         }))
         .await;
     fixture.realloc_steward_state().await;
@@ -507,10 +499,6 @@ async fn test_add_validator_next_cycle() {
             num_epochs_between_scoring: Some(1), // 1 epoch cycle
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-            pf_lookback_epochs: Some(10),
-            pf_lookback_offset: Some(2),
-            pf_max_commission_bps: Some(5_000),
-            pf_error_margin_bps: Some(10),
         }))
         .await;
     fixture.realloc_steward_state().await;

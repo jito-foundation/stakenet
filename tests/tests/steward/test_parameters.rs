@@ -5,7 +5,6 @@ use jito_steward::{
         BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN, EPOCH_PROGRESS_MAX,
         MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX,
     },
-    instructions::AuthorityType,
     Config, Parameters, UpdateParametersArgs,
 };
 use solana_program_test::*;
@@ -173,34 +172,6 @@ async fn _set_parameter(
             "minimum_voting_epochs, does not match update"
         );
     }
-
-    if let Some(pf_lookback_epochs) = update_parameters.pf_lookback_epochs {
-        assert_eq!(
-            config.parameters.priority_fee_lookback_epochs, pf_lookback_epochs,
-            "pf_lookback_epochs, does not match update"
-        );
-    }
-
-    if let Some(pf_lookback_offset) = update_parameters.pf_lookback_offset {
-        assert_eq!(
-            config.parameters.priority_fee_lookback_offset, pf_lookback_offset,
-            "pf_lookback_offset, does not match update"
-        );
-    }
-
-    if let Some(pf_max_commission_bps) = update_parameters.pf_max_commission_bps {
-        assert_eq!(
-            config.parameters.priority_fee_max_commission_bps, pf_max_commission_bps,
-            "pf_max_commission_bps, does not match update"
-        );
-    }
-
-    if let Some(pf_error_margin_bps) = update_parameters.pf_error_margin_bps {
-        assert_eq!(
-            config.parameters.priority_fee_error_margin_bps, pf_error_margin_bps,
-            "pf_error_margin_bps, does not match update"
-        );
-    }
 }
 
 #[tokio::test]
@@ -242,66 +213,10 @@ async fn test_update_parameters() {
             num_epochs_between_scoring: Some(8),
             minimum_stake_lamports: Some(1),
             minimum_voting_epochs: Some(1),
-            pf_lookback_epochs: None,
-            pf_lookback_offset: None,
-            pf_max_commission_bps: None,
-            pf_error_margin_bps: None,
         },
         &fixture.keypair,
     )
     .await;
-
-    let priority_fee_authority_keypair = fixture
-        .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)
-        .await;
-
-    // Should pass when priority fee updates are changed with correct authority
-    _set_parameter(
-        &fixture,
-        &UpdateParametersArgs {
-            pf_lookback_epochs: Some(1),
-            pf_lookback_offset: Some(1),
-            pf_max_commission_bps: Some(1),
-            pf_error_margin_bps: Some(1),
-            ..UpdateParametersArgs::default()
-        },
-        &priority_fee_authority_keypair,
-    )
-    .await;
-
-    // Should error when priority fee updates are changed with incorrect authority
-    let update_params = UpdateParametersArgs {
-        pf_lookback_epochs: Some(1),
-        pf_lookback_offset: Some(1),
-        pf_max_commission_bps: Some(1),
-        pf_error_margin_bps: Some(1),
-        ..UpdateParametersArgs::default()
-    };
-    let ctx = &fixture.ctx;
-    let ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::UpdateParameters {
-            config: fixture.steward_config.pubkey(),
-            authority: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::UpdateParameters {
-            update_parameters_args: update_params.clone(),
-        }
-        .data(),
-    };
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
-    );
-
-    fixture
-        .submit_transaction_assert_error(tx, "ConstraintAddress")
-        .await;
-
-    drop(fixture);
 }
 
 // ---------- UNIT TESTS ----------
@@ -342,12 +257,7 @@ fn _test_parameter(
     let current_epoch = current_epoch.unwrap_or(512);
     let slots_per_epoch = slots_per_epoch.unwrap_or(432_000);
 
-    valid_parameters.get_valid_updated_parameters(
-        update_parameters,
-        current_epoch,
-        slots_per_epoch,
-        false,
-    )
+    valid_parameters.get_valid_updated_parameters(update_parameters, current_epoch, slots_per_epoch)
 }
 
 #[test]
@@ -989,62 +899,4 @@ fn test_num_epochs_between_scoring() {
         assert!(result.is_ok());
         assert_eq!(result.unwrap().num_epochs_between_scoring, new_value);
     }
-}
-
-#[test]
-fn test_priority_fee_settings() {
-    // Validate the values change
-    let expected_value: u8 = 1;
-    let update_parameters = UpdateParametersArgs {
-        pf_lookback_epochs: Some(expected_value),
-        pf_lookback_offset: Some(expected_value),
-        pf_max_commission_bps: Some(expected_value.into()),
-        pf_error_margin_bps: Some(expected_value.into()),
-        ..UpdateParametersArgs::default()
-    };
-    let result = _test_parameter(&update_parameters, None, None, None);
-    assert!(result.is_ok());
-    let new_params = &result.unwrap();
-    assert_eq!(new_params.priority_fee_lookback_epochs, expected_value);
-    assert_eq!(new_params.priority_fee_lookback_offset, expected_value);
-    assert_eq!(
-        new_params.priority_fee_max_commission_bps,
-        u16::from(expected_value)
-    );
-    assert_eq!(
-        new_params.priority_fee_error_margin_bps,
-        u16::from(expected_value)
-    );
-}
-
-#[test]
-fn test_mutually_exclusivity_of_priority_fee_settings() {
-    // result is ok if only priority fee settings are Some
-    let update_parameters = UpdateParametersArgs {
-        pf_lookback_epochs: Some(1),
-        pf_lookback_offset: Some(1),
-        pf_max_commission_bps: Some(1),
-        pf_error_margin_bps: Some(1),
-        ..UpdateParametersArgs::default()
-    };
-    let result = _test_parameter(&update_parameters, None, None, None);
-    assert!(result.is_ok());
-
-    // result is ok if only other settings are some
-    let update_parameters = UpdateParametersArgs {
-        mev_commission_range: Some(1),
-        ..UpdateParametersArgs::default()
-    };
-    let result = _test_parameter(&update_parameters, None, None, None);
-    assert!(result.is_ok());
-
-    // TODO: Write a more exhaustive test for all permutations
-    // test any over lap between priority fee settings and others
-    let update_parameters = UpdateParametersArgs {
-        mev_commission_range: Some(1),
-        pf_lookback_epochs: Some(1),
-        ..UpdateParametersArgs::default()
-    };
-    let result = _test_parameter(&update_parameters, None, None, None);
-    assert!(result.is_err());
 }

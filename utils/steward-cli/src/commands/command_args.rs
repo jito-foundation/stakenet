@@ -1,5 +1,5 @@
 use clap::{arg, command, Parser, Subcommand};
-use jito_steward::UpdateParametersArgs;
+use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
@@ -101,22 +101,6 @@ pub struct ConfigParameters {
     /// Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool
     #[arg(long, env)]
     pub minimum_voting_epochs: Option<u64>,
-
-    /// The number of epochs the priority fee distribution check should lookback
-    #[arg(long, env)]
-    pub pf_lookback_epochs: Option<u8>,
-
-    /// The offset of epochs for the priority fee distribution
-    #[arg(long, env)]
-    pub pf_lookback_offset: Option<u8>,
-
-    /// The maximum validator commission before the validator scores 0
-    #[arg(long, env)]
-    pub pf_max_commission_bps: Option<u16>,
-
-    /// An error of margin for priority fee commission calculations
-    #[arg(long, env)]
-    pub pf_error_margin_bps: Option<u16>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -141,10 +125,36 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             num_epochs_between_scoring: config.num_epochs_between_scoring,
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
-            pf_lookback_epochs: config.pf_lookback_epochs,
-            pf_lookback_offset: config.pf_lookback_offset,
-            pf_max_commission_bps: config.pf_max_commission_bps,
-            pf_error_margin_bps: config.pf_error_margin_bps,
+        }
+    }
+}
+
+#[derive(Parser)]
+pub struct ConfigPriorityFeeParameters {
+    /// The number of epochs the priority fee distribution check should lookback
+    #[arg(long, env)]
+    pub priority_fee_lookback_epochs: Option<u8>,
+
+    /// The offset of epochs for the priority fee distribution
+    #[arg(long, env)]
+    pub priority_fee_lookback_offset: Option<u8>,
+
+    /// The maximum validator commission before the validator scores 0
+    #[arg(long, env)]
+    pub priority_fee_max_commission_bps: Option<u16>,
+
+    /// An error of margin for priority fee commission calculations
+    #[arg(long, env)]
+    pub priority_fee_error_margin_bps: Option<u16>,
+}
+
+impl From<ConfigPriorityFeeParameters> for UpdatePriorityFeeParametersArgs {
+    fn from(config: ConfigPriorityFeeParameters) -> Self {
+        UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs: config.priority_fee_lookback_epochs,
+            priority_fee_lookback_offset: config.priority_fee_lookback_offset,
+            priority_fee_max_commission_bps: config.priority_fee_max_commission_bps,
+            priority_fee_error_margin_bps: config.priority_fee_error_margin_bps,
         }
     }
 }
@@ -309,6 +319,9 @@ pub struct InitSteward {
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+
+    #[command(flatten)]
+    pub config_priority_fee_parameters: ConfigPriorityFeeParameters,
 }
 
 #[derive(Parser)]

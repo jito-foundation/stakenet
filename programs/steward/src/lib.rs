@@ -73,8 +73,13 @@ pub mod steward {
     pub fn initialize_steward(
         ctx: Context<InitializeSteward>,
         update_parameters_args: UpdateParametersArgs,
+        update_priority_fee_parameters_args: UpdatePriorityFeeParametersArgs,
     ) -> Result<()> {
-        instructions::initialize_steward::handler(ctx, &update_parameters_args)
+        instructions::initialize_steward::handler(
+            ctx,
+            &update_parameters_args,
+            &update_priority_fee_parameters_args,
+        )
     }
 
     /// Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE

@@ -17,7 +17,7 @@ use jito_steward::{
     instructions::AuthorityType,
     utils::{StakePool, ValidatorList},
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
-    StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
+    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -337,11 +337,14 @@ impl TestFixture {
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-            pf_lookback_epochs: Some(10),
-            pf_lookback_offset: Some(2),
-            pf_max_commission_bps: Some(5_000),
-            pf_error_margin_bps: Some(10),
         });
+
+        let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs: Some(10),
+            priority_fee_lookback_offset: Some(2),
+            priority_fee_max_commission_bps: Some(5_000),
+            priority_fee_error_margin_bps: Some(10),
+        };
 
         let instruction = Instruction {
             program_id: jito_steward::id(),
@@ -356,6 +359,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: jito_steward::instruction::InitializeSteward {
                 update_parameters_args,
+                update_priority_fee_parameters_args,
             }
             .data(),
         };

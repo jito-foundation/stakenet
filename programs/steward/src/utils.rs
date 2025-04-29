@@ -15,7 +15,6 @@ use spl_stake_pool::{
     state::{StakeStatus, ValidatorListHeader, ValidatorStakeInfo},
 };
 
-use crate::UpdateParametersArgs;
 use crate::{
     constants::{STAKE_STATUS_OFFSET, U64_SIZE, VEC_SIZE_BYTES},
     errors::StewardError,
@@ -143,21 +142,10 @@ pub fn get_config_blacklist_authority(account: &AccountLoader<Config>) -> Result
     Ok(config.blacklist_authority)
 }
 
-pub fn get_config_parameter_authority(
-    account: &AccountLoader<Config>,
-    update_parameters_args: &UpdateParametersArgs,
-) -> Result<Pubkey> {
+pub fn get_config_parameter_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
 
-    if update_parameters_args.pf_lookback_epochs.is_some()
-        || update_parameters_args.pf_lookback_offset.is_some()
-        || update_parameters_args.pf_max_commission_bps.is_some()
-        || update_parameters_args.pf_error_margin_bps.is_some()
-    {
-        Ok(config.priority_fee_setting_authority)
-    } else {
-        Ok(config.parameters_authority)
-    }
+    Ok(config.parameters_authority)
 }
 
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {

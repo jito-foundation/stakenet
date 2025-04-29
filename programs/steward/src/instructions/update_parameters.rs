@@ -2,12 +2,11 @@ use crate::{utils::get_config_parameter_authority, Config, UpdateParametersArgs}
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-#[instruction(update_parameters_args: UpdateParametersArgs)]
 pub struct UpdateParameters<'info> {
     #[account(mut)]
     pub config: AccountLoader<'info, Config>,
 
-    #[account(mut, address = get_config_parameter_authority(&config, &update_parameters_args)?)]
+    #[account(mut, address = get_config_parameter_authority(&config)?)]
     pub authority: Signer<'info>,
 }
 
@@ -23,7 +22,6 @@ pub fn handler(
         update_parameters_args,
         current_epoch,
         max_slots_in_epoch,
-        false,
     )?;
 
     config.parameters = new_parameters;
