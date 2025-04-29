@@ -1286,7 +1286,7 @@ impl Default for FixtureDefaultAccounts {
             parameters: Parameters::default(),
             paused: false.into(),
             _padding_0: [0u8; 7],
-            priority_fee_setting_authority: Pubkey::new_unique(),
+            priority_fee_parameters_authority: Pubkey::new_unique(),
             _padding: [0; 984],
         };
 
@@ -1827,7 +1827,7 @@ impl Default for StateMachineFixtures {
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
             _padding_0: [0u8; 7],
-            priority_fee_setting_authority: Pubkey::new_unique(),
+            priority_fee_parameters_authority: Pubkey::new_unique(),
             _padding: [0; 984],
         };
 

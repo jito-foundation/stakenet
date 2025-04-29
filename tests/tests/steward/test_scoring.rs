@@ -33,7 +33,7 @@ fn create_config(
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
         _padding_0: [0u8; 7],
-        priority_fee_setting_authority: Pubkey::new_unique(),
+        priority_fee_parameters_authority: Pubkey::new_unique(),
         _padding: [0; 984],
     }
 }

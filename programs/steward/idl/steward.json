@@ -2320,7 +2320,7 @@
             }
           },
           {
-            "name": "priority_fee_setting_authority",
+            "name": "priority_fee_parameters_authority",
             "docs": [
               "The authority that can update the priority fee configs"
             ],

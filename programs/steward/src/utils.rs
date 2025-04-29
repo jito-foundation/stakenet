@@ -151,7 +151,7 @@ pub fn get_config_priority_fee_parameter_authority(
     account: &AccountLoader<Config>,
 ) -> Result<Pubkey> {
     let config = account.load()?;
-    Ok(config.priority_fee_setting_authority)
+    Ok(config.priority_fee_parameters_authority)
 }
 
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {

@@ -51,7 +51,7 @@ pub struct Config {
     pub _padding_0: [u8; 7],
 
     /// The authority that can update the priority fee configs
-    pub priority_fee_setting_authority: Pubkey,
+    pub priority_fee_parameters_authority: Pubkey,
 
     /// Padding for future governance parameters
     pub _padding: [u8; 984],
