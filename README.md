@@ -48,6 +48,10 @@ On-chain Steward accounts for JitoSOL:
 | Validator History | [2024-01-12](security-audits/jito_validator_history_audit.pdf) | [fc34c25](https://github.com/jito-foundation/stakenet/commit/fc34c25) |
 
 
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
 
 ## Build and Test
 
