@@ -144,7 +144,6 @@ pub fn get_config_blacklist_authority(account: &AccountLoader<Config>) -> Result
 
 pub fn get_config_parameter_authority(account: &AccountLoader<Config>) -> Result<Pubkey> {
     let config = account.load()?;
-
     Ok(config.parameters_authority)
 }
 
@@ -152,7 +151,6 @@ pub fn get_config_priority_fee_parameter_authority(
     account: &AccountLoader<Config>,
 ) -> Result<Pubkey> {
     let config = account.load()?;
-
     Ok(config.priority_fee_setting_authority)
 }
 

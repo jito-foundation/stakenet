@@ -535,7 +535,7 @@ pub fn calculate_priority_fee_commission(
         .ok_or(ArithmeticError)?;
     let avg_commission: u16 = u16::try_from(avg_commission).map_err(|_| ArithmeticError)?;
 
-    let max_commission = config.max_avg_commission()?;
+    let max_commission = config.max_avg_commission();
 
     if avg_commission <= max_commission {
         Ok((

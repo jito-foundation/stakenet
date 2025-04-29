@@ -4,9 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{
-    errors::StewardError, parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState,
-};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
 
@@ -72,11 +70,10 @@ impl Config {
     }
 
     /// The maximum the average commission could be.
-    pub fn max_avg_commission(&self) -> Result<u16> {
+    pub fn max_avg_commission(&self) -> u16 {
         self.parameters
             .priority_fee_max_commission_bps
-            .checked_add(self.parameters.priority_fee_error_margin_bps)
-            .ok_or(StewardError::ArithmeticError.into())
+            .saturating_add(self.parameters.priority_fee_error_margin_bps)
     }
 
     pub fn priority_fee_epoch_range(&self, current_epoch: u16) -> (u16, u16) {

@@ -234,6 +234,7 @@ pub enum Commands {
 
     UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
+    UpdatePriorityFeeConfig(UpdatePriorityFeeConfig),
     ResetState(ResetState),
     ResetValidatorLamportBalances(ResetValidatorLamportBalances),
 
@@ -363,6 +364,16 @@ pub struct UpdateConfig {
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Updates config priority fee parameters")]
+pub struct UpdatePriorityFeeConfig {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigPriorityFeeParameters,
 }
 
 #[derive(Parser)]
