@@ -559,7 +559,7 @@ mod test_calculate_realized_commission_bps {
 }
 
 mod test_calculate_priority_fee_commission {
-    use jito_steward::constants::BASIS_POINTS_MAX;
+    use jito_steward::constants::{BASIS_POINTS_MAX, EPOCH_DEFAULT};
 
     use super::*;
 
@@ -679,6 +679,34 @@ mod test_calculate_priority_fee_commission {
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
         assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let mut config = create_config(300, 8, 10);
+        config.parameters = Parameters::default();
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
+        let res = calculate_priority_fee_commission(&config, &validator, 0);
+        assert!(res.is_ok());
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
+
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[1_000_000_000; 12],
+            &[1_000_000_000; 12],
+        );
+        let res = calculate_priority_fee_commission(&config, &validator, 12);
+        assert!(res.is_ok());
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
 }
 

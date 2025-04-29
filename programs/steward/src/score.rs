@@ -462,7 +462,8 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
 
 /// Given a validator's tips and total fees, determine their realized commission rate
 pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
-    // total_fees is 
+    // total_fees is None when the ValidatorHistoryEntry has been created, but the
+    //  priority_fee_oracle_authority has not called UpdatePriorityFeeHistory
     if total_fees.is_none() {
         return 0;
     }
