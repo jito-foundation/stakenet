@@ -1,0 +1,191 @@
+use anchor_lang::{InstructionData, ToAccountMetas};
+use jito_steward::{
+    constants::BASIS_POINTS_MAX, instructions::AuthorityType, Config, Parameters,
+    UpdatePriorityFeeParametersArgs,
+};
+use solana_program_test::*;
+use solana_sdk::{instruction::Instruction, signer::Signer, transaction::Transaction};
+use tests::steward_fixtures::TestFixture;
+
+#[tokio::test]
+async fn test_update_priority_fee_parameters() {
+    let fixture = TestFixture::new().await;
+    fixture.initialize_stake_pool().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
+
+    let priority_fee_authority_keypair = fixture
+        .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)
+        .await;
+
+    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+        priority_fee_lookback_epochs: Some(1),
+        priority_fee_lookback_offset: Some(1),
+        priority_fee_max_commission_bps: Some(1),
+        priority_fee_error_margin_bps: Some(1),
+    };
+
+    let ctx = &fixture.ctx;
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::UpdatePriorityFeeParameters {
+            config: fixture.steward_config.pubkey(),
+            authority: priority_fee_authority_keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::UpdatePriorityFeeParameters {
+            update_priority_fee_parameters_args: update_priority_fee_parameters_args.clone(),
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&priority_fee_authority_keypair.pubkey()),
+        &[&priority_fee_authority_keypair],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+
+    if let Some(priority_fee_lookback_epochs) =
+        update_priority_fee_parameters_args.priority_fee_lookback_epochs
+    {
+        assert_eq!(
+            config.parameters.priority_fee_lookback_epochs, priority_fee_lookback_epochs,
+            "priority_fee_lookback_epochs, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_lookback_offset) =
+        update_priority_fee_parameters_args.priority_fee_lookback_offset
+    {
+        assert_eq!(
+            config.parameters.priority_fee_lookback_offset, priority_fee_lookback_offset,
+            "priority_fee_lookback_offset, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_max_commission_bps) =
+        update_priority_fee_parameters_args.priority_fee_max_commission_bps
+    {
+        assert_eq!(
+            config.parameters.priority_fee_max_commission_bps, priority_fee_max_commission_bps,
+            "priority_fee_max_commission_bps, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_error_margin_bps) =
+        update_priority_fee_parameters_args.priority_fee_error_margin_bps
+    {
+        assert_eq!(
+            config.parameters.priority_fee_error_margin_bps, priority_fee_error_margin_bps,
+            "priority_fee_error_margin_bps, does not match update"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_bad_authority() {
+    let fixture = TestFixture::new().await;
+    fixture.initialize_stake_pool().await;
+    fixture.initialize_steward(None).await;
+    fixture.realloc_steward_state().await;
+
+    fixture
+        .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)
+        .await;
+
+    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+        priority_fee_lookback_epochs: Some(1),
+        priority_fee_lookback_offset: Some(1),
+        priority_fee_max_commission_bps: Some(1),
+        priority_fee_error_margin_bps: Some(1),
+    };
+
+    let ctx = &fixture.ctx;
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::UpdatePriorityFeeParameters {
+            config: fixture.steward_config.pubkey(),
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::UpdatePriorityFeeParameters {
+            update_priority_fee_parameters_args: update_priority_fee_parameters_args.clone(),
+        }
+        .data(),
+    };
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(tx, "ConstraintAddress")
+        .await;
+}
+
+#[test]
+fn test_priority_parameter_validation() {
+    let valid_parameters = Parameters {
+        mev_commission_range: 10,
+        epoch_credits_range: 30,
+        commission_range: 30,
+        scoring_delinquency_threshold_ratio: 0.85,
+        instant_unstake_delinquency_threshold_ratio: 0.7,
+        mev_commission_bps_threshold: 1000,
+        commission_threshold: 5,
+        historical_commission_threshold: 50,
+        num_delegation_validators: 200,
+        scoring_unstake_cap_bps: 10,
+        instant_unstake_cap_bps: 10,
+        stake_deposit_unstake_cap_bps: 10,
+        instant_unstake_epoch_progress: 0.9,
+        compute_score_slot_range: 1000,
+        instant_unstake_inputs_epoch_progress: 0.5,
+        num_epochs_between_scoring: 10,
+        minimum_stake_lamports: 5_000_000_000_000,
+        minimum_voting_epochs: 5,
+        priority_fee_lookback_epochs: 10,
+        priority_fee_lookback_offset: 2,
+        priority_fee_max_commission_bps: 5_000,
+        priority_fee_error_margin_bps: 10,
+        _padding_1: [0; 32],
+    };
+
+    // First Valid Epoch
+    let current_epoch = 512;
+    let slots_per_epoch = 432_000;
+
+    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+        priority_fee_lookback_epochs: Some(1),
+        priority_fee_lookback_offset: Some(1),
+        priority_fee_max_commission_bps: Some(BASIS_POINTS_MAX + 1),
+        priority_fee_error_margin_bps: Some(1),
+    };
+    let res = valid_parameters.get_updated_priority_fee_parameters(
+        &update_priority_fee_parameters_args,
+        current_epoch,
+        slots_per_epoch,
+    );
+    assert!(res.is_err());
+
+    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+        priority_fee_lookback_epochs: Some(1),
+        priority_fee_lookback_offset: Some(1),
+        priority_fee_max_commission_bps: Some(1),
+        priority_fee_error_margin_bps: Some(BASIS_POINTS_MAX + 1),
+    };
+    let res = valid_parameters.get_updated_priority_fee_parameters(
+        &update_priority_fee_parameters_args,
+        current_epoch,
+        slots_per_epoch,
+    );
+    assert!(res.is_err());
+}

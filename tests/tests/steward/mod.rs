@@ -3,6 +3,7 @@ mod test_cycle;
 mod test_epoch_maintenance;
 mod test_integration;
 mod test_parameters;
+mod test_priority_fee_parameters;
 mod test_scoring;
 mod test_spl_passthrough;
 mod test_state_methods;

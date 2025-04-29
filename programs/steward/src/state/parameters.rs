@@ -462,6 +462,14 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
+        if self.priority_fee_max_commission_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.priority_fee_error_margin_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
         Ok(())
     }
 }
