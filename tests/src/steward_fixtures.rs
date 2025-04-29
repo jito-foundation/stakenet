@@ -316,7 +316,11 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_steward(&self, parameters: Option<UpdateParametersArgs>) {
+    pub async fn initialize_steward(
+        &self,
+        parameters: Option<UpdateParametersArgs>,
+        priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
+    ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -339,12 +343,13 @@ impl TestFixture {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         });
 
-        let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
-            priority_fee_lookback_epochs: Some(10),
-            priority_fee_lookback_offset: Some(2),
-            priority_fee_max_commission_bps: Some(5_000),
-            priority_fee_error_margin_bps: Some(10),
-        };
+        let update_priority_fee_parameters_args =
+            priority_fee_parameters.unwrap_or(UpdatePriorityFeeParametersArgs {
+                priority_fee_lookback_epochs: Some(10),
+                priority_fee_lookback_offset: Some(2),
+                priority_fee_max_commission_bps: Some(5_000),
+                priority_fee_error_margin_bps: Some(10),
+            });
 
         let instruction = Instruction {
             program_id: jito_steward::id(),

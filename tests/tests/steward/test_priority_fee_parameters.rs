@@ -7,11 +7,74 @@ use solana_program_test::*;
 use solana_sdk::{instruction::Instruction, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::TestFixture;
 
+fn _validate_config_priority_fee_settings(
+    config: &Config,
+    expected_priority_fee_parameters: &UpdatePriorityFeeParametersArgs,
+) {
+    if let Some(priority_fee_lookback_epochs) =
+        expected_priority_fee_parameters.priority_fee_lookback_epochs
+    {
+        assert_eq!(
+            config.parameters.priority_fee_lookback_epochs, priority_fee_lookback_epochs,
+            "priority_fee_lookback_epochs, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_lookback_offset) =
+        expected_priority_fee_parameters.priority_fee_lookback_offset
+    {
+        assert_eq!(
+            config.parameters.priority_fee_lookback_offset, priority_fee_lookback_offset,
+            "priority_fee_lookback_offset, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_max_commission_bps) =
+        expected_priority_fee_parameters.priority_fee_max_commission_bps
+    {
+        assert_eq!(
+            config.parameters.priority_fee_max_commission_bps, priority_fee_max_commission_bps,
+            "priority_fee_max_commission_bps, does not match update"
+        );
+    }
+
+    if let Some(priority_fee_error_margin_bps) =
+        expected_priority_fee_parameters.priority_fee_error_margin_bps
+    {
+        assert_eq!(
+            config.parameters.priority_fee_error_margin_bps, priority_fee_error_margin_bps,
+            "priority_fee_error_margin_bps, does not match update"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_initialize_steward_sets_priority_fee_parameters() {
+    let fixture = TestFixture::new().await;
+    fixture.initialize_stake_pool().await;
+
+    let expected_priority_fee_parameters = UpdatePriorityFeeParametersArgs {
+        priority_fee_lookback_epochs: Some(123),
+        priority_fee_lookback_offset: Some(12),
+        priority_fee_max_commission_bps: Some(1234),
+        priority_fee_error_margin_bps: Some(12),
+    };
+    fixture
+        .initialize_steward(None, Some(expected_priority_fee_parameters.clone()))
+        .await;
+
+    let config: Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+
+    _validate_config_priority_fee_settings(&config, &expected_priority_fee_parameters);
+}
+
 #[tokio::test]
 async fn test_update_priority_fee_parameters() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     let priority_fee_authority_keypair = fixture
@@ -51,48 +114,14 @@ async fn test_update_priority_fee_parameters() {
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
 
-    if let Some(priority_fee_lookback_epochs) =
-        update_priority_fee_parameters_args.priority_fee_lookback_epochs
-    {
-        assert_eq!(
-            config.parameters.priority_fee_lookback_epochs, priority_fee_lookback_epochs,
-            "priority_fee_lookback_epochs, does not match update"
-        );
-    }
-
-    if let Some(priority_fee_lookback_offset) =
-        update_priority_fee_parameters_args.priority_fee_lookback_offset
-    {
-        assert_eq!(
-            config.parameters.priority_fee_lookback_offset, priority_fee_lookback_offset,
-            "priority_fee_lookback_offset, does not match update"
-        );
-    }
-
-    if let Some(priority_fee_max_commission_bps) =
-        update_priority_fee_parameters_args.priority_fee_max_commission_bps
-    {
-        assert_eq!(
-            config.parameters.priority_fee_max_commission_bps, priority_fee_max_commission_bps,
-            "priority_fee_max_commission_bps, does not match update"
-        );
-    }
-
-    if let Some(priority_fee_error_margin_bps) =
-        update_priority_fee_parameters_args.priority_fee_error_margin_bps
-    {
-        assert_eq!(
-            config.parameters.priority_fee_error_margin_bps, priority_fee_error_margin_bps,
-            "priority_fee_error_margin_bps, does not match update"
-        );
-    }
+    _validate_config_priority_fee_settings(&config, &update_priority_fee_parameters_args);
 }
 
 #[tokio::test]
 async fn test_bad_authority() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     fixture
