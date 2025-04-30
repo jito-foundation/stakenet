@@ -2790,11 +2790,27 @@
             "type": "u64"
           },
           {
+            "name": "priority_fee_scoring_start_epoch",
+            "docs": [
+              "The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_padding_0",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "_padding_1",
             "type": {
               "array": [
                 "u64",
-                32
+                31
               ]
             }
           }
@@ -3486,6 +3502,12 @@
           },
           {
             "name": "priority_fee_error_margin_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "priority_fee_scoring_start_epoch",
             "type": {
               "option": "u16"
             }
