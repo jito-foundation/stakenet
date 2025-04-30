@@ -62,6 +62,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -74,6 +75,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -104,6 +107,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -116,6 +120,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -144,6 +150,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -156,6 +163,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -184,6 +193,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -196,6 +206,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -228,6 +240,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -240,6 +253,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -270,6 +285,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -282,6 +298,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -313,6 +331,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -325,6 +344,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -357,6 +378,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -369,6 +391,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -398,6 +422,7 @@ fn test_compute_score() {
             commission_score: 0.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -410,6 +435,8 @@ fn test_compute_score() {
                 max_commission_epoch: current_epoch as u16,
                 max_historical_commission: 11,
                 max_historical_commission_epoch: current_epoch as u16,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -447,6 +474,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -459,6 +487,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 14,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -486,6 +516,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -498,6 +529,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 16,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -532,6 +565,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -544,6 +578,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -573,6 +609,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -585,6 +622,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -619,6 +658,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -631,6 +671,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -663,6 +705,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -675,6 +718,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -744,6 +789,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 0.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -756,6 +802,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -789,6 +837,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -801,6 +850,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -834,6 +885,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -846,6 +898,108 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 1
+    let mut validator = good_validator;
+    let end_epoch =
+        current_epoch as usize - config.parameters.priority_fee_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.priority_fee_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 60;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 4_000,
+                max_priority_fee_commission_epoch: 8,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 0
+    let mut validator = good_validator;
+    let end_epoch =
+        current_epoch as usize - config.parameters.priority_fee_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.priority_fee_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 10;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 0.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 0.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 9_000,
+                max_priority_fee_commission_epoch: 8,
             }
         }
     );

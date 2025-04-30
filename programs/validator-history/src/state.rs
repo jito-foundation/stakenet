@@ -389,6 +389,13 @@ impl CircBuf {
         field_latest!(self, merkle_root_upload_authority)
     }
 
+    pub fn priority_fee_tips_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u64>> {
+        field_range!(self, start_epoch, end_epoch, priority_fee_tips, u64)
+    }
+
+    pub fn total_priority_fees_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u64>> {
+        field_range!(self, start_epoch, end_epoch, total_priority_fees, u64)
+    }
     /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 16x higher
     /// for every epoch starting at `tvc_activation_epoch`
     pub fn epoch_credits_latest_normalized(

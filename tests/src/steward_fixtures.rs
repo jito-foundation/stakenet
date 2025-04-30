@@ -14,10 +14,10 @@ use anchor_lang::{
 use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
-    utils::StakePool,
-    utils::ValidatorList,
+    instructions::AuthorityType,
+    utils::{StakePool, ValidatorList},
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
-    StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
+    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -316,7 +316,11 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_steward(&self, parameters: Option<UpdateParametersArgs>) {
+    pub async fn initialize_steward(
+        &self,
+        parameters: Option<UpdateParametersArgs>,
+        priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
+    ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -339,6 +343,15 @@ impl TestFixture {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         });
 
+        let update_priority_fee_parameters_args =
+            priority_fee_parameters.unwrap_or(UpdatePriorityFeeParametersArgs {
+                priority_fee_lookback_epochs: Some(10),
+                priority_fee_lookback_offset: Some(2),
+                priority_fee_max_commission_bps: Some(5_000),
+                priority_fee_error_margin_bps: Some(10),
+                priority_fee_scoring_start_epoch: Some(0),
+            });
+
         let instruction = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::InitializeSteward {
@@ -352,6 +365,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: jito_steward::instruction::InitializeSteward {
                 update_parameters_args,
+                update_priority_fee_parameters_args,
             }
             .data(),
         };
@@ -363,6 +377,34 @@ impl TestFixture {
             self.ctx.borrow().last_blockhash,
         );
         self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn set_new_authority(&self, authority_type: AuthorityType) -> Keypair {
+        let new_authority = Keypair::new();
+        self.ctx
+            .borrow_mut()
+            .set_account(&new_authority.pubkey(), &system_account(1_000_000).into());
+
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::SetNewAuthority {
+                config: self.steward_config.pubkey(),
+                new_authority: new_authority.pubkey(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::SetNewAuthority { authority_type }.data(),
+        };
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+
+        self.submit_transaction_assert_success(tx).await;
+
+        new_authority
     }
 
     pub async fn get_latest_blockhash(&self) -> Hash {
@@ -1243,8 +1285,10 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             validator_history_blacklist: LargeBitMask::default(),
             parameters: Parameters::default(),
-            _padding: [0; 1023],
             paused: false.into(),
+            _padding_0: [0u8; 7],
+            priority_fee_parameters_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1756,7 +1800,6 @@ impl Default for StateMachineFixtures {
             instant_unstake_delinquency_threshold_ratio: 0.1,
             commission_threshold: 10,
             historical_commission_threshold: 10,
-            _padding_0: [0; 6],
             num_delegation_validators: 3,
             scoring_unstake_cap_bps: 1000,
             instant_unstake_cap_bps: 1000,
@@ -1767,7 +1810,13 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
-            _padding_1: [0; 32],
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
+            priority_fee_scoring_start_epoch: 0,
+            _padding_0: [0; 6],
+            _padding_1: [0; 31],
         };
 
         // Setup Config
@@ -1780,7 +1829,9 @@ impl Default for StateMachineFixtures {
             parameters_authority: Pubkey::new_unique(),
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
-            _padding: [0; 1023],
+            _padding_0: [0u8; 7],
+            priority_fee_parameters_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         // Setup Sysvars: Clock, EpochSchedule

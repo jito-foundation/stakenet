@@ -147,6 +147,13 @@ pub fn get_config_parameter_authority(account: &AccountLoader<Config>) -> Result
     Ok(config.parameters_authority)
 }
 
+pub fn get_config_priority_fee_parameter_authority(
+    account: &AccountLoader<Config>,
+) -> Result<Pubkey> {
+    let config = account.load()?;
+    Ok(config.priority_fee_parameters_authority)
+}
+
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {
     let current_epoch = clock.epoch;
     let current_slot = clock.slot;

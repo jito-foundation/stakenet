@@ -946,6 +946,14 @@
               "name": "UpdateParametersArgs"
             }
           }
+        },
+        {
+          "name": "update_priority_fee_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdatePriorityFeeParametersArgs"
+            }
+          }
         }
       ]
     },
@@ -1502,6 +1510,43 @@
           }
         }
       ]
+    },
+    {
+      "name": "update_priority_fee_parameters",
+      "docs": [
+        "For priority fee parameters that are present in args, the instruction checks that they",
+        "are within sensible bounds and saves them to config struct"
+      ],
+      "discriminator": [
+        244,
+        245,
+        159,
+        167,
+        235,
+        54,
+        76,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "update_priority_fee_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdatePriorityFeeParametersArgs"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1885,6 +1930,17 @@
                 }
               }
             ]
+          },
+          {
+            "name": "SetPriorityFeeParameterAuthority",
+            "fields": [
+              {
+                "name": "SetPriorityFeeParameterAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
           }
         ]
       }
@@ -2251,6 +2307,26 @@
             }
           },
           {
+            "name": "_padding_0",
+            "docs": [
+              "Required so that the struct is 8-byte aligned",
+              "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_parameters_authority",
+            "docs": [
+              "The authority that can update the priority fee configs"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -2258,7 +2334,7 @@
             "type": {
               "array": [
                 "u8",
-                1023
+                984
               ]
             }
           }
@@ -2616,17 +2692,35 @@
             "type": "u8"
           },
           {
-            "name": "_padding_0",
+            "name": "priority_fee_lookback_epochs",
             "docs": [
-              "Required so that the struct is 8-byte aligned",
-              "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
+              "The number of epochs the priority fee distribution check should lookback"
             ],
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
+            "type": "u8"
+          },
+          {
+            "name": "priority_fee_lookback_offset",
+            "docs": [
+              "The offset of epochs for the priority fee distribution. E.g. look at epochs from",
+              "(current_epoch - offset - priority_fee_lookback_epochs) to (current_epoch - offset)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "priority_fee_max_commission_bps",
+            "docs": [
+              "The maximum validator commission before the validator scores 0.",
+              "E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,",
+              "then score = 0"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "priority_fee_error_margin_bps",
+            "docs": [
+              "An error of margin for priority fee commission calculations"
+            ],
+            "type": "u16"
           },
           {
             "name": "num_delegation_validators",
@@ -2696,11 +2790,27 @@
             "type": "u64"
           },
           {
+            "name": "priority_fee_scoring_start_epoch",
+            "docs": [
+              "The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_padding_0",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "_padding_1",
             "type": {
               "array": [
                 "u64",
-                32
+                31
               ]
             }
           }
@@ -2936,6 +3046,14 @@
                 "name": "ScoreDetails"
               }
             }
+          },
+          {
+            "name": "priority_fee_commission_score",
+            "docs": [
+              "If validator has realized priority fee commissions > config limits over a lookback range,",
+              "score 0."
+            ],
+            "type": "f64"
           }
         ]
       }
@@ -3005,6 +3123,20 @@
             "name": "max_historical_commission_epoch",
             "docs": [
               "Epoch of max historical commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_priority_fee_commission",
+            "docs": [
+              "Max realized priority fee commission observed"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_priority_fee_commission_epoch",
+            "docs": [
+              "Epoch of realized priority fee commission"
             ],
             "type": "u16"
           }
@@ -3351,111 +3483,33 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "mev_commission_range",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "epoch_credits_range",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "commission_range",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "scoring_delinquency_threshold_ratio",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "instant_unstake_delinquency_threshold_ratio",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "mev_commission_bps_threshold",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
-            "name": "commission_threshold",
+            "name": "priority_fee_lookback_epochs",
             "type": {
               "option": "u8"
             }
           },
           {
-            "name": "historical_commission_threshold",
+            "name": "priority_fee_lookback_offset",
             "type": {
               "option": "u8"
             }
           },
           {
-            "name": "num_delegation_validators",
+            "name": "priority_fee_max_commission_bps",
             "type": {
-              "option": "u32"
+              "option": "u16"
             }
           },
           {
-            "name": "scoring_unstake_cap_bps",
+            "name": "priority_fee_error_margin_bps",
             "type": {
-              "option": "u32"
+              "option": "u16"
             }
           },
           {
-            "name": "instant_unstake_cap_bps",
+            "name": "priority_fee_scoring_start_epoch",
             "type": {
-              "option": "u32"
-            }
-          },
-          {
-            "name": "stake_deposit_unstake_cap_bps",
-            "type": {
-              "option": "u32"
-            }
-          },
-          {
-            "name": "instant_unstake_epoch_progress",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "compute_score_slot_range",
-            "type": {
-              "option": "u64"
-            }
-          },
-          {
-            "name": "instant_unstake_inputs_epoch_progress",
-            "type": {
-              "option": "f64"
-            }
-          },
-          {
-            "name": "num_epochs_between_scoring",
-            "type": {
-              "option": "u64"
-            }
-          },
-          {
-            "name": "minimum_stake_lamports",
-            "type": {
-              "option": "u64"
-            }
-          },
-          {
-            "name": "minimum_voting_epochs",
-            "type": {
-              "option": "u64"
+              "option": "u16"
             }
           }
         ]

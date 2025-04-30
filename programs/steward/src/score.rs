@@ -58,6 +58,10 @@ pub struct ScoreComponentsV3 {
 
     /// Details about why a given score was calculated
     pub details: ScoreDetails,
+
+    /// If validator has realized priority fee commissions > config limits over a lookback range,
+    /// score 0.  
+    pub priority_fee_commission_score: f64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
@@ -88,6 +92,12 @@ pub struct ScoreDetails {
 
     /// Epoch of max historical commission
     pub max_historical_commission_epoch: u16,
+
+    /// Max realized priority fee commission observed
+    pub max_priority_fee_commission: u16,
+
+    /// Epoch of realized priority fee commission
+    pub max_priority_fee_commission_epoch: u16,
 }
 
 pub fn validator_score(
@@ -166,6 +176,12 @@ pub fn validator_score(
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
 
+    let (
+        priority_fee_commission_score,
+        max_priority_fee_commission,
+        max_priority_fee_commission_epoch,
+    ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
+
     /////// Formula ///////
 
     let yield_score = vote_credits_ratio * (1. - max_commission as f64 / COMMISSION_MAX as f64);
@@ -178,7 +194,8 @@ pub fn validator_score(
         * delinquency_score
         * running_jito_score
         * yield_score
-        * merkle_root_upload_authority_score;
+        * merkle_root_upload_authority_score
+        * priority_fee_commission_score;
 
     Ok(ScoreComponentsV3 {
         score,
@@ -204,7 +221,10 @@ pub fn validator_score(
             max_commission_epoch,
             max_historical_commission,
             max_historical_commission_epoch,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
         },
+        priority_fee_commission_score,
     })
 }
 
@@ -437,6 +457,110 @@ pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f
         Ok(0.0)
     } else {
         Ok(1.0)
+    }
+}
+
+/// Given a validator's tips and total fees, determine their realized commission rate
+pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
+    // total_fees is None when the ValidatorHistoryEntry has been created, but the
+    //  priority_fee_oracle_authority has not called UpdatePriorityFeeHistory
+    if total_fees.is_none() {
+        return 0;
+    }
+    // Default the tips to 0 because we assume the PFDA was not created and the validator is not
+    // distributing priority fees. This forces inverse_commission to 0 and commission to
+    // BASIS_POINTS_MAX
+    let tips = tips.unwrap_or(0);
+    // Default the total_fees to u64::MAX to force inverse_commission towards 0 and commission
+    // to BASIS_POINTS_MAX
+    let total_fees = total_fees.unwrap_or(u64::MAX);
+
+    let validators_rake = total_fees.checked_sub(tips).unwrap_or(total_fees);
+    // We scale by BASIS_POINTS_MAX before division, so the output is in bps
+    let numerator = validators_rake
+        .checked_mul(BASIS_POINTS_MAX as u64)
+        .unwrap_or(0);
+    let commission = numerator
+        .checked_div(total_fees)
+        .unwrap_or(BASIS_POINTS_MAX as u64);
+    u16::try_from(commission).unwrap_or(BASIS_POINTS_MAX)
+}
+
+/// Checks if validator is maintaining < X% realized commission rates over some history of epochs
+pub fn calculate_priority_fee_commission(
+    config: &Config,
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+) -> Result<(f64, u16, u16)> {
+    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
+        return Ok((1.0, 0, EPOCH_DEFAULT));
+    }
+    let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
+    let priority_fee_tips = validator
+        .history
+        .priority_fee_tips_range(start_epoch, end_epoch);
+    let total_priority_fees = validator
+        .history
+        .total_priority_fees_range(start_epoch, end_epoch);
+
+    // determine the highest priority fee commission
+    let mut max_priority_fee_commission: u16 = 0;
+    let mut max_priority_fee_commission_epoch: u16 = EPOCH_DEFAULT;
+    let realized_commissions: Vec<u16> = priority_fee_tips
+        .iter()
+        .zip(&total_priority_fees)
+        .enumerate()
+        .map(|(relative_epoch, (tips, total_fees))| {
+            let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
+
+            if max_priority_fee_commission < commission_bps {
+                let max_commission_epoch: u16 = start_epoch
+                    .checked_add(relative_epoch as u16)
+                    .ok_or(ArithmeticError)?;
+                max_priority_fee_commission = commission_bps;
+                max_priority_fee_commission_epoch = max_commission_epoch;
+            }
+            Ok(commission_bps)
+        })
+        .collect::<Result<Vec<u16>>>()?;
+
+    // return score 1 when there's not enough history. We assume both fields being None means the
+    // priority fee data is non-existent for this epoch.
+    if priority_fee_tips[0].is_none() && total_priority_fees[0].is_none() {
+        return Ok((
+            1.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ));
+    }
+
+    let num_epochs: u64 = realized_commissions.len() as u64;
+    let total_commission: u64 = realized_commissions
+        .into_iter()
+        .fold(0, |agg, val| agg.checked_add(u64::from(val)).unwrap());
+    // We calculate the avg commission bps, rounding up to the nearest bp
+    let avg_commission: u64 = total_commission
+        // this addition of (denominator - 1) is used to round up if there is any remainder
+        .checked_add(num_epochs.checked_sub(1).ok_or(ArithmeticError)?)
+        .ok_or(ArithmeticError)?
+        .checked_div(num_epochs)
+        .ok_or(ArithmeticError)?;
+    let avg_commission: u16 = u16::try_from(avg_commission).map_err(|_| ArithmeticError)?;
+
+    let max_commission = config.max_avg_commission();
+
+    if avg_commission <= max_commission {
+        Ok((
+            1.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ))
+    } else {
+        Ok((
+            0.0,
+            max_priority_fee_commission,
+            max_priority_fee_commission_epoch,
+        ))
     }
 }
 
