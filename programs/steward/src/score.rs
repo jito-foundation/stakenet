@@ -492,6 +492,9 @@ pub fn calculate_priority_fee_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
+    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
+        return Ok((1.0, 0, EPOCH_DEFAULT));
+    }
     let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
     let priority_fee_tips = validator
         .history

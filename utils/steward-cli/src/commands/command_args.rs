@@ -146,6 +146,10 @@ pub struct ConfigPriorityFeeParameters {
     /// An error of margin for priority fee commission calculations
     #[arg(long, env)]
     pub priority_fee_error_margin_bps: Option<u16>,
+
+    /// The epoch for when priority fee commission scoring starts
+    #[arg(long, env)]
+    pub priority_fee_scoring_start_epoch: Option<u16>,
 }
 
 impl From<ConfigPriorityFeeParameters> for UpdatePriorityFeeParametersArgs {
@@ -155,6 +159,7 @@ impl From<ConfigPriorityFeeParameters> for UpdatePriorityFeeParametersArgs {
             priority_fee_lookback_offset: config.priority_fee_lookback_offset,
             priority_fee_max_commission_bps: config.priority_fee_max_commission_bps,
             priority_fee_error_margin_bps: config.priority_fee_error_margin_bps,
+            priority_fee_scoring_start_epoch: config.priority_fee_scoring_start_epoch,
         }
     }
 }

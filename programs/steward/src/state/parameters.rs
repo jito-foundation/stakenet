@@ -223,7 +223,12 @@ pub struct Parameters {
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
 
-    pub _padding_1: [u64; 32],
+    /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
+    pub priority_fee_scoring_start_epoch: u16,
+
+    pub _padding_0: [u8; 6],
+
+    pub _padding_1: [u64; 31],
 }
 
 impl Parameters {
@@ -352,6 +357,7 @@ impl Parameters {
             priority_fee_lookback_offset,
             priority_fee_max_commission_bps,
             priority_fee_error_margin_bps,
+            priority_fee_scoring_start_epoch,
         } = *args;
 
         let mut new_parameters = self;
@@ -370,6 +376,10 @@ impl Parameters {
 
         if let Some(priority_fee_error_margin_bps) = priority_fee_error_margin_bps {
             new_parameters.priority_fee_error_margin_bps = priority_fee_error_margin_bps;
+        }
+
+        if let Some(priority_fee_scoring_start_epoch) = priority_fee_scoring_start_epoch {
+            new_parameters.priority_fee_scoring_start_epoch = priority_fee_scoring_start_epoch;
         }
 
         new_parameters.validate(current_epoch, slots_per_epoch)?;
@@ -481,6 +491,7 @@ pub struct UpdatePriorityFeeParametersArgs {
     pub priority_fee_lookback_offset: Option<u8>,
     pub priority_fee_max_commission_bps: Option<u16>,
     pub priority_fee_error_margin_bps: Option<u16>,
+    pub priority_fee_scoring_start_epoch: Option<u16>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -507,6 +518,11 @@ impl IdlBuild for UpdatePriorityFeeParametersArgs {
                     },
                     IdlField {
                         name: "priority_fee_error_margin_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_scoring_start_epoch".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U16)),
                         docs: Default::default(),
                     },

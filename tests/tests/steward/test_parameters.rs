@@ -250,7 +250,9 @@ fn _test_parameter(
         priority_fee_lookback_offset: 2,
         priority_fee_max_commission_bps: 5_000,
         priority_fee_error_margin_bps: 10,
-        _padding_1: [0; 32],
+        priority_fee_scoring_start_epoch: 0,
+        _padding_0: [0; 6],
+        _padding_1: [0; 31],
     });
 
     // First Valid Epoch

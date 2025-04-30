@@ -635,6 +635,39 @@ mod test_calculate_priority_fee_commission {
     }
 
     #[test]
+    fn test_starting_epoch_setting() {
+        let mut config = create_config(300, 8, 10);
+        let total_priority_fees: u64 = 1_000_000_000;
+        let min_tips_required: u64 = (BASIS_POINTS_MAX as u64
+            - u64::from(
+                config.parameters.priority_fee_error_margin_bps
+                    + config.parameters.priority_fee_max_commission_bps,
+            ))
+            * total_priority_fees
+            / BASIS_POINTS_MAX as u64;
+        // After priority_fee_scoring_start_epoch, result is standard calculation
+        let mut validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[min_tips_required; 12],
+            &[total_priority_fees; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        config.parameters.priority_fee_scoring_start_epoch = EPOCH_DEFAULT;
+        // Before priority_fee_scoring_start_epoch, result is always 1
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) =
+            calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
+    }
+
+    #[test]
     fn test_edge_cases() {
         // Empty history, score 1
         let config = create_config(300, 8, 10);

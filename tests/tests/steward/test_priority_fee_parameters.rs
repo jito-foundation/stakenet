@@ -46,6 +46,15 @@ fn _validate_config_priority_fee_settings(
             "priority_fee_error_margin_bps, does not match update"
         );
     }
+
+    if let Some(priority_fee_scoring_start_epoch) =
+        expected_priority_fee_parameters.priority_fee_scoring_start_epoch
+    {
+        assert_eq!(
+            config.parameters.priority_fee_scoring_start_epoch, priority_fee_scoring_start_epoch,
+            "priority_fee_scoring_start_epoch, does not match update"
+        );
+    }
 }
 
 #[tokio::test]
@@ -58,6 +67,7 @@ async fn test_initialize_steward_sets_priority_fee_parameters() {
         priority_fee_lookback_offset: Some(12),
         priority_fee_max_commission_bps: Some(1234),
         priority_fee_error_margin_bps: Some(12),
+        priority_fee_scoring_start_epoch: Some(10),
     };
     fixture
         .initialize_steward(None, Some(expected_priority_fee_parameters.clone()))
@@ -86,6 +96,7 @@ async fn test_update_priority_fee_parameters() {
         priority_fee_lookback_offset: Some(1),
         priority_fee_max_commission_bps: Some(1),
         priority_fee_error_margin_bps: Some(1),
+        priority_fee_scoring_start_epoch: Some(1),
     };
 
     let ctx = &fixture.ctx;
@@ -133,6 +144,7 @@ async fn test_bad_authority() {
         priority_fee_lookback_offset: Some(1),
         priority_fee_max_commission_bps: Some(1),
         priority_fee_error_margin_bps: Some(1),
+        priority_fee_scoring_start_epoch: Some(1),
     };
 
     let ctx = &fixture.ctx;
@@ -185,7 +197,9 @@ fn test_priority_parameter_validation() {
         priority_fee_lookback_offset: 2,
         priority_fee_max_commission_bps: 5_000,
         priority_fee_error_margin_bps: 10,
-        _padding_1: [0; 32],
+        priority_fee_scoring_start_epoch: 0,
+        _padding_0: [0; 6],
+        _padding_1: [0; 31],
     };
 
     // First Valid Epoch
@@ -197,6 +211,7 @@ fn test_priority_parameter_validation() {
         priority_fee_lookback_offset: Some(1),
         priority_fee_max_commission_bps: Some(BASIS_POINTS_MAX + 1),
         priority_fee_error_margin_bps: Some(1),
+        priority_fee_scoring_start_epoch: Some(1),
     };
     let res = valid_parameters.get_updated_priority_fee_parameters(
         &update_priority_fee_parameters_args,
@@ -210,6 +225,7 @@ fn test_priority_parameter_validation() {
         priority_fee_lookback_offset: Some(1),
         priority_fee_max_commission_bps: Some(1),
         priority_fee_error_margin_bps: Some(BASIS_POINTS_MAX + 1),
+        priority_fee_scoring_start_epoch: Some(1),
     };
     let res = valid_parameters.get_updated_priority_fee_parameters(
         &update_priority_fee_parameters_args,
