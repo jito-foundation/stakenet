@@ -21,7 +21,7 @@ It fetches validator IPs from their history account and determines their countri
 ##### Parameters
 
 - `--stake-pool`: The stake pool address to analyze (required)
-- `country`: Filter results to show only a specific country (optional)
+- `--country`: Filter results to show only a specific country (optional)
 - `--ip-info-token`: API token for IP geolocation service (required)
 
 To obtain an IP info token, sign up at (https://ipinfo.io)[https://ipinfo.io]
