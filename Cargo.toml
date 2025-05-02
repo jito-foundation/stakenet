@@ -19,7 +19,6 @@ axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
-proc-macro2 = "1.0.95"
 reqwest = { version = "0.11.27", features = ["json"] }
 serde = "1.0.183"
 serde_derive = "1.0.183"
