@@ -2688,7 +2688,7 @@ dependencies = [
 [[package]]
 name = "jito-programs-vote-state"
 version = "0.1.5"
-source = "git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41#9456e5e96b84ae85219e7802711de9b7b8df6e41"
+source = "git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c#b230b2b5cdb911232a66cdd85f83828e6933cc1c"
 dependencies = [
  "anchor-lang",
  "bincode",
@@ -2757,10 +2757,10 @@ dependencies = [
 [[package]]
 name = "jito-tip-distribution"
 version = "0.1.5"
-source = "git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41#9456e5e96b84ae85219e7802711de9b7b8df6e41"
+source = "git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c#b230b2b5cdb911232a66cdd85f83828e6933cc1c"
 dependencies = [
  "anchor-lang",
- "jito-programs-vote-state 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41)",
+ "jito-programs-vote-state 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c)",
  "solana-program",
  "solana-security-txt",
 ]
@@ -6432,7 +6432,7 @@ dependencies = [
  "futures",
  "futures-util",
  "jito-steward",
- "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41)",
+ "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c)",
  "log",
  "rand 0.8.5",
  "solana-account-decoder",
@@ -6751,7 +6751,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "jito-steward",
- "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41)",
+ "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c)",
  "rand 0.7.3",
  "rand_chacha 0.3.1",
  "semver",
@@ -7428,7 +7428,7 @@ dependencies = [
  "bincode",
  "bytemuck",
  "cfg-if",
- "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=9456e5e96b84ae85219e7802711de9b7b8df6e41)",
+ "jito-tip-distribution 0.1.5 (git+https://github.com/jito-foundation/jito-programs?rev=b230b2b5cdb911232a66cdd85f83828e6933cc1c)",
  "semver",
  "serde",
  "serde_derive",
