@@ -5,7 +5,7 @@ edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = { workspace = true }
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"] }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenv = "0.15.0"
@@ -13,7 +13,7 @@ env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
-jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
+jito-tip-distribution = { workspace = true }
 log = "0.4.18"
 rand = "0.8.5"
 solana-account-decoder = "1.18"

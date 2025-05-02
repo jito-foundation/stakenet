@@ -5,7 +5,7 @@ edition = "2021"
 description = "CLI to manage validator history program"
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = { workspace = true }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 ipinfo = { workspace = true }
 reqwest = { workspace = true }

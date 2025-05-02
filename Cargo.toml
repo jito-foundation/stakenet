@@ -14,11 +14,12 @@ resolver = "2"
 overflow-checks = true
 
 [workspace.dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = "0.30.1"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
+jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "9456e5e96b84ae85219e7802711de9b7b8df6e41" }
 reqwest = { version = "0.11.27", features = ["json"] }
 serde = "1.0.183"
 serde_derive = "1.0.183"

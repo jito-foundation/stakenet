@@ -18,7 +18,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = { workspace = true }
 bincode = "1.3.3"
 bv = "0.11.1"
 bytemuck = { version = "1.13.1", features = ["derive", "min_const_generics"] }
@@ -26,7 +26,7 @@ cfg-if = "1.0.0"
 ed25519-dalek = "1.0.1"
 futures = "0.3.25"
 jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
-jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e" }
+jito-tip-distribution = { workspace = true }
 rand = "0.7.3"
 rand_chacha = "0.3.1"
 semver = "1.0.17"
