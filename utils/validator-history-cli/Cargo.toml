@@ -8,9 +8,7 @@ description = "CLI to manage validator history program"
 anchor-lang = "0.30.0"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 ipinfo = { workspace = true }
-log = "0.4.18"
 reqwest = { workspace = true }
-serde = { workspace = true }
 solana-account-decoder = "1.18"
 solana-clap-utils = "1.18"
 solana-client = "1.18"
@@ -18,6 +16,5 @@ solana-metrics = "1.18"
 solana-program = "1.18"
 solana-sdk = "1.18"
 spl-stake-pool = { workspace = true }
-thiserror = "1.0.37"
 tokio = { workspace = true }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }

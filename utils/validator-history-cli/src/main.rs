@@ -5,7 +5,6 @@ use anchor_lang::{
 };
 use clap::{arg, command, Parser, Subcommand};
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
-use serde::Deserialize;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -826,18 +825,6 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             }
         }
     }
-}
-
-#[allow(dead_code)]
-#[derive(Deserialize)]
-struct Response {
-    ip: Option<String>,
-    asn: Option<String>,
-    as_name: Option<String>,
-    country_code: Option<String>,
-    country: Option<String>,
-    continent_code: Option<String>,
-    continent: Option<String>,
 }
 
 #[tokio::main]
