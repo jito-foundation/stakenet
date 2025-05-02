@@ -1,15 +1,10 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::Arc,
-    thread::{self, sleep},
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 
 use anchor_lang::{
     AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas,
 };
 use clap::{arg, command, Parser, Subcommand};
+use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use serde::Deserialize;
 use solana_client::{
     rpc_client::RpcClient,
@@ -20,7 +15,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-use spl_stake_pool::state::{StakePool, ValidatorList, ValidatorStakeInfo};
+use spl_stake_pool::state::{StakePool, ValidatorList};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -617,7 +612,12 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
-fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
+async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
+    let ip_config = IpInfoConfig {
+        token: Some(args.ip_info_token),
+        ..Default::default()
+    };
+
     let stake_pool_acc_raw = match client.get_account(&args.stake_pool) {
         Ok(account) => account,
         Err(err) => {
@@ -652,169 +652,159 @@ fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     let validator_count = validator_list.validators.len();
     println!("Processing {validator_count} validators...");
 
-    let thread_count = 5;
+    let mut ip_info = match IpInfo::new(ip_config) {
+        Ok(ip_info) => ip_info,
+        Err(err) => {
+            eprintln!("Error initializing ip info: {err}");
+            return;
+        }
+    };
 
-    let chunk_size = (validator_count + thread_count - 1) / thread_count;
+    let mut validator_map: HashMap<Pubkey, u64> = HashMap::new();
 
-    let validators = validator_list.validators.clone();
-    let validator_chunks: Vec<Vec<ValidatorStakeInfo>> = validators
+    // Group validators by chunks for batch processing
+    let validator_history_pdas: Vec<Vec<Pubkey>> = validator_list
+        .validators
         .into_iter()
-        .collect::<Vec<_>>()
-        .chunks(chunk_size)
+        .map(|validator| {
+            let stake_lamports = validator.stake_lamports().unwrap();
+            validator_map
+                .entry(validator.vote_account_address)
+                .and_modify(|stake| *stake += stake_lamports)
+                .or_insert(stake_lamports);
+            let (validator_history_pda, _) = Pubkey::find_program_address(
+                &[
+                    ValidatorHistory::SEED,
+                    validator.vote_account_address.as_ref(),
+                ],
+                &validator_history::ID,
+            );
+            validator_history_pda
+        })
+        .collect::<Vec<Pubkey>>()
+        .chunks(100)
         .map(|chunk| chunk.to_vec())
         .collect();
 
-    let client_arc = Arc::new(client);
-    let ip_info_token_arc = Arc::new(args.ip_info_token);
+    let mut validator_ip_map: HashMap<Pubkey, String> = HashMap::new();
+    let mut country_map: HashMap<String, u64> = HashMap::new();
 
-    let mut handles = Vec::new();
-
-    println!("Dividing work into {thread_count} thread(s)...");
-
-    for (chunk_idx, chunk) in validator_chunks.into_iter().enumerate() {
+    for (chunk_idx, validator_history_pda_chunk) in validator_history_pdas.iter().enumerate() {
         println!(
-            "Thread {} processing {} validators",
+            "Processing chunk {}/{} with {} validator histories",
             chunk_idx + 1,
-            chunk.len()
+            validator_history_pdas.len(),
+            validator_history_pda_chunk.len()
         );
-        for validator in chunk {
-            let active_stake_lamports = match validator.stake_lamports() {
-                Ok(lamports) => lamports,
+
+        let validator_history_acc_raws =
+            match client.get_multiple_accounts(validator_history_pda_chunk) {
+                Ok(accounts) => accounts,
                 Err(err) => {
-                    eprintln!(
-                        "Error getting stake lamports for validator {}: {}",
-                        validator.vote_account_address, err
-                    );
+                    eprintln!("Error fetching validator history accounts: {err}");
                     continue;
                 }
             };
 
-            let client_clone = client_arc.clone();
-            let ip_info_token_clone = ip_info_token_arc.clone();
-            let vote_account = validator.vote_account_address;
-            let handle = thread::spawn(move || {
-                let mut local_map: HashMap<String, u64> = HashMap::new();
-
-                let (validator_history_pda, _) = Pubkey::find_program_address(
-                    &[ValidatorHistory::SEED, vote_account.as_ref()],
-                    &validator_history::ID,
-                );
-                let validator_history_account = match client_clone
-                    .get_account(&validator_history_pda)
-                {
-                    Ok(account) => account,
-                    Err(err) => {
-                        eprintln!("Error fetching history for validator {vote_account}: {err}",);
-                        return local_map;
+        let validator_histories: Vec<ValidatorHistory> = validator_history_acc_raws
+            .iter()
+            .enumerate()
+            .filter_map(|(i, validator_history_acc)| {
+                if let Some(validator_history_account) = validator_history_acc {
+                    match ValidatorHistory::try_deserialize(
+                        &mut validator_history_account.data.as_slice(),
+                    ) {
+                        Ok(history) => Some(history),
+                        Err(err) => {
+                            eprintln!("Error deserializing validator history at index {i}: {err}");
+                            None
+                        }
                     }
-                };
-                let validator_history = match ValidatorHistory::try_deserialize(
-                    &mut validator_history_account.data.as_slice(),
-                ) {
-                    Ok(history) => history,
-                    Err(err) => {
-                        eprintln!(
-                            "Error deserializing history for validator {vote_account}: {err}",
-                        );
-                        return local_map;
-                    }
-                };
+                } else {
+                    // Account not found
+                    None
+                }
+            })
+            .collect();
 
+        println!(
+            "Found {} valid validator histories",
+            validator_histories.len()
+        );
+
+        let validator_ips: Vec<String> = validator_histories
+            .iter()
+            .filter_map(|validator_history| {
                 if let Some(latest_history) = validator_history.history.last() {
                     let ip_addr = std::net::IpAddr::from(latest_history.ip);
-                    let url = format!(
-                        "https://api.ipinfo.io/lite/{}?token={}",
-                        ip_addr, ip_info_token_clone
-                    );
+                    validator_ip_map.insert(validator_history.vote_account, ip_addr.to_string());
+                    Some(ip_addr.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-                    let client = reqwest::blocking::ClientBuilder::new()
-                        .timeout(Duration::from_secs(5))
-                        .build()
-                        .unwrap_or_else(|_| reqwest::blocking::Client::new());
-                    match client.get(&url).send() {
-                        Ok(response) => {
-                            // Check for successful response
-                            if !response.status().is_success() {
-                                eprintln!("HTTP error for IP {}: {}", ip_addr, response.status());
-                                return local_map;
-                            }
+        if validator_ips.is_empty() {
+            println!("No valid IPs found in this batch, skipping...");
+            continue;
+        }
 
-                            // Parse JSON with error handling
-                            match response.json::<Response>() {
-                                Ok(res_json) => {
-                                    if let Some(country) = res_json.country {
-                                        local_map
-                                            .entry(country)
-                                            .and_modify(|stake| *stake += active_stake_lamports)
-                                            .or_insert(active_stake_lamports);
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("JSON parsing error for IP {ip_addr}: {e}");
-                                }
+        println!("Looking up {} IPs...", validator_ips.len());
+
+        let ip_strs: Vec<&str> = validator_ips.iter().map(|s| s.as_str()).collect();
+        if let Ok(batch_results) = ip_info
+            .lookup_batch(&ip_strs, BatchReqOpts::default())
+            .await
+        {
+            println!(
+                "Successfully retrieved country data for {} IPs",
+                batch_results.len()
+            );
+            // Process the results immediately within this loop iteration
+            for (vote_account, ip_address) in validator_ip_map.iter() {
+                if let Some(stake_amount) = validator_map.get(vote_account) {
+                    if let Some(ip_details) = batch_results.get(ip_address) {
+                        match &ip_details.country_name {
+                            Some(country_name) => {
+                                country_map
+                                    .entry(country_name.clone())
+                                    .and_modify(|amount| *amount += stake_amount)
+                                    .or_insert(*stake_amount);
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("HTTP request error for IP {ip_addr}: {e}");
+                            None => {
+                                // Country name not available
+                                eprintln!("No country data for IP {}", ip_address);
+                            }
                         }
                     }
                 }
-
-                local_map
-            });
-
-            handles.push(handle);
-        }
-    }
-
-    println!("Waiting for all threads to complete...");
-
-    let mut final_map: HashMap<String, u64> = HashMap::new();
-    let mut success_count = 0;
-    let mut error_count = 0;
-
-    for (i, handle) in handles.into_iter().enumerate() {
-        match handle.join() {
-            Ok(thread_map) => {
-                for (country, stake) in thread_map {
-                    final_map
-                        .entry(country)
-                        .and_modify(|total_stake| *total_stake += stake)
-                        .or_insert(stake);
-                }
-                success_count += 1;
-            }
-            Err(e) => {
-                eprintln!("Thread {} panicked: {:?}", i, e);
-                error_count += 1;
             }
         }
     }
 
-    println!("Processing complete: {success_count} succeeded, {error_count} failed",);
-
-    if final_map.is_empty() {
+    if country_map.is_empty() {
         println!("No data collected. Please check error messages above.");
         return;
     }
 
-    let total_stake: u64 = final_map.values().sum();
-    match args.country {
+    let total_stake: u64 = country_map.values().sum();
+
+    match &args.country {
         Some(country) => {
             println!("JitoSOL Stake for Country: {country}");
-            match final_map.get(&country) {
+            match country_map.get(country) {
                 Some(stake) => {
                     let percentage = (*stake as f64 / total_stake as f64) * 100.0;
                     println!("Lamports: {stake}, Percentage: {:.2}%", percentage);
                 }
                 None => {
-                    println!("Can not find it");
-                    println!("No data found for country: {}", country);
+                    println!("Country not found: {}", country);
                     println!(
                         "Available countries: {}",
-                        final_map
+                        country_map
                             .keys()
-                            .map(|k| k.as_str())
+                            .map(|key| key.as_str())
                             .collect::<Vec<&str>>()
                             .join(", ")
                     );
@@ -822,8 +812,7 @@ fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             }
         }
         None => {
-            let mut countries: Vec<(&String, &u64)> = final_map.iter().collect();
-
+            let mut countries: Vec<(&String, &u64)> = country_map.iter().collect();
             countries.sort_by(|a, b| b.1.cmp(a.1));
 
             println!("JitoSOL Stake by Country (Sorted by Percentage):");
@@ -851,7 +840,8 @@ struct Response {
     continent: Option<String>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
@@ -861,6 +851,6 @@ fn main() {
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
-        Commands::StakeByCountry(args) => command_stake_by_country(args, client),
+        Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
     };
 }
