@@ -129,7 +129,7 @@ struct StakeByCountry {
 
     /// Stake pool address
     #[arg(short, long, env)]
-    country: String,
+    country: Option<String>,
 
     /// IP Info Token
     #[arg(short, long, env)]
@@ -618,19 +618,39 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
 }
 
 fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
-    let stake_pool_acc_raw = client
-        .get_account(&args.stake_pool)
-        .expect("Failed to fetch stake pool");
-    let stake_pool = StakePool::deserialize(&mut stake_pool_acc_raw.data.as_slice())
-        .expect("Failed to deserialize");
+    let stake_pool_acc_raw = match client.get_account(&args.stake_pool) {
+        Ok(account) => account,
+        Err(err) => {
+            eprintln!("Error fetching stake pool account: {err}");
+            return;
+        }
+    };
+    let stake_pool = match StakePool::deserialize(&mut stake_pool_acc_raw.data.as_slice()) {
+        Ok(pool) => pool,
+        Err(err) => {
+            eprintln!("Error deserializing stake pool: {err}");
+            return;
+        }
+    };
 
-    let validator_list_acc_raw = client
-        .get_account(&stake_pool.validator_list)
-        .expect("Failed to fetch validator list");
-    let validator_list = ValidatorList::deserialize(&mut validator_list_acc_raw.data.as_slice())
-        .expect("Failed to deserialize");
+    let validator_list_acc_raw = match client.get_account(&stake_pool.validator_list) {
+        Ok(account) => account,
+        Err(err) => {
+            eprintln!("Error fetching validator list account: {err}");
+            return;
+        }
+    };
+    let validator_list =
+        match ValidatorList::deserialize(&mut validator_list_acc_raw.data.as_slice()) {
+            Ok(list) => list,
+            Err(err) => {
+                eprintln!("Error deserializing validator list: {err}");
+                return;
+            }
+        };
 
     let validator_count = validator_list.validators.len();
+    println!("Processing {validator_count} validators...");
 
     let thread_count = 5;
 
@@ -649,57 +669,93 @@ fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
 
     let mut handles = Vec::new();
 
-    for chunk in validator_chunks {
+    println!("Dividing work into {thread_count} thread(s)...");
+
+    for (chunk_idx, chunk) in validator_chunks.into_iter().enumerate() {
+        println!(
+            "Thread {} processing {} validators",
+            chunk_idx + 1,
+            chunk.len()
+        );
         for validator in chunk {
-            let active_stake_lamports = validator
-                .stake_lamports()
-                .expect("Failed to get stake lamports");
+            let active_stake_lamports = match validator.stake_lamports() {
+                Ok(lamports) => lamports,
+                Err(err) => {
+                    eprintln!(
+                        "Error getting stake lamports for validator {}: {}",
+                        validator.vote_account_address, err
+                    );
+                    continue;
+                }
+            };
 
             let client_clone = client_arc.clone();
             let ip_info_token_clone = ip_info_token_arc.clone();
+            let vote_account = validator.vote_account_address;
             let handle = thread::spawn(move || {
                 let mut local_map: HashMap<String, u64> = HashMap::new();
 
                 let (validator_history_pda, _) = Pubkey::find_program_address(
-                    &[
-                        ValidatorHistory::SEED,
-                        validator.vote_account_address.as_ref(),
-                    ],
+                    &[ValidatorHistory::SEED, vote_account.as_ref()],
                     &validator_history::ID,
                 );
-                let validator_history_account = client_clone
-                    .clone()
+                let validator_history_account = match client_clone
                     .get_account(&validator_history_pda)
-                    .expect("Failed to get validator history account");
-                let validator_history = ValidatorHistory::try_deserialize(
+                {
+                    Ok(account) => account,
+                    Err(err) => {
+                        eprintln!("Error fetching history for validator {vote_account}: {err}",);
+                        return local_map;
+                    }
+                };
+                let validator_history = match ValidatorHistory::try_deserialize(
                     &mut validator_history_account.data.as_slice(),
-                )
-                .expect("Failed to deserialize validator history account");
+                ) {
+                    Ok(history) => history,
+                    Err(err) => {
+                        eprintln!(
+                            "Error deserializing history for validator {vote_account}: {err}",
+                        );
+                        return local_map;
+                    }
+                };
 
                 if let Some(latest_history) = validator_history.history.last() {
+                    let ip_addr = std::net::IpAddr::from(latest_history.ip);
                     let url = format!(
-                        "http://api.ipinfo.io/lite/{}?token={}",
-                        std::net::IpAddr::from(latest_history.ip),
-                        ip_info_token_clone
+                        "https://api.ipinfo.io/lite/{}?token={}",
+                        ip_addr, ip_info_token_clone
                     );
 
-                    if let Ok(response) = reqwest::blocking::get(url) {
-                        match response.json::<Response>() {
-                            Ok(res_json) => {
-                                if let Some(country) = res_json.country {
-                                    println!(
-                                        "Country: {}, Stake: {}",
-                                        country, active_stake_lamports
-                                    );
-                                    local_map
-                                        .entry(country)
-                                        .and_modify(|stake| *stake += active_stake_lamports)
-                                        .or_insert(active_stake_lamports);
+                    let client = reqwest::blocking::ClientBuilder::new()
+                        .timeout(Duration::from_secs(5))
+                        .build()
+                        .unwrap_or_else(|_| reqwest::blocking::Client::new());
+                    match client.get(&url).send() {
+                        Ok(response) => {
+                            // Check for successful response
+                            if !response.status().is_success() {
+                                eprintln!("HTTP error for IP {}: {}", ip_addr, response.status());
+                                return local_map;
+                            }
+
+                            // Parse JSON with error handling
+                            match response.json::<Response>() {
+                                Ok(res_json) => {
+                                    if let Some(country) = res_json.country {
+                                        local_map
+                                            .entry(country)
+                                            .and_modify(|stake| *stake += active_stake_lamports)
+                                            .or_insert(active_stake_lamports);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("JSON parsing error for IP {ip_addr}: {e}");
                                 }
                             }
-                            Err(e) => {
-                                eprintln!("Error: {e}");
-                            }
+                        }
+                        Err(e) => {
+                            eprintln!("HTTP request error for IP {ip_addr}: {e}");
                         }
                     }
                 }
@@ -711,31 +767,75 @@ fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
         }
     }
 
-    let mut final_map: HashMap<String, u64> = HashMap::new();
+    println!("Waiting for all threads to complete...");
 
-    for handle in handles {
-        if let Ok(thread_map) = handle.join() {
-            for (country, stake) in thread_map {
-                final_map
-                    .entry(country)
-                    .and_modify(|total_stake| *total_stake += stake)
-                    .or_insert(stake);
+    let mut final_map: HashMap<String, u64> = HashMap::new();
+    let mut success_count = 0;
+    let mut error_count = 0;
+
+    for (i, handle) in handles.into_iter().enumerate() {
+        match handle.join() {
+            Ok(thread_map) => {
+                for (country, stake) in thread_map {
+                    final_map
+                        .entry(country)
+                        .and_modify(|total_stake| *total_stake += stake)
+                        .or_insert(stake);
+                }
+                success_count += 1;
+            }
+            Err(e) => {
+                eprintln!("Thread {} panicked: {:?}", i, e);
+                error_count += 1;
             }
         }
     }
 
-    let mut countries: Vec<(&String, &u64)> = final_map.iter().collect();
+    println!("Processing complete: {success_count} succeeded, {error_count} failed",);
 
-    countries.sort_by(|a, b| b.1.cmp(a.1));
+    if final_map.is_empty() {
+        println!("No data collected. Please check error messages above.");
+        return;
+    }
 
-    println!("JitoSOL Stake by Country (Sorted by Percentage):");
     let total_stake: u64 = final_map.values().sum();
-    for (country, stake) in countries {
-        let percentage = (*stake as f64 / total_stake as f64) * 100.0;
-        println!(
-            "Country: {}, Lamports: {}, Percentage: {:.2}%",
-            country, stake, percentage
-        );
+    match args.country {
+        Some(country) => {
+            println!("JitoSOL Stake for Country: {country}");
+            match final_map.get(&country) {
+                Some(stake) => {
+                    let percentage = (*stake as f64 / total_stake as f64) * 100.0;
+                    println!("Lamports: {stake}, Percentage: {:.2}%", percentage);
+                }
+                None => {
+                    println!("Can not find it");
+                    println!("No data found for country: {}", country);
+                    println!(
+                        "Available countries: {}",
+                        final_map
+                            .keys()
+                            .map(|k| k.as_str())
+                            .collect::<Vec<&str>>()
+                            .join(", ")
+                    );
+                }
+            }
+        }
+        None => {
+            let mut countries: Vec<(&String, &u64)> = final_map.iter().collect();
+
+            countries.sort_by(|a, b| b.1.cmp(a.1));
+
+            println!("JitoSOL Stake by Country (Sorted by Percentage):");
+            println!("Total stake: {total_stake} lamports");
+            for (country, stake) in countries {
+                let percentage = (*stake as f64 / total_stake as f64) * 100.0;
+                println!(
+                    "Country: {}, Lamports: {}, Percentage: {:.2}%",
+                    country, stake, percentage
+                );
+            }
+        }
     }
 }
 
