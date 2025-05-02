@@ -1,7 +1,16 @@
-use std::{path::PathBuf, thread::sleep, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::Arc,
+    thread::{self, sleep},
+    time::Duration,
+};
 
-use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
+use anchor_lang::{
+    AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas,
+};
 use clap::{arg, command, Parser, Subcommand};
+use serde::Deserialize;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -11,6 +20,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use spl_stake_pool::state::{StakePool, ValidatorList, ValidatorStakeInfo};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -40,6 +50,7 @@ enum Commands {
     ClusterHistoryStatus,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    StakeByCountry(StakeByCountry),
 }
 
 #[derive(Parser)]
@@ -107,6 +118,22 @@ struct BackfillClusterHistory {
     /// Number of blocks in epoch
     #[arg(short, long, env)]
     blocks_in_epoch: u32,
+}
+
+#[derive(Parser)]
+#[command(about = "Display JitoSOL stake percentage by country")]
+struct StakeByCountry {
+    /// Stake pool address
+    #[arg(short, long, env)]
+    stake_pool: Pubkey,
+
+    /// Stake pool address
+    #[arg(short, long, env)]
+    country: String,
+
+    /// IP Info Token
+    #[arg(short, long, env)]
+    ip_info_token: String,
 }
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
@@ -590,6 +617,140 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
+fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
+    let stake_pool_acc_raw = client
+        .get_account(&args.stake_pool)
+        .expect("Failed to fetch stake pool");
+    let stake_pool = StakePool::deserialize(&mut stake_pool_acc_raw.data.as_slice())
+        .expect("Failed to deserialize");
+
+    let validator_list_acc_raw = client
+        .get_account(&stake_pool.validator_list)
+        .expect("Failed to fetch validator list");
+    let validator_list = ValidatorList::deserialize(&mut validator_list_acc_raw.data.as_slice())
+        .expect("Failed to deserialize");
+
+    let validator_count = validator_list.validators.len();
+
+    let thread_count = 5;
+
+    let chunk_size = (validator_count + thread_count - 1) / thread_count;
+
+    let validators = validator_list.validators.clone();
+    let validator_chunks: Vec<Vec<ValidatorStakeInfo>> = validators
+        .into_iter()
+        .collect::<Vec<_>>()
+        .chunks(chunk_size)
+        .map(|chunk| chunk.to_vec())
+        .collect();
+
+    let client_arc = Arc::new(client);
+    let ip_info_token_arc = Arc::new(args.ip_info_token);
+
+    let mut handles = Vec::new();
+
+    for chunk in validator_chunks {
+        for validator in chunk {
+            let active_stake_lamports = validator
+                .stake_lamports()
+                .expect("Failed to get stake lamports");
+
+            let client_clone = client_arc.clone();
+            let ip_info_token_clone = ip_info_token_arc.clone();
+            let handle = thread::spawn(move || {
+                let mut local_map: HashMap<String, u64> = HashMap::new();
+
+                let (validator_history_pda, _) = Pubkey::find_program_address(
+                    &[
+                        ValidatorHistory::SEED,
+                        validator.vote_account_address.as_ref(),
+                    ],
+                    &validator_history::ID,
+                );
+                let validator_history_account = client_clone
+                    .clone()
+                    .get_account(&validator_history_pda)
+                    .expect("Failed to get validator history account");
+                let validator_history = ValidatorHistory::try_deserialize(
+                    &mut validator_history_account.data.as_slice(),
+                )
+                .expect("Failed to deserialize validator history account");
+
+                if let Some(latest_history) = validator_history.history.last() {
+                    let url = format!(
+                        "http://api.ipinfo.io/lite/{}?token={}",
+                        std::net::IpAddr::from(latest_history.ip),
+                        ip_info_token_clone
+                    );
+
+                    if let Ok(response) = reqwest::blocking::get(url) {
+                        match response.json::<Response>() {
+                            Ok(res_json) => {
+                                if let Some(country) = res_json.country {
+                                    println!(
+                                        "Country: {}, Stake: {}",
+                                        country, active_stake_lamports
+                                    );
+                                    local_map
+                                        .entry(country)
+                                        .and_modify(|stake| *stake += active_stake_lamports)
+                                        .or_insert(active_stake_lamports);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Error: {e}");
+                            }
+                        }
+                    }
+                }
+
+                local_map
+            });
+
+            handles.push(handle);
+        }
+    }
+
+    let mut final_map: HashMap<String, u64> = HashMap::new();
+
+    for handle in handles {
+        if let Ok(thread_map) = handle.join() {
+            for (country, stake) in thread_map {
+                final_map
+                    .entry(country)
+                    .and_modify(|total_stake| *total_stake += stake)
+                    .or_insert(stake);
+            }
+        }
+    }
+
+    let mut countries: Vec<(&String, &u64)> = final_map.iter().collect();
+
+    countries.sort_by(|a, b| b.1.cmp(a.1));
+
+    println!("JitoSOL Stake by Country (Sorted by Percentage):");
+    let total_stake: u64 = final_map.values().sum();
+    for (country, stake) in countries {
+        let percentage = (*stake as f64 / total_stake as f64) * 100.0;
+        println!(
+            "Country: {}, Lamports: {}, Percentage: {:.2}%",
+            country, stake, percentage
+        );
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize)]
+struct Response {
+    ip: Option<String>,
+    asn: Option<String>,
+    as_name: Option<String>,
+    country_code: Option<String>,
+    country: Option<String>,
+    continent_code: Option<String>,
+    continent: Option<String>,
+}
+
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
@@ -600,5 +761,6 @@ fn main() {
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
+        Commands::StakeByCountry(args) => command_stake_by_country(args, client),
     };
 }
