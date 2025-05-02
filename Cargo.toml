@@ -14,7 +14,7 @@ resolver = "2"
 overflow-checks = true
 
 [workspace.dependencies]
-anchor-lang = "0.30.0"
+anchor-lang = "0.30.1"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 http = { version = "0.2.1" }
