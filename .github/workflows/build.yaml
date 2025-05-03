@@ -35,14 +35,14 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          toolchain: nightly-2024-02-04
+          toolchain: nightly-2024-04-01  # Updated from nightly-2024-02-04
       - name: Install cargo-sort from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-sort
-      - run: cargo +nightly-2024-02-04 sort --workspace --check
-      - run: cargo +nightly-2024-02-04 fmt --all --check
-      - run: cargo +nightly-2024-02-04 clippy --all-features --all-targets --tests -- -D warnings
+      - run: cargo +nightly-2024-04-01 sort --workspace --check  # Updated toolchain reference
+      - run: cargo +nightly-2024-04-01 fmt --all --check  # Updated toolchain reference
+      - run: cargo +nightly-2024-04-01 clippy --all-features --all-targets --tests -- -D warnings  # Updated toolchain reference
 
   udeps:
     name: udeps
@@ -53,13 +53,13 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-02-04
+          toolchain: nightly-2024-04-01  # Updated from nightly-2024-02-04
       - name: Install cargo-udeps from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
           version: "0.1.45"
-      - run: cargo +nightly-2024-02-04 udeps --all-features --all-targets --tests
+      - run: cargo +nightly-2024-04-01 udeps --all-features --all-targets --tests  # Updated toolchain reference
 
   verified_build:
     name: verified_build
@@ -70,7 +70,7 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-04-01
+          toolchain: nightly-2024-04-01  # Updated from nightly-2024-02-04
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -139,7 +139,7 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-02-04
+          toolchain: nightly-2024-04-01  # Updated from nightly-2024-02-04
       - uses: actions/download-artifact@v4
         with:
           name: validator_history.so
