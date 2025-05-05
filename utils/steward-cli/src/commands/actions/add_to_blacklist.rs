@@ -36,14 +36,24 @@ pub async fn command_add_to_blacklist(
 
     // Build list of indices, starting with those passed directly
     let mut indices = args.validator_history_indices_to_blacklist.clone();
-
     // Fetch indices for each vote account provided
+    println!("Vote Account\tHistory Address\tIndex");
     for vote_account in args.vote_accounts_to_blacklist.iter() {
         let history_address = get_validator_history_address(vote_account, &validator_history::id());
-        let account = client.get_account(&history_address).await?;
-
-        let vh = ValidatorHistory::try_deserialize(&mut account.data.as_slice())?;
-        indices.push(vh.index);
+        let (vh_index, account_exists) = match client.get_account(&history_address).await {
+            Ok(account) => match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
+                Ok(vh) => (vh.index.to_string(), true),
+                Err(_) => ("N/A".to_string(), false),
+            },
+            Err(_) => ("N/A".to_string(), false),
+        };
+        println!(
+            "{}\thttps://solscan.io/account/{}\t{}",
+            vote_account, history_address, vh_index
+        );
+        if account_exists {
+            indices.push(vh_index.parse().unwrap());
+        }
     }
 
     let ix = Instruction {
