@@ -872,5 +872,3 @@ pub fn print_governance_ix(ixs: &[Instruction]) {
         }
     });
 }
-
-// Intentionally left generic; CLI crate can implement its own helper to choose between printers.

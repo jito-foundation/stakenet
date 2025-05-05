@@ -58,12 +58,10 @@ pub async fn command_set_staker(
         blockhash,
     );
 
-    if maybe_print_tx(
+    if !maybe_print_tx(
         &configured_ix,
         &args.permissioned_parameters.transaction_parameters,
     ) {
-        // printed, do nothing
-    } else {
         let signature = client
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;

@@ -13,8 +13,7 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-// Re-export governance printer from sdk
-pub use stakenet_sdk::utils::transactions::print_governance_ix;
+use stakenet_sdk::utils::transactions::print_governance_ix;
 
 use crate::commands::command_args::TransactionParameters;
 
@@ -25,7 +24,7 @@ pub fn maybe_print_tx(ixs: &[Instruction], params: &TransactionParameters) -> bo
         stakenet_sdk::utils::transactions::print_base58_tx(ixs);
         true
     } else if params.print_gov_tx {
-        stakenet_sdk::utils::transactions::print_governance_ix(ixs);
+        print_governance_ix(ixs);
         true
     } else {
         false
