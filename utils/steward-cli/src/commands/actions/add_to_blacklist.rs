@@ -5,10 +5,10 @@ use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
+use crate::utils::transactions::{configure_instruction, maybe_print_tx};
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
 use crate::commands::command_args::AddToBlacklist;
 
@@ -56,9 +56,10 @@ pub async fn command_add_to_blacklist(
         blockhash,
     );
 
-    if args.permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
+    if !maybe_print_tx(
+        &configured_ix,
+        &args.permissioned_parameters.transaction_parameters,
+    ) {
         let signature = client
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;

@@ -86,7 +86,7 @@ pub struct ConfigParameters {
     #[arg(long, env)]
     pub instant_unstake_epoch_progress: Option<f64>,
 
-    /// Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress
+    /// Inputs to "Compute Instant Unstake" need to be updated past this point in epoch progress
     #[arg(long, env)]
     pub instant_unstake_inputs_epoch_progress: Option<f64>,
 
@@ -150,6 +150,10 @@ pub struct TransactionParameters {
     /// This will print out the raw TX instead of running it
     #[arg(long, env, default_value = "false")]
     pub print_tx: bool,
+
+    /// When enabled, prints the transaction as a spl-governance encoded InstructionData (Base64)
+    #[arg(long, env, default_value_t = false)]
+    pub print_gov_tx: bool,
 }
 
 #[derive(Parser)]

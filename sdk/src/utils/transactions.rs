@@ -30,6 +30,12 @@ use crate::models::submit_stats::SubmitStats;
 
 use std::future::Future;
 
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
+use borsh::BorshSerialize;
+use spl_governance::state::proposal_transaction::InstructionData;
+use std::io::Cursor;
+
 pub const DEFAULT_COMPUTE_LIMIT: u64 = 200_000;
 
 pub async fn retry<F, Fut, T, E>(mut f: F, retries: usize) -> Result<T, E>
@@ -845,3 +851,26 @@ pub fn print_base58_tx(ixs: &[Instruction]) {
         println!("{}\n", base58_string);
     });
 }
+
+/// Prints each instruction as a spl-governance encoded InstructionData in base64.
+pub fn print_governance_ix(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ GOV IX ------\n");
+
+        // Convert the instruction to governance InstructionData format
+        let gov_ix_data = InstructionData::from(ix.clone());
+
+        let mut buffer = Cursor::new(Vec::new());
+        match gov_ix_data.serialize(&mut buffer) {
+            Ok(_) => {
+                let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
+                println!("Base64 InstructionData: {:?}\n", base64_ix);
+            }
+            Err(err) => {
+                println!("Failed to serialize InstructionData: {}", err);
+            }
+        }
+    });
+}
+
+// Intentionally left generic; CLI crate can implement its own helper to choose between printers.
