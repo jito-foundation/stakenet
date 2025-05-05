@@ -29,7 +29,7 @@ pub async fn command_add_to_blacklist(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddValidatorsToBlacklist {
-            validator_history_blacklist: vec![args.validator_history_index_to_blacklist as u32],
+            validator_history_blacklist: args.validator_history_indices_to_blacklist,
         }
         .data(),
     };

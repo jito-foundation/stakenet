@@ -363,9 +363,13 @@ pub struct AddToBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
-    pub validator_history_index_to_blacklist: u64,
+    /// Validator indices of validator list to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
+    pub validator_history_indices_to_blacklist: Vec<u32>,
+}
+
+fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+    s.parse()
 }
 
 #[derive(Parser)]
@@ -376,7 +380,7 @@ pub struct RemoveFromBlacklist {
 
     /// Validator index of validator list to remove
     #[arg(long, env)]
-    pub validator_history_index_to_deblacklist: u64,
+    pub validator_history_indices_to_deblacklist: Vec<u32>,
 }
 
 #[derive(Parser)]
