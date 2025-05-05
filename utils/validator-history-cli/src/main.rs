@@ -9,7 +9,8 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
+    transaction::Transaction,
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -323,6 +324,16 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     } else {
         entry.vote_account_last_update_slot.to_string()
     };
+
+    let priority_fee_info = format!(
+        "Tips {} | Total {} | Commission {} | Slots {}",
+        lamports_to_sol(entry.priority_fee_tips),
+        lamports_to_sol(entry.total_priority_fees),
+        entry.priority_fee_commission,
+        entry.total_leader_slots
+    );
+
+    return priority_fee_info;
 
     format!(
         "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",

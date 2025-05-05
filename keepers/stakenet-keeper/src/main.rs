@@ -103,7 +103,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
-    let block_metadata_interval = keeper_config.block_metadata_interval;
+    let block_metadata_interval = 60;
 
     let intervals = vec![
         validator_history_interval,
@@ -239,14 +239,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 );
             }
 
-            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown(keeper_config.cool_down_range).await;
-            }
-
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
             );
+
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown(keeper_config.cool_down_range).await;
+            }
         }
 
         // STEWARD
