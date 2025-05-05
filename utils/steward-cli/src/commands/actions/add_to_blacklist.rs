@@ -22,17 +22,20 @@ pub async fn command_add_to_blacklist(
     let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
-    let authority_pubkey =
-        if maybe_print_tx(&[], &args.permissioned_parameters.transaction_parameters) {
-            let config_account = client
-                .get_account(&args.permissioned_parameters.steward_config)
-                .await?;
-            let config =
-                jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
-            config.blacklist_authority
-        } else {
-            authority.pubkey()
-        };
+    let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx
+        || args
+            .permissioned_parameters
+            .transaction_parameters
+            .print_gov_tx
+    {
+        let config_account = client
+            .get_account(&args.permissioned_parameters.steward_config)
+            .await?;
+        let config = jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
+        config.blacklist_authority
+    } else {
+        authority.pubkey()
+    };
 
     // Build list of indices, starting with those passed directly
     let mut indices = args.validator_history_indices_to_blacklist.clone();
