@@ -10,7 +10,7 @@ use solana_sdk::{
 };
 
 use crate::commands::command_args::RemoveFromBlacklist;
-use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
+use crate::utils::transactions::{configure_instruction, maybe_print_tx};
 
 pub async fn command_remove_from_blacklist(
     args: RemoveFromBlacklist,
@@ -29,7 +29,7 @@ pub async fn command_remove_from_blacklist(
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
-            validator_history_blacklist: vec![args.validator_history_index_to_deblacklist as u32],
+            validator_history_blacklist: args.validator_history_indices_to_deblacklist,
         }
         .data(),
     };
@@ -56,9 +56,10 @@ pub async fn command_remove_from_blacklist(
         blockhash,
     );
 
-    if args.permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
+    if !maybe_print_tx(
+        &configured_ix,
+        &args.permissioned_parameters.transaction_parameters,
+    ) {
         let signature = client
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
