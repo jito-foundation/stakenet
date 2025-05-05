@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
@@ -11,25 +11,50 @@ use solana_sdk::{
 };
 
 use crate::commands::command_args::AddToBlacklist;
+use stakenet_sdk::utils::accounts::get_validator_history_address;
+use validator_history::{self, ValidatorHistory};
 
 pub async fn command_add_to_blacklist(
     args: AddToBlacklist,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // Creates config account
     let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
+
+    let authority_pubkey =
+        if maybe_print_tx(&[], &args.permissioned_parameters.transaction_parameters) {
+            let config_account = client
+                .get_account(&args.permissioned_parameters.steward_config)
+                .await?;
+            let config =
+                jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
+            config.blacklist_authority
+        } else {
+            authority.pubkey()
+        };
+
+    // Build list of indices, starting with those passed directly
+    let mut indices = args.validator_history_indices_to_blacklist.clone();
+
+    // Fetch indices for each vote account provided
+    for vote_account in args.vote_accounts_to_blacklist.iter() {
+        let history_address = get_validator_history_address(vote_account, &validator_history::id());
+        let account = client.get_account(&history_address).await?;
+
+        let vh = ValidatorHistory::try_deserialize(&mut account.data.as_slice())?;
+        indices.push(vh.index);
+    }
 
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::AddValidatorsToBlacklist {
             config: args.permissioned_parameters.steward_config,
-            authority: authority.pubkey(),
+            authority: authority_pubkey,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddValidatorsToBlacklist {
-            validator_history_blacklist: args.validator_history_indices_to_blacklist,
+            validator_history_blacklist: indices,
         }
         .data(),
     };
@@ -49,17 +74,16 @@ pub async fn command_add_to_blacklist(
             .heap_size,
     );
 
-    let transaction = Transaction::new_signed_with_payer(
-        &configured_ix,
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
-
     if !maybe_print_tx(
         &configured_ix,
         &args.permissioned_parameters.transaction_parameters,
     ) {
+        let transaction = Transaction::new_signed_with_payer(
+            &configured_ix,
+            Some(&authority.pubkey()),
+            &[&authority],
+            blockhash,
+        );
         let signature = client
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;

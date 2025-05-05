@@ -366,10 +366,20 @@ pub struct AddToBlacklist {
     /// Validator indices of validator list to blacklist (comma separated)
     #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
     pub validator_history_indices_to_blacklist: Vec<u32>,
+
+    /// Vote accounts of validators to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
+    pub vote_accounts_to_blacklist: Vec<Pubkey>,
 }
 
 fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
     s.parse()
+}
+
+// Add helper to parse a Pubkey from string
+fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+    use std::str::FromStr;
+    Pubkey::from_str(s)
 }
 
 #[derive(Parser)]
