@@ -1,5 +1,6 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
+use log::info;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use stakenet_sdk::{
     models::entries::{Address, UpdateInstruction},
@@ -69,6 +70,8 @@ impl Address for ValidatorPriorityFeeCommissionEntry {
 
 impl UpdateInstruction for ValidatorPriorityFeeCommissionEntry {
     fn update_instruction(&self) -> Instruction {
+        info!("{}", self.config);
+
         Instruction {
             program_id: self.program_id,
             accounts: validator_history::accounts::CopyPriorityFeeDistribution {

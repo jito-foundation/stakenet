@@ -1,8 +1,12 @@
+use super::keeper_operations::{check_flag, KeeperOperations};
 use crate::state::keeper_config::KeeperConfig;
 use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
     state::keeper_state::KeeperState,
 };
+use anchor_lang::error;
+use log::error as log_error;
+use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -16,8 +20,6 @@ use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
-
-use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::PriorityFeeCommission
@@ -86,6 +88,7 @@ pub async fn fire(
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
+                        log_error!("ERROR: {}", e.to_string());
                         datapoint_error!(
                             "priority-fee-commission-error",
                             ("error", e.to_string(), String),
@@ -156,6 +159,10 @@ pub async fn update_priority_fee_commission(
         })
         .collect::<Vec<_>>();
 
+    let temp = update_instructions[0].accounts[2].pubkey.clone();
+    info!("{}", temp);
+
+    info!("--- GOING TO SUBMIT ---\n\n\n\n");
     let submit_result = submit_instructions(
         client,
         update_instructions,
@@ -164,7 +171,7 @@ pub async fn update_priority_fee_commission(
         retry_count,
         confirmation_time,
         None,
-        no_pack,
+        true,
     )
     .await;
 
