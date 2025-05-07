@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::prelude::{EpochSchedule, SlotHistory};
-use log::debug;
+use log::{debug, error};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
@@ -17,6 +17,7 @@ use solana_sdk::{
     signature::Keypair,
     signer::Signer,
     slot_history,
+    vote::instruction::VoteInstruction,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
@@ -41,7 +42,7 @@ use crate::{
 use super::{db::LeaderBlockMetadata, errors::BlockMetadataKeeperError};
 
 fn _get_operation() -> KeeperOperations {
-    KeeperOperations::GossipUpload
+    KeeperOperations::BlockMetadataKeeper
 }
 
 fn _should_run() -> bool {
@@ -260,6 +261,169 @@ async fn update_block_metadata(
     Ok(submit_result?)
 }
 
+async fn search_block_for_voter(
+    rpc_client: &RpcClient,
+    identity: &String,
+    slot: u64,
+    slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+) -> Result<Option<String>, BlockMetadataKeeperError> {
+    let block = get_block_safe(rpc_client, slot, slot_history, maybe_redundant_rpc_urls).await?;
+    let identity = Pubkey::from_str(identity).map_err(|err| {
+        BlockMetadataKeeperError::OtherError(
+            format!("Failed to parse Identity {} - {:?}", identity, err).to_string(),
+        )
+    })?;
+
+    if let Some(txs) = block.transactions {
+        for tx in txs {
+            let decoded_tx = tx.transaction.decode().ok_or_else(|| {
+                BlockMetadataKeeperError::OtherError(
+                    "Failed to decode transaction: None returned".to_string(),
+                )
+            })?;
+            let accounts = decoded_tx.message.address_table_lookups().ok_or_else(|| {
+                BlockMetadataKeeperError::OtherError(
+                    "Failed to grab accounts: None returned".to_string(),
+                )
+            })?;
+
+            let ixs = decoded_tx.message.instructions();
+            for ix in ixs {
+                let program_id = accounts[ix.program_id_index as usize].account_key;
+
+                if program_id.ne(&solana_sdk::vote::program::id()) {
+                    continue;
+                }
+                let vote_ix = match solana_bincode::limited_deserialize::<VoteInstruction>(
+                    &ix.data,
+                    solana_packet::PACKET_DATA_SIZE as u64,
+                ) {
+                    Ok(vote_ix) => vote_ix,
+                    Err(_) => continue, // Skip if unable to deserialize
+                };
+
+                match vote_ix {
+                    VoteInstruction::Vote(_) => {
+                        // The vote account is always the first account
+                        // The vote authority is the 4th account ( most likely identity )
+                        // https://docs.rs/solana-vote-program/2.2.7/solana_vote_program/vote_instruction/enum.VoteInstruction.html#variant.Vote
+                        let vote_account = accounts[0].account_key;
+                        let identity_account = accounts[3].account_key;
+
+                        if identity.eq(&identity_account) {
+                            return Ok(Some(vote_account.to_string()));
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+pub async fn search_for_voter(
+    rpc_client: &RpcClient,
+    identity: &String,
+    starting_slot: u64,
+    slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+) -> Option<String> {
+    let end_of_epoch = (starting_slot + DEFAULT_SLOTS_PER_EPOCH) % DEFAULT_SLOTS_PER_EPOCH;
+    let start_of_epoch = starting_slot % DEFAULT_SLOTS_PER_EPOCH;
+
+    // Forward Search
+    for slot in starting_slot..=end_of_epoch {
+        match search_block_for_voter(
+            rpc_client,
+            identity,
+            slot,
+            slot_history,
+            maybe_redundant_rpc_urls,
+        )
+        .await
+        {
+            Ok(maybe_voter) => {
+                if let Some(voter) = maybe_voter {
+                    return Some(voter);
+                }
+            }
+            Err(_err) => break, // Break on error
+        }
+    }
+
+    //Reverse Search
+    for slot in (start_of_epoch..=starting_slot).rev() {
+        match search_block_for_voter(
+            rpc_client,
+            identity,
+            slot,
+            slot_history,
+            maybe_redundant_rpc_urls,
+        )
+        .await
+        {
+            Ok(maybe_voter) => {
+                if let Some(voter) = maybe_voter {
+                    return Some(voter);
+                }
+            }
+            Err(_err) => break,
+        }
+    }
+
+    None
+}
+
+pub async fn populate_relative_slot_leaders(
+    rpc_client: &RpcClient,
+    identity_to_vote_map: &HashMap<String, String>,
+    slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    starting_slot: u64,
+) -> Result<Vec<LeaderInfo>, BlockMetadataKeeperError> {
+    let mut relative_slot_leaders: Vec<LeaderInfo> =
+        vec![LeaderInfo::default(); DEFAULT_SLOTS_PER_EPOCH as usize];
+
+    let rpc_leader_schedule = match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
+        Some(schedule) => schedule,
+        None => {
+            return Err(BlockMetadataKeeperError::OtherError(
+                "Could not get leader schedule".to_string(),
+            ))
+        }
+    };
+
+    for (leader, slots) in rpc_leader_schedule.iter() {
+        for relative_slot in slots {
+            // Convert leader (identity pubkey) to be the vote_key
+            if let Some(voter) = identity_to_vote_map.get(leader) {
+                relative_slot_leaders[*relative_slot] = LeaderInfo::new(leader, Some(voter))
+            } else {
+                match search_for_voter(
+                    rpc_client,
+                    leader,
+                    starting_slot,
+                    slot_history,
+                    maybe_redundant_rpc_urls,
+                )
+                .await
+                {
+                    Some(voter) => {
+                        relative_slot_leaders[*relative_slot] =
+                            LeaderInfo::new(leader, Some(&voter))
+                    }
+                    None => relative_slot_leaders[*relative_slot] = LeaderInfo::new(leader, None),
+                }
+            }
+        }
+    }
+
+    Ok(relative_slot_leaders)
+}
+
 pub async fn handle_slots_for_epoch(
     rpc_client: &RpcClient,
     conn: &Connection,
@@ -277,23 +441,15 @@ pub async fn handle_slots_for_epoch(
         "Gathering data for slots: {} - {}",
         starting_slot, ending_slot
     );
-    let rpc_leader_schedule = rpc_client
-        .get_leader_schedule(Some(starting_slot))
-        .await
-        .unwrap()
-        .expect("leader_schedule");
-    let mut relative_slot_leaders: Vec<Option<&String>> =
-        vec![None; DEFAULT_SLOTS_PER_EPOCH as usize];
-    for (leader, slots) in rpc_leader_schedule.iter() {
-        for relative_slot in slots {
-            // Convert leader (identity pubkey) to be the vote_key
-            if let Some(vote_key) = identity_to_vote_map.get(leader) {
-                relative_slot_leaders[*relative_slot] = Some(vote_key);
-            } else {
-                return Err(BlockMetadataKeeperError::MissingVoteKey(leader.to_owned()));
-            }
-        }
-    }
+
+    let relative_slot_leaders: Vec<LeaderInfo> = populate_relative_slot_leaders(
+        rpc_client,
+        identity_to_vote_map,
+        slot_history,
+        maybe_redundant_rpc_urls,
+        starting_slot,
+    )
+    .await?;
 
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
 
@@ -451,7 +607,7 @@ pub async fn aggregate_information(
     epoch_starting_slot: u64,
     starting_slot: u64,
     ending_slot: u64,
-    slot_leaders: Vec<Option<&String>>,
+    slot_leaders: Vec<LeaderInfo>,
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Result<LeadersMap, BlockMetadataKeeperError> {
@@ -459,11 +615,13 @@ pub async fn aggregate_information(
     // We use an inclusive range as the program relies on it being included
     for slot in starting_slot..=ending_slot {
         let relative_slot = slot - epoch_starting_slot;
-        let leader = slot_leaders[relative_slot as usize].unwrap();
+        let leader_info = slot_leaders[relative_slot as usize].clone();
         let maybe_block_data =
-            get_block(client, slot, slot_history, maybe_redundant_rpc_urls).await;
+            get_block_safe(client, slot, slot_history, maybe_redundant_rpc_urls).await;
         match maybe_block_data {
             Ok(block) => {
+                let voter = leader_info.get_voter_safe()?;
+
                 // get the priority fee rewards for the block.
                 let priority_fees = block
                     .rewards
@@ -472,11 +630,13 @@ pub async fn aggregate_information(
                     .find(|r| r.reward_type == Some(RewardType::Fee))
                     .map(|r| r.lamports)
                     .unwrap_or(0);
-                increment_leader_info(&mut res, leader, epoch, 1, 1, priority_fees);
+                increment_leader_info(&mut res, &voter, epoch, 1, 1, priority_fees);
             }
             Err(err) => match err {
                 BlockMetadataKeeperError::SkippedBlock => {
-                    increment_leader_info(&mut res, leader, epoch, 1, 0, 0);
+                    let voter = leader_info.get_voter_safe()?;
+
+                    increment_leader_info(&mut res, &voter, epoch, 1, 0, 0);
                 }
                 _ => return Err(err),
             },
@@ -485,8 +645,20 @@ pub async fn aggregate_information(
     Ok(res)
 }
 
+pub async fn get_leader_schedule_safe(
+    rpc_client: &RpcClient,
+    starting_slot: u64,
+) -> Result<HashMap<String, Vec<usize>>, BlockMetadataKeeperError> {
+    match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
+        Some(schedule) => Ok(schedule),
+        None => Err(BlockMetadataKeeperError::OtherError(
+            "Could not get leader schedule".to_string(),
+        )),
+    }
+}
+
 /// Wrapper on Solana RPC get_block, but propagates skipped blocks as BlockMetadataKeeperError
-async fn get_block(
+async fn get_block_safe(
     client: &RpcClient,
     slot: u64,
     slot_history: &SlotHistory,
@@ -561,5 +733,32 @@ async fn get_block(
                 _ => return Err(BlockMetadataKeeperError::SolanaClientError(err)),
             },
         };
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct LeaderInfo {
+    pub identity: String,
+    pub voter: Option<String>,
+}
+
+impl LeaderInfo {
+    pub fn new(identity: &String, voter: Option<&String>) -> Self {
+        LeaderInfo {
+            identity: identity.clone(),
+            voter: match voter {
+                Some(voter) => Some(voter.clone()),
+                None => None,
+            },
+        }
+    }
+
+    pub fn get_voter_safe(self) -> Result<String, BlockMetadataKeeperError> {
+        let voter = self
+            .voter
+            .as_ref()
+            .ok_or_else(|| BlockMetadataKeeperError::MissingVoteKey(self.identity.clone()))?;
+
+        Ok(voter.clone())
     }
 }
