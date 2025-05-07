@@ -6,6 +6,8 @@ use type_layout::TypeLayout;
 
 use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
+static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
+
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
 /// squat a config address for another party's stake pool.
@@ -44,8 +46,15 @@ pub struct Config {
     /// Halts any state machine progress
     pub paused: U8Bool,
 
+    /// Required so that the struct is 8-byte aligned
+    /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
+    pub _padding_0: [u8; 7],
+
+    /// The authority that can update the priority fee configs
+    pub priority_fee_parameters_authority: Pubkey,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 1023],
+    pub _padding: [u8; 984],
 }
 
 impl Config {
@@ -58,6 +67,21 @@ impl Config {
 
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused.into();
+    }
+
+    /// The maximum the average commission could be.
+    pub fn max_avg_commission(&self) -> u16 {
+        self.parameters
+            .priority_fee_max_commission_bps
+            .saturating_add(self.parameters.priority_fee_error_margin_bps)
+    }
+
+    pub fn priority_fee_epoch_range(&self, current_epoch: u16) -> (u16, u16) {
+        let end_epoch: u16 =
+            current_epoch.saturating_sub(self.parameters.priority_fee_lookback_offset.into());
+        let start_epoch: u16 =
+            end_epoch.saturating_sub(self.parameters.priority_fee_lookback_epochs.into());
+        (start_epoch, end_epoch)
     }
 }
 

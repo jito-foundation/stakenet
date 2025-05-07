@@ -85,26 +85,29 @@ async fn _epoch_maintenance_setup() -> (
     fixture.advance_num_epochs(20, 10).await;
     fixture.initialize_stake_pool().await;
     fixture
-        .initialize_steward(Some(UpdateParametersArgs {
-            mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
-            epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
-            commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
-            scoring_delinquency_threshold_ratio: Some(0.85),
-            instant_unstake_delinquency_threshold_ratio: Some(0.70),
-            mev_commission_bps_threshold: Some(1000),
-            commission_threshold: Some(5),
-            historical_commission_threshold: Some(50),
-            num_delegation_validators: Some(200),
-            scoring_unstake_cap_bps: Some(750),
-            instant_unstake_cap_bps: Some(10),
-            stake_deposit_unstake_cap_bps: Some(10),
-            instant_unstake_epoch_progress: Some(0.00),
-            compute_score_slot_range: Some(1000),
-            instant_unstake_inputs_epoch_progress: Some(0.50),
-            num_epochs_between_scoring: Some(2), // 2 epoch cycle
-            minimum_stake_lamports: Some(5_000_000_000),
-            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-        }))
+        .initialize_steward(
+            Some(UpdateParametersArgs {
+                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
+                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
+                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                scoring_delinquency_threshold_ratio: Some(0.85),
+                instant_unstake_delinquency_threshold_ratio: Some(0.70),
+                mev_commission_bps_threshold: Some(1000),
+                commission_threshold: Some(5),
+                historical_commission_threshold: Some(50),
+                num_delegation_validators: Some(200),
+                scoring_unstake_cap_bps: Some(750),
+                instant_unstake_cap_bps: Some(10),
+                stake_deposit_unstake_cap_bps: Some(10),
+                instant_unstake_epoch_progress: Some(0.00),
+                compute_score_slot_range: Some(1000),
+                instant_unstake_inputs_epoch_progress: Some(0.50),
+                num_epochs_between_scoring: Some(2), // 2 epoch cycle
+                minimum_stake_lamports: Some(5_000_000_000),
+                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            }),
+            None,
+        )
         .await;
     fixture.realloc_steward_state().await;
 

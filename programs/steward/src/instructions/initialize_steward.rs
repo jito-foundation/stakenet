@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, solana_program::program::invoke};
 
 use crate::{
     constants::MAX_ALLOC_BYTES, utils::deserialize_stake_pool, Config, StewardStateAccount,
-    UpdateParametersArgs,
+    UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 
 #[derive(Accounts)]
@@ -43,6 +43,7 @@ pub struct InitializeSteward<'info> {
 pub fn handler(
     ctx: Context<InitializeSteward>,
     update_parameters_args: &UpdateParametersArgs,
+    update_priority_fee_parameters_args: &UpdatePriorityFeeParametersArgs,
 ) -> Result<()> {
     // Confirm that the stake pool is valid
     let stake_pool_account = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
@@ -64,6 +65,12 @@ pub fn handler(
 
     let initial_parameters = config.parameters.get_valid_updated_parameters(
         update_parameters_args,
+        current_epoch,
+        max_slots_in_epoch,
+    )?;
+
+    let initial_parameters = initial_parameters.get_updated_priority_fee_parameters(
+        update_priority_fee_parameters_args,
         current_epoch,
         max_slots_in_epoch,
     )?;

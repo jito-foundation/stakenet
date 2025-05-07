@@ -1,5 +1,5 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
-use jito_tip_distribution::sdk::derive_tip_distribution_account_address;
+use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
 use stakenet_sdk::{
     models::entries::{Address, UpdateInstruction},

@@ -486,7 +486,7 @@ async fn test_add_validator_to_pool() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     {
@@ -509,7 +509,7 @@ async fn test_remove_validator_from_pool() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     // Setup the steward state
@@ -603,7 +603,7 @@ async fn test_set_preferred_validator() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
@@ -661,7 +661,7 @@ async fn test_increase_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
@@ -683,7 +683,7 @@ async fn test_decrease_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -762,7 +762,7 @@ async fn test_increase_additional_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
@@ -785,7 +785,7 @@ async fn test_decrease_additional_validator_stake() {
     let fixture = TestFixture::new().await;
 
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -879,7 +879,7 @@ async fn test_set_staker() {
     // Set up the test fixture
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     let new_staker = Keypair::new();

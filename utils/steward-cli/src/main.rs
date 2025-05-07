@@ -16,6 +16,7 @@ use commands::{
         resume::command_resume, revert_staker::command_revert_staker,
         set_staker::command_set_staker, update_authority::command_update_authority,
         update_config::command_update_config,
+        update_priority_fee_config::command_update_priority_fee_config,
         update_validator_list_balance::command_update_validator_list_balance,
     },
     command_args::{Args, Commands},
@@ -66,6 +67,9 @@ async fn main() -> Result<()> {
         Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
         Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
+        Commands::UpdatePriorityFeeConfig(args) => {
+            command_update_priority_fee_config(args, &client, program_id).await
+        }
         Commands::UpdateAuthority(args) => {
             command_update_authority(args, &client, program_id).await
         }

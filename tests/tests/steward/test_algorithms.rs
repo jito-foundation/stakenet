@@ -11,15 +11,18 @@ use jito_steward::{
     events::DecreaseComponents,
     insert_sorted_index,
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2,
-        InstantUnstakeDetails, ScoreComponentsV2, ScoreDetails,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
+        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
-use validator_history::{constants::TVC_MULTIPLIER, ClusterHistoryEntry, ValidatorHistoryEntry};
+use validator_history::{
+    constants::TVC_MULTIPLIER, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    ValidatorHistoryEntry,
+};
 
 #[test]
 fn test_compute_score() {
@@ -47,7 +50,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -58,6 +61,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -70,6 +75,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -88,7 +95,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -99,6 +106,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -111,6 +120,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -127,7 +138,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -138,6 +149,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -150,6 +163,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -166,7 +181,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -177,6 +192,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -189,6 +206,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -209,7 +228,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -220,6 +239,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -232,6 +253,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -250,7 +273,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -261,6 +284,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -273,6 +298,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -292,7 +319,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -303,6 +330,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -315,6 +344,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -335,7 +366,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -346,6 +377,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -358,6 +391,8 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -375,7 +410,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
@@ -386,6 +421,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 0.0,
             historical_commission_score: 0.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -398,6 +435,8 @@ fn test_compute_score() {
                 max_commission_epoch: current_epoch as u16,
                 max_historical_commission: 11,
                 max_historical_commission_epoch: current_epoch as u16,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -423,7 +462,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -434,6 +473,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -446,6 +487,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 14,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -461,7 +504,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -472,6 +515,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 0.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -484,6 +529,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 16,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -506,7 +553,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
@@ -517,6 +564,8 @@ fn test_compute_score() {
             vote_credits_ratio: 0.88,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -529,6 +578,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -546,7 +597,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
@@ -557,6 +608,8 @@ fn test_compute_score() {
             vote_credits_ratio: 0.95,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -569,6 +622,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -591,7 +646,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
@@ -602,6 +657,8 @@ fn test_compute_score() {
             vote_credits_ratio: 0.9,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -614,6 +671,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -634,7 +693,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV2 {
+        ScoreComponentsV3 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -645,6 +704,8 @@ fn test_compute_score() {
             vote_credits_ratio: 1.0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -657,6 +718,8 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
     );
@@ -696,6 +759,250 @@ fn test_compute_score() {
         TVC_ACTIVATION_EPOCH,
     );
     assert!(res == Err(StewardError::StakeHistoryNotRecentEnough.into()));
+
+    // test merkle_root_upload_authority is other
+    let mut validator = good_validator;
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .merkle_root_upload_authority = MerkleRootUploadAuthority::Other;
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 0.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 0.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+            }
+        }
+    );
+
+    // test merkle_root_upload_authority is OldJito
+    let mut validator = good_validator;
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .merkle_root_upload_authority = MerkleRootUploadAuthority::OldJitoLabs;
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+            }
+        }
+    );
+
+    // test merkle_root_upload_authority is TipRouter
+    let mut validator = good_validator;
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .merkle_root_upload_authority = MerkleRootUploadAuthority::TipRouter;
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 0,
+                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 1
+    let mut validator = good_validator;
+    let end_epoch =
+        current_epoch as usize - config.parameters.priority_fee_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.priority_fee_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 60;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 1.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 1.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 4_000,
+                max_priority_fee_commission_epoch: 8,
+            }
+        }
+    );
+
+    // Test permission fee commssion score 0
+    let mut validator = good_validator;
+    let end_epoch =
+        current_epoch as usize - config.parameters.priority_fee_lookback_offset as usize;
+    let start_epoch = end_epoch - config.parameters.priority_fee_lookback_epochs as usize;
+    for i in start_epoch..=end_epoch {
+        validator.history.arr_mut()[i].priority_fee_tips = 10;
+        validator.history.arr_mut()[i].total_priority_fees = 100;
+    }
+    let components = validator_score(
+        &validator,
+        &cluster_history,
+        &config,
+        current_epoch as u16,
+        TVC_ACTIVATION_EPOCH,
+    )
+    .unwrap();
+    assert_eq!(
+        components,
+        ScoreComponentsV3 {
+            score: 0.0,
+            yield_score: 1.0,
+            mev_commission_score: 1.0,
+            blacklisted_score: 1.0,
+            superminority_score: 1.0,
+            delinquency_score: 1.0,
+            running_jito_score: 1.0,
+            vote_credits_ratio: 1.0,
+            commission_score: 1.0,
+            historical_commission_score: 1.0,
+            merkle_root_upload_authority_score: 1.0,
+            priority_fee_commission_score: 0.0,
+            vote_account: validator.vote_account,
+            epoch: current_epoch as u16,
+            details: ScoreDetails {
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
+                superminority_epoch: EPOCH_DEFAULT,
+                delinquency_ratio: 1.0,
+                delinquency_epoch: EPOCH_DEFAULT,
+                max_commission: 0,
+                max_commission_epoch: 10,
+                max_historical_commission: 0,
+                max_historical_commission_epoch: 0,
+                max_priority_fee_commission: 9_000,
+                max_priority_fee_commission_epoch: 8,
+            }
+        }
+    );
 }
 
 #[test]
@@ -738,12 +1045,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -774,12 +1082,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: true,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -807,12 +1116,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: true,
             commission_check: true,
             mev_commission_check: true,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: bad_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -858,12 +1168,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: true,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -909,12 +1220,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: true,
             delinquency_check: false,
             commission_check: true,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -942,12 +1254,13 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -975,13 +1288,52 @@ fn test_instant_unstake() {
     assert!(res.is_ok());
     assert_eq!(
         res.unwrap(),
-        InstantUnstakeComponentsV2 {
+        InstantUnstakeComponentsV3 {
             instant_unstake: false,
             delinquency_check: false,
             commission_check: false,
             mev_commission_check: false,
             is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
+            epoch: current_epoch,
+            details: InstantUnstakeDetails {
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
+                vote_account_last_update_slot: end_slot,
+                total_blocks_latest: 0,
+                cluster_history_slot_index: slot_index,
+                commission: 0,
+                mev_commission: 0
+            }
+        }
+    );
+
+    // Instant unstake true when bad merkle root upload authority
+    let mut validator = validators[0];
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .merkle_root_upload_authority = MerkleRootUploadAuthority::Other;
+    let res = instant_unstake_validator(
+        &validator,
+        &cluster_history,
+        &config,
+        start_slot,
+        current_epoch,
+        TVC_ACTIVATION_EPOCH,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap(),
+        InstantUnstakeComponentsV3 {
+            instant_unstake: true,
+            delinquency_check: false,
+            commission_check: false,
+            mev_commission_check: false,
+            is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: true,
+            vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
                 epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),

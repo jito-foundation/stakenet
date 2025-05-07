@@ -73,8 +73,13 @@ pub mod steward {
     pub fn initialize_steward(
         ctx: Context<InitializeSteward>,
         update_parameters_args: UpdateParametersArgs,
+        update_priority_fee_parameters_args: UpdatePriorityFeeParametersArgs,
     ) -> Result<()> {
-        instructions::initialize_steward::handler(ctx, &update_parameters_args)
+        instructions::initialize_steward::handler(
+            ctx,
+            &update_parameters_args,
+            &update_priority_fee_parameters_args,
+        )
     }
 
     /// Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE
@@ -315,6 +320,18 @@ pub mod steward {
             lamports,
             transient_seed,
             ephemeral_seed,
+        )
+    }
+
+    /// For priority fee parameters that are present in args, the instruction checks that they
+    /// are within sensible bounds and saves them to config struct
+    pub fn update_priority_fee_parameters(
+        ctx: Context<UpdatePriorityFeeParameters>,
+        update_priority_fee_parameters_args: UpdatePriorityFeeParametersArgs,
+    ) -> Result<()> {
+        instructions::update_priority_fee_parameters::handler(
+            ctx,
+            &update_priority_fee_parameters_args,
         )
     }
 }

@@ -4,7 +4,7 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::{cast_epoch, fixed_point_sol},
-    ValidatorHistoryEntry,
+    MerkleRootUploadAuthority, ValidatorHistoryEntry,
 };
 
 use jito_tip_distribution::state::TipDistributionAccount;
@@ -72,7 +72,16 @@ pub fn handle_copy_tip_distribution_account(
         ValidatorHistoryEntry::default().mev_earned
     };
 
-    validator_history_account.set_mev_commission(epoch, mev_commission_bps, mev_earned)?;
+    let merkle_root_upload_authority = MerkleRootUploadAuthority::from_pubkey(
+        &tip_distribution_account.merkle_root_upload_authority,
+    );
+
+    validator_history_account.set_mev_commission(
+        epoch,
+        mev_commission_bps,
+        mev_earned,
+        merkle_root_upload_authority,
+    )?;
 
     Ok(())
 }
