@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::prelude::{EpochSchedule, SlotHistory};
-use log::{debug, error};
+use log::{debug, error, info};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
@@ -268,7 +268,16 @@ async fn search_block_for_voter(
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Result<Option<String>, BlockMetadataKeeperError> {
-    let block = get_block_safe(rpc_client, slot, slot_history, maybe_redundant_rpc_urls).await?;
+    let block = get_block_safe(
+        rpc_client,
+        slot,
+        slot_history,
+        maybe_redundant_rpc_urls,
+        Some(UiTransactionEncoding::Binary),
+        Some(TransactionDetails::Full),
+    )
+    .await?;
+
     let identity = Pubkey::from_str(identity).map_err(|err| {
         BlockMetadataKeeperError::OtherError(
             format!("Failed to parse Identity {} - {:?}", identity, err).to_string(),
@@ -282,40 +291,32 @@ async fn search_block_for_voter(
                     "Failed to decode transaction: None returned".to_string(),
                 )
             })?;
-            let accounts = decoded_tx.message.address_table_lookups().ok_or_else(|| {
-                BlockMetadataKeeperError::OtherError(
-                    "Failed to grab accounts: None returned".to_string(),
-                )
-            })?;
+
+            let accounts = decoded_tx.message.static_account_keys();
 
             let ixs = decoded_tx.message.instructions();
             for ix in ixs {
-                let program_id = accounts[ix.program_id_index as usize].account_key;
+                let program_id = accounts[ix.program_id_index as usize];
 
                 if program_id.ne(&solana_sdk::vote::program::id()) {
                     continue;
                 }
-                let vote_ix = match solana_bincode::limited_deserialize::<VoteInstruction>(
-                    &ix.data,
-                    solana_packet::PACKET_DATA_SIZE as u64,
-                ) {
-                    Ok(vote_ix) => vote_ix,
-                    Err(_) => continue, // Skip if unable to deserialize
-                };
 
-                match vote_ix {
-                    VoteInstruction::Vote(_) => {
-                        // The vote account is always the first account
-                        // The vote authority is the 4th account ( most likely identity )
-                        // https://docs.rs/solana-vote-program/2.2.7/solana_vote_program/vote_instruction/enum.VoteInstruction.html#variant.Vote
-                        let vote_account = accounts[0].account_key;
-                        let identity_account = accounts[3].account_key;
+                // TOWER_SYNC discriminator is 14
+                // The vote account is always the first account
+                // The vote authority is the 2nd account ( most likely identity )
+                // https://docs.rs/solana-vote-program/2.2.7/solana_vote_program/vote_instruction/enum.VoteInstruction.html#variant.TowerSync
+                const TOWER_SYNC: u8 = 14;
+                if ix.data[0] == TOWER_SYNC {
+                    let vote_account = accounts[1];
+                    let identity_account = accounts[0];
 
-                        if identity.eq(&identity_account) {
-                            return Ok(Some(vote_account.to_string()));
-                        }
+                    // info!("{} {}", vote_account, identity_account);
+
+                    if identity.eq(&identity_account) {
+                        info!("Found {}", identity_account);
+                        return Ok(Some(vote_account.to_string()));
                     }
-                    _ => continue,
                 }
             }
         }
@@ -331,11 +332,13 @@ pub async fn search_for_voter(
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Option<String> {
-    let end_of_epoch = (starting_slot + DEFAULT_SLOTS_PER_EPOCH) % DEFAULT_SLOTS_PER_EPOCH;
-    let start_of_epoch = starting_slot % DEFAULT_SLOTS_PER_EPOCH;
+    let start_of_search = (starting_slot / DEFAULT_SLOTS_PER_EPOCH) * DEFAULT_SLOTS_PER_EPOCH;
+    let end_of_search = start_of_search + DEFAULT_SLOTS_PER_EPOCH;
 
     // Forward Search
-    for slot in starting_slot..=end_of_epoch {
+    for slot in starting_slot..=end_of_search {
+        info!("Searching for {}:{}", identity, slot);
+
         match search_block_for_voter(
             rpc_client,
             identity,
@@ -355,7 +358,9 @@ pub async fn search_for_voter(
     }
 
     //Reverse Search
-    for slot in (start_of_epoch..=starting_slot).rev() {
+    for slot in (start_of_search..=starting_slot).rev() {
+        info!("Searching for {}:{}", identity, slot);
+
         match search_block_for_voter(
             rpc_client,
             identity,
@@ -450,6 +455,8 @@ pub async fn handle_slots_for_epoch(
         starting_slot,
     )
     .await?;
+
+    return Err(BlockMetadataKeeperError::OtherError("Test".to_string()));
 
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
 
@@ -616,8 +623,15 @@ pub async fn aggregate_information(
     for slot in starting_slot..=ending_slot {
         let relative_slot = slot - epoch_starting_slot;
         let leader_info = slot_leaders[relative_slot as usize].clone();
-        let maybe_block_data =
-            get_block_safe(client, slot, slot_history, maybe_redundant_rpc_urls).await;
+        let maybe_block_data = get_block_safe(
+            client,
+            slot,
+            slot_history,
+            maybe_redundant_rpc_urls,
+            Some(UiTransactionEncoding::Json),
+            Some(TransactionDetails::None),
+        )
+        .await;
         match maybe_block_data {
             Ok(block) => {
                 let voter = leader_info.get_voter_safe()?;
@@ -663,6 +677,8 @@ async fn get_block_safe(
     slot: u64,
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    encoding: Option<UiTransactionEncoding>,
+    transaction_details: Option<TransactionDetails>,
 ) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
     let mut current_client = client;
     let mut redundant_rpc_index = 0;
@@ -671,8 +687,8 @@ async fn get_block_safe(
             .get_block_with_config(
                 slot,
                 RpcBlockConfig {
-                    encoding: Some(UiTransactionEncoding::Json),
-                    transaction_details: Some(TransactionDetails::None),
+                    encoding,
+                    transaction_details,
                     rewards: Some(true),
                     commitment: Some(CommitmentConfig::finalized()),
                     max_supported_transaction_version: Some(0),

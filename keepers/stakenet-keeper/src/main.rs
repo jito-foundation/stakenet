@@ -239,10 +239,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             //     );
             // }
 
-            info!("Updating priority fee commission...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
-            );
+            // info!("Updating priority fee commission...");
+            // keeper_state.set_runs_errors_and_txs_for_epoch(
+            //     operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            // );
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;
