@@ -87,7 +87,7 @@ jobs:
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Override proc-macro2 version
-        run: cargo update -p proc-macro2 --precise 1.0.69
+        run: cargo update -p proc-macro2 --precise 1.0.94
 
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
