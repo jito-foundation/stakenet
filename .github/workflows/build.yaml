@@ -90,7 +90,7 @@ jobs:
         run: cargo update -p proc-macro2 --precise 1.0.94
 
       # build the program and IDL; exit if error
-      - run: anchor build --idl idl
+      - run: RUSTUP_TOOLCHAIN=nightly-2024-02-04 anchor build --idl idl
       - name: Check for diff on IDL
         run: git diff --exit-code
 
