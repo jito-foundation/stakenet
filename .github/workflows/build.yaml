@@ -70,7 +70,7 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-03-01
+          toolchain: nightly-2024-02-04
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -87,7 +87,7 @@ jobs:
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       # build the program and IDL; exit if error
-      - run: anchor build --idl idl
+      - run: RUSTUP_TOOLCHAIN=nightly-2024-03-01 anchor build --idl idl
       - name: Check for diff on IDL
         run: git diff --exit-code
 
