@@ -1,6 +1,7 @@
 FROM rust:1.85 as builder
 
-RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler libc6 libstdc++6
+RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
+
 RUN update-ca-certificates
 
 WORKDIR /usr/src/app
@@ -20,4 +21,3 @@ ENV APP="stakenet-keeper"
 COPY --from=builder /usr/src/app/target/release/$APP ./$APP
 
 ENTRYPOINT ./$APP
- 
