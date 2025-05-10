@@ -17,7 +17,6 @@ use solana_sdk::{
     signature::Keypair,
     signer::Signer,
     slot_history,
-    vote::instruction::VoteInstruction,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
@@ -237,8 +236,13 @@ async fn update_block_metadata(
             )
             .await?,
         );
+
+        info!("instructions extended {}", instructions.len());
+
         starting_slot = ending_slot + 1;
     }
+
+    info!("total ixs {}", instructions.len());
 
     let submit_result = submit_instructions(
         client,
@@ -306,12 +310,17 @@ async fn search_block_for_voter(
                 // The vote account is always the first account
                 // The vote authority is the 2nd account ( most likely identity )
                 // https://docs.rs/solana-vote-program/2.2.7/solana_vote_program/vote_instruction/enum.VoteInstruction.html#variant.TowerSync
+                //
+                // Vote Dq16VEt4GLCpArpdn5mdgx2bjau5tmN3nm3bPGbamGqu Identity(Authority) 73kcKwNwdBDryYdEE3jpReZiokXvx2eQEbqGWQ3YNpEn
                 const TOWER_SYNC: u8 = 14;
+                const VOTE_ACCOUNT_INDEX: u8 = 0;
+                const VOTE_AUTHORITY_INDEX: u8 = 1;
                 if ix.data[0] == TOWER_SYNC {
-                    let vote_account = accounts[1];
-                    let identity_account = accounts[0];
+                    let vote_account_index = ix.accounts[VOTE_ACCOUNT_INDEX as usize];
+                    let vote_authority_index = ix.accounts[VOTE_AUTHORITY_INDEX as usize];
 
-                    // info!("{} {}", vote_account, identity_account);
+                    let vote_account = accounts[vote_account_index as usize];
+                    let identity_account = accounts[vote_authority_index as usize];
 
                     if identity.eq(&identity_account) {
                         info!("Found {}", identity_account);
@@ -328,17 +337,20 @@ async fn search_block_for_voter(
 pub async fn search_for_voter(
     rpc_client: &RpcClient,
     identity: &String,
-    starting_slot: u64,
+    slot: u64,
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
 ) -> Option<String> {
-    let start_of_search = (starting_slot / DEFAULT_SLOTS_PER_EPOCH) * DEFAULT_SLOTS_PER_EPOCH;
-    let end_of_search = start_of_search + DEFAULT_SLOTS_PER_EPOCH;
+    // let start_of_search = (slot / DEFAULT_SLOTS_PER_EPOCH) * DEFAULT_SLOTS_PER_EPOCH;
+    // let end_of_search =
+    //     ((slot + DEFAULT_SLOTS_PER_EPOCH) / DEFAULT_SLOTS_PER_EPOCH) * DEFAULT_SLOTS_PER_EPOCH;
+
+    let slots_to_search = 10;
+    let start_of_search = slot - slots_to_search / 2;
+    let end_of_search = slot + slots_to_search / 2;
 
     // Forward Search
-    for slot in starting_slot..=end_of_search {
-        info!("Searching for {}:{}", identity, slot);
-
+    for slot in start_of_search..=end_of_search {
         match search_block_for_voter(
             rpc_client,
             identity,
@@ -350,32 +362,18 @@ pub async fn search_for_voter(
         {
             Ok(maybe_voter) => {
                 if let Some(voter) = maybe_voter {
+                    info!("Found {}:{} - {}", identity, slot, voter);
                     return Some(voter);
+                } else {
+                    info!("Could not find {}:{}", identity, slot);
                 }
             }
-            Err(_err) => break, // Break on error
-        }
-    }
-
-    //Reverse Search
-    for slot in (start_of_search..=starting_slot).rev() {
-        info!("Searching for {}:{}", identity, slot);
-
-        match search_block_for_voter(
-            rpc_client,
-            identity,
-            slot,
-            slot_history,
-            maybe_redundant_rpc_urls,
-        )
-        .await
-        {
-            Ok(maybe_voter) => {
-                if let Some(voter) = maybe_voter {
-                    return Some(voter);
-                }
-            }
-            Err(_err) => break,
+            Err(err) => {
+                error!(
+                    "Could not find with error {}:{} - {:?}",
+                    identity, slot, err
+                );
+            } // Break on error
         }
     }
 
@@ -401,8 +399,17 @@ pub async fn populate_relative_slot_leaders(
         }
     };
 
+    let mut identity_to_vote_map = identity_to_vote_map.clone();
+    let mut ignore_leader: Vec<String> = vec![];
+
     for (leader, slots) in rpc_leader_schedule.iter() {
         for relative_slot in slots {
+            let absolute_slot = starting_slot + *relative_slot as u64;
+
+            if ignore_leader.contains(&leader) {
+                continue;
+            }
+
             // Convert leader (identity pubkey) to be the vote_key
             if let Some(voter) = identity_to_vote_map.get(leader) {
                 relative_slot_leaders[*relative_slot] = LeaderInfo::new(leader, Some(voter))
@@ -410,17 +417,21 @@ pub async fn populate_relative_slot_leaders(
                 match search_for_voter(
                     rpc_client,
                     leader,
-                    starting_slot,
+                    absolute_slot,
                     slot_history,
                     maybe_redundant_rpc_urls,
                 )
                 .await
                 {
                     Some(voter) => {
+                        identity_to_vote_map.insert(leader.clone(), voter.clone());
                         relative_slot_leaders[*relative_slot] =
                             LeaderInfo::new(leader, Some(&voter))
                     }
-                    None => relative_slot_leaders[*relative_slot] = LeaderInfo::new(leader, None),
+                    None => {
+                        ignore_leader.push(leader.clone());
+                        relative_slot_leaders[*relative_slot] = LeaderInfo::new(leader, None)
+                    }
                 }
             }
         }
@@ -456,9 +467,8 @@ pub async fn handle_slots_for_epoch(
     )
     .await?;
 
-    return Err(BlockMetadataKeeperError::OtherError("Test".to_string()));
-
     let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
+    info!("relative slot leaders {}", relative_slot_leaders.len());
 
     let aggregate_info = aggregate_information(
         &rpc_client,
@@ -473,6 +483,7 @@ pub async fn handle_slots_for_epoch(
     .await?;
 
     // Update the SQL lite DB with the aggregate information
+    info!("aggregate_info {}", aggregate_info.len());
     let leader_block_metadatas = get_updated_leader_block_metadatas(
         &conn,
         &epoch_schedule,
@@ -480,6 +491,9 @@ pub async fn handle_slots_for_epoch(
         ending_slot,
         aggregate_info,
     )?;
+
+    info!("leader block data {}", leader_block_metadatas.len());
+
     batch_insert_leader_block_data(&conn, &leader_block_metadatas)?;
     // Update the block_keeper_metadata record
     upsert_block_keeper_metadata(&conn, epoch, ending_slot)?;
@@ -504,6 +518,8 @@ pub async fn handle_slots_for_epoch(
             )
         })
         .collect::<Vec<_>>();
+
+    info!("IX len {}", instructions.len());
 
     Ok(instructions)
 }
@@ -634,28 +650,42 @@ pub async fn aggregate_information(
         .await;
         match maybe_block_data {
             Ok(block) => {
-                let voter = leader_info.get_voter_safe()?;
-
-                // get the priority fee rewards for the block.
-                let priority_fees = block
-                    .rewards
-                    .unwrap()
-                    .into_iter()
-                    .find(|r| r.reward_type == Some(RewardType::Fee))
-                    .map(|r| r.lamports)
-                    .unwrap_or(0);
-                increment_leader_info(&mut res, &voter, epoch, 1, 1, priority_fees);
+                if let Ok(voter) = leader_info.clone().get_voter_safe() {
+                    // get the priority fee rewards for the block.
+                    let priority_fees = block
+                        .rewards
+                        .unwrap()
+                        .into_iter()
+                        .find(|r| r.reward_type == Some(RewardType::Fee))
+                        .map(|r| r.lamports)
+                        .unwrap_or(0);
+                    increment_leader_info(&mut res, &voter, epoch, 1, 1, priority_fees);
+                } else {
+                    error!(
+                        "Skipping... Could not find voter for {}",
+                        leader_info.identity
+                    )
+                }
             }
             Err(err) => match err {
                 BlockMetadataKeeperError::SkippedBlock => {
-                    let voter = leader_info.get_voter_safe()?;
-
-                    increment_leader_info(&mut res, &voter, epoch, 1, 0, 0);
+                    if let Ok(voter) = leader_info.clone().get_voter_safe() {
+                        increment_leader_info(&mut res, &voter, epoch, 1, 0, 0);
+                    } else {
+                        error!(
+                            "Skipping with error... Could not find voter for {}. {}",
+                            leader_info.identity, err
+                        )
+                    }
                 }
                 _ => return Err(err),
             },
         }
+        info!("Done with slot {}", slot)
     }
+
+    info!("Done with all slots");
+
     Ok(res)
 }
 
