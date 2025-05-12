@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anchor_lang::prelude::EpochSchedule;
 use log::info;
 use rusqlite::{params, Connection};
@@ -230,6 +232,39 @@ impl DBSlotInfo {
         }
 
         Ok(slots_needing_update)
+    }
+
+    pub fn get_unmapped_identity_accounts(
+        connection: &Connection,
+    ) -> Result<HashMap<String, Vec<u64>>, BlockMetadataKeeperError> {
+        // Prepare query to find all (epoch, identity_key) pairs where vote_key is empty
+        let mut statement = connection.prepare(
+            "SELECT epoch, identity_key
+             FROM slot_info
+             WHERE vote_key = ''
+             ORDER BY identity_key ASC, epoch ASC",
+        )?;
+
+        // Execute query
+        let unmapped_results = statement.query_map(params![], |row| {
+            let epoch: u64 = row.get(0)?;
+            let identity_key: String = row.get(1)?;
+            Ok((epoch, identity_key))
+        })?;
+
+        // Group results by identity_key
+        let mut unmapped_accounts: HashMap<String, Vec<u64>> = HashMap::new();
+        for result in unmapped_results {
+            let (epoch, identity_key) = result?;
+
+            // Add the epoch to the vector for this identity, creating the vector if it doesn't exist
+            unmapped_accounts
+                .entry(identity_key)
+                .or_insert_with(Vec::new)
+                .push(epoch);
+        }
+
+        Ok(unmapped_accounts)
     }
 
     pub fn get_vote_keys_per_epoch(

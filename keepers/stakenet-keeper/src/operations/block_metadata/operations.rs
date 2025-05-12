@@ -269,6 +269,18 @@ async fn update_block_metadata_2(
         }
     }
 
+    // 2b. Print out all
+    let all_unmapped_identities = DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection)?;
+    if !all_unmapped_identities.is_empty() {
+        let mut output_string = String::new();
+        output_string.push_str("\n\n ------- UNMAPPED IDENTITIES -------");
+        for (identity, epochs) in all_unmapped_identities.iter() {
+            output_string.push_str(&format!("\n {} {:?}", identity, epochs));
+        }
+        output_string.push_str("\n");
+        info!("{}", output_string)
+    }
+
     // 3. Update Blocks
     info!("3. Update Blocks");
     let slots_needing_blocks =
