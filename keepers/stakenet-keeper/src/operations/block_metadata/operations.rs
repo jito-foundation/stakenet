@@ -31,7 +31,7 @@ use crate::{
     operations::{
         block_metadata::db::{
             batch_insert_leader_block_data, fetch_block_keeper_metadata, prune_prior_records,
-            upsert_block_keeper_metadata, BlockKeeperMetadata,
+            upsert_block_keeper_metadata, BlockKeeperMetadata, DBSlotInfo,
         },
         keeper_operations::{check_flag, KeeperOperations},
     },
@@ -150,7 +150,7 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     no_pack: bool,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
-    update_block_metadata(
+    update_block_metadata_2(
         client,
         sqlite_connection,
         block_metadata_interval,
@@ -164,6 +164,212 @@ async fn _process(
         no_pack,
     )
     .await
+}
+
+async fn update_block_metadata_2(
+    client: &Arc<RpcClient>,
+    sqlite_connection: &Arc<Connection>,
+    block_metadata_interval: u64,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    keeper_state: &KeeperState,
+    program_id: &Pubkey,
+    priority_fee_oracle_authority_keypair: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
+    priority_fee_in_microlamports: u64,
+    no_pack: bool,
+) -> Result<SubmitStats, Box<dyn std::error::Error>> {
+    let identity_to_vote_map = &keeper_state.identity_to_vote_map;
+    let slot_history = &keeper_state.slot_history;
+    let epoch_schedule = &keeper_state.epoch_schedule;
+    let current_epoch_info = &keeper_state.epoch_info;
+    let current_epoch = current_epoch_info.epoch;
+    let current_finalized_slot = client
+        .get_slot_with_commitment(CommitmentConfig::finalized())
+        .await?;
+
+    let lookback_epochs = 3;
+    let epoch_range = (current_epoch - lookback_epochs)..current_epoch;
+
+    // 1. Update Epoch Schedule
+    info!("1. Update Epoch Schedule");
+    for epoch in epoch_range.clone() {
+        // 1.a Update Epoch Schedule
+        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
+
+        let epoch_leader_schedule =
+            match get_leader_schedule_safe(&client, epoch_starting_slot).await {
+                Ok(schedule) => schedule,
+                Err(err) => {
+                    info!(
+                        "Could not get Epoch Leader Schedule for {} - skipping: {:?}",
+                        epoch, err
+                    );
+                    continue;
+                }
+            };
+
+        let result = DBSlotInfo::create_from_leader_schedule(
+            sqlite_connection,
+            epoch,
+            epoch_schedule,
+            &epoch_leader_schedule,
+        );
+        if result.is_err() {
+            info!(
+                "Could not write leader squedule to DB {} - skipping: {:?}",
+                epoch,
+                result.err()
+            );
+            continue;
+        }
+
+        // 1.b Find missing vote accounts
+        if epoch == current_epoch {
+            for leader in epoch_leader_schedule.keys() {
+                if !identity_to_vote_map.contains_key(leader) {
+                    // TODO
+                    info!("TODO Could not find Vote for {}", leader)
+                }
+            }
+        }
+    }
+
+    // 2. Update Mapping
+    info!("2. Update Mapping");
+    for entry in identity_to_vote_map {
+        let identity = match Pubkey::from_str(entry.0.clone().as_str()) {
+            Ok(identity) => identity,
+            Err(err) => {
+                info!("Could not parse identity {} - skipping: {:?}", entry.0, err);
+                continue;
+            }
+        };
+        let vote = match Pubkey::from_str(entry.1.clone().as_str()) {
+            Ok(vote) => vote,
+            Err(err) => {
+                info!("Could not parse vote {} - skipping: {:?}", entry.0, err);
+                continue;
+            }
+        };
+
+        let result = DBSlotInfo::update_vote_identity_mapping(
+            sqlite_connection,
+            current_epoch,
+            &identity,
+            &vote,
+        );
+        if result.is_err() {
+            info!(
+                "Could not write leader squedule to DB {} - skipping: {:?}",
+                current_epoch,
+                result.err()
+            );
+            continue;
+        }
+    }
+
+    // 3. Update Blocks
+    info!("3. Update Blocks");
+    let slots_needing_blocks =
+        DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
+    for slot in slots_needing_blocks {
+        let maybe_block_data = get_block_safe(
+            client,
+            slot,
+            slot_history,
+            maybe_redundant_rpc_urls,
+            Some(UiTransactionEncoding::Json),
+            Some(TransactionDetails::None),
+        )
+        .await;
+
+        match maybe_block_data {
+            Ok(block) => {
+                let priority_fees = block
+                    .rewards
+                    .unwrap()
+                    .into_iter()
+                    .find(|r| r.reward_type == Some(RewardType::Fee))
+                    .map(|r| r.lamports)
+                    .unwrap_or(0) as u64;
+                DBSlotInfo::update_block_data(sqlite_connection, slot, priority_fees)?
+            }
+            Err(err) => match err {
+                BlockMetadataKeeperError::SkippedBlock => {
+                    DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
+                }
+                _ => {
+                    info!(
+                        "Could not get block info for slot {} - skipping: {:?}",
+                        slot, err
+                    )
+                }
+            },
+        }
+    }
+
+    // 4. Submit Update TXs
+    info!("4. Submit Update TXs");
+    let mut ixs = vec![];
+    for epoch in epoch_range {
+        let vote_keys = match DBSlotInfo::get_vote_keys_per_epoch(sqlite_connection, epoch) {
+            Ok(vote_keys) => vote_keys,
+            Err(err) => {
+                info!(
+                    "Could not get vote keys for epoch {} - skipping: {:?}",
+                    epoch, err
+                );
+                continue;
+            }
+        };
+
+        for vote_key in vote_keys {
+            let vote = match Pubkey::from_str(vote_key.clone().as_str()) {
+                Ok(vote) => vote,
+                Err(err) => {
+                    info!(
+                        "Could not parse vote_key {} - skipping: {:?}",
+                        vote_key, err
+                    );
+                    continue;
+                }
+            };
+            let entry = match DBSlotInfo::get_priority_fee_and_block_metadata_entry(
+                sqlite_connection,
+                &vote,
+                epoch,
+                current_finalized_slot,
+                program_id,
+                &priority_fee_oracle_authority_keypair.pubkey(),
+            ) {
+                Ok(entry) => entry,
+                Err(err) => {
+                    info!(
+                        "Could not fetch entry for {} - skipping: {:?}",
+                        vote_key, err
+                    );
+                    continue;
+                }
+            };
+
+            ixs.push(entry.update_instruction());
+        }
+    }
+
+    let submit_result = submit_instructions(
+        client,
+        ixs,
+        priority_fee_oracle_authority_keypair,
+        priority_fee_in_microlamports,
+        retry_count,
+        confirmation_time,
+        None,
+        no_pack,
+    )
+    .await;
+
+    Ok(submit_result?)
 }
 
 async fn update_block_metadata(
