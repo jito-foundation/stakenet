@@ -152,6 +152,10 @@ pub struct Args {
     #[arg(long, env, default_value = "false")]
     pub pay_for_new_accounts: bool,
 
+    /// Pay for the creation of new accounts when needed
+    #[arg(long, env, default_value = "local")]
+    pub region: String,
+
     /// DEBUGGING Changes the random cool down range ( minutes )
     #[arg(long, env, default_value = "20")]
     pub cool_down_range: u8,
@@ -190,6 +194,7 @@ impl fmt::Display for Args {
             No Pack: {}\n\
             Pay for New Accounts: {}\n\
             Cool Down Range: {} minutes\n\
+            Region: {}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoint,
@@ -217,7 +222,8 @@ impl fmt::Display for Args {
             self.full_startup,
             self.no_pack,
             self.pay_for_new_accounts,
-            self.cool_down_range
+            self.cool_down_range,
+            self.region,
         )
     }
 }

@@ -21,7 +21,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{sync::Arc, time::Duration};
+use std::{process::Command, sync::Arc, time::Duration};
 use tokio::time::sleep;
 
 fn set_run_flags(args: &Args) -> u32 {
@@ -291,7 +291,18 @@ async fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    set_host_id(format!("{}", args.cluster));
+    let hostname_cmd = Command::new("hostname")
+        .output()
+        .expect("Failed to execute hostname command");
+
+    let hostname = String::from_utf8_lossy(&hostname_cmd.stdout)
+        .trim()
+        .to_string();
+
+    set_host_id(format!(
+        "stakenet-keeper_{}_{}_{}",
+        args.region, args.cluster, hostname
+    ));
 
     let client = Arc::new(RpcClient::new_with_timeout(
         args.json_rpc_url.clone(),
