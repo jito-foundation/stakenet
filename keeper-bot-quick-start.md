@@ -30,6 +30,9 @@ JSON_RPC_URL="INCLUDE YOUR RPC URL HERE"
 # Cluster to specify (mainnet, testnet, devnet)
 CLUSTER=mainnet
 
+# Region to specify for metrics purposes (us-east, eu-west, local, etc.)
+REGION=local
+
 # Log levels
 RUST_LOG="info,solana_gossip=error,solana_metrics=info"
 

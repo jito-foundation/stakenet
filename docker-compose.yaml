@@ -4,7 +4,6 @@ services:
     build:
       context: .
       target: validator-history
-    container_name: stakenet-keeper
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -33,6 +32,7 @@ services:
       - PAY_FOR_NEW_ACCOUNTS=${PAY_FOR_NEW_ACCOUNTS}
       - COOL_DOWN_RANGE=${COOL_DOWN_RANGE}
       - GOSSIP_ENTRYPOINT=${GOSSIP_ENTRYPOINT}
+      - REGION=${REGION}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
