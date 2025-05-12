@@ -188,7 +188,7 @@ async fn update_block_metadata_2(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 3;
+    let lookback_epochs = 0;
     let epoch_range = (current_epoch - lookback_epochs)..current_epoch;
 
     // 1. Update Epoch Schedule
@@ -930,6 +930,7 @@ async fn get_block_safe(
 ) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
     let mut current_client = client;
     let mut redundant_rpc_index = 0;
+
     loop {
         let block_res = current_client
             .get_block_with_config(
