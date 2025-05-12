@@ -188,7 +188,7 @@ async fn update_block_metadata_2(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 0;
+    let lookback_epochs = 3;
     let epoch_range = (current_epoch - lookback_epochs)..current_epoch;
 
     // 1. Update Epoch Schedule
@@ -286,6 +286,7 @@ async fn update_block_metadata_2(
     let slots_needing_blocks =
         DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
     for slot in slots_needing_blocks {
+        info!("Updating Block {}", slot);
         let maybe_block_data = get_block_safe(
             client,
             slot,
@@ -335,6 +336,7 @@ async fn update_block_metadata_2(
                 continue;
             }
         };
+        info!("Vote Keys Count {}", vote_keys.len());
 
         for vote_key in vote_keys {
             let vote = match Pubkey::from_str(vote_key.clone().as_str()) {
@@ -369,6 +371,7 @@ async fn update_block_metadata_2(
         }
     }
 
+    info!("5. TX Len {}", ixs.len());
     let submit_result = submit_instructions(
         client,
         ixs,

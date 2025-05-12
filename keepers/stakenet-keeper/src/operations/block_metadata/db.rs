@@ -474,9 +474,6 @@ pub fn upsert_block_keeper_metadata(
 
 /// Create all necessary tables and indexes. Uses IF NOT EXISTS to be safe
 pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeperError> {
-    //TODO TAKE OUT
-    conn.execute("DROP TABLE IF EXISTS slot_info", ())?;
-
     conn.execute(
         "CREATE TABLE IF NOT EXISTS slot_info (
           absolute_slot  INTEGER PRIMARY KEY,
