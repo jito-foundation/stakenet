@@ -101,6 +101,7 @@ impl DBSlotInfo {
                 let absolute_slot = first_slot_in_epoch + *relative_slot as u64;
 
                 // Each execute is its own implicit transaction in SQLite
+                info!("Writing {} --- {}", relative_slot, absolute_slot);
                 connection.execute(
                     sql,
                     params![
