@@ -6144,6 +6144,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "spl-governance"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79362b8e4616f4f84ca5a2a413f84e88fb4dd00322fe4baaa407254901ef6d62"
+dependencies = [
+ "arrayref",
+ "bincode",
+ "borsh 0.10.3",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "serde_derive",
+ "solana-program",
+ "spl-governance-addin-api",
+ "spl-governance-tools",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
+name = "spl-governance-addin-api"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dc1be90f8b71e336933fedbe17f645cd33d36e8451dfb6ce1210ef585dc73b6"
+dependencies = [
+ "borsh 0.10.3",
+ "solana-program",
+ "spl-governance-tools",
+]
+
+[[package]]
+name = "spl-governance-tools"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73b9c475357534e31e296a40491a5a834cf1289292f9eb592628a8f6e2525d7f"
+dependencies = [
+ "arrayref",
+ "bincode",
+ "borsh 0.10.3",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "serde_derive",
+ "solana-program",
+ "spl-token",
+ "thiserror",
+]
+
+[[package]]
 name = "spl-math"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6424,7 +6473,9 @@ name = "stakenet-sdk"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "base64 0.21.7",
  "bincode",
+ "borsh 0.10.3",
  "clap 4.4.18",
  "futures",
  "jito-steward",
@@ -6436,6 +6487,7 @@ dependencies = [
  "solana-program",
  "solana-sdk",
  "solana-transaction-status",
+ "spl-governance",
  "spl-pod",
  "spl-stake-pool",
  "thiserror",
