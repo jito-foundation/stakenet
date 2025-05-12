@@ -481,8 +481,8 @@ pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeper
           epoch INTEGER,
           vote_key TEXT,
           identity_key TEXT,
-          priority_fees INTEGER
-          state INTEGER
+          priority_fees INTEGER,
+          state INTEGER,
           error_string TEXT
       )",
         (),
@@ -492,8 +492,7 @@ pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeper
         "CREATE TABLE IF NOT EXISTS slot_info (
           id    INTEGER PRIMARY KEY,
           slot  INTEGER,
-          epoch INTEGER,
-
+          epoch INTEGER
       )",
         (),
     )?;
