@@ -194,9 +194,9 @@ async fn update_block_metadata_2(
     // 1. Update Epoch Schedule
     info!("1. Update Epoch Schedule");
     for epoch in epoch_range.clone() {
+        info!("Getting Epoch Schedule for {}", epoch);
         // 1.a Update Epoch Schedule
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
-
         let epoch_leader_schedule =
             match get_leader_schedule_safe(&client, epoch_starting_slot).await {
                 Ok(schedule) => schedule,
@@ -209,6 +209,7 @@ async fn update_block_metadata_2(
                 }
             };
 
+        info!("Writing Epoch Schedule");
         let result = DBSlotInfo::create_from_leader_schedule(
             sqlite_connection,
             epoch,
