@@ -92,6 +92,7 @@ impl DBSlotInfo {
             error_string
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
+        let mut writes: u64 = 0;
         for leader in leader_schedule.iter() {
             let identity_key = leader.0;
             let relative_slots = leader.1;
@@ -101,7 +102,11 @@ impl DBSlotInfo {
                 let absolute_slot = first_slot_in_epoch + *relative_slot as u64;
 
                 // Each execute is its own implicit transaction in SQLite
-                info!("Writing {} --- {}", relative_slot, absolute_slot);
+                writes += 1;
+                info!(
+                    "Writing ({}) {} --- {}",
+                    writes, relative_slot, absolute_slot
+                );
                 connection.execute(
                     sql,
                     params![
