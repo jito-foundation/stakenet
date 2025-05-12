@@ -388,8 +388,8 @@ pub struct RemoveFromBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
+    /// Validator indices of validator list to remove (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
     pub validator_history_indices_to_deblacklist: Vec<u32>,
 }
 

@@ -55,7 +55,7 @@ pub async fn command_add_to_blacklist(
             vote_account, history_address, vh_index
         );
         if account_exists {
-            indices.push(vh_index.parse().unwrap());
+            indices.push(vh_index.parse()?);
         }
     }
 
