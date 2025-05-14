@@ -1,5 +1,6 @@
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{prelude::EpochSchedule, InstructionData, ToAccountMetas};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
+use solana_sdk::epoch_schedule;
 use stakenet_sdk::{
     models::entries::{Address, UpdateInstruction},
     utils::accounts::{get_validator_history_address, get_validator_history_config_address},
@@ -16,7 +17,12 @@ pub struct PriorityFeeAndBlockMetadataEntry {
     pub total_priority_fees: u64,
     pub total_leader_slots: u32,
     pub blocks_produced: u32,
-    pub current_slot: u64,
+    pub update_slot: u64,
+    // Aux Data
+    pub blocks_left: u32,
+    pub blocks_error: u32,
+    pub blocks_missed: u32,
+    pub highest_slot: u64,
 }
 
 impl PriorityFeeAndBlockMetadataEntry {
@@ -25,10 +31,6 @@ impl PriorityFeeAndBlockMetadataEntry {
         epoch: u64,
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
-        total_priority_fees: u64,
-        total_leader_slots: u32,
-        blocks_produced: u32,
-        current_slot: u64,
     ) -> Self {
         let validator_history_account = get_validator_history_address(vote_account, program_id);
         let config = get_validator_history_config_address(program_id);
@@ -40,10 +42,14 @@ impl PriorityFeeAndBlockMetadataEntry {
             program_id: *program_id,
             priority_fee_oracle_authority: *priority_fee_oracle_authority,
             epoch,
-            total_priority_fees,
-            total_leader_slots,
-            blocks_produced,
-            current_slot,
+            total_priority_fees: 0,
+            total_leader_slots: 0,
+            blocks_produced: 0,
+            update_slot: 0,
+            blocks_left: 0,
+            blocks_error: 0,
+            blocks_missed: 0,
+            highest_slot: 0,
         }
     }
 }
@@ -70,7 +76,7 @@ impl UpdateInstruction for PriorityFeeAndBlockMetadataEntry {
                 total_priority_fees: self.total_priority_fees,
                 total_leader_slots: self.total_leader_slots,
                 blocks_produced: self.blocks_produced,
-                current_slot: self.current_slot,
+                current_slot: self.update_slot,
             }
             .data(),
         }

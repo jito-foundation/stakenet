@@ -6,6 +6,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use stakenet_sdk::models::cluster::Cluster;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use tokio::sync::Mutex;
 
 pub struct KeeperConfig {
     pub client: Arc<RpcClient>,
@@ -29,9 +30,15 @@ pub struct KeeperConfig {
     pub full_startup: bool,
     pub no_pack: bool,
     pub pay_for_new_accounts: bool,
-    pub sqlite_connection: Arc<Connection>,
+    pub sqlite_connection: Arc<Mutex<Connection>>,
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
+}
+
+impl KeeperConfig {
+    pub async fn mut_connection(&self) -> tokio::sync::MutexGuard<'_, Connection> {
+        self.sqlite_connection.lock().await
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -128,19 +135,19 @@ pub struct Args {
     pub cluster: Cluster,
 
     /// Run running the cluster history
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_cluster_history: bool,
 
     /// Run MEV commission
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_copy_vote_accounts: bool,
 
     /// Run MEV commission
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_mev_commission: bool,
 
     /// Run MEV earned
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_mev_earned: bool,
 
     /// Run stake upload
@@ -154,15 +161,15 @@ pub struct Args {
     pub run_gossip_upload: bool,
 
     /// Run stake upload
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_steward: bool,
 
     /// Run emit metrics
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_emit_metrics: bool,
 
     /// Run with the startup flag set to true
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub full_startup: bool,
 
     /// DEBUGGING Don't smart pack instructions - it will be faster, but more expensive
@@ -199,7 +206,7 @@ pub struct Args {
     pub redundant_rpc_urls: Option<Vec<String>>,
 
     /// Run Priority Fee Commission
-    #[arg(long, env, default_value = "true")]
+    #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
 }
 

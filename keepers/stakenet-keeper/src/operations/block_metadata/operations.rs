@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::prelude::{EpochSchedule, SlotHistory};
+use futures::future::join_all;
 use log::{debug, error, info};
 use regex::Regex;
 use rusqlite::Connection;
@@ -79,7 +80,8 @@ pub async fn fire(
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
-    let sqlite_connection = &keeper_config.sqlite_connection;
+    let mut mutex_guard = keeper_config.mut_connection().await;
+    let sqlite_connection: &mut Connection = &mut *mutex_guard;
     let block_metadata_interval = keeper_config.block_metadata_interval;
     let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_oracle_authority_keypair = keeper_config
@@ -139,7 +141,7 @@ pub async fn fire(
 
 async fn _process(
     client: &Arc<RpcClient>,
-    sqlite_connection: &Arc<Connection>,
+    sqlite_connection: &mut Connection,
     block_metadata_interval: u64,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
@@ -168,7 +170,7 @@ async fn _process(
 
 async fn update_block_metadata_2(
     client: &Arc<RpcClient>,
-    sqlite_connection: &Arc<Connection>,
+    sqlite_connection: &mut Connection,
     block_metadata_interval: u64,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
@@ -188,204 +190,214 @@ async fn update_block_metadata_2(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 3;
-    let epoch_range = (current_epoch - lookback_epochs)..current_epoch;
+    let lookback_epochs = 1;
+    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule
-    info!("1. Update Epoch Schedule");
-    for epoch in epoch_range.clone() {
-        info!("Getting Epoch Schedule for {}", epoch);
-        // 1.a Update Epoch Schedule
-        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
-        let epoch_leader_schedule =
-            match get_leader_schedule_safe(&client, epoch_starting_slot).await {
-                Ok(schedule) => schedule,
-                Err(err) => {
-                    info!(
-                        "Could not get Epoch Leader Schedule for {} - skipping: {:?}",
-                        epoch, err
-                    );
-                    continue;
-                }
-            };
-
-        info!("Writing Epoch Schedule");
-        let result = DBSlotInfo::create_from_leader_schedule(
-            sqlite_connection,
-            epoch,
-            epoch_schedule,
-            &epoch_leader_schedule,
-        );
-        if result.is_err() {
-            info!(
-                "Could not write leader squedule to DB {} - skipping: {:?}",
-                epoch,
-                result.err()
-            );
-            continue;
-        }
-
-        // 1.b Find missing vote accounts
-        if epoch == current_epoch {
-            for leader in epoch_leader_schedule.keys() {
-                if !identity_to_vote_map.contains_key(leader) {
-                    // TODO
-                    info!("TODO Could not find Vote for {}", leader)
-                }
-            }
-        }
-    }
-
-    // 2. Update Mapping
-    info!("2. Update Mapping");
-    for entry in identity_to_vote_map {
-        let identity = match Pubkey::from_str(entry.0.clone().as_str()) {
-            Ok(identity) => identity,
-            Err(err) => {
-                info!("Could not parse identity {} - skipping: {:?}", entry.0, err);
-                continue;
-            }
-        };
-        let vote = match Pubkey::from_str(entry.1.clone().as_str()) {
-            Ok(vote) => vote,
-            Err(err) => {
-                info!("Could not parse vote {} - skipping: {:?}", entry.0, err);
-                continue;
-            }
-        };
-
-        let result = DBSlotInfo::update_vote_identity_mapping(
+    {
+        info!("\n\n\n1. Update Epoch Schedule\n\n\n");
+        let start_time = std::time::Instant::now();
+        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
+        let epoch_leader_schedule = get_leader_schedule_safe(&client, epoch_starting_slot).await?;
+        match DBSlotInfo::upsert_leader_schedule(
             sqlite_connection,
             current_epoch,
-            &identity,
-            &vote,
-        );
-        if result.is_err() {
-            info!(
-                "Could not write leader squedule to DB {} - skipping: {:?}",
-                current_epoch,
-                result.err()
-            );
-            continue;
+            epoch_schedule,
+            &epoch_leader_schedule,
+            None,
+        ) {
+            Ok(write_count) => {
+                let time_ms = start_time.elapsed().as_millis();
+                info!(
+                    "Wrote {} leaders for epoch {} in {:.3}s",
+                    write_count,
+                    current_epoch,
+                    time_ms as f64 / 1000.0
+                )
+            }
+            Err(err) => error!("Error writing leaders {:?}", err),
+        }
+
+        // 1.b Log out missing vote accounts
+        for leader in epoch_leader_schedule.keys() {
+            if !identity_to_vote_map.contains_key(leader) {
+                // TODO
+                error!("TODO Could not find Vote for {}", leader)
+            }
         }
     }
 
-    // 2b. Print out all
-    let all_unmapped_identities = DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection)?;
-    if !all_unmapped_identities.is_empty() {
-        let mut output_string = String::new();
-        output_string.push_str("\n\n ------- UNMAPPED IDENTITIES -------");
-        for (identity, epochs) in all_unmapped_identities.iter() {
-            output_string.push_str(&format!("\n {} {:?}", identity, epochs));
+    // 2. Update Mapping ( Only for current epoch )
+    {
+        info!("\n\n\n2. Map Identity to Vote\n\n\n");
+        let start_time = std::time::Instant::now();
+        match DBSlotInfo::upsert_vote_identity_mapping(
+            sqlite_connection,
+            current_epoch,
+            identity_to_vote_map,
+            None,
+        ) {
+            Ok(write_counter) => {
+                let time_ms = start_time.elapsed().as_millis();
+                info!(
+                    "Wrote {} identity/vote mappings in {:.3}s",
+                    write_counter,
+                    time_ms as f64 / 1000.0
+                )
+            }
+            Err(err) => error!("Error updating identity/vote mapping {:?}", err),
         }
-        output_string.push_str("\n");
-        info!("{}", output_string)
+
+        // 2b. Print out all
+        let all_unmapped_identities =
+            DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection, current_epoch)?;
+        error!(
+            "Unmapped identities ({}) \n{:?}\n",
+            all_unmapped_identities.len(),
+            all_unmapped_identities
+        );
     }
 
     // 3. Update Blocks
-    info!("3. Update Blocks");
-    let slots_needing_blocks =
-        DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
-    for slot in slots_needing_blocks {
-        info!("Updating Block {}", slot);
-        let maybe_block_data = get_block_safe(
-            client,
-            slot,
-            slot_history,
-            maybe_redundant_rpc_urls,
-            Some(UiTransactionEncoding::Json),
-            Some(TransactionDetails::None),
-        )
-        .await;
+    {
+        info!("\n\n\n3. Update Blocks\n\n\n");
+        let start_total_time = std::time::Instant::now();
+        let slots_needing_blocks =
+            DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
+        let chunk_size = 1000;
 
-        match maybe_block_data {
-            Ok(block) => {
-                let priority_fees = block
-                    .rewards
-                    .unwrap()
-                    .into_iter()
-                    .find(|r| r.reward_type == Some(RewardType::Fee))
-                    .map(|r| r.lamports)
-                    .unwrap_or(0) as u64;
-                DBSlotInfo::update_block_data(sqlite_connection, slot, priority_fees)?
-            }
-            Err(err) => match err {
-                BlockMetadataKeeperError::SkippedBlock => {
-                    DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
+        let mut total_blocks = 0;
+        for slots_needing_blocks in slots_needing_blocks.chunks(chunk_size) {
+            // Add timing measurement before the operation
+            let start_time = std::time::Instant::now();
+
+            let block_data = get_bulk_block_safe(
+                client,
+                &slots_needing_blocks.to_vec(),
+                slot_history,
+                maybe_redundant_rpc_urls,
+                Some(UiTransactionEncoding::Json),
+                Some(TransactionDetails::None),
+                None,
+            )
+            .await;
+            let mut ok_entries = vec![];
+            for (slot, maybe_block_data) in block_data {
+                match maybe_block_data {
+                    Ok(block) => {
+                        let priority_fees = block
+                            .rewards
+                            .unwrap()
+                            .into_iter()
+                            .find(|r| r.reward_type == Some(RewardType::Fee))
+                            .map(|r| r.lamports)
+                            .unwrap_or(0) as u64;
+                        ok_entries.push((slot, priority_fees));
+                    }
+                    Err(err) => match err {
+                        BlockMetadataKeeperError::SkippedBlock => {
+                            DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
+                        }
+                        _ => {
+                            info!(
+                                "Could not get block info for slot {} - skipping: {:?}",
+                                slot, err
+                            )
+                        }
+                    },
                 }
-                _ => {
+            }
+
+            match DBSlotInfo::upsert_block_data(sqlite_connection, &ok_entries, None) {
+                Ok(write_counter) => {
+                    let time_ms = start_time.elapsed().as_millis();
+                    let blocks_per_second = (write_counter as f64 * 1000.0) / time_ms.max(1) as f64;
+                    total_blocks += write_counter;
+
                     info!(
-                        "Could not get block info for slot {} - skipping: {:?}",
-                        slot, err
+                        "Wrote {} blocks in {:.3}s ({:.1} blocks/s)",
+                        write_counter,
+                        time_ms as f64 / 1000.0,
+                        blocks_per_second
                     )
                 }
-            },
+                Err(err) => error!("Error writing blocks {:?}", err),
+            }
         }
+
+        let time_ms = start_total_time.elapsed().as_millis();
+        let blocks_per_second = (total_blocks as f64 * 1000.0) / time_ms.max(1) as f64;
+        info!(
+            "Wrote Total {} blocks in {:.3}s ({:.1} blocks/s)",
+            total_blocks,
+            time_ms as f64 / 1000.0,
+            blocks_per_second
+        );
     }
 
-    // 4. Submit Update TXs
-    info!("4. Submit Update TXs");
+    // 4. Aggregate Update TXs
     let mut ixs = vec![];
-    for epoch in epoch_range {
-        let vote_keys = match DBSlotInfo::get_vote_keys_per_epoch(sqlite_connection, epoch) {
-            Ok(vote_keys) => vote_keys,
-            Err(err) => {
-                info!(
-                    "Could not get vote keys for epoch {} - skipping: {:?}",
-                    epoch, err
-                );
-                continue;
-            }
-        };
-        info!("Vote Keys Count {}", vote_keys.len());
+    {
+        info!("\n\n\n4. Aggregate Update TXs\n\n\n");
 
-        for vote_key in vote_keys {
-            let vote = match Pubkey::from_str(vote_key.clone().as_str()) {
-                Ok(vote) => vote,
-                Err(err) => {
-                    info!(
-                        "Could not parse vote_key {} - skipping: {:?}",
-                        vote_key, err
-                    );
-                    continue;
-                }
-            };
-            let entry = match DBSlotInfo::get_priority_fee_and_block_metadata_entry(
+        let start_time = std::time::Instant::now();
+        for epoch in epoch_range {
+            let update_map = match DBSlotInfo::get_priority_fee_and_block_metadata_entries(
                 sqlite_connection,
-                &vote,
+                epoch_schedule,
                 epoch,
-                current_finalized_slot,
                 program_id,
                 &priority_fee_oracle_authority_keypair.pubkey(),
             ) {
-                Ok(entry) => entry,
+                Ok(map) => map,
                 Err(err) => {
-                    info!(
-                        "Could not fetch entry for {} - skipping: {:?}",
-                        vote_key, err
-                    );
+                    error!("Could not get update map - skipping... {:?}", err);
                     continue;
                 }
             };
 
-            ixs.push(entry.update_instruction());
+            let update_ixs = update_map
+                .iter()
+                .map(|entry| entry.1.update_instruction())
+                .collect::<Vec<Instruction>>();
+            ixs.extend(update_ixs);
         }
+
+        let time_ms = start_time.elapsed().as_millis();
+        info!(
+            "Aggregated {} in {:.3}s",
+            ixs.len(),
+            time_ms as f64 / 1000.0,
+        )
     }
 
-    info!("5. TX Len {}", ixs.len());
-    let submit_result = submit_instructions(
-        client,
-        ixs,
-        priority_fee_oracle_authority_keypair,
-        priority_fee_in_microlamports,
-        retry_count,
-        confirmation_time,
-        None,
-        no_pack,
-    )
-    .await;
+    // 5. Submit TXs
+    {
+        info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
 
-    Ok(submit_result?)
+        let start_time = std::time::Instant::now();
+        let submit_result = submit_instructions(
+            client,
+            ixs,
+            priority_fee_oracle_authority_keypair,
+            priority_fee_in_microlamports,
+            retry_count,
+            confirmation_time,
+            None,
+            true,
+        )
+        .await?;
+
+        let time_ms = start_time.elapsed().as_millis();
+        info!(
+            "Sent {}🟩 {}🟥 in {:.3}s",
+            submit_result.successes,
+            submit_result.errors,
+            time_ms as f64 / 1000.0,
+        );
+
+        Ok(submit_result)
+    }
 }
 
 async fn update_block_metadata(
@@ -720,30 +732,31 @@ pub async fn handle_slots_for_epoch(
     // Update the block_keeper_metadata record
     upsert_block_keeper_metadata(&conn, epoch, ending_slot)?;
 
-    let instructions = leader_block_metadatas
-        .iter()
-        .filter_map(|leader_block_metadata| {
-            let vote_key = Pubkey::from_str(&leader_block_metadata.vote_key).ok()?;
+    // let instructions = leader_block_metadatas
+    //     .iter()
+    //     .filter_map(|leader_block_metadata| {
+    //         let vote_key = Pubkey::from_str(&leader_block_metadata.vote_key).ok()?;
 
-            Some(
-                PriorityFeeAndBlockMetadataEntry::new(
-                    &vote_key,
-                    epoch,
-                    program_id,
-                    priority_fee_oracle_authority,
-                    leader_block_metadata.total_priority_fees.try_into().ok()?,
-                    leader_block_metadata.leader_slots,
-                    leader_block_metadata.blocks_produced,
-                    leader_block_metadata.block_data_last_update_slot,
-                )
-                .update_instruction(),
-            )
-        })
-        .collect::<Vec<_>>();
+    //         Some(
+    //             PriorityFeeAndBlockMetadataEntry::new(
+    //                 &vote_key,
+    //                 epoch,
+    //                 program_id,
+    //                 priority_fee_oracle_authority,
+    //                 leader_block_metadata.total_priority_fees.try_into().ok()?,
+    //                 leader_block_metadata.leader_slots,
+    //                 leader_block_metadata.blocks_produced,
+    //                 leader_block_metadata.block_data_last_update_slot,
+    //             )
+    //             .update_instruction(),
+    //         )
+    //     })
+    //     .collect::<Vec<_>>();
 
-    info!("IX len {}", instructions.len());
+    // info!("IX len {}", instructions.len());
 
-    Ok(instructions)
+    // Ok(instructions)
+    todo!()
 }
 
 pub fn get_updated_leader_block_metadatas(
@@ -921,6 +934,48 @@ pub async fn get_leader_schedule_safe(
             "Could not get leader schedule".to_string(),
         )),
     }
+}
+
+async fn get_bulk_block_safe(
+    client: &RpcClient,
+    slots: &Vec<u64>,
+    slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    encoding: Option<UiTransactionEncoding>,
+    transaction_details: Option<TransactionDetails>,
+    chunk_size: Option<usize>,
+) -> Vec<(u64, Result<UiConfirmedBlock, BlockMetadataKeeperError>)> {
+    let chunk_size = chunk_size.unwrap_or(50);
+
+    let mut results = vec![];
+    for slots in slots.chunks(chunk_size) {
+        let futures = slots
+            .iter()
+            .map(|&slot| {
+                let client = client; // Clone if needed
+                let slot_history = slot_history.clone(); // Clone if needed
+                let maybe_redundant_rpc_urls = maybe_redundant_rpc_urls.clone(); // Clone if needed
+
+                async move {
+                    let result = get_block_safe(
+                        &client,
+                        slot,
+                        &slot_history,
+                        &maybe_redundant_rpc_urls,
+                        encoding,
+                        transaction_details,
+                    )
+                    .await;
+                    (slot, result)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let future_results = join_all(futures).await;
+        results.extend(future_results);
+    }
+
+    results
 }
 
 /// Wrapper on Solana RPC get_block, but propagates skipped blocks as BlockMetadataKeeperError

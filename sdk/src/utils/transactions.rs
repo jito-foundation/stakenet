@@ -622,8 +622,13 @@ pub async fn parallel_execute_instructions(
     let mut transactions: Vec<Vec<Instruction>> = vec![];
 
     if no_pack {
-        for ix in instructions.iter() {
-            transactions.push(vec![ix.clone()]);
+        for ix in instructions.chunks(8) {
+            let mut tx = vec![];
+            tx.push(ComputeBudgetInstruction::set_compute_unit_limit(
+                DEFAULT_COMPUTE_LIMIT as u32,
+            ));
+            tx.extend(ix.to_vec());
+            transactions.push(tx);
         }
     } else {
         transactions = pack_instructions(

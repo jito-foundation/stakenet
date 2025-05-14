@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use anchor_lang::prelude::EpochSchedule;
-use log::info;
+use log::{error, info};
 use rusqlite::{params, Connection};
 use solana_client::rpc_response::RpcLeaderSchedule;
 use solana_sdk::pubkey::Pubkey;
@@ -56,29 +56,42 @@ pub struct DBSlotInfo {
 }
 
 impl DBSlotInfo {
-    pub fn from_db_row(row: &rusqlite::Row<'_>) -> Result<Self, BlockMetadataKeeperError> {
+    // -------------------- HELPERS -----------------------------
+    fn from_db_row(row: &rusqlite::Row<'_>) -> Result<Self, BlockMetadataKeeperError> {
         let state_raw = row.get(6)?;
         let state = DBSlotInfoState::from_u8(state_raw)?;
 
         Ok(Self {
-            identity_key: row.get(0)?,
-            vote_key: row.get(1)?,
+            absolute_slot: row.get(0)?,
+            relative_slot: row.get(1)?,
             epoch: row.get(2)?,
-            absolute_slot: row.get(3)?,
-            relative_slot: row.get(4)?,
+            vote_key: row.get(3)?,
+            identity_key: row.get(4)?,
             priority_fees: row.get(5)?,
             state,
             error_string: row.get(7)?,
         })
     }
 
-    pub fn create_from_leader_schedule(
-        connection: &Connection,
+    // -------------------- STAGES -----------------------------
+
+    // 1. Updates the leader schedule such that we know we have every entry for a given epoch
+    pub fn upsert_leader_schedule(
+        connection: &mut Connection,
         epoch: u64,
         epoch_schedule: &EpochSchedule,
         leader_schedule: &RpcLeaderSchedule,
-    ) -> Result<(), BlockMetadataKeeperError> {
+        chunk_size: Option<usize>,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let chunk_size = chunk_size.unwrap_or(100);
         let first_slot_in_epoch = epoch_schedule.get_first_slot_in_epoch(epoch);
+
+        let schedule_length: usize = leader_schedule.iter().map(|entry| entry.1.len()).sum();
+        let slots_written = Self::get_slots_per_epoch(connection, epoch)?;
+
+        if schedule_length == slots_written.len() {
+            return Ok(0);
+        }
 
         // Prepare the SQL statement once
         let sql = "INSERT OR IGNORE INTO slot_info (
@@ -92,82 +105,118 @@ impl DBSlotInfo {
             error_string
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-        let mut writes: u64 = 0;
+        let mut write_counter = 0;
+        let mut transaction = connection.transaction()?;
         for leader in leader_schedule.iter() {
             let identity_key = leader.0;
             let relative_slots = leader.1;
 
             // Process each slot individually
-            for relative_slot in relative_slots {
-                let absolute_slot = first_slot_in_epoch + *relative_slot as u64;
+            for relative_slots in relative_slots.chunks(chunk_size) {
+                for relative_slot in relative_slots {
+                    let absolute_slot = first_slot_in_epoch + *relative_slot as u64;
 
-                // Each execute is its own implicit transaction in SQLite
-                writes += 1;
-                info!(
-                    "Writing ({}) {} --- {}",
-                    writes, relative_slot, absolute_slot
-                );
-                connection.execute(
-                    sql,
-                    params![
-                        absolute_slot,
-                        relative_slot,
-                        epoch,
-                        "", // vote_key is empty at this point, will be updated later
-                        identity_key,
-                        0,                              // priority_fees default to 0
-                        DBSlotInfoState::Created as u8, // Set initial state to Created
-                        ""                              // error_string default to empty
-                    ],
-                )?;
+                    if slots_written.contains(&absolute_slot) {
+                        continue;
+                    }
+
+                    write_counter += 1;
+                    transaction.execute(
+                        sql,
+                        params![
+                            absolute_slot,
+                            relative_slot,
+                            epoch,
+                            "", // vote_key is empty at this point, will be updated later
+                            identity_key,
+                            0,                              // priority_fees default to 0
+                            DBSlotInfoState::Created as u8, // Set initial state to Created
+                            ""                              // error_string default to empty
+                        ],
+                    )?;
+                }
+
+                // info!("Wrote {} Leaders", write_counter);
+                transaction.commit()?;
+                transaction = connection.transaction()?;
             }
         }
 
-        Ok(())
+        Ok(write_counter)
     }
 
-    // Update Vote/Identity Mapping
-    pub fn update_vote_identity_mapping(
-        connection: &Connection,
+    // 2. Update the Vote Identity Mapping only for the current epoch.
+    pub fn upsert_vote_identity_mapping(
+        connection: &mut Connection,
         epoch: u64,
-        identity: &Pubkey,
-        vote: &Pubkey,
-    ) -> Result<(), BlockMetadataKeeperError> {
-        let identity_key = identity.to_string();
-        let vote_key = vote.to_string();
+        mapping: &HashMap<String, String>, // identity, vote
+        chunk_size: Option<usize>,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let chunk_size = chunk_size.unwrap_or(100);
+        let unmapped = match Self::get_unmapped_identity_accounts(connection, epoch) {
+            Ok(list) => list,
+            Err(_) => mapping.keys().cloned().collect(),
+        };
 
-        // Update all entries for the given epoch and identity key
-        let query = format!(
-            "UPDATE slot_info
-             SET vote_key = '{}'
-             WHERE epoch = {} AND identity_key = '{}'",
-            vote_key, epoch, identity_key
-        );
+        let sql = "UPDATE slot_info
+         SET vote_key = ?
+         WHERE epoch = ? AND identity_key = ? AND vote_key = ''";
 
-        connection.execute(&query, ())?;
+        let mut write_counter = 0;
+        let mut transaction = connection.transaction()?;
+        let entries: Vec<_> = mapping.iter().collect();
 
-        Ok(())
+        // Only write to the entried that are not already mapped
+        let entries_to_write: Vec<_> = entries
+            .iter()
+            .filter(|entry| unmapped.contains(entry.0))
+            .collect();
+
+        for entries in entries_to_write.chunks(chunk_size) {
+            for entry in entries {
+                let identity_key = entry.0.to_string();
+                let vote_key = entry.1.to_string();
+
+                write_counter += 1;
+                transaction.execute(&sql, params![vote_key, epoch, identity_key])?;
+            }
+            transaction.commit()?;
+            transaction = connection.transaction()?;
+            info!("Wrote {} Mappings", write_counter);
+        }
+
+        Ok(write_counter)
     }
 
-    // Update block data
-    pub fn update_block_data(
-        connection: &Connection,
-        slot: u64,
-        priority_fees: u64,
-    ) -> Result<(), BlockMetadataKeeperError> {
-        // Update the priority_fees and state for the given slot
-        let query = format!(
-            "UPDATE slot_info
-             SET priority_fees = {}, state = {}
-             WHERE absolute_slot = {}",
-            priority_fees,
-            DBSlotInfoState::Done as u8,
-            slot
-        );
+    pub fn upsert_block_data(
+        connection: &mut Connection,
+        entries: &Vec<(u64, u64)>, // slot, priority_fees
+        chunk_size: Option<usize>,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let chunk_size = chunk_size.unwrap_or(50);
 
-        connection.execute(&query, ())?;
+        let sql = "UPDATE slot_info
+         SET priority_fees = ?, state = ?
+         WHERE absolute_slot = ?";
 
-        Ok(())
+        let mut write_counter = 0;
+        let mut transaction = connection.transaction()?;
+        for entries in entries.chunks(chunk_size) {
+            for entry in entries {
+                let (slot, priority_fees) = entry;
+
+                write_counter += 1;
+                transaction.execute(
+                    &sql,
+                    params![priority_fees, DBSlotInfoState::Done as u8, slot],
+                )?;
+            }
+
+            transaction.commit()?;
+            transaction = connection.transaction()?;
+        }
+
+        Ok(write_counter)
     }
 
     // Block DNE
@@ -175,17 +224,19 @@ impl DBSlotInfo {
         connection: &Connection,
         slot: u64,
     ) -> Result<(), BlockMetadataKeeperError> {
-        // Update the priority_fees and state for the given slot
-        let query = format!(
-            "UPDATE slot_info
-             SET priority_fees = {}, state = {}
-             WHERE absolute_slot = {}",
-            0,
-            DBSlotInfoState::BlockDNE as u8,
-            slot
-        );
+        let sql = "UPDATE slot_info
+         SET priority_fees = ?, state = ?
+         WHERE absolute_slot = ? AND state = ?";
 
-        connection.execute(&query, ())?;
+        connection.execute(
+            &sql,
+            params![
+                0,
+                DBSlotInfoState::BlockDNE as u8,
+                slot,
+                DBSlotInfoState::Created as u8
+            ],
+        )?;
 
         Ok(())
     }
@@ -196,19 +247,49 @@ impl DBSlotInfo {
         slot: u64,
         error_string: &String,
     ) -> Result<(), BlockMetadataKeeperError> {
-        let query = format!(
-            "UPDATE slot_info
-             SET priority_fees = {}, state = {}, error_string = '{}',
-             WHERE absolute_slot = {}",
-            0,
-            DBSlotInfoState::Error as u8,
-            error_string,
-            slot
-        );
+        let sql = "UPDATE slot_info
+         SET priority_fees = ?, state = ?, error_string = ?
+         WHERE absolute_slot = ? AND state = ?";
 
-        connection.execute(&query, ())?;
+        connection.execute(
+            &sql,
+            params![
+                0,
+                DBSlotInfoState::Error as u8,
+                error_string,
+                slot,
+                DBSlotInfoState::Created as u8
+            ],
+        )?;
 
         Ok(())
+    }
+
+    pub fn get_unmapped_identity_accounts(
+        connection: &Connection,
+        epoch: u64,
+    ) -> Result<Vec<String>, BlockMetadataKeeperError> {
+        // Prepare query to find all distinct identity_keys where vote_key is empty
+        let mut statement = connection.prepare(
+            "SELECT DISTINCT identity_key
+             FROM slot_info
+             WHERE vote_key = '' AND epoch = ?
+             ORDER BY identity_key ASC",
+        )?;
+
+        // Execute query and map the results to a Vec<String>
+        let unmapped_results = statement.query_map(params![epoch], |row| {
+            let identity_key: String = row.get(0)?;
+            Ok(identity_key)
+        })?;
+
+        // Collect results into a Vec<String>
+        let mut unmapped_identities = Vec::new();
+        for result in unmapped_results {
+            unmapped_identities.push(result?);
+        }
+
+        Ok(unmapped_identities)
     }
 
     pub fn get_slots_needing_blocks(
@@ -237,43 +318,14 @@ impl DBSlotInfo {
             slots_needing_update.push(slot);
         }
 
+        info!(
+            "Found {} slots that need updating",
+            slots_needing_update.len()
+        );
         Ok(slots_needing_update)
     }
 
-    pub fn get_unmapped_identity_accounts(
-        connection: &Connection,
-    ) -> Result<HashMap<String, Vec<u64>>, BlockMetadataKeeperError> {
-        // Prepare query to find all (epoch, identity_key) pairs where vote_key is empty
-        let mut statement = connection.prepare(
-            "SELECT epoch, identity_key
-             FROM slot_info
-             WHERE vote_key = ''
-             ORDER BY identity_key ASC, epoch ASC",
-        )?;
-
-        // Execute query
-        let unmapped_results = statement.query_map(params![], |row| {
-            let epoch: u64 = row.get(0)?;
-            let identity_key: String = row.get(1)?;
-            Ok((epoch, identity_key))
-        })?;
-
-        // Group results by identity_key
-        let mut unmapped_accounts: HashMap<String, Vec<u64>> = HashMap::new();
-        for result in unmapped_results {
-            let (epoch, identity_key) = result?;
-
-            // Add the epoch to the vector for this identity, creating the vector if it doesn't exist
-            unmapped_accounts
-                .entry(identity_key)
-                .or_insert_with(Vec::new)
-                .push(epoch);
-        }
-
-        Ok(unmapped_accounts)
-    }
-
-    pub fn get_vote_keys_per_epoch(
+    pub fn get_vote_keys_for_epoch(
         connection: &Connection,
         epoch: u64,
     ) -> Result<Vec<String>, BlockMetadataKeeperError> {
@@ -299,18 +351,40 @@ impl DBSlotInfo {
         Ok(vote_keys)
     }
 
-    // To Entry
-    pub fn get_priority_fee_and_block_metadata_entry(
+    pub fn get_slots_per_epoch(
         connection: &Connection,
-        vote_account: &Pubkey,
         epoch: u64,
-        current_slot: u64, //TODO take out
+    ) -> Result<Vec<u64>, BlockMetadataKeeperError> {
+        // Prepare query to find all non-empty vote keys for the given epoch
+        let mut statement = connection.prepare(
+            "SELECT absolute_slot
+             FROM slot_info
+             WHERE epoch = ?
+             ORDER BY absolute_slot ASC",
+        )?;
+
+        // Execute query with the epoch parameter
+        let absolute_slot_results =
+            statement.query_map(params![epoch], |row| Ok(row.get::<_, u64>(0)?))?;
+
+        // Collect results into a Vec<String>
+        let mut absolute_slots = Vec::new();
+        for absolute_slot_result in absolute_slot_results {
+            let absolute_slot = absolute_slot_result?;
+            absolute_slots.push(absolute_slot);
+        }
+
+        Ok(absolute_slots)
+    }
+
+    // To Entry
+    pub fn get_priority_fee_and_block_metadata_entries(
+        connection: &Connection,
+        epoch_schedule: &EpochSchedule,
+        epoch: u64,
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
-    ) -> Result<PriorityFeeAndBlockMetadataEntry, BlockMetadataKeeperError> {
-        // Fetch all entries given a vote account for the given epoch
-        let vote_key = vote_account.to_string();
-
+    ) -> Result<HashMap<String, PriorityFeeAndBlockMetadataEntry>, BlockMetadataKeeperError> {
         // Fetch all entries for the given vote account and epoch
         let mut statement = connection.prepare(
             "SELECT
@@ -323,48 +397,69 @@ impl DBSlotInfo {
                 state,
                 error_string
             FROM slot_info
-            WHERE vote_key = ? AND epoch = ?
+            WHERE epoch = ? AND state = ? AND vote_key != ''
             ORDER BY absolute_slot ASC",
         )?;
-        let slot_infos =
-            statement.query_map(params![vote_key, epoch], |row| Ok(Self::from_db_row(row)))?;
+        let slot_infos = statement
+            .query_map(params![epoch, DBSlotInfoState::Done as u8], |row| {
+                Ok(Self::from_db_row(row))
+            })?;
 
-        let mut total_leader_slots = 0;
-        let mut total_priority_fees = 0;
-        let mut blocks_produced = 0;
+        let mut map = HashMap::<String, PriorityFeeAndBlockMetadataEntry>::new();
         for slot_info in slot_infos {
             let slot_info = slot_info??;
 
-            total_leader_slots += 1;
+            let vote_key_string = match slot_info.vote_key {
+                Some(vote_key) => vote_key,
+                None => {
+                    error!("No vote key - skipping");
+                    continue;
+                }
+            };
+            let vote_key = match Pubkey::from_str(&vote_key_string) {
+                Ok(vote_key) => vote_key,
+                Err(_) => {
+                    error!("Could not parse vote key - skipping");
+                    continue;
+                }
+            };
 
+            let entry = map.entry(vote_key.to_string()).or_insert_with(|| {
+                PriorityFeeAndBlockMetadataEntry::new(
+                    &vote_key,
+                    epoch,
+                    program_id,
+                    priority_fee_oracle_authority,
+                )
+            });
+
+            entry.total_leader_slots += 1;
             match slot_info.state {
                 DBSlotInfoState::Created => {
-                    info!("Block created");
+                    entry.blocks_left += 1;
                 }
                 DBSlotInfoState::Done => {
-                    info!("Block created");
-                    blocks_produced += 1;
-                    total_priority_fees += slot_info.priority_fees;
+                    entry.blocks_produced += 1;
+                    entry.total_priority_fees += slot_info.priority_fees;
                 }
                 DBSlotInfoState::BlockDNE => {
-                    info!("Block DNE");
+                    entry.blocks_missed += 1;
                 }
                 DBSlotInfoState::Error => {
+                    entry.blocks_error += 1;
                     info!("Block Error {:?}", slot_info.error_string);
                 }
             }
+
+            entry.highest_slot = slot_info.absolute_slot.max(entry.highest_slot);
+            entry.update_slot = if entry.blocks_left > 0 {
+                entry.highest_slot
+            } else {
+                epoch_schedule.get_first_slot_in_epoch(entry.epoch + 1)
+            };
         }
 
-        Ok(PriorityFeeAndBlockMetadataEntry::new(
-            vote_account,
-            epoch,
-            program_id,
-            priority_fee_oracle_authority,
-            total_priority_fees,
-            total_leader_slots,
-            blocks_produced,
-            current_slot,
-        ))
+        Ok(map)
     }
 }
 

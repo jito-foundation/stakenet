@@ -159,10 +159,6 @@ pub async fn update_priority_fee_commission(
         })
         .collect::<Vec<_>>();
 
-    let temp = update_instructions[0].accounts[2].pubkey.clone();
-    info!("{}", temp);
-
-    info!("--- GOING TO SUBMIT ---\n\n\n\n");
     let submit_result = submit_instructions(
         client,
         update_instructions,
