@@ -201,54 +201,54 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // ---------------------- FIRE ------------------------------------
 
         // VALIDATOR HISTORY
-        // if should_fire(tick, validator_history_interval) {
-        //     info!("Firing operations...");
+        if should_fire(tick, validator_history_interval) {
+            info!("Firing operations...");
 
-        //     info!("Updating cluster history...");
-        //     keeper_state.set_runs_errors_and_txs_for_epoch(
-        //         operations::cluster_history::fire(&keeper_config, &keeper_state).await,
-        //     );
+            // info!("Updating cluster history...");
+            // keeper_state.set_runs_errors_and_txs_for_epoch(
+            //     operations::cluster_history::fire(&keeper_config, &keeper_state).await,
+            // );
 
-        //     info!("Updating copy vote accounts...");
-        //     keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-        //         operations::vote_account::fire(&keeper_config, &keeper_state).await,
-        //     );
+            // info!("Updating copy vote accounts...");
+            // keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+            //     operations::vote_account::fire(&keeper_config, &keeper_state).await,
+            // );
 
-        //     info!("Updating mev commission...");
-        //     keeper_state.set_runs_errors_and_txs_for_epoch(
-        //         operations::mev_commission::fire(&keeper_config, &keeper_state).await,
-        //     );
+            // info!("Updating mev commission...");
+            // keeper_state.set_runs_errors_and_txs_for_epoch(
+            //     operations::mev_commission::fire(&keeper_config, &keeper_state).await,
+            // );
 
-        //     info!("Updating mev earned...");
-        //     keeper_state.set_runs_errors_and_txs_for_epoch(
-        //         operations::mev_earned::fire(&keeper_config, &keeper_state).await,
-        //     );
+            // info!("Updating mev earned...");
+            // keeper_state.set_runs_errors_and_txs_for_epoch(
+            //     operations::mev_earned::fire(&keeper_config, &keeper_state).await,
+            // );
 
-        //     if keeper_config.oracle_authority_keypair.is_some() {
-        //         info!("Updating stake accounts...");
-        //         keeper_state.set_runs_errors_and_txs_for_epoch(
-        //             operations::stake_upload::fire(&keeper_config, &keeper_state).await,
-        //         );
-        //     }
+            // if keeper_config.oracle_authority_keypair.is_some() {
+            //     info!("Updating stake accounts...");
+            //     keeper_state.set_runs_errors_and_txs_for_epoch(
+            //         operations::stake_upload::fire(&keeper_config, &keeper_state).await,
+            //     );
+            // }
 
-        //     if keeper_config.oracle_authority_keypair.is_some()
-        //         && keeper_config.gossip_entrypoint.is_some()
-        //     {
-        //         info!("Updating gossip accounts...");
-        //         keeper_state.set_runs_errors_and_txs_for_epoch(
-        //             operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
-        //         );
-        //     }
+            // if keeper_config.oracle_authority_keypair.is_some()
+            //     && keeper_config.gossip_entrypoint.is_some()
+            // {
+            //     info!("Updating gossip accounts...");
+            //     keeper_state.set_runs_errors_and_txs_for_epoch(
+            //         operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+            //     );
+            // }
 
-        //     info!("Updating priority fee commission...");
-        //     keeper_state.set_runs_errors_and_txs_for_epoch(
-        //         operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
-        //     );
+            info!("Updating priority fee commission...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            );
 
-        //     if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-        //         random_cooldown(keeper_config.cool_down_range).await;
-        //     }
-        // }
+            // if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+            //     random_cooldown(keeper_config.cool_down_range).await;
+            // }
+        }
 
         // STEWARD
         // if should_fire(tick, steward_interval) {
