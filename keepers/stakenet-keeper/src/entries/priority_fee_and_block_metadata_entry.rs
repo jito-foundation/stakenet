@@ -1,6 +1,5 @@
-use anchor_lang::{prelude::EpochSchedule, InstructionData, ToAccountMetas};
+use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_program::{instruction::Instruction, pubkey::Pubkey};
-use solana_sdk::epoch_schedule;
 use stakenet_sdk::{
     models::entries::{Address, UpdateInstruction},
     utils::accounts::{get_validator_history_address, get_validator_history_config_address},

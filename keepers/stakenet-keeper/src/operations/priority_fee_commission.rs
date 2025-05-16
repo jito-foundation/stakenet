@@ -127,7 +127,7 @@ pub async fn update_priority_fee_commission(
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
-    no_pack: bool,
+    _no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
     let validator_history_map = &keeper_state.validator_history_map;

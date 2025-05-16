@@ -204,63 +204,63 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         if should_fire(tick, validator_history_interval) {
             info!("Firing operations...");
 
-            // info!("Updating cluster history...");
-            // keeper_state.set_runs_errors_and_txs_for_epoch(
-            //     operations::cluster_history::fire(&keeper_config, &keeper_state).await,
-            // );
+            info!("Updating cluster history...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::cluster_history::fire(&keeper_config, &keeper_state).await,
+            );
 
-            // info!("Updating copy vote accounts...");
-            // keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-            //     operations::vote_account::fire(&keeper_config, &keeper_state).await,
-            // );
+            info!("Updating copy vote accounts...");
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                operations::vote_account::fire(&keeper_config, &keeper_state).await,
+            );
 
-            // info!("Updating mev commission...");
-            // keeper_state.set_runs_errors_and_txs_for_epoch(
-            //     operations::mev_commission::fire(&keeper_config, &keeper_state).await,
-            // );
+            info!("Updating mev commission...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::mev_commission::fire(&keeper_config, &keeper_state).await,
+            );
 
-            // info!("Updating mev earned...");
-            // keeper_state.set_runs_errors_and_txs_for_epoch(
-            //     operations::mev_earned::fire(&keeper_config, &keeper_state).await,
-            // );
+            info!("Updating mev earned...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::mev_earned::fire(&keeper_config, &keeper_state).await,
+            );
 
-            // if keeper_config.oracle_authority_keypair.is_some() {
-            //     info!("Updating stake accounts...");
-            //     keeper_state.set_runs_errors_and_txs_for_epoch(
-            //         operations::stake_upload::fire(&keeper_config, &keeper_state).await,
-            //     );
-            // }
+            if keeper_config.oracle_authority_keypair.is_some() {
+                info!("Updating stake accounts...");
+                keeper_state.set_runs_errors_and_txs_for_epoch(
+                    operations::stake_upload::fire(&keeper_config, &keeper_state).await,
+                );
+            }
 
-            // if keeper_config.oracle_authority_keypair.is_some()
-            //     && keeper_config.gossip_entrypoint.is_some()
-            // {
-            //     info!("Updating gossip accounts...");
-            //     keeper_state.set_runs_errors_and_txs_for_epoch(
-            //         operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
-            //     );
-            // }
+            if keeper_config.oracle_authority_keypair.is_some()
+                && keeper_config.gossip_entrypoint.is_some()
+            {
+                info!("Updating gossip accounts...");
+                keeper_state.set_runs_errors_and_txs_for_epoch(
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+                );
+            }
 
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
             );
 
-            // if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-            //     random_cooldown(keeper_config.cool_down_range).await;
-            // }
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown(keeper_config.cool_down_range).await;
+            }
         }
 
         // STEWARD
-        // if should_fire(tick, steward_interval) {
-        //     info!("Cranking Steward...");
-        //     keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-        //         operations::steward::fire(&keeper_config, &keeper_state).await,
-        //     );
+        if should_fire(tick, steward_interval) {
+            info!("Cranking Steward...");
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                operations::steward::fire(&keeper_config, &keeper_state).await,
+            );
 
-        //     if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-        //         random_cooldown(keeper_config.cool_down_range).await;
-        //     }
-        // }
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown(keeper_config.cool_down_range).await;
+            }
+        }
 
         // PRIORITY FEE BLOCK METADATA
         if should_fire(tick, block_metadata_interval) {
@@ -278,25 +278,25 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------------------- EMIT ---------------------------------
 
-        // if should_fire(tick, metrics_interval) {
-        //     keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
-        //         &keeper_config,
-        //         &keeper_state,
-        //     ));
-        // }
+        if should_fire(tick, metrics_interval) {
+            keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
+                &keeper_config,
+                &keeper_state,
+            ));
+        }
 
-        // if should_emit(tick, &intervals) {
-        //     info!("Emitting metrics...");
-        //     keeper_state.emit();
+        if should_emit(tick, &intervals) {
+            info!("Emitting metrics...");
+            keeper_state.emit();
 
-        //     KeeperOperations::emit(
-        //         &keeper_state.runs_for_epoch,
-        //         &keeper_state.errors_for_epoch,
-        //         &keeper_state.txs_for_epoch,
-        //     );
+            KeeperOperations::emit(
+                &keeper_state.runs_for_epoch,
+                &keeper_state.errors_for_epoch,
+                &keeper_state.txs_for_epoch,
+            );
 
-        //     KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
-        // }
+            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
+        }
 
         // ---------- CLEAR STARTUP ----------
         if should_clear_startup_flag(tick, &intervals) {
@@ -304,7 +304,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // ---------- SLEEP ----------
-        // sleep_and_tick(&mut tick).await;
+        sleep_and_tick(&mut tick).await;
     }
 }
 
