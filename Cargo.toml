@@ -17,6 +17,7 @@ overflow-checks = true
 anchor-lang = "0.30.0"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
+dotenvy = "0.15.7"
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
 reqwest = { version = "0.11.27", features = ["json"] }

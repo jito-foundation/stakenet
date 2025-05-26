@@ -4,7 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use clap::Parser;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use log::*;
 use rand::Rng;
 use solana_client::nonblocking::rpc_client::RpcClient;
