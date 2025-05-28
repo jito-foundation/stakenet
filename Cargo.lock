@@ -1634,10 +1634,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
+name = "dotenvy"
+version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "downcast"
@@ -6395,7 +6395,7 @@ dependencies = [
  "anchor-lang",
  "bytemuck",
  "clap 4.4.18",
- "dotenv",
+ "dotenvy",
  "env_logger 0.10.2",
  "futures",
  "futures-util",
@@ -6456,7 +6456,7 @@ dependencies = [
  "anchor-lang",
  "anyhow",
  "clap 4.4.18",
- "dotenv",
+ "dotenvy",
  "futures",
  "futures-util",
  "jito-steward",

@@ -17,8 +17,10 @@ overflow-checks = true
 anchor-lang = "0.30.0"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
+dotenvy = "0.15.7"
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
+jito-tip-distribution = { package = "jito-tip-distribution", git = "https://github.com/jito-foundation/jito-programs", rev = "50d450e993cb2278bcf97cd01b19e8a4f1f56e8e", features = ["no-entrypoint"] }
 reqwest = { version = "0.11.27", features = ["json"] }
 serde = "1.0.183"
 serde_derive = "1.0.183"

@@ -33,7 +33,7 @@ use commands::{
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use std::{sync::Arc, time::Duration};
 
