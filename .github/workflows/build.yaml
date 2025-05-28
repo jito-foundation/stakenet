@@ -37,11 +37,10 @@ jobs:
         with:
           components: rustfmt, clippy
           toolchain: nightly-2024-02-04
-      - name: Install cargo-sort from crates.io
+      - name: Install latest cargo-sort from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-sort
-          version: "1.0.9"
       - run: cargo +nightly-2024-02-04 sort --workspace --check
       - run: cargo +nightly-2024-02-04 fmt --all --check
       - run: cargo +nightly-2024-02-04 clippy --all-features --all-targets --tests -- -D warnings
