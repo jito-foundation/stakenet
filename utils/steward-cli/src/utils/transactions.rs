@@ -1,14 +1,35 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use keeper_core::{parallel_execute_transactions, SubmitStats, TransactionExecutionError};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+use stakenet_sdk::{
+    models::{errors::JitoTransactionExecutionError, submit_stats::SubmitStats},
+    utils::transactions::parallel_execute_transactions,
+};
 
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
     transaction::Transaction,
 };
+
+use stakenet_sdk::utils::transactions::print_governance_ix;
+
+use crate::commands::command_args::TransactionParameters;
+
+/// Decides whether to print the transaction in raw or governance format.
+/// Returns true if a print happened and caller should skip executing.
+pub fn maybe_print_tx(ixs: &[Instruction], params: &TransactionParameters) -> bool {
+    if params.print_tx {
+        stakenet_sdk::utils::transactions::print_base58_tx(ixs);
+        true
+    } else if params.print_gov_tx {
+        print_governance_ix(ixs);
+        true
+    } else {
+        false
+    }
+}
 
 pub fn configure_instruction(
     ixs: &[Instruction],
@@ -56,7 +77,7 @@ pub async fn submit_packaged_transactions(
     keypair: &Arc<Keypair>,
     retry_count: Option<u16>,
     retry_interval: Option<u64>,
-) -> Result<SubmitStats, TransactionExecutionError> {
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
     let tx_slice = transactions
         .iter()
