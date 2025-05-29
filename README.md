@@ -135,3 +135,9 @@ To see all of the available commands:
 ```
 
 To see more info on the Steward CLI check out the [CLI notes](./utils/steward-cli/steward_cli_notes.md)
+
+---
+
+## 📖 Documentation
+
+The comprehensive documentation for Stakenet has moved to [jito.network/docs/stakenet](https://jito.network/docs/stakenet). The source files are maintained in the [Jito Omnidocs repository](https://github.com/jito-foundation/jito-omnidocs/tree/master/stakenet).
