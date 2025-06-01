@@ -227,8 +227,6 @@ fn test_compute_scores() {
         state.num_pool_validators,
     );
     assert!(res.is_ok());
-    println!("{:?}", state.start_computing_scores_slot);
-    println!("{:?}", clock.slot);
     assert!(state.start_computing_scores_slot == clock.slot);
 }
 
@@ -786,7 +784,6 @@ fn test_rebalance_default_lamports() {
         &fixtures.config.parameters,
     );
 
-    println!("{:?}", res);
     assert!(res.is_ok());
     match res.unwrap() {
         RebalanceType::None => {}
@@ -824,7 +821,6 @@ fn test_rebalance_default_lamports() {
     );
 
     assert!(res.is_ok());
-    println!("{:?}", res);
     if let RebalanceType::Increase(increase_amount) = res.unwrap() {
         assert_eq!(
             state.validator_lamport_balances[0],
@@ -918,4 +914,47 @@ fn test_remove_validator_fails() {
     let res = state.remove_validator(state.num_pool_validators as usize);
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
+}
+
+#[test]
+fn test_rebalance_max_lamports() {
+    let fixtures = StateMachineFixtures::default();
+    let mut state = fixtures.state;
+    let mut validator_list = fixtures.validator_list.clone();
+
+    // Case 1: Testing Total Pool Lamports MAX SOLANA
+    const MAX_SOLANA_LAMPORTS: u64 = 600_000_000 * LAMPORTS_PER_SOL;
+    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    validator_list[0].transient_stake_lamports = 1000.into();
+    let validator_list_bigvec = BigVec {
+        data: &mut validator_list.try_to_vec().unwrap(),
+    };
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        MAX_SOLANA_LAMPORTS,
+        0,
+        u64::from(validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
 }
