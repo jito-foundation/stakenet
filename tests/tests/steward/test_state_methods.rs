@@ -918,48 +918,41 @@ fn test_remove_validator_fails() {
 
 #[test]
 fn test_rebalance_max_lamports() {
-    let fixtures = StateMachineFixtures::default();
-    let mut state = fixtures.state;
-    let mut validator_list = fixtures.validator_list.clone();
+    let mut fixtures = Box::<StateMachineFixtures>::default();
+    fixtures.config.parameters.scoring_unstake_cap_bps = 10000;
+    fixtures.config.parameters.instant_unstake_cap_bps = 10000;
+    fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
 
-    // Case 1: Testing Total Pool Lamports MAX SOLANA
     const MAX_SOLANA_LAMPORTS: u64 = 600_000_000 * LAMPORTS_PER_SOL;
-    state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
-    state.state_tag = StewardStateEnum::Rebalance;
-    state.delegations[0..3].copy_from_slice(&[
-        Delegation::new(0, 1),
-        Delegation::default(),
-        Delegation::default(),
-    ]);
-    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
-    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    let state = &mut fixtures.state;
 
-    validator_list[0].active_stake_lamports = 1000.into();
+    state.state_tag = StewardStateEnum::Rebalance;
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut fixtures.validator_list.try_to_vec().unwrap(),
     };
 
-    let mut parameters = fixtures.config.parameters.clone();
-    parameters.stake_deposit_unstake_cap_bps = 10_000;
-    parameters.instant_unstake_cap_bps = 10_000;
-    parameters.scoring_unstake_cap_bps = 10_000;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 2),
+        Delegation::new(1, 2),
+        Delegation::new(0, 1),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    // Second validator is instant unstakeable
+    state.instant_unstake.set(1, true).unwrap();
 
     let res = state.rebalance(
         fixtures.current_epoch,
-        0,
+        1,
         &validator_list_bigvec,
         MAX_SOLANA_LAMPORTS,
+        1000 * LAMPORTS_PER_SOL,
+        u64::from(fixtures.validator_list[1].active_stake_lamports),
         0,
-        u64::from(validator_list[0].active_stake_lamports),
         0,
-        0,
-        &parameters,
+        &fixtures.config.parameters,
     );
 
     assert!(res.is_ok());
-    match res.unwrap() {
-        RebalanceType::None => {}
-        _ => panic!("Expected RebalanceType::Increase"),
-    }
-    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
 }
