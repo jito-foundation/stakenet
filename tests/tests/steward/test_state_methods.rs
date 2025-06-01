@@ -927,17 +927,22 @@ fn test_rebalance_max_lamports() {
     state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
     state.state_tag = StewardStateEnum::Rebalance;
     state.delegations[0..3].copy_from_slice(&[
-        Delegation::new(1, 1),
+        Delegation::new(0, 1),
         Delegation::default(),
         Delegation::default(),
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
-    validator_list[0].transient_stake_lamports = 1000.into();
+    validator_list[0].active_stake_lamports = 1000.into();
     let validator_list_bigvec = BigVec {
         data: &mut validator_list.try_to_vec().unwrap(),
     };
+
+    let mut parameters = fixtures.config.parameters.clone();
+    parameters.stake_deposit_unstake_cap_bps = 10_000;
+    parameters.instant_unstake_cap_bps = 10_000;
+    parameters.scoring_unstake_cap_bps = 10_000;
 
     let res = state.rebalance(
         fixtures.current_epoch,
@@ -948,7 +953,7 @@ fn test_rebalance_max_lamports() {
         u64::from(validator_list[0].active_stake_lamports),
         0,
         0,
-        &fixtures.config.parameters,
+        &parameters,
     );
 
     assert!(res.is_ok());
