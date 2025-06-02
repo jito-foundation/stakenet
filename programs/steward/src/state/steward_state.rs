@@ -944,19 +944,19 @@ impl StewardState {
                     .and_then(|x| x.checked_div(10_000))
                     .ok_or(StewardError::ArithmeticError)?
                     .try_into()
-                    .map_err(|_| StewardError::ArithmeticError)?;
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
                 let instant_unstake_cap: u64 = (stake_pool_lamports as u128)
                     .checked_mul(parameters.instant_unstake_cap_bps as u128)
                     .and_then(|x| x.checked_div(10_000))
                     .ok_or(StewardError::ArithmeticError)?
                     .try_into()
-                    .map_err(|_| StewardError::ArithmeticError)?;
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
                 let stake_deposit_unstake_cap: u64 = (stake_pool_lamports as u128)
                     .checked_mul(parameters.stake_deposit_unstake_cap_bps as u128)
                     .and_then(|x| x.checked_div(10_000))
                     .ok_or(StewardError::ArithmeticError)?
                     .try_into()
-                    .map_err(|_| StewardError::ArithmeticError)?;
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
 
                 let unstake_state = UnstakeState {
                     stake_deposit_unstake_total: self.stake_deposit_unstake_total,

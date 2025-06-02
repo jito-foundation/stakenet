@@ -172,7 +172,7 @@ pub fn get_target_lamports(delegation: &Delegation, stake_pool_lamports: u64) ->
                 .and_then(|x| x.checked_div(delegation.denominator as u128))
                 .ok_or(StewardError::ArithmeticError)?
                 .try_into()
-                .map_err(|_| StewardError::ArithmeticError)?;
+                .map_err(|_| StewardError::ArithmeticCastError)?;
             Ok(target)
         }
     }
