@@ -1848,8 +1848,8 @@
     },
     {
       "code": 6031,
-      "name": "InvalidValidatorState",
-      "msg": "Invalid validator state"
+      "name": "ArithmeticCastError",
+      "msg": "Arithmetic casting error"
     }
   ],
   "types": [
