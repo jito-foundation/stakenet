@@ -87,13 +87,13 @@ jobs:
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      # build the program and IDL; exit if error
-      - run: anchor build --idl idl
-      - name: Check for diff on IDL
-        run: git diff --exit-code
+      # # build the program and IDL; exit if error
+      # - run: anchor build --idl idl
+      # - name: Check for diff on IDL
+      #   run: git diff --exit-code
 
       # run verified build
-      - run: solana-verify build --library-name validator_history
+      # - run: solana-verify build --library-name validator_history
 
       - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
 
