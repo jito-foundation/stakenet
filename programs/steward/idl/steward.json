@@ -9,8 +9,19 @@
   "instructions": [
     {
       "name": "add_validator_to_pool",
-      "docs": ["Passthrough spl-stake-pool: Add a validator to the pool"],
-      "discriminator": [181, 6, 29, 25, 192, 211, 190, 187],
+      "docs": [
+        "Passthrough spl-stake-pool: Add a validator to the pool"
+      ],
+      "discriminator": [
+        181,
+        6,
+        29,
+        25,
+        192,
+        211,
+        190,
+        187
+      ],
       "accounts": [
         {
           "name": "config"
@@ -82,7 +93,16 @@
       "docs": [
         "Adds the validators to the blacklist. They will be instant unstaked and never receive delegations. Each u32 is a ValidatorHistory index."
       ],
-      "discriminator": [204, 81, 61, 86, 100, 92, 226, 86],
+      "discriminator": [
+        204,
+        81,
+        61,
+        86,
+        100,
+        92,
+        226,
+        86
+      ],
       "accounts": [
         {
           "name": "config",
@@ -108,7 +128,16 @@
       "docs": [
         "Admin to mark or unmark validator for removal and unstuck the machine"
       ],
-      "discriminator": [213, 225, 98, 245, 9, 15, 154, 63],
+      "discriminator": [
+        213,
+        225,
+        98,
+        245,
+        9,
+        15,
+        154,
+        63
+      ],
       "accounts": [
         {
           "name": "config",
@@ -144,7 +173,16 @@
       "docs": [
         "Adds a validator to the pool if it has a validator history account, matches stake_minimum, and is not yet in the pool"
       ],
-      "discriminator": [166, 226, 7, 8, 169, 239, 220, 69],
+      "discriminator": [
+        166,
+        226,
+        7,
+        8,
+        169,
+        239,
+        220,
+        69
+      ],
       "accounts": [
         {
           "name": "config"
@@ -207,7 +245,16 @@
       "docs": [
         "Removes a validator from the pool if its stake account is inactive or the vote account has closed"
       ],
-      "discriminator": [65, 39, 73, 213, 52, 34, 181, 94],
+      "discriminator": [
+        65,
+        39,
+        73,
+        213,
+        52,
+        34,
+        181,
+        94
+      ],
       "accounts": [
         {
           "name": "config"
@@ -240,7 +287,9 @@
         },
         {
           "name": "transient_stake_account",
-          "docs": ["Account may not exist yet so no owner check done"],
+          "docs": [
+            "Account may not exist yet so no owner check done"
+          ],
           "writable": true
         },
         {
@@ -282,7 +331,16 @@
         "Config is not closed as it is a Keypair, so lamports can simply be withdrawn.",
         "Reclaims lamports to authority"
       ],
-      "discriminator": [172, 171, 212, 186, 90, 10, 181, 24],
+      "discriminator": [
+        172,
+        171,
+        212,
+        186,
+        90,
+        10,
+        181,
+        24
+      ],
       "accounts": [
         {
           "name": "config"
@@ -305,7 +363,16 @@
         "Computes delegation for a validator for the current cycle.",
         "All validators must have delegations computed before stake can be delegated"
       ],
-      "discriminator": [249, 138, 49, 247, 69, 32, 11, 175],
+      "discriminator": [
+        249,
+        138,
+        49,
+        247,
+        69,
+        32,
+        11,
+        175
+      ],
       "accounts": [
         {
           "name": "config"
@@ -325,7 +392,16 @@
       "docs": [
         "Checks if a validator at `validator_list_index` should be instant unstaked, and marks it if so"
       ],
-      "discriminator": [172, 220, 51, 183, 2, 94, 253, 251],
+      "discriminator": [
+        172,
+        220,
+        51,
+        183,
+        2,
+        94,
+        253,
+        251
+      ],
       "accounts": [
         {
           "name": "config"
@@ -356,7 +432,16 @@
       "docs": [
         "Computes score for a the validator at `validator_list_index` for the current cycle."
       ],
-      "discriminator": [161, 101, 4, 93, 120, 62, 41, 20],
+      "discriminator": [
+        161,
+        101,
+        4,
+        93,
+        120,
+        62,
+        41,
+        20
+      ],
       "accounts": [
         {
           "name": "config"
@@ -387,7 +472,16 @@
       "docs": [
         "Passthrough spl-stake-pool: Decrease additional validator stake"
       ],
-      "discriminator": [90, 22, 113, 73, 21, 229, 33, 83],
+      "discriminator": [
+        90,
+        22,
+        113,
+        73,
+        21,
+        229,
+        33,
+        83
+      ],
       "accounts": [
         {
           "name": "config"
@@ -467,8 +561,19 @@
     },
     {
       "name": "decrease_validator_stake",
-      "docs": ["Passthrough spl-stake-pool: Decrease validator stake"],
-      "discriminator": [145, 203, 107, 123, 71, 63, 35, 225],
+      "docs": [
+        "Passthrough spl-stake-pool: Decrease validator stake"
+      ],
+      "discriminator": [
+        145,
+        203,
+        107,
+        123,
+        71,
+        63,
+        35,
+        225
+      ],
       "accounts": [
         {
           "name": "config"
@@ -547,7 +652,16 @@
       "docs": [
         "Housekeeping, run at the start of any new epoch before any other instructions"
       ],
-      "discriminator": [208, 225, 211, 82, 219, 242, 58, 200],
+      "discriminator": [
+        208,
+        225,
+        211,
+        82,
+        219,
+        242,
+        58,
+        200
+      ],
       "accounts": [
         {
           "name": "config"
@@ -577,7 +691,16 @@
       "docs": [
         "Idle state, waiting for epoch progress before transitioning to next state"
       ],
-      "discriminator": [200, 79, 16, 41, 251, 91, 239, 83],
+      "discriminator": [
+        200,
+        79,
+        16,
+        41,
+        251,
+        91,
+        239,
+        83
+      ],
       "accounts": [
         {
           "name": "config"
@@ -597,7 +720,16 @@
       "docs": [
         "Passthrough spl-stake-pool: Increase additional validator stake"
       ],
-      "discriminator": [93, 136, 94, 230, 32, 54, 167, 242],
+      "discriminator": [
+        93,
+        136,
+        94,
+        230,
+        32,
+        54,
+        167,
+        242
+      ],
       "accounts": [
         {
           "name": "config"
@@ -679,8 +811,19 @@
     },
     {
       "name": "increase_validator_stake",
-      "docs": ["Passthrough spl-stake-pool: Increase validator stake"],
-      "discriminator": [5, 121, 50, 243, 14, 159, 97, 6],
+      "docs": [
+        "Passthrough spl-stake-pool: Increase validator stake"
+      ],
+      "discriminator": [
+        5,
+        121,
+        50,
+        243,
+        14,
+        159,
+        97,
+        6
+      ],
       "accounts": [
         {
           "name": "config"
@@ -759,7 +902,16 @@
     },
     {
       "name": "initialize_steward",
-      "discriminator": [195, 182, 16, 84, 217, 58, 220, 175],
+      "discriminator": [
+        195,
+        182,
+        16,
+        84,
+        217,
+        58,
+        220,
+        175
+      ],
       "accounts": [
         {
           "name": "config",
@@ -802,7 +954,16 @@
       "docs": [
         "When a validator is marked for immediate removal, it needs to be removed before normal functions can continue"
       ],
-      "discriminator": [119, 127, 216, 135, 24, 63, 229, 242],
+      "discriminator": [
+        119,
+        127,
+        216,
+        135,
+        24,
+        63,
+        229,
+        242
+      ],
       "accounts": [
         {
           "name": "config"
@@ -827,8 +988,19 @@
     },
     {
       "name": "pause_steward",
-      "docs": ["Pauses the steward, preventing any further state transitions"],
-      "discriminator": [214, 85, 52, 67, 192, 238, 178, 102],
+      "docs": [
+        "Pauses the steward, preventing any further state transitions"
+      ],
+      "discriminator": [
+        214,
+        85,
+        52,
+        67,
+        192,
+        238,
+        178,
+        102
+      ],
       "accounts": [
         {
           "name": "config",
@@ -847,7 +1019,16 @@
       "docs": [
         "Increases state account by 10KiB each ix until it reaches StewardStateAccount::SIZE"
       ],
-      "discriminator": [67, 181, 233, 214, 215, 148, 245, 126],
+      "discriminator": [
+        67,
+        181,
+        233,
+        214,
+        215,
+        148,
+        245,
+        126
+      ],
       "accounts": [
         {
           "name": "state_account",
@@ -876,7 +1057,16 @@
         "Increases or decreases stake for a validator at `validator_list_index` to match the target stake,",
         "given constraints on increase/decrease priority, reserve balance, and unstaking caps"
       ],
-      "discriminator": [108, 158, 77, 9, 210, 52, 88, 62],
+      "discriminator": [
+        108,
+        158,
+        77,
+        9,
+        210,
+        52,
+        88,
+        62
+      ],
       "accounts": [
         {
           "name": "config"
@@ -911,7 +1101,9 @@
         },
         {
           "name": "transient_stake_account",
-          "docs": ["Account may not exist yet so no owner check done"],
+          "docs": [
+            "Account may not exist yet so no owner check done"
+          ],
           "writable": true
         },
         {
@@ -945,8 +1137,19 @@
     },
     {
       "name": "remove_validator_from_pool",
-      "docs": ["Passthrough spl-stake-pool: Remove a validator from the pool"],
-      "discriminator": [161, 32, 213, 239, 221, 15, 181, 114],
+      "docs": [
+        "Passthrough spl-stake-pool: Remove a validator from the pool"
+      ],
+      "discriminator": [
+        161,
+        32,
+        213,
+        239,
+        221,
+        15,
+        181,
+        114
+      ],
       "accounts": [
         {
           "name": "config"
@@ -1004,7 +1207,16 @@
       "docs": [
         "Removes the validators from the blacklist. Each u32 is a ValidatorHistory index."
       ],
-      "discriminator": [233, 114, 77, 164, 159, 209, 137, 137],
+      "discriminator": [
+        233,
+        114,
+        77,
+        164,
+        159,
+        209,
+        137,
+        137
+      ],
       "accounts": [
         {
           "name": "config",
@@ -1027,8 +1239,19 @@
     },
     {
       "name": "reset_steward_state",
-      "docs": ["Resets steward state account to its initial state."],
-      "discriminator": [84, 248, 158, 46, 200, 205, 234, 86],
+      "docs": [
+        "Resets steward state account to its initial state."
+      ],
+      "discriminator": [
+        84,
+        248,
+        158,
+        46,
+        200,
+        205,
+        234,
+        86
+      ],
       "accounts": [
         {
           "name": "state_account",
@@ -1053,8 +1276,19 @@
     },
     {
       "name": "reset_validator_lamport_balances",
-      "docs": ["Reset validator_lamport_balances to default"],
-      "discriminator": [69, 111, 124, 69, 69, 29, 96, 181],
+      "docs": [
+        "Reset validator_lamport_balances to default"
+      ],
+      "discriminator": [
+        69,
+        111,
+        124,
+        69,
+        69,
+        29,
+        96,
+        181
+      ],
       "accounts": [
         {
           "name": "steward_state",
@@ -1072,8 +1306,19 @@
     },
     {
       "name": "resume_steward",
-      "docs": ["Resumes the steward, allowing state transitions to continue"],
-      "discriminator": [25, 71, 153, 183, 197, 197, 187, 3],
+      "docs": [
+        "Resumes the steward, allowing state transitions to continue"
+      ],
+      "discriminator": [
+        25,
+        71,
+        153,
+        183,
+        197,
+        197,
+        187,
+        3
+      ],
       "accounts": [
         {
           "name": "config",
@@ -1089,7 +1334,16 @@
     },
     {
       "name": "set_new_authority",
-      "discriminator": [94, 40, 220, 124, 122, 142, 142, 98],
+      "discriminator": [
+        94,
+        40,
+        220,
+        124,
+        122,
+        142,
+        142,
+        98
+      ],
       "accounts": [
         {
           "name": "config",
@@ -1117,8 +1371,19 @@
     },
     {
       "name": "set_preferred_validator",
-      "docs": ["Passthrough spl-stake-pool: Set the preferred validator"],
-      "discriminator": [114, 42, 19, 98, 212, 97, 109, 13],
+      "docs": [
+        "Passthrough spl-stake-pool: Set the preferred validator"
+      ],
+      "discriminator": [
+        114,
+        42,
+        19,
+        98,
+        212,
+        97,
+        109,
+        13
+      ],
       "accounts": [
         {
           "name": "config"
@@ -1162,8 +1427,19 @@
     },
     {
       "name": "set_staker",
-      "docs": ["Passthrough spl-stake-pool: Set the staker for the pool"],
-      "discriminator": [149, 203, 114, 28, 80, 138, 17, 131],
+      "docs": [
+        "Passthrough spl-stake-pool: Set the staker for the pool"
+      ],
+      "discriminator": [
+        149,
+        203,
+        114,
+        28,
+        80,
+        138,
+        17,
+        131
+      ],
       "accounts": [
         {
           "name": "config"
@@ -1195,7 +1471,16 @@
       "docs": [
         "For parameters that are present in args, the instruction checks that they are within sensible bounds and saves them to config struct"
       ],
-      "discriminator": [116, 107, 24, 207, 101, 49, 213, 77],
+      "discriminator": [
+        116,
+        107,
+        24,
+        207,
+        101,
+        49,
+        213,
+        77
+      ],
       "accounts": [
         {
           "name": "config",
@@ -1222,61 +1507,187 @@
   "accounts": [
     {
       "name": "ClusterHistory",
-      "discriminator": [41, 154, 241, 80, 135, 88, 85, 252]
+      "discriminator": [
+        41,
+        154,
+        241,
+        80,
+        135,
+        88,
+        85,
+        252
+      ]
     },
     {
       "name": "Config",
-      "discriminator": [155, 12, 170, 224, 30, 250, 204, 130]
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
     },
     {
       "name": "StewardStateAccount",
-      "discriminator": [55, 216, 46, 49, 148, 67, 228, 29]
+      "discriminator": [
+        55,
+        216,
+        46,
+        49,
+        148,
+        67,
+        228,
+        29
+      ]
     },
     {
       "name": "ValidatorHistory",
-      "discriminator": [205, 25, 8, 221, 253, 131, 2, 146]
+      "discriminator": [
+        205,
+        25,
+        8,
+        221,
+        253,
+        131,
+        2,
+        146
+      ]
     }
   ],
   "events": [
     {
       "name": "AutoAddValidatorEvent",
-      "discriminator": [123, 65, 239, 15, 82, 216, 206, 28]
+      "discriminator": [
+        123,
+        65,
+        239,
+        15,
+        82,
+        216,
+        206,
+        28
+      ]
     },
     {
       "name": "AutoRemoveValidatorEvent",
-      "discriminator": [211, 46, 52, 163, 17, 38, 197, 186]
+      "discriminator": [
+        211,
+        46,
+        52,
+        163,
+        17,
+        38,
+        197,
+        186
+      ]
     },
     {
       "name": "DecreaseComponents",
-      "discriminator": [129, 8, 124, 12, 11, 140, 0, 8]
+      "discriminator": [
+        129,
+        8,
+        124,
+        12,
+        11,
+        140,
+        0,
+        8
+      ]
     },
     {
       "name": "EpochMaintenanceEvent",
-      "discriminator": [255, 149, 70, 161, 199, 176, 9, 42]
+      "discriminator": [
+        255,
+        149,
+        70,
+        161,
+        199,
+        176,
+        9,
+        42
+      ]
     },
     {
       "name": "InstantUnstakeComponents",
-      "discriminator": [217, 80, 196, 114, 226, 11, 127, 77]
+      "discriminator": [
+        217,
+        80,
+        196,
+        114,
+        226,
+        11,
+        127,
+        77
+      ]
     },
     {
       "name": "InstantUnstakeComponentsV2",
-      "discriminator": [138, 62, 181, 14, 9, 48, 109, 47]
+      "discriminator": [
+        138,
+        62,
+        181,
+        14,
+        9,
+        48,
+        109,
+        47
+      ]
     },
     {
       "name": "RebalanceEvent",
-      "discriminator": [120, 27, 117, 235, 104, 42, 132, 75]
+      "discriminator": [
+        120,
+        27,
+        117,
+        235,
+        104,
+        42,
+        132,
+        75
+      ]
     },
     {
       "name": "ScoreComponents",
-      "discriminator": [218, 204, 53, 7, 22, 2, 217, 251]
+      "discriminator": [
+        218,
+        204,
+        53,
+        7,
+        22,
+        2,
+        217,
+        251
+      ]
     },
     {
       "name": "ScoreComponentsV2",
-      "discriminator": [140, 182, 108, 49, 246, 38, 247, 181]
+      "discriminator": [
+        140,
+        182,
+        108,
+        49,
+        246,
+        38,
+        247,
+        181
+      ]
     },
     {
       "name": "StateTransition",
-      "discriminator": [106, 9, 120, 247, 169, 106, 206, 233]
+      "discriminator": [
+        106,
+        9,
+        120,
+        247,
+        169,
+        106,
+        206,
+        233
+      ]
     }
   ],
   "errors": [
@@ -1437,8 +1848,8 @@
     },
     {
       "code": 6031,
-      "name": "ArithmeticCastError",
-      "msg": "Arithmetic casting error"
+      "name": "InvalidValidatorState",
+      "msg": "Invalid validator state"
     }
   ],
   "types": [
@@ -1545,7 +1956,10 @@
           {
             "name": "values",
             "type": {
-              "array": ["u64", 79]
+              "array": [
+                "u64",
+                79
+              ]
             }
           }
         ]
@@ -1571,7 +1985,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -1610,7 +2027,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -1673,7 +2093,10 @@
           {
             "name": "_padding0",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -1683,7 +2106,10 @@
           {
             "name": "_padding1",
             "type": {
-              "array": ["u8", 232]
+              "array": [
+                "u8",
+                232
+              ]
             }
           },
           {
@@ -1717,7 +2143,10 @@
           {
             "name": "padding0",
             "type": {
-              "array": ["u8", 2]
+              "array": [
+                "u8",
+                2
+              ]
             }
           },
           {
@@ -1727,7 +2156,10 @@
           {
             "name": "padding",
             "type": {
-              "array": ["u8", 240]
+              "array": [
+                "u8",
+                240
+              ]
             }
           }
         ]
@@ -1749,12 +2181,16 @@
         "fields": [
           {
             "name": "stake_pool",
-            "docs": ["SPL Stake Pool address that this program is managing"],
+            "docs": [
+              "SPL Stake Pool address that this program is managing"
+            ],
             "type": "pubkey"
           },
           {
             "name": "validator_list",
-            "docs": ["Validator List"],
+            "docs": [
+              "Validator List"
+            ],
             "type": "pubkey"
           },
           {
@@ -1770,7 +2206,10 @@
           },
           {
             "name": "parameters_authority",
-            "docs": ["Parameters Authority", "- Can update steward parameters"],
+            "docs": [
+              "Parameters Authority",
+              "- Can update steward parameters"
+            ],
             "type": "pubkey"
           },
           {
@@ -1796,7 +2235,9 @@
           },
           {
             "name": "parameters",
-            "docs": ["Parameters for scoring, delegation, and state machine"],
+            "docs": [
+              "Parameters for scoring, delegation, and state machine"
+            ],
             "type": {
               "defined": {
                 "name": "Parameters"
@@ -1805,7 +2246,9 @@
           },
           {
             "name": "paused",
-            "docs": ["Halts any state machine progress"],
+            "docs": [
+              "Halts any state machine progress"
+            ],
             "type": {
               "defined": {
                 "name": "U8Bool"
@@ -1814,9 +2257,14 @@
           },
           {
             "name": "_padding",
-            "docs": ["Padding for future governance parameters"],
+            "docs": [
+              "Padding for future governance parameters"
+            ],
             "type": {
-              "array": ["u8", 1023]
+              "array": [
+                "u8",
+                1023
+              ]
             }
           }
         ]
@@ -1948,7 +2396,9 @@
         "fields": [
           {
             "name": "instant_unstake",
-            "docs": ["Aggregate of all checks"],
+            "docs": [
+              "Aggregate of all checks"
+            ],
             "type": "bool"
           },
           {
@@ -1974,7 +2424,9 @@
           },
           {
             "name": "is_blacklisted",
-            "docs": ["Checks if validator was added to blacklist"],
+            "docs": [
+              "Checks if validator was added to blacklist"
+            ],
             "type": "bool"
           },
           {
@@ -1987,7 +2439,9 @@
           },
           {
             "name": "details",
-            "docs": ["Details about why a given check was calculated"],
+            "docs": [
+              "Details about why a given check was calculated"
+            ],
             "type": {
               "defined": {
                 "name": "InstantUnstakeDetails"
@@ -2004,32 +2458,44 @@
         "fields": [
           {
             "name": "epoch_credits_latest",
-            "docs": ["Latest epoch credits"],
+            "docs": [
+              "Latest epoch credits"
+            ],
             "type": "u64"
           },
           {
             "name": "vote_account_last_update_slot",
-            "docs": ["Latest vote account update slot"],
+            "docs": [
+              "Latest vote account update slot"
+            ],
             "type": "u64"
           },
           {
             "name": "total_blocks_latest",
-            "docs": ["Latest total blocks"],
+            "docs": [
+              "Latest total blocks"
+            ],
             "type": "u32"
           },
           {
             "name": "cluster_history_slot_index",
-            "docs": ["Cluster history slot index"],
+            "docs": [
+              "Cluster history slot index"
+            ],
             "type": "u64"
           },
           {
             "name": "commission",
-            "docs": ["Commission value"],
+            "docs": [
+              "Commission value"
+            ],
             "type": "u8"
           },
           {
             "name": "mev_commission",
-            "docs": ["MEV commission value"],
+            "docs": [
+              "MEV commission value"
+            ],
             "type": "u16"
           }
         ]
@@ -2053,7 +2519,10 @@
           {
             "name": "values",
             "type": {
-              "array": ["u64", 313]
+              "array": [
+                "u64",
+                313
+              ]
             }
           }
         ]
@@ -2070,22 +2539,30 @@
         "fields": [
           {
             "name": "mev_commission_range",
-            "docs": ["Number of epochs to consider for MEV commission"],
+            "docs": [
+              "Number of epochs to consider for MEV commission"
+            ],
             "type": "u16"
           },
           {
             "name": "epoch_credits_range",
-            "docs": ["Number of epochs to consider for epoch credits"],
+            "docs": [
+              "Number of epochs to consider for epoch credits"
+            ],
             "type": "u16"
           },
           {
             "name": "commission_range",
-            "docs": ["Number of epochs to consider for commission"],
+            "docs": [
+              "Number of epochs to consider for commission"
+            ],
             "type": "u16"
           },
           {
             "name": "mev_commission_bps_threshold",
-            "docs": ["Highest MEV commission rate allowed in bps"],
+            "docs": [
+              "Highest MEV commission rate allowed in bps"
+            ],
             "type": "u16"
           },
           {
@@ -2111,7 +2588,9 @@
           },
           {
             "name": "historical_commission_threshold",
-            "docs": ["Highest commission rate allowed in tracked history"],
+            "docs": [
+              "Highest commission rate allowed in tracked history"
+            ],
             "type": "u8"
           },
           {
@@ -2121,12 +2600,17 @@
               "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
             ],
             "type": {
-              "array": ["u8", 6]
+              "array": [
+                "u8",
+                6
+              ]
             }
           },
           {
             "name": "num_delegation_validators",
-            "docs": ["Number of validators to delegate to"],
+            "docs": [
+              "Number of validators to delegate to"
+            ],
             "type": "u32"
           },
           {
@@ -2149,12 +2633,16 @@
           },
           {
             "name": "compute_score_slot_range",
-            "docs": ["Number of slots that scoring must be completed in"],
+            "docs": [
+              "Number of slots that scoring must be completed in"
+            ],
             "type": "u64"
           },
           {
             "name": "instant_unstake_epoch_progress",
-            "docs": ["Progress in epoch before instant unstake is allowed"],
+            "docs": [
+              "Progress in epoch before instant unstake is allowed"
+            ],
             "type": "f64"
           },
           {
@@ -2188,7 +2676,10 @@
           {
             "name": "_padding_1",
             "type": {
-              "array": ["u64", 32]
+              "array": [
+                "u64",
+                32
+              ]
             }
           }
         ]
@@ -2329,12 +2820,16 @@
         "fields": [
           {
             "name": "score",
-            "docs": ["Product of all scoring components"],
+            "docs": [
+              "Product of all scoring components"
+            ],
             "type": "f64"
           },
           {
             "name": "yield_score",
-            "docs": ["vote_credits_ratio * (1 - commission)"],
+            "docs": [
+              "vote_credits_ratio * (1 - commission)"
+            ],
             "type": "f64"
           },
           {
@@ -2346,7 +2841,9 @@
           },
           {
             "name": "blacklisted_score",
-            "docs": ["If validator is blacklisted, score is 0.0, else 1.0"],
+            "docs": [
+              "If validator is blacklisted, score is 0.0, else 1.0"
+            ],
             "type": "f64"
           },
           {
@@ -2402,7 +2899,9 @@
           },
           {
             "name": "details",
-            "docs": ["Details about why a given score was calculated"],
+            "docs": [
+              "Details about why a given score was calculated"
+            ],
             "type": {
               "defined": {
                 "name": "ScoreDetails"
@@ -2419,47 +2918,65 @@
         "fields": [
           {
             "name": "max_mev_commission",
-            "docs": ["Max MEV commission observed"],
+            "docs": [
+              "Max MEV commission observed"
+            ],
             "type": "u16"
           },
           {
             "name": "max_mev_commission_epoch",
-            "docs": ["Epoch of max MEV commission"],
+            "docs": [
+              "Epoch of max MEV commission"
+            ],
             "type": "u16"
           },
           {
             "name": "superminority_epoch",
-            "docs": ["Epoch when superminority was detected"],
+            "docs": [
+              "Epoch when superminority was detected"
+            ],
             "type": "u16"
           },
           {
             "name": "delinquency_ratio",
-            "docs": ["Ratio that failed delinquency check"],
+            "docs": [
+              "Ratio that failed delinquency check"
+            ],
             "type": "f64"
           },
           {
             "name": "delinquency_epoch",
-            "docs": ["Epoch when delinquency was detected"],
+            "docs": [
+              "Epoch when delinquency was detected"
+            ],
             "type": "u16"
           },
           {
             "name": "max_commission",
-            "docs": ["Max commission observed"],
+            "docs": [
+              "Max commission observed"
+            ],
             "type": "u8"
           },
           {
             "name": "max_commission_epoch",
-            "docs": ["Epoch of max commission"],
+            "docs": [
+              "Epoch of max commission"
+            ],
             "type": "u16"
           },
           {
             "name": "max_historical_commission",
-            "docs": ["Max historical commission observed"],
+            "docs": [
+              "Max historical commission observed"
+            ],
             "type": "u8"
           },
           {
             "name": "max_historical_commission_epoch",
-            "docs": ["Epoch of max historical commission"],
+            "docs": [
+              "Epoch of max historical commission"
+            ],
             "type": "u16"
           }
         ]
@@ -2505,7 +3022,9 @@
         "fields": [
           {
             "name": "state_tag",
-            "docs": ["Current state of the Steward"],
+            "docs": [
+              "Current state of the Steward"
+            ],
             "type": {
               "defined": {
                 "name": "StewardStateEnum"
@@ -2519,7 +3038,10 @@
               "so not always equal to the stake account balance."
             ],
             "type": {
-              "array": ["u64", 5000]
+              "array": [
+                "u64",
+                5000
+              ]
             }
           },
           {
@@ -2528,14 +3050,22 @@
               "Overall score of validator, used to determine delegates and order for delegation."
             ],
             "type": {
-              "array": ["u32", 5000]
+              "array": [
+                "u32",
+                5000
+              ]
             }
           },
           {
             "name": "sorted_score_indices",
-            "docs": ["Indices of validators, sorted by score descending"],
+            "docs": [
+              "Indices of validators, sorted by score descending"
+            ],
             "type": {
-              "array": ["u16", 5000]
+              "array": [
+                "u16",
+                5000
+              ]
             }
           },
           {
@@ -2544,14 +3074,22 @@
               "Yield component of the score. Used as secondary priority, to determine order for unstaking."
             ],
             "type": {
-              "array": ["u32", 5000]
+              "array": [
+                "u32",
+                5000
+              ]
             }
           },
           {
             "name": "sorted_yield_score_indices",
-            "docs": ["Indices of validators, sorted by yield score descending"],
+            "docs": [
+              "Indices of validators, sorted by yield score descending"
+            ],
             "type": {
-              "array": ["u16", 5000]
+              "array": [
+                "u16",
+                5000
+              ]
             }
           },
           {
@@ -2632,7 +3170,9 @@
           },
           {
             "name": "next_cycle_epoch",
-            "docs": ["Next cycle start"],
+            "docs": [
+              "Next cycle start"
+            ],
             "type": "u64"
           },
           {
@@ -2645,7 +3185,9 @@
           },
           {
             "name": "scoring_unstake_total",
-            "docs": ["Total lamports that have been due to scoring this cycle"],
+            "docs": [
+              "Total lamports that have been due to scoring this cycle"
+            ],
             "type": "u64"
           },
           {
@@ -2664,7 +3206,9 @@
           },
           {
             "name": "status_flags",
-            "docs": ["Flags to track state transitions and operations"],
+            "docs": [
+              "Flags to track state transitions and operations"
+            ],
             "type": "u32"
           },
           {
@@ -2676,9 +3220,14 @@
           },
           {
             "name": "_padding0",
-            "docs": ["Future state and #[repr(C)] alignment"],
+            "docs": [
+              "Future state and #[repr(C)] alignment"
+            ],
             "type": {
-              "array": ["u8", 40002]
+              "array": [
+                "u8",
+                40002
+              ]
             }
           }
         ]
@@ -2716,7 +3265,10 @@
           {
             "name": "_padding",
             "type": {
-              "array": ["u8", 6]
+              "array": [
+                "u8",
+                6
+              ]
             }
           }
         ]
@@ -2747,7 +3299,9 @@
     },
     {
       "name": "U8Bool",
-      "docs": ["A boolean type stored as a u8."],
+      "docs": [
+        "A boolean type stored as a u8."
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -2906,7 +3460,10 @@
           {
             "name": "_padding0",
             "type": {
-              "array": ["u8", 7]
+              "array": [
+                "u8",
+                7
+              ]
             }
           },
           {
@@ -2920,7 +3477,10 @@
           {
             "name": "_padding1",
             "type": {
-              "array": ["u8", 232]
+              "array": [
+                "u8",
+                232
+              ]
             }
           },
           {
@@ -2978,7 +3538,10 @@
           {
             "name": "ip",
             "type": {
-              "array": ["u8", 4]
+              "array": [
+                "u8",
+                4
+              ]
             }
           },
           {
@@ -3004,7 +3567,10 @@
           {
             "name": "padding1",
             "type": {
-              "array": ["u8", 84]
+              "array": [
+                "u8",
+                84
+              ]
             }
           }
         ]
