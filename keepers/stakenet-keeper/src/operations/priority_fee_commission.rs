@@ -4,9 +4,7 @@ use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
     state::keeper_state::KeeperState,
 };
-use anchor_lang::error;
 use log::error as log_error;
-use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{

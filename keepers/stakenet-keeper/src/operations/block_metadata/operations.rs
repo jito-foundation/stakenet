@@ -1,13 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anchor_lang::prelude::SlotHistory;
+use anchor_lang::{prelude::SlotHistory, AnchorDeserialize};
 use futures::future::join_all;
+use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
 use log::{error, info};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
-    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig,
-    rpc_request::RpcError,
+    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig, rpc_request::RpcError
 };
 use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
@@ -18,16 +18,15 @@ use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
 use stakenet_sdk::{
-    models::{entries::UpdateInstruction, submit_stats::SubmitStats},
+    models::{ cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
     utils::transactions::submit_instructions,
 };
 
 use crate::{
-    operations::{
+    entries::priority_fee_commission_entry::derive_priority_fee_distribution_account_address, operations::{
         block_metadata::db::DBSlotInfo,
         keeper_operations::{check_flag, KeeperOperations},
-    },
-    state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
+    }, state::{keeper_config::KeeperConfig, keeper_state::KeeperState}
 };
 
 use super::errors::BlockMetadataKeeperError;
@@ -92,11 +91,13 @@ pub async fn fire(
             &keeper_config.redundant_rpc_urls,
             keeper_state,
             program_id,
+            &keeper_config.priority_fee_distribution_program_id,
             priority_fee_oracle_authority_keypair,
             keeper_config.tx_retry_count,
             keeper_config.tx_confirmation_seconds,
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
+            keeper_config.cluster
         )
         .await
         {
@@ -135,11 +136,13 @@ async fn _process(
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
+    priority_fee_distribution_program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     no_pack: bool,
+    cluster: Cluster,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -148,11 +151,13 @@ async fn _process(
         maybe_redundant_rpc_urls,
         keeper_state,
         program_id,
+        priority_fee_distribution_program_id,
         priority_fee_oracle_authority_keypair,
         retry_count,
         confirmation_time,
         priority_fee_in_microlamports,
         no_pack,
+        cluster
     )
     .await
 }
@@ -164,11 +169,13 @@ async fn update_block_metadata(
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
+    priority_fee_distribution_program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     _no_pack: bool, //TODO take out
+    cluster: Cluster,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -179,7 +186,7 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 1;
+    let lookback_epochs = 3;
     let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule
@@ -348,8 +355,16 @@ async fn update_block_metadata(
             for entry in update_map.clone() {
                 let (vote_account, entry) = entry;
 
+                // Calculate total lamports transferred
+                let (total_lamports_transferred, validator_commission_bps) = get_priority_fee_distribution_account_info(
+                    client,
+                    priority_fee_distribution_program_id,
+                    &entry.vote_account,
+                    epoch
+                ).await;
+
                 datapoint_info!(
-                  "pfh-block-info",
+                  "pfh-block-info-0.0.2",
                   ("vote-account", vote_account, String),
                   ("blocks-error", entry.blocks_error, i64),
                   ("blocks-left", entry.blocks_left, i64),
@@ -359,7 +374,10 @@ async fn update_block_metadata(
                   ("highest-slot", entry.highest_slot, i64),
                   ("total-leader-slots", entry.total_leader_slots, i64),
                   ("total-priority-fees", entry.total_priority_fees, i64),
+                  ("fts-total-lamports-transferred", total_lamports_transferred, Option<i64>),
+                  ("fts-validator-commission-bps", validator_commission_bps, Option<i64>),
                   ("update-slot", entry.update_slot, i64),
+                  "cluster" => cluster.to_string(),
                   // ("validator-history-account", entry.validator_history_account, String)
                   // ("priority-fee-oracle-authority", entry.priority_fee_oracle_authority, String),
                   // ("program-id", entry.program_id, String),
@@ -406,6 +424,38 @@ async fn update_block_metadata(
 
         Ok(submit_result)
     }
+}
+
+pub async fn get_priority_fee_distribution_account_info(
+    client: &RpcClient,
+    priority_fee_distribution_program_id: &Pubkey,
+    vote_account: &Pubkey,
+    epoch: u64,
+) -> (Option<u64>, Option<u16>) { // total lamports transferred, validator commission bps
+
+    let (priority_fee_distribution_account, _) =
+        derive_priority_fee_distribution_account_address(
+            priority_fee_distribution_program_id,
+            vote_account,
+            epoch,
+        );
+    match client.get_account(&priority_fee_distribution_account).await {
+        Ok(account) => {
+            let mut data_slice = account.data.as_slice();
+            match PriorityFeeDistributionAccount::deserialize(&mut data_slice) {
+                Ok(priority_fee_distribution_account) => {
+                    (Some(priority_fee_distribution_account.total_lamports_transferred), Some(priority_fee_distribution_account.validator_commission_bps))
+                }
+                Err(_) => {
+                    (None, None)
+                }
+            }
+        }
+        _ => {
+            (None, None)
+        }
+    }
+
 }
 
 pub async fn get_leader_schedule_safe(

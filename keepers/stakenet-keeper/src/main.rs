@@ -396,6 +396,7 @@ async fn main() {
         sqlite_connection: Arc::new(Mutex::new(connection)),
         priority_fee_oracle_authority_keypair,
         redundant_rpc_urls,
+        cluster: args.cluster
     };
 
     run_keeper(config).await;

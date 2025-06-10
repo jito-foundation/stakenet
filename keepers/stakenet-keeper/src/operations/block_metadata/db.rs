@@ -8,7 +8,7 @@ use solana_sdk::pubkey::Pubkey;
 
 use crate::entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry;
 
-use super::{errors::BlockMetadataKeeperError, operations::AggregateBlockInfo};
+use super::errors::BlockMetadataKeeperError;
 
 // -------------------------- NEW SCHEMA -----------------------------
 #[repr(u8)]

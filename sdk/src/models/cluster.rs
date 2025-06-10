@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use std::fmt::{Display, Formatter};
 
-#[derive(ValueEnum, Debug, Clone)]
+#[derive(ValueEnum, Debug, Clone, Copy)]
 pub enum Cluster {
     Mainnet,
     Testnet,
