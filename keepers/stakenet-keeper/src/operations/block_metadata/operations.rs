@@ -278,9 +278,9 @@ async fn update_block_metadata(
                             .rewards
                             .unwrap()
                             .into_iter()
-                            .find(|r| r.reward_type == Some(RewardType::Fee))
-                            .map(|r| r.lamports)
-                            .unwrap_or(0) as u64;
+                            .filter(|r| r.reward_type == Some(RewardType::Fee))
+                            .map(|r| r.lamports as u64)
+                            .sum::<u64>();
                         ok_entries.push((slot, priority_fees));
                     }
                     Err(err) => match err {
