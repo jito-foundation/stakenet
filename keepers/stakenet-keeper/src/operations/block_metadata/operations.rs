@@ -9,9 +9,9 @@ use solana_client::{
     client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig,
     rpc_request::RpcError,
 };
-use solana_metrics::datapoint_error;
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
-    commitment_config::CommitmentConfig, instruction::Instruction, pubkey::Pubkey,
+    commitment_config::CommitmentConfig, pubkey::Pubkey,
     signature::Keypair, signer::Signer, slot_history,
 };
 use solana_transaction_status::{
@@ -345,11 +345,30 @@ async fn update_block_metadata(
                 }
             };
 
-            let update_ixs = update_map
-                .iter()
-                .map(|entry| entry.1.update_instruction())
-                .collect::<Vec<Instruction>>();
-            ixs.extend(update_ixs);
+            for entry in update_map.clone() {
+                let (vote_account, entry) = entry;
+
+                datapoint_info!(
+                  "pfh-block-info",
+                  ("vote-account", vote_account, String),
+                  ("blocks-error", entry.blocks_error, i64),
+                  ("blocks-left", entry.blocks_left, i64),
+                  ("blocks-missed", entry.blocks_missed, i64),
+                  ("blocks-produced", entry.blocks_produced, i64),
+                  ("epoch", entry.epoch, i64),
+                  ("highest-slot", entry.highest_slot, i64),
+                  ("total-leader-slots", entry.total_leader_slots, i64),
+                  ("total-priority-fees", entry.total_priority_fees, i64),
+                  ("update-slot", entry.update_slot, i64),
+                  // ("validator-history-account", entry.validator_history_account, String)
+                  // ("priority-fee-oracle-authority", entry.priority_fee_oracle_authority, String),
+                  // ("program-id", entry.program_id, String),
+                  // ("config", entry.config, String),
+                  //
+                );
+
+                ixs.push(entry.update_instruction());
+            }
         }
 
         let time_ms = start_time.elapsed().as_millis();
