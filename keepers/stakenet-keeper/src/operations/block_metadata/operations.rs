@@ -377,6 +377,7 @@ async fn update_block_metadata(
                   ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
                   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
                   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
+                  ("pfs-priority-fee-distribution-program", priority_fee_distribution_program_id.to_string(), String),
                   ("update-slot", entry.update_slot, i64),
                   "cluster" => cluster.to_string(),
                   // ("validator-history-account", entry.validator_history_account, String)
