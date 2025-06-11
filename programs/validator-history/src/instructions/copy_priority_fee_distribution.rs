@@ -66,13 +66,7 @@ pub fn handle_copy_priority_fee_distribution_account(
 
     let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)?;
     let commission_bps = distribution_account.validator_commission_bps;
-
-    // if the merkle_root has been uploaded pull the mev_earned for the epoch
-    let priority_fees_earned = if let Some(merkle_root) = distribution_account.merkle_root {
-        merkle_root.max_total_claim
-    } else {
-        ValidatorHistoryEntry::default().priority_fee_tips
-    };
+    let priority_fees_earned = distribution_account.total_lamports_transferred;
 
     validator_history_account.set_priority_fees_earned_and_commission(
         epoch,
