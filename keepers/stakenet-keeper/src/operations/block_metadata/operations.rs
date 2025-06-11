@@ -356,7 +356,7 @@ async fn update_block_metadata(
                 let (vote_account, entry) = entry;
 
                 // Calculate total lamports transferred
-                let (total_lamports_transferred, validator_commission_bps) = get_priority_fee_distribution_account_info(
+                let (priority_fee_distribution_account,total_lamports_transferred, validator_commission_bps) = get_priority_fee_distribution_account_info(
                     client,
                     priority_fee_distribution_program_id,
                     &entry.vote_account,
@@ -364,7 +364,7 @@ async fn update_block_metadata(
                 ).await;
 
                 datapoint_info!(
-                  "pfh-block-info-0.0.2",
+                  "pfh-block-info-0.0.3",
                   ("vote-account", vote_account, String),
                   ("blocks-error", entry.blocks_error, i64),
                   ("blocks-left", entry.blocks_left, i64),
@@ -374,8 +374,9 @@ async fn update_block_metadata(
                   ("highest-slot", entry.highest_slot, i64),
                   ("total-leader-slots", entry.total_leader_slots, i64),
                   ("total-priority-fees", entry.total_priority_fees, i64),
-                  ("fts-total-lamports-transferred", total_lamports_transferred, Option<i64>),
-                  ("fts-validator-commission-bps", validator_commission_bps, Option<i64>),
+                  ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
+                  ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
+                  ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
                   ("update-slot", entry.update_slot, i64),
                   "cluster" => cluster.to_string(),
                   // ("validator-history-account", entry.validator_history_account, String)
@@ -431,7 +432,7 @@ pub async fn get_priority_fee_distribution_account_info(
     priority_fee_distribution_program_id: &Pubkey,
     vote_account: &Pubkey,
     epoch: u64,
-) -> (Option<u64>, Option<u16>) { // total lamports transferred, validator commission bps
+) -> (Pubkey, i64, i64) { // total lamports transferred, validator commission bps
 
     let (priority_fee_distribution_account, _) =
         derive_priority_fee_distribution_account_address(
@@ -443,16 +444,16 @@ pub async fn get_priority_fee_distribution_account_info(
         Ok(account) => {
             let mut data_slice = account.data.as_slice();
             match PriorityFeeDistributionAccount::deserialize(&mut data_slice) {
-                Ok(priority_fee_distribution_account) => {
-                    (Some(priority_fee_distribution_account.total_lamports_transferred), Some(priority_fee_distribution_account.validator_commission_bps))
+                Ok(account) => {
+                    (priority_fee_distribution_account, account.total_lamports_transferred as i64, account.validator_commission_bps as i64)
                 }
                 Err(_) => {
-                    (None, None)
+                    (priority_fee_distribution_account, -1, -1)
                 }
             }
         }
         _ => {
-            (None, None)
+            (priority_fee_distribution_account, -1, -1)
         }
     }
 
