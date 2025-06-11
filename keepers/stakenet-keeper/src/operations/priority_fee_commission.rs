@@ -128,7 +128,6 @@ pub async fn update_priority_fee_commission(
     _no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
-    let validator_history_map = &keeper_state.validator_history_map;
     let current_epoch_tip_distribution_map = &keeper_state.current_epoch_tip_distribution_map;
 
     let existing_entries = current_epoch_tip_distribution_map
@@ -136,14 +135,7 @@ pub async fn update_priority_fee_commission(
         .filter_map(|(pubkey, account)| account.as_ref().map(|_| *pubkey))
         .collect::<Vec<_>>();
 
-    let entries_to_update = existing_entries
-        .into_iter()
-        .filter(|entry| {
-            !priority_fee_commission_uploaded(validator_history_map, entry, epoch_info.epoch)
-        })
-        .collect::<Vec<Pubkey>>();
-
-    let update_instructions = entries_to_update
+    let update_instructions = existing_entries
         .iter()
         .map(|vote_account| {
             ValidatorPriorityFeeCommissionEntry::new(
@@ -170,19 +162,4 @@ pub async fn update_priority_fee_commission(
     .await;
 
     submit_result.map_err(|e| e.into())
-}
-
-fn priority_fee_commission_uploaded(
-    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-    vote_account: &Pubkey,
-    epoch: u64,
-) -> bool {
-    if let Some(validator_history) = validator_history_map.get(vote_account) {
-        if let Some(latest_entry) = validator_history.history.last() {
-            return latest_entry.epoch == epoch as u16
-                && latest_entry.priority_fee_commission
-                    != ValidatorHistoryEntry::default().priority_fee_commission;
-        }
-    }
-    false
 }
