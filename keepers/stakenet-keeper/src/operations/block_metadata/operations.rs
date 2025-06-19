@@ -356,7 +356,7 @@ async fn update_block_metadata(
                 let (vote_account, entry) = entry;
 
                 // Calculate total lamports transferred
-                let (priority_fee_distribution_account,total_lamports_transferred, validator_commission_bps) = get_priority_fee_distribution_account_info(
+                let (priority_fee_distribution_account, total_lamports_transferred, validator_commission_bps, error_string) = get_priority_fee_distribution_account_info(
                     client,
                     priority_fee_distribution_program_id,
                     &entry.vote_account,
@@ -364,8 +364,7 @@ async fn update_block_metadata(
                 ).await;
 
                 datapoint_info!(
-                  "pfh-block-info-0.0.3",
-                  ("vote-account", vote_account, String),
+                  "pfh-block-info-0.0.9",
                   ("blocks-error", entry.blocks_error, i64),
                   ("blocks-left", entry.blocks_left, i64),
                   ("blocks-missed", entry.blocks_missed, i64),
@@ -377,14 +376,14 @@ async fn update_block_metadata(
                   ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
                   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
                   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
-                  ("pfs-priority-fee-distribution-program", priority_fee_distribution_program_id.to_string(), String),
+                  ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
                   ("update-slot", entry.update_slot, i64),
                   "cluster" => cluster.to_string(),
-                  // ("validator-history-account", entry.validator_history_account, String)
-                  // ("priority-fee-oracle-authority", entry.priority_fee_oracle_authority, String),
-                  // ("program-id", entry.program_id, String),
-                  // ("config", entry.config, String),
-                  //
+                  "vote" => vote_account.to_string(),
+                  "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
+                  "priority-fee-oracle-authority" => priority_fee_oracle_authority_keypair.pubkey().to_string(),
+                  "validator-history-program" => program_id.to_string(),
+                  "epoch" => format!("{}", epoch),
                 );
 
                 ixs.push(entry.update_instruction());
@@ -433,7 +432,7 @@ pub async fn get_priority_fee_distribution_account_info(
     priority_fee_distribution_program_id: &Pubkey,
     vote_account: &Pubkey,
     epoch: u64,
-) -> (Pubkey, i64, i64) { // total lamports transferred, validator commission bps
+) -> (Pubkey, i64, i64, Option<String>) { // total lamports transferred, validator commission bps
 
     let (priority_fee_distribution_account, _) =
         derive_priority_fee_distribution_account_address(
@@ -446,15 +445,17 @@ pub async fn get_priority_fee_distribution_account_info(
             let mut data_slice = account.data.as_slice();
             match PriorityFeeDistributionAccount::deserialize(&mut data_slice) {
                 Ok(account) => {
-                    (priority_fee_distribution_account, account.total_lamports_transferred as i64, account.validator_commission_bps as i64)
+                    (priority_fee_distribution_account, account.total_lamports_transferred as i64, account.validator_commission_bps as i64, None)
                 }
-                Err(_) => {
-                    (priority_fee_distribution_account, -1, -1)
+                Err(error) => {
+                    let error_string = format!("Could not deserialize account data {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
+                    (priority_fee_distribution_account, -1, -1, Some(error_string))
                 }
             }
         }
-        _ => {
-            (priority_fee_distribution_account, -1, -1)
+        Err(error) => {
+            let error_string = format!("Could not fetch account {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
+            (priority_fee_distribution_account, -1, -1, Some(error_string))
         }
     }
 

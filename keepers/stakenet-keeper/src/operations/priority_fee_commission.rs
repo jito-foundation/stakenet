@@ -15,9 +15,8 @@ use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
 use stakenet_sdk::utils::transactions::submit_instructions;
-use std::{collections::HashMap, sync::Arc};
-use validator_history::ValidatorHistory;
-use validator_history::ValidatorHistoryEntry;
+use std::sync::Arc;
+
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::PriorityFeeCommission
