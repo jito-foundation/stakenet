@@ -24,6 +24,7 @@ use stakenet_keeper::{
     },
 };
 use std::{process::Command, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 fn set_run_flags(args: &Args) -> u32 {
@@ -101,9 +102,9 @@ async fn random_cooldown(range: u8) {
 async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
-    let validator_history_interval = keeper_config.validator_history_interval;
+    let validator_history_interval = 60;
     let steward_interval = keeper_config.steward_interval;
-    let block_metadata_interval = keeper_config.block_metadata_interval;
+    let block_metadata_interval = 60;
 
     let intervals = vec![
         validator_history_interval,
@@ -239,14 +240,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 );
             }
 
-            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown(keeper_config.cool_down_range).await;
-            }
-
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
             );
+
+            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                random_cooldown(keeper_config.cool_down_range).await;
+            }
         }
 
         // STEWARD
@@ -367,9 +368,8 @@ async fn main() {
         .redundant_rpc_urls
         .map(|x| Arc::new(x.into_iter().map(|y| RpcClient::new(y)).collect()));
 
-    let conn = Connection::open(args.sqlite_path.clone()).unwrap();
-    // Set up the SQLite DB
-    create_sqlite_tables(&conn).expect("SQLite tables created");
+    let connection = Connection::open(args.sqlite_path.clone()).unwrap();
+    create_sqlite_tables(&connection).expect("SQLite tables created");
 
     let config = KeeperConfig {
         client,
@@ -393,9 +393,10 @@ async fn main() {
         cool_down_range: args.cool_down_range,
         tx_retry_count: args.tx_retry_count,
         tx_confirmation_seconds: args.tx_confirmation_seconds,
-        sqlite_connection: Arc::new(conn),
+        sqlite_connection: Arc::new(Mutex::new(connection)),
         priority_fee_oracle_authority_keypair,
         redundant_rpc_urls,
+        cluster: args.cluster
     };
 
     run_keeper(config).await;
