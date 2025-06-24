@@ -1,47 +1,38 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use anchor_lang::prelude::{EpochSchedule, SlotHistory};
-use log::debug;
+use anchor_lang::{prelude::SlotHistory, AnchorDeserialize};
+use futures::future::join_all;
+use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
+use log::{error, info};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
-    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig,
-    rpc_request::RpcError,
+    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig, rpc_request::RpcError
 };
-use solana_metrics::datapoint_error;
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
-    clock::{DEFAULT_SLOTS_PER_EPOCH, DEFAULT_TICKS_PER_SECOND, DEFAULT_TICKS_PER_SLOT},
-    commitment_config::CommitmentConfig,
-    instruction::Instruction,
-    pubkey::Pubkey,
-    signature::Keypair,
-    signer::Signer,
-    slot_history,
+    commitment_config::CommitmentConfig, pubkey::Pubkey,
+    signature::Keypair, signer::Signer, slot_history,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
 use stakenet_sdk::{
-    models::{entries::UpdateInstruction, submit_stats::SubmitStats},
+    models::{ cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
     utils::transactions::submit_instructions,
 };
 
 use crate::{
-    entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry,
-    operations::{
-        block_metadata::db::{
-            batch_insert_leader_block_data, fetch_block_keeper_metadata, prune_prior_records,
-            upsert_block_keeper_metadata, BlockKeeperMetadata,
-        },
+    entries::priority_fee_commission_entry::derive_priority_fee_distribution_account_address, operations::{
+        block_metadata::db::DBSlotInfo,
         keeper_operations::{check_flag, KeeperOperations},
-    },
-    state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
+    }, state::{keeper_config::KeeperConfig, keeper_state::KeeperState}
 };
 
-use super::{db::LeaderBlockMetadata, errors::BlockMetadataKeeperError};
+use super::errors::BlockMetadataKeeperError;
 
 fn _get_operation() -> KeeperOperations {
-    KeeperOperations::GossipUpload
+    KeeperOperations::BlockMetadataKeeper
 }
 
 fn _should_run() -> bool {
@@ -72,14 +63,13 @@ impl AggregateBlockInfo {
     }
 }
 
-type LeadersMap = HashMap<String, AggregateBlockInfo>;
-
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
-    let sqlite_connection = &keeper_config.sqlite_connection;
+    let mut mutex_guard = keeper_config.mut_connection().await;
+    let sqlite_connection: &mut Connection = &mut *mutex_guard;
     let block_metadata_interval = keeper_config.block_metadata_interval;
     let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_oracle_authority_keypair = keeper_config
@@ -101,11 +91,13 @@ pub async fn fire(
             &keeper_config.redundant_rpc_urls,
             keeper_state,
             program_id,
+            &keeper_config.priority_fee_distribution_program_id,
             priority_fee_oracle_authority_keypair,
             keeper_config.tx_retry_count,
             keeper_config.tx_confirmation_seconds,
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
+            keeper_config.cluster
         )
         .await
         {
@@ -139,16 +131,18 @@ pub async fn fire(
 
 async fn _process(
     client: &Arc<RpcClient>,
-    sqlite_connection: &Arc<Connection>,
+    sqlite_connection: &mut Connection,
     block_metadata_interval: u64,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
+    priority_fee_distribution_program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     no_pack: bool,
+    cluster: Cluster,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -157,350 +151,389 @@ async fn _process(
         maybe_redundant_rpc_urls,
         keeper_state,
         program_id,
+        priority_fee_distribution_program_id,
         priority_fee_oracle_authority_keypair,
         retry_count,
         confirmation_time,
         priority_fee_in_microlamports,
         no_pack,
+        cluster
     )
     .await
 }
 
 async fn update_block_metadata(
     client: &Arc<RpcClient>,
-    sqlite_connection: &Arc<Connection>,
-    block_metadata_interval: u64,
+    sqlite_connection: &mut Connection,
+    _block_metadata_interval: u64, //TODO take out
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     keeper_state: &KeeperState,
     program_id: &Pubkey,
+    priority_fee_distribution_program_id: &Pubkey,
     priority_fee_oracle_authority_keypair: &Arc<Keypair>,
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
-    no_pack: bool,
+    _no_pack: bool, //TODO take out
+    cluster: Cluster,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
-    let epoch_info = &keeper_state.epoch_info;
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
+    let slot_history = &keeper_state.slot_history;
     let epoch_schedule = &keeper_state.epoch_schedule;
+    let current_epoch_info = &keeper_state.epoch_info;
+    let current_epoch = current_epoch_info.epoch;
     let current_finalized_slot = client
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
-    let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch);
 
-    // Gather the data for what slot & epoch the keeper last indexed
-    let maybe_block_keeper_metadata = fetch_block_keeper_metadata(sqlite_connection)?;
-    let block_keeper_metadata = match maybe_block_keeper_metadata {
-        Some(block_keeper_metadata) => block_keeper_metadata,
-        None => {
-            // When block_keeper_metadata does not exist, we assume the keeper has not ran
-            // before and pick an appropriate starting slot relative to the keeper's interval.
-            let solana_ticks_per_keeper_interval =
-                block_metadata_interval * DEFAULT_TICKS_PER_SECOND;
-            let estimated_slots_per_keeper_interval =
-                solana_ticks_per_keeper_interval / DEFAULT_TICKS_PER_SLOT;
-            // Non-issue, but this could underflow if started during chain genesis.
-            let potential_starting_slot = current_finalized_slot
-                .checked_sub(estimated_slots_per_keeper_interval)
-                .unwrap();
-            let slot = std::cmp::max(potential_starting_slot, epoch_starting_slot);
-            BlockKeeperMetadata::new(1, slot, epoch_info.epoch)
+    let lookback_epochs = 3;
+    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
+
+    // 1. Update Epoch Schedule
+    {
+        info!("\n\n\n1. Update Epoch Schedule\n\n\n");
+        let start_time = std::time::Instant::now();
+        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
+        let epoch_leader_schedule = get_leader_schedule_safe(&client, epoch_starting_slot).await?;
+        match DBSlotInfo::upsert_leader_schedule(
+            sqlite_connection,
+            current_epoch,
+            epoch_schedule,
+            &epoch_leader_schedule,
+            None,
+        ) {
+            Ok(write_count) => {
+                let time_ms = start_time.elapsed().as_millis();
+                info!(
+                    "Wrote {} leaders for epoch {} in {:.3}s",
+                    write_count,
+                    current_epoch,
+                    time_ms as f64 / 1000.0
+                )
+            }
+            Err(err) => error!("Error writing leaders {:?}", err),
         }
-    };
-    debug!("block_keeper_metadata {:?}", block_keeper_metadata);
 
-    let mut instructions: Vec<Instruction> = vec![];
-    // Handle case where current epoch is above the last indexed in SQLlite
-    let epochs_diff = epoch_info.epoch - block_keeper_metadata.epoch;
-    let mut starting_slot = block_keeper_metadata.slot + 1;
-    for relative_epoch in 0..=epochs_diff {
-        // For each epoch we are behind we need to generate the update instructions
-        let epoch = block_keeper_metadata.epoch + relative_epoch;
-        let epoch_ending_slot = epoch_schedule.get_last_slot_in_epoch(epoch);
+        // 1.b Log out missing vote accounts
+        for leader in epoch_leader_schedule.keys() {
+            if !identity_to_vote_map.contains_key(leader) {
+                // TODO
+                error!("TODO Could not find Vote for {}", leader)
+            }
+        }
+    }
 
-        // Clamp the ending slot to make sure it's all from the same epoch
-        let ending_slot = std::cmp::min(current_finalized_slot, epoch_ending_slot);
-        // REVIEW: Do we want to submit the data intra epoch? Or just when an epoch is finalized?
-        instructions.extend(
-            handle_slots_for_epoch(
-                &client,
-                &sqlite_connection,
-                &epoch_schedule,
-                identity_to_vote_map,
+    // 2. Update Mapping ( Only for current epoch )
+    {
+        info!("\n\n\n2. Map Identity to Vote\n\n\n");
+        let start_time = std::time::Instant::now();
+        match DBSlotInfo::upsert_vote_identity_mapping(
+            sqlite_connection,
+            current_epoch,
+            identity_to_vote_map,
+            None,
+        ) {
+            Ok(write_counter) => {
+                let time_ms = start_time.elapsed().as_millis();
+                info!(
+                    "Wrote {} identity/vote mappings in {:.3}s",
+                    write_counter,
+                    time_ms as f64 / 1000.0
+                )
+            }
+            Err(err) => error!("Error updating identity/vote mapping {:?}", err),
+        }
+
+        // 2b. Print out all
+        let all_unmapped_identities =
+            DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection, current_epoch)?;
+        error!(
+            "Unmapped identities ({}) \n{:?}\n",
+            all_unmapped_identities.len(),
+            all_unmapped_identities
+        );
+    }
+
+    // 3. Update Blocks
+    {
+        info!("\n\n\n3. Update Blocks\n\n\n");
+        let start_total_time = std::time::Instant::now();
+        let slots_needing_blocks =
+            DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
+        let chunk_size = 1000;
+
+        let mut total_blocks = 0;
+        for slots_needing_blocks in slots_needing_blocks.chunks(chunk_size) {
+            // Add timing measurement before the operation
+            let start_time = std::time::Instant::now();
+
+            let block_data = get_bulk_block_safe(
+                client,
+                &slots_needing_blocks.to_vec(),
+                slot_history,
                 maybe_redundant_rpc_urls,
-                &keeper_state.slot_history,
+                Some(UiTransactionEncoding::Json),
+                Some(TransactionDetails::None),
+                None,
+            )
+            .await;
+            let mut ok_entries = vec![];
+            for (slot, maybe_block_data) in block_data {
+                match maybe_block_data {
+                    Ok(block) => {
+                        let priority_fees = block
+                            .rewards
+                            .unwrap()
+                            .into_iter()
+                            .filter(|r| r.reward_type == Some(RewardType::Fee))
+                            .map(|r| r.lamports as u64)
+                            .sum::<u64>();
+                        ok_entries.push((slot, priority_fees));
+                    }
+                    Err(err) => match err {
+                        BlockMetadataKeeperError::SkippedBlock => {
+                            DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
+                        }
+                        _ => {
+                            info!(
+                                "Could not get block info for slot {} - skipping: {:?}",
+                                slot, err
+                            )
+                        }
+                    },
+                }
+            }
+
+            match DBSlotInfo::upsert_block_data(sqlite_connection, &ok_entries, None) {
+                Ok(write_counter) => {
+                    let time_ms = start_time.elapsed().as_millis();
+                    let blocks_per_second = (write_counter as f64 * 1000.0) / time_ms.max(1) as f64;
+                    total_blocks += write_counter;
+
+                    info!(
+                        "Wrote {} blocks in {:.3}s ({:.1} blocks/s)",
+                        write_counter,
+                        time_ms as f64 / 1000.0,
+                        blocks_per_second
+                    )
+                }
+                Err(err) => error!("Error writing blocks {:?}", err),
+            }
+        }
+
+        let time_ms = start_total_time.elapsed().as_millis();
+        let blocks_per_second = (total_blocks as f64 * 1000.0) / time_ms.max(1) as f64;
+        info!(
+            "Wrote Total {} blocks in {:.3}s ({:.1} blocks/s)",
+            total_blocks,
+            time_ms as f64 / 1000.0,
+            blocks_per_second
+        );
+    }
+
+    // 4. Aggregate Update TXs
+    let mut ixs = vec![];
+    {
+        info!("\n\n\n4. Aggregate Update TXs\n\n\n");
+
+        let start_time = std::time::Instant::now();
+        for epoch in epoch_range {
+            let update_map = match DBSlotInfo::get_priority_fee_and_block_metadata_entries(
+                sqlite_connection,
+                epoch_schedule,
                 epoch,
-                starting_slot,
-                ending_slot,
                 program_id,
                 &priority_fee_oracle_authority_keypair.pubkey(),
-            )
-            .await?,
+            ) {
+                Ok(map) => map,
+                Err(err) => {
+                    error!("Could not get update map - skipping... {:?}", err);
+                    continue;
+                }
+            };
+
+            for entry in update_map.clone() {
+                let (vote_account, entry) = entry;
+
+                // Calculate total lamports transferred
+                let (priority_fee_distribution_account, total_lamports_transferred, validator_commission_bps, error_string) = get_priority_fee_distribution_account_info(
+                    client,
+                    priority_fee_distribution_program_id,
+                    &entry.vote_account,
+                    epoch
+                ).await;
+
+                datapoint_info!(
+                  "pfh-block-info-0.0.9",
+                  ("blocks-error", entry.blocks_error, i64),
+                  ("blocks-left", entry.blocks_left, i64),
+                  ("blocks-missed", entry.blocks_missed, i64),
+                  ("blocks-produced", entry.blocks_produced, i64),
+                  ("epoch", entry.epoch, i64),
+                  ("highest-slot", entry.highest_slot, i64),
+                  ("total-leader-slots", entry.total_leader_slots, i64),
+                  ("total-priority-fees", entry.total_priority_fees, i64),
+                  ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
+                  ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
+                  ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
+                  ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
+                  ("update-slot", entry.update_slot, i64),
+                  "cluster" => cluster.to_string(),
+                  "vote" => vote_account.to_string(),
+                  "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
+                  "priority-fee-oracle-authority" => priority_fee_oracle_authority_keypair.pubkey().to_string(),
+                  "validator-history-program" => program_id.to_string(),
+                  "epoch" => format!("{}", epoch),
+                );
+
+                ixs.push(entry.update_instruction());
+            }
+        }
+
+        let time_ms = start_time.elapsed().as_millis();
+        info!(
+            "Aggregated {} in {:.3}s",
+            ixs.len(),
+            time_ms as f64 / 1000.0,
+        )
+    }
+
+    // 5. Submit TXs
+    {
+        info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
+
+        let start_time = std::time::Instant::now();
+        let submit_result = submit_instructions(
+            client,
+            ixs,
+            priority_fee_oracle_authority_keypair,
+            priority_fee_in_microlamports,
+            retry_count,
+            confirmation_time,
+            None,
+            true,
+        )
+        .await?;
+
+        let time_ms = start_time.elapsed().as_millis();
+        info!(
+            "Sent {}🟩 {}🟥 in {:.3}s",
+            submit_result.successes,
+            submit_result.errors,
+            time_ms as f64 / 1000.0,
         );
-        starting_slot = ending_slot + 1;
-    }
 
-    let submit_result = submit_instructions(
-        client,
-        instructions,
-        priority_fee_oracle_authority_keypair,
-        priority_fee_in_microlamports,
-        retry_count,
-        confirmation_time,
-        None,
-        no_pack,
-    )
-    .await;
-
-    // Delete records older than 2 epochs
-    prune_prior_records(
-        sqlite_connection,
-        epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch - 2),
-    )?;
-
-    Ok(submit_result?)
-}
-
-pub async fn handle_slots_for_epoch(
-    rpc_client: &RpcClient,
-    conn: &Connection,
-    epoch_schedule: &EpochSchedule,
-    identity_to_vote_map: &HashMap<String, String>,
-    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
-    slot_history: &SlotHistory,
-    epoch: u64,
-    starting_slot: u64,
-    ending_slot: u64,
-    program_id: &Pubkey,
-    priority_fee_oracle_authority: &Pubkey,
-) -> Result<Vec<Instruction>, BlockMetadataKeeperError> {
-    debug!(
-        "Gathering data for slots: {} - {}",
-        starting_slot, ending_slot
-    );
-    let rpc_leader_schedule = rpc_client
-        .get_leader_schedule(Some(starting_slot))
-        .await
-        .unwrap()
-        .expect("leader_schedule");
-    let mut relative_slot_leaders: Vec<Option<&String>> =
-        vec![None; DEFAULT_SLOTS_PER_EPOCH as usize];
-    for (leader, slots) in rpc_leader_schedule.iter() {
-        for relative_slot in slots {
-            // Convert leader (identity pubkey) to be the vote_key
-            if let Some(vote_key) = identity_to_vote_map.get(leader) {
-                relative_slot_leaders[*relative_slot] = Some(vote_key);
-            } else {
-                return Err(BlockMetadataKeeperError::MissingVoteKey(leader.to_owned()));
-            }
-        }
-    }
-
-    let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
-
-    let aggregate_info = aggregate_information(
-        &rpc_client,
-        epoch,
-        epoch_starting_slot,
-        starting_slot,
-        ending_slot,
-        relative_slot_leaders,
-        slot_history,
-        maybe_redundant_rpc_urls,
-    )
-    .await?;
-
-    // Update the SQL lite DB with the aggregate information
-    let leader_block_metadatas = get_updated_leader_block_metadatas(
-        &conn,
-        &epoch_schedule,
-        starting_slot - 1,
-        ending_slot,
-        aggregate_info,
-    )?;
-    batch_insert_leader_block_data(&conn, &leader_block_metadatas)?;
-    // Update the block_keeper_metadata record
-    upsert_block_keeper_metadata(&conn, epoch, ending_slot)?;
-
-    let instructions = leader_block_metadatas
-        .iter()
-        .filter_map(|leader_block_metadata| {
-            let vote_key = Pubkey::from_str(&leader_block_metadata.vote_key).ok()?;
-
-            Some(
-                PriorityFeeAndBlockMetadataEntry::new(
-                    &vote_key,
-                    epoch,
-                    program_id,
-                    priority_fee_oracle_authority,
-                    leader_block_metadata.total_priority_fees.try_into().ok()?,
-                    leader_block_metadata.leader_slots,
-                    leader_block_metadata.blocks_produced,
-                    leader_block_metadata.block_data_last_update_slot,
-                )
-                .update_instruction(),
-            )
-        })
-        .collect::<Vec<_>>();
-
-    Ok(instructions)
-}
-
-pub fn get_updated_leader_block_metadatas(
-    conn: &Connection,
-    epoch_schedule: &EpochSchedule,
-    previous_update_slot: u64,
-    block_data_last_update_slot: u64,
-    leader_aggregate_block_info: LeadersMap,
-) -> Result<Vec<LeaderBlockMetadata>, BlockMetadataKeeperError> {
-    // Fetch the latest leader_block_metadata for a given leader
-    let mut res = conn
-  .prepare("SELECT vote_key, total_priority_fees, leader_slots, blocks_produced, block_data_last_update_slot FROM leader_block_metadata WHERE block_data_last_update_slot = ?1")
-  .unwrap();
-    let leader_block_metadatas = res
-        .query_map([previous_update_slot], |row| {
-            Ok(LeaderBlockMetadata {
-                vote_key: row.get(0).unwrap(),
-                total_priority_fees: row.get(1).unwrap(),
-                leader_slots: row.get(2).unwrap(),
-                blocks_produced: row.get(3).unwrap(),
-                block_data_last_update_slot: row.get(4).unwrap(),
-            })
-        })
-        .unwrap();
-
-    let leader_block_metadatas_map: HashMap<String, LeaderBlockMetadata> = leader_block_metadatas
-        .into_iter()
-        .filter(|x| x.is_ok())
-        .map(|x| (x.as_ref().unwrap().vote_key.clone(), x.unwrap()))
-        .collect();
-
-    let records: Vec<LeaderBlockMetadata> = leader_aggregate_block_info
-        .into_iter()
-        .map(|(leader, aggregate_block_info)| {
-            // Check if the existing block metadata is apart of the same epoch
-            let maybe_leader_block_metadata = leader_block_metadatas_map.get(&leader);
-            match maybe_leader_block_metadata {
-                Some(leader_block_metadata) => {
-                    if aggregate_block_info.epoch
-                        == epoch_schedule
-                            .get_epoch(leader_block_metadata.block_data_last_update_slot)
-                    {
-                        // When same epoch increment the data before storing
-                        leader_block_metadata.new_and_increment_data(
-                            aggregate_block_info.priority_fees,
-                            aggregate_block_info.leader_slots,
-                            aggregate_block_info.blocks_produced,
-                            block_data_last_update_slot,
-                        )
-                    } else {
-                        // When different epoch, we start with fresh data
-                        LeaderBlockMetadata::new_from_aggregate_data(
-                            leader,
-                            block_data_last_update_slot,
-                            aggregate_block_info,
-                        )
-                    }
-                }
-                None => LeaderBlockMetadata::new_from_aggregate_data(
-                    leader,
-                    block_data_last_update_slot,
-                    aggregate_block_info,
-                ),
-            }
-        })
-        .collect();
-    // REVIEW: Here we are only creating LeaderBlockMetadata for those that came from the
-    //  newly aggregated information. This means that validator's that did not have a leader
-    //  slot in the aggregated range will not show up in this vector.
-    // IF we want to make sure all ValidatorHistoryEntries are updated with the same update
-    // slot, then we likely need to pull those other records in.
-    // IF transactions are submited only when an epoch is finalized, then we would also
-    // have to pull those records in.
-    //
-    // It probably makes the most sense to pull them in here, but worth a quick discussion
-    //  on TX submissions and leaving this here as a reminder.
-
-    Ok(records)
-}
-
-fn increment_leader_info(
-    leaders_map: &mut LeadersMap,
-    leader: &String,
-    epoch: u64,
-    leader_slots: u32,
-    blocks_produced: u32,
-    priority_fees: i64,
-) {
-    match leaders_map.get_mut(leader) {
-        Some(leader_info) => {
-            leader_info.increment_data(leader_slots, blocks_produced, priority_fees);
-        }
-        None => {
-            let mut leader_info = AggregateBlockInfo::new(epoch);
-            leader_info.increment_data(leader_slots, blocks_produced, priority_fees);
-            leaders_map.insert(leader.clone(), leader_info);
-        }
+        Ok(submit_result)
     }
 }
 
-/// Iterates through each slot from _starting_slot_ to _ending_slot_, inclusive of the ending slot.
-/// Lots the block metadata and aggreates the information on a per leader basis.
-pub async fn aggregate_information(
+pub async fn get_priority_fee_distribution_account_info(
     client: &RpcClient,
+    priority_fee_distribution_program_id: &Pubkey,
+    vote_account: &Pubkey,
     epoch: u64,
-    epoch_starting_slot: u64,
-    starting_slot: u64,
-    ending_slot: u64,
-    slot_leaders: Vec<Option<&String>>,
-    slot_history: &SlotHistory,
-    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
-) -> Result<LeadersMap, BlockMetadataKeeperError> {
-    let mut res: LeadersMap = HashMap::new();
-    // We use an inclusive range as the program relies on it being included
-    for slot in starting_slot..=ending_slot {
-        let relative_slot = slot - epoch_starting_slot;
-        let leader = slot_leaders[relative_slot as usize].unwrap();
-        let maybe_block_data =
-            get_block(client, slot, slot_history, maybe_redundant_rpc_urls).await;
-        match maybe_block_data {
-            Ok(block) => {
-                // get the priority fee rewards for the block.
-                let priority_fees = block
-                    .rewards
-                    .unwrap()
-                    .into_iter()
-                    .find(|r| r.reward_type == Some(RewardType::Fee))
-                    .map(|r| r.lamports)
-                    .unwrap_or(0);
-                increment_leader_info(&mut res, leader, epoch, 1, 1, priority_fees);
-            }
-            Err(err) => match err {
-                BlockMetadataKeeperError::SkippedBlock => {
-                    increment_leader_info(&mut res, leader, epoch, 1, 0, 0);
+) -> (Pubkey, i64, i64, Option<String>) { // total lamports transferred, validator commission bps
+
+    let (priority_fee_distribution_account, _) =
+        derive_priority_fee_distribution_account_address(
+            priority_fee_distribution_program_id,
+            vote_account,
+            epoch,
+        );
+    match client.get_account(&priority_fee_distribution_account).await {
+        Ok(account) => {
+            let mut data_slice = account.data.as_slice();
+            match PriorityFeeDistributionAccount::deserialize(&mut data_slice) {
+                Ok(account) => {
+                    (priority_fee_distribution_account, account.total_lamports_transferred as i64, account.validator_commission_bps as i64, None)
                 }
-                _ => return Err(err),
-            },
+                Err(error) => {
+                    let error_string = format!("Could not deserialize account data {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
+                    (priority_fee_distribution_account, -1, -1, Some(error_string))
+                }
+            }
+        }
+        Err(error) => {
+            let error_string = format!("Could not fetch account {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
+            (priority_fee_distribution_account, -1, -1, Some(error_string))
         }
     }
-    Ok(res)
+
+}
+
+pub async fn get_leader_schedule_safe(
+    rpc_client: &RpcClient,
+    starting_slot: u64,
+) -> Result<HashMap<String, Vec<usize>>, BlockMetadataKeeperError> {
+    match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
+        Some(schedule) => Ok(schedule),
+        None => Err(BlockMetadataKeeperError::OtherError(
+            "Could not get leader schedule".to_string(),
+        )),
+    }
+}
+
+async fn get_bulk_block_safe(
+    client: &RpcClient,
+    slots: &Vec<u64>,
+    slot_history: &SlotHistory,
+    maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    encoding: Option<UiTransactionEncoding>,
+    transaction_details: Option<TransactionDetails>,
+    chunk_size: Option<usize>,
+) -> Vec<(u64, Result<UiConfirmedBlock, BlockMetadataKeeperError>)> {
+    let chunk_size = chunk_size.unwrap_or(50);
+
+    let mut results = vec![];
+    for slots in slots.chunks(chunk_size) {
+        let futures = slots
+            .iter()
+            .map(|&slot| {
+                let client = client; // Clone if needed
+                let slot_history = slot_history.clone(); // Clone if needed
+                let maybe_redundant_rpc_urls = maybe_redundant_rpc_urls.clone(); // Clone if needed
+
+                async move {
+                    let result = get_block_safe(
+                        &client,
+                        slot,
+                        &slot_history,
+                        &maybe_redundant_rpc_urls,
+                        encoding,
+                        transaction_details,
+                    )
+                    .await;
+                    (slot, result)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let future_results = join_all(futures).await;
+        results.extend(future_results);
+    }
+
+    results
 }
 
 /// Wrapper on Solana RPC get_block, but propagates skipped blocks as BlockMetadataKeeperError
-async fn get_block(
+async fn get_block_safe(
     client: &RpcClient,
     slot: u64,
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
+    encoding: Option<UiTransactionEncoding>,
+    transaction_details: Option<TransactionDetails>,
 ) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
     let mut current_client = client;
     let mut redundant_rpc_index = 0;
+
     loop {
         let block_res = current_client
             .get_block_with_config(
                 slot,
                 RpcBlockConfig {
-                    encoding: Some(UiTransactionEncoding::Json),
-                    transaction_details: Some(TransactionDetails::None),
+                    encoding,
+                    transaction_details,
                     rewards: Some(true),
                     commitment: Some(CommitmentConfig::finalized()),
                     max_supported_transaction_version: Some(0),

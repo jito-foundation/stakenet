@@ -19,4 +19,6 @@ pub enum BlockMetadataKeeperError {
     MissingVoteKey(String),
     #[error("Slot {0} not found. SlotHistory not up to date or slot in future")]
     SlotInFuture(u64),
+    #[error("Other Error {0}")]
+    OtherError(String),
 }

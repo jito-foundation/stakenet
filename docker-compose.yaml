@@ -66,3 +66,40 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
+  priority-fees:
+    build:
+      context: .
+      target: validator-history
+    container_name: priority-fees
+    environment:
+      - RUST_LOG=${RUST_LOG}
+      - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
+      - JSON_RPC_URL=${JSON_RPC_URL}
+      - CLUSTER=${CLUSTER}
+      - KEYPAIR=${KEYPAIR}
+      - ORACLE_AUTHORITY_KEYPAIR=${ORACLE_AUTHORITY_KEYPAIR}
+      - PRIORITY_FEE_ORACLE_AUTHORITY_KEYPAIR=${ORACLE_AUTHORITY_KEYPAIR}
+      - VALIDATOR_HISTORY_PROGRAM_ID=${VALIDATOR_HISTORY_PROGRAM_ID}
+      - TIP_DISTRIBUTION_PROGRAM_ID=${TIP_DISTRIBUTION_PROGRAM_ID}
+      - PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID=${PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID}
+      - STEWARD_PROGRAM_ID=${STEWARD_PROGRAM_ID}
+      - STEWARD_CONFIG=${STEWARD_CONFIG}
+      - METRICS_INTERVAL=${METRICS_INTERVAL}
+      - STEWARD_INTERVAL=1000000000000
+      - VALIDATOR_HISTORY_INTERVAL=1000000000000
+      - RUN_CLUSTER_HISTORY=false
+      - RUN_COPY_VOTE_ACCOUNTS=false
+      - RUN_MEV_COMMISSION=false
+      - RUN_MEV_EARNED=false
+      - RUN_STEWARD=false
+      - RUN_STAKE_UPLOAD=false
+      - RUN_GOSSIP_UPLOAD=false
+      - RUN_EMIT_METRICS=false
+      - RUN_BLOCK_METADATA=true
+      - BLOCK_METADATA_INTERVAL=1
+      - SQLITE_PATH=/data/db
+      - RUN_PRIORITY_FEE_COMMISSION=true
+    volumes:
+      - ./credentials:/credentials
+      - ./data:/data
+    restart: on-failure:5

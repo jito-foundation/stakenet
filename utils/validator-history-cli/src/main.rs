@@ -2,6 +2,7 @@ use std::{path::PathBuf, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
+use log::info;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -9,7 +10,8 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
+    transaction::Transaction,
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -40,6 +42,7 @@ enum Commands {
     ClusterHistoryStatus,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    GetConfig(GetConfig),
 }
 
 #[derive(Parser)]
@@ -108,6 +111,10 @@ struct BackfillClusterHistory {
     #[arg(short, long, env)]
     blocks_in_epoch: u32,
 }
+
+#[derive(Parser)]
+#[command(about = "Get Config info")]
+struct GetConfig {}
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
     // Creates config account, sets tip distribution program address, and optionally sets authority for commission history program
@@ -323,6 +330,16 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     } else {
         entry.vote_account_last_update_slot.to_string()
     };
+
+    let priority_fee_info = format!(
+        "Tips {} | Total {} | Commission {} | Slots {}",
+        lamports_to_sol(entry.priority_fee_tips),
+        lamports_to_sol(entry.total_priority_fees),
+        entry.priority_fee_commission,
+        entry.total_leader_slots
+    );
+
+    return priority_fee_info;
 
     format!(
         "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
@@ -590,6 +607,25 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
+fn command_get_config(args: GetConfig, client: RpcClient) {
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let config_account_raw = client.get_account(&config_pda).unwrap();
+    let config_account = Config::try_deserialize(&mut config_account_raw.data.as_slice())
+        .expect("Failed to deserialize cluster history account");
+
+    info!("--- Config Account ---");
+    info!("Address: {}", config_pda);
+    info!("Admin: {}", config_account.admin);
+    info!("Counter: {}", config_account.counter);
+    info!("Oracle Auth: {}", config_account.oracle_authority);
+    info!(
+        "Priority Fee Auth: {}",
+        config_account.priority_fee_oracle_authority
+    );
+    info!("Tip Distro: {}", config_account.tip_distribution_program);
+}
+
 fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
@@ -600,5 +636,6 @@ fn main() {
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
+        Commands::GetConfig(args) => command_get_config(args, client),
     };
 }
