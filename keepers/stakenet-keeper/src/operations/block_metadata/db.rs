@@ -459,14 +459,10 @@ impl DBSlotInfo {
             };
         }
 
-        //TODO remove IXs where Validator Vote Account DNE
-
         Ok(map)
     }
 }
 
-// --------------- OLD SCHEMA -------------------
-//
 /// Create all necessary tables and indexes. Uses IF NOT EXISTS to be safe
 pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeperError> {
     conn.execute(
