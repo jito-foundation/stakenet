@@ -606,6 +606,9 @@ pub struct InstantUnstakeComponentsV3 {
     /// Checks if validator has an unacceptable merkle root upload authority
     pub is_bad_merkle_root_upload_authority: bool,
 
+    /// Checks if validator has an unacceptable priority fee merkle root upload authority
+    pub is_bad_priority_fee_merkle_root_upload_authority: bool,
+
     pub vote_account: Pubkey,
 
     pub epoch: u16,
@@ -716,6 +719,7 @@ pub fn instant_unstake_validator(
         mev_commission_check,
         is_blacklisted,
         is_bad_merkle_root_upload_authority,
+        is_bad_priority_fee_merkle_root_upload_authority,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: InstantUnstakeDetails {

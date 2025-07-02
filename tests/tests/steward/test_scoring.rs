@@ -1005,8 +1005,10 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
             ..Default::default()
         });
-        let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
         assert!(is_instant_unstake);
 
         // MerkleRootUploadAuthority::OldJitoLabs should never instant unstake
@@ -1014,16 +1016,58 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
             ..Default::default()
         });
-        let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
         assert!(!is_instant_unstake);
         // MerkleRootUploadAuthority::TipRouter should never instant unstake
         validator.history.push(ValidatorHistoryEntry {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
-        let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+
+        // Priority fees: When using MerkleRootUploadAuthority::Other should always instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(is_instant_unstake);
+
+        // Priorty fees: MerkleRootUploadAuthority::OldJitoLabs should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+        // Priority fees: MerkleRootUploadAuthority::TipRouter should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
         assert!(!is_instant_unstake);
     }
 
@@ -1031,8 +1075,10 @@ mod test_calculate_instant_unstake_merkle_root_upload_auth {
     fn test_edge_cases() {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
-        let is_instant_unstake =
-            calculate_instant_unstake_merkle_root_upload_auth(&validator).unwrap();
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
         assert!(!is_instant_unstake);
     }
 }
