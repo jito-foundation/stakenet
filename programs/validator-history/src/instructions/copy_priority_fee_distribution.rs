@@ -4,7 +4,7 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
-    ValidatorHistoryEntry,
+    MerkleRootUploadAuthority, ValidatorHistoryEntry,
 };
 
 use jito_priority_fee_distribution::{
@@ -67,11 +67,13 @@ pub fn handle_copy_priority_fee_distribution_account(
     let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)?;
     let commission_bps = distribution_account.validator_commission_bps;
     let priority_fees_earned = distribution_account.total_lamports_transferred;
+    let merkle_root_upload_authority = distribution_account.merkle_root_upload_authority;
 
     validator_history_account.set_priority_fees_earned_and_commission(
         epoch,
         commission_bps,
         priority_fees_earned,
+        MerkleRootUploadAuthority::from_pubkey(&merkle_root_upload_authority),
     )?;
 
     Ok(())
