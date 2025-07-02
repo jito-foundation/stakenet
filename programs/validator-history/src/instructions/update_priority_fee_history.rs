@@ -34,7 +34,7 @@ pub fn handle_update_priority_fee_history(
     total_priority_fees: u64,
     total_leader_slots: u32,
     blocks_produced: u32,
-    current_slot: u64, //TODO Take out
+    current_slot: u64,
 ) -> Result<()> {
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
     let clock = Clock::get()?;
