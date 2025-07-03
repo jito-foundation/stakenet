@@ -75,8 +75,7 @@ static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 #[repr(u8)]
 pub enum MerkleRootUploadAuthority {
     #[default]
-    Unset = 0,
-    Empty = u8::MAX,
+    Unset = u8::MAX,
     Other = 1,
     OldJitoLabs = 2,
     TipRouter = 3,
@@ -397,7 +396,9 @@ impl CircBuf {
         field_latest!(self, merkle_root_upload_authority)
     }
 
-    pub fn priority_fee_merkle_root_upload_authority_latest(&self) -> Option<MerkleRootUploadAuthority> {
+    pub fn priority_fee_merkle_root_upload_authority_latest(
+        &self,
+    ) -> Option<MerkleRootUploadAuthority> {
         field_latest!(self, priority_fee_merkle_root_upload_authority)
     }
 
