@@ -603,6 +603,58 @@ pub async fn pack_instructions(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub async fn parallel_execute_chunk_instructions(
+    client: &Arc<RpcClient>,
+    instructions: &[Instruction],
+    signer: &Arc<Keypair>,
+    retry_count: u16,
+    confirmation_time: u64,
+    priority_fee_in_microlamports: u64,
+    max_cu_per_tx: Option<u32>,
+    chunk_size: usize,
+) -> Result<Vec<Result<(), JitoSendTransactionError>>, JitoTransactionExecutionError> {
+    if instructions.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let max_cu_per_tx = max_cu_per_tx.unwrap_or(DEFAULT_COMPUTE_LIMIT as u32);
+
+    let mut transactions: Vec<Vec<Instruction>> = vec![];
+
+    for ix in instructions.chunks(chunk_size) {
+        let mut tx = vec![];
+        tx.push(ComputeBudgetInstruction::set_compute_unit_limit(
+            DEFAULT_COMPUTE_LIMIT as u32,
+        ));
+        tx.extend(ix.to_vec());
+        transactions.push(tx);
+    }
+
+    for tx in transactions.iter_mut() {
+        tx.insert(
+            0,
+            ComputeBudgetInstruction::set_compute_unit_price(priority_fee_in_microlamports),
+        );
+        if max_cu_per_tx != DEFAULT_COMPUTE_LIMIT as u32 {
+            tx.insert(
+                0,
+                ComputeBudgetInstruction::set_compute_unit_limit(max_cu_per_tx),
+            );
+        }
+    }
+    let transactions: Vec<&[Instruction]> = transactions.iter().map(|c| c.as_slice()).collect();
+
+    parallel_execute_transactions(
+        client,
+        &transactions,
+        signer,
+        retry_count,
+        confirmation_time,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
 pub async fn parallel_execute_instructions(
     client: &Arc<RpcClient>,
     instructions: &[Instruction],
@@ -714,6 +766,40 @@ pub async fn submit_instructions(
         priority_fee_in_microlamports,
         max_cu_per_tx,
         no_pack,
+    )
+    .await
+    {
+        Ok(results) => {
+            stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
+            stats.errors = results.len() as u64 - stats.successes;
+            stats.results = results;
+            Ok(stats)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn submit_chunk_instructions(
+    client: &Arc<RpcClient>,
+    instructions: Vec<Instruction>,
+    keypair: &Arc<Keypair>,
+    priority_fee_in_microlamports: u64,
+    retry_count: u16,
+    confirmation_time: u64,
+    max_cu_per_tx: Option<u32>,
+    chunk_size: usize,
+) -> Result<SubmitStats, JitoTransactionExecutionError> {
+    let mut stats = SubmitStats::default();
+    match parallel_execute_chunk_instructions(
+        client,
+        &instructions,
+        keypair,
+        retry_count,
+        confirmation_time,
+        priority_fee_in_microlamports,
+        max_cu_per_tx,
+        chunk_size,
     )
     .await
     {
