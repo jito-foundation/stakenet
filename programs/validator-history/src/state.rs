@@ -75,10 +75,10 @@ static_assertions::const_assert_eq!(size_of::<ValidatorHistoryEntry>(), 128);
 #[repr(u8)]
 pub enum MerkleRootUploadAuthority {
     #[default]
-    Empty,
-    Other,
-    OldJitoLabs,
-    TipRouter,
+    Unset = u8::MAX,
+    Other = 1,
+    OldJitoLabs = 2,
+    TipRouter = 3,
 }
 
 unsafe impl Zeroable for MerkleRootUploadAuthority {}
@@ -103,6 +103,10 @@ impl IdlBuild for MerkleRootUploadAuthority {
             name: "MerkleRootUploadAuthority".to_string(),
             ty: IdlTypeDefTy::Enum {
                 variants: vec![
+                    IdlEnumVariant {
+                        name: "Unset".to_string(),
+                        fields: None,
+                    },
                     IdlEnumVariant {
                         name: "Empty".to_string(),
                         fields: None,
@@ -167,7 +171,9 @@ pub struct ValidatorHistoryEntry {
     pub blocks_produced: u32,
     // The last slot the block data was last updated at
     pub block_data_updated_at_slot: u64,
-    pub padding1: [u8; 48],
+    /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
+    pub priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority,
+    pub padding1: [u8; 47],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -191,7 +197,7 @@ impl Default for ValidatorHistoryEntry {
             rank: u32::MAX,
             vote_account_last_update_slot: u64::MAX,
             mev_earned: u32::MAX,
-            merkle_root_upload_authority: MerkleRootUploadAuthority::default(),
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
             priority_fee_tips: u64::MAX,
             total_priority_fees: u64::MAX,
             priority_fee_commission: u16::MAX,
@@ -199,12 +205,13 @@ impl Default for ValidatorHistoryEntry {
             blocks_produced: u32::MAX,
             padding0: [u8::MAX, 2],
             block_data_updated_at_slot: u64::MAX,
-            padding1: [u8::MAX; 48],
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
+            padding1: [u8::MAX; 47],
         }
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, PartialEq)]
 #[zero_copy]
 pub struct ClientVersion {
     pub major: u8,
@@ -389,6 +396,12 @@ impl CircBuf {
         field_latest!(self, merkle_root_upload_authority)
     }
 
+    pub fn priority_fee_merkle_root_upload_authority_latest(
+        &self,
+    ) -> Option<MerkleRootUploadAuthority> {
+        field_latest!(self, priority_fee_merkle_root_upload_authority)
+    }
+
     pub fn priority_fee_tips_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u64>> {
         field_range!(self, start_epoch, end_epoch, priority_fee_tips, u64)
     }
@@ -396,6 +409,57 @@ impl CircBuf {
     pub fn total_priority_fees_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u64>> {
         field_range!(self, start_epoch, end_epoch, total_priority_fees, u64)
     }
+
+    pub fn priority_fee_tips_latest(&self) -> Option<u64> {
+        field_latest!(self, priority_fee_tips)
+    }
+
+    pub fn total_priority_fees_latest(&self) -> Option<u64> {
+        field_latest!(self, total_priority_fees)
+    }
+
+    pub fn merkle_root_upload_authority_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<MerkleRootUploadAuthority>> {
+        field_range!(
+            self,
+            start_epoch,
+            end_epoch,
+            merkle_root_upload_authority,
+            MerkleRootUploadAuthority
+        )
+    }
+
+    pub fn priority_fee_merkle_root_upload_authority_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<MerkleRootUploadAuthority>> {
+        field_range!(
+            self,
+            start_epoch,
+            end_epoch,
+            priority_fee_merkle_root_upload_authority,
+            MerkleRootUploadAuthority
+        )
+    }
+
+    pub fn vote_account_last_update_slot_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<u64>> {
+        field_range!(
+            self,
+            start_epoch,
+            end_epoch,
+            vote_account_last_update_slot,
+            u64
+        )
+    }
+
     /// Normalized epoch credits, accounting for Timely Vote Credits making the max number of credits 16x higher
     /// for every epoch starting at `tvc_activation_epoch`
     pub fn epoch_credits_latest_normalized(
@@ -466,6 +530,104 @@ impl CircBuf {
 
     pub fn vote_account_last_update_slot_latest(&self) -> Option<u64> {
         field_latest!(self, vote_account_last_update_slot)
+    }
+
+    pub fn activated_stake_lamports_latest(&self) -> Option<u64> {
+        field_latest!(self, activated_stake_lamports)
+    }
+
+    pub fn activated_stake_lamports_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<u64>> {
+        field_range!(self, start_epoch, end_epoch, activated_stake_lamports, u64)
+    }
+
+    pub fn client_type_latest(&self) -> Option<u8> {
+        field_latest!(self, client_type)
+    }
+
+    pub fn client_type_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u8>> {
+        field_range!(self, start_epoch, end_epoch, client_type, u8)
+    }
+
+    pub fn version_latest(&self) -> Option<ClientVersion> {
+        field_latest!(self, version)
+    }
+
+    pub fn version_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<ClientVersion>> {
+        field_range!(self, start_epoch, end_epoch, version, ClientVersion)
+    }
+
+    pub fn ip_latest(&self) -> Option<[u8; 4]> {
+        field_latest!(self, ip)
+    }
+
+    pub fn ip_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<[u8; 4]>> {
+        field_range!(self, start_epoch, end_epoch, ip, [u8; 4])
+    }
+
+    pub fn rank_latest(&self) -> Option<u32> {
+        field_latest!(self, rank)
+    }
+
+    pub fn rank_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
+        field_range!(self, start_epoch, end_epoch, rank, u32)
+    }
+
+    pub fn mev_earned_latest(&self) -> Option<u32> {
+        field_latest!(self, mev_earned)
+    }
+
+    pub fn mev_earned_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
+        field_range!(self, start_epoch, end_epoch, mev_earned, u32)
+    }
+
+    pub fn priority_fee_commission_latest(&self) -> Option<u16> {
+        field_latest!(self, priority_fee_commission)
+    }
+
+    pub fn priority_fee_commission_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<u16>> {
+        field_range!(self, start_epoch, end_epoch, priority_fee_commission, u16)
+    }
+
+    pub fn total_leader_slots_latest(&self) -> Option<u32> {
+        field_latest!(self, total_leader_slots)
+    }
+
+    pub fn total_leader_slots_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
+        field_range!(self, start_epoch, end_epoch, total_leader_slots, u32)
+    }
+
+    pub fn blocks_produced_latest(&self) -> Option<u32> {
+        field_latest!(self, blocks_produced)
+    }
+
+    pub fn blocks_produced_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u32>> {
+        field_range!(self, start_epoch, end_epoch, blocks_produced, u32)
+    }
+
+    pub fn block_data_updated_at_slot_latest(&self) -> Option<u64> {
+        field_latest!(self, block_data_updated_at_slot)
+    }
+
+    pub fn block_data_updated_at_slot_range(
+        &self,
+        start_epoch: u16,
+        end_epoch: u16,
+    ) -> Vec<Option<u64>> {
+        field_range!(
+            self,
+            start_epoch,
+            end_epoch,
+            block_data_updated_at_slot,
+            u64
+        )
     }
 }
 
@@ -552,12 +714,14 @@ impl ValidatorHistory {
         epoch: u16,
         commission: u16,
         priority_fee_tips: u64,
+        merkle_root_upload_authority: MerkleRootUploadAuthority,
     ) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
                     entry.priority_fee_commission = commission;
                     entry.priority_fee_tips = priority_fee_tips;
+                    entry.priority_fee_merkle_root_upload_authority = merkle_root_upload_authority;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -569,6 +733,8 @@ impl ValidatorHistory {
                     {
                         entry.priority_fee_commission = commission;
                         entry.priority_fee_tips = priority_fee_tips;
+                        entry.priority_fee_merkle_root_upload_authority =
+                            merkle_root_upload_authority;
                     }
                     return Ok(());
                 }
@@ -579,6 +745,7 @@ impl ValidatorHistory {
             epoch,
             priority_fee_commission: commission,
             priority_fee_tips,
+            merkle_root_upload_authority,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

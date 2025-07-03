@@ -1,11 +1,10 @@
-use anchor_lang::{prelude::*, solana_program::vote};
-
 use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::{cast_epoch, fixed_point_sol},
     MerkleRootUploadAuthority, ValidatorHistoryEntry,
 };
+use anchor_lang::{prelude::*, solana_program::vote};
 
 use jito_tip_distribution::state::TipDistributionAccount;
 

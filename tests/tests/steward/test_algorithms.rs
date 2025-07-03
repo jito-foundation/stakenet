@@ -65,6 +65,7 @@ fn test_compute_score() {
             priority_fee_commission_score: 1.0,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 10,
@@ -107,6 +108,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -150,6 +152,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -193,6 +196,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -240,6 +244,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -285,6 +290,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -331,6 +337,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -378,6 +385,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -422,6 +430,7 @@ fn test_compute_score() {
             commission_score: 0.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -474,6 +483,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -516,6 +526,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -565,6 +576,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -609,6 +621,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -658,6 +671,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -705,6 +719,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -789,6 +804,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 0.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -837,6 +853,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -885,6 +902,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -935,6 +953,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 1.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -985,6 +1004,7 @@ fn test_compute_score() {
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1.0,
             priority_fee_commission_score: 0.0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
@@ -1052,6 +1072,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1089,6 +1110,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: true,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1123,6 +1145,7 @@ fn test_instant_unstake() {
             mev_commission_check: true,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: bad_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1175,6 +1198,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1227,6 +1251,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1261,6 +1286,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1295,6 +1321,7 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
             vote_account: good_validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {
@@ -1333,6 +1360,45 @@ fn test_instant_unstake() {
             mev_commission_check: false,
             is_blacklisted: false,
             is_bad_merkle_root_upload_authority: true,
+            is_bad_priority_fee_merkle_root_upload_authority: false,
+            vote_account: validator.vote_account,
+            epoch: current_epoch,
+            details: InstantUnstakeDetails {
+                epoch_credits_latest: 1000 * (TVC_MULTIPLIER as u64),
+                vote_account_last_update_slot: end_slot,
+                total_blocks_latest: 0,
+                cluster_history_slot_index: slot_index,
+                commission: 0,
+                mev_commission: 0
+            }
+        }
+    );
+
+    let mut validator = validators[0];
+    validator
+        .history
+        .last_mut()
+        .unwrap()
+        .priority_fee_merkle_root_upload_authority = MerkleRootUploadAuthority::Other;
+    let res = instant_unstake_validator(
+        &validator,
+        &cluster_history,
+        &config,
+        start_slot,
+        current_epoch,
+        TVC_ACTIVATION_EPOCH,
+    );
+    assert!(res.is_ok());
+    assert_eq!(
+        res.unwrap(),
+        InstantUnstakeComponentsV3 {
+            instant_unstake: true,
+            delinquency_check: false,
+            commission_check: false,
+            mev_commission_check: false,
+            is_blacklisted: false,
+            is_bad_merkle_root_upload_authority: false,
+            is_bad_priority_fee_merkle_root_upload_authority: true,
             vote_account: validator.vote_account,
             epoch: current_epoch,
             details: InstantUnstakeDetails {

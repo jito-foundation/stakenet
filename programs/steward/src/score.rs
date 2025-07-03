@@ -62,6 +62,9 @@ pub struct ScoreComponentsV3 {
     /// If validator has realized priority fee commissions > config limits over a lookback range,
     /// score 0.  
     pub priority_fee_commission_score: f64,
+
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
+    pub priority_fee_merkle_root_upload_authority_score: f64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
@@ -175,6 +178,8 @@ pub fn validator_score(
     let blacklisted_score = calculate_blacklist(config, validator.index)?;
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
+    let priority_fee_merkle_root_upload_authority_score =
+        calculate_priority_fee_merkle_root_authority(validator)?;
 
     let (
         priority_fee_commission_score,
@@ -225,6 +230,7 @@ pub fn validator_score(
             max_priority_fee_commission_epoch,
         },
         priority_fee_commission_score,
+        priority_fee_merkle_root_upload_authority_score,
     })
 }
 
@@ -453,7 +459,24 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
 pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
-    if calculate_instant_unstake_merkle_root_upload_auth(validator)? {
+    // calculate_instant_unstake_merkle_root_upload_auth returns whether or not
+    // instant unstake should be triggered, so we invert the result to get the score
+    if calculate_instant_unstake_merkle_root_upload_auth(
+        &validator.history.merkle_root_upload_authority_latest(),
+    )? {
+        Ok(0.0)
+    } else {
+        Ok(1.0)
+    }
+}
+
+/// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
+pub fn calculate_priority_fee_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
+    if calculate_instant_unstake_merkle_root_upload_auth(
+        &validator
+            .history
+            .priority_fee_merkle_root_upload_authority_latest(),
+    )? {
         Ok(0.0)
     } else {
         Ok(1.0)
@@ -585,6 +608,9 @@ pub struct InstantUnstakeComponentsV3 {
     /// Checks if validator has an unacceptable merkle root upload authority
     pub is_bad_merkle_root_upload_authority: bool,
 
+    /// Checks if validator has an unacceptable priority fee merkle root upload authority
+    pub is_bad_priority_fee_merkle_root_upload_authority: bool,
+
     pub vote_account: Pubkey,
 
     pub epoch: u16,
@@ -671,8 +697,16 @@ pub fn instant_unstake_validator(
 
     let is_blacklisted = calculate_instant_unstake_blacklist(config, validator.index)?;
 
-    let is_bad_merkle_root_upload_authority =
-        calculate_instant_unstake_merkle_root_upload_auth(validator)?;
+    let is_bad_merkle_root_upload_authority = calculate_instant_unstake_merkle_root_upload_auth(
+        &validator.history.merkle_root_upload_authority_latest(),
+    )?;
+
+    let is_bad_priority_fee_merkle_root_upload_authority =
+        calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )?;
 
     let instant_unstake = delinquency_check
         || commission_check
@@ -687,6 +721,7 @@ pub fn instant_unstake_validator(
         mev_commission_check,
         is_blacklisted,
         is_bad_merkle_root_upload_authority,
+        is_bad_priority_fee_merkle_root_upload_authority,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: InstantUnstakeDetails {
@@ -766,11 +801,9 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
 
 /// Checks if the validator is using allowed Tip Distribution merkle root upload authority
 pub fn calculate_instant_unstake_merkle_root_upload_auth(
-    validator: &ValidatorHistory,
+    latest_authority: &Option<MerkleRootUploadAuthority>,
 ) -> Result<bool> {
-    if let Some(merkle_root_upload_authority) =
-        validator.history.merkle_root_upload_authority_latest()
-    {
+    if let Some(merkle_root_upload_authority) = latest_authority {
         match merkle_root_upload_authority {
             MerkleRootUploadAuthority::OldJitoLabs => Ok(false),
             MerkleRootUploadAuthority::TipRouter => Ok(false),
