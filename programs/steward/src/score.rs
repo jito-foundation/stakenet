@@ -177,7 +177,7 @@ pub fn validator_score(
 
     let blacklisted_score = calculate_blacklist_score(config, validator.index)?;
 
-    let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
+    let merkle_root_upload_authority_score = calculate_merkle_root_authority_score(validator)?;
     let priority_fee_merkle_root_upload_authority_score =
         calculate_priority_fee_merkle_root_authority(validator)?;
 
@@ -458,7 +458,7 @@ pub fn calculate_blacklist_score(config: &Config, validator_index: u32) -> Resul
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
+pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Result<f64> {
     // calculate_instant_unstake_merkle_root_upload_auth returns whether or not
     // instant unstake should be triggered, so we invert the result to get the score
     if calculate_instant_unstake_merkle_root_upload_auth(
