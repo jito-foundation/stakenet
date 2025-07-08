@@ -69,7 +69,7 @@ pub fn handler(
         max_slots_in_epoch,
     )?;
 
-    let initial_parameters = initial_parameters.get_updated_priority_fee_parameters(
+    let initial_parameters = initial_parameters.priority_fee_parameters(
         update_priority_fee_parameters_args,
         current_epoch,
         max_slots_in_epoch,

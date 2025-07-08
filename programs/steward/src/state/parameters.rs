@@ -346,7 +346,7 @@ impl Parameters {
         Ok(new_parameters)
     }
 
-    pub fn get_updated_priority_fee_parameters(
+    pub fn priority_fee_parameters(
         self,
         args: &UpdatePriorityFeeParametersArgs,
         current_epoch: u64,
