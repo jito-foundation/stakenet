@@ -7,15 +7,21 @@
 use crate::constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS};
 use crate::errors::StewardError;
 use crate::state::Config;
-use crate::utils::{
-    deserialize_stake_pool, get_config_admin, get_stake_pool_address,
-    get_validator_stake_info_at_index, stake_is_inactive_without_history, stake_is_usable_by_pool,
-};
 use crate::StewardStateAccount;
+use crate::{
+    stake_pool_utils::deserialize_stake_pool,
+    utils::{
+        get_config_admin, get_stake_pool_address, get_validator_stake_info_at_index,
+        stake_is_inactive_without_history, stake_is_usable_by_pool,
+    },
+};
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};
-use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
-use spl_pod::solana_program::stake::state::StakeStateV2;
+use anchor_lang::solana_program::{
+    borsh1::try_from_slice_unchecked,
+    program::invoke_signed,
+    stake::{self, state::StakeStateV2},
+    sysvar, vote,
+};
 use spl_stake_pool::find_stake_program_address;
 use spl_stake_pool::instruction::PreferredValidatorType;
 use spl_stake_pool::state::{StakeStatus, ValidatorListHeader};

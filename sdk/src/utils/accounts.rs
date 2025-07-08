@@ -14,7 +14,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config as StewardConfig, StewardStateAccount,
 };
 
@@ -163,7 +163,7 @@ pub async fn get_all_validator_history_accounts(
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
-            ValidatorHistory::discriminator().into(),
+            ValidatorHistory::DISCRIMINATOR.into(),
         ))]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
@@ -321,7 +321,7 @@ pub async fn get_tip_distribution_accounts(
         filters: Some(vec![
             RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 0,
-                TipDistributionAccount::discriminator().into(),
+                TipDistributionAccount::DISCRIMINATOR.into(),
             )),
             RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 EPOCH_OFFSET,

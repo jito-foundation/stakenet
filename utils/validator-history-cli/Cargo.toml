@@ -5,17 +5,17 @@ edition = "2021"
 description = "CLI to manage validator history program"
 
 [dependencies]
-anchor-lang = "0.30.1"
+anchor-lang = "0.31.1"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 futures = "0.3.21"
 futures-util = "0.3.21"
 log = "0.4.18"
-solana-account-decoder = "1.18"
-solana-clap-utils = "1.18"
-solana-client = "1.18"
-solana-metrics = "1.18"
-solana-program = "1.18"
-solana-sdk = "1.18"
+solana-account-decoder = { workspace = true }
+solana-clap-utils = { workspace = true }
+solana-client = { workspace = true }
+solana-metrics = { workspace = true }
+solana-program = { workspace = true }
+solana-sdk = { workspace = true }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }

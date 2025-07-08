@@ -1,7 +1,7 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 
-use crate::spl_stake_pool_cli;
+use crate::{spl_stake_pool_cli, stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account}};
 use anchor_lang::{
     prelude::SolanaSysvar,
     solana_program::{
@@ -15,7 +15,7 @@ use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     instructions::AuthorityType,
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
     StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
@@ -1615,39 +1615,6 @@ pub fn closed_vote_account() -> Account {
     }
 }
 
-// TODO write a function to serialize any account with T: AnchorSerialize
-pub fn serialized_validator_list_account(
-    validator_list: SPLValidatorList,
-    account_size: Option<usize>,
-) -> Account {
-    // Passes in size because zeros at the end will be truncated during serialization
-    let mut data = vec![];
-    validator_list.serialize(&mut data).unwrap();
-    let account_size = account_size.unwrap_or(5 + 4 + 73 * validator_list.validators.len());
-    data.extend(vec![0; account_size - data.len()]);
-    Account {
-        lamports: 1_000_000_000,
-        data,
-        owner: spl_stake_pool::id(),
-        ..Account::default()
-    }
-}
-
-pub fn serialized_stake_pool_account(
-    stake_pool: spl_stake_pool::state::StakePool,
-    account_size: usize,
-) -> Account {
-    let mut data = vec![];
-    stake_pool.serialize(&mut data).unwrap();
-    data.extend(vec![0; account_size - data.len()]);
-    Account {
-        lamports: 10_000_000_000,
-        data,
-        owner: spl_stake_pool::id(),
-        ..Account::default()
-    }
-}
-
 pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> Account {
     let mut data = vec![];
     stake_account.serialize(&mut data).unwrap();
@@ -1662,8 +1629,8 @@ pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> A
 pub fn serialized_validator_history_account(validator_history: ValidatorHistory) -> Account {
     let mut data = vec![];
     validator_history.serialize(&mut data).unwrap();
-    for byte in ValidatorHistory::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in ValidatorHistory::DISCRIMINATOR.into_iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 1_000_000_000,
@@ -1676,8 +1643,8 @@ pub fn serialized_validator_history_account(validator_history: ValidatorHistory)
 pub fn serialized_steward_state_account(state: StewardStateAccount) -> Account {
     let mut data = vec![];
     state.serialize(&mut data).unwrap();
-    for byte in StewardStateAccount::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in StewardStateAccount::DISCRIMINATOR.into_iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 100_000_000_000,
@@ -1690,8 +1657,8 @@ pub fn serialized_steward_state_account(state: StewardStateAccount) -> Account {
 pub fn serialized_config(config: Config) -> Account {
     let mut data = vec![];
     config.serialize(&mut data).unwrap();
-    for byte in Config::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in Config::DISCRIMINATOR.into_iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 1_000_000_000,
@@ -1760,8 +1727,8 @@ pub fn cluster_history_default() -> ClusterHistory {
 pub fn serialized_cluster_history_account(cluster_history: ClusterHistory) -> Account {
     let mut data = vec![];
     cluster_history.serialize(&mut data).unwrap();
-    for byte in ClusterHistory::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in ClusterHistory::DISCRIMINATOR.into_iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 10_000_000_000,

@@ -3,7 +3,7 @@
 // Modified to not make any RPC calls
 use anchor_lang::solana_program::system_instruction;
 use solana_program::{
-    borsh0_10::{get_instance_packed_len, get_packed_len},
+    borsh1::{get_instance_packed_len, get_packed_len},
     instruction::Instruction,
     program_pack::Pack,
     pubkey::Pubkey,
