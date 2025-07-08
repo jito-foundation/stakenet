@@ -34,7 +34,7 @@ pub struct CopyPriorityFeeDistribution<'info> {
     pub config: Account<'info, Config>,
 
     /// CHECK: Avoiding struct deserialization here to avoid default Owner trait check.
-    /// `owner = PRIORITY_FEE_DIST_PROGRAM_ID` here is sufficient.
+    /// `owner = config.priority_fee_distribution_program.key()` here is sufficient.
     #[account(
         seeds = [
             PriorityFeeDistributionAccount::SEED,
@@ -42,8 +42,8 @@ pub struct CopyPriorityFeeDistribution<'info> {
             epoch.to_le_bytes().as_ref(),
         ],
         bump,
-        seeds::program = PRIORITY_FEE_DIST_PROGRAM_ID,
-        owner = PRIORITY_FEE_DIST_PROGRAM_ID
+        seeds::program = config.priority_fee_distribution_program.key(),
+        owner = config.priority_fee_distribution_program.key()
     )]
     pub distribution_account: UncheckedAccount<'info>,
 

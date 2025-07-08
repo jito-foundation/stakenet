@@ -1,5 +1,8 @@
 use crate::{errors::ValidatorHistoryError, Config};
 use anchor_lang::{prelude::*, system_program, Discriminator};
+use jito_priority_fee_distribution::{
+     ID as PRIORITY_FEE_DISTIBUTION_PROGRAM_ID,
+};
 
 #[derive(Accounts)]
 pub struct ReallocConfigAccount<'info> {
@@ -41,6 +44,11 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
     }
 
     // Call realloc
+    // NOTE: Realloc has been deprecated in favor of resize, however
+    // this program is using an older version of the solana-account-info crate
+    // https://docs.rs/solana-account-info/latest/solana_account_info/struct.AccountInfo.html#method.realloc
+    //
+    // The `init_zero` only applies to the newly allocated space, not the rest of the account data
     ctx.accounts.config_account.realloc(new_size, true)?;
 
     // Set the priority_fee_oracle_authority if not already set
@@ -48,11 +56,24 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
         let data = ctx.accounts.config_account.try_borrow_data()?;
         Config::try_deserialize(&mut &data[..])?
     };
-    if config.priority_fee_oracle_authority.eq(&Pubkey::default()) {
-        config.priority_fee_oracle_authority = config.oracle_authority;
+
+    let should_set_priority_fee_distribution_account = config.priority_fee_distribution_program.eq(&Pubkey::default());
+    let should_set_priority_fee_oracle_authority = config.priority_fee_oracle_authority.eq(&Pubkey::default());
+
+    if should_set_priority_fee_distribution_account || should_set_priority_fee_oracle_authority {
+
+        if should_set_priority_fee_distribution_account {
+            config.priority_fee_distribution_program = PRIORITY_FEE_DISTIBUTION_PROGRAM_ID;
+        }
+
+        if should_set_priority_fee_oracle_authority {
+            config.priority_fee_oracle_authority = config.oracle_authority;
+        }
+
         let mut data = ctx.accounts.config_account.try_borrow_mut_data()?;
         data[Config::DISCRIMINATOR.len()..].copy_from_slice(&config.try_to_vec()?);
     }
+
 
     Ok(())
 }
