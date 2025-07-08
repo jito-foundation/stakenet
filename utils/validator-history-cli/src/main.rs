@@ -45,6 +45,7 @@ enum Commands {
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
     StakeByCountry(StakeByCountry),
+    GetConfig,
 }
 
 #[derive(Parser)]
@@ -827,6 +828,32 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     }
 }
 
+fn command_get_config(client: RpcClient) {
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    
+    match client.get_account(&config_pda) {
+        Ok(account) => {
+            match Config::try_deserialize(&mut account.data.as_slice()) {
+                Ok(config) => {
+                    println!("Validator History Config:");
+                    println!("  Pubkey: {}", config_pda);
+                    println!("  Tip Distribution Program: {}", config.tip_distribution_program);
+                    println!("  Admin: {}", config.admin);
+                    println!("  Oracle Authority: {}", config.oracle_authority);
+                    println!("  Counter: {}", config.counter);
+                    println!("  Bump: {}", config.bump);
+                }
+                Err(err) => {
+                    eprintln!("Error deserializing config: {err}");
+                }
+            }
+        }
+        Err(err) => {
+            eprintln!("Error fetching config account: {err}");
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -839,5 +866,6 @@ async fn main() {
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
+        Commands::GetConfig => command_get_config(client),
     };
 }
