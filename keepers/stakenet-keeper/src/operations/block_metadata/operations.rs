@@ -20,7 +20,7 @@ use solana_transaction_status::{
 };
 use stakenet_sdk::{
     models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
-    utils::transactions::submit_instructions,
+    utils::transactions::submit_chunk_instructions,
 };
 
 use crate::{
