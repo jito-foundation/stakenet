@@ -175,7 +175,7 @@ pub fn validator_score(
     let (superminority_score, superminority_epoch) =
         calculate_superminority(validator, current_epoch, params.commission_range)?;
 
-    let blacklisted_score = calculate_blacklist(config, validator.index)?;
+    let blacklisted_score = calculate_blacklist_score(config, validator.index)?;
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority(validator)?;
     let priority_fee_merkle_root_upload_authority_score =
@@ -446,7 +446,7 @@ pub fn calculate_superminority(
 }
 
 /// Checks if validator is blacklisted using the validator history index in the config's blacklist
-pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
+pub fn calculate_blacklist_score(config: &Config, validator_index: u32) -> Result<f64> {
     if config
         .validator_history_blacklist
         .get(validator_index as usize)?
@@ -487,7 +487,7 @@ pub fn calculate_priority_fee_merkle_root_authority(validator: &ValidatorHistory
 pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
     // total_fees is None when the ValidatorHistoryEntry has been created, but the
     //  priority_fee_oracle_authority has not called UpdatePriorityFeeHistory
-    if total_fees.is_none() {
+    if total_fees.is_none() || total_fees.iter().all(|&f| f == 0) {
         return 0;
     }
     // Default the tips to 0 because we assume the PFDA was not created and the validator is not
@@ -498,11 +498,9 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
     // to BASIS_POINTS_MAX
     let total_fees = total_fees.unwrap_or(u64::MAX);
 
-    let validators_rake = total_fees.checked_sub(tips).unwrap_or(total_fees);
+    let validators_rake = total_fees.saturating_sub(tips);
     // We scale by BASIS_POINTS_MAX before division, so the output is in bps
-    let numerator = validators_rake
-        .checked_mul(BASIS_POINTS_MAX as u64)
-        .unwrap_or(0);
+    let numerator = validators_rake.saturating_mul(BASIS_POINTS_MAX as u64);
     let commission = numerator
         .checked_div(total_fees)
         .unwrap_or(BASIS_POINTS_MAX as u64);
@@ -537,9 +535,7 @@ pub fn calculate_priority_fee_commission(
             let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
 
             if max_priority_fee_commission < commission_bps {
-                let max_commission_epoch: u16 = start_epoch
-                    .checked_add(relative_epoch as u16)
-                    .ok_or(ArithmeticError)?;
+                let max_commission_epoch: u16 = start_epoch.saturating_add(relative_epoch as u16);
                 max_priority_fee_commission = commission_bps;
                 max_priority_fee_commission_epoch = max_commission_epoch;
             }

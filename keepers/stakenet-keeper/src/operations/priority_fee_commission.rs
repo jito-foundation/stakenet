@@ -17,7 +17,6 @@ use stakenet_sdk::models::submit_stats::SubmitStats;
 use stakenet_sdk::utils::transactions::submit_instructions;
 use std::sync::Arc;
 
-
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::PriorityFeeCommission
 }

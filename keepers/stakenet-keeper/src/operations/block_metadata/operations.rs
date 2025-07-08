@@ -7,26 +7,29 @@ use log::{error, info};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
-    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig, rpc_request::RpcError
+    client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig,
+    rpc_request::RpcError,
 };
 use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
-    commitment_config::CommitmentConfig, pubkey::Pubkey,
-    signature::Keypair, signer::Signer, slot_history,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    slot_history,
 };
 use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
 use stakenet_sdk::{
-    models::{ cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
+    models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
     utils::transactions::submit_instructions,
 };
 
 use crate::{
-    entries::priority_fee_commission_entry::derive_priority_fee_distribution_account_address, operations::{
+    entries::priority_fee_commission_entry::derive_priority_fee_distribution_account_address,
+    operations::{
         block_metadata::db::DBSlotInfo,
         keeper_operations::{check_flag, KeeperOperations},
-    }, state::{keeper_config::KeeperConfig, keeper_state::KeeperState}
+    },
+    state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
 };
 
 use super::errors::BlockMetadataKeeperError;
@@ -97,7 +100,7 @@ pub async fn fire(
             keeper_config.tx_confirmation_seconds,
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
-            keeper_config.cluster
+            keeper_config.cluster,
         )
         .await
         {
@@ -157,7 +160,7 @@ async fn _process(
         confirmation_time,
         priority_fee_in_microlamports,
         no_pack,
-        cluster
+        cluster,
     )
     .await
 }
@@ -356,12 +359,18 @@ async fn update_block_metadata(
                 let (vote_account, entry) = entry;
 
                 // Calculate total lamports transferred
-                let (priority_fee_distribution_account, total_lamports_transferred, validator_commission_bps, error_string) = get_priority_fee_distribution_account_info(
+                let (
+                    priority_fee_distribution_account,
+                    total_lamports_transferred,
+                    validator_commission_bps,
+                    error_string,
+                ) = get_priority_fee_distribution_account_info(
                     client,
                     priority_fee_distribution_program_id,
                     &entry.vote_account,
-                    epoch
-                ).await;
+                    epoch,
+                )
+                .await;
 
                 datapoint_info!(
                   "pfh-block-info-0.0.9",
@@ -432,33 +441,59 @@ pub async fn get_priority_fee_distribution_account_info(
     priority_fee_distribution_program_id: &Pubkey,
     vote_account: &Pubkey,
     epoch: u64,
-) -> (Pubkey, i64, i64, Option<String>) { // total lamports transferred, validator commission bps
+) -> (Pubkey, i64, i64, Option<String>) {
+    // total lamports transferred, validator commission bps
 
-    let (priority_fee_distribution_account, _) =
-        derive_priority_fee_distribution_account_address(
-            priority_fee_distribution_program_id,
-            vote_account,
-            epoch,
-        );
+    let (priority_fee_distribution_account, _) = derive_priority_fee_distribution_account_address(
+        priority_fee_distribution_program_id,
+        vote_account,
+        epoch,
+    );
     match client.get_account(&priority_fee_distribution_account).await {
         Ok(account) => {
             let mut data_slice = account.data.as_slice();
             match PriorityFeeDistributionAccount::deserialize(&mut data_slice) {
-                Ok(account) => {
-                    (priority_fee_distribution_account, account.total_lamports_transferred as i64, account.validator_commission_bps as i64, None)
-                }
+                Ok(account) => (
+                    priority_fee_distribution_account,
+                    account.total_lamports_transferred as i64,
+                    account.validator_commission_bps as i64,
+                    None,
+                ),
                 Err(error) => {
-                    let error_string = format!("Could not deserialize account data {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
-                    (priority_fee_distribution_account, -1, -1, Some(error_string))
+                    let error_string = format!(
+                        "Could not deserialize account data {}-{}-{} = {}: {:?}",
+                        priority_fee_distribution_program_id,
+                        vote_account,
+                        epoch,
+                        priority_fee_distribution_account,
+                        error
+                    );
+                    (
+                        priority_fee_distribution_account,
+                        -1,
+                        -1,
+                        Some(error_string),
+                    )
                 }
             }
         }
         Err(error) => {
-            let error_string = format!("Could not fetch account {}-{}-{} = {}: {:?}", priority_fee_distribution_program_id, vote_account, epoch, priority_fee_distribution_account, error);
-            (priority_fee_distribution_account, -1, -1, Some(error_string))
+            let error_string = format!(
+                "Could not fetch account {}-{}-{} = {}: {:?}",
+                priority_fee_distribution_program_id,
+                vote_account,
+                epoch,
+                priority_fee_distribution_account,
+                error
+            );
+            (
+                priority_fee_distribution_account,
+                -1,
+                -1,
+                Some(error_string),
+            )
         }
     }
-
 }
 
 pub async fn get_leader_schedule_safe(
