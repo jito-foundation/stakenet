@@ -213,7 +213,7 @@ fn test_priority_parameter_validation() {
         priority_fee_error_margin_bps: Some(1),
         priority_fee_scoring_start_epoch: Some(1),
     };
-    let res = valid_parameters.get_updated_priority_fee_parameters(
+    let res = valid_parameters.priority_fee_parameters(
         &update_priority_fee_parameters_args,
         current_epoch,
         slots_per_epoch,
@@ -227,7 +227,7 @@ fn test_priority_parameter_validation() {
         priority_fee_error_margin_bps: Some(BASIS_POINTS_MAX + 1),
         priority_fee_scoring_start_epoch: Some(1),
     };
-    let res = valid_parameters.get_updated_priority_fee_parameters(
+    let res = valid_parameters.priority_fee_parameters(
         &update_priority_fee_parameters_args,
         current_epoch,
         slots_per_epoch,
