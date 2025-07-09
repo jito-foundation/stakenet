@@ -127,7 +127,7 @@ pub mod validator_history {
         total_priority_fees: u64,
         total_leader_slots: u32,
         blocks_produced: u32,
-        highest_oracle_recoreded_slot: u64,
+        highest_oracle_recorded_slot: u64,
     ) -> Result<()> {
         handle_update_priority_fee_history(
             ctx,
@@ -135,7 +135,7 @@ pub mod validator_history {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            highest_oracle_recoreded_slot,
+            highest_oracle_recorded_slot,
         )
     }
 

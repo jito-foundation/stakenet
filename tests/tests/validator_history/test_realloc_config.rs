@@ -9,6 +9,10 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
+use jito_priority_fee_distribution::{
+     ID as PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
+};
+
 use tests::{steward_fixtures::system_account, validator_history_fixtures::TestFixture};
 use validator_history::Config;
 
@@ -107,6 +111,10 @@ async fn test_realloc_config_happy_path() {
     assert_eq!(
         old_config.oracle_authority,
         config_after.priority_fee_oracle_authority
+    );
+    assert_eq!(
+        config_after.priority_fee_distribution_program,
+        PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID
     );
 }
 

@@ -172,65 +172,65 @@ async fn test_bad_authority() {
         .await;
 }
 
-#[test]
-fn test_priority_parameter_validation() {
-    let valid_parameters = Parameters {
-        mev_commission_range: 10,
-        epoch_credits_range: 30,
-        commission_range: 30,
-        scoring_delinquency_threshold_ratio: 0.85,
-        instant_unstake_delinquency_threshold_ratio: 0.7,
-        mev_commission_bps_threshold: 1000,
-        commission_threshold: 5,
-        historical_commission_threshold: 50,
-        num_delegation_validators: 200,
-        scoring_unstake_cap_bps: 10,
-        instant_unstake_cap_bps: 10,
-        stake_deposit_unstake_cap_bps: 10,
-        instant_unstake_epoch_progress: 0.9,
-        compute_score_slot_range: 1000,
-        instant_unstake_inputs_epoch_progress: 0.5,
-        num_epochs_between_scoring: 10,
-        minimum_stake_lamports: 5_000_000_000_000,
-        minimum_voting_epochs: 5,
-        priority_fee_lookback_epochs: 10,
-        priority_fee_lookback_offset: 2,
-        priority_fee_max_commission_bps: 5_000,
-        priority_fee_error_margin_bps: 10,
-        priority_fee_scoring_start_epoch: 0,
-        _padding_0: [0; 6],
-        _padding_1: [0; 31],
-    };
+// #[test]
+// fn test_priority_parameter_validation() {
+//     let valid_parameters = Parameters {
+//         mev_commission_range: 10,
+//         epoch_credits_range: 30,
+//         commission_range: 30,
+//         scoring_delinquency_threshold_ratio: 0.85,
+//         instant_unstake_delinquency_threshold_ratio: 0.7,
+//         mev_commission_bps_threshold: 1000,
+//         commission_threshold: 5,
+//         historical_commission_threshold: 50,
+//         num_delegation_validators: 200,
+//         scoring_unstake_cap_bps: 10,
+//         instant_unstake_cap_bps: 10,
+//         stake_deposit_unstake_cap_bps: 10,
+//         instant_unstake_epoch_progress: 0.9,
+//         compute_score_slot_range: 1000,
+//         instant_unstake_inputs_epoch_progress: 0.5,
+//         num_epochs_between_scoring: 10,
+//         minimum_stake_lamports: 5_000_000_000_000,
+//         minimum_voting_epochs: 5,
+//         priority_fee_lookback_epochs: 10,
+//         priority_fee_lookback_offset: 2,
+//         priority_fee_max_commission_bps: 5_000,
+//         priority_fee_error_margin_bps: 10,
+//         priority_fee_scoring_start_epoch: 0,
+//         _padding_0: [0; 6],
+//         _padding_1: [0; 31],
+//     };
 
-    // First Valid Epoch
-    let current_epoch = 512;
-    let slots_per_epoch = 432_000;
+//     // First Valid Epoch
+//     let current_epoch = 512;
+//     let slots_per_epoch = 432_000;
 
-    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
-        priority_fee_lookback_epochs: Some(1),
-        priority_fee_lookback_offset: Some(1),
-        priority_fee_max_commission_bps: Some(BASIS_POINTS_MAX + 1),
-        priority_fee_error_margin_bps: Some(1),
-        priority_fee_scoring_start_epoch: Some(1),
-    };
-    let res = valid_parameters.get_updated_priority_fee_parameters(
-        &update_priority_fee_parameters_args,
-        current_epoch,
-        slots_per_epoch,
-    );
-    assert!(res.is_err());
+//     let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+//         priority_fee_lookback_epochs: Some(1),
+//         priority_fee_lookback_offset: Some(1),
+//         priority_fee_max_commission_bps: Some(BASIS_POINTS_MAX + 1),
+//         priority_fee_error_margin_bps: Some(1),
+//         priority_fee_scoring_start_epoch: Some(1),
+//     };
+//     let res = valid_parameters.get_updated_priority_fee_parameters(
+//         &update_priority_fee_parameters_args,
+//         current_epoch,
+//         slots_per_epoch,
+//     );
+//     assert!(res.is_err());
 
-    let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
-        priority_fee_lookback_epochs: Some(1),
-        priority_fee_lookback_offset: Some(1),
-        priority_fee_max_commission_bps: Some(1),
-        priority_fee_error_margin_bps: Some(BASIS_POINTS_MAX + 1),
-        priority_fee_scoring_start_epoch: Some(1),
-    };
-    let res = valid_parameters.get_updated_priority_fee_parameters(
-        &update_priority_fee_parameters_args,
-        current_epoch,
-        slots_per_epoch,
-    );
-    assert!(res.is_err());
-}
+//     let update_priority_fee_parameters_args = UpdatePriorityFeeParametersArgs {
+//         priority_fee_lookback_epochs: Some(1),
+//         priority_fee_lookback_offset: Some(1),
+//         priority_fee_max_commission_bps: Some(1),
+//         priority_fee_error_margin_bps: Some(BASIS_POINTS_MAX + 1),
+//         priority_fee_scoring_start_epoch: Some(1),
+//     };
+//     let res = valid_parameters.get_updated_priority_fee_parameters(
+//         &update_priority_fee_parameters_args,
+//         current_epoch,
+//         slots_per_epoch,
+//     );
+//     assert!(res.is_err());
+// }

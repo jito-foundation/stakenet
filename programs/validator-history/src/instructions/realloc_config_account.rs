@@ -1,7 +1,7 @@
 use crate::{errors::ValidatorHistoryError, Config};
 use anchor_lang::{prelude::*, system_program, Discriminator};
 use jito_priority_fee_distribution::{
-     ID as PRIORITY_FEE_DISTIBUTION_PROGRAM_ID,
+     ID as PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
 };
 
 #[derive(Accounts)]
@@ -63,7 +63,7 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
     if should_set_priority_fee_distribution_account || should_set_priority_fee_oracle_authority {
 
         if should_set_priority_fee_distribution_account {
-            config.priority_fee_distribution_program = PRIORITY_FEE_DISTIBUTION_PROGRAM_ID;
+            config.priority_fee_distribution_program = PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID;
         }
 
         if should_set_priority_fee_oracle_authority {

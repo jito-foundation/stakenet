@@ -804,7 +804,7 @@ impl ValidatorHistory {
         total_priority_fees: u64,
         total_leader_slots: u32,
         blocks_produced: u32,
-        highest_oracle_recoreded_slot: u64,
+        highest_oracle_recorded_slot: u64,
     ) -> Result<()> {
         // Only one authority for upload here, so any epoch can be updated in case of missed upload
         if let Some(entry) = self.history.last_mut() {
@@ -813,7 +813,7 @@ impl ValidatorHistory {
                     entry.total_priority_fees = total_priority_fees;
                     entry.total_leader_slots = total_leader_slots;
                     entry.blocks_produced = blocks_produced;
-                    entry.block_data_updated_at_slot = highest_oracle_recoreded_slot;
+                    entry.block_data_updated_at_slot = highest_oracle_recorded_slot;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -822,7 +822,7 @@ impl ValidatorHistory {
                             entry.total_priority_fees = total_priority_fees;
                             entry.total_leader_slots = total_leader_slots;
                             entry.blocks_produced = blocks_produced;
-                            entry.block_data_updated_at_slot = highest_oracle_recoreded_slot;
+                            entry.block_data_updated_at_slot = highest_oracle_recorded_slot;
                             return Ok(());
                         }
                     }
@@ -836,7 +836,7 @@ impl ValidatorHistory {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            block_data_updated_at_slot: highest_oracle_recoreded_slot,
+            block_data_updated_at_slot: highest_oracle_recorded_slot,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);
