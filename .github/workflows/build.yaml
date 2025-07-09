@@ -81,7 +81,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
-          version: "0.30.1"
+          version: "0.31.1"
       - name: install solana toolsuite
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
