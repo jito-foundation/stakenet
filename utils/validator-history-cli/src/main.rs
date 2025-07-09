@@ -379,7 +379,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
-            ValidatorHistory::discriminator().into(),
+            ValidatorHistory::DISCRIMINATOR.into(),
         ))]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),

@@ -5,7 +5,7 @@ edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
 [dependencies]
-anchor-lang = "0.30.1"
+anchor-lang = "0.31.1"
 bincode = "1.3.3"
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"] }
 clap = { version = "4.3.0", features = ["derive", "env"] }
@@ -13,31 +13,27 @@ dotenv = "0.15.0"
 env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
-jito-priority-fee-distribution = { features = [
-    "no-entrypoint",
-], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
+jito-priority-fee-distribution = { features = ["no-entrypoint"] ,workspace = true }
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
-jito-tip-distribution = { features = [
-    "no-entrypoint",
-], git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
-jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", branch = "tj/priority-fee-distributor" }
+jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
+jito-tip-distribution-sdk = { workspace = true }
 log = "0.4.18"
 rand = "0.8.5"
 regex = "1.10"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
-solana-account-decoder = "1.18"
-solana-bincode = "2.2.1"
-solana-clap-utils = "1.18"
-solana-client = "1.18"
-solana-gossip = "1.18"
-solana-metrics = "1.18"
-solana-net-utils = "1.18"
-solana-packet = "2.2.1"
-solana-program = "1.18"
-solana-sdk = "1.18"
-solana-streamer = "1.18"
-solana-transaction-status = "1.18"
-spl-stake-pool = { features = ["no-entrypoint"], version = "1.0.0" }
+solana-account-decoder = { workspace = true }
+solana-bincode = { workspace = true }
+solana-clap-utils = { workspace = true }
+solana-client = { workspace = true }
+solana-gossip = { workspace = true }
+solana-metrics = { workspace = true }
+solana-net-utils = { workspace = true }
+solana-packet = { workspace = true }
+solana-program = { workspace = true }
+solana-sdk = { workspace = true }
+solana-streamer = { workspace = true }
+solana-transaction-status = { workspace = true }
+spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
