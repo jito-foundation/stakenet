@@ -1,7 +1,6 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use anchor_lang::{
-    solana_program::instruction::Instruction, Discriminator, InstructionData,
-    ToAccountMetas,
+    solana_program::instruction::Instruction, Discriminator, InstructionData, ToAccountMetas,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -286,7 +285,6 @@ fn serialized_validator_history_account(validator_history: ValidatorHistory) -> 
         ..Account::default()
     }
 }
-
 
 #[tokio::test]
 async fn test_insert_missing_entries_wraparound() {

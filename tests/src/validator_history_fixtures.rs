@@ -159,7 +159,11 @@ impl TestFixture {
         };
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction, set_tip_distribution_instruction, set_priority_fee_distribution_program],
+            &[
+                instruction,
+                set_tip_distribution_instruction,
+                set_priority_fee_distribution_program,
+            ],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,

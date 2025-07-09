@@ -1,7 +1,10 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 
-use crate::{spl_stake_pool_cli, stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account}};
+use crate::{
+    spl_stake_pool_cli,
+    stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account},
+};
 use anchor_lang::{
     prelude::SolanaSysvar,
     solana_program::{

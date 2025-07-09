@@ -1,17 +1,7 @@
 [workspace]
-members = [
-  "api",
-  "keepers/*",
-  "programs/*", 
-  "sdk",
-  "tests",
-  "utils/*",
-]
+members = ["api", "keepers/*", "programs/*", "sdk", "tests", "utils/*"]
 
 resolver = "2"
-
-[profile.release]
-overflow-checks = true
 
 [workspace.dependencies]
 anchor-lang = "0.31.1"
@@ -24,22 +14,22 @@ jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-pro
 serde = "1.0.183"
 serde_derive = "1.0.183"
 serde_json = "1.0.102"
-solana-bincode = "=2.2.1"
-solana-program = "=2.2.1"
-solana-rpc-client = "=2.2.1"
-solana-rpc-client-api = "=2.2.1"
 solana-account-decoder = "=2.2.1"
+solana-bincode = "=2.2.1"
 solana-clap-utils = "=2.2.1"
 solana-client = "=2.2.1"
 solana-gossip = { git = "https://github.com/gzalz/agave", rev = "e828441d3e6e37febc48b46c9742419bb84cf44b" }
 solana-metrics = "=2.2.1"
 solana-net-utils = "=2.2.1"
 solana-packet = "=2.2.1"
+solana-program = "=2.2.1"
+solana-rpc-client = "=2.2.1"
+solana-rpc-client-api = "=2.2.1"
 solana-sdk = "=2.2.1"
 solana-streamer = { git = "https://github.com/gzalz/agave", rev = "e828441d3e6e37febc48b46c9742419bb84cf44b" } 
 solana-transaction-status = "=2.2.1"
-spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.2" }
 spl-pod = "0.5.1"
+spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.2" }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
@@ -49,3 +39,6 @@ tracing = { version = "0.1.37" }
 tracing-core = "0.1.32"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 validator-history = { path = "programs/validator-history", version = "0.1.0" }
+
+[profile.release]
+overflow-checks = true
