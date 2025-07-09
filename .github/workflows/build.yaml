@@ -4,13 +4,14 @@ on:
     branches:
       - master
       - steward-test-branch
+      - feat/add-priority-fee-support
     tags:
       - "v*"
   pull_request:
     branches:
       - master
       - steward-test-branch
-
+      - feat/add-priority-fee-support
 jobs:
   security_audit:
     name: security_audit

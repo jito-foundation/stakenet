@@ -1,6 +1,6 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use anchor_lang::{
-    solana_program::instruction::Instruction, AnchorSerialize, Discriminator, InstructionData,
+    solana_program::instruction::Instruction, Discriminator, InstructionData,
     ToAccountMetas,
 };
 use solana_program_test::*;
@@ -274,7 +274,8 @@ async fn test_insert_missing_entries_compute() {
 
 fn serialized_validator_history_account(validator_history: ValidatorHistory) -> Account {
     let mut data = vec![];
-    validator_history.serialize(&mut data).unwrap();
+    let validator_history_bytes = bytemuck::bytes_of(&validator_history);
+    data.extend_from_slice(&validator_history_bytes);
     for byte in ValidatorHistory::discriminator().into_iter().rev() {
         data.insert(0, byte);
     }
@@ -285,6 +286,7 @@ fn serialized_validator_history_account(validator_history: ValidatorHistory) -> 
         ..Account::default()
     }
 }
+
 
 #[tokio::test]
 async fn test_insert_missing_entries_wraparound() {

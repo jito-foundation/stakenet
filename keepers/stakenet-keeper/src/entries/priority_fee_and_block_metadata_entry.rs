@@ -75,7 +75,7 @@ impl UpdateInstruction for PriorityFeeAndBlockMetadataEntry {
                 total_priority_fees: self.total_priority_fees,
                 total_leader_slots: self.total_leader_slots,
                 blocks_produced: self.blocks_produced,
-                current_slot: self.update_slot,
+                highest_oracle_recorded_slot: self.update_slot,
             }
             .data(),
         }
