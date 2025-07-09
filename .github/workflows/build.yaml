@@ -86,7 +86,10 @@ jobs:
         run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-
+      - name: Install Solana CLI (beta)
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/beta/install)"
+          echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
       - name: Check for diff on IDL
