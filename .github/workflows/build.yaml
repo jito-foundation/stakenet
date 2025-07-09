@@ -71,7 +71,7 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-02-04
+          toolchain: 1.84.1
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
