@@ -4,11 +4,11 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
-    MerkleRootUploadAuthority, ValidatorHistoryEntry,
+    MerkleRootUploadAuthority,
 };
 
 use jito_priority_fee_distribution::{
-    state::PriorityFeeDistributionAccount, ID as PRIORITY_FEE_DIST_PROGRAM_ID,
+    state::PriorityFeeDistributionAccount
 };
 
 #[derive(Accounts)]

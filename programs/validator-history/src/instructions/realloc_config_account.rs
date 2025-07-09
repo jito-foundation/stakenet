@@ -57,12 +57,12 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
         Config::try_deserialize(&mut &data[..])?
     };
 
-    let should_set_priority_fee_distribution_account = config.priority_fee_distribution_program.eq(&Pubkey::default());
+    let should_set_priority_fee_distribution_program = config.priority_fee_distribution_program.eq(&Pubkey::default());
     let should_set_priority_fee_oracle_authority = config.priority_fee_oracle_authority.eq(&Pubkey::default());
 
-    if should_set_priority_fee_distribution_account || should_set_priority_fee_oracle_authority {
+    if should_set_priority_fee_distribution_program || should_set_priority_fee_oracle_authority {
 
-        if should_set_priority_fee_distribution_account {
+        if should_set_priority_fee_distribution_program {
             config.priority_fee_distribution_program = PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID;
         }
 
