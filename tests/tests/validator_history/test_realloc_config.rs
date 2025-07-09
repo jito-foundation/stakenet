@@ -1,5 +1,5 @@
-use anchor_lang::{system_program, InstructionData, ToAccountMetas};
-use borsh::BorshDeserialize;
+use anchor_lang::{system_program, InstructionData, ToAccountMetas, Discriminator};
+use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program_test::*;
 
 use solana_sdk::{
@@ -13,10 +13,11 @@ use jito_priority_fee_distribution::{
      ID as PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
 };
 
+use std::str::FromStr;
 use tests::{steward_fixtures::system_account, validator_history_fixtures::TestFixture};
 use validator_history::Config;
 
-#[derive(BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 struct OldConfig {
     pub tip_distribution_program: Pubkey,
     pub admin: Pubkey,
@@ -36,16 +37,24 @@ async fn test_realloc_config_happy_path() {
     ctx.borrow_mut()
         .set_account(&random_payer.pubkey(), &system_account(10000000).into());
 
+    // Create an old config structure that doesn't have priority_fee_oracle_authority
+    let old_config = OldConfig {
+        tip_distribution_program: Pubkey::from_str("4R3gSG8BpU4t19KYj8CfnbtRpnT8gtk4dvTHxVRwc2r7").unwrap(),
+        admin: Pubkey::from_str("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib").unwrap(),
+        oracle_authority: Pubkey::from_str("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt").unwrap(),
+        counter: 12,
+        bump: 248,
+    };
+
+    let mut old_data = vec![];
+    let discriminator_bytes = Config::DISCRIMINATOR.to_vec();
+    let config_bytes = old_config.try_to_vec().unwrap();
+    
+    old_data.extend(&discriminator_bytes);
+    old_data.extend(&config_bytes);
+
     // Override and set the config account to be like an old config. This allows the test
     // to guard against old values being zeroed and anchor trying to deserialize a smaller account.
-    let old_data = vec![
-        155, 12, 170, 224, 30, 250, 204, 130, 50, 188, 7, 199, 253, 229, 63, 44, 159, 69, 138, 232,
-        81, 242, 88, 42, 158, 196, 251, 0, 10, 135, 214, 103, 196, 119, 15, 22, 209, 209, 252, 156,
-        69, 30, 61, 213, 13, 59, 123, 133, 54, 4, 92, 43, 122, 194, 236, 37, 148, 115, 235, 194,
-        90, 227, 188, 190, 31, 190, 177, 125, 82, 251, 199, 190, 169, 202, 56, 195, 181, 73, 237,
-        112, 140, 152, 55, 180, 250, 179, 224, 36, 3, 89, 36, 25, 203, 32, 61, 151, 43, 195, 71,
-        78, 205, 193, 106, 112, 151, 12, 0, 0, 248, 0, 0, 0,
-    ];
     let old_config_account = Account {
         lamports: 1_670_400,
         owner: validator_history::id(),
@@ -57,8 +66,6 @@ async fn test_realloc_config_happy_path() {
         &fixture.validator_history_config,
         &old_config_account.into(),
     );
-    let mut data: &[u8] = &old_data[8..];
-    let old_config = OldConfig::deserialize(&mut data).unwrap();
 
     // TX to re-alloc the config account
     let instruction = Instruction {
