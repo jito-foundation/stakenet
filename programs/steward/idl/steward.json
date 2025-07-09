@@ -2508,6 +2508,13 @@
             "type": "bool"
           },
           {
+            "name": "is_bad_priority_fee_merkle_root_upload_authority",
+            "docs": [
+              "Checks if validator has an unacceptable priority fee merkle root upload authority"
+            ],
+            "type": "bool"
+          },
+          {
             "name": "vote_account",
             "type": "pubkey"
           },
@@ -2611,6 +2618,9 @@
       "type": {
         "kind": "enum",
         "variants": [
+          {
+            "name": "Unset"
+          },
           {
             "name": "Empty"
           },
@@ -3052,6 +3062,13 @@
             "docs": [
               "If validator has realized priority fee commissions > config limits over a lookback range,",
               "score 0."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "priority_fee_merkle_root_upload_authority_score",
+            "docs": [
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
             ],
             "type": "f64"
           }
@@ -3688,11 +3705,22 @@
             "type": "u64"
           },
           {
+            "name": "priority_fee_merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                48
+                47
               ]
             }
           }

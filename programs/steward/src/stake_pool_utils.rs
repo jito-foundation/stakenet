@@ -2,6 +2,8 @@ use std::ops::Deref;
 
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
+#[cfg(feature = "idl-build")]
+use anchor_lang::IdlBuild;
 
 use anchor_lang::{
     prelude::{AccountInfo, ProgramError, Pubkey},
