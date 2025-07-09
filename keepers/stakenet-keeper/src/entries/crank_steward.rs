@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
-use jito_steward::utils::{StakePool, ValidatorList};
+use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
 
 use solana_client::nonblocking::rpc_client::RpcClient;
