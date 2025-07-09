@@ -463,79 +463,79 @@ mod test_calculate_superminority {
     }
 }
 
-// mod test_calculate_blacklist {
-//     use super::*;
+mod test_calculate_blacklist {
+    use super::*;
 
-//     #[test]
-//     fn test_normal() {
-//         let mut config = create_config(300, 8, 10);
-//         config.validator_history_blacklist.set(5, true).unwrap();
+    #[test]
+    fn test_normal() {
+        let mut config = create_config(300, 8, 10);
+        config.validator_history_blacklist.set(5, true).unwrap();
 
-//         let score = calculate_blacklist(&config, 5).unwrap();
-//         assert_eq!(score, 0.0);
+        let score = calculate_blacklist(&config, 5).unwrap();
+        assert_eq!(score, 0.0);
 
-//         let score = calculate_blacklist(&config, 6).unwrap();
-//         assert_eq!(score, 1.0);
-//     }
+        let score = calculate_blacklist(&config, 6).unwrap();
+        assert_eq!(score, 1.0);
+    }
 
-//     #[test]
-//     fn test_edge_cases() {
-//         let config = create_config(300, 8, 10);
+    #[test]
+    fn test_edge_cases() {
+        let config = create_config(300, 8, 10);
 
-//         // Index out of bounds
-//         let result = calculate_blacklist(&config, u32::MAX);
-//         assert!(result.is_err());
-//     }
-// }
+        // Index out of bounds
+        let result = calculate_blacklist(&config, u32::MAX);
+        assert!(result.is_err());
+    }
+}
 
-// mod test_calculate_merkle_root_authoirty {
-//     use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
+mod test_calculate_merkle_root_authoirty {
+    use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
 
-//     use super::*;
+    use super::*;
 
-//     #[test]
-//     fn test_normal() {
-//         let mut validator = create_validator_history(
-//             &[100; 10],
-//             &[5; 10],
-//             &[1000; 10],
-//             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-//             &[0; 10],
-//             &[0; 10],
-//         );
+    #[test]
+    fn test_normal() {
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
+        );
 
-//         // When using MerkleRootUploadAuthority::Other it should be a 0 score always
-//         validator.history.push(ValidatorHistoryEntry {
-//             merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
-//             ..Default::default()
-//         });
-//         let score = calculate_merkle_root_authority(&validator).unwrap();
-//         assert_eq!(score, 0.0);
+        // When using MerkleRootUploadAuthority::Other it should be a 0 score always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator).unwrap();
+        assert_eq!(score, 0.0);
 
-//         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
-//         validator.history.push(ValidatorHistoryEntry {
-//             merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
-//             ..Default::default()
-//         });
-//         let score = calculate_merkle_root_authority(&validator).unwrap();
-//         assert_eq!(score, 1.0);
-//         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
-//         validator.history.push(ValidatorHistoryEntry {
-//             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
-//             ..Default::default()
-//         });
-//         let score = calculate_merkle_root_authority(&validator).unwrap();
-//         assert_eq!(score, 1.0);
-//     }
+        // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator).unwrap();
+        assert_eq!(score, 1.0);
+        // MerkleRootUploadAuthority::TipRouter returns score of 1 always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
 
-//     #[test]
-//     fn test_edge_cases() {
-//         // Empty history
-//         let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
-//         let score = calculate_merkle_root_authority(&validator).unwrap();
-//         assert_eq!(score, 1.0);
-//     }
-// }
+    #[test]
+    fn test_edge_cases() {
+        // Empty history
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[]);
+        let score = calculate_merkle_root_authority(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+}
 
 mod test_calculate_realized_commission_bps {
     use jito_steward::constants::BASIS_POINTS_MAX;
