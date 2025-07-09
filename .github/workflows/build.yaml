@@ -83,13 +83,9 @@ jobs:
           crate: anchor-cli
           version: "0.31.1"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.solana.com/v1.18.11/install)"
+        run: sh -c "$(curl -sSfL https://release.solana.com/v2.2.1/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-      - name: Install Solana CLI (beta)
-        run: |
-          sh -c "$(curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev)"
-          echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
       - name: Check for diff on IDL
