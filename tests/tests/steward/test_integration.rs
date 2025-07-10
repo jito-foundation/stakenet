@@ -7,7 +7,7 @@ use anchor_lang::{
 };
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config, Delegation, StewardStateAccount, StewardStateEnum, UpdateParametersArgs,
 };
 use solana_program_test::*;
@@ -19,13 +19,13 @@ use spl_stake_pool::{
     minimum_delegation,
     state::{AccountType, ValidatorListHeader, ValidatorStakeInfo},
 };
-use tests::steward_fixtures::{
+use tests::{stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account}, steward_fixtures::{
     cluster_history_default, new_vote_account, serialized_cluster_history_account,
-    serialized_config, serialized_stake_account, serialized_stake_pool_account,
+    serialized_config, serialized_stake_account,
     serialized_steward_state_account, serialized_validator_history_account,
-    serialized_validator_history_config, serialized_validator_list_account,
+    serialized_validator_history_config,
     validator_history_default, TestFixture,
-};
+}};
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
     Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,

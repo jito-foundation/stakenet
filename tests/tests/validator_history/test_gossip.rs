@@ -7,7 +7,8 @@ use ed25519_dalek::Signer as Ed25519Signer;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use solana_gossip::{
     contact_info::ContactInfo,
-    crds_value::{CrdsData, NodeInstance, Version},
+    crds_data::CrdsData,
+    crds_value::{NodeInstance, Version},
     legacy_contact_info::LegacyContactInfo,
 };
 use solana_program_test::*;

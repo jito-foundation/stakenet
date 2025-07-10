@@ -6,7 +6,7 @@ use anchor_lang::{
 };
 use jito_steward::{
     instructions::AuthorityType,
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config, StewardStateAccount,
 };
 use solana_program_test::*;
@@ -21,11 +21,11 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use spl_stake_pool::state::StakeStatus;
-use tests::steward_fixtures::{
+use tests::{stake_pool_utils::serialized_validator_list_account, steward_fixtures::{
     closed_vote_account, crank_epoch_maintenance, crank_stake_pool, manual_remove_validator,
     new_vote_account, serialized_stake_account, serialized_validator_history_account,
-    serialized_validator_list_account, system_account, validator_history_default, TestFixture,
-};
+    system_account, validator_history_default, TestFixture,
+}};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 async fn _auto_add_validator_to_pool(fixture: &TestFixture, vote_account: &Pubkey) {

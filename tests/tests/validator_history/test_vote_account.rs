@@ -275,8 +275,8 @@ fn serialized_validator_history_account(validator_history: ValidatorHistory) -> 
     let mut data = vec![];
     let validator_history_bytes = bytemuck::bytes_of(&validator_history);
     data.extend_from_slice(&validator_history_bytes);
-    for byte in ValidatorHistory::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in ValidatorHistory::DISCRIMINATOR.into_iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 1_000_000_000,
