@@ -23,7 +23,6 @@ regex = "1.10"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 solana-account-decoder = { workspace = true }
 solana-bincode = { workspace = true }
-solana-clap-utils = { workspace = true }
 solana-client = { workspace = true }
 solana-gossip = { workspace = true }
 solana-metrics = { workspace = true }
