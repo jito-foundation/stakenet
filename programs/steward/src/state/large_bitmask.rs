@@ -12,6 +12,7 @@ use crate::errors::StewardError;
 //We are allocating at this size to handle future growth of ValidatorHistory accounts, at 2800 in June 2024
 const LARGE_BITMASK_INDEXES: usize = 20_000;
 
+#[allow(clippy::identity_op)]
 #[allow(clippy::integer_division)]
 const LARGE_BITMASK: usize = (LARGE_BITMASK_INDEXES + 64 - 1) / 64; // ceil(LARGE_BITMASK_INDEXES / 64)
 

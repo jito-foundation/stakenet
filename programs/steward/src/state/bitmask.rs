@@ -3,6 +3,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 
 use crate::{constants::MAX_VALIDATORS, errors::StewardError};
 
+#[allow(clippy::identity_op)]
 #[allow(clippy::integer_division)]
 const BITMASK_SIZE: usize = (MAX_VALIDATORS + 64 - 1) / 64; // ceil(MAX_VALIDATORS / 64)
 
