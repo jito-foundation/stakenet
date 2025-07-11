@@ -101,6 +101,7 @@ jobs:
         run: git diff -- programs --exit-code
 
       # run verified build
+      - run: git checkout $(git rev-parse --abbrev-ref HEAD) -- Cargo.lock
       - run: solana-verify build --library-name validator_history
 
       - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
