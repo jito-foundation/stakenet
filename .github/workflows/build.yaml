@@ -64,7 +64,7 @@ jobs:
         with:
           crate: cargo-udeps
           version: "0.1.45"
-      - run: cargo udeps --all-features --all-targets --tests
+      - run: cargo +nightly udeps --all-features --all-targets --tests
 
   verified_build:
     name: verified_build
