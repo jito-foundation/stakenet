@@ -329,7 +329,7 @@ impl TestFixture {
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
-        let mut ctx = self.ctx.borrow_mut();
+        let ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx
             .banks_client
             .process_transaction_with_preflight(transaction)
@@ -351,7 +351,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
-            println!("{} {}", e.to_string(), error_message);
+            println!("{} {}", e, error_message);
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);

@@ -1,3 +1,5 @@
+#![allow(clippy::await_holding_refcell_ref)]
+
 use anchor_lang::{system_program, Discriminator, InstructionData, ToAccountMetas};
 use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program_test::*;
@@ -14,6 +16,7 @@ use solana_sdk::{
 use std::str::FromStr;
 use tests::{steward_fixtures::system_account, validator_history_fixtures::TestFixture};
 use validator_history::Config;
+
 
 #[derive(BorshSerialize, BorshDeserialize)]
 struct OldConfig {
@@ -98,7 +101,7 @@ async fn test_realloc_with_actual_current_config() {
         .load_and_deserialize(&fixture.validator_history_config)
         .await;
     assert!(config_account_data_after.len() > old_data.len());
-    assert_eq!(config_account_data_after.len(), Config::SIZE as usize);
+    assert_eq!(config_account_data_after.len(), Config::SIZE);
 
     // Validate the old config account data did not change
     assert_eq!(
@@ -198,7 +201,7 @@ async fn test_realloc_config_happy_path() {
         .load_and_deserialize(&fixture.validator_history_config)
         .await;
     assert!(config_account_data_after.len() > old_data.len());
-    assert_eq!(config_account_data_after.len(), Config::SIZE as usize);
+    assert_eq!(config_account_data_after.len(), Config::SIZE);
 
     // Validate the old config account data did not change
     assert_eq!(

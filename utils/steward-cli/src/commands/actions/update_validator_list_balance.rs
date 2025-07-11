@@ -5,10 +5,11 @@ use solana_sdk::{
     commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
     signer::Signer, transaction::Transaction,
 };
-use spl_stake_pool::instruction::update_validator_list_balance;
 use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
-use crate::commands::command_args::UpdateValidatorListBalance;
+use crate::commands::{command_args::UpdateValidatorListBalance};
+#[allow(deprecated)]
+use spl_stake_pool::instruction::update_validator_list_balance;
 
 pub async fn command_update_validator_list_balance(
     client: &Arc<RpcClient>,
@@ -31,6 +32,7 @@ pub async fn command_update_validator_list_balance(
         [args.validator_list_index as usize]
         .vote_account_address;
 
+    #[allow(deprecated)]
     let instruction = update_validator_list_balance(
         &spl_stake_pool::id(),
         &stake_pool,

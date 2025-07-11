@@ -274,8 +274,8 @@ async fn test_insert_missing_entries_compute() {
 fn serialized_validator_history_account(validator_history: ValidatorHistory) -> Account {
     let mut data = vec![];
     let validator_history_bytes = bytemuck::bytes_of(&validator_history);
-    data.extend_from_slice(&validator_history_bytes);
-    for byte in ValidatorHistory::DISCRIMINATOR.into_iter().rev() {
+    data.extend_from_slice(validator_history_bytes);
+    for byte in ValidatorHistory::DISCRIMINATOR.iter().rev() {
         data.insert(0, *byte);
     }
     Account {

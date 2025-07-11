@@ -178,7 +178,7 @@ impl DBSlotInfo {
                 let vote_key = entry.1.to_string();
 
                 write_counter += 1;
-                transaction.execute(&sql, params![vote_key, epoch, identity_key])?;
+                transaction.execute(sql, params![vote_key, epoch, identity_key])?;
             }
             transaction.commit()?;
             transaction = connection.transaction()?;
@@ -190,7 +190,7 @@ impl DBSlotInfo {
 
     pub fn upsert_block_data(
         connection: &mut Connection,
-        entries: &Vec<(u64, u64)>, // slot, priority_fees
+        entries: &[(u64, u64)], // slot, priority_fees
         chunk_size: Option<usize>,
     ) -> Result<u64, BlockMetadataKeeperError> {
         let chunk_size = chunk_size.unwrap_or(50);
@@ -207,7 +207,7 @@ impl DBSlotInfo {
 
                 write_counter += 1;
                 transaction.execute(
-                    &sql,
+                    sql,
                     params![priority_fees, DBSlotInfoState::Done as u8, slot],
                 )?;
             }
@@ -229,7 +229,7 @@ impl DBSlotInfo {
          WHERE absolute_slot = ? AND state = ?";
 
         connection.execute(
-            &sql,
+            sql,
             params![
                 0,
                 DBSlotInfoState::BlockDNE as u8,
@@ -252,7 +252,7 @@ impl DBSlotInfo {
          WHERE absolute_slot = ? AND state = ?";
 
         connection.execute(
-            &sql,
+        sql,
             params![
                 0,
                 DBSlotInfoState::Error as u8,
@@ -308,7 +308,7 @@ impl DBSlotInfo {
         // Execute query with parameters
         let slot_results = statement.query_map(
             params![DBSlotInfoState::Created as u8, current_slot],
-            |row| Ok(row.get::<_, u64>(0)?),
+            |row| row.get::<_, u64>(0),
         )?;
 
         // Collect results into a Vec<u64>
@@ -339,7 +339,7 @@ impl DBSlotInfo {
 
         // Execute query with the epoch parameter
         let vote_key_results =
-            statement.query_map(params![epoch], |row| Ok(row.get::<_, String>(0)?))?;
+            statement.query_map(params![epoch], |row| row.get::<_, String>(0))?;
 
         // Collect results into a Vec<String>
         let mut vote_keys = Vec::new();
@@ -365,7 +365,7 @@ impl DBSlotInfo {
 
         // Execute query with the epoch parameter
         let absolute_slot_results =
-            statement.query_map(params![epoch], |row| Ok(row.get::<_, u64>(0)?))?;
+            statement.query_map(params![epoch], |row| row.get::<_, u64>(0))?;
 
         // Collect results into a Vec<String>
         let mut absolute_slots = Vec::new();

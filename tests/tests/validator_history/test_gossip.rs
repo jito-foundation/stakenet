@@ -11,12 +11,12 @@ use solana_gossip::{
     legacy_contact_info::LegacyContactInfo,
 };
 use solana_program_test::*;
+#[allow(deprecated)]
 use solana_sdk::{
     clock::Clock,
     ed25519_instruction::{
         new_ed25519_instruction, DATA_START, PUBKEY_SERIALIZED_SIZE, SIGNATURE_SERIALIZED_SIZE,
     },
-    signature::Keypair,
     signer::Signer,
     transaction::Transaction,
 };
@@ -33,6 +33,7 @@ fn create_gossip_tx(fixture: &TestFixture, crds_data: &CrdsData) -> Transaction 
         ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
 
     // create ed25519 instruction
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(crds_data).unwrap());
 
     // create CopyGossipContactInfo instruction
@@ -148,6 +149,7 @@ async fn test_copy_legacy_version() {
         ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
 
     // create ed25519 instruction
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
 
     // create CopyGossipContactInfo instruction
@@ -234,6 +236,7 @@ async fn test_gossip_wrong_signer() {
     // cranker keypair instead of node identity keypair
     let dalek_keypair = ed25519_dalek::Keypair::from_bytes(&fixture.keypair.to_bytes()).unwrap();
 
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
 
     let instruction = Instruction {
@@ -347,7 +350,7 @@ async fn test_gossip_timestamps() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let mut banks_client = {
+    let banks_client = {
         let ctx = fixture.ctx.borrow_mut();
         ctx.banks_client.clone()
     };
@@ -451,8 +454,8 @@ async fn test_fake_offsets() {
     contact_info
         .set_socket(0, SocketAddr::new(ip, 1234))
         .expect("could not set socket");
-    let crds_data = CrdsData::ContactInfo(contact_info.clone());
 
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&[0u8; 10]).unwrap());
 
     // Invalid instruction
@@ -510,12 +513,6 @@ async fn test_fake_offsets() {
     debug_assert_eq!(instruction_data.len(), message_data_offset);
 
     instruction_data.extend_from_slice(&message);
-
-    let fake_instruction: Instruction = Instruction {
-        program_id: solana_sdk::ed25519_program::id(),
-        accounts: vec![],
-        data: instruction_data,
-    };
 
     let copy_gossip_ix = Instruction {
         program_id: validator_history::id(),

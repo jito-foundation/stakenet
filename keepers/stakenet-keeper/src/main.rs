@@ -263,17 +263,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // PRIORITY FEE BLOCK METADATA
-        if should_fire(tick, block_metadata_interval) {
-            if keeper_config
-                .priority_fee_oracle_authority_keypair
-                .is_some()
-            {
-                info!("Updating priority fee block metadata...");
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::block_metadata::operations::fire(&keeper_config, &keeper_state)
-                        .await,
-                );
-            }
+        if should_fire(tick, block_metadata_interval) && keeper_config
+            .priority_fee_oracle_authority_keypair
+            .is_some() {
+            info!("Updating priority fee block metadata...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::block_metadata::operations::fire(&keeper_config, &keeper_state)
+                    .await,
+            );
         }
 
         // ---------------------- EMIT ---------------------------------
@@ -366,7 +363,7 @@ async fn main() {
 
     let redundant_rpc_urls = args
         .redundant_rpc_urls
-        .map(|x| Arc::new(x.into_iter().map(|y| RpcClient::new(y)).collect()));
+        .map(|x| Arc::new(x.into_iter().map(RpcClient::new).collect()));
 
     let connection = Connection::open(args.sqlite_path.clone()).unwrap();
     create_sqlite_tables(&connection).expect("SQLite tables created");
