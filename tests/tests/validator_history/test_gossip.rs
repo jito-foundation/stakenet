@@ -61,7 +61,20 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
+    //let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
     let mut legacy_contact_info = LegacyContactInfo::default();
+    legacy_contact_info.id = fixture.identity_keypair.pubkey();
+    let dummy_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)), 1234);
+    legacy_contact_info.gossip = dummy_socket_addr;
+    legacy_contact_info.tvu = dummy_socket_addr;
+    legacy_contact_info.tvu_quic = dummy_socket_addr;
+    legacy_contact_info.serve_repair_quic = dummy_socket_addr;
+    legacy_contact_info.tpu = dummy_socket_addr;
+    legacy_contact_info.tpu_forwards = dummy_socket_addr;
+    legacy_contact_info.tpu_vote = dummy_socket_addr;
+    legacy_contact_info.rpc = dummy_socket_addr;
+    legacy_contact_info.rpc_pubsub = dummy_socket_addr;
+
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
@@ -370,6 +383,13 @@ async fn test_gossip_timestamps() {
     assert!(account.last_version_timestamp == wallclock + 1);
 
     let mut legacy_contact_info = LegacyContactInfo::default();
+    legacy_contact_info.id = fixture.identity_keypair.pubkey();
+    let dummy_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)), 1234);
+    legacy_contact_info.gossip = dummy_socket_addr;
+    legacy_contact_info.tvu = dummy_socket_addr;
+    legacy_contact_info.tvu_quic = dummy_socket_addr;
+    legacy_contact_info.serve_repair_quic = dummy_socket_addr;
+    legacy_contact_info.tpu = dummy_socket_addr;
     legacy_contact_info.set_wallclock(wallclock);
 
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info);
