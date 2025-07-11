@@ -1375,7 +1375,7 @@ pub struct ValidatorEpochStakeAggregation {
 
     // Indicates whether or not we've observed every validator (history) account
     // This provides finality of stake observations
-    pub finished: u8, /* boolean */
+    finished: u8, /* boolean */
     _padding0: [u8; 7],
 
     // Sorted validator stake amounts (ascending by amount)
@@ -1384,13 +1384,23 @@ pub struct ValidatorEpochStakeAggregation {
 
 impl ValidatorEpochStakeAggregation {
     pub const SEED: &'static [u8] = b"validator-epoch-stake-aggregation";
+    /// TODO: Total size of 80_032 bytes,
+    /// which will require an initial init instruction at max bytes plus 7 additional realloc calls to initialize
     pub const SIZE: usize = 8 + size_of::<Self>();
 
     /// Resets aggregation for new epoch
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.length = 0;
         self.finished = 0;
         self.stake_buffer = [ValidatorStake::default(); MAX_VALIDATORS];
+    }
+
+    pub fn set_finished(&mut self) {
+        self.finished = 1;
+    }
+
+    pub fn finished(&self) -> bool {
+        self.finished == 1
     }
 }
 
