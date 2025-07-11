@@ -4,6 +4,8 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
+use crate::constants::MAX_VALIDATORS;
+
 use {
     crate::{
         constants::TVC_MULTIPLIER,
@@ -1351,6 +1353,44 @@ impl ClusterHistory {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Default, PartialEq)]
+#[zero_copy]
+pub struct ValidatorStake {
+    pub validator_id: u64,
+    pub stake_amount: u64,
+}
+
+#[derive(BorshSerialize)]
+#[account(zero_copy)]
+pub struct ValidatorEpochStakeAggregation {
+    // Most recent epoch observed when aggregating stake amounts
+    // If this doesn't equal the current epoch, reset
+    pub last_observed_epoch: u64,
+
+    // Length of the stake buffer (number of validator stake ammounts observed this epoch)
+    pub length: u64,
+
+    // Indicates whether or not we've observed every validator (history) account
+    // This provides finality of stake observations
+    pub finished: u8, /* boolean */
+    _padding0: [u8; 7],
+
+    // Sorted validator stake amounts (ascending by amount)
+    pub stake_buffer: [ValidatorStake; MAX_VALIDATORS],
+}
+
+impl ValidatorEpochStakeAggregation {
+    pub const SEED: &'static [u8] = b"validator-epoch-stake-aggregation";
+    pub const SIZE: usize = 8 + size_of::<Self>();
+
+    /// Resets aggregation for new epoch
+    fn reset(&mut self) {
+        self.length = 0;
+        self.finished = 0;
+        self.stake_buffer = [ValidatorStake::default(); MAX_VALIDATORS];
     }
 }
 
