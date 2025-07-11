@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          toolchain: 1.86.0
+          toolchain: 1.84.1
       - name: Install Protobuf Compiler
         run: |
           sudo apt-get update
@@ -45,8 +45,9 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-sort
-      - run: cargo +1.86.0 sort --workspace --check
-      - run: cargo +1.86.0 fmt --all --check
+          version: 1.0.9
+      - run: cargo sort --workspace --check
+      - run: cargo fmt --all --check
       - run: cargo clippy --all-features --all-targets --tests -- -D warnings
 
   udeps:
