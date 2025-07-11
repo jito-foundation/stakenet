@@ -141,8 +141,8 @@ jobs:
   test:
     name: test
     runs-on: big-runner-1
-    #needs:
-    #  - verified_build
+    needs:
+      - verified_build
     steps:
       - uses: actions/checkout@v4
         with:
