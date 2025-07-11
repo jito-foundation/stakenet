@@ -3,7 +3,7 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
-use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
+use validator_history::{constants::MAX_ALLOC_BYTES, Config, StakeAggregation, ValidatorHistory};
 
 #[tokio::test]
 async fn test_initialize() {
@@ -42,7 +42,6 @@ async fn test_initialize() {
     assert!(config.admin == test.keypair.pubkey());
 
     // Initialize validator history account
-
     let instruction = Instruction {
         program_id: validator_history::id(),
         accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
@@ -62,7 +61,38 @@ async fn test_initialize() {
     );
     test.submit_transaction_assert_success(transaction).await;
 
-    // Get account and Assert exists
+    // Initialize stake aggregation account
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::InitializeStakeAggregationAccount {
+            stake_aggregation_account: test.stake_aggregation_account,
+            system_program: anchor_lang::solana_program::system_program::id(),
+            signer: test.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeStakeAggregationAccount {}.data(),
+    };
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&test.keypair.pubkey()),
+        &[&test.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    test.submit_transaction_assert_success(transaction).await;
+
+    // Get stake aggregation account and assert exists and zero initialized
+    let account = ctx
+        .borrow_mut()
+        .banks_client
+        .get_account(test.stake_aggregation_account)
+        .await
+        .unwrap();
+    assert!(account.is_some());
+    let account = account.unwrap();
+    assert!(account.owner == validator_history::id());
+    assert!(account.data.len() == MAX_ALLOC_BYTES);
+
+    // Get validator history account and assert exists
     let account = ctx
         .borrow_mut()
         .banks_client
@@ -147,7 +177,7 @@ async fn test_initialize_fail() {
 }
 
 #[tokio::test]
-async fn test_extra_realloc() {
+async fn test_extra_realloc_validator_history() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;

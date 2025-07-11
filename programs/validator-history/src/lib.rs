@@ -60,6 +60,12 @@ pub mod validator_history {
         handle_initialize_cluster_history_account(ctx)
     }
 
+    pub fn initialize_stake_aggregation_account(
+        ctx: Context<InitializeStakeAggregationAccount>,
+    ) -> Result<()> {
+        handle_initialize_stake_aggregation_account(ctx)
+    }
+
     pub fn realloc_cluster_history_account(
         ctx: Context<ReallocClusterHistoryAccount>,
     ) -> Result<()> {

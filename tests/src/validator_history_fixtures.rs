@@ -27,6 +27,7 @@ pub struct TestFixture {
     pub vote_account: Pubkey,
     pub identity_keypair: Keypair,
     pub cluster_history_account: Pubkey,
+    pub stake_aggregation_account: Pubkey,
     pub validator_history_account: Pubkey,
     pub validator_history_config: Pubkey,
     pub tip_distribution_account: Pubkey,
@@ -78,6 +79,11 @@ impl TestFixture {
             &validator_history::id(),
         )
         .0;
+        let stake_aggregation_account = Pubkey::find_program_address(
+            &[validator_history::state::StakeAggregation::SEED],
+            &validator_history::id(),
+        )
+        .0;
         let keypair = Keypair::new();
         let priority_fee_oracle_keypair = Keypair::new();
 
@@ -99,6 +105,7 @@ impl TestFixture {
             validator_history_config,
             validator_history_account,
             cluster_history_account,
+            stake_aggregation_account,
             identity_keypair,
             vote_account,
             tip_distribution_account,
@@ -329,7 +336,7 @@ impl TestFixture {
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
-        let mut ctx = self.ctx.borrow_mut();
+        let ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx
             .banks_client
             .process_transaction_with_preflight(transaction)
