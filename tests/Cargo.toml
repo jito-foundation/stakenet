@@ -43,7 +43,7 @@ solana-sdk = { workspace = true }
 solana-version = { workspace = true }
 spl-associated-token-account = "7.0.0"
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
-spl-token = "4.0"
+spl-token = { version = "4.0", features = ["no-entrypoint"] }
 test-case = "3.3.1"
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
 validator-history-vote-state = { path = "../utils/vote-state" }
