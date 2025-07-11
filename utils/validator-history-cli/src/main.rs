@@ -247,6 +247,7 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
+#[allow(unused_variables)]
 fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
         "[NULL]".to_string()
@@ -340,21 +341,6 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     );
 
     return priority_fee_info;
-
-    format!(
-        "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
-        commission_str,
-        epoch_credits_str,
-        mev_commission_str,
-        mev_earned_str,
-        stake_str,
-        rank_str,
-        superminority_str,
-        ip_str,
-        client_type_str,
-        client_version_str,
-        last_update_slot
-    )
 }
 
 fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
