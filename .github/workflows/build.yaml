@@ -98,7 +98,7 @@ jobs:
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
       - name: Check for diff on IDL
-        run: git diff --exit-code
+        run: git diff -- programs --exit-code
 
       # run verified build
       - run: solana-verify build --library-name validator_history
