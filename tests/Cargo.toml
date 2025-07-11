@@ -41,7 +41,7 @@ solana-program = { workspace = true }
 solana-program-test = { workspace = true }
 solana-sdk = { workspace = true }
 solana-version = { workspace = true }
-spl-associated-token-account = "7.0.0"
+spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
 test-case = "3.3.1"
