@@ -47,7 +47,7 @@ jobs:
           crate: cargo-sort
       - run: cargo +1.84.1 sort --workspace --check
       - run: cargo +1.84.1 fmt --all --check
-      - run: cargo +1.84.1 clippy --all-features --all-targets --tests -- -D warnings
+      - run: cargo clippy --all-features --all-targets --tests -- -D warnings
 
   udeps:
     name: udeps

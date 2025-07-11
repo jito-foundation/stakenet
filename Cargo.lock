@@ -82,7 +82,7 @@ dependencies = [
 [[package]]
 name = "agave-transaction-view"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-hash",
  "solana-message",
@@ -5078,7 +5078,7 @@ dependencies = [
 [[package]]
 name = "solana-account-decoder"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -5132,7 +5132,7 @@ dependencies = [
 [[package]]
 name = "solana-account-decoder-client-types"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "base64 0.22.1",
  "bs58",
@@ -5209,7 +5209,7 @@ dependencies = [
 [[package]]
 name = "solana-accounts-db"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "bincode",
@@ -5299,7 +5299,7 @@ dependencies = [
 [[package]]
 name = "solana-address-lookup-table-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "bytemuck",
@@ -5417,7 +5417,7 @@ dependencies = [
 [[package]]
 name = "solana-bloom"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bv",
  "fnv",
@@ -5506,7 +5506,7 @@ dependencies = [
 [[package]]
 name = "solana-bpf-loader-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "libsecp256k1",
@@ -5574,7 +5574,7 @@ dependencies = [
 [[package]]
 name = "solana-bucket-map"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bv",
  "bytemuck",
@@ -5615,7 +5615,7 @@ dependencies = [
 [[package]]
 name = "solana-builtins"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-address-lookup-table-program 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
  "solana-bpf-loader-program 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
@@ -5659,7 +5659,7 @@ dependencies = [
 [[package]]
 name = "solana-builtins-default-costs"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "lazy_static",
@@ -5710,7 +5710,7 @@ dependencies = [
 [[package]]
 name = "solana-clap-utils"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "chrono",
  "clap 2.34.0",
@@ -5784,7 +5784,7 @@ dependencies = [
 [[package]]
 name = "solana-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-trait",
  "bincode",
@@ -5894,7 +5894,7 @@ dependencies = [
 [[package]]
 name = "solana-compute-budget"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-fee-structure",
  "solana-program-entrypoint",
@@ -5924,7 +5924,7 @@ dependencies = [
 [[package]]
 name = "solana-compute-budget-instruction"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "log",
  "solana-borsh",
@@ -5967,7 +5967,7 @@ dependencies = [
 [[package]]
 name = "solana-compute-budget-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "qualifier_attr",
  "solana-program-runtime 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
@@ -6000,7 +6000,7 @@ dependencies = [
 [[package]]
 name = "solana-config-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "chrono",
@@ -6047,7 +6047,7 @@ dependencies = [
 [[package]]
 name = "solana-connection-cache"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-trait",
  "bincode",
@@ -6099,7 +6099,7 @@ dependencies = [
 [[package]]
 name = "solana-cost-model"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "lazy_static",
@@ -6155,7 +6155,7 @@ dependencies = [
 [[package]]
 name = "solana-curve25519"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bytemuck",
  "bytemuck_derive",
@@ -6209,7 +6209,7 @@ dependencies = [
 [[package]]
 name = "solana-entry"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "crossbeam-channel",
@@ -6348,7 +6348,7 @@ dependencies = [
 [[package]]
 name = "solana-fee"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-feature-set",
  "solana-fee-structure",
@@ -6412,7 +6412,7 @@ dependencies = [
 [[package]]
 name = "solana-gossip"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -6513,7 +6513,7 @@ dependencies = [
 [[package]]
 name = "solana-inline-spl"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bytemuck",
  "solana-pubkey",
@@ -6613,7 +6613,7 @@ dependencies = [
 [[package]]
 name = "solana-lattice-hash"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -6624,7 +6624,7 @@ dependencies = [
 [[package]]
 name = "solana-ledger"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -6768,7 +6768,7 @@ dependencies = [
 [[package]]
 name = "solana-loader-v4-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "log",
  "qualifier_attr",
@@ -6802,7 +6802,7 @@ dependencies = [
 [[package]]
 name = "solana-log-collector"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "log",
 ]
@@ -6827,12 +6827,12 @@ checksum = "8f1fced2cfeff80f0214af86bc27bc6e798465a45b70329c3b468bb75957c082"
 [[package]]
 name = "solana-measure"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 
 [[package]]
 name = "solana-merkle-tree"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "fast-math",
  "solana-hash",
@@ -6883,7 +6883,7 @@ dependencies = [
 [[package]]
 name = "solana-metrics"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "crossbeam-channel",
  "gethostname",
@@ -6937,7 +6937,7 @@ dependencies = [
 [[package]]
 name = "solana-net-utils"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "anyhow",
  "bincode",
@@ -7052,7 +7052,7 @@ dependencies = [
 [[package]]
 name = "solana-perf"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "bincode",
@@ -7105,7 +7105,7 @@ dependencies = [
 [[package]]
 name = "solana-poseidon"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ark-bn254",
  "light-poseidon",
@@ -7328,7 +7328,7 @@ dependencies = [
 [[package]]
 name = "solana-program-runtime"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -7459,7 +7459,7 @@ dependencies = [
 [[package]]
 name = "solana-pubsub-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "crossbeam-channel",
  "futures-util",
@@ -7516,7 +7516,7 @@ dependencies = [
 [[package]]
 name = "solana-quic-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-lock",
  "async-trait",
@@ -7565,7 +7565,7 @@ dependencies = [
 [[package]]
 name = "solana-rayon-threadlimit"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "lazy_static",
  "num_cpus",
@@ -7598,7 +7598,7 @@ dependencies = [
 [[package]]
 name = "solana-remote-wallet"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "console",
  "dialoguer",
@@ -7721,7 +7721,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -7789,7 +7789,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client-api"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7836,7 +7836,7 @@ dependencies = [
 [[package]]
 name = "solana-rpc-client-nonce-utils"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-account",
  "solana-commitment-config",
@@ -7938,7 +7938,7 @@ dependencies = [
 [[package]]
 name = "solana-runtime"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "aquamarine",
@@ -8044,7 +8044,7 @@ dependencies = [
 [[package]]
 name = "solana-runtime-transaction"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "agave-transaction-view 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
  "log",
@@ -8440,7 +8440,7 @@ dependencies = [
 [[package]]
 name = "solana-stake-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "log",
@@ -8468,7 +8468,7 @@ dependencies = [
 [[package]]
 name = "solana-storage-bigtable"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "backoff",
  "bincode",
@@ -8509,7 +8509,7 @@ dependencies = [
 [[package]]
 name = "solana-storage-proto"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "bs58",
@@ -8580,7 +8580,7 @@ dependencies = [
 [[package]]
 name = "solana-streamer"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-channel",
  "bytes",
@@ -8671,7 +8671,7 @@ dependencies = [
 [[package]]
 name = "solana-svm"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "ahash 0.8.12",
  "itertools 0.12.1",
@@ -8724,7 +8724,7 @@ dependencies = [
 [[package]]
 name = "solana-svm-rent-collector"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-sdk",
 ]
@@ -8746,7 +8746,7 @@ dependencies = [
 [[package]]
 name = "solana-svm-transaction"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "solana-hash",
  "solana-message",
@@ -8801,7 +8801,7 @@ dependencies = [
 [[package]]
 name = "solana-system-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "log",
@@ -8917,7 +8917,7 @@ dependencies = [
 [[package]]
 name = "solana-thin-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "log",
@@ -8962,7 +8962,7 @@ dependencies = [
 [[package]]
 name = "solana-timings"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "eager",
  "enum-iterator",
@@ -8985,7 +8985,7 @@ dependencies = [
 [[package]]
 name = "solana-tls-utils"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "rustls 0.23.29",
  "solana-keypair",
@@ -9031,7 +9031,7 @@ dependencies = [
 [[package]]
 name = "solana-tpu-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-trait",
  "bincode",
@@ -9137,7 +9137,7 @@ dependencies = [
 [[package]]
 name = "solana-transaction-metrics-tracker"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -9194,7 +9194,7 @@ dependencies = [
 [[package]]
 name = "solana-transaction-status"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -9257,7 +9257,7 @@ dependencies = [
 [[package]]
 name = "solana-transaction-status-client-types"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "base64 0.22.1",
  "bincode",
@@ -9289,7 +9289,7 @@ dependencies = [
 [[package]]
 name = "solana-type-overrides"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "lazy_static",
  "rand 0.8.5",
@@ -9314,7 +9314,7 @@ dependencies = [
 [[package]]
 name = "solana-udp-client"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "async-trait",
  "solana-connection-cache 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
@@ -9342,7 +9342,7 @@ dependencies = [
 [[package]]
 name = "solana-unified-scheduler-logic"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "assert_matches",
  "solana-pubkey",
@@ -9374,7 +9374,7 @@ dependencies = [
 [[package]]
 name = "solana-version"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "semver",
  "serde",
@@ -9412,7 +9412,7 @@ dependencies = [
 [[package]]
 name = "solana-vote"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "itertools 0.12.1",
  "log",
@@ -9493,7 +9493,7 @@ dependencies = [
 [[package]]
 name = "solana-vote-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bincode",
  "log",
@@ -9541,7 +9541,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-elgamal-proof-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bytemuck",
  "num-derive",
@@ -9593,7 +9593,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-sdk"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
@@ -9646,7 +9646,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-token-proof-program"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "bytemuck",
  "num-derive",
@@ -9698,7 +9698,7 @@ dependencies = [
 [[package]]
 name = "solana-zk-token-sdk"
 version = "2.2.1"
-source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#e5f5ac4a964f382db05d1936466b02d027151e2c"
+source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#8c9665e99ef14206800cc7bbb69e97661145678c"
 dependencies = [
  "aes-gcm-siv",
  "base64 0.22.1",
