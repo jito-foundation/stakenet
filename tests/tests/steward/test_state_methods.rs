@@ -6,7 +6,8 @@
 
 */
 
-use anchor_lang::{error::Error, AnchorSerialize};
+use anchor_lang::error::Error;
+use crate::steward::serialize_validator_list;
 use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,

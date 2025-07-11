@@ -1,5 +1,5 @@
 // Unit tests for scoring, instant unstake, and delegation methods
-use anchor_lang::AnchorSerialize;
+use crate::steward::serialize_validator_list;
 use jito_steward::{
     constants::{
         EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
