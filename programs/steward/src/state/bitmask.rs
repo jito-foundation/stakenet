@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crate::{constants::MAX_VALIDATORS, errors::StewardError};
 
 #[allow(clippy::integer_division)]
-const BITMASK_SIZE: usize = (MAX_VALIDATORS + 64 - 1) / 64; // ceil(MAX_VALIDATORS / 64)
+const BITMASK_SIZE: usize = (MAX_VALIDATORS + 64 - 1).div_ceil(64); // ceil(MAX_VALIDATORS / 64)
 
 /// Data structure used to efficiently pack a binary array, primarily used to store all validators.
 /// Each validator has an index (its index in the spl_stake_pool::ValidatorList), corresponding to a bit in the bitmask.
