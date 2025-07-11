@@ -340,7 +340,7 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
         entry.total_leader_slots
     );
 
-    return priority_fee_info;
+    priority_fee_info
 }
 
 fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
@@ -622,6 +622,6 @@ fn main() {
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
-        Commands::GetConfig(args) => command_get_config(args, client),
+        Commands::GetConfig(_) => command_get_config(client),
     };
 }
