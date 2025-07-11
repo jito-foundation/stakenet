@@ -37,6 +37,10 @@ jobs:
         with:
           components: rustfmt, clippy
           toolchain: 1.84.1
+      - name: Install Protobuf Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler libudev-dev
       - name: Install cargo-sort from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
