@@ -21,10 +21,12 @@ use spl_stake_pool::{
     find_ephemeral_stake_program_address, instruction::PreferredValidatorType, minimum_delegation,
     state::StakeStatus,
 };
-use tests::{stake_pool_utils::serialized_stake_pool_account, steward_fixtures::{
-    new_vote_account, serialized_stake_account,
-    serialized_steward_state_account, TestFixture,
-}};
+use tests::{
+    stake_pool_utils::serialized_stake_pool_account,
+    steward_fixtures::{
+        new_vote_account, serialized_stake_account, serialized_steward_state_account, TestFixture,
+    },
+};
 
 // ------------------------ HELPERS ------------------------
 async fn _get_latest_blockhash(fixture: &TestFixture) -> solana_sdk::hash::Hash {

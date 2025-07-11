@@ -11,11 +11,14 @@ use jito_steward::{
 use solana_program_test::*;
 use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};
 use spl_stake_pool::state::{StakeStatus, ValidatorList as SPLValidatorList};
-use tests::{stake_pool_utils::serialized_validator_list_account, steward_fixtures::{
-    auto_add_validator, crank_epoch_maintenance, crank_stake_pool, manual_remove_validator,
-    ExtraValidatorAccounts, FixtureDefaultAccounts,
-    StateMachineFixtures, TestFixture, ValidatorEntry,
-}};
+use tests::{
+    stake_pool_utils::serialized_validator_list_account,
+    steward_fixtures::{
+        auto_add_validator, crank_epoch_maintenance, crank_stake_pool, manual_remove_validator,
+        ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures, TestFixture,
+        ValidatorEntry,
+    },
+};
 use validator_history::ValidatorHistory;
 
 async fn _epoch_maintenance_tx(

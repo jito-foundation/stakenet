@@ -36,14 +36,14 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          toolchain: nightly-2024-02-04
+          toolchain: 1.84.1
       - name: Install cargo-sort from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-sort
-      - run: cargo +nightly-2024-02-04 sort --workspace --check
-      - run: cargo +nightly-2024-02-04 fmt --all --check
-      - run: cargo +nightly-2024-02-04 clippy --all-features --all-targets --tests -- -D warnings
+      - run: cargo 1.84.1 sort --workspace --check
+      - run: cargo 1.84.1 fmt --all --check
+      - run: cargo 1.84.1 clippy --all-features --all-targets --tests -- -D warnings
 
   udeps:
     name: udeps
@@ -54,13 +54,13 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-02-04
+          toolchain: 1.84.1
       - name: Install cargo-udeps from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
           version: "0.1.45"
-      - run: cargo +nightly-2024-02-04 udeps --all-features --all-targets --tests
+      - run: cargo 1.84.1 udeps --all-features --all-targets --tests
 
   verified_build:
     name: verified_build
@@ -139,7 +139,7 @@ jobs:
           submodules: recursive
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2024-02-04
+          toolchain: 1.84.1
       - uses: actions/download-artifact@v4
         with:
           name: validator_history.so
