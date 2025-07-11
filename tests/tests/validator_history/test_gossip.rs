@@ -61,8 +61,6 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
-    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
-    // create legacycontactinfo as signed crdsdata struct
     let mut legacy_contact_info = LegacyContactInfo::default();
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
@@ -371,8 +369,6 @@ async fn test_gossip_timestamps() {
     assert!(account.last_ip_timestamp == wallclock + 1);
     assert!(account.last_version_timestamp == wallclock + 1);
 
-    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
-    // LegacyContactInfo with old wallclock
     let mut legacy_contact_info = LegacyContactInfo::default();
     legacy_contact_info.set_wallclock(wallclock);
 
@@ -417,7 +413,7 @@ async fn test_fake_offsets() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let mut banks_client = {
+    let banks_client = {
         let ctx = fixture.ctx.borrow_mut();
         ctx.banks_client.clone()
     };
