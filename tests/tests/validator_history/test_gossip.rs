@@ -16,6 +16,7 @@ use solana_sdk::{
     ed25519_instruction::{
         new_ed25519_instruction, DATA_START, PUBKEY_SERIALIZED_SIZE, SIGNATURE_SERIALIZED_SIZE,
     },
+    signature::Keypair,
     signer::Signer,
     transaction::Transaction,
 };
@@ -452,7 +453,7 @@ async fn test_fake_offsets() {
         .expect("could not set socket");
     let crds_data = CrdsData::ContactInfo(contact_info.clone());
 
-    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
+    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&[0u8; 10]).unwrap());
 
     // Invalid instruction
     let fake_ipv4 = Ipv4Addr::new(5, 5, 5, 5);
@@ -510,7 +511,7 @@ async fn test_fake_offsets() {
 
     instruction_data.extend_from_slice(&message);
 
-    let fake_instruction = Instruction {
+    let fake_instruction: Instruction = Instruction {
         program_id: solana_sdk::ed25519_program::id(),
         accounts: vec![],
         data: instruction_data,
@@ -530,7 +531,7 @@ async fn test_fake_offsets() {
     };
 
     let transaction = Transaction::new_signed_with_payer(
-        &[ed25519_ix, fake_instruction, copy_gossip_ix],
+        &[ed25519_ix, copy_gossip_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,
