@@ -36,11 +36,11 @@ rand_chacha = "0.3.1"
 semver = "1.0.17"
 serde = "1.0.183"
 serde_derive = "1.0.183"
-solana-gossip = "2.2"
-solana-program = "2.2"
-solana-program-test = "2.2"
-solana-sdk = "2.2"
-solana-version = "2.2"
+solana-gossip = { workspace = true }
+solana-program = { workspace = true }
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+solana-version = { workspace = true }
 spl-associated-token-account = "7.0.0"
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 spl-token = "4.0"

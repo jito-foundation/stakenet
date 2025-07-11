@@ -7,7 +7,7 @@ use ed25519_dalek::Signer as Ed25519Signer;
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use solana_gossip::{
     contact_info::ContactInfo,
-    crds_value::{CrdsData, NodeInstance, Version},
+    crds_data::{CrdsData, NodeInstance, Version},
     legacy_contact_info::LegacyContactInfo,
 };
 use solana_program_test::*;
@@ -61,10 +61,7 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
-    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
-    // create legacycontactinfo as signed crdsdata struct
-    let mut legacy_contact_info =
-        LegacyContactInfo::new_rand(&mut rng, Some(fixture.identity_keypair.pubkey()));
+    let mut legacy_contact_info = LegacyContactInfo::default();
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
@@ -372,10 +369,7 @@ async fn test_gossip_timestamps() {
     assert!(account.last_ip_timestamp == wallclock + 1);
     assert!(account.last_version_timestamp == wallclock + 1);
 
-    let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
-    // LegacyContactInfo with old wallclock
-    let mut legacy_contact_info =
-        LegacyContactInfo::new_rand(&mut rng, Some(fixture.identity_keypair.pubkey()));
+    let mut legacy_contact_info = LegacyContactInfo::default();
     legacy_contact_info.set_wallclock(wallclock);
 
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info);
@@ -419,7 +413,7 @@ async fn test_fake_offsets() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let mut banks_client = {
+    let banks_client = {
         let ctx = fixture.ctx.borrow_mut();
         ctx.banks_client.clone()
     };

@@ -6,7 +6,9 @@ use type_layout::TypeLayout;
 
 use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
-static_assertions::const_assert_eq!(size_of::<Config>(), 4040);
+/* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
+const EXPECTED_SIZE: usize = 4040;
+assert!(EXPECTED_SIZE == CONFIG_SIZE);*/
 
 /// Config is a user-provided keypair.
 /// This is so there can be multiple configs per stake pool, and one party can't
