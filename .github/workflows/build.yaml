@@ -153,8 +153,8 @@ jobs:
           sudo apt-get install -y protobuf-compiler libudev-dev
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.86.0
-      - uses: actions/download-artifact@v4
+          toolchain: 1.84.1
+      - uses: actions/download-artifact@v4cargo +1.84.1 test --package tests --all-features --color auto
         with:
           name: validator_history.so
           path: target/deploy/
@@ -166,7 +166,7 @@ jobs:
         run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
         shell: bash
       - name: cargo test
-        run: cargo +nightly-2024-11-19 test --package tests --all-features --color auto
+        run: cargo +1.84.1 test --package tests --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
