@@ -13,7 +13,7 @@ dotenv = "0.15.0"
 env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
-jito-priority-fee-distribution = { features = ["no-entrypoint"] ,workspace = true }
+jito-priority-fee-distribution = { features = ["no-entrypoint"], workspace = true }
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
 jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
 jito-tip-distribution-sdk = { workspace = true }
