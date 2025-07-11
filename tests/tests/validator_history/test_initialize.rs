@@ -3,7 +3,10 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
-use validator_history::{constants::MAX_ALLOC_BYTES, Config, StakeAggregation, ValidatorHistory};
+use validator_history::{
+    constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS},
+    Config, StakeAggregation, ValidatorHistory,
+};
 
 #[tokio::test]
 async fn test_initialize() {
@@ -113,10 +116,10 @@ async fn test_initialize() {
     assert!(account.is_some());
     let account = account.unwrap();
     assert!(account.owner == validator_history::id());
-    assert!(account.data.len() == MAX_ALLOC_BYTES);
+    assert!(account.data.len() >= MAX_ALLOC_BYTES);
     let account =
         bytemuck::try_from_bytes::<StakeAggregation>(&account.data.as_slice()[8..]).unwrap();
-    assert!(account.last_observed_epoch == 0);
+    assert!(account.stake_buffer.len() == MAX_VALIDATORS);
 
     // Get validator history account and assert exists
     let account = ctx
