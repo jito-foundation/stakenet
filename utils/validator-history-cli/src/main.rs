@@ -593,7 +593,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
-fn command_get_config(args: GetConfig, client: RpcClient) {
+fn command_get_config(client: RpcClient) {
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
 
     let config_account_raw = client.get_account(&config_pda).unwrap();
