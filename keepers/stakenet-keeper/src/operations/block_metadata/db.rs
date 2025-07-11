@@ -252,7 +252,7 @@ impl DBSlotInfo {
          WHERE absolute_slot = ? AND state = ?";
 
         connection.execute(
-        sql,
+            sql,
             params![
                 0,
                 DBSlotInfoState::Error as u8,

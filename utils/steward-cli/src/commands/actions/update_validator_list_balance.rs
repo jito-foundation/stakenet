@@ -7,7 +7,7 @@ use solana_sdk::{
 };
 use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
-use crate::commands::{command_args::UpdateValidatorListBalance};
+use crate::commands::command_args::UpdateValidatorListBalance;
 #[allow(deprecated)]
 use spl_stake_pool::instruction::update_validator_list_balance;
 

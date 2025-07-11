@@ -263,13 +263,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         // PRIORITY FEE BLOCK METADATA
-        if should_fire(tick, block_metadata_interval) && keeper_config
-            .priority_fee_oracle_authority_keypair
-            .is_some() {
+        if should_fire(tick, block_metadata_interval)
+            && keeper_config
+                .priority_fee_oracle_authority_keypair
+                .is_some()
+        {
             info!("Updating priority fee block metadata...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::block_metadata::operations::fire(&keeper_config, &keeper_state)
-                    .await,
+                operations::block_metadata::operations::fire(&keeper_config, &keeper_state).await,
             );
         }
 

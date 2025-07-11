@@ -17,7 +17,6 @@ use std::str::FromStr;
 use tests::{steward_fixtures::system_account, validator_history_fixtures::TestFixture};
 use validator_history::Config;
 
-
 #[derive(BorshSerialize, BorshDeserialize)]
 struct OldConfig {
     pub tip_distribution_program: Pubkey,
