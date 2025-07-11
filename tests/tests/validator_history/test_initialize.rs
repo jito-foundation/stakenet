@@ -80,6 +80,29 @@ async fn test_initialize() {
     );
     test.submit_transaction_assert_success(transaction).await;
 
+    // Realloc stake aggregation account
+    let num_reallocs = (StakeAggregation::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    let ixs = vec![
+        Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::ReallocStakeAggregationAccount {
+                stake_aggregation_account: test.stake_aggregation_account,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: test.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::ReallocStakeAggregationAccount {}.data(),
+        };
+        num_reallocs
+    ];
+    let transaction = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&test.keypair.pubkey()),
+        &[&test.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    test.submit_transaction_assert_success(transaction).await;
+
     // Get stake aggregation account and assert exists and zero initialized
     let account = ctx
         .borrow_mut()
@@ -91,6 +114,9 @@ async fn test_initialize() {
     let account = account.unwrap();
     assert!(account.owner == validator_history::id());
     assert!(account.data.len() == MAX_ALLOC_BYTES);
+    let account =
+        bytemuck::try_from_bytes::<StakeAggregation>(&account.data.as_slice()[8..]).unwrap();
+    assert!(account.last_observed_epoch == 0);
 
     // Get validator history account and assert exists
     let account = ctx
