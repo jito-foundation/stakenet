@@ -2,8 +2,9 @@ use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::events::AutoAddValidatorEvent;
 use crate::state::{Config, StewardStateAccount};
-use crate::utils::{
-    add_validator_check, deserialize_stake_pool, get_stake_pool_address, get_validator_list_length,
+use crate::{
+    stake_pool_utils::deserialize_stake_pool,
+    utils::{add_validator_check, get_stake_pool_address, get_validator_list_length},
 };
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{program::invoke_signed, stake, sysvar, vote};

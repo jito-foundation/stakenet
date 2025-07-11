@@ -5,7 +5,7 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
-use jito_steward::{utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
+use jito_steward::{stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
 use solana_program_test::*;
 use solana_sdk::{
     clock::Clock, epoch_schedule::EpochSchedule, signature::Keypair, signer::Signer,

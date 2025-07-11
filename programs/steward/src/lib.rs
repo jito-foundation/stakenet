@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::IdlBuild;
 use instructions::*;
 
-use crate::utils::PreferredValidatorType;
+use crate::stake_pool_utils::PreferredValidatorType;
 
 mod allocator;
 pub mod constants;
@@ -13,6 +13,7 @@ pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod score;
+pub mod stake_pool_utils;
 pub mod state;
 pub mod utils;
 

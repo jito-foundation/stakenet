@@ -4,7 +4,7 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 use anchor_lang::prelude::{event, AnchorDeserialize, AnchorSerialize};
-use anchor_lang::solana_program::pubkey::Pubkey;
+use anchor_lang::{solana_program::pubkey::Pubkey, Discriminator};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 #[event]

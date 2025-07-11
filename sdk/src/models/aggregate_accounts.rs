@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config as StewardConfig, StewardStateAccount,
 };
 use solana_sdk::account::Account;

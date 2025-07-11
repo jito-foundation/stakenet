@@ -135,7 +135,7 @@
         {
           "name": "distribution_account",
           "docs": [
-            "`owner = PRIORITY_FEE_DIST_PROGRAM_ID` here is sufficient."
+            "`owner = config.priority_fee_distribution_program.key()` here is sufficient."
           ]
         },
         {
@@ -465,6 +465,33 @@
       "args": []
     },
     {
+      "name": "set_new_priority_fee_distribution_program",
+      "discriminator": [
+        219,
+        234,
+        129,
+        224,
+        128,
+        162,
+        61,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "new_priority_fee_distribution_program"
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "set_new_priority_fee_oracle_authority",
       "discriminator": [
         140,
@@ -564,7 +591,7 @@
           "type": "u32"
         },
         {
-          "name": "current_slot",
+          "name": "highest_oracle_recorded_slot",
           "type": "u64"
         }
       ]
@@ -967,6 +994,10 @@
             }
           },
           {
+            "name": "priority_fee_distribution_program",
+            "type": "pubkey"
+          },
+          {
             "name": "priority_fee_oracle_authority",
             "type": "pubkey"
           },
@@ -975,7 +1006,7 @@
             "type": {
               "array": [
                 "u8",
-                256
+                224
               ]
             }
           }
@@ -987,6 +1018,9 @@
       "type": {
         "kind": "enum",
         "variants": [
+          {
+            "name": "Unset"
+          },
           {
             "name": "Empty"
           },
@@ -1175,11 +1209,22 @@
             "type": "u64"
           },
           {
+            "name": "priority_fee_merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                48
+                47
               ]
             }
           }

@@ -3,13 +3,13 @@ use std::num::NonZeroU32;
 use anchor_lang::{
     prelude::*,
     solana_program::{
+        borsh1::try_from_slice_unchecked,
         program::invoke_signed,
-        stake::{self, tools::get_minimum_delegation},
+        stake::{self, state::StakeStateV2, tools::get_minimum_delegation},
         system_program, sysvar, vote,
     },
 };
 use borsh::BorshDeserialize;
-use spl_pod::solana_program::{borsh1::try_from_slice_unchecked, stake::state::StakeStateV2};
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
     state::ValidatorListHeader,
@@ -22,10 +22,8 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition,
-    utils::{
-        deserialize_stake_pool, get_stake_pool_address, get_validator_stake_info_at_index,
-        state_checks,
-    },
+    stake_pool_utils::deserialize_stake_pool,
+    utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
     Config, StewardStateAccount, StewardStateEnum,
 };
 

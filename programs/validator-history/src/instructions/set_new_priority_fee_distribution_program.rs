@@ -16,7 +16,10 @@ pub struct SetNewPriorityFeeDistributionProgram<'info> {
     pub admin: Signer<'info>,
 }
 
-pub fn handle_set_new_priority_fee_distribution_program(ctx: Context<SetNewPriorityFeeDistributionProgram>) -> Result<()> {
-    ctx.accounts.config.priority_fee_distribution_program = ctx.accounts.new_priority_fee_distribution_program.key();
+pub fn handle_set_new_priority_fee_distribution_program(
+    ctx: Context<SetNewPriorityFeeDistributionProgram>,
+) -> Result<()> {
+    ctx.accounts.config.priority_fee_distribution_program =
+        ctx.accounts.new_priority_fee_distribution_program.key();
     Ok(())
 }

@@ -1,7 +1,8 @@
 #[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 use anchor_lang::{
-    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
+    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,
+    Discriminator, Result,
 };
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,

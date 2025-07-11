@@ -4,7 +4,7 @@ use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClien
 use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
 
 use crate::models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts};
-use spl_pod::solana_program::borsh1::try_from_slice_unchecked;
+use solana_program::borsh1::try_from_slice_unchecked;
 
 use super::accounts::get_validator_history_address;
 

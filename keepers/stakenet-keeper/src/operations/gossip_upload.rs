@@ -11,7 +11,8 @@ use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
-use solana_gossip::crds_value::{CrdsData, CrdsValue, CrdsValueLabel};
+use solana_gossip::crds_data::CrdsData;
+use solana_gossip::crds_value::{CrdsValue, CrdsValueLabel};
 use solana_gossip::gossip_service::make_gossip_node;
 use solana_metrics::datapoint_error;
 use solana_sdk::signature::Signable;
@@ -139,7 +140,7 @@ fn check_entry_valid(
     // 2. Entry is for the correct validator
     match &entry.data {
         CrdsData::LegacyContactInfo(legacy_contact_info) => {
-            if legacy_contact_info.wallclock() < validator_history.last_ip_timestamp {
+            if legacy_contact_info.wallclock < validator_history.last_ip_timestamp {
                 return false;
             }
         }
