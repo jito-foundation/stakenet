@@ -63,8 +63,7 @@ async fn test_copy_legacy_contact_info() {
 
     let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
     // create legacycontactinfo as signed crdsdata struct
-    let mut legacy_contact_info =
-        LegacyContactInfo::new_rand(&mut rng, Some(fixture.identity_keypair.pubkey()));
+    let mut legacy_contact_info = LegacyContactInfo::default();
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
