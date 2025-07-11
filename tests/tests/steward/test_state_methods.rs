@@ -512,8 +512,9 @@ fn test_rebalance() {
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
+    let mut serialized_data = serialize_validator_list(&fixtures.validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut fixtures.validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     let res = state.rebalance(
@@ -770,8 +771,10 @@ fn test_rebalance_default_lamports() {
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
     validator_list[0].transient_stake_lamports = 1000.into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     let res = state.rebalance(
@@ -807,8 +810,10 @@ fn test_rebalance_default_lamports() {
 
     state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
     validator_list[0].transient_stake_lamports = 0.into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     let res = state.rebalance(
