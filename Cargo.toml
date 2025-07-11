@@ -33,6 +33,7 @@ solana-version = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.2" }
 spl-token = { features = ["no-entrypoint"], version = "4.0" }
+spl-associated-token-account = { features = ["no-entrypoint"], version = "7.0.0" }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
