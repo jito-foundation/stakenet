@@ -154,7 +154,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: 1.84.1
-      - uses: actions/download-artifact@v4cargo test --package tests --all-features --color auto
+      - uses: actions/download-artifact@v4cargo +nightly-2024-11-19 test --package tests --all-features --color auto
         with:
           name: validator_history.so
           path: target/deploy/
