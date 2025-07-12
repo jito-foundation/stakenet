@@ -19,7 +19,9 @@ use {
         transaction::Transaction,
     },
     std::{cell::RefCell, rc::Rc},
-    validator_history::{self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory},
+    validator_history::{
+        self, constants::MAX_ALLOC_BYTES, ClusterHistory, StakeAggregation, ValidatorHistory,
+    },
 };
 
 pub struct TestFixture {
@@ -206,6 +208,46 @@ impl TestFixture {
             self.ctx.borrow().last_blockhash,
         );
         self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub fn build_initialize_stake_aggregation_account_instruction(&self) -> Instruction {
+        Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::ReallocStakeAggregationAccount {
+                stake_aggregation_account: self.stake_aggregation_account,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::ReallocStakeAggregationAccount {}.data(),
+        }
+    }
+
+    pub fn build_initialize_and_realloc_stake_aggregation_account_transaction(
+        &self,
+    ) -> Transaction {
+        let mut ixs = vec![];
+        let init_ix = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::InitializeStakeAggregationAccount {
+                stake_aggregation_account: self.stake_aggregation_account,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::InitializeStakeAggregationAccount {}.data(),
+        };
+        ixs.push(init_ix);
+        let num_reallocs = (StakeAggregation::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let realloc_ixs =
+            vec![self.build_initialize_stake_aggregation_account_instruction(); num_reallocs];
+        ixs.extend_from_slice(realloc_ixs.as_slice());
+        Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        )
     }
 
     pub async fn initialize_validator_history_account(&self) {

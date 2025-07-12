@@ -65,45 +65,7 @@ async fn test_initialize() {
     test.submit_transaction_assert_success(transaction).await;
 
     // Initialize stake aggregation account
-    let instruction = Instruction {
-        program_id: validator_history::id(),
-        accounts: validator_history::accounts::InitializeStakeAggregationAccount {
-            stake_aggregation_account: test.stake_aggregation_account,
-            system_program: anchor_lang::solana_program::system_program::id(),
-            signer: test.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: validator_history::instruction::InitializeStakeAggregationAccount {}.data(),
-    };
-    let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
-        Some(&test.keypair.pubkey()),
-        &[&test.keypair],
-        ctx.borrow().last_blockhash,
-    );
-    test.submit_transaction_assert_success(transaction).await;
-
-    // Realloc stake aggregation account
-    let num_reallocs = (StakeAggregation::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
-    let ixs = vec![
-        Instruction {
-            program_id: validator_history::id(),
-            accounts: validator_history::accounts::ReallocStakeAggregationAccount {
-                stake_aggregation_account: test.stake_aggregation_account,
-                system_program: anchor_lang::solana_program::system_program::id(),
-                signer: test.keypair.pubkey(),
-            }
-            .to_account_metas(None),
-            data: validator_history::instruction::ReallocStakeAggregationAccount {}.data(),
-        };
-        num_reallocs
-    ];
-    let transaction = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&test.keypair.pubkey()),
-        &[&test.keypair],
-        ctx.borrow().last_blockhash,
-    );
+    let transaction = test.build_initialize_and_realloc_stake_aggregation_account_transaction();
     test.submit_transaction_assert_success(transaction).await;
 
     // Get stake aggregation account and assert exists and zero initialized
@@ -202,6 +164,28 @@ async fn test_initialize_fail() {
         ctx.borrow().last_blockhash,
     );
     test.submit_transaction_assert_error(transaction, "NotEnoughVotingHistory")
+        .await;
+}
+
+#[tokio::test]
+async fn test_extra_realloc_stake_aggregation() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+
+    // Initialize and relloc to the limit
+    let transaction = fixture.build_initialize_and_realloc_stake_aggregation_account_transaction();
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    // Assert than an additional realloc fails
+    let instruction = fixture.build_initialize_stake_aggregation_account_instruction();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture
+        .submit_transaction_assert_error(transaction, "NoReallocNeeded")
         .await;
 }
 
