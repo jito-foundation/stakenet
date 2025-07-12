@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use solana_program::log::sol_log;
 
 use crate::{constants::MAX_ALLOC_BYTES, errors::ValidatorHistoryError, StakeAggregation};
 
@@ -34,13 +33,11 @@ pub fn handle_realloc_stake_aggregation_account(
         // Big enough but not initialized yet
         (true, false) => {
             // Can actually initialze values now that the account is proper size
-            sol_log("initializing ////////////////////");
             let mut stake_aggregation_account =
                 ctx.accounts.stake_aggregation_account.load_mut()?;
-            let epoch = Clock::get()?.epoch;
-            sol_log(format!("current epoch: {:?} ////////////////", epoch).as_str());
-            stake_aggregation_account.last_observed_epoch = epoch;
-            stake_aggregation_account.reset();
+            // Indicate that the account has been initialized
+            // by uniquely setting the last-observed-epoch value to 1
+            stake_aggregation_account.reset(1u64);
         }
         // Already initialized
         (true, true) => {
@@ -52,10 +49,8 @@ pub fn handle_realloc_stake_aggregation_account(
 
 fn is_initialized(account_info: &AccountInfo) -> Result<bool> {
     let account_data = account_info.as_ref().try_borrow_data()?;
-    // Parse .last_observed_epoch bytes (first u64 field after discriminator)
-    let discriminator = 8;
-    let epoch = 8;
-    let epoch_bytes = account_data[discriminator..epoch].to_vec();
+    // Parse last-observed-epoch bytes (first u64 field after discriminator)
+    let epoch_bytes = account_data[8..16].to_vec();
     // Check for any non-zero bytes
     let non_zero = epoch_bytes.iter().any(|&x| x.ne(&0));
     Ok(non_zero)

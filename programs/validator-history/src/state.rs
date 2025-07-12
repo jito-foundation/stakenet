@@ -1389,7 +1389,8 @@ impl StakeAggregation {
     pub const SIZE: usize = 8 + size_of::<Self>();
 
     /// Resets aggregation for new epoch
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, epoch: u64) {
+        self.last_observed_epoch = epoch;
         self.length = 0;
         self.finished = 0;
         self.stake_buffer = [ValidatorStake::default(); MAX_VALIDATORS];
