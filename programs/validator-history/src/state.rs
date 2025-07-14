@@ -1365,7 +1365,7 @@ pub struct ValidatorStake {
 
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
-pub struct StakeAggregation {
+pub struct ValidatorStakeBuffer {
     // Most recent epoch observed when aggregating stake amounts
     // If this doesn't equal the current epoch, reset
     pub last_observed_epoch: u64,
@@ -1379,11 +1379,11 @@ pub struct StakeAggregation {
     _padding0: [u8; 7],
 
     // Sorted validator stake amounts (ascending by amount)
-    pub stake_buffer: [ValidatorStake; MAX_VALIDATORS],
+    pub buffer: [ValidatorStake; MAX_VALIDATORS],
 }
 
-impl StakeAggregation {
-    pub const SEED: &'static [u8] = b"stake-aggregation";
+impl ValidatorStakeBuffer {
+    pub const SEED: &'static [u8] = b"validator-stake-buffer";
     /// TODO: Total size of 80_032 bytes,
     /// which will require an initial init instruction at max bytes plus 7 additional realloc calls to initialize
     pub const SIZE: usize = 8 + size_of::<Self>();
@@ -1393,7 +1393,7 @@ impl StakeAggregation {
         self.last_observed_epoch = epoch;
         self.length = 0;
         self.finished = 0;
-        self.stake_buffer = [ValidatorStake::default(); MAX_VALIDATORS];
+        self.buffer = [ValidatorStake::default(); MAX_VALIDATORS];
     }
 
     pub fn set_finished(&mut self) {

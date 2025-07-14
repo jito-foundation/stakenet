@@ -5,7 +5,7 @@ use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{
     constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS},
-    Config, StakeAggregation, ValidatorHistory,
+    Config, ValidatorHistory, ValidatorStakeBuffer,
 };
 
 #[tokio::test]
@@ -65,14 +65,15 @@ async fn test_initialize() {
     test.submit_transaction_assert_success(transaction).await;
 
     // Initialize stake aggregation account
-    let transaction = test.build_initialize_and_realloc_stake_aggregation_account_transaction();
+    let transaction =
+        test.build_initialize_and_realloc_validator_stake_buffer_account_transaction();
     test.submit_transaction_assert_success(transaction).await;
 
     // Get stake aggregation account and assert exists and zero initialized
     let account = ctx
         .borrow_mut()
         .banks_client
-        .get_account(test.stake_aggregation_account)
+        .get_account(test.validator_stake_buffer_account)
         .await
         .unwrap();
     assert!(account.is_some());
@@ -80,8 +81,8 @@ async fn test_initialize() {
     assert!(account.owner == validator_history::id());
     assert!(account.data.len() >= MAX_ALLOC_BYTES);
     let account =
-        bytemuck::try_from_bytes::<StakeAggregation>(&account.data.as_slice()[8..]).unwrap();
-    assert!(account.stake_buffer.len() == MAX_VALIDATORS);
+        bytemuck::try_from_bytes::<ValidatorStakeBuffer>(&account.data.as_slice()[8..]).unwrap();
+    assert!(account.buffer.len() == MAX_VALIDATORS);
 
     // Get validator history account and assert exists
     let account = ctx
@@ -168,16 +169,17 @@ async fn test_initialize_fail() {
 }
 
 #[tokio::test]
-async fn test_extra_realloc_stake_aggregation() {
+async fn test_extra_realloc_validator_stake_buffer() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
 
     // Initialize and relloc to the limit
-    let transaction = fixture.build_initialize_and_realloc_stake_aggregation_account_transaction();
+    let transaction =
+        fixture.build_initialize_and_realloc_validator_stake_buffer_account_transaction();
     fixture.submit_transaction_assert_success(transaction).await;
 
     // Assert than an additional realloc fails
-    let instruction = fixture.build_initialize_stake_aggregation_account_instruction();
+    let instruction = fixture.build_initialize_validator_stake_buffer_account_instruction();
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
         Some(&fixture.keypair.pubkey()),

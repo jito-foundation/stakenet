@@ -20,7 +20,7 @@ use {
     },
     std::{cell::RefCell, rc::Rc},
     validator_history::{
-        self, constants::MAX_ALLOC_BYTES, ClusterHistory, StakeAggregation, ValidatorHistory,
+        self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory, ValidatorStakeBuffer,
     },
 };
 
@@ -29,7 +29,7 @@ pub struct TestFixture {
     pub vote_account: Pubkey,
     pub identity_keypair: Keypair,
     pub cluster_history_account: Pubkey,
-    pub stake_aggregation_account: Pubkey,
+    pub validator_stake_buffer_account: Pubkey,
     pub validator_history_account: Pubkey,
     pub validator_history_config: Pubkey,
     pub tip_distribution_account: Pubkey,
@@ -81,8 +81,8 @@ impl TestFixture {
             &validator_history::id(),
         )
         .0;
-        let stake_aggregation_account = Pubkey::find_program_address(
-            &[validator_history::state::StakeAggregation::SEED],
+        let validator_stake_buffer_account = Pubkey::find_program_address(
+            &[validator_history::state::ValidatorStakeBuffer::SEED],
             &validator_history::id(),
         )
         .0;
@@ -107,7 +107,7 @@ impl TestFixture {
             validator_history_config,
             validator_history_account,
             cluster_history_account,
-            stake_aggregation_account,
+            validator_stake_buffer_account,
             identity_keypair,
             vote_account,
             tip_distribution_account,
@@ -210,37 +210,37 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
-    pub fn build_initialize_stake_aggregation_account_instruction(&self) -> Instruction {
+    pub fn build_initialize_validator_stake_buffer_account_instruction(&self) -> Instruction {
         Instruction {
             program_id: validator_history::id(),
-            accounts: validator_history::accounts::ReallocStakeAggregationAccount {
-                stake_aggregation_account: self.stake_aggregation_account,
+            accounts: validator_history::accounts::ReallocValidatorStakeBufferAccount {
+                validator_stake_buffer_account: self.validator_stake_buffer_account,
                 system_program: anchor_lang::solana_program::system_program::id(),
                 signer: self.keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: validator_history::instruction::ReallocStakeAggregationAccount {}.data(),
+            data: validator_history::instruction::ReallocValidatorStakeBufferAccount {}.data(),
         }
     }
 
-    pub fn build_initialize_and_realloc_stake_aggregation_account_transaction(
+    pub fn build_initialize_and_realloc_validator_stake_buffer_account_transaction(
         &self,
     ) -> Transaction {
         let mut ixs = vec![];
         let init_ix = Instruction {
             program_id: validator_history::id(),
-            accounts: validator_history::accounts::InitializeStakeAggregationAccount {
-                stake_aggregation_account: self.stake_aggregation_account,
+            accounts: validator_history::accounts::InitializeValidatorStakeBufferAccount {
+                validator_stake_buffer_account: self.validator_stake_buffer_account,
                 system_program: anchor_lang::solana_program::system_program::id(),
                 signer: self.keypair.pubkey(),
             }
             .to_account_metas(None),
-            data: validator_history::instruction::InitializeStakeAggregationAccount {}.data(),
+            data: validator_history::instruction::InitializeValidatorStakeBufferAccount {}.data(),
         };
         ixs.push(init_ix);
-        let num_reallocs = (StakeAggregation::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let num_reallocs = (ValidatorStakeBuffer::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let realloc_ixs =
-            vec![self.build_initialize_stake_aggregation_account_instruction(); num_reallocs];
+            vec![self.build_initialize_validator_stake_buffer_account_instruction(); num_reallocs];
         ixs.extend_from_slice(realloc_ixs.as_slice());
         Transaction::new_signed_with_payer(
             &ixs,

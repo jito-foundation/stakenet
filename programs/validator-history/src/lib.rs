@@ -66,16 +66,16 @@ pub mod validator_history {
         handle_realloc_cluster_history_account(ctx)
     }
 
-    pub fn initialize_stake_aggregation_account(
-        ctx: Context<InitializeStakeAggregationAccount>,
+    pub fn initialize_validator_stake_buffer_account(
+        ctx: Context<InitializeValidatorStakeBufferAccount>,
     ) -> Result<()> {
-        handle_initialize_stake_aggregation_account(ctx)
+        handle_initialize_validator_stake_buffer_account(ctx)
     }
 
-    pub fn realloc_stake_aggregation_account(
-        ctx: Context<ReallocStakeAggregationAccount>,
+    pub fn realloc_validator_stake_buffer_account(
+        ctx: Context<ReallocValidatorStakeBufferAccount>,
     ) -> Result<()> {
-        handle_realloc_stake_aggregation_account(ctx)
+        handle_realloc_validator_stake_buffer_account(ctx)
     }
 
     pub fn copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
