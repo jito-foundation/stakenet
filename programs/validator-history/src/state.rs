@@ -1400,8 +1400,26 @@ impl ValidatorStakeBuffer {
         self.finished = 1;
     }
 
-    pub fn finished(&self) -> bool {
+    pub fn is_finished(&self) -> bool {
         self.finished == 1
+    }
+
+    pub fn insert(&mut self, entry: ValidatorStake) -> Result<()> {
+        // If the buffer is full early exit
+        if self.length == MAX_VALIDATORS as u64 {
+            return Err(ValidatorHistoryError::StakeBufferFull.into());
+        }
+        // Start linear search from end of buffer until finding validator with less stake
+        let mut i = self.length as usize;
+        while i > 0 && entry.stake_amount < self.buffer[i - 1].stake_amount {
+            // Shift element to the right one
+            self.buffer[i] = self.buffer[i - 1];
+            i -= 1;
+        }
+        // Insert entry
+        self.length += 1;
+        self.buffer[i] = entry;
+        Ok(())
     }
 }
 
