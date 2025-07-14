@@ -44,6 +44,5 @@ tracing-core = "0.1.32"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 validator-history = { path = "programs/validator-history", version = "0.1.0" }
 
-
 [profile.release]
 overflow-checks = true
