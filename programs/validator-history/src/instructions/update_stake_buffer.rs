@@ -36,29 +36,18 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
 
     // Validate buffer against epoch
     let epoch = Clock::get()?.epoch;
-    match validator_stake_buffer.compare_to_last_observed_epoch(&epoch) {
-        // First observation in current epoch
-        std::cmp::Ordering::Less => {
-            // Reset buffer
-            validator_stake_buffer.reset(epoch);
-            // Observe vote account stake
-            let stake_amount: u64 = get_epoch_stake_for_vote_account(&vote_account_pubkey);
-            // Insert into buffer
-            let entry = ValidatorStake::new(validator_id, stake_amount);
-            let mut insert = validator_stake_buffer.insert_builder(config);
-            insert(entry)?;
-        }
-        // Adding to current epoch buffer
-        std::cmp::Ordering::Equal => {
-            // // Exit if finalized already
-            // if validator_stake_buffer.is_finalized() {
-            //     return Err(ValidatorHistoryError::StakeBufferFinalized.into());
-            // }
-            // if validator_stake_buffer.length.eq(&(num_validators - 1)) {}
-            todo!()
-        }
-        std::cmp::Ordering::Greater => return Err(ValidatorHistoryError::EpochOutOfRange.into()),
+    if let std::cmp::Ordering::Less = validator_stake_buffer.compare_to_last_observed_epoch(&epoch)
+    {
+        // Reset buffer
+        validator_stake_buffer.reset(epoch);
     }
+
+    // Observe vote account stake
+    let stake_amount: u64 = get_epoch_stake_for_vote_account(&vote_account_pubkey);
+    // Insert into buffer
+    let entry = ValidatorStake::new(validator_id, stake_amount);
+    let mut insert = validator_stake_buffer.insert_builder(config);
+    insert(entry)?;
 
     Ok(())
 }
