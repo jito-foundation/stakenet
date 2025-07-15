@@ -1,4 +1,5 @@
 use anchor_lang::error::Error;
+use anchor_lang::prelude::ProgramError;
 use validator_history::constants::TVC_MULTIPLIER;
 use validator_history::errors::ValidatorHistoryError;
 use validator_history::state::CircBuf;
@@ -186,7 +187,7 @@ fn test_validator_stake_buffer_finalized_error() {
         }
     }
     assert_eq!(buffer.length(), max_len);
-    assert!(buffer.is_finalized()); // Should be finalized when full
+    assert!(buffer.is_finalized());
 
     // Attempt to insert into a full buffer
     let new_entry = ValidatorStake::new(9999, 50);
@@ -261,14 +262,41 @@ fn test_validator_stake_buffer_insert_with_zero_max_len() {
     };
     let entry = ValidatorStake::new(1, 100);
 
-    // Insert into buffer where max length (counter) is 0
-    // This is an invalid state.
+    // Attempt to insert with config.counter set to zero (violates validation)
     let mut insert = buffer.insert_builder(&config);
     let result = insert(entry);
     drop(insert);
 
-    assert!(result.is_ok());
-    assert_eq!(buffer.length(), 1);
-    // Not finalized
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        Error::from(ProgramError::InvalidAccountData)
+    );
+    // The buffer should remain unchanged
+    assert_eq!(buffer.length(), 0);
+    assert!(!buffer.is_finalized());
+}
+
+#[test]
+fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    let config = Config {
+        counter: (MAX_VALIDATORS + 1) as u32,
+        ..Default::default()
+    };
+    let entry = ValidatorStake::new(1, 100);
+
+    // Attempt to insert with counter greater than max validators
+    let mut insert = buffer.insert_builder(&config);
+    let result = insert(entry);
+    drop(insert);
+
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        Error::from(ProgramError::InvalidAccountData)
+    );
+    // The buffer should remain unchanged
+    assert_eq!(buffer.length(), 0);
     assert!(!buffer.is_finalized());
 }

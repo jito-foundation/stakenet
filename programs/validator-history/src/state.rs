@@ -1469,7 +1469,20 @@ impl ValidatorStakeBuffer {
         &'a mut self,
         config: &'a Config,
     ) -> impl FnMut(ValidatorStake) -> Result<()> + 'a {
-        move |entry| self.insert_with_config(config, entry)
+        // Validate the config account before using insert function.
+        //
+        // The config counter should invariably be
+        // 1) non-zero
+        // 2) less than or equal to `MAX_VALIDATORS`
+        move |entry| {
+            if config.counter.eq(&0) {
+                return Err(ProgramError::InvalidAccountData.into());
+            }
+            if config.counter.gt(&(MAX_VALIDATORS as u32)) {
+                return Err(ProgramError::InvalidAccountData.into());
+            }
+            self.insert_with_config(config, entry)
+        }
     }
 }
 
