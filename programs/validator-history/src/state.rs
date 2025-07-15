@@ -1426,8 +1426,8 @@ impl ValidatorStakeBuffer {
         self.length
     }
 
-    pub fn compare_to_last_observed_epoch(&self, epoch: &u64) -> std::cmp::Ordering {
-        self.last_observed_epoch.cmp(epoch)
+    pub fn needs_reset(&self, epoch: u64) -> bool {
+        epoch.gt(&self.last_observed_epoch)
     }
 
     pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {

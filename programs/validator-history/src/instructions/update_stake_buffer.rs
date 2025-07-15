@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::epoch_stake::get_epoch_stake_for_vote_account;
 
-use crate::{
-    errors::ValidatorHistoryError, Config, ValidatorHistory, ValidatorStake, ValidatorStakeBuffer,
-};
+use crate::{Config, ValidatorHistory, ValidatorStake, ValidatorStakeBuffer};
 
 #[derive(Accounts)]
 pub struct UpdateStakeBuffer<'info> {
@@ -23,7 +21,7 @@ pub struct UpdateStakeBuffer<'info> {
     )]
     pub config: Account<'info, Config>,
 }
-
+// TODO: write event when finalized?
 pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()> {
     // Get validator vote account and index for insertion
     let validator_history = ctx.accounts.validator_history_account.load()?;
@@ -36,8 +34,7 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
 
     // Validate buffer against epoch
     let epoch = Clock::get()?.epoch;
-    if let std::cmp::Ordering::Less = validator_stake_buffer.compare_to_last_observed_epoch(&epoch)
-    {
+    if validator_stake_buffer.needs_reset(epoch) {
         // Reset buffer
         validator_stake_buffer.reset(epoch);
     }
