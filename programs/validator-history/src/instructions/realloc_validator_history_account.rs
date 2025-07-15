@@ -46,7 +46,6 @@ pub struct ReallocValidatorHistoryAccount<'info> {
     pub signer: Signer<'info>,
 }
 
-// TODO: is there not a bug here, that allows anyone to keep resizing this account indefinitely?
 pub fn handle_realloc_validator_history_account(
     ctx: Context<ReallocValidatorHistoryAccount>,
 ) -> Result<()> {
