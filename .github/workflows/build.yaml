@@ -69,7 +69,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
-          version: "0.1.57"
+          version: "0.1.50"
       - run: cargo +nightly-2024-11-19 udeps --all-features --all-targets --tests
 
   verified_build:
