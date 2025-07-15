@@ -18,7 +18,7 @@ solana-account-decoder = "=2.2.1"
 solana-bincode = "=2.2.1"
 solana-clap-utils = "=2.2.1"
 solana-client = "=2.2.1"
-solana-gossip = { git = "https://github.com/gzalz/agave", rev = "e7996cfd52a5d569c3014257797521b947a70502" }
+solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
 solana-metrics = "=2.2.1"
 solana-net-utils = "=2.2.1"
 solana-packet = "=2.2.1"
@@ -27,11 +27,13 @@ solana-program-test = "=2.2.1"
 solana-rpc-client = "=2.2.1"
 solana-rpc-client-api = "=2.2.1"
 solana-sdk = "=2.2.1"
-solana-streamer = { git = "https://github.com/gzalz/agave", rev = "e7996cfd52a5d569c3014257797521b947a70502" } 
+solana-streamer = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
 solana-transaction-status = "=2.2.1"
-solana-version = { git = "https://github.com/gzalz/agave", rev = "e7996cfd52a5d569c3014257797521b947a70502" }
+solana-version = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
+spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.2" }
+spl-token = { version = "4.0", features = ["no-entrypoint"] }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }

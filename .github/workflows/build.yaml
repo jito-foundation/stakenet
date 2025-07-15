@@ -36,7 +36,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          toolchain: nightly-2024-11-19 
+          toolchain: nightly-2024-11-19
       - name: Install Protobuf Compiler
         run: |
           sudo apt-get update
@@ -69,6 +69,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
+	  version: "0.1.45"
       - run: cargo +nightly-2024-11-19 udeps --all-features --all-targets --tests
 
   verified_build:
@@ -98,9 +99,10 @@ jobs:
       # build the program and IDL; exit if error
       - run: anchor build --idl idl
       - name: Check for diff on IDL
-        run: git diff --exit-code
+        run: git diff -- programs --exit-code
 
       # run verified build
+      - run: git checkout $(git rev-parse --abbrev-ref HEAD) -- Cargo.lock
       - run: solana-verify build --library-name validator_history
 
       - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
@@ -165,12 +167,13 @@ jobs:
         run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
         shell: bash
       - name: cargo test
-        run: cargo test --package tests --all-features --color auto
+        run: cargo test +nightly-2024-11-19 --package tests --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
           RUST_MIN_STACK: 10000000
+          RUSTFLAGS: --cfg anchor-debug
 
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality

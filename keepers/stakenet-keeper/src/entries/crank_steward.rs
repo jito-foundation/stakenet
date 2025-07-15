@@ -11,6 +11,7 @@ use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
 use solana_sdk::vote::state::VoteState;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
+#[allow(deprecated)]
 use spl_stake_pool::instruction::{
     cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
 };
@@ -72,6 +73,7 @@ pub fn _get_update_stake_pool_ixs(
                 .map(|v| v.vote_account_address)
                 .collect::<Vec<Pubkey>>();
 
+            #[allow(deprecated)]
             update_list_instructions.push(update_validator_list_balance(
                 program_id,
                 stake_pool_address,
@@ -144,7 +146,7 @@ pub fn _get_update_stake_pool_ixs(
 
                     match stake_account {
                         StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                            if stake.delegation.deactivation_epoch != std::u64::MAX {
+                            if stake.delegation.deactivation_epoch != u64::MAX {
                                 false
                             } else {
                                 latest_epoch <= epoch - 5

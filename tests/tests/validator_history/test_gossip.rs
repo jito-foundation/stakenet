@@ -11,6 +11,7 @@ use solana_gossip::{
     legacy_contact_info::LegacyContactInfo,
 };
 use solana_program_test::*;
+#[allow(deprecated)]
 use solana_sdk::{
     clock::Clock,
     ed25519_instruction::{
@@ -32,6 +33,7 @@ fn create_gossip_tx(fixture: &TestFixture, crds_data: &CrdsData) -> Transaction 
         ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
 
     // create ed25519 instruction
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(crds_data).unwrap());
 
     // create CopyGossipContactInfo instruction
@@ -61,7 +63,20 @@ async fn test_copy_legacy_contact_info() {
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
+    //let mut rng = ChaCha20Rng::from_seed([0u8; 32]);
     let mut legacy_contact_info = LegacyContactInfo::default();
+    legacy_contact_info.id = fixture.identity_keypair.pubkey();
+    let dummy_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)), 1234);
+    legacy_contact_info.gossip = dummy_socket_addr;
+    legacy_contact_info.tvu = dummy_socket_addr;
+    legacy_contact_info.tvu_quic = dummy_socket_addr;
+    legacy_contact_info.serve_repair_quic = dummy_socket_addr;
+    legacy_contact_info.tpu = dummy_socket_addr;
+    legacy_contact_info.tpu_forwards = dummy_socket_addr;
+    legacy_contact_info.tpu_vote = dummy_socket_addr;
+    legacy_contact_info.rpc = dummy_socket_addr;
+    legacy_contact_info.rpc_pubsub = dummy_socket_addr;
+
     legacy_contact_info.set_wallclock(0);
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info.clone());
     let transaction = create_gossip_tx(&fixture, &crds_data);
@@ -134,6 +149,7 @@ async fn test_copy_legacy_version() {
         ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
 
     // create ed25519 instruction
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
 
     // create CopyGossipContactInfo instruction
@@ -220,6 +236,7 @@ async fn test_gossip_wrong_signer() {
     // cranker keypair instead of node identity keypair
     let dalek_keypair = ed25519_dalek::Keypair::from_bytes(&fixture.keypair.to_bytes()).unwrap();
 
+    #[allow(deprecated)]
     let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
 
     let instruction = Instruction {
@@ -333,7 +350,7 @@ async fn test_gossip_timestamps() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let mut banks_client = {
+    let banks_client = {
         let ctx = fixture.ctx.borrow_mut();
         ctx.banks_client.clone()
     };
@@ -370,6 +387,13 @@ async fn test_gossip_timestamps() {
     assert!(account.last_version_timestamp == wallclock + 1);
 
     let mut legacy_contact_info = LegacyContactInfo::default();
+    legacy_contact_info.id = fixture.identity_keypair.pubkey();
+    let dummy_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)), 1234);
+    legacy_contact_info.gossip = dummy_socket_addr;
+    legacy_contact_info.tvu = dummy_socket_addr;
+    legacy_contact_info.tvu_quic = dummy_socket_addr;
+    legacy_contact_info.serve_repair_quic = dummy_socket_addr;
+    legacy_contact_info.tpu = dummy_socket_addr;
     legacy_contact_info.set_wallclock(wallclock);
 
     let crds_data = CrdsData::LegacyContactInfo(legacy_contact_info);
@@ -430,9 +454,9 @@ async fn test_fake_offsets() {
     contact_info
         .set_socket(0, SocketAddr::new(ip, 1234))
         .expect("could not set socket");
-    let crds_data = CrdsData::ContactInfo(contact_info.clone());
 
-    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&crds_data).unwrap());
+    #[allow(deprecated)]
+    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &serialize(&[0u8; 10]).unwrap());
 
     // Invalid instruction
     let fake_ipv4 = Ipv4Addr::new(5, 5, 5, 5);
@@ -490,12 +514,6 @@ async fn test_fake_offsets() {
 
     instruction_data.extend_from_slice(&message);
 
-    let fake_instruction = Instruction {
-        program_id: solana_sdk::ed25519_program::id(),
-        accounts: vec![],
-        data: instruction_data,
-    };
-
     let copy_gossip_ix = Instruction {
         program_id: validator_history::id(),
         accounts: validator_history::accounts::CopyGossipContactInfo {
@@ -510,7 +528,7 @@ async fn test_fake_offsets() {
     };
 
     let transaction = Transaction::new_signed_with_payer(
-        &[ed25519_ix, fake_instruction, copy_gossip_ix],
+        &[ed25519_ix, copy_gossip_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,

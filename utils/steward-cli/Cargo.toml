@@ -14,7 +14,6 @@ futures-util = "0.3.21"
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
 log = "0.4.18"
 solana-account-decoder = { workspace = true }
-solana-clap-utils = { workspace = true }
 solana-client = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
