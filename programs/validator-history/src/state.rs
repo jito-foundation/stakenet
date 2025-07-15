@@ -1379,10 +1379,10 @@ impl ValidatorStake {
 pub struct ValidatorStakeBuffer {
     // Most recent epoch observed when aggregating stake amounts
     // If this doesn't equal the current epoch, reset
-    pub last_observed_epoch: u64,
+    last_observed_epoch: u64,
 
     // Length of the stake buffer (number of validator stake ammounts observed this epoch)
-    pub length: u32,
+    length: u32,
 
     // Indicates whether or not we've observed every validator (history) account
     // This provides finality of stake observations
@@ -1391,7 +1391,7 @@ pub struct ValidatorStakeBuffer {
     _padding0: [u8; 11],
 
     // Sorted validator stake amounts (ascending by amount)
-    pub buffer: [ValidatorStake; MAX_VALIDATORS],
+    buffer: [ValidatorStake; MAX_VALIDATORS],
 }
 
 impl Default for ValidatorStakeBuffer {
@@ -1420,6 +1420,21 @@ impl ValidatorStakeBuffer {
 
     pub fn is_finalized(&self) -> bool {
         self.finalized == 1
+    }
+
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    pub fn compare_to_last_observed_epoch(&self, epoch: &u64) -> std::cmp::Ordering {
+        self.last_observed_epoch.cmp(epoch)
+    }
+
+    pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
+        if index.ge(&(self.length as usize)) {
+            return Err(ProgramError::InvalidAccountData.into());
+        }
+        Ok(self.buffer[index])
     }
 
     /// Inserts a new [ValidatorStake] entry into the buffer.

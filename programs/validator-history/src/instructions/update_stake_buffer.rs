@@ -36,7 +36,7 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
 
     // Validate buffer against epoch
     let epoch = Clock::get()?.epoch;
-    match validator_stake_buffer.last_observed_epoch.cmp(&epoch) {
+    match validator_stake_buffer.compare_to_last_observed_epoch(&epoch) {
         // First observation in current epoch
         std::cmp::Ordering::Less => {
             // Reset buffer

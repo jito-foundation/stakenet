@@ -7,6 +7,7 @@ use validator_history::{
 };
 
 const MAX_ITEMS: usize = 512;
+
 #[test]
 fn test_normalized_epoch_credits_latest() {
     let mut circ_buf = CircBuf {
@@ -88,8 +89,8 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
         let mut insert = buffer.insert_builder(&config);
         insert(entry).unwrap();
     }
-    assert_eq!(buffer.length, 1);
-    assert_eq!(buffer.buffer[0], entry);
+    assert_eq!(buffer.length(), 1);
+    assert_eq!(buffer.get_by_index(0).unwrap(), entry);
 }
 
 #[test]
@@ -105,10 +106,10 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
         insert(ValidatorStake::new(2, 200)).unwrap();
         insert(ValidatorStake::new(3, 300)).unwrap();
     }
-    assert_eq!(buffer.length, 3);
-    assert_eq!(buffer.buffer[0].stake_amount, 100);
-    assert_eq!(buffer.buffer[1].stake_amount, 200);
-    assert_eq!(buffer.buffer[2].stake_amount, 300);
+    assert_eq!(buffer.length(), 3);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
 }
 
 #[test]
@@ -124,10 +125,10 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
         insert(ValidatorStake::new(2, 300)).unwrap();
         insert(ValidatorStake::new(3, 200)).unwrap();
     }
-    assert_eq!(buffer.length, 3);
-    assert_eq!(buffer.buffer[0].stake_amount, 100);
-    assert_eq!(buffer.buffer[1].stake_amount, 200);
-    assert_eq!(buffer.buffer[2].stake_amount, 300);
+    assert_eq!(buffer.length(), 3);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
 }
 
 #[test]
@@ -143,10 +144,10 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
         insert(ValidatorStake::new(2, 300)).unwrap();
         insert(ValidatorStake::new(3, 50)).unwrap();
     }
-    assert_eq!(buffer.length, 3);
-    assert_eq!(buffer.buffer[0].stake_amount, 50);
-    assert_eq!(buffer.buffer[1].stake_amount, 100);
-    assert_eq!(buffer.buffer[2].stake_amount, 300);
+    assert_eq!(buffer.length(), 3);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 50);
+    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
 }
 
 #[test]
@@ -162,10 +163,10 @@ fn test_validator_stake_buffer_insert_partially_full_unordered() {
         insert(ValidatorStake::new(2, 100)).unwrap();
         insert(ValidatorStake::new(3, 200)).unwrap();
     }
-    assert_eq!(buffer.length, 3);
-    assert_eq!(buffer.buffer[0].stake_amount, 100);
-    assert_eq!(buffer.buffer[1].stake_amount, 200);
-    assert_eq!(buffer.buffer[2].stake_amount, 300);
+    assert_eq!(buffer.length(), 3);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
 }
 
 #[test]
@@ -184,7 +185,7 @@ fn test_validator_stake_buffer_finalized_error() {
             insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
         }
     }
-    assert_eq!(buffer.length, max_len);
+    assert_eq!(buffer.length(), max_len);
     assert!(buffer.is_finalized()); // Should be finalized when full
 
     // Attempt to insert into a full buffer
@@ -199,10 +200,10 @@ fn test_validator_stake_buffer_finalized_error() {
     );
 
     // The buffer should remain unchanged in length and finalized state
-    assert_eq!(buffer.length, max_len);
+    assert_eq!(buffer.length(), max_len);
     assert!(buffer.is_finalized());
     // Verify that the first element is still the smallest of the *original* set
-    assert_eq!(buffer.buffer[0].stake_amount, 100);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -221,7 +222,7 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
             insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
         }
     }
-    assert_eq!(buffer.length, initial_max_len);
+    assert_eq!(buffer.length(), initial_max_len);
     assert!(buffer.is_finalized());
 
     // Create a new config with a monotonically incremented counter
@@ -245,8 +246,29 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
     );
 
     // The buffer should remain unchanged in length and finalized state
-    assert_eq!(buffer.length, initial_max_len);
+    assert_eq!(buffer.length(), initial_max_len);
     assert!(buffer.is_finalized());
     // Verify that the first element is still the smallest of the *original* set
-    assert_eq!(buffer.buffer[0].stake_amount, 100);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+}
+
+#[test]
+fn test_validator_stake_buffer_insert_with_zero_max_len() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    let config = Config {
+        counter: 0,
+        ..Default::default()
+    };
+    let entry = ValidatorStake::new(1, 100);
+
+    // Insert into buffer where max length (counter) is 0
+    // This is an invalid state.
+    let mut insert = buffer.insert_builder(&config);
+    let result = insert(entry);
+    drop(insert);
+
+    assert!(result.is_ok());
+    assert_eq!(buffer.length(), 1);
+    // Not finalized
+    assert!(!buffer.is_finalized());
 }
