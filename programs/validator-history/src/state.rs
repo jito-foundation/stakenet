@@ -1356,14 +1356,14 @@ impl ClusterHistory {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Default, PartialEq)]
+#[derive(BorshSerialize, Debug, Default, PartialEq)]
 #[zero_copy]
 pub struct ValidatorStake {
     pub validator_id: u64,
     pub stake_amount: u64,
 }
 
-#[derive(BorshSerialize)]
+#[derive(BorshSerialize, Debug, PartialEq)]
 #[account(zero_copy)]
 pub struct ValidatorStakeBuffer {
     // Most recent epoch observed when aggregating stake amounts
@@ -1380,6 +1380,18 @@ pub struct ValidatorStakeBuffer {
 
     // Sorted validator stake amounts (ascending by amount)
     pub buffer: [ValidatorStake; MAX_VALIDATORS],
+}
+
+impl Default for ValidatorStakeBuffer {
+    fn default() -> Self {
+        Self {
+            last_observed_epoch: 0,
+            length: 0,
+            finished: 0,
+            _padding0: [0; 7],
+            buffer: [ValidatorStake::default(); MAX_VALIDATORS],
+        }
+    }
 }
 
 impl ValidatorStakeBuffer {
@@ -1752,5 +1764,168 @@ mod tests {
         assert!(
             circ_buf.insert(entry, 50) == Err(Error::from(ValidatorHistoryError::EpochOutOfRange))
         );
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_empty_buffer() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        let entry = ValidatorStake {
+            validator_id: 1,
+            stake_amount: 100,
+        };
+        buffer.insert(entry).unwrap();
+        assert_eq!(buffer.length, 1);
+        assert_eq!(buffer.buffer[0], entry);
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_partially_full_ordered() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 1,
+                stake_amount: 100,
+            })
+            .unwrap();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 2,
+                stake_amount: 200,
+            })
+            .unwrap();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 3,
+                stake_amount: 300,
+            })
+            .unwrap();
+
+        assert_eq!(buffer.length, 3);
+        assert_eq!(buffer.buffer[0].stake_amount, 100);
+        assert_eq!(buffer.buffer[1].stake_amount, 200);
+        assert_eq!(buffer.buffer[2].stake_amount, 300);
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_partially_full_unordered() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 1,
+                stake_amount: 300,
+            })
+            .unwrap();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 2,
+                stake_amount: 100,
+            })
+            .unwrap();
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 3,
+                stake_amount: 200,
+            })
+            .unwrap();
+
+        assert_eq!(buffer.length, 3);
+        assert_eq!(buffer.buffer[0].stake_amount, 100);
+        assert_eq!(buffer.buffer[1].stake_amount, 200);
+        assert_eq!(buffer.buffer[2].stake_amount, 300);
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_full_larger_than_min() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        for i in 0..MAX_VALIDATORS {
+            buffer
+                .insert(ValidatorStake {
+                    validator_id: i as u64,
+                    stake_amount: i as u64 + 100,
+                })
+                .unwrap();
+        }
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+
+        // Insert a new validator with stake larger than the current min (100)
+        buffer
+            .insert(ValidatorStake {
+                validator_id: 9999,
+                stake_amount: 50, // Should be inserted at index 0, pushing 100 out
+            })
+            .unwrap();
+
+        // The smallest element (original 100) should be replaced by 50.
+        // The length should remain MAX_VALIDATORS.
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+        assert_eq!(buffer.buffer[0].stake_amount, 50);
+        assert_eq!(buffer.buffer[1].stake_amount, 101); // Original 101 moved to index 1
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_full_in_middle() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        for i in 0..MAX_VALIDATORS {
+            buffer
+                .insert(ValidatorStake {
+                    validator_id: i as u64,
+                    stake_amount: (i * 10) as u64,
+                })
+                .unwrap();
+        }
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+
+        // Insert a value in the middle
+        let new_entry = ValidatorStake {
+            validator_id: 9999,
+            stake_amount: 25000, // Should fit somewhere in the middle
+        };
+        buffer.insert(new_entry).unwrap();
+
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+        // Check if the new entry is in the buffer and order is maintained
+        let mut found = false;
+        for i in 0..MAX_VALIDATORS {
+            if buffer.buffer[i].validator_id == new_entry.validator_id {
+                found = true;
+            }
+            if i > 0 {
+                assert!(buffer.buffer[i].stake_amount >= buffer.buffer[i - 1].stake_amount);
+            }
+        }
+        assert!(found);
+        // The smallest element should have been pushed out
+        assert!(buffer.buffer[0].stake_amount > 0); // Original 0 should be gone
+    }
+
+    #[test]
+    fn test_validator_stake_buffer_insert_full_smaller_than_min_full_buffer() {
+        let mut buffer = ValidatorStakeBuffer::default();
+        for i in 0..MAX_VALIDATORS {
+            buffer
+                .insert(ValidatorStake {
+                    validator_id: i as u64,
+                    stake_amount: i as u64 + 100,
+                })
+                .unwrap();
+        }
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+
+        // Attempt to insert a value smaller than the current smallest (100)
+        let new_entry = ValidatorStake {
+            validator_id: 5000,
+            stake_amount: 50,
+        };
+        // This should return StakeBufferFull error as per the instruction's new logic
+        let result = buffer.insert(new_entry);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            Error::from(ValidatorHistoryError::StakeBufferFull)
+        );
+
+        // The buffer should remain unchanged
+        assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+        assert_eq!(buffer.buffer[0].stake_amount, 100);
     }
 }
