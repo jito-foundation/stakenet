@@ -117,6 +117,62 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
 }
 
 #[test]
+fn test_validator_stake_buffer_insert_unordered_in_middle() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 1,
+            stake_amount: 100,
+        })
+        .unwrap();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 2,
+            stake_amount: 300,
+        })
+        .unwrap();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 3,
+            stake_amount: 200,
+        })
+        .unwrap();
+
+    assert_eq!(buffer.length, 3);
+    assert_eq!(buffer.buffer[0].stake_amount, 100);
+    assert_eq!(buffer.buffer[1].stake_amount, 200);
+    assert_eq!(buffer.buffer[2].stake_amount, 300);
+}
+
+#[test]
+fn test_validator_stake_buffer_insert_unordered_at_start() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 1,
+            stake_amount: 100,
+        })
+        .unwrap();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 2,
+            stake_amount: 300,
+        })
+        .unwrap();
+    buffer
+        .insert(ValidatorStake {
+            validator_id: 3,
+            stake_amount: 50,
+        })
+        .unwrap();
+
+    assert_eq!(buffer.length, 3);
+    assert_eq!(buffer.buffer[0].stake_amount, 50);
+    assert_eq!(buffer.buffer[1].stake_amount, 100);
+    assert_eq!(buffer.buffer[2].stake_amount, 300);
+}
+
+#[test]
 fn test_validator_stake_buffer_insert_partially_full_unordered() {
     let mut buffer = ValidatorStakeBuffer::default();
     buffer
