@@ -1396,8 +1396,6 @@ impl Default for ValidatorStakeBuffer {
 
 impl ValidatorStakeBuffer {
     pub const SEED: &'static [u8] = b"validator-stake-buffer";
-    /// TODO: Total size of 80_032 bytes,
-    /// which will require an initial init instruction at max bytes plus 7 additional realloc calls to initialize
     pub const SIZE: usize = 8 + size_of::<Self>();
 
     /// Resets aggregation for new epoch
