@@ -3,7 +3,7 @@ use validator_history::constants::TVC_MULTIPLIER;
 use validator_history::errors::ValidatorHistoryError;
 use validator_history::state::CircBuf;
 use validator_history::{
-    constants::MAX_VALIDATORS, ValidatorHistoryEntry, ValidatorStake, ValidatorStakeBuffer,
+    constants::MAX_VALIDATORS, Config, ValidatorHistoryEntry, ValidatorStake, ValidatorStakeBuffer,
 };
 
 const MAX_ITEMS: usize = 512;
@@ -79,11 +79,15 @@ fn test_epoch_credits_range_normalized() {
 #[test]
 fn test_validator_stake_buffer_insert_empty_buffer() {
     let mut buffer = ValidatorStakeBuffer::default();
-    let entry = ValidatorStake {
-        validator_id: 1,
-        stake_amount: 100,
+    let entry = ValidatorStake::new(1, 100);
+    let config = Config {
+        counter: MAX_VALIDATORS as u32,
+        ..Default::default()
     };
-    buffer.insert(entry).unwrap();
+    {
+        let mut insert = buffer.insert_builder(&config);
+        insert(entry).unwrap();
+    }
     assert_eq!(buffer.length, 1);
     assert_eq!(buffer.buffer[0], entry);
 }
@@ -91,25 +95,16 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
 #[test]
 fn test_validator_stake_buffer_insert_partially_full_ordered() {
     let mut buffer = ValidatorStakeBuffer::default();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 1,
-            stake_amount: 100,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 2,
-            stake_amount: 200,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 3,
-            stake_amount: 300,
-        })
-        .unwrap();
-
+    let config = Config {
+        counter: MAX_VALIDATORS as u32,
+        ..Default::default()
+    };
+    {
+        let mut insert = buffer.insert_builder(&config);
+        insert(ValidatorStake::new(1, 100)).unwrap();
+        insert(ValidatorStake::new(2, 200)).unwrap();
+        insert(ValidatorStake::new(3, 300)).unwrap();
+    }
     assert_eq!(buffer.length, 3);
     assert_eq!(buffer.buffer[0].stake_amount, 100);
     assert_eq!(buffer.buffer[1].stake_amount, 200);
@@ -119,25 +114,16 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
 #[test]
 fn test_validator_stake_buffer_insert_unordered_in_middle() {
     let mut buffer = ValidatorStakeBuffer::default();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 1,
-            stake_amount: 100,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 2,
-            stake_amount: 300,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 3,
-            stake_amount: 200,
-        })
-        .unwrap();
-
+    let config = Config {
+        counter: MAX_VALIDATORS as u32,
+        ..Default::default()
+    };
+    {
+        let mut insert = buffer.insert_builder(&config);
+        insert(ValidatorStake::new(1, 100)).unwrap();
+        insert(ValidatorStake::new(2, 300)).unwrap();
+        insert(ValidatorStake::new(3, 200)).unwrap();
+    }
     assert_eq!(buffer.length, 3);
     assert_eq!(buffer.buffer[0].stake_amount, 100);
     assert_eq!(buffer.buffer[1].stake_amount, 200);
@@ -147,25 +133,16 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
 #[test]
 fn test_validator_stake_buffer_insert_unordered_at_start() {
     let mut buffer = ValidatorStakeBuffer::default();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 1,
-            stake_amount: 100,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 2,
-            stake_amount: 300,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 3,
-            stake_amount: 50,
-        })
-        .unwrap();
-
+    let config = Config {
+        counter: MAX_VALIDATORS as u32,
+        ..Default::default()
+    };
+    {
+        let mut insert = buffer.insert_builder(&config);
+        insert(ValidatorStake::new(1, 100)).unwrap();
+        insert(ValidatorStake::new(2, 300)).unwrap();
+        insert(ValidatorStake::new(3, 50)).unwrap();
+    }
     assert_eq!(buffer.length, 3);
     assert_eq!(buffer.buffer[0].stake_amount, 50);
     assert_eq!(buffer.buffer[1].stake_amount, 100);
@@ -175,25 +152,16 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
 #[test]
 fn test_validator_stake_buffer_insert_partially_full_unordered() {
     let mut buffer = ValidatorStakeBuffer::default();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 1,
-            stake_amount: 300,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 2,
-            stake_amount: 100,
-        })
-        .unwrap();
-    buffer
-        .insert(ValidatorStake {
-            validator_id: 3,
-            stake_amount: 200,
-        })
-        .unwrap();
-
+    let config = Config {
+        counter: MAX_VALIDATORS as u32,
+        ..Default::default()
+    };
+    {
+        let mut insert = buffer.insert_builder(&config);
+        insert(ValidatorStake::new(1, 300)).unwrap();
+        insert(ValidatorStake::new(2, 100)).unwrap();
+        insert(ValidatorStake::new(3, 200)).unwrap();
+    }
     assert_eq!(buffer.length, 3);
     assert_eq!(buffer.buffer[0].stake_amount, 100);
     assert_eq!(buffer.buffer[1].stake_amount, 200);
@@ -201,32 +169,84 @@ fn test_validator_stake_buffer_insert_partially_full_unordered() {
 }
 
 #[test]
-fn test_validator_stake_buffer_insert_full_expect_error() {
+fn test_validator_stake_buffer_finalized_error() {
     let mut buffer = ValidatorStakeBuffer::default();
-    for i in 0..MAX_VALIDATORS {
-        buffer
-            .insert(ValidatorStake {
-                validator_id: i as u64,
-                stake_amount: i as u64 + 100,
-            })
-            .unwrap();
-    }
-    assert_eq!(buffer.length, MAX_VALIDATORS as u64);
-
-    // Attempt to insert a value when the buffer is full.
-    let new_entry = ValidatorStake {
-        validator_id: 9999,
-        stake_amount: 50,
+    let max_len = 10;
+    let config = Config {
+        counter: max_len,
+        ..Default::default()
     };
-    let result = buffer.insert(new_entry);
+
+    // Fill the buffer to max_len
+    {
+        let mut insert = buffer.insert_builder(&config);
+        for i in 0..max_len {
+            insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
+        }
+    }
+    assert_eq!(buffer.length, max_len);
+    assert!(buffer.is_finalized()); // Should be finalized when full
+
+    // Attempt to insert into a full buffer
+    let new_entry = ValidatorStake::new(9999, 50);
+    let mut insert = buffer.insert_builder(&config);
+    let result = insert(new_entry);
+    drop(insert);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        Error::from(ValidatorHistoryError::StakeBufferFull)
+        Error::from(ValidatorHistoryError::StakeBufferFinalized)
     );
 
-    // The buffer should remain unchanged
-    assert_eq!(buffer.length, MAX_VALIDATORS as u64);
+    // The buffer should remain unchanged in length and finalized state
+    assert_eq!(buffer.length, max_len);
+    assert!(buffer.is_finalized());
+    // Verify that the first element is still the smallest of the *original* set
+    assert_eq!(buffer.buffer[0].stake_amount, 100);
+}
+
+#[test]
+fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    let initial_max_len = 5;
+    let initial_config = Config {
+        counter: initial_max_len,
+        ..Default::default()
+    };
+
+    // Fill the buffer to initial_max_len, which should finalize it
+    {
+        let mut insert = buffer.insert_builder(&initial_config);
+        for i in 0..initial_max_len {
+            insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
+        }
+    }
+    assert_eq!(buffer.length, initial_max_len);
+    assert!(buffer.is_finalized());
+
+    // Create a new config with a monotonically incremented counter
+    let new_max_len = initial_max_len + 5;
+    let new_config = Config {
+        counter: new_max_len,
+        ..Default::default()
+    };
+
+    // Attempt to insert into the same buffer using a new insert_builder with the new config
+    let new_entry = ValidatorStake::new(9999, 50);
+    let mut insert_with_new_config = buffer.insert_builder(&new_config);
+    let result = insert_with_new_config(new_entry);
+    drop(insert_with_new_config);
+
+    // The insertion should still fail because the buffer was finalized with the previous config
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferFinalized)
+    );
+
+    // The buffer should remain unchanged in length and finalized state
+    assert_eq!(buffer.length, initial_max_len);
+    assert!(buffer.is_finalized());
     // Verify that the first element is still the smallest of the *original* set
     assert_eq!(buffer.buffer[0].stake_amount, 100);
 }

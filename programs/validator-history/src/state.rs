@@ -1359,8 +1359,19 @@ impl ClusterHistory {
 #[derive(BorshSerialize, Debug, Default, PartialEq)]
 #[zero_copy]
 pub struct ValidatorStake {
-    pub validator_id: u64,
     pub stake_amount: u64,
+    pub validator_id: u32,
+    _padding0: u32,
+}
+
+impl ValidatorStake {
+    pub fn new(validator_id: u32, stake_amount: u64) -> Self {
+        Self {
+            stake_amount,
+            validator_id,
+            _padding0: 0,
+        }
+    }
 }
 
 #[derive(BorshSerialize, Debug, PartialEq)]
@@ -1371,12 +1382,13 @@ pub struct ValidatorStakeBuffer {
     pub last_observed_epoch: u64,
 
     // Length of the stake buffer (number of validator stake ammounts observed this epoch)
-    pub length: u64,
+    pub length: u32,
 
     // Indicates whether or not we've observed every validator (history) account
     // This provides finality of stake observations
-    finished: u8, /* boolean */
-    _padding0: [u8; 7],
+    finalized: u8, /* boolean */
+
+    _padding0: [u8; 11],
 
     // Sorted validator stake amounts (ascending by amount)
     pub buffer: [ValidatorStake; MAX_VALIDATORS],
@@ -1387,8 +1399,8 @@ impl Default for ValidatorStakeBuffer {
         Self {
             last_observed_epoch: 0,
             length: 0,
-            finished: 0,
-            _padding0: [0; 7],
+            finalized: 0,
+            _padding0: [0; 11],
             buffer: [ValidatorStake::default(); MAX_VALIDATORS],
         }
     }
@@ -1402,22 +1414,19 @@ impl ValidatorStakeBuffer {
     pub fn reset(&mut self, epoch: u64) {
         self.last_observed_epoch = epoch;
         self.length = 0;
-        self.finished = 0;
+        self.finalized = 0;
         self.buffer = [ValidatorStake::default(); MAX_VALIDATORS];
     }
 
-    pub fn set_finished(&mut self) {
-        self.finished = 1;
+    pub fn is_finalized(&self) -> bool {
+        self.finalized == 1
     }
 
-    pub fn is_finished(&self) -> bool {
-        self.finished == 1
-    }
-
-    pub fn insert(&mut self, entry: ValidatorStake) -> Result<()> {
-        // If the buffer is full early exit
-        if self.length == MAX_VALIDATORS as u64 {
-            return Err(ValidatorHistoryError::StakeBufferFull.into());
+    /// Inserts a new [ValidatorStake] entry into the buffer.
+    fn insert_with_config(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
+        // early exit if finalized
+        if self.is_finalized() {
+            return Err(ValidatorHistoryError::StakeBufferFinalized.into());
         }
         // Start linear search from end of buffer until finding validator with less stake
         let mut i = self.length as usize;
@@ -1429,7 +1438,23 @@ impl ValidatorStakeBuffer {
         // Insert entry
         self.length += 1;
         self.buffer[i] = entry;
+        // Set finalized flag if the buffer is now full
+        let max_length = config.counter;
+        if self.length == max_length {
+            self.finalized = 1;
+        }
         Ok(())
+    }
+
+    /// Builds an insert function.
+    ///
+    /// This forces the user to pass in a [Config], before calling `insert`.
+    /// There is a dependency on the `config.counter` field for validation.
+    pub fn insert_builder<'a>(
+        &'a mut self,
+        config: &'a Config,
+    ) -> impl FnMut(ValidatorStake) -> Result<()> + 'a {
+        move |entry| self.insert_with_config(config, entry)
     }
 }
 
