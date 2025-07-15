@@ -36,4 +36,10 @@ pub enum ValidatorHistoryError {
     NoReallocNeeded,
     #[msg("Stake buffer has been marked as finalized")]
     StakeBufferFinalized,
+    #[msg("Config counter found at floor")]
+    ConfigCounterFloor,
+    #[msg("Config counter found at ceiling")]
+    ConfigCounterCeiling,
+    #[msg("Stake buffer out of bounds")]
+    StakeBufferOutOfBounds,
 }

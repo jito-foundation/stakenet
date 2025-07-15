@@ -1432,7 +1432,7 @@ impl ValidatorStakeBuffer {
 
     pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
         if index.ge(&(self.length as usize)) {
-            return Err(ProgramError::InvalidAccountData.into());
+            return Err(ValidatorHistoryError::StakeBufferOutOfBounds.into());
         }
         Ok(self.buffer[index])
     }
@@ -1476,10 +1476,10 @@ impl ValidatorStakeBuffer {
         // 2) less than or equal to `MAX_VALIDATORS`
         move |entry| {
             if config.counter.eq(&0) {
-                return Err(ProgramError::InvalidAccountData.into());
+                return Err(ValidatorHistoryError::ConfigCounterFloor.into());
             }
             if config.counter.gt(&(MAX_VALIDATORS as u32)) {
-                return Err(ProgramError::InvalidAccountData.into());
+                return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
             }
             self.insert_with_config(config, entry)
         }

@@ -1,5 +1,4 @@
 use anchor_lang::error::Error;
-use anchor_lang::prelude::ProgramError;
 use validator_history::constants::TVC_MULTIPLIER;
 use validator_history::errors::ValidatorHistoryError;
 use validator_history::state::CircBuf;
@@ -270,7 +269,7 @@ fn test_validator_stake_buffer_insert_with_zero_max_len() {
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        Error::from(ProgramError::InvalidAccountData)
+        Error::from(ValidatorHistoryError::ConfigCounterFloor)
     );
     // The buffer should remain unchanged
     assert_eq!(buffer.length(), 0);
@@ -294,7 +293,7 @@ fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators()
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        Error::from(ProgramError::InvalidAccountData)
+        Error::from(ValidatorHistoryError::ConfigCounterCeiling)
     );
     // The buffer should remain unchanged
     assert_eq!(buffer.length(), 0);
