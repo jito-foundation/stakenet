@@ -1381,6 +1381,10 @@ pub struct ValidatorStakeBuffer {
     // If this doesn't equal the current epoch, reset
     last_observed_epoch: u64,
 
+    // Accumulator of total stake in pool
+    // Not useful until buffer is finalized
+    total_stake: u64,
+
     // Length of the stake buffer (number of validator stake ammounts observed this epoch)
     length: u32,
 
@@ -1388,7 +1392,7 @@ pub struct ValidatorStakeBuffer {
     // This provides finality of stake observations
     finalized: u8, /* boolean */
 
-    _padding0: [u8; 11],
+    _padding0: [u8; 3],
 
     // Sorted validator stake amounts (ascending by amount)
     buffer: [ValidatorStake; MAX_VALIDATORS],
@@ -1398,13 +1402,17 @@ impl Default for ValidatorStakeBuffer {
     fn default() -> Self {
         Self {
             last_observed_epoch: 0,
+            total_stake: 0,
             length: 0,
             finalized: 0,
-            _padding0: [0; 11],
+            _padding0: [0; 3],
             buffer: [ValidatorStake::default(); MAX_VALIDATORS],
         }
     }
 }
+
+/// (Stake Lamports, Rank, Superminority)
+type ValidatorPosition = (u64, u32, bool);
 
 impl ValidatorStakeBuffer {
     pub const SEED: &'static [u8] = b"validator-stake-buffer";
@@ -1413,6 +1421,7 @@ impl ValidatorStakeBuffer {
     /// Resets aggregation for new epoch
     pub fn reset(&mut self, epoch: u64) {
         self.last_observed_epoch = epoch;
+        self.total_stake = 0;
         self.length = 0;
         self.finalized = 0;
         self.buffer = [ValidatorStake::default(); MAX_VALIDATORS];
@@ -1430,11 +1439,36 @@ impl ValidatorStakeBuffer {
         epoch.gt(&self.last_observed_epoch)
     }
 
+    /// Get element by index
     pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
         if index.ge(&(self.length as usize)) {
             return Err(ValidatorHistoryError::StakeBufferOutOfBounds.into());
         }
         Ok(self.buffer[index])
+    }
+
+    /// Get element by validator id
+    pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorPosition> {
+        // Accumulators
+        let mut cumulative_stake: u64 = 0;
+        let mut is_supermintority = false;
+        let superminority_threshold = self.total_stake / 3;
+        // Search for validator rank and superminority threshold
+        for rank in 0..self.length as usize {
+            let entry = &self.buffer[rank];
+            // Superminority threshold check
+            if (cumulative_stake <= superminority_threshold) && !is_supermintority {
+                cumulative_stake += entry.stake_amount;
+                if cumulative_stake > superminority_threshold {
+                    is_supermintority = true;
+                }
+            }
+            // Rank
+            if entry.validator_id == validator_id {
+                return Ok((entry.stake_amount, rank as u32, is_supermintority));
+            }
+        }
+        Err(ValidatorHistoryError::StakeBufferOutOfBounds.into())
     }
 
     /// Inserts a new [ValidatorStake] entry into the buffer.
@@ -1443,16 +1477,19 @@ impl ValidatorStakeBuffer {
         if self.is_finalized() {
             return Err(ValidatorHistoryError::StakeBufferFinalized.into());
         }
-        // Start linear search from end of buffer until finding validator with less stake
+        // Start linear search from end of buffer until finding validator with greater or equal stake
+        // to insert the new entry while maintaining descending order.
         let mut i = self.length as usize;
-        while i > 0 && entry.stake_amount < self.buffer[i - 1].stake_amount {
-            // Shift element to the right one
+        while i > 0 && entry.stake_amount > self.buffer[i - 1].stake_amount {
+            // Shift element to the right one to make space
             self.buffer[i] = self.buffer[i - 1];
             i -= 1;
         }
         // Insert entry
-        self.length += 1;
         self.buffer[i] = entry;
+        self.length += 1;
+        self.total_stake += entry.stake_amount;
+
         // Set finalized flag if the buffer is now full
         let max_length = config.counter;
         if self.length == max_length {

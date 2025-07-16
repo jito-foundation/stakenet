@@ -107,6 +107,10 @@ pub mod validator_history {
         handle_set_new_oracle_authority(ctx)
     }
 
+    pub fn update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()> {
+        handle_update_stake_buffer(ctx)
+    }
+
     pub fn update_stake_history(
         ctx: Context<UpdateStakeHistory>,
         epoch: u64,

@@ -107,9 +107,9 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
         insert(ValidatorStake::new(3, 300)).unwrap();
     }
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -126,9 +126,9 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
         insert(ValidatorStake::new(3, 200)).unwrap();
     }
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -145,9 +145,9 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
         insert(ValidatorStake::new(3, 50)).unwrap();
     }
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 50);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 100);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 50);
 }
 
 #[test]
@@ -164,9 +164,9 @@ fn test_validator_stake_buffer_insert_partially_full_unordered() {
         insert(ValidatorStake::new(3, 200)).unwrap();
     }
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -202,8 +202,11 @@ fn test_validator_stake_buffer_finalized_error() {
     // The buffer should remain unchanged in length and finalized state
     assert_eq!(buffer.length(), max_len);
     assert!(buffer.is_finalized());
-    // Verify that the first element is still the smallest of the *original* set
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    // Verify that the first element is the largest (descending sort)
+    assert_eq!(
+        buffer.get_by_index(0).unwrap().stake_amount,
+        100 + (max_len as u64 - 1)
+    );
 }
 
 #[test]
@@ -248,8 +251,11 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
     // The buffer should remain unchanged in length and finalized state
     assert_eq!(buffer.length(), initial_max_len);
     assert!(buffer.is_finalized());
-    // Verify that the first element is still the smallest of the *original* set
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 100);
+    // Verify that the first element is the largest (descending sort)
+    assert_eq!(
+        buffer.get_by_index(0).unwrap().stake_amount,
+        100 + (initial_max_len as u64 - 1)
+    );
 }
 
 #[test]
