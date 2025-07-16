@@ -1435,6 +1435,10 @@ impl ValidatorStakeBuffer {
         self.length
     }
 
+    pub fn last_observed_epoch(&self) -> u64 {
+        self.last_observed_epoch
+    }
+
     pub fn needs_reset(&self, epoch: u64) -> bool {
         epoch.gt(&self.last_observed_epoch)
     }

@@ -111,14 +111,8 @@ pub mod validator_history {
         handle_update_stake_buffer(ctx)
     }
 
-    pub fn update_stake_history(
-        ctx: Context<UpdateStakeHistory>,
-        epoch: u64,
-        lamports: u64,
-        rank: u32,
-        is_superminority: bool,
-    ) -> Result<()> {
-        handle_update_stake_history(ctx, epoch, lamports, rank, is_superminority)
+    pub fn update_stake_history(ctx: Context<UpdateStakeHistory>) -> Result<()> {
+        handle_update_stake_history(ctx)
     }
 
     pub fn copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> Result<()> {

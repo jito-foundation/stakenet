@@ -34,8 +34,10 @@ pub enum ValidatorHistoryError {
     DuplicateEpoch,
     #[msg("Account already sized properly")]
     NoReallocNeeded,
-    #[msg("Stake buffer has been marked as finalized")]
+    #[msg("Stake buffer has been finalized")]
     StakeBufferFinalized,
+    #[msg("Stake buffer has not been finalized")]
+    StakeBufferNotFinalized,
     #[msg("Config counter found at floor")]
     ConfigCounterFloor,
     #[msg("Config counter found at ceiling")]

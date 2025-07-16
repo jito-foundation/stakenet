@@ -2,6 +2,7 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
+    ValidatorStakeBuffer,
 };
 use anchor_lang::{prelude::*, solana_program::vote};
 
@@ -14,6 +15,13 @@ pub struct UpdateStakeHistory<'info> {
     )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
 
+    #[account(
+        mut,
+        seeds = [ValidatorStakeBuffer::SEED],
+        bump
+    )]
+    pub validator_stake_buffer_account: AccountLoader<'info, ValidatorStakeBuffer>,
+
     /// CHECK: fine since we are not deserializing account
     #[account(owner = vote::program::ID.key())]
     pub vote_account: AccountInfo<'info>,
@@ -21,32 +29,36 @@ pub struct UpdateStakeHistory<'info> {
     #[account(
         seeds = [Config::SEED],
         bump = config.bump,
-        has_one = oracle_authority
     )]
     pub config: Account<'info, Config>,
-
-    #[account(mut)]
-    pub oracle_authority: Signer<'info>,
 }
 
-// NOTE: If using this instruction to backfill a new validator history account, you must ensure that epochs are added in ascending order.
-// This is because new entries cannot be inserted for an epoch that is lower than the last entry's if missed.
-pub fn handle_update_stake_history(
-    ctx: Context<UpdateStakeHistory>,
-    epoch: u64,
-    lamports: u64,
-    rank: u32,
-    is_superminority: bool,
-) -> Result<()> {
+// TODO: backfilling?
+pub fn handle_update_stake_history(ctx: Context<UpdateStakeHistory>) -> Result<()> {
+    // Load accounts
     let mut validator_history_account: std::cell::RefMut<'_, ValidatorHistory> =
         ctx.accounts.validator_history_account.load_mut()?;
+    let validator_stake_buffer_account = ctx.accounts.validator_stake_buffer_account.load()?;
 
-    // Cannot set stake for future epochs
-    if epoch > Clock::get()?.epoch {
+    // Assert that the stake buffer is finalized for the current epoch
+    let epoch = Clock::get()?.epoch;
+    if validator_stake_buffer_account
+        .last_observed_epoch()
+        .ne(&epoch)
+    {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
-    let epoch = cast_epoch(epoch)?;
+    if !validator_stake_buffer_account.is_finalized() {
+        return Err(ValidatorHistoryError::StakeBufferNotFinalized.into());
+    }
 
+    // Get validator rank
+    let validator_id = validator_history_account.index;
+    let (lamports, rank, is_superminority) =
+        validator_stake_buffer_account.get_by_id(validator_id)?;
+
+    // Persist
+    let epoch = cast_epoch(epoch)?;
     validator_history_account.set_stake(epoch, lamports, rank, is_superminority)?;
 
     Ok(())
