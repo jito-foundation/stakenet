@@ -210,7 +210,7 @@ fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
             payer: keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
+        data: validator_history::instruction::ReallocConfigAccount {}.data(),
     }];
 
     let blockhash = client
