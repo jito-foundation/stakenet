@@ -202,17 +202,18 @@ fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
 
-    let mut instructions = vec![];
-    instructions.push(Instruction {
-        program_id: validator_history::ID,
-        accounts: validator_history::accounts::ReallocConfigAccount {
-            config_account: config_pda,
-            system_program: solana_program::system_program::id(),
-            payer: keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
-    });
+    let instructions = vec![
+    	Instruction {
+        	program_id: validator_history::ID,
+        	accounts: validator_history::accounts::ReallocConfigAccount {
+            		config_account: config_pda,
+            		system_program: solana_program::system_program::id(),
+            		payer: keypair.pubkey(),
+        	}
+        	.to_account_metas(None),
+        	data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
+    	}
+    ];
 
     let blockhash = client
         .get_latest_blockhash()
