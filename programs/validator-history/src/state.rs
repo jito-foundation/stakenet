@@ -1474,7 +1474,7 @@ impl ValidatorStakeBuffer {
         // The config counter should invariably be
         // 1) non-zero
         // 2) less than or equal to `MAX_VALIDATORS`
-        move |entry| {
+        |entry| {
             if config.counter.eq(&0) {
                 return Err(ValidatorHistoryError::ConfigCounterFloor.into());
             }
