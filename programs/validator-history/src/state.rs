@@ -1412,7 +1412,7 @@ impl Default for ValidatorStakeBuffer {
 }
 
 /// (Stake Lamports, Rank, Superminority)
-type ValidatorPosition = (u64, u32, bool);
+type ValidatorRank = (u64, u32, bool);
 
 impl ValidatorStakeBuffer {
     pub const SEED: &'static [u8] = b"validator-stake-buffer";
@@ -1447,8 +1447,14 @@ impl ValidatorStakeBuffer {
         Ok(self.buffer[index])
     }
 
+    pub fn total_stake(&self) -> u64 {
+        self.total_stake
+    }
+
     /// Get element by validator id
-    pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorPosition> {
+    ///
+    /// Linear searches thru buffer for rank
+    pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
         // Accumulators
         let mut cumulative_stake: u64 = 0;
         let mut is_supermintority = false;
