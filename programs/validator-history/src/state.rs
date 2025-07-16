@@ -1385,7 +1385,7 @@ pub struct ValidatorStakeBuffer {
     // Not useful until buffer is finalized
     total_stake: u64,
 
-    // Length of the stake buffer (number of validator stake ammounts observed this epoch)
+    // Length of the stake buffer (number of validators observed this epoch)
     length: u32,
 
     // Indicates whether or not we've observed every validator (history) account
