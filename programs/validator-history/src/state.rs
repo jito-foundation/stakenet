@@ -1483,14 +1483,14 @@ impl ValidatorStakeBuffer {
         Err(ValidatorHistoryError::StakeBufferOutOfBounds.into())
     }
 
-    /// Inserts a new [ValidatorStake] entry into the buffer.
+    /// Inserts a new [ValidatorStake] entry into the buffer
     fn insert_with_config(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
         // early exit if finalized
         if self.is_finalized() {
             return Err(ValidatorHistoryError::StakeBufferFinalized.into());
         }
         // Start linear search from end of buffer until finding validator with greater or equal stake
-        // to insert the new entry while maintaining descending order.
+        // to insert the new entry while maintaining descending order
         let mut i = self.length as usize;
         while i > 0 && entry.stake_amount > self.buffer[i - 1].stake_amount {
             // Shift element to the right one to make space
@@ -1510,15 +1510,15 @@ impl ValidatorStakeBuffer {
         Ok(())
     }
 
-    /// Builds an insert function.
+    /// Builds an insert function
     ///
-    /// This forces the user to pass in a [Config], before calling `insert`.
-    /// There is a dependency on the `config.counter` field for validation.
+    /// This forces the user to pass in a [Config], before calling `insert`
+    /// There is a dependency on the `config.counter` field for validation
     pub fn insert_builder<'a>(
         &'a mut self,
         config: &'a Config,
     ) -> impl FnMut(ValidatorStake) -> Result<()> + 'a {
-        // Validate the config account before using insert function.
+        // Validate the config account before using insert function
         //
         // The config counter should invariably be
         // 1) non-zero
