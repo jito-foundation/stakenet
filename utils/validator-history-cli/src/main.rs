@@ -199,7 +199,6 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
 }
 
 fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
-
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
 
