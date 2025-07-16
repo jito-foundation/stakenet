@@ -1,8 +1,8 @@
 use crate::{
     errors::StewardError,
+    stake_pool_utils::deserialize_stake_pool,
     utils::{
-        deserialize_stake_pool, get_stake_pool_address, get_validator_list,
-        get_validator_list_length, tally_stake_status,
+        get_stake_pool_address, get_validator_list, get_validator_list_length, tally_stake_status,
     },
     Config, StewardStateAccount,
 };

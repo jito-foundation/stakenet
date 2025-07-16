@@ -7,9 +7,7 @@ use crate::{
     MerkleRootUploadAuthority,
 };
 
-use jito_priority_fee_distribution::{
-    state::PriorityFeeDistributionAccount
-};
+use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
 
 #[derive(Accounts)]
 #[instruction(epoch: u64)]

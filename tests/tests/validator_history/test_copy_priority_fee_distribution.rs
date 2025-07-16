@@ -7,7 +7,7 @@ use tests::{
     priority_fee_distribution_helpers::derive_priority_fee_distribution_account_address,
     validator_history_fixtures::{new_priority_fee_distribution_account, TestFixture},
 };
-use validator_history::{ValidatorHistory, Config};
+use validator_history::{Config, ValidatorHistory};
 
 #[tokio::test]
 async fn test_priority_fee_commission() {
@@ -62,10 +62,7 @@ async fn test_priority_fee_commission() {
     assert!(account.history.idx == 0);
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].priority_fee_commission == 42);
-    assert!(
-        account.history.arr[0].priority_fee_tips
-            == 0
-    );
+    assert!(account.history.arr[0].priority_fee_tips == 0);
 
     ctx.borrow_mut().set_account(
         &distribution_account,

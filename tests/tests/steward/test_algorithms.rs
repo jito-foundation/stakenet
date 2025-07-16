@@ -1,5 +1,5 @@
 // Unit tests for scoring, instant unstake, and delegation methods
-use anchor_lang::AnchorSerialize;
+use crate::steward::serialize_validator_list;
 use jito_steward::{
     constants::{
         EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
@@ -1515,8 +1515,10 @@ fn test_increase_stake_calculation() {
 
     let mut validator_list = default_fixture.validator_list.clone();
     validator_list[0].active_stake_lamports = (500 * LAMPORTS_PER_SOL).into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     // 500 SOL in reserve, 500 SOL on validator[0], 1000 SOL on validator[1], 1000
@@ -1577,8 +1579,10 @@ fn test_increase_stake_calculation() {
     validator_list[0].active_stake_lamports = (3000 * LAMPORTS_PER_SOL).into();
     validator_list[1].active_stake_lamports = 0.into();
     validator_list[2].active_stake_lamports = 0.into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     let result = increase_stake_calculation(
@@ -1616,8 +1620,10 @@ fn test_increase_stake_calculation() {
     // validator before target validator is instant unstake
     let mut validator_list = default_fixture.validator_list.clone();
     validator_list[0].active_stake_lamports = (500 * LAMPORTS_PER_SOL).into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     state.instant_unstake.set(0, true).unwrap();
@@ -1658,8 +1664,10 @@ fn test_increase_stake_calculation() {
     validator_list[0].transient_stake_lamports = (1000 * LAMPORTS_PER_SOL).into();
     validator_list[1].active_stake_lamports = 0.into();
     validator_list[2].active_stake_lamports = (500 * LAMPORTS_PER_SOL).into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
     let result = increase_stake_calculation(
         &state,
@@ -1682,9 +1690,12 @@ fn test_increase_stake_calculation() {
     validator_list[0].transient_stake_lamports = 0.into();
     validator_list[1].active_stake_lamports = 0.into();
     validator_list[2].active_stake_lamports = 0.into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
+
     let minimum_delegation = 2 * LAMPORTS_PER_SOL;
     let result = increase_stake_calculation(
         &state,
@@ -1733,8 +1744,10 @@ fn test_decrease_stake_calculation() {
     state.delegations[2] = Delegation::new(0, 1);
 
     let validator_list = default_fixture.validator_list.clone();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     // Test: unstake cap reached before target validator
@@ -1921,8 +1934,10 @@ fn test_decrease_stake_calculation() {
     let mut validator_list = default_fixture.validator_list.clone();
     validator_list[1].active_stake_lamports = (2000 * LAMPORTS_PER_SOL).into();
     validator_list[2].active_stake_lamports = (2000 * LAMPORTS_PER_SOL).into();
+
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
 
     // Test: Stake deposit cap reached before target validator
@@ -2048,8 +2063,9 @@ fn test_decrease_stake_calculation() {
     let mut validator_list = default_fixture.validator_list.clone();
     validator_list[0].transient_stake_lamports = (1000 * LAMPORTS_PER_SOL).into();
     validator_list[1].transient_stake_lamports = (1000 * LAMPORTS_PER_SOL).into();
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
     state.instant_unstake.set(0, true).unwrap();
     state.instant_unstake.set(1, true).unwrap();
@@ -2084,10 +2100,10 @@ fn test_decrease_stake_calculation() {
 
     // Test unstake amount is less than minimum delegation
     let validator_list = default_fixture.validator_list.clone();
+    let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
-        data: &mut validator_list.try_to_vec().unwrap(),
+        data: &mut serialized_data,
     };
-    // 900 SOL unstaked from first two then 50 SOL left to unstake from the third, less than minimum delegation
     let unstake_state = UnstakeState {
         instant_unstake_cap: 1850 * LAMPORTS_PER_SOL,
         ..Default::default()

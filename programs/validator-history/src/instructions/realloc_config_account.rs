@@ -1,8 +1,6 @@
 use crate::{errors::ValidatorHistoryError, Config};
 use anchor_lang::{prelude::*, system_program, Discriminator};
-use jito_priority_fee_distribution::{
-     ID as PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID,
-};
+use jito_priority_fee_distribution::ID as PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID;
 
 #[derive(Accounts)]
 pub struct ReallocConfigAccount<'info> {
@@ -57,11 +55,13 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
         Config::try_deserialize(&mut &data[..])?
     };
 
-    let should_set_priority_fee_distribution_program = config.priority_fee_distribution_program.eq(&Pubkey::default());
-    let should_set_priority_fee_oracle_authority = config.priority_fee_oracle_authority.eq(&Pubkey::default());
+    let should_set_priority_fee_distribution_program = config
+        .priority_fee_distribution_program
+        .eq(&Pubkey::default());
+    let should_set_priority_fee_oracle_authority =
+        config.priority_fee_oracle_authority.eq(&Pubkey::default());
 
     if should_set_priority_fee_distribution_program || should_set_priority_fee_oracle_authority {
-
         if should_set_priority_fee_distribution_program {
             config.priority_fee_distribution_program = PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID;
         }
@@ -73,7 +73,6 @@ pub fn handle_realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Resu
         let mut data = ctx.accounts.config_account.try_borrow_mut_data()?;
         data[Config::DISCRIMINATOR.len()..].copy_from_slice(&config.try_to_vec()?);
     }
-
 
     Ok(())
 }

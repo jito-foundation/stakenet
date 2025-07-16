@@ -159,7 +159,11 @@ impl TestFixture {
         };
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction, set_tip_distribution_instruction, set_priority_fee_distribution_program],
+            &[
+                instruction,
+                set_tip_distribution_instruction,
+                set_priority_fee_distribution_program,
+            ],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
@@ -325,7 +329,7 @@ impl TestFixture {
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
-        let mut ctx = self.ctx.borrow_mut();
+        let ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx
             .banks_client
             .process_transaction_with_preflight(transaction)
@@ -347,6 +351,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
+            println!("{} {}", e, error_message);
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);

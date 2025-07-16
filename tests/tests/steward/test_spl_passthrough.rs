@@ -7,7 +7,7 @@ use anchor_lang::{
 use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS},
     derive_steward_state_address,
-    utils::{StakePool, ValidatorList},
+    stake_pool_utils::{StakePool, ValidatorList},
     Config, Delegation, StewardStateAccount, StewardStateEnum,
 };
 use rand::prelude::SliceRandom;
@@ -21,9 +21,11 @@ use spl_stake_pool::{
     find_ephemeral_stake_program_address, instruction::PreferredValidatorType, minimum_delegation,
     state::StakeStatus,
 };
-use tests::steward_fixtures::{
-    new_vote_account, serialized_stake_account, serialized_stake_pool_account,
-    serialized_steward_state_account, TestFixture,
+use tests::{
+    stake_pool_utils::serialized_stake_pool_account,
+    steward_fixtures::{
+        new_vote_account, serialized_stake_account, serialized_steward_state_account, TestFixture,
+    },
 };
 
 // ------------------------ HELPERS ------------------------
