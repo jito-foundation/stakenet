@@ -1394,7 +1394,7 @@ pub struct ValidatorStakeBuffer {
 
     _padding0: [u8; 3],
 
-    // Sorted validator stake amounts (ascending by amount)
+    // Sorted validator stake amounts (descending by amount)
     buffer: [ValidatorStake; MAX_VALIDATORS],
 }
 
