@@ -1140,10 +1140,6 @@ pub async fn update_stake_history(
     fixture: &TestFixture,
     extra_validator_accounts: &[ExtraValidatorAccounts],
     index: usize,
-    epoch: u64,
-    lamports: u64,
-    rank: u32,
-    is_superminority: bool,
 ) {
     let ctx = &fixture.ctx;
 
@@ -1151,18 +1147,14 @@ pub async fn update_stake_history(
         program_id: validator_history::id(),
         accounts: validator_history::accounts::UpdateStakeHistory {
             validator_history_account: extra_validator_accounts[index].validator_history_address,
+            // TODO:
+            validator_stake_buffer_account: extra_validator_accounts[index]
+                .validator_history_address,
             vote_account: extra_validator_accounts[index].vote_account,
             config: fixture.validator_history_config,
-            oracle_authority: fixture.keypair.pubkey(),
         }
         .to_account_metas(None),
-        data: validator_history::instruction::UpdateStakeHistory {
-            epoch,
-            is_superminority,
-            lamports,
-            rank,
-        }
-        .data(),
+        data: validator_history::instruction::UpdateStakeHistory {}.data(),
     };
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let tx = Transaction::new_signed_with_payer(
@@ -1220,14 +1212,15 @@ pub async fn crank_validator_history_accounts(
             .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 1000);
         copy_vote_account(fixture, extra_validator_accounts, i).await;
         // only field that's relevant to score is is_superminority
+        // TODO:
         update_stake_history(
             fixture,
             extra_validator_accounts,
             i,
-            clock.epoch,
-            1_000_000,
-            1_000,
-            false,
+            // clock.epoch,
+            // 1_000_000,
+            // 1_000,
+            // false,
         )
         .await;
     }
