@@ -322,15 +322,19 @@ fn test_get_by_id_zero_total_stake() {
     assert_eq!(buffer.length(), 150);
     assert_eq!(buffer.total_stake(), 0);
 
-    let (stake, rank, is_superminority) = buffer.get_by_id(0).unwrap();
-    assert_eq!(stake, 0);
-    assert_eq!(rank, 0);
-    assert!(!is_superminority);
+    let result = buffer.get_by_id(0);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferEmpty)
+    );
 
-    let (stake, rank, is_superminority) = buffer.get_by_id(75).unwrap();
-    assert_eq!(stake, 0);
-    assert_eq!(rank, 75);
-    assert!(!is_superminority);
+    let result = buffer.get_by_id(75);
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferEmpty)
+    );
 }
 
 #[test]
@@ -342,19 +346,16 @@ fn test_get_by_id_superminority_calculation() {
     };
     {
         let mut insert = buffer.insert_builder(&config);
-        // Scenario 1: Simple superminority calculation (total_stake = 300, threshold = 100)
-        // Ranks: 0 (100), 1 (100), 2 (100), ..., 150 (small_stake)
-        // Superminority threshold will be rank 2 (cumulative 300 > 300/3 = 100)
+        // Total stake: 3 * 100 + 147 * 1 = 300 + 147 = 447
+        // superminority_threshold_stake = 447 / 3 = 149
+        // cumulative_stake_at_rank_0 = 100
+        // cumulative_stake_at_rank_1 = 200 (so rank 1 is superminority threshold)
         for i in 0..150 {
-            let stake = if i < 3 { 100 } else { 1 }; // 3 validators with 100 stake, rest with 1
+            let stake = if i < 3 { 100 } else { 1 };
             insert(ValidatorStake::new(i, stake)).unwrap();
         }
     }
     assert_eq!(buffer.length(), 150);
-    // Total stake: 3 * 100 + 147 * 1 = 300 + 147 = 447
-    // superminority_threshold_stake = 447 / 3 = 149
-    // cumulative_stake_at_rank_0 = 100
-    // cumulative_stake_at_rank_1 = 200 (so rank 1 is superminority threshold)
 
     // Test validator at rank 0 (stake 100)
     let (_, rank, is_superminority) = buffer.get_by_id(0).unwrap();
@@ -366,7 +367,7 @@ fn test_get_by_id_superminority_calculation() {
     assert_eq!(rank, 1);
     assert!(is_superminority);
 
-    // Test validator at rank 2 (stake 100)
+    // Test validator outside superminority (rank 2, stake 100)
     let (_, rank, is_superminority) = buffer.get_by_id(2).unwrap();
     assert_eq!(rank, 2);
     assert!(!is_superminority);
@@ -394,7 +395,7 @@ fn test_get_by_id_superminority_calculation() {
     assert_eq!(rank, 49);
     assert!(is_superminority);
 
-    // Test validator at rank 50 (threshold rank)
+    // Test validator at rank 50
     let (_, rank, is_superminority) = buffer.get_by_id(50).unwrap();
     assert_eq!(rank, 50);
     assert!(is_superminority);
@@ -419,6 +420,9 @@ fn test_get_by_id_basic_found_rank_and_stake() {
         // Rank 1: (999, 1)
         // ...
         // Rank 100: (900, 100)
+        //
+        // Superminority cutoff is at rank 47 where cum stake is 46_872
+        // Total stake is 138_832 ... 1/3 of that is 46_275
         for i in 0..150 {
             insert(ValidatorStake::new(i, 1000 - i as u64)).unwrap();
         }
@@ -431,13 +435,19 @@ fn test_get_by_id_basic_found_rank_and_stake() {
     assert_eq!(rank, 0);
     assert!(is_superminority);
 
-    // Test finding validator in the middle
-    let (stake, rank, is_superminority) = buffer.get_by_id(50).unwrap();
-    assert_eq!(stake, 1000 - 50);
-    assert_eq!(rank, 50);
+    // Test finding validator in the middle (at threshold)
+    let (stake, rank, is_superminority) = buffer.get_by_id(47).unwrap();
+    assert_eq!(stake, 1000 - 47);
+    assert_eq!(rank, 47);
     assert!(is_superminority);
 
-    // Test finding validator at the end of inserted range
+    // Test finding validator in the middle (after threshold)
+    let (stake, rank, is_superminority) = buffer.get_by_id(48).unwrap();
+    assert_eq!(stake, 1000 - 48);
+    assert_eq!(rank, 48);
+    assert!(!is_superminority);
+
+    // Test finding validator at the end of inserted range (after threshold)
     let (stake, rank, is_superminority) = buffer.get_by_id(149).unwrap();
     assert_eq!(stake, 1000 - 149);
     assert_eq!(rank, 149);

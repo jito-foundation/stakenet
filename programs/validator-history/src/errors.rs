@@ -42,4 +42,6 @@ pub enum ValidatorHistoryError {
     ConfigCounterCeiling,
     #[msg("Stake buffer out of bounds")]
     StakeBufferOutOfBounds,
+    #[msg("Stake buffer is empty")]
+    StakeBufferEmpty,
 }

@@ -1455,19 +1455,21 @@ impl ValidatorStakeBuffer {
     ///
     /// Linear searches thru buffer for rank
     pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
+        if self.total_stake().eq(&0) {
+            return Err(ValidatorHistoryError::StakeBufferEmpty.into());
+        }
         // Accumulators
         let mut cumulative_stake: u64 = 0;
-        let mut is_supermintority = false;
+        let mut is_supermintority = true;
         let superminority_threshold = self.total_stake / 3;
         // Search for validator rank and superminority threshold
         for rank in 0..self.length as usize {
             let entry = &self.buffer[rank];
             // Superminority threshold check
-            if (cumulative_stake <= superminority_threshold) && !is_supermintority {
-                cumulative_stake += entry.stake_amount;
-                if cumulative_stake > superminority_threshold {
-                    is_supermintority = true;
-                }
+            if cumulative_stake > superminority_threshold && is_supermintority {
+                is_supermintority = false;
+            } else {
+                cumulative_stake += entry.stake_amount
             }
             // Rank
             if entry.validator_id == validator_id {
