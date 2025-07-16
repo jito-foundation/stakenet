@@ -37,6 +37,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Commands {
     InitConfig(InitConfig),
+    ReallocConfig(ReallocConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
     ClusterHistoryStatus,
@@ -67,6 +68,14 @@ struct InitConfig {
     /// If not provided, the initial keypair will be the authority
     #[arg(short, long, env, required(false))]
     stake_authority: Option<Pubkey>,
+}
+
+#[derive(Parser)]
+#[command(about = "Realloc Config")]
+struct ReallocConfig {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
 }
 
 #[derive(Parser)]
@@ -172,6 +181,39 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
             data: validator_history::instruction::SetNewOracleAuthority {}.data(),
         });
     }
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
+fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
+
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let mut instructions = vec![];
+    instructions.push(Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::ReallocConfigAccount {
+            config_account: config_pda,
+            system_program: solana_program::system_program::id(),
+            payer: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeClusterHistoryAccount {}.data(),
+    });
 
     let blockhash = client
         .get_latest_blockhash()
@@ -617,6 +659,7 @@ fn main() {
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
+        Commands::ReallocConfig(args) => command_realloc_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::ClusterHistoryStatus => command_cluster_history(client),
