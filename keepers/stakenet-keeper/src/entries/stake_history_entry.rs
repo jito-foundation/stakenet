@@ -56,18 +56,23 @@ impl Address for StakeHistoryEntry {
 }
 
 impl UpdateInstruction for StakeHistoryEntry {
-    // TODO:
     fn update_instruction(&self) -> Instruction {
         Instruction {
             program_id: self.program_id,
             accounts: validator_history::accounts::UpdateStakeHistory {
                 validator_history_account: self.address,
-                validator_stake_buffer_account: self.address,
                 vote_account: self.vote_account,
                 config: self.config,
+                oracle_authority: self.signer,
             }
             .to_account_metas(None),
-            data: validator_history::instruction::UpdateStakeHistory {}.data(),
+            data: validator_history::instruction::UpdateStakeHistory {
+                lamports: self.stake,
+                epoch: self.epoch,
+                rank: self.rank,
+                is_superminority: self.is_superminority,
+            }
+            .data(),
         }
     }
 }
