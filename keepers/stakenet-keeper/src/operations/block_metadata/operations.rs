@@ -101,6 +101,7 @@ pub async fn fire(
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
             keeper_config.cluster,
+            keeper_config.lookback_epochs,
         )
         .await
         {
@@ -146,6 +147,7 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     no_pack: bool,
     cluster: Cluster,
+    lookback_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -161,6 +163,7 @@ async fn _process(
         priority_fee_in_microlamports,
         no_pack,
         cluster,
+        lookback_epochs,
     )
     .await
 }
@@ -179,6 +182,7 @@ async fn update_block_metadata(
     priority_fee_in_microlamports: u64,
     _no_pack: bool, //TODO take out
     cluster: Cluster,
+    lookback_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -189,7 +193,6 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 3;
     let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule

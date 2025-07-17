@@ -34,6 +34,7 @@ pub struct KeeperConfig {
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
+    pub lookback_epochs: u64,
 }
 
 impl KeeperConfig {
@@ -209,6 +210,10 @@ pub struct Args {
     /// Run Priority Fee Commission
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
+
+    /// Number of epochs to look back for block metadata
+    #[arg(long, env, default_value = "3")]
+    pub lookback_epochs: u64,
 }
 
 impl fmt::Display for Args {

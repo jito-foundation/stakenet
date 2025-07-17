@@ -397,6 +397,7 @@ async fn main() {
         priority_fee_oracle_authority_keypair,
         redundant_rpc_urls,
         cluster: args.cluster,
+        lookback_epochs: args.lookback_epochs,
     };
 
     run_keeper(config).await;
