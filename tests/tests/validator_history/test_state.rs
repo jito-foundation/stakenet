@@ -3,7 +3,8 @@ use validator_history::constants::TVC_MULTIPLIER;
 use validator_history::errors::ValidatorHistoryError;
 use validator_history::state::CircBuf;
 use validator_history::{
-    constants::MAX_VALIDATORS, Config, ValidatorHistoryEntry, ValidatorStake, ValidatorStakeBuffer,
+    constants::MAX_STAKE_BUFFER_VALIDATORS, Config, ValidatorHistoryEntry, ValidatorStake,
+    ValidatorStakeBuffer,
 };
 
 const MAX_ITEMS: usize = 512;
@@ -82,7 +83,7 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
     let mut buffer = ValidatorStakeBuffer::default();
     let entry = ValidatorStake::new(1, 100);
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -97,7 +98,7 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
 fn test_validator_stake_buffer_insert_partially_full_ordered() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -116,7 +117,7 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
 fn test_validator_stake_buffer_insert_unordered_in_middle() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -135,7 +136,7 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
 fn test_validator_stake_buffer_insert_unordered_at_start() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -154,7 +155,7 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
 fn test_validator_stake_buffer_insert_partially_full_unordered() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -286,7 +287,7 @@ fn test_validator_stake_buffer_insert_with_zero_max_len() {
 fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: (MAX_VALIDATORS + 1) as u32,
+        counter: (MAX_STAKE_BUFFER_VALIDATORS + 1) as u32,
         ..Default::default()
     };
     let entry = ValidatorStake::new(1, 100);
@@ -310,7 +311,7 @@ fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators()
 fn test_get_by_id_zero_total_stake() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -341,7 +342,7 @@ fn test_get_by_id_zero_total_stake() {
 fn test_get_by_id_superminority_calculation() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -410,7 +411,7 @@ fn test_get_by_id_superminority_calculation() {
 fn test_get_by_id_basic_found_rank_and_stake() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {
@@ -458,7 +459,7 @@ fn test_get_by_id_basic_found_rank_and_stake() {
 fn test_get_by_id_validator_not_found() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: MAX_VALIDATORS as u32,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
     {

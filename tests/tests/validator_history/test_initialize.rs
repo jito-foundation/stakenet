@@ -4,7 +4,7 @@ use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{
-    constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS},
+    constants::{MAX_ALLOC_BYTES, MAX_STAKE_BUFFER_VALIDATORS},
     Config, ValidatorHistory, ValidatorStakeBuffer,
 };
 
@@ -82,7 +82,7 @@ async fn test_initialize() {
     assert!(account.data.len() >= MAX_ALLOC_BYTES);
     let account =
         bytemuck::try_from_bytes::<ValidatorStakeBuffer>(&account.data.as_slice()[8..]).unwrap();
-    assert!(account.buffer.len() == MAX_VALIDATORS);
+    assert!(account.size() == MAX_STAKE_BUFFER_VALIDATORS);
 
     // Get validator history account and assert exists
     let account = ctx

@@ -4,7 +4,7 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
-use crate::constants::MAX_VALIDATORS;
+use crate::constants::MAX_STAKE_BUFFER_VALIDATORS;
 
 use {
     crate::{
@@ -1395,7 +1395,7 @@ pub struct ValidatorStakeBuffer {
     _padding0: [u8; 3],
 
     // Sorted validator stake amounts (descending by amount)
-    buffer: [ValidatorStake; MAX_VALIDATORS],
+    buffer: [ValidatorStake; MAX_STAKE_BUFFER_VALIDATORS],
 }
 
 impl Default for ValidatorStakeBuffer {
@@ -1406,7 +1406,7 @@ impl Default for ValidatorStakeBuffer {
             length: 0,
             finalized: 0,
             _padding0: [0; 3],
-            buffer: [ValidatorStake::default(); MAX_VALIDATORS],
+            buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
         }
     }
 }
@@ -1424,7 +1424,7 @@ impl ValidatorStakeBuffer {
         self.total_stake = 0;
         self.length = 0;
         self.finalized = 0;
-        self.buffer = [ValidatorStake::default(); MAX_VALIDATORS];
+        self.buffer = [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS];
     }
 
     pub fn is_finalized(&self) -> bool {
@@ -1433,6 +1433,10 @@ impl ValidatorStakeBuffer {
 
     pub fn length(&self) -> u32 {
         self.length
+    }
+
+    pub fn size(&self) -> usize {
+        self.buffer.len()
     }
 
     pub fn last_observed_epoch(&self) -> u64 {
@@ -1522,12 +1526,12 @@ impl ValidatorStakeBuffer {
         //
         // The config counter should invariably be
         // 1) non-zero
-        // 2) less than or equal to `MAX_VALIDATORS`
+        // 2) less than or equal to `MAX_STAKE_BUFFER_VALIDATORS`
         |entry| {
             if config.counter.eq(&0) {
                 return Err(ValidatorHistoryError::ConfigCounterFloor.into());
             }
-            if config.counter.gt(&(MAX_VALIDATORS as u32)) {
+            if config.counter.gt(&(MAX_STAKE_BUFFER_VALIDATORS as u32)) {
                 return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
             }
             self.insert_with_config(config, entry)
