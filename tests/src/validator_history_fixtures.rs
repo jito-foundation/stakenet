@@ -56,6 +56,25 @@ impl TestFixture {
             None,
         );
 
+        // instead, just register a tiny‐epoch sysvar
+        use solana_program::sysvar::epoch_schedule::EpochSchedule;
+        let tiny_schedule = EpochSchedule {
+            // only 32 slots per epoch!
+            slots_per_epoch: 32,
+            // the rest you can leave at zero/default
+            leader_schedule_slot_offset: 0,
+            warmup: false,
+            first_normal_epoch: 0,
+            first_normal_slot: 0,
+        };
+        // this writes it into genesis so every bank you warp through uses 32‑slot epochs
+        program.add_sysvar_account(solana_program::sysvar::epoch_schedule::id(), &tiny_schedule);
+        use solana_program::sysvar::stake_history::StakeHistory;
+        program.add_sysvar_account(
+            solana_program::sysvar::stake_history::id(),
+            &StakeHistory::default(),
+        );
+
         let epoch = 0;
         let vote_account = Pubkey::new_unique();
         let identity_keypair = Keypair::new();
@@ -93,11 +112,11 @@ impl TestFixture {
             vote_account,
             new_vote_account(identity_pubkey, vote_account, 1, Some(vec![(0, 0, 0); 10])),
         );
-        program.add_account(keypair.pubkey(), system_account(100_000_000_000));
-        program.add_account(identity_pubkey, system_account(100_000_000_000));
+        program.add_account(keypair.pubkey(), system_account(100_000_000_000_000));
+        program.add_account(identity_pubkey, system_account(100_000_000_000_000));
         program.add_account(
             priority_fee_oracle_keypair.pubkey(),
-            system_account(100_000_000_000),
+            system_account(100_000_000_000_000),
         );
 
         let ctx = Rc::new(RefCell::new(program.start_with_context().await));
