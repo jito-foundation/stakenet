@@ -1,6 +1,5 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
-use borsh::BorshSerialize;
-use solana_program::sysvar::{clock::Clock, epoch_schedule::EpochSchedule};
+use solana_program::sysvar::clock::Clock;
 use solana_program::vote::{
     self as solana_vote_program, instruction as vote_instruction,
     state::{VoteInit, VoteState},
@@ -11,7 +10,6 @@ use solana_sdk::stake::{
     state::{Authorized, Lockup, StakeStateV2},
 };
 use solana_sdk::{
-    account::Account,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signer::{keypair::Keypair, Signer},
@@ -21,28 +19,123 @@ use solana_sdk::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use tests::validator_history_fixtures::TestFixture;
+use validator_history::constants::MAX_ALLOC_BYTES;
 use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
-use validator_history::ValidatorHistoryEntry;
 
-// Helper function to create and set up a validator with a history account
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
-pub async fn create_and_setup_validator_accounts(
+pub async fn create_validator_accounts(
     ctx: &Rc<RefCell<ProgramTestContext>>,
     payer: &Keypair,
-    index: u32,
     stake_amount: u64,
-    is_superminority: bool,
+    validator_history_config: &Pubkey,
 ) -> (Pubkey, Pubkey) {
-    let vote_account = Keypair::new();
-    let validator_history_address = Pubkey::find_program_address(
-        &[ValidatorHistory::SEED, vote_account.pubkey().as_ref()],
+    let vote_account = create_vote_account(ctx, payer).await;
+    let _ = create_stake_account(ctx, payer, &vote_account, stake_amount).await;
+    let validator_history_account =
+        create_validator_history_account(ctx, payer, &vote_account, validator_history_config).await;
+    (vote_account, validator_history_account)
+}
+
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
+pub async fn create_validator_history_account(
+    ctx: &Rc<RefCell<ProgramTestContext>>,
+    payer: &Keypair,
+    vote_account: &Pubkey,
+    validator_history_config: &Pubkey,
+) -> Pubkey {
+    let validator_history_account = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, vote_account.as_ref()],
         &validator_history::id(),
     )
     .0;
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
+            validator_history_account,
+            vote_account: *vote_account,
+            system_program: anchor_lang::solana_program::system_program::id(),
+            signer: payer.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeValidatorHistoryAccount {}.data(),
+    };
+    let mut ixs = vec![instruction];
+    let num_reallocs = (ValidatorHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    ixs.extend(vec![
+        Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::ReallocValidatorHistoryAccount {
+                validator_history_account,
+                vote_account: *vote_account,
+                config: *validator_history_config,
+                system_program: anchor_lang::solana_program::system_program::id(),
+                signer: payer.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::ReallocValidatorHistoryAccount {}.data(),
+        };
+        num_reallocs
+    ]);
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&payer.pubkey()),
+        &[payer],
+        ctx.borrow().last_blockhash,
+    );
+    ctx.borrow_mut()
+        .banks_client
+        .process_transaction(tx)
+        .await
+        .unwrap();
+    validator_history_account
+}
 
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
+pub async fn create_stake_account(
+    ctx: &Rc<RefCell<ProgramTestContext>>,
+    payer: &Keypair,
+    vote_account: &Pubkey,
+    stake_amount: u64,
+) -> Pubkey {
+    let stake_account = Keypair::new();
+    let rent = ctx.borrow().banks_client.get_rent().await.unwrap();
+    let stake_rent = rent.minimum_balance(StakeStateV2::size_of());
+    let lamports_to_delegate = stake_amount + stake_rent;
+    let authorized = Authorized {
+        staker: payer.pubkey(),
+        withdrawer: payer.pubkey(),
+    };
+    let lockup = Lockup::default();
+    let instructions = vec![
+        system_instruction::create_account(
+            &payer.pubkey(),
+            &stake_account.pubkey(),
+            lamports_to_delegate,
+            StakeStateV2::size_of() as u64,
+            &stake::program::id(),
+        ),
+        stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
+        stake_instruction::delegate_stake(&stake_account.pubkey(), &payer.pubkey(), vote_account),
+    ];
+    let tx = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&payer.pubkey()),
+        &[payer, &stake_account],
+        ctx.borrow().last_blockhash,
+    );
+    ctx.borrow_mut()
+        .banks_client
+        .process_transaction(tx)
+        .await
+        .unwrap();
+    stake_account.pubkey()
+}
+
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
+pub async fn create_vote_account(ctx: &Rc<RefCell<ProgramTestContext>>, payer: &Keypair) -> Pubkey {
+    let vote_account = Keypair::new();
     let rent = ctx.borrow().banks_client.get_rent().await.unwrap();
     let vote_rent = rent.minimum_balance(VoteState::size_of());
-
     // Create and initialize vote account
     let vote_init = VoteInit {
         node_pubkey: payer.pubkey(),
@@ -50,7 +143,7 @@ pub async fn create_and_setup_validator_accounts(
         authorized_withdrawer: payer.pubkey(),
         commission: 0,
     };
-    let mut instructions = vec![
+    let instructions = vec![
         system_instruction::create_account(
             &payer.pubkey(),
             &vote_account.pubkey(),
@@ -81,78 +174,7 @@ pub async fn create_and_setup_validator_accounts(
         .process_transaction(tx)
         .await
         .unwrap();
-
-    // Create and delegate stake account
-    let stake_account = Keypair::new();
-    let stake_rent = rent.minimum_balance(StakeStateV2::size_of());
-    let lamports_to_delegate = stake_amount + stake_rent;
-
-    let authorized = Authorized {
-        staker: payer.pubkey(),
-        withdrawer: payer.pubkey(),
-    };
-    let lockup = Lockup::default();
-    instructions = vec![
-        system_instruction::create_account(
-            &payer.pubkey(),
-            &stake_account.pubkey(),
-            lamports_to_delegate,
-            StakeStateV2::size_of() as u64,
-            &stake::program::id(),
-        ),
-        stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
-        stake_instruction::delegate_stake(
-            &stake_account.pubkey(),
-            &payer.pubkey(),
-            &vote_account.pubkey(),
-        ),
-    ];
-    let tx = Transaction::new_signed_with_payer(
-        &instructions,
-        Some(&payer.pubkey()),
-        &[payer, &stake_account],
-        ctx.borrow().last_blockhash,
-    );
-    ctx.borrow_mut()
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
-
-    let mut validator_history = ValidatorHistory {
-        struct_version: 0,
-        vote_account: vote_account.pubkey(),
-        index,
-        bump: 0,
-        _padding0: [0; 7],
-        last_ip_timestamp: 0,
-        last_version_timestamp: 0,
-        _padding1: [0; 232],
-        history: Default::default(),
-    };
-    validator_history.history.push(ValidatorHistoryEntry {
-        activated_stake_lamports: stake_amount,
-        is_superminority: is_superminority as u8,
-        ..Default::default()
-    });
-
-    let mut validator_history_data = Vec::new();
-    validator_history
-        .serialize(&mut validator_history_data)
-        .unwrap();
-
-    ctx.borrow_mut().set_account(
-        &validator_history_address,
-        &Account {
-            lamports: 1_000_000_000,
-            data: validator_history_data,
-            owner: validator_history::id(),
-            ..Default::default()
-        }
-        .into(),
-    );
-
-    (vote_account.pubkey(), validator_history_address)
+    vote_account.pubkey()
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -174,17 +196,14 @@ async fn test_stake_buffer_insert() {
     for i in 0..num_validators {
         // Simulate different stake amounts and ensure some are superminority
         let stake_amount = (100 - i) as u64 * 1_000_000_000; // Decreasing stake
-        let is_superminority = i < 2; // First two are superminority for testing
 
-        let (vote_account_address, validator_history_address) =
-            create_and_setup_validator_accounts(
-                &test.ctx,
-                &test.keypair,
-                i as u32,
-                stake_amount,
-                is_superminority,
-            )
-            .await;
+        let (vote_account_address, validator_history_address) = create_validator_accounts(
+            &test.ctx,
+            &test.keypair,
+            stake_amount,
+            &test.validator_history_config,
+        )
+        .await;
 
         validator_accounts.push((vote_account_address, validator_history_address));
     }
