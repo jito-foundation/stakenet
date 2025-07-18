@@ -1,9 +1,5 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_program::sysvar::clock::Clock;
-use solana_program::vote::{
-    self as solana_vote_program, instruction as vote_instruction,
-    state::{VoteInit, VoteState},
-};
 use solana_program_test::*;
 use solana_sdk::stake::{
     self, instruction as stake_instruction,
@@ -13,12 +9,12 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signer::{keypair::Keypair, Signer},
-    system_instruction, sysvar,
+    system_instruction,
     transaction::Transaction,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use tests::validator_history_fixtures::TestFixture;
+use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::constants::MAX_ALLOC_BYTES;
 use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
 
@@ -26,10 +22,11 @@ use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
 pub async fn create_validator_accounts(
     ctx: &Rc<RefCell<ProgramTestContext>>,
     payer: &Keypair,
-    stake_amount: u64,
+    identity: &Pubkey,
     validator_history_config: &Pubkey,
+    stake_amount: u64,
 ) -> (Pubkey, Pubkey) {
-    let vote_account = create_vote_account(ctx, payer).await;
+    let vote_account = create_vote_account(ctx, identity).await;
     let _ = create_stake_account(ctx, payer, &vote_account, stake_amount).await;
     let validator_history_account =
         create_validator_history_account(ctx, payer, &vote_account, validator_history_config).await;
@@ -132,48 +129,21 @@ pub async fn create_stake_account(
 }
 
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
-pub async fn create_vote_account(ctx: &Rc<RefCell<ProgramTestContext>>, payer: &Keypair) -> Pubkey {
+pub async fn create_vote_account(
+    ctx: &Rc<RefCell<ProgramTestContext>>,
+    identity: &Pubkey,
+) -> Pubkey {
     let vote_account = Keypair::new();
-    let rent = ctx.borrow().banks_client.get_rent().await.unwrap();
-    let vote_rent = rent.minimum_balance(VoteState::size_of());
-    // Create and initialize vote account
-    let vote_init = VoteInit {
-        node_pubkey: payer.pubkey(),
-        authorized_voter: payer.pubkey(),
-        authorized_withdrawer: payer.pubkey(),
-        commission: 0,
-    };
-    let instructions = vec![
-        system_instruction::create_account(
-            &payer.pubkey(),
-            &vote_account.pubkey(),
-            vote_rent,
-            VoteState::size_of() as u64,
-            &solana_vote_program::program::id(),
-        ),
-        Instruction::new_with_bincode(
-            solana_vote_program::program::id(),
-            &vote_instruction::VoteInstruction::InitializeAccount(vote_init),
-            vec![
-                AccountMeta::new(vote_account.pubkey(), false),
-                AccountMeta::new_readonly(sysvar::rent::id(), false),
-                AccountMeta::new_readonly(sysvar::clock::id(), false),
-                AccountMeta::new_readonly(vote_init.node_pubkey, true),
-            ],
-        ),
-    ];
-
-    let tx = Transaction::new_signed_with_payer(
-        &instructions,
-        Some(&payer.pubkey()),
-        &[payer, &vote_account],
-        ctx.borrow().last_blockhash,
+    ctx.borrow_mut().genesis_config().add_account(
+        vote_account.pubkey(),
+        new_vote_account(
+            *identity,
+            vote_account.pubkey(),
+            1,
+            Some(vec![(0, 0, 0); 10]),
+        )
+        .into(),
     );
-    ctx.borrow_mut()
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
     vote_account.pubkey()
 }
 
@@ -200,8 +170,9 @@ async fn test_stake_buffer_insert() {
         let (vote_account_address, validator_history_address) = create_validator_accounts(
             &test.ctx,
             &test.keypair,
-            stake_amount,
+            &test.identity_keypair.pubkey(),
             &test.validator_history_config,
+            stake_amount,
         )
         .await;
 
