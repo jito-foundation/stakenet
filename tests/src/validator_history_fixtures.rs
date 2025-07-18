@@ -27,6 +27,7 @@ use {
 pub struct TestFixture {
     pub ctx: Rc<RefCell<ProgramTestContext>>,
     pub vote_account: Pubkey,
+    pub additional_vote_accounts: Vec<Pubkey>,
     pub identity_keypair: Keypair,
     pub cluster_history_account: Pubkey,
     pub validator_stake_buffer_account: Pubkey,
@@ -75,6 +76,7 @@ impl TestFixture {
             &StakeHistory::default(),
         );
 
+        // Derive pubkeys
         let epoch = 0;
         let vote_account = Pubkey::new_unique();
         let identity_keypair = Keypair::new();
@@ -108,6 +110,7 @@ impl TestFixture {
         let keypair = Keypair::new();
         let priority_fee_oracle_keypair = Keypair::new();
 
+        // Add accounts
         program.add_account(
             vote_account,
             new_vote_account(identity_pubkey, vote_account, 1, Some(vec![(0, 0, 0); 10])),
@@ -119,8 +122,24 @@ impl TestFixture {
             system_account(100_000_000_000_000),
         );
 
-        let ctx = Rc::new(RefCell::new(program.start_with_context().await));
+        // Add vec of additional vote accounts
+        let mut additional_vote_accounts = vec![];
+        for _ in 0..5 {
+            let keypair = Keypair::new();
+            program.add_account(
+                keypair.pubkey(),
+                new_vote_account(
+                    identity_pubkey,
+                    keypair.pubkey(),
+                    1,
+                    Some(vec![(0, 0, 0); 10]),
+                ),
+            );
+            additional_vote_accounts.push(keypair.pubkey());
+        }
 
+        // Start program
+        let ctx = Rc::new(RefCell::new(program.start_with_context().await));
         Self {
             ctx,
             validator_history_config,
@@ -129,6 +148,7 @@ impl TestFixture {
             validator_stake_buffer_account,
             identity_keypair,
             vote_account,
+            additional_vote_accounts,
             tip_distribution_account,
             keypair,
             priority_fee_oracle_keypair,

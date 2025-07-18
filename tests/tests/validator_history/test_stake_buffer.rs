@@ -22,15 +22,14 @@ use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
 pub async fn create_validator_accounts(
     ctx: &Rc<RefCell<ProgramTestContext>>,
     payer: &Keypair,
-    identity: &Pubkey,
     validator_history_config: &Pubkey,
+    vote_account: &Pubkey,
     stake_amount: u64,
-) -> (Pubkey, Pubkey) {
-    let vote_account = create_vote_account(ctx, identity).await;
+) -> Pubkey {
     let _ = create_stake_account(ctx, payer, &vote_account, stake_amount).await;
     let validator_history_account =
         create_validator_history_account(ctx, payer, &vote_account, validator_history_config).await;
-    (vote_account, validator_history_account)
+    validator_history_account
 }
 
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
@@ -128,25 +127,6 @@ pub async fn create_stake_account(
     stake_account.pubkey()
 }
 
-#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
-pub async fn create_vote_account(
-    ctx: &Rc<RefCell<ProgramTestContext>>,
-    identity: &Pubkey,
-) -> Pubkey {
-    let vote_account = Keypair::new();
-    ctx.borrow_mut().genesis_config().add_account(
-        vote_account.pubkey(),
-        new_vote_account(
-            *identity,
-            vote_account.pubkey(),
-            1,
-            Some(vec![(0, 0, 0); 10]),
-        )
-        .into(),
-    );
-    vote_account.pubkey()
-}
-
 #[tokio::test(flavor = "current_thread")]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert() {
@@ -161,26 +141,31 @@ async fn test_stake_buffer_insert() {
     .await;
 
     // Create several mock validator history accounts with different stake amounts
-    let num_validators = 5;
+    let num_validators = test.additional_vote_accounts.len();
     let mut validator_accounts = Vec::new();
-    for i in 0..num_validators {
+    for (i, vote_account) in test
+        .additional_vote_accounts
+        .clone()
+        .into_iter()
+        .enumerate()
+    {
         // Simulate different stake amounts and ensure some are superminority
         let stake_amount = (100 - i) as u64 * 1_000_000_000; // Decreasing stake
 
-        let (vote_account_address, validator_history_address) = create_validator_accounts(
+        let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
-            &test.identity_keypair.pubkey(),
             &test.validator_history_config,
+            &vote_account,
             stake_amount,
         )
         .await;
 
-        validator_accounts.push((vote_account_address, validator_history_address));
+        validator_accounts.push((vote_account, validator_history_address));
     }
     // Fake advancing by one epoch without spawning any banks
     // (use your genesis_config's slot timing, e.g. 100 ms/slot)
-    test.advance_clock(1 /* epochs */, 500 /* ms per slot */)
+    test.advance_clock(3 /* epochs */, 500 /* ms per slot */)
         .await;
     // test.advance_num_epochs(1).await;
 
