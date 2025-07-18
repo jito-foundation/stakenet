@@ -188,12 +188,11 @@ async fn test_stake_buffer_insert() {
 
         validator_accounts.push((vote_account_address, validator_history_address));
     }
-
     // Fake advancing by one epoch without spawning any banks
     // (use your genesis_config's slot timing, e.g. 100 ms/slot)
     test.advance_clock(1 /* epochs */, 500 /* ms per slot */)
         .await;
-    // test.advance_num_epochs(2).await;
+    // test.advance_num_epochs(1).await;
 
     for (vote_account_address, validator_history_address) in validator_accounts {
         // Call update_stake_buffer instruction for this specific validator
