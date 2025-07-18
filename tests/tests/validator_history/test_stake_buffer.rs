@@ -8,7 +8,7 @@ use solana_program::vote::{
 use solana_program_test::*;
 use solana_sdk::stake::{
     self, instruction as stake_instruction,
-    state::{Authorized, Lockup, StakeState},
+    state::{Authorized, Lockup, StakeStateV2},
 };
 use solana_sdk::{
     account::Account,
@@ -25,7 +25,7 @@ use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
 use validator_history::ValidatorHistoryEntry;
 
 // Helper function to create and set up a validator with a history account
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 pub async fn create_and_setup_validator_accounts(
     ctx: &Rc<RefCell<ProgramTestContext>>,
     payer: &Keypair,
@@ -84,7 +84,7 @@ pub async fn create_and_setup_validator_accounts(
 
     // Create and delegate stake account
     let stake_account = Keypair::new();
-    let stake_rent = rent.minimum_balance(StakeState::size_of());
+    let stake_rent = rent.minimum_balance(StakeStateV2::size_of());
     let lamports_to_delegate = stake_amount + stake_rent;
 
     let authorized = Authorized {
@@ -97,7 +97,7 @@ pub async fn create_and_setup_validator_accounts(
             &payer.pubkey(),
             &stake_account.pubkey(),
             lamports_to_delegate,
-            StakeState::size_of() as u64,
+            StakeStateV2::size_of() as u64,
             &stake::program::id(),
         ),
         stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
@@ -156,6 +156,7 @@ pub async fn create_and_setup_validator_accounts(
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert() {
     // Starting test_stake_buffer_insert
     let test = TestFixture::new().await;
@@ -258,6 +259,7 @@ async fn test_stake_buffer_insert() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_update_and_resort() {
     let test = TestFixture::new().await;
 
