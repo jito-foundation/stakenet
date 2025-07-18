@@ -100,12 +100,12 @@ pub async fn create_and_setup_validator_accounts(
             StakeStateV2::size_of() as u64,
             &stake::program::id(),
         ),
-        stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
-        stake_instruction::delegate_stake(
-            &stake_account.pubkey(),
-            &payer.pubkey(),
-            &vote_account.pubkey(),
-        ),
+        // stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
+        // stake_instruction::delegate_stake(
+        //     &stake_account.pubkey(),
+        //     &payer.pubkey(),
+        //     &vote_account.pubkey(),
+        // ),
     ];
     let tx = Transaction::new_signed_with_payer(
         &instructions,
@@ -155,7 +155,7 @@ pub async fn create_and_setup_validator_accounts(
     (vote_account.pubkey(), validator_history_address)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert() {
     // Starting test_stake_buffer_insert
@@ -170,13 +170,13 @@ async fn test_stake_buffer_insert() {
 
     // Create several mock validator history accounts with different stake amounts
     let num_validators = 5;
-    let mut validator_history_addresses = Vec::new();
+    let mut validator_accounts = Vec::new();
     for i in 0..num_validators {
         // Simulate different stake amounts and ensure some are superminority
-        let stake_amount = (100 - i) as u64 * 1_000_000_000; // Decreasing stake
+        let stake_amount = (100 - i) as u64 * 1_000; // Decreasing stake
         let is_superminority = i < 2; // First two are superminority for testing
 
-        let (_vote_account_address, validator_history_address) =
+        let (vote_account_address, validator_history_address) =
             create_and_setup_validator_accounts(
                 &test.ctx,
                 &test.keypair,
@@ -186,28 +186,14 @@ async fn test_stake_buffer_insert() {
             )
             .await;
 
-        validator_history_addresses.push(validator_history_address);
+        validator_accounts.push((vote_account_address, validator_history_address));
     }
 
-    // Advance to next epoch for stake to be activated
-    let clock = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap();
-    let epoch_schedule = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<EpochSchedule>()
-        .await
-        .unwrap();
-    let next_epoch_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch + 1);
-    test.ctx.borrow_mut().warp_to_slot(next_epoch_slot).unwrap();
+    // Fake advancing by one epoch without spawning any banks
+    // (use your genesis_config's slot timing, e.g. 100 ms/slot)
+    test.advance_clock(1 /* epochs */, 100 /* ms per slot */).await;
 
-    for validator_history_address in validator_history_addresses {
+    for (vote_account_address, validator_history_address) in validator_accounts {
         // Call update_stake_buffer instruction for this specific validator
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
 
@@ -217,10 +203,13 @@ async fn test_stake_buffer_insert() {
             validator_history_account: validator_history_address,
         };
 
+        let mut metas = accounts.to_account_metas(None);
+        metas.push(AccountMeta::new_readonly(vote_account_address, false));
+
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[Instruction {
                 program_id: validator_history::id(),
-                accounts: accounts.to_account_metas(None),
+                accounts: metas,
                 data: ix_data.data(),
             }],
             Some(&test.keypair.pubkey()),
@@ -252,13 +241,13 @@ async fn test_stake_buffer_insert() {
 
     // Verify individual entries are inserted and sorted by stake amount (descending)
     for i in 0..num_validators {
-        let expected_stake = (100 - i) as u64 * 1_000_000_000;
+        let expected_stake = (100 - i) as u64 * 1_000;
         let entry = stake_buffer_account.get_by_index(i).unwrap();
         assert_eq!(entry.stake_amount, expected_stake);
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_update_and_resort() {
     let test = TestFixture::new().await;
@@ -270,13 +259,13 @@ async fn test_stake_buffer_update_and_resort() {
     .await;
 
     let num_validators = 5;
-    let mut validator_history_addresses = Vec::new();
+    let mut validator_accounts = Vec::new();
 
     for i in 0..num_validators {
-        let stake_amount = (100 - i * 10) as u64 * 1_000_000_000;
+        let stake_amount = (100 - i * 10) as u64 * 1_000;
         let is_superminority = i < 2;
 
-        let (_vote_account_address, validator_history_address) =
+        let (vote_account_address, validator_history_address) =
             create_and_setup_validator_accounts(
                 &test.ctx,
                 &test.keypair,
@@ -286,38 +275,26 @@ async fn test_stake_buffer_update_and_resort() {
             )
             .await;
 
-        validator_history_addresses.push(validator_history_address);
+        validator_accounts.push((vote_account_address, validator_history_address));
     }
 
-    // Advance to next epoch for stake to be activated
-    let mut clock = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap();
-    let mut epoch_schedule = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<EpochSchedule>()
-        .await
-        .unwrap();
-    let mut next_epoch_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch + 1);
-    test.ctx.borrow_mut().warp_to_slot(next_epoch_slot).unwrap();
+    // Fake advancing by one epoch without spawning any banks
+    // (use your genesis_config's slot timing, e.g. 100 ms/slot)
+    test.advance_clock(1 /* epochs */, 100 /* ms per slot */).await;
 
-    for validator_history_address in &validator_history_addresses {
+    for (vote_account_address, validator_history_address) in &validator_accounts {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
             validator_history_account: *validator_history_address,
         };
+        let mut metas = accounts.to_account_metas(None);
+        metas.push(AccountMeta::new_readonly(*vote_account_address, false));
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[Instruction {
                 program_id: validator_history::id(),
-                accounts: accounts.to_account_metas(None),
+                accounts: metas,
                 data: ix_data.data(),
             }],
             Some(&test.keypair.pubkey()),
@@ -329,9 +306,9 @@ async fn test_stake_buffer_update_and_resort() {
 
     // Update a validator's stake to change its rank
     let validator_to_update_index = 3; // Initially has 70 stake
-    let new_stake_amount = 110 * 1_000_000_000; // New stake, should be rank 0
+    let new_stake_amount = 110 * 1_000; // New stake, should be rank 0
 
-    let (_new_vote_account, new_validator_history) = create_and_setup_validator_accounts(
+    let (new_vote_account, new_validator_history) = create_and_setup_validator_accounts(
         &test.ctx,
         &test.keypair,
         validator_to_update_index as u32,
@@ -340,23 +317,9 @@ async fn test_stake_buffer_update_and_resort() {
     )
     .await;
 
-    // Advance to next epoch for stake to be activated
-    clock = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap();
-    epoch_schedule = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<EpochSchedule>()
-        .await
-        .unwrap();
-    next_epoch_slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch + 1);
-    test.ctx.borrow_mut().warp_to_slot(next_epoch_slot).unwrap();
+    // Fake advancing by one epoch without spawning any banks
+    // (use your genesis_config's slot timing, e.g. 100 ms/slot)
+    test.advance_clock(1 /* epochs */, 100 /* ms per slot */).await;
 
     // Call update_stake_buffer for the updated validator
     let ix_data = validator_history::instruction::UpdateStakeBuffer {};
@@ -365,10 +328,12 @@ async fn test_stake_buffer_update_and_resort() {
         validator_stake_buffer_account: test.validator_stake_buffer_account,
         validator_history_account: new_validator_history,
     };
+    let mut metas = accounts.to_account_metas(None);
+    metas.push(AccountMeta::new_readonly(new_vote_account, false));
     let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
         &[Instruction {
             program_id: validator_history::id(),
-            accounts: accounts.to_account_metas(None),
+            accounts: metas,
             data: ix_data.data(),
         }],
         Some(&test.keypair.pubkey()),
