@@ -22,6 +22,7 @@ use {
     validator_history::{
         self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory, ValidatorStakeBuffer,
     },
+    solana_program::rent::Rent,
 };
 
 pub struct TestFixture {
@@ -462,11 +463,14 @@ pub fn new_vote_account(
         vote_state.epoch_credits = epoch_credits;
     }
     let vote_state_versions = VoteStateVersions::new_current(vote_state);
-    let mut data = vec![0; VoteState::size_of()];
+    let data_len = VoteState::size_of();
+    let rent_exempt = Rent::default().minimum_balance(data_len);
+
+    let mut data = vec![0; data_len];
     VoteState::serialize(&vote_state_versions, &mut data).unwrap();
 
     Account {
-        lamports: 1000000,
+        lamports: rent_exempt,
         data,
         owner: anchor_lang::solana_program::vote::program::ID,
         ..Account::default()
