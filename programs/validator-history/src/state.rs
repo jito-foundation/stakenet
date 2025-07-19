@@ -4,6 +4,8 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
+use crate::constants::MAX_STAKE_BUFFER_VALIDATORS;
+
 use {
     crate::{
         constants::TVC_MULTIPLIER,
@@ -1351,6 +1353,189 @@ impl ClusterHistory {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(BorshSerialize, Debug, Default, PartialEq)]
+#[zero_copy]
+pub struct ValidatorStake {
+    pub stake_amount: u64,
+    pub validator_id: u32,
+    _padding0: u32,
+}
+
+impl ValidatorStake {
+    pub fn new(validator_id: u32, stake_amount: u64) -> Self {
+        Self {
+            stake_amount,
+            validator_id,
+            _padding0: 0,
+        }
+    }
+}
+
+#[derive(BorshSerialize, Debug, PartialEq)]
+#[account(zero_copy)]
+pub struct ValidatorStakeBuffer {
+    // Most recent epoch observed when aggregating stake amounts
+    // If this doesn't equal the current epoch, reset
+    last_observed_epoch: u64,
+
+    // Accumulator of total stake in pool
+    // Not useful until buffer is finalized
+    total_stake: u64,
+
+    // Length of the stake buffer (number of validators observed this epoch)
+    length: u32,
+
+    // Indicates whether or not we've observed every validator (history) account
+    // This provides finality of stake observations
+    finalized: u8, /* boolean */
+
+    _padding0: [u8; 3],
+
+    // Sorted validator stake amounts (descending by amount)
+    buffer: [ValidatorStake; MAX_STAKE_BUFFER_VALIDATORS],
+}
+
+impl Default for ValidatorStakeBuffer {
+    fn default() -> Self {
+        Self {
+            last_observed_epoch: 0,
+            total_stake: 0,
+            length: 0,
+            finalized: 0,
+            _padding0: [0; 3],
+            buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
+        }
+    }
+}
+
+/// (Stake Lamports, Rank, Superminority)
+type ValidatorRank = (u64, u32, bool);
+
+impl ValidatorStakeBuffer {
+    pub const SEED: &'static [u8] = b"validator-stake-buffer";
+    pub const SIZE: usize = 8 + size_of::<Self>();
+
+    /// Resets aggregation for new epoch
+    pub fn reset(&mut self, epoch: u64) {
+        self.last_observed_epoch = epoch;
+        self.total_stake = 0;
+        self.length = 0;
+        self.finalized = 0;
+        self.buffer = [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS];
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        self.finalized == 1
+    }
+
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    pub fn size(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn last_observed_epoch(&self) -> u64 {
+        self.last_observed_epoch
+    }
+
+    pub fn needs_reset(&self, epoch: u64) -> bool {
+        epoch.gt(&self.last_observed_epoch)
+    }
+
+    /// Get element by index
+    pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
+        if index.ge(&(self.length as usize)) {
+            return Err(ValidatorHistoryError::StakeBufferOutOfBounds.into());
+        }
+        Ok(self.buffer[index])
+    }
+
+    pub fn total_stake(&self) -> u64 {
+        self.total_stake
+    }
+
+    /// Get element by validator id
+    ///
+    /// Linear searches thru buffer for rank
+    pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
+        if self.total_stake().eq(&0) {
+            return Err(ValidatorHistoryError::StakeBufferEmpty.into());
+        }
+        // Accumulators
+        let mut cumulative_stake: u64 = 0;
+        let mut is_supermintority = true;
+        let superminority_threshold = self.total_stake / 3;
+        // Search for validator rank and superminority threshold
+        for rank in 0..self.length as usize {
+            let entry = &self.buffer[rank];
+            // Superminority threshold check
+            if cumulative_stake > superminority_threshold && is_supermintority {
+                is_supermintority = false;
+            } else {
+                cumulative_stake += entry.stake_amount
+            }
+            // Rank
+            if entry.validator_id == validator_id {
+                return Ok((entry.stake_amount, rank as u32, is_supermintority));
+            }
+        }
+        Err(ValidatorHistoryError::StakeBufferOutOfBounds.into())
+    }
+
+    /// Inserts a new [ValidatorStake] entry into the buffer
+    fn insert_with_config(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
+        // early exit if finalized
+        if self.is_finalized() {
+            return Err(ValidatorHistoryError::StakeBufferFinalized.into());
+        }
+        // Start linear search from end of buffer until finding validator with greater or equal stake
+        // to insert the new entry while maintaining descending order
+        let mut i = self.length as usize;
+        while i > 0 && entry.stake_amount > self.buffer[i - 1].stake_amount {
+            // Shift element to the right one to make space
+            self.buffer[i] = self.buffer[i - 1];
+            i -= 1;
+        }
+        // Insert entry
+        self.buffer[i] = entry;
+        self.length += 1;
+        self.total_stake += entry.stake_amount;
+
+        // Set finalized flag if the buffer is now full
+        let max_length = config.counter;
+        if self.length == max_length {
+            self.finalized = 1;
+        }
+        Ok(())
+    }
+
+    /// Builds an insert function
+    ///
+    /// This forces the user to pass in a [Config], before calling `insert`
+    /// There is a dependency on the `config.counter` field for validation
+    pub fn insert_builder<'a>(
+        &'a mut self,
+        config: &'a Config,
+    ) -> impl FnMut(ValidatorStake) -> Result<()> + 'a {
+        // Validate the config account before using insert function
+        //
+        // The config counter should invariably be
+        // 1) non-zero
+        // 2) less than or equal to `MAX_STAKE_BUFFER_VALIDATORS`
+        |entry| {
+            if config.counter.eq(&0) {
+                return Err(ValidatorHistoryError::ConfigCounterFloor.into());
+            }
+            if config.counter.gt(&(MAX_STAKE_BUFFER_VALIDATORS as u32)) {
+                return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
+            }
+            self.insert_with_config(config, entry)
+        }
     }
 }
 
