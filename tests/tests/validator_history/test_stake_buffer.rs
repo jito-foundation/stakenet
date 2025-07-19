@@ -14,7 +14,7 @@ use solana_sdk::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use tests::validator_history_fixtures::{new_vote_account, TestFixture};
+use tests::validator_history_fixtures::TestFixture;
 use validator_history::constants::MAX_ALLOC_BYTES;
 use validator_history::state::{ValidatorHistory, ValidatorStakeBuffer};
 
@@ -26,9 +26,9 @@ pub async fn create_validator_accounts(
     vote_account: &Pubkey,
     stake_amount: u64,
 ) -> Pubkey {
-    let _ = create_stake_account(ctx, payer, &vote_account, stake_amount).await;
+    let _ = create_stake_account(ctx, payer, vote_account, stake_amount).await;
     let validator_history_account =
-        create_validator_history_account(ctx, payer, &vote_account, validator_history_config).await;
+        create_validator_history_account(ctx, payer, vote_account, validator_history_config).await;
     validator_history_account
 }
 
@@ -130,7 +130,6 @@ pub async fn create_stake_account(
 #[tokio::test(flavor = "current_thread")]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert() {
-    // Starting test_stake_buffer_insert
     let test = TestFixture::new().await;
 
     // Initialize validator history config and stake buffer accounts
@@ -163,14 +162,11 @@ async fn test_stake_buffer_insert() {
 
         validator_accounts.push((vote_account, validator_history_address));
     }
-    // Fake advancing by one epoch without spawning any banks
-    // (use your genesis_config's slot timing, e.g. 100 ms/slot)
-    test.advance_clock(3 /* epochs */, 500 /* ms per slot */)
-        .await;
-    // test.advance_num_epochs(1).await;
+    // Advance epoch to finalize stake delegations
+    test.advance_num_epochs(1).await;
 
+    // Insert validators into stake buffer
     for (vote_account_address, validator_history_address) in validator_accounts {
-        // Call update_stake_buffer instruction for this specific validator
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
 
         let accounts = validator_history::accounts::UpdateStakeBuffer {
@@ -200,8 +196,6 @@ async fn test_stake_buffer_insert() {
     let stake_buffer_account: ValidatorStakeBuffer = test
         .load_and_deserialize(&test.validator_stake_buffer_account)
         .await;
-
-    // Fetch current epoch after all transactions
     let current_epoch = test
         .ctx
         .borrow_mut()
