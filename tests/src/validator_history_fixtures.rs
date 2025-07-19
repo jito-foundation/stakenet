@@ -96,16 +96,16 @@ impl TestFixture {
             vote_account,
             new_vote_account(identity_pubkey, vote_account, 1, Some(vec![(0, 0, 0); 10])),
         );
-        program.add_account(keypair.pubkey(), system_account(100_000_000_000_000));
-        program.add_account(identity_pubkey, system_account(100_000_000_000_000));
+        program.add_account(keypair.pubkey(), system_account(900_000_000_000_000_000));
+        program.add_account(identity_pubkey, system_account(900_000_000_000_000_000));
         program.add_account(
             priority_fee_oracle_keypair.pubkey(),
-            system_account(100_000_000_000_000),
+            system_account(900_000_000_000_000_000),
         );
 
         // Add vec of additional vote accounts
         let mut additional_vote_accounts = vec![];
-        for _ in 0..5 {
+        for _ in 0..500 {
             let keypair = Keypair::new();
             program.add_account(
                 keypair.pubkey(),

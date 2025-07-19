@@ -140,16 +140,17 @@ async fn test_stake_buffer_insert() {
     .await;
 
     // Create several mock validator history accounts with different stake amounts
-    let num_validators = test.additional_vote_accounts.len();
+    let num_validators = 5;
     let mut validator_accounts = Vec::new();
     for (i, vote_account) in test
         .additional_vote_accounts
         .clone()
         .into_iter()
+        .take(num_validators)
         .enumerate()
     {
         // Simulate different stake amounts and ensure some are superminority
-        let stake_amount = (100 - i) as u64 * 1_000_000_000; // Decreasing stake
+        let stake_amount = (100 - i) as u64 * 100_000_000; // Decreasing stake
 
         let validator_history_address = create_validator_accounts(
             &test.ctx,
@@ -211,7 +212,7 @@ async fn test_stake_buffer_insert() {
 
     // Verify individual entries are inserted and sorted by stake amount (descending)
     for i in 0..num_validators {
-        let expected_stake = (100 - i) as u64 * 1_000_000_000;
+        let expected_stake = (100 - i) as u64 * 100_000_000;
         let entry = stake_buffer_account.get_by_index(i).unwrap();
         assert_eq!(entry.stake_amount, expected_stake);
     }

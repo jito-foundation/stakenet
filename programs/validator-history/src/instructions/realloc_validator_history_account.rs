@@ -3,6 +3,7 @@ use crate::{
     state::{Config, ValidatorHistory, ValidatorHistoryEntry, ValidatorHistoryVersion},
 };
 use anchor_lang::{prelude::*, solana_program::vote};
+use solana_program::log::sol_log;
 
 fn get_realloc_size(account_info: &AccountInfo) -> usize {
     let account_size = account_info.data_len();
@@ -57,6 +58,7 @@ pub fn handle_realloc_validator_history_account(
         let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
 
         validator_history_account.index = ctx.accounts.config.counter;
+        sol_log(format!("validator id: {}", validator_history_account.index).as_str());
         ctx.accounts.config.counter += 1;
         validator_history_account.bump = ctx.bumps.validator_history_account;
         validator_history_account.vote_account = *ctx.accounts.vote_account.key;
