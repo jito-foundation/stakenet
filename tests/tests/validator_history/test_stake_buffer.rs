@@ -304,5 +304,5 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
 
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
-    assert!(stake_buffer_account.total_stake() > 0);
+    assert!(stake_buffer_account.total_stake() == num_validators as u64 * 100 * 100_000_000);
 }
