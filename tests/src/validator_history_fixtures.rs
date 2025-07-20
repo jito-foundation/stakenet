@@ -13,6 +13,7 @@ use {
     },
     jito_tip_distribution::state::{MerkleRoot, TipDistributionAccount},
     jito_tip_distribution_sdk::derive_tip_distribution_account_address,
+    solana_program::rent::Rent,
     solana_program_test::*,
     solana_sdk::{
         account::Account, instruction::Instruction, signature::Keypair, signer::Signer,
@@ -22,7 +23,6 @@ use {
     validator_history::{
         self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory, ValidatorStakeBuffer,
     },
-    solana_program::rent::Rent,
 };
 
 pub struct TestFixture {
@@ -106,7 +106,7 @@ impl TestFixture {
 
         // Add vec of additional vote accounts
         let mut additional_vote_accounts = vec![];
-        for _ in 0..500 {
+        for _ in 0..5_000 {
             let keypair = Keypair::new();
             program.add_account(
                 keypair.pubkey(),
