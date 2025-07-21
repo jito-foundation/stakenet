@@ -21,7 +21,9 @@ use {
     },
     std::{cell::RefCell, rc::Rc},
     validator_history::{
-        self, constants::MAX_ALLOC_BYTES, ClusterHistory, ValidatorHistory, ValidatorStakeBuffer,
+        self,
+        constants::{MAX_ALLOC_BYTES, MAX_STAKE_BUFFER_VALIDATORS},
+        ClusterHistory, ValidatorHistory, ValidatorStakeBuffer,
     },
 };
 
@@ -106,7 +108,7 @@ impl TestFixture {
 
         // Add vec of additional vote accounts
         let mut additional_vote_accounts = vec![];
-        for _ in 0..5_000 {
+        for _ in 0..10_000 {
             let keypair = Keypair::new();
             program.add_account(
                 keypair.pubkey(),

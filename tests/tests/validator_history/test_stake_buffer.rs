@@ -242,21 +242,25 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     )
     .await;
 
-    // Create several mock validator history accounts with different stake amounts
+    // Create several mock validator history accounts
     let num_validators = test.additional_vote_accounts.len();
     let mut validator_accounts = Vec::new();
-    for vote_account in test.additional_vote_accounts.clone().into_iter() {
-        let stake_amount = 100 * 100_000_000;
+    for (_i, vote_account) in test.additional_vote_accounts.clone().iter().enumerate() {
+        // Set linearly increasing stake amounts
+        // such that we iterate the entire buffer onchain on every insert instruction, simulating
+        // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
+        // size.
+        let stake_amount = (10 * 100_000_000); // + i as u64;
         let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
             &test.validator_history_config,
-            &vote_account,
+            vote_account,
             stake_amount,
         )
         .await;
 
-        validator_accounts.push((vote_account, validator_history_address));
+        validator_accounts.push((*vote_account, validator_history_address));
     }
     // Advance epoch to finalize stake delegations
     test.advance_num_epochs(1).await;
@@ -264,7 +268,6 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     // Insert validators into stake buffer
     for (vote_account_address, validator_history_address) in validator_accounts {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
-
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
@@ -302,7 +305,11 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         .unwrap()
         .epoch;
 
+    let expected_total_stake = num_validators as u64 * 10 * 100_000_000;
+    println!("Actual total_stake: {}", stake_buffer_account.total_stake());
+    println!("Expected total_stake: {}", expected_total_stake);
+
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
-    assert!(stake_buffer_account.total_stake() == num_validators as u64 * 100 * 100_000_000);
+    assert!(stake_buffer_account.total_stake() == expected_total_stake);
 }
