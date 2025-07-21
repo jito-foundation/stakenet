@@ -37,6 +37,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Commands {
     InitConfig(InitConfig),
+    ReallocConfig(ReallocConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
     ClusterHistoryStatus,
@@ -67,6 +68,14 @@ struct InitConfig {
     /// If not provided, the initial keypair will be the authority
     #[arg(short, long, env, required(false))]
     stake_authority: Option<Pubkey>,
+}
+
+#[derive(Parser)]
+#[command(about = "Realloc Config")]
+struct ReallocConfig {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
 }
 
 #[derive(Parser)]
@@ -189,6 +198,37 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     println!("Signature: {}", signature);
 }
 
+fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let instructions = vec![Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::ReallocConfigAccount {
+            config_account: config_pda,
+            system_program: solana_program::system_program::id(),
+            payer: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::ReallocConfigAccount {}.data(),
+    }];
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
 fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     // Creates cluster history account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
@@ -247,6 +287,7 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
+#[allow(unused_variables)]
 fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
     let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
         "[NULL]".to_string()
@@ -339,22 +380,7 @@ fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
         entry.total_leader_slots
     );
 
-    return priority_fee_info;
-
-    format!(
-        "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
-        commission_str,
-        epoch_credits_str,
-        mev_commission_str,
-        mev_earned_str,
-        stake_str,
-        rank_str,
-        superminority_str,
-        ip_str,
-        client_type_str,
-        client_version_str,
-        last_update_slot
-    )
+    priority_fee_info
 }
 
 fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
@@ -379,7 +405,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
-            ValidatorHistory::discriminator().into(),
+            ValidatorHistory::DISCRIMINATOR.into(),
         ))]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
@@ -607,7 +633,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {}", signature);
 }
 
-fn command_get_config(args: GetConfig, client: RpcClient) {
+fn command_get_config(client: RpcClient) {
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
 
     let config_account_raw = client.get_account(&config_pda).unwrap();
@@ -631,11 +657,12 @@ fn main() {
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
+        Commands::ReallocConfig(args) => command_realloc_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
         Commands::ClusterHistoryStatus => command_cluster_history(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
-        Commands::GetConfig(args) => command_get_config(args, client),
+        Commands::GetConfig(_) => command_get_config(client),
     };
 }

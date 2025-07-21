@@ -25,7 +25,7 @@ async fn test_priority_fee_history_basic_update() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            current_slot,
+            highest_oracle_recorded_slot: current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -77,7 +77,7 @@ async fn test_priority_fee_history_basic_update() {
             total_priority_fees: total_priority_fees + 1,
             total_leader_slots,
             blocks_produced,
-            current_slot,
+            highest_oracle_recorded_slot: current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -141,7 +141,7 @@ async fn test_priority_fee_history_wrong_authority() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            current_slot,
+            highest_oracle_recorded_slot: current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {
@@ -190,7 +190,7 @@ async fn test_priority_fee_history_future_epoch() {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            current_slot,
+            highest_oracle_recorded_slot: current_slot,
         }
         .data(),
         accounts: validator_history::accounts::UpdatePriorityFeeHistory {

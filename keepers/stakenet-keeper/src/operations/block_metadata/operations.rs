@@ -72,7 +72,7 @@ pub async fn fire(
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let mut mutex_guard = keeper_config.mut_connection().await;
-    let sqlite_connection: &mut Connection = &mut *mutex_guard;
+    let sqlite_connection: &mut Connection = &mut mutex_guard;
     let block_metadata_interval = keeper_config.block_metadata_interval;
     let program_id = &keeper_config.validator_history_program_id;
     let priority_fee_oracle_authority_keypair = keeper_config
@@ -133,6 +133,7 @@ pub async fn fire(
     (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     sqlite_connection: &mut Connection,
@@ -168,6 +169,7 @@ async fn _process(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_block_metadata(
     client: &Arc<RpcClient>,
     sqlite_connection: &mut Connection,
@@ -200,8 +202,8 @@ async fn update_block_metadata(
         info!("\n\n\n1. Update Epoch Schedule\n\n\n");
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
-        let epoch_leader_schedule = get_leader_schedule_safe(&client, epoch_starting_slot).await?;
-        match DBSlotInfo::insert_leader_schedule(
+        let epoch_leader_schedule = get_leader_schedule_safe(client, epoch_starting_slot).await?;
+        match DBSlotInfo::upsert_leader_schedule(
             sqlite_connection,
             current_epoch,
             epoch_schedule,
@@ -275,7 +277,7 @@ async fn update_block_metadata(
 
             let block_data = get_bulk_block_safe(
                 client,
-                &slots_needing_blocks.to_vec(),
+                slots_needing_blocks,
                 slot_history,
                 maybe_redundant_rpc_urls,
                 Some(UiTransactionEncoding::Json),
@@ -512,7 +514,7 @@ pub async fn get_leader_schedule_safe(
 
 async fn get_bulk_block_safe(
     client: &RpcClient,
-    slots: &Vec<u64>,
+    slots: &[u64],
     slot_history: &SlotHistory,
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     encoding: Option<UiTransactionEncoding>,
@@ -526,13 +528,12 @@ async fn get_bulk_block_safe(
         let futures = slots
             .iter()
             .map(|&slot| {
-                let client = client; // Clone if needed
                 let slot_history = slot_history.clone(); // Clone if needed
                 let maybe_redundant_rpc_urls = maybe_redundant_rpc_urls.clone(); // Clone if needed
 
                 async move {
                     let result = get_block_safe(
-                        &client,
+                        client,
                         slot,
                         &slot_history,
                         &maybe_redundant_rpc_urls,
@@ -564,6 +565,8 @@ async fn get_block_safe(
     let mut current_client = client;
     let mut redundant_rpc_index = 0;
 
+    let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
+
     loop {
         let block_res = current_client
             .get_block_with_config(
@@ -594,7 +597,6 @@ async fn get_block_safe(
                         // Meaning they can arise from RPC issues or lack of history (limit ledger
                         //  space, no big table) accesible  by an RPC. This is why we check
                         // SlotHistory and then follow up with redundant RPC checks.
-                        let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
                         if slot_skipped_regex.is_match(&message) {
                             match slot_history.check(slot) {
                                 slot_history::Check::Future => {

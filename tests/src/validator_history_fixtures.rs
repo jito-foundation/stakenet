@@ -147,9 +147,23 @@ impl TestFixture {
             .to_account_metas(None),
             data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),
         };
+        let set_priority_fee_distribution_program = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::SetNewPriorityFeeDistributionProgram {
+                config: self.validator_history_config,
+                new_priority_fee_distribution_program: jito_priority_fee_distribution::id(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::SetNewPriorityFeeDistributionProgram {}.data(),
+        };
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction, set_tip_distribution_instruction],
+            &[
+                instruction,
+                set_tip_distribution_instruction,
+                set_priority_fee_distribution_program,
+            ],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
@@ -315,7 +329,7 @@ impl TestFixture {
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
-        let mut ctx = self.ctx.borrow_mut();
+        let ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx
             .banks_client
             .process_transaction_with_preflight(transaction)
@@ -337,6 +351,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
+            println!("{} {}", e, error_message);
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
@@ -429,6 +444,7 @@ pub fn new_priority_fee_distribution_account(
     let tda = PriorityFeeDistributionAccount {
         validator_vote_account: vote_account,
         validator_commission_bps: priority_fee_commission_bps,
+        total_lamports_transferred: priority_fees_earned.unwrap_or(0),
         merkle_root,
         merkle_root_upload_authority,
         ..PriorityFeeDistributionAccount::default()

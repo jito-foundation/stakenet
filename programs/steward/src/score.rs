@@ -1,7 +1,8 @@
 #[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 use anchor_lang::{
-    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
+    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,
+    Discriminator, Result,
 };
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
@@ -60,7 +61,7 @@ pub struct ScoreComponentsV3 {
     pub details: ScoreDetails,
 
     /// If validator has realized priority fee commissions > config limits over a lookback range,
-    /// score 0.  
+    /// score 0.
     pub priority_fee_commission_score: f64,
 
     /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
@@ -708,7 +709,8 @@ pub fn instant_unstake_validator(
         || commission_check
         || mev_commission_check
         || is_blacklisted
-        || is_bad_merkle_root_upload_authority;
+        || is_bad_merkle_root_upload_authority
+        || is_bad_priority_fee_merkle_root_upload_authority;
 
     Ok(InstantUnstakeComponentsV3 {
         instant_unstake,

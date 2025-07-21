@@ -44,9 +44,11 @@ pub struct Config {
 
     pub padding0: [u8; 3],
 
+    pub priority_fee_distribution_program: Pubkey,
+
     pub priority_fee_oracle_authority: Pubkey,
 
-    pub reserve: [u8; 256],
+    pub reserve: [u8; 224],
 }
 
 impl Default for Config {
@@ -58,8 +60,9 @@ impl Default for Config {
             counter: Default::default(),
             bump: Default::default(),
             padding0: Default::default(),
+            priority_fee_distribution_program: Default::default(),
             priority_fee_oracle_authority: Default::default(),
-            reserve: [0u8; 256],
+            reserve: [0u8; 224],
         }
     }
 }
@@ -83,7 +86,8 @@ pub enum MerkleRootUploadAuthority {
 
 unsafe impl Zeroable for MerkleRootUploadAuthority {}
 unsafe impl Pod for MerkleRootUploadAuthority {}
-
+// FUTURE UPGRADE
+// Add a `merkle_root_upload_authority` mapping to the `Config` struct
 impl MerkleRootUploadAuthority {
     pub fn from_pubkey(tda_authority: &Pubkey) -> Self {
         if tda_authority.eq(&JITO_LABS_AUTHORITY) {
@@ -800,7 +804,7 @@ impl ValidatorHistory {
         total_priority_fees: u64,
         total_leader_slots: u32,
         blocks_produced: u32,
-        slot: u64,
+        highest_oracle_recorded_slot: u64,
     ) -> Result<()> {
         // Only one authority for upload here, so any epoch can be updated in case of missed upload
         if let Some(entry) = self.history.last_mut() {
@@ -809,7 +813,7 @@ impl ValidatorHistory {
                     entry.total_priority_fees = total_priority_fees;
                     entry.total_leader_slots = total_leader_slots;
                     entry.blocks_produced = blocks_produced;
-                    entry.block_data_updated_at_slot = slot;
+                    entry.block_data_updated_at_slot = highest_oracle_recorded_slot;
                     return Ok(());
                 }
                 Ordering::Greater => {
@@ -818,7 +822,7 @@ impl ValidatorHistory {
                             entry.total_priority_fees = total_priority_fees;
                             entry.total_leader_slots = total_leader_slots;
                             entry.blocks_produced = blocks_produced;
-                            entry.block_data_updated_at_slot = slot;
+                            entry.block_data_updated_at_slot = highest_oracle_recorded_slot;
                             return Ok(());
                         }
                     }
@@ -832,7 +836,7 @@ impl ValidatorHistory {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            block_data_updated_at_slot: slot,
+            block_data_updated_at_slot: highest_oracle_recorded_slot,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

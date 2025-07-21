@@ -127,7 +127,7 @@ pub mod validator_history {
         total_priority_fees: u64,
         total_leader_slots: u32,
         blocks_produced: u32,
-        current_slot: u64,
+        highest_oracle_recorded_slot: u64,
     ) -> Result<()> {
         handle_update_priority_fee_history(
             ctx,
@@ -135,7 +135,7 @@ pub mod validator_history {
             total_priority_fees,
             total_leader_slots,
             blocks_produced,
-            current_slot,
+            highest_oracle_recorded_slot,
         )
     }
 
@@ -148,6 +148,12 @@ pub mod validator_history {
 
     pub fn realloc_config_account(ctx: Context<ReallocConfigAccount>) -> Result<()> {
         handle_realloc_config_account(ctx)
+    }
+
+    pub fn set_new_priority_fee_distribution_program(
+        ctx: Context<SetNewPriorityFeeDistributionProgram>,
+    ) -> Result<()> {
+        handle_set_new_priority_fee_distribution_program(ctx)
     }
 
     pub fn set_new_priority_fee_oracle_authority(
