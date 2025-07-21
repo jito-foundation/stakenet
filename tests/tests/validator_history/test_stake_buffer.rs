@@ -245,12 +245,12 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     // Create several mock validator history accounts
     let num_validators = test.additional_vote_accounts.len();
     let mut validator_accounts = Vec::new();
-    for (_i, vote_account) in test.additional_vote_accounts.clone().iter().enumerate() {
+    for (i, vote_account) in test.additional_vote_accounts.clone().iter().enumerate() {
         // Set linearly increasing stake amounts
         // such that we iterate the entire buffer onchain on every insert instruction, simulating
         // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
         // size.
-        let stake_amount = (10 * 100_000_000); // + i as u64;
+        let stake_amount = (10 * 100_000_000) + i as u64;
         let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
@@ -279,11 +279,16 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
 
         let latest_blockhash = fresh_blockhash(&test.ctx).await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
-            &[Instruction {
-                program_id: validator_history::id(),
-                accounts: metas,
-                data: ix_data.data(),
-            }],
+            &[
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                    1_400_000,
+                ),
+                Instruction {
+                    program_id: validator_history::id(),
+                    accounts: metas,
+                    data: ix_data.data(),
+                },
+            ],
             Some(&test.keypair.pubkey()),
             &[&test.keypair],
             latest_blockhash,
@@ -305,13 +310,15 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         .unwrap()
         .epoch;
 
-    let expected_total_stake = num_validators as u64 * 10 * 100_000_000;
+    let base_stake_per_validator = 10 * 100_000_000;
+    // sum of arithmetic series
+    let sum_of_increments = num_validators as u64 * (num_validators as u64 - 1) / 2;
+    let expected_total_stake = num_validators as u64 * base_stake_per_validator + sum_of_increments;
     println!("Actual total_stake: {}", stake_buffer_account.total_stake());
     println!("Expected total_stake: {}", expected_total_stake);
     println!("buffer length: {}", stake_buffer_account.length());
 
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
-    assert!(stake_buffer_account.total_stake() == expected_total_stake);
-    assert!(false);
+    assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
 }
