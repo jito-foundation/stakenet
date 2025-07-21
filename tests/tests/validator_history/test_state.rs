@@ -86,10 +86,7 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        insert(entry).unwrap();
-    }
+    buffer.insert(&config, entry).unwrap();
     assert_eq!(buffer.length(), 1);
     assert_eq!(buffer.get_by_index(0).unwrap(), entry);
 }
@@ -101,12 +98,9 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        insert(ValidatorStake::new(1, 100)).unwrap();
-        insert(ValidatorStake::new(2, 200)).unwrap();
-        insert(ValidatorStake::new(3, 300)).unwrap();
-    }
+    buffer.insert(&config, ValidatorStake::new(1, 100)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(2, 200)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(3, 300)).unwrap();
     assert_eq!(buffer.length(), 3);
     assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
@@ -120,12 +114,9 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        insert(ValidatorStake::new(1, 100)).unwrap();
-        insert(ValidatorStake::new(2, 300)).unwrap();
-        insert(ValidatorStake::new(3, 200)).unwrap();
-    }
+    buffer.insert(&config, ValidatorStake::new(1, 100)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(2, 300)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(3, 200)).unwrap();
     assert_eq!(buffer.length(), 3);
     assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
@@ -139,12 +130,9 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        insert(ValidatorStake::new(1, 100)).unwrap();
-        insert(ValidatorStake::new(2, 300)).unwrap();
-        insert(ValidatorStake::new(3, 50)).unwrap();
-    }
+    buffer.insert(&config, ValidatorStake::new(1, 100)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(2, 300)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(3, 50)).unwrap();
     assert_eq!(buffer.length(), 3);
     assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 100);
@@ -158,12 +146,9 @@ fn test_validator_stake_buffer_insert_partially_full_unordered() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        insert(ValidatorStake::new(1, 300)).unwrap();
-        insert(ValidatorStake::new(2, 100)).unwrap();
-        insert(ValidatorStake::new(3, 200)).unwrap();
-    }
+    buffer.insert(&config, ValidatorStake::new(1, 300)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(2, 100)).unwrap();
+    buffer.insert(&config, ValidatorStake::new(3, 200)).unwrap();
     assert_eq!(buffer.length(), 3);
     assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
     assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
@@ -180,20 +165,17 @@ fn test_validator_stake_buffer_finalized_error() {
     };
 
     // Fill the buffer to max_len
-    {
-        let mut insert = buffer.insert_builder(&config);
-        for i in 0..max_len {
-            insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
-        }
+    for i in 0..max_len {
+        buffer
+            .insert(&config, ValidatorStake::new(i, i as u64 + 100))
+            .unwrap();
     }
     assert_eq!(buffer.length(), max_len);
     assert!(buffer.is_finalized());
 
     // Attempt to insert into a full buffer
     let new_entry = ValidatorStake::new(9999, 50);
-    let mut insert = buffer.insert_builder(&config);
-    let result = insert(new_entry);
-    drop(insert);
+    let result = buffer.insert(&config, new_entry);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
@@ -220,11 +202,10 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
     };
 
     // Fill the buffer to initial_max_len, which should finalize it
-    {
-        let mut insert = buffer.insert_builder(&initial_config);
-        for i in 0..initial_max_len {
-            insert(ValidatorStake::new(i, i as u64 + 100)).unwrap();
-        }
+    for i in 0..initial_max_len {
+        buffer
+            .insert(&initial_config, ValidatorStake::new(i, i as u64 + 100))
+            .unwrap();
     }
     assert_eq!(buffer.length(), initial_max_len);
     assert!(buffer.is_finalized());
@@ -238,9 +219,7 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
 
     // Attempt to insert into the same buffer using a new insert_builder with the new config
     let new_entry = ValidatorStake::new(9999, 50);
-    let mut insert_with_new_config = buffer.insert_builder(&new_config);
-    let result = insert_with_new_config(new_entry);
-    drop(insert_with_new_config);
+    let result = buffer.insert(&new_config, new_entry);
 
     // The insertion should still fail because the buffer was finalized with the previous config
     assert!(result.is_err());
@@ -267,11 +246,7 @@ fn test_validator_stake_buffer_insert_with_zero_max_len() {
         ..Default::default()
     };
     let entry = ValidatorStake::new(1, 100);
-
-    // Attempt to insert with config.counter set to zero (violates validation)
-    let mut insert = buffer.insert_builder(&config);
-    let result = insert(entry);
-    drop(insert);
+    let result = buffer.insert(&config, entry);
 
     assert!(result.is_err());
     assert_eq!(
@@ -291,11 +266,7 @@ fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators()
         ..Default::default()
     };
     let entry = ValidatorStake::new(1, 100);
-
-    // Attempt to insert with counter greater than max validators
-    let mut insert = buffer.insert_builder(&config);
-    let result = insert(entry);
-    drop(insert);
+    let result = buffer.insert(&config, entry);
 
     assert!(result.is_err());
     assert_eq!(
@@ -314,11 +285,8 @@ fn test_get_by_id_zero_total_stake() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        for i in 0..150 {
-            insert(ValidatorStake::new(i, 0)).unwrap();
-        }
+    for i in 0..150 {
+        buffer.insert(&config, ValidatorStake::new(i, 0)).unwrap();
     }
     assert_eq!(buffer.length(), 150);
     assert_eq!(buffer.total_stake(), 0);
@@ -345,16 +313,15 @@ fn test_get_by_id_superminority_calculation() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        // Total stake: 3 * 100 + 147 * 1 = 300 + 147 = 447
-        // superminority_threshold_stake = 447 / 3 = 149
-        // cumulative_stake_at_rank_0 = 100
-        // cumulative_stake_at_rank_1 = 200 (so rank 1 is superminority threshold)
-        for i in 0..150 {
-            let stake = if i < 3 { 100 } else { 1 };
-            insert(ValidatorStake::new(i, stake)).unwrap();
-        }
+    // Total stake: 3 * 100 + 147 * 1 = 300 + 147 = 447
+    // superminority_threshold_stake = 447 / 3 = 149
+    // cumulative_stake_at_rank_0 = 100
+    // cumulative_stake_at_rank_1 = 200 (so rank 1 is superminority threshold)
+    for i in 0..150 {
+        let stake = if i < 3 { 100 } else { 1 };
+        buffer
+            .insert(&config, ValidatorStake::new(i, stake))
+            .unwrap();
     }
     assert_eq!(buffer.length(), 150);
 
@@ -384,11 +351,8 @@ fn test_get_by_id_superminority_calculation() {
     // cumulative_stake_at_rank_49 = 50 * 100 = 5000
     // cumulative_stake_at_rank_50 = 51 * 100 = 5100 (so rank 50 is threshold)
     let mut buffer = ValidatorStakeBuffer::default();
-    {
-        let mut insert = buffer.insert_builder(&config);
-        for i in 0..150 {
-            insert(ValidatorStake::new(i, 100)).unwrap();
-        }
+    for i in 0..150 {
+        buffer.insert(&config, ValidatorStake::new(i, 100)).unwrap();
     }
 
     // Test validator at rank 49
@@ -414,19 +378,18 @@ fn test_get_by_id_basic_found_rank_and_stake() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        // Values are stake_amount, validator_id
-        // Rank 0: (1000, 0)
-        // Rank 1: (999, 1)
-        // ...
-        // Rank 100: (900, 100)
-        //
-        // Superminority cutoff is at rank 47 where cum stake is 46_872
-        // Total stake is 138_832 ... 1/3 of that is 46_275
-        for i in 0..150 {
-            insert(ValidatorStake::new(i, 1000 - i as u64)).unwrap();
-        }
+    // Values are stake_amount, validator_id
+    // Rank 0: (1000, 0)
+    // Rank 1: (999, 1)
+    // ...
+    // Rank 100: (900, 100)
+    //
+    // Superminority cutoff is at rank 47 where cum stake is 46_872
+    // Total stake is 138_832 ... 1/3 of that is 46_275
+    for i in 0..150 {
+        buffer
+            .insert(&config, ValidatorStake::new(i, 1000 - i as u64))
+            .unwrap();
     }
     assert_eq!(buffer.length(), 150);
 
@@ -462,11 +425,10 @@ fn test_get_by_id_validator_not_found() {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    {
-        let mut insert = buffer.insert_builder(&config);
-        for i in 0..150 {
-            insert(ValidatorStake::new(i, 1000 - i as u64)).unwrap();
-        }
+    for i in 0..150 {
+        buffer
+            .insert(&config, ValidatorStake::new(i, 1000 - i as u64))
+            .unwrap();
     }
     assert_eq!(buffer.length(), 150);
 

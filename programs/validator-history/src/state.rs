@@ -1488,10 +1488,19 @@ impl ValidatorStakeBuffer {
     }
 
     /// Inserts a new [ValidatorStake] entry into the buffer
-    fn insert_with_config(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
+    pub fn insert(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
         // early exit if finalized
         if self.is_finalized() {
             return Err(ValidatorHistoryError::StakeBufferFinalized.into());
+        }
+        // The config counter should invariably be
+        // 1) non-zero
+        // 2) less than or equal to `MAX_STAKE_BUFFER_VALIDATORS`
+        if config.counter.eq(&0) {
+            return Err(ValidatorHistoryError::ConfigCounterFloor.into());
+        }
+        if config.counter.gt(&(MAX_STAKE_BUFFER_VALIDATORS as u32)) {
+            return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
         }
         // Start linear search from end of buffer until finding validator with greater or equal stake
         // to insert the new entry while maintaining descending order
@@ -1512,30 +1521,6 @@ impl ValidatorStakeBuffer {
             self.finalized = 1;
         }
         Ok(())
-    }
-
-    /// Builds an insert function
-    ///
-    /// This forces the user to pass in a [Config], before calling `insert`
-    /// There is a dependency on the `config.counter` field for validation
-    pub fn insert_builder<'a>(
-        &'a mut self,
-        config: &'a Config,
-    ) -> impl FnMut(ValidatorStake) -> Result<()> + 'a {
-        // Validate the config account before using insert function
-        //
-        // The config counter should invariably be
-        // 1) non-zero
-        // 2) less than or equal to `MAX_STAKE_BUFFER_VALIDATORS`
-        |entry| {
-            if config.counter.eq(&0) {
-                return Err(ValidatorHistoryError::ConfigCounterFloor.into());
-            }
-            if config.counter.gt(&(MAX_STAKE_BUFFER_VALIDATORS as u32)) {
-                return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
-            }
-            self.insert_with_config(config, entry)
-        }
     }
 }
 

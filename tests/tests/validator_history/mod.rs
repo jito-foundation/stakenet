@@ -11,4 +11,4 @@ mod test_stake_buffer;
 // mod test_total_priority_fees;
 // mod test_vote_account;
 //
-// mod test_state;
+mod test_state;

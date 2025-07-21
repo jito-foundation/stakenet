@@ -48,8 +48,7 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
     sol_log(format!("{}: {}", vote_account_pubkey, stake_amount).as_str());
     // Insert into buffer
     let entry = ValidatorStake::new(validator_id, stake_amount);
-    let mut insert = validator_stake_buffer.insert_builder(config);
-    insert(entry)?;
+    validator_stake_buffer.insert(config, entry)?;
 
     Ok(())
 }
