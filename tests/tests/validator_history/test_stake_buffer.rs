@@ -308,8 +308,10 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     let expected_total_stake = num_validators as u64 * 10 * 100_000_000;
     println!("Actual total_stake: {}", stake_buffer_account.total_stake());
     println!("Expected total_stake: {}", expected_total_stake);
+    println!("buffer length: {}", stake_buffer_account.length());
 
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert!(stake_buffer_account.total_stake() == expected_total_stake);
+    assert!(false);
 }

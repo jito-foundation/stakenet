@@ -108,7 +108,7 @@ impl TestFixture {
 
         // Add vec of additional vote accounts
         let mut additional_vote_accounts = vec![];
-        for _ in 0..10_000 {
+        for _ in 0..MAX_STAKE_BUFFER_VALIDATORS {
             let keypair = Keypair::new();
             program.add_account(
                 keypair.pubkey(),
