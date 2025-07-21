@@ -64,7 +64,7 @@ async fn test_initialize() {
     );
     test.submit_transaction_assert_success(transaction).await;
 
-    // Initialize stake aggregation account
+    // Initialize stake buffer account
     let transaction =
         test.build_initialize_and_realloc_validator_stake_buffer_account_transaction();
     test.submit_transaction_assert_success(transaction).await;

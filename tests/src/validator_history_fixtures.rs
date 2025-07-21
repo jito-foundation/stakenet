@@ -16,7 +16,7 @@ use {
     solana_program::rent::Rent,
     solana_program_test::*,
     solana_sdk::{
-        account::Account, instruction::Instruction, signature::Keypair, signer::Signer,
+        account::Account, hash::Hash, instruction::Instruction, signature::Keypair, signer::Signer,
         transaction::Transaction,
     },
     std::{cell::RefCell, rc::Rc},
@@ -246,9 +246,9 @@ impl TestFixture {
         }
     }
 
-    pub fn build_initialize_and_realloc_validator_stake_buffer_account_transaction(
-        &self,
-    ) -> Transaction {
+    pub fn build_initialize_and_realloc_validator_stake_buffer_account_transaction<'a>(
+        &'a self,
+    ) -> Vec<impl FnOnce(Hash) -> Transaction + use<'a>> {
         let mut ixs = vec![];
         let init_ix = Instruction {
             program_id: validator_history::id(),
@@ -265,12 +265,20 @@ impl TestFixture {
         let realloc_ixs =
             vec![self.build_initialize_validator_stake_buffer_account_instruction(); num_reallocs];
         ixs.extend_from_slice(realloc_ixs.as_slice());
-        Transaction::new_signed_with_payer(
-            &ixs,
-            Some(&self.keypair.pubkey()),
-            &[&self.keypair],
-            self.ctx.borrow().last_blockhash,
-        )
+        let mut transactions = vec![];
+        for chunk in ixs.chunks(10) {
+            let chunk = chunk.to_vec();
+            let tx = move |hash| {
+                Transaction::new_signed_with_payer(
+                    chunk.as_slice(),
+                    Some(&self.keypair.pubkey()),
+                    &[&self.keypair],
+                    hash,
+                )
+            };
+            transactions.push(tx);
+        }
+        transactions
     }
 
     pub async fn initialize_validator_history_account(&self) {

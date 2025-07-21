@@ -237,10 +237,14 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
 
     // Initialize validator history config and stake buffer accounts
     test.initialize_config().await;
-    test.submit_transaction_assert_success(
-        test.build_initialize_and_realloc_validator_stake_buffer_account_transaction(),
-    )
-    .await;
+    for tx in test
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = fresh_blockhash(&test.ctx).await;
+        let tx = tx(hash);
+        test.submit_transaction_assert_success(tx).await;
+    }
 
     // Create several mock validator history accounts
     let num_validators = test.additional_vote_accounts.len();
