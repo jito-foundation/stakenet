@@ -640,16 +640,18 @@ fn command_get_config(client: RpcClient) {
     let config_account = Config::try_deserialize(&mut config_account_raw.data.as_slice())
         .expect("Failed to deserialize cluster history account");
 
-    info!("--- Config Account ---");
-    info!("Address: {}", config_pda);
-    info!("Admin: {}", config_account.admin);
-    info!("Counter: {}", config_account.counter);
-    info!("Oracle Auth: {}", config_account.oracle_authority);
-    info!(
+    println!("--- Config Account ---");
+    println!("Address: {}", config_pda);
+    println!("Admin: {}", config_account.admin);
+    println!("Counter: {}", config_account.counter);
+    println!("Oracle Auth: {}", config_account.oracle_authority);
+    println!(
         "Priority Fee Auth: {}",
         config_account.priority_fee_oracle_authority
     );
-    info!("Tip Distro: {}", config_account.tip_distribution_program);
+    println!("Tip Distro: {}", config_account.tip_distribution_program);
+    println!("PF Distro: {}", config_account.priority_fee_distribution_program);
+
 }
 
 fn main() {
