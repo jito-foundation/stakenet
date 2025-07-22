@@ -139,100 +139,9 @@ async fn fresh_blockhash(ctx: &Rc<RefCell<ProgramTestContext>>) -> Hash {
         .unwrap()
 }
 
-// #[tokio::test(flavor = "current_thread")]
-// #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
-// async fn test_stake_buffer_insert() {
-//     let test = TestFixture::new().await;
-//
-//     // Initialize validator history config and stake buffer accounts
-//     test.initialize_config().await;
-//     test.submit_transaction_assert_success(
-//         test.build_initialize_and_realloc_validator_stake_buffer_account_transaction(),
-//     )
-//     .await;
-//
-//     // Create several mock validator history accounts with different stake amounts
-//     let num_validators = 5;
-//     let mut validator_accounts = Vec::new();
-//     for (i, vote_account) in test
-//         .additional_vote_accounts
-//         .clone()
-//         .into_iter()
-//         .take(num_validators)
-//         .enumerate()
-//     {
-//         // Simulate different stake amounts and ensure some are superminority
-//         let stake_amount = (100 - i) as u64 * 100_000_000; // Decreasing stake
-//
-//         let validator_history_address = create_validator_accounts(
-//             &test.ctx,
-//             &test.keypair,
-//             &test.validator_history_config,
-//             &vote_account,
-//             stake_amount,
-//         )
-//         .await;
-//
-//         validator_accounts.push((vote_account, validator_history_address));
-//     }
-//     // Advance epoch to finalize stake delegations
-//     test.advance_num_epochs(1).await;
-//
-//     // Insert validators into stake buffer
-//     for (vote_account_address, validator_history_address) in validator_accounts {
-//         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
-//
-//         let accounts = validator_history::accounts::UpdateStakeBuffer {
-//             config: test.validator_history_config,
-//             validator_stake_buffer_account: test.validator_stake_buffer_account,
-//             validator_history_account: validator_history_address,
-//         };
-//
-//         let mut metas = accounts.to_account_metas(None);
-//         metas.push(AccountMeta::new_readonly(vote_account_address, false));
-//
-//         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
-//             &[Instruction {
-//                 program_id: validator_history::id(),
-//                 accounts: metas,
-//                 data: ix_data.data(),
-//             }],
-//             Some(&test.keypair.pubkey()),
-//             &[&test.keypair],
-//             test.ctx.borrow().last_blockhash,
-//         );
-//
-//         test.submit_transaction_assert_success(transaction).await;
-//     }
-//
-//     // Assert the state of the ValidatorStakeBuffer
-//     let stake_buffer_account: ValidatorStakeBuffer = test
-//         .load_and_deserialize(&test.validator_stake_buffer_account)
-//         .await;
-//     let current_epoch = test
-//         .ctx
-//         .borrow_mut()
-//         .banks_client
-//         .get_sysvar::<Clock>()
-//         .await
-//         .unwrap()
-//         .epoch;
-//
-//     assert_eq!(stake_buffer_account.length(), num_validators as u32);
-//     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
-//     assert!(stake_buffer_account.total_stake() > 0);
-//
-//     // Verify individual entries are inserted and sorted by stake amount (descending)
-//     for i in 0..num_validators {
-//         let expected_stake = (100 - i) as u64 * 100_000_000;
-//         let entry = stake_buffer_account.get_by_index(i).unwrap();
-//         assert_eq!(entry.stake_amount, expected_stake);
-//     }
-// }
-
-#[tokio::test(flavor = "current_thread")]
+#[tokio::test]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
-async fn test_stake_buffer_insert_until_cu_limit_max() {
+async fn test_stake_buffer_insert_cu_limit_min() {
     let test = TestFixture::new().await;
 
     // Initialize validator history config and stake buffer accounts
@@ -250,11 +159,13 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     let num_validators = test.additional_vote_accounts.len();
     let mut validator_accounts = Vec::new();
     for (i, vote_account) in test.additional_vote_accounts.clone().iter().enumerate() {
-        // Set linearly increasing stake amounts
-        // such that we iterate the entire buffer onchain on every insert instruction, simulating
-        // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
-        // size.
-        let stake_amount = (10 * 100_000_000) + i as u64;
+        // Set linearly decreasing stake amounts
+        // such that we are always directly pushing to the end of the buffer,
+        // simulating the optimal case.
+        // Notice in the logs, that CUs per insert instruction are constant
+        // as opposed to the lineary increasing test case where CUs are linearly increasing with every
+        // sequential insert instruction.
+        let stake_amount = (100 * 100_000_000) - i as u64;
         let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
@@ -314,10 +225,28 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         .unwrap()
         .epoch;
 
-    let base_stake_per_validator = 10 * 100_000_000;
-    // sum of arithmetic series
-    let sum_of_increments = num_validators as u64 * (num_validators as u64 - 1) / 2;
-    let expected_total_stake = num_validators as u64 * base_stake_per_validator + sum_of_increments;
+    assert_eq!(stake_buffer_account.length(), num_validators as u32);
+    assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
+    assert!(stake_buffer_account.total_stake() > 0);
+
+    // Assert the state of the ValidatorStakeBuffer
+    let stake_buffer_account: ValidatorStakeBuffer = test
+        .load_and_deserialize(&test.validator_stake_buffer_account)
+        .await;
+    let current_epoch = test
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar::<Clock>()
+        .await
+        .unwrap()
+        .epoch;
+
+    let base_stake_per_validator = 100 * 100_000_000;
+    // Sum of arithmetic series 0, 1, ..., num_validators-1
+    let sum_of_decrements = num_validators as u64 * (num_validators as u64 - 1) / 2;
+    let expected_total_stake = num_validators as u64 * base_stake_per_validator - sum_of_decrements;
+
     println!("Actual total_stake: {}", stake_buffer_account.total_stake());
     println!("Expected total_stake: {}", expected_total_stake);
     println!("buffer length: {}", stake_buffer_account.length());
@@ -326,3 +255,100 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
 }
+
+// #[tokio::test(flavor = "current_thread")]
+// #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
+// async fn test_stake_buffer_insert_until_cu_limit_max() {
+//     let test = TestFixture::new().await;
+//
+//     // Initialize validator history config and stake buffer accounts
+//     test.initialize_config().await;
+//     for tx in test
+//         .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+//         .into_iter()
+//     {
+//         let hash = fresh_blockhash(&test.ctx).await;
+//         let tx = tx(hash);
+//         test.submit_transaction_assert_success(tx).await;
+//     }
+//
+//     // Create several mock validator history accounts
+//     let num_validators = test.additional_vote_accounts.len();
+//     let mut validator_accounts = Vec::new();
+//     for (i, vote_account) in test.additional_vote_accounts.clone().iter().enumerate() {
+//         // Set linearly increasing stake amounts
+//         // such that we iterate the entire buffer onchain on every insert instruction, simulating
+//         // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
+//         // size.
+//         let stake_amount = (10 * 100_000_000) + i as u64;
+//         let validator_history_address = create_validator_accounts(
+//             &test.ctx,
+//             &test.keypair,
+//             &test.validator_history_config,
+//             vote_account,
+//             stake_amount,
+//         )
+//         .await;
+//
+//         validator_accounts.push((*vote_account, validator_history_address));
+//     }
+//     // Advance epoch to finalize stake delegations
+//     test.advance_num_epochs(1).await;
+//
+//     // Insert validators into stake buffer
+//     for (vote_account_address, validator_history_address) in validator_accounts {
+//         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
+//         let accounts = validator_history::accounts::UpdateStakeBuffer {
+//             config: test.validator_history_config,
+//             validator_stake_buffer_account: test.validator_stake_buffer_account,
+//             validator_history_account: validator_history_address,
+//         };
+//
+//         let mut metas = accounts.to_account_metas(None);
+//         metas.push(AccountMeta::new_readonly(vote_account_address, false));
+//
+//         let latest_blockhash = fresh_blockhash(&test.ctx).await;
+//         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
+//             &[
+//                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+//                     1_400_000,
+//                 ),
+//                 Instruction {
+//                     program_id: validator_history::id(),
+//                     accounts: metas,
+//                     data: ix_data.data(),
+//                 },
+//             ],
+//             Some(&test.keypair.pubkey()),
+//             &[&test.keypair],
+//             latest_blockhash,
+//         );
+//         test.ctx.borrow_mut().last_blockhash = latest_blockhash;
+//         test.submit_transaction_assert_success(transaction).await;
+//     }
+//
+//     // Assert the state of the ValidatorStakeBuffer
+//     let stake_buffer_account: ValidatorStakeBuffer = test
+//         .load_and_deserialize(&test.validator_stake_buffer_account)
+//         .await;
+//     let current_epoch = test
+//         .ctx
+//         .borrow_mut()
+//         .banks_client
+//         .get_sysvar::<Clock>()
+//         .await
+//         .unwrap()
+//         .epoch;
+//
+//     let base_stake_per_validator = 10 * 100_000_000;
+//     // sum of arithmetic series
+//     let sum_of_increments = num_validators as u64 * (num_validators as u64 - 1) / 2;
+//     let expected_total_stake = num_validators as u64 * base_stake_per_validator + sum_of_increments;
+//     println!("Actual total_stake: {}", stake_buffer_account.total_stake());
+//     println!("Expected total_stake: {}", expected_total_stake);
+//     println!("buffer length: {}", stake_buffer_account.length());
+//
+//     assert_eq!(stake_buffer_account.length(), num_validators as u32);
+//     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
+//     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
+// }
