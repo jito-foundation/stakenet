@@ -2,6 +2,27 @@ use anchor_lang::prelude::*;
 
 use crate::{constants::MAX_ALLOC_BYTES, errors::ValidatorHistoryError, ValidatorStakeBuffer};
 
+// TODO: Size trait such that this fn can be generic ?
+// (copy pasta'd 4 times now)
+fn get_realloc_size(account_info: &AccountInfo) -> usize {
+    let account_size = account_info.data_len();
+    // If account is already over-allocated, don't try to shrink
+    if account_size < ValidatorStakeBuffer::SIZE {
+        ValidatorStakeBuffer::SIZE.min(account_size + MAX_ALLOC_BYTES)
+    } else {
+        account_size
+    }
+}
+
+fn is_initialized(account_info: &AccountInfo) -> Result<bool> {
+    let account_data = account_info.as_ref().try_borrow_data()?;
+    // Parse last-observed-epoch bytes (first u64 field after discriminator)
+    let epoch_bytes = account_data[8..16].to_vec();
+    // Check for any non-zero bytes
+    let non_zero = epoch_bytes.iter().any(|&x| x.ne(&0));
+    Ok(non_zero)
+}
+
 #[derive(Accounts)]
 pub struct ReallocValidatorStakeBufferAccount<'info> {
     #[account(
@@ -49,25 +70,4 @@ pub fn handle_realloc_validator_stake_buffer_account(
         }
     }
     Ok(())
-}
-
-fn is_initialized(account_info: &AccountInfo) -> Result<bool> {
-    let account_data = account_info.as_ref().try_borrow_data()?;
-    // Parse last-observed-epoch bytes (first u64 field after discriminator)
-    let epoch_bytes = account_data[8..16].to_vec();
-    // Check for any non-zero bytes
-    let non_zero = epoch_bytes.iter().any(|&x| x.ne(&0));
-    Ok(non_zero)
-}
-
-// TODO: Size trait such that this fn can be generic ?
-// (copy pasta'd 4 times now)
-fn get_realloc_size(account_info: &AccountInfo) -> usize {
-    let account_size = account_info.data_len();
-    // If account is already over-allocated, don't try to shrink
-    if account_size < ValidatorStakeBuffer::SIZE {
-        ValidatorStakeBuffer::SIZE.min(account_size + MAX_ALLOC_BYTES)
-    } else {
-        account_size
-    }
 }
