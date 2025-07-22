@@ -1473,20 +1473,20 @@ impl ValidatorStakeBuffer {
         }
         // Accumulators
         let mut cumulative_stake: u64 = 0;
-        let mut is_supermintority = true;
+        let mut is_superminority = true;
         let superminority_threshold = self.total_stake / 3;
         // Search for validator rank and superminority threshold
         for rank in 0..self.length as usize {
             let entry = &self.buffer[rank];
             // Superminority threshold check
-            if cumulative_stake > superminority_threshold && is_supermintority {
-                is_supermintority = false;
+            if cumulative_stake > superminority_threshold && is_superminority {
+                is_superminority = false;
             } else {
                 cumulative_stake += entry.stake_amount
             }
             // Rank
             if entry.validator_id == validator_id {
-                return Ok((entry.stake_amount, rank as u32, is_supermintority));
+                return Ok((entry.stake_amount, rank as u32, is_superminority));
             }
         }
         Err(ValidatorHistoryError::StakeBufferOutOfBounds.into())
