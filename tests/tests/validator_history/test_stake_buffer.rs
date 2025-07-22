@@ -139,6 +139,11 @@ async fn fresh_blockhash(ctx: &Rc<RefCell<ProgramTestContext>>) -> Hash {
         .unwrap()
 }
 
+/// This test inserts monotonically decreasing stake amounts into the buffer, which is best case
+/// scenario in terms of compute units consumed.
+///
+/// We have observed that CUs remain constant for every insertion regardless of buffer size or
+/// length. Roughly 17_000 CUs.
 #[tokio::test]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert_cu_limit_min() {
@@ -250,6 +255,20 @@ async fn test_stake_buffer_insert_cu_limit_min() {
     }
 }
 
+/// This test was used to max out the size of the stake buffer by measuring the consumption of
+/// compute units when inserting into the buffer with the buffer size set to 50_000 validators.
+///
+/// Because this test inserts validators with monotonically increasing stake amounts, it forces the
+/// insert instruction into the worst case on invocation.
+///
+/// We observed linearly increasing CUs up to the 50_000 element, maxing out at just over 700_000 CUs.
+/// This is about half of the max CUs that a single transaction is permitted to consume, which is
+/// sweet spot between maintaining a huge buffer allowing for growth of the protocol while still
+/// remaining well within the CU bounds.
+///
+/// This test is now nerfed down to 10 validators, as it still serves as a useful integration test.
+/// Scaling up to 50_000 validators take about 10 minutes to run ... which is not practical for CI
+/// pipelines.
 #[tokio::test]
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
 async fn test_stake_buffer_insert_until_cu_limit_max() {
