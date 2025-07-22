@@ -218,7 +218,7 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         test.submit_transaction_assert_success(transaction).await;
     }
 
-    // Assert the state of the ValidatorStakeBuffer
+    // Deserialize buffer account
     let stake_buffer_account: ValidatorStakeBuffer = test
         .load_and_deserialize(&test.validator_stake_buffer_account)
         .await;
@@ -231,36 +231,16 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         .unwrap()
         .epoch;
 
-    assert_eq!(stake_buffer_account.length(), num_validators as u32);
-    assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
-    assert!(stake_buffer_account.total_stake() > 0);
-
-    // Assert the state of the ValidatorStakeBuffer
-    let stake_buffer_account: ValidatorStakeBuffer = test
-        .load_and_deserialize(&test.validator_stake_buffer_account)
-        .await;
-    let current_epoch = test
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap()
-        .epoch;
-
+    // Assert total stake amount
     let base_stake_per_validator = 100 * 100_000_000;
-    // Sum of arithmetic series 0, 1, ..., num_validators-1
-    let sum_of_decrements = num_validators as u64 * (num_validators as u64 - 1) / 2;
-    let expected_total_stake = num_validators as u64 * base_stake_per_validator - sum_of_decrements;
-
-    println!("Actual total_stake: {}", stake_buffer_account.total_stake());
-    println!("Expected total_stake: {}", expected_total_stake);
-    println!("buffer length: {}", stake_buffer_account.length());
-
+    let sum_of_decrements = num_validators as u128 * (num_validators as u128 - 1) / 2; /* sum of arithmetic series */
+    let expected_total_stake =
+        num_validators as u128 * base_stake_per_validator - sum_of_decrements;
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
 
+    // Assert each entry
     for i in 0..stake_buffer_account.length() {
         let acc = stake_buffer_account.get_by_index(i as usize).unwrap();
         let expected = 100 * 100_000_000 - i as u64;
@@ -347,7 +327,7 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         test.submit_transaction_assert_success(transaction).await;
     }
 
-    // Assert the state of the ValidatorStakeBuffer
+    // Deserialize buffer account
     let stake_buffer_account: ValidatorStakeBuffer = test
         .load_and_deserialize(&test.validator_stake_buffer_account)
         .await;
@@ -360,14 +340,16 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         .unwrap()
         .epoch;
 
+    // Assert total stake amount
     let base_stake_per_validator = 10 * 100_000_000;
-    // sum of arithmetic series
-    let sum_of_increments = num_validators as u64 * (num_validators as u64 - 1) / 2;
-    let expected_total_stake = num_validators as u64 * base_stake_per_validator + sum_of_increments;
+    let sum_of_increments = num_validators as u128 * (num_validators as u128 - 1) / 2; /* sum of arithmetic series */
+    let expected_total_stake =
+        num_validators as u128 * base_stake_per_validator + sum_of_increments;
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
 
+    // Assert each entry
     for i in 0..stake_buffer_account.length() {
         let acc = stake_buffer_account.get_by_index(i as usize).unwrap();
         let expected = 10 * 100_000_000 + (10 - i as u64 - 1);

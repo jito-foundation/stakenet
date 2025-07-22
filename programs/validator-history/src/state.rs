@@ -1392,7 +1392,7 @@ pub struct ValidatorStakeBuffer {
 
     // Accumulator of total stake in pool
     // Not useful until buffer is finalized
-    total_stake: u128,
+    total_stake: [u8; 16], /* u128, 1 aligned */
 
     // Bitmask of inserted validators
     inserted_validators: BitMask,
@@ -1408,7 +1408,7 @@ impl Default for ValidatorStakeBuffer {
             length: 0,
             finalized: 0,
             _padding0: [0; 131],
-            total_stake: 0,
+            total_stake: [0; 16],
             inserted_validators: BitMask::default(),
             buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
         }
@@ -1425,7 +1425,7 @@ impl ValidatorStakeBuffer {
     /// Resets aggregation for new epoch
     pub fn reset(&mut self, epoch: u64) {
         self.last_observed_epoch = epoch;
-        self.total_stake = 0;
+        self.total_stake = [0; 16];
         self.length = 0;
         self.finalized = 0;
         self.inserted_validators.reset();
@@ -1461,20 +1461,21 @@ impl ValidatorStakeBuffer {
     }
 
     pub fn total_stake(&self) -> u128 {
-        self.total_stake
+        u128::from_le_bytes(self.total_stake)
     }
 
     /// Get element by validator id
     ///
     /// Linear searches thru buffer for rank
     pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
-        if self.total_stake == 0 {
+        let total_stake = self.total_stake();
+        if total_stake == 0 {
             return Err(ValidatorHistoryError::StakeBufferEmpty.into());
         }
         // Accumulators
         let mut cumulative_stake: u128 = 0;
         let mut is_superminority = true;
-        let superminority_threshold = self.total_stake / 3;
+        let superminority_threshold = total_stake / 3;
         // Search for validator rank and superminority threshold
         for rank in 0..self.length as usize {
             let entry = &self.buffer[rank];
@@ -1518,7 +1519,10 @@ impl ValidatorStakeBuffer {
         // Insert entry
         self.buffer[i] = entry;
         self.length += 1;
-        self.total_stake += entry.stake_amount as u128;
+        // Increment total stake
+        let mut total_stake = self.total_stake();
+        total_stake += entry.stake_amount as u128;
+        self.total_stake = total_stake.to_le_bytes();
         // Set finalized flag if the buffer is now full
         let max_length = config.counter.min(MAX_STAKE_BUFFER_VALIDATORS as u32);
         if self.length == max_length {
