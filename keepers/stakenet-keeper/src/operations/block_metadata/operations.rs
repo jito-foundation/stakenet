@@ -19,8 +19,7 @@ use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
 use stakenet_sdk::{
-    models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
-    utils::transactions::submit_chunk_instructions,
+    models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats}, utils::transactions::submit_chunk_instructions,
 };
 
 use crate::{
@@ -203,7 +202,7 @@ async fn update_block_metadata(
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
         let epoch_leader_schedule = get_leader_schedule_safe(client, epoch_starting_slot).await?;
-        match DBSlotInfo::upsert_leader_schedule(
+        match DBSlotInfo::insert_leader_schedule(
             sqlite_connection,
             current_epoch,
             epoch_schedule,
