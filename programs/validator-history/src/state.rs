@@ -1381,10 +1381,6 @@ pub struct ValidatorStakeBuffer {
     // If this doesn't equal the current epoch, reset
     last_observed_epoch: u64,
 
-    // Accumulator of total stake in pool
-    // Not useful until buffer is finalized
-    total_stake: u64,
-
     // Length of the stake buffer (number of validators observed this epoch)
     length: u32,
 
@@ -1392,7 +1388,11 @@ pub struct ValidatorStakeBuffer {
     // This provides finality of stake observations
     finalized: u8, /* boolean */
 
-    _padding0: [u8; 3],
+    _padding0: [u8; 131],
+
+    // Accumulator of total stake in pool
+    // Not useful until buffer is finalized
+    total_stake: u128,
 
     // Bitmask of inserted validators
     inserted_validators: BitMask,
@@ -1405,10 +1405,10 @@ impl Default for ValidatorStakeBuffer {
     fn default() -> Self {
         Self {
             last_observed_epoch: 0,
-            total_stake: 0,
             length: 0,
             finalized: 0,
-            _padding0: [0; 3],
+            _padding0: [0; 131],
+            total_stake: 0,
             inserted_validators: BitMask::default(),
             buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
         }
@@ -1460,7 +1460,7 @@ impl ValidatorStakeBuffer {
         Ok(self.buffer[index])
     }
 
-    pub fn total_stake(&self) -> u64 {
+    pub fn total_stake(&self) -> u128 {
         self.total_stake
     }
 
@@ -1468,11 +1468,11 @@ impl ValidatorStakeBuffer {
     ///
     /// Linear searches thru buffer for rank
     pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
-        if self.total_stake().eq(&0) {
+        if self.total_stake.eq(&0) {
             return Err(ValidatorHistoryError::StakeBufferEmpty.into());
         }
         // Accumulators
-        let mut cumulative_stake: u64 = 0;
+        let mut cumulative_stake: u128 = 0;
         let mut is_superminority = true;
         let superminority_threshold = self.total_stake / 3;
         // Search for validator rank and superminority threshold
@@ -1482,7 +1482,7 @@ impl ValidatorStakeBuffer {
             if cumulative_stake > superminority_threshold && is_superminority {
                 is_superminority = false;
             } else {
-                cumulative_stake += entry.stake_amount
+                cumulative_stake += entry.stake_amount as u128;
             }
             // Rank
             if entry.validator_id == validator_id {
@@ -1518,7 +1518,7 @@ impl ValidatorStakeBuffer {
         // Insert entry
         self.buffer[i] = entry;
         self.length += 1;
-        self.total_stake += entry.stake_amount;
+        self.total_stake += entry.stake_amount as u128;
         // Set finalized flag if the buffer is now full
         let max_length = config.counter.min(MAX_STAKE_BUFFER_VALIDATORS as u32);
         if self.length == max_length {
