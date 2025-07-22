@@ -1449,12 +1449,12 @@ impl ValidatorStakeBuffer {
     }
 
     pub fn needs_reset(&self, epoch: u64) -> bool {
-        epoch.gt(&self.last_observed_epoch)
+        epoch > self.last_observed_epoch
     }
 
     /// Get element by index
     pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
-        if index.ge(&(self.length as usize)) {
+        if index >= self.length as usize {
             return Err(ValidatorHistoryError::StakeBufferOutOfBounds.into());
         }
         Ok(self.buffer[index])
@@ -1468,7 +1468,7 @@ impl ValidatorStakeBuffer {
     ///
     /// Linear searches thru buffer for rank
     pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
-        if self.total_stake.eq(&0) {
+        if self.total_stake == 0 {
             return Err(ValidatorHistoryError::StakeBufferEmpty.into());
         }
         // Accumulators
