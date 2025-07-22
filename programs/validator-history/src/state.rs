@@ -1520,7 +1520,7 @@ impl ValidatorStakeBuffer {
         self.length += 1;
         self.total_stake += entry.stake_amount;
         // Set finalized flag if the buffer is now full
-        let max_length = config.counter;
+        let max_length = config.counter.min(MAX_STAKE_BUFFER_VALIDATORS as u32);
         if self.length == max_length {
             self.finalized = 1;
         }
