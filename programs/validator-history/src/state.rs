@@ -4,7 +4,7 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
-use crate::constants::MAX_STAKE_BUFFER_VALIDATORS;
+use crate::{bitmask::BitMask, constants::MAX_STAKE_BUFFER_VALIDATORS};
 
 use {
     crate::{
@@ -1394,6 +1394,9 @@ pub struct ValidatorStakeBuffer {
 
     _padding0: [u8; 3],
 
+    // Bitmask of inserted validators
+    inserted_validators: BitMask,
+
     // Sorted validator stake amounts (descending by amount)
     buffer: [ValidatorStake; MAX_STAKE_BUFFER_VALIDATORS],
 }
@@ -1406,6 +1409,7 @@ impl Default for ValidatorStakeBuffer {
             length: 0,
             finalized: 0,
             _padding0: [0; 3],
+            inserted_validators: BitMask::default(),
             buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
         }
     }
@@ -1424,6 +1428,7 @@ impl ValidatorStakeBuffer {
         self.total_stake = 0;
         self.length = 0;
         self.finalized = 0;
+        self.inserted_validators.reset();
         self.buffer = [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS];
     }
 
@@ -1488,20 +1493,20 @@ impl ValidatorStakeBuffer {
     }
 
     /// Inserts a new [ValidatorStake] entry into the buffer
+    ///
+    /// Validates against bitmask to prevent duplicate assertions,
+    /// and marks buffer as finalized when length equals total validator history count.
     pub fn insert(&mut self, config: &Config, entry: ValidatorStake) -> Result<()> {
-        // early exit if finalized
+        // Early exit if finalized
         if self.is_finalized() {
             return Err(ValidatorHistoryError::StakeBufferFinalized.into());
         }
-        // The config counter should invariably be
-        // 1) non-zero
-        // 2) less than or equal to `MAX_STAKE_BUFFER_VALIDATORS`
-        if config.counter.eq(&0) {
-            return Err(ValidatorHistoryError::ConfigCounterFloor.into());
+        // Check for duplicate entry before insertion
+        if self.inserted_validators.get(entry.validator_id as usize)? {
+            return Err(ValidatorHistoryError::StakeBufferDuplicate.into());
         }
-        if config.counter.gt(&(MAX_STAKE_BUFFER_VALIDATORS as u32)) {
-            return Err(ValidatorHistoryError::ConfigCounterCeiling.into());
-        }
+        self.inserted_validators
+            .set(entry.validator_id as usize, true)?;
         // Start linear search from end of buffer until finding validator with greater or equal stake
         // to insert the new entry while maintaining descending order
         let mut i = self.length as usize;
@@ -1514,7 +1519,6 @@ impl ValidatorStakeBuffer {
         self.buffer[i] = entry;
         self.length += 1;
         self.total_stake += entry.stake_amount;
-
         // Set finalized flag if the buffer is now full
         let max_length = config.counter;
         if self.length == max_length {

@@ -38,12 +38,10 @@ pub enum ValidatorHistoryError {
     StakeBufferFinalized,
     #[msg("Stake buffer has not been finalized")]
     StakeBufferNotFinalized,
-    #[msg("Config counter found at floor")]
-    ConfigCounterFloor,
-    #[msg("Config counter found at ceiling")]
-    ConfigCounterCeiling,
     #[msg("Stake buffer out of bounds")]
     StakeBufferOutOfBounds,
     #[msg("Stake buffer is empty")]
     StakeBufferEmpty,
+    #[msg("Stake buffer already contains entry")]
+    StakeBufferDuplicate,
 }

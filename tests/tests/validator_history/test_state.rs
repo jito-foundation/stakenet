@@ -239,43 +239,40 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
 }
 
 #[test]
-fn test_validator_stake_buffer_insert_with_zero_max_len() {
+fn test_stake_buffer_insert_duplicate_error() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
-        counter: 0,
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    let entry = ValidatorStake::new(1, 100);
-    let result = buffer.insert(&config, entry);
 
+    // Insert an entry
+    let entry = ValidatorStake::new(1, 100);
+    buffer.insert(&config, entry).unwrap();
+    assert_eq!(buffer.length(), 1);
+
+    // Attempt to insert the same entry again
+    let result = buffer.insert(&config, entry);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
-        Error::from(ValidatorHistoryError::ConfigCounterFloor)
+        Error::from(ValidatorHistoryError::StakeBufferDuplicate)
     );
-    // The buffer should remain unchanged
-    assert_eq!(buffer.length(), 0);
-    assert!(!buffer.is_finalized());
-}
 
-#[test]
-fn test_validator_stake_buffer_insert_with_counter_greater_than_max_validators() {
-    let mut buffer = ValidatorStakeBuffer::default();
-    let config = Config {
-        counter: (MAX_STAKE_BUFFER_VALIDATORS + 1) as u32,
-        ..Default::default()
-    };
-    let entry = ValidatorStake::new(1, 100);
-    let result = buffer.insert(&config, entry);
+    // The buffer should remain unchanged in length
+    assert_eq!(buffer.length(), 1);
 
-    assert!(result.is_err());
+    // Attempt to insert a different entry with the same validator_id
+    let new_entry_same_id = ValidatorStake::new(1, 200);
+    let result2 = buffer.insert(&config, new_entry_same_id);
+    assert!(result2.is_err());
     assert_eq!(
-        result.unwrap_err(),
-        Error::from(ValidatorHistoryError::ConfigCounterCeiling)
+        result2.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferDuplicate)
     );
-    // The buffer should remain unchanged
-    assert_eq!(buffer.length(), 0);
-    assert!(!buffer.is_finalized());
+
+    // The buffer should still be unchanged
+    assert_eq!(buffer.length(), 1);
 }
 
 #[test]
