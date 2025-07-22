@@ -1359,17 +1359,17 @@ impl ClusterHistory {
 #[derive(BorshSerialize, Debug, Default, PartialEq)]
 #[zero_copy]
 pub struct ValidatorStake {
-    pub stake_amount: u64,
     pub validator_id: u32,
     _padding0: u32,
+    pub stake_amount: u64,
 }
 
 impl ValidatorStake {
     pub fn new(validator_id: u32, stake_amount: u64) -> Self {
         Self {
-            stake_amount,
             validator_id,
             _padding0: 0,
+            stake_amount,
         }
     }
 }
