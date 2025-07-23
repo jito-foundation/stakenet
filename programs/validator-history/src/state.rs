@@ -1359,15 +1359,15 @@ impl ClusterHistory {
 #[derive(BorshSerialize, Debug, Default, PartialEq)]
 #[zero_copy]
 pub struct ValidatorStake {
-    pub validator_id: u32,
+    pub validator_index: u32,
     _padding0: u32,
     pub stake_amount: u64,
 }
 
 impl ValidatorStake {
-    pub fn new(validator_id: u32, stake_amount: u64) -> Self {
+    pub fn new(validator_index: u32, stake_amount: u64) -> Self {
         Self {
-            validator_id,
+            validator_index,
             _padding0: 0,
             stake_amount,
         }
@@ -1452,8 +1452,8 @@ impl ValidatorStakeBuffer {
         epoch > self.last_observed_epoch
     }
 
-    /// Get element by index
-    pub fn get_by_index(&self, index: usize) -> Result<ValidatorStake> {
+    /// Get element by positional index in buffer
+    pub fn get(&self, index: usize) -> Result<ValidatorStake> {
         if index >= self.length as usize {
             return Err(ValidatorHistoryError::StakeBufferOutOfBounds.into());
         }
@@ -1464,10 +1464,10 @@ impl ValidatorStakeBuffer {
         u128::from_le_bytes(self.total_stake)
     }
 
-    /// Get element by validator id
+    /// Get element by validator index
     ///
     /// Linear searches thru buffer for rank
-    pub fn get_by_id(&self, validator_id: u32) -> Result<ValidatorRank> {
+    pub fn get_by_validator_index(&self, validator_index: u32) -> Result<ValidatorRank> {
         let total_stake = self.total_stake();
         if total_stake == 0 {
             return Err(ValidatorHistoryError::StakeBufferEmpty.into());
@@ -1486,7 +1486,7 @@ impl ValidatorStakeBuffer {
                 cumulative_stake += entry.stake_amount as u128;
             }
             // Rank
-            if entry.validator_id == validator_id {
+            if entry.validator_index == validator_index {
                 return Ok((entry.stake_amount, rank as u32, is_superminority));
             }
         }
@@ -1503,11 +1503,14 @@ impl ValidatorStakeBuffer {
             return Err(ValidatorHistoryError::StakeBufferFinalized.into());
         }
         // Check for duplicate entry before insertion
-        if self.inserted_validators.get(entry.validator_id as usize)? {
+        if self
+            .inserted_validators
+            .get(entry.validator_index as usize)?
+        {
             return Err(ValidatorHistoryError::StakeBufferDuplicate.into());
         }
         self.inserted_validators
-            .set(entry.validator_id as usize, true)?;
+            .set(entry.validator_index as usize, true)?;
         // Start linear search from end of buffer until finding validator with greater or equal stake
         // to insert the new entry while maintaining descending order
         let mut i = self.length as usize;

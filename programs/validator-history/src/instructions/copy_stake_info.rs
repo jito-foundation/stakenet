@@ -49,7 +49,7 @@ pub fn handle_copy_stake_info(ctx: Context<CopyStakeInfo>) -> Result<()> {
 
     // Look up stake info in buffer
     let (stake, rank, is_superminority) =
-        validator_stake_buffer_account.get_by_id(validator_history_account.index)?;
+        validator_stake_buffer_account.get_by_validator_index(validator_history_account.index)?;
 
     // Insert and persit stake info in validator history account
     let epoch = cast_epoch(epoch)?;

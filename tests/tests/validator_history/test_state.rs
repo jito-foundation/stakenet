@@ -88,7 +88,7 @@ fn test_validator_stake_buffer_insert_empty_buffer() {
     };
     buffer.insert(&config, entry).unwrap();
     assert_eq!(buffer.length(), 1);
-    assert_eq!(buffer.get_by_index(0).unwrap(), entry);
+    assert_eq!(buffer.get(0).unwrap(), entry);
 }
 
 #[test]
@@ -102,9 +102,9 @@ fn test_validator_stake_buffer_insert_partially_full_ordered() {
     buffer.insert(&config, ValidatorStake::new(2, 200)).unwrap();
     buffer.insert(&config, ValidatorStake::new(3, 300)).unwrap();
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
-    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get(0).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -118,9 +118,9 @@ fn test_validator_stake_buffer_insert_unordered_in_middle() {
     buffer.insert(&config, ValidatorStake::new(2, 300)).unwrap();
     buffer.insert(&config, ValidatorStake::new(3, 200)).unwrap();
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
-    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get(0).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -134,9 +134,9 @@ fn test_validator_stake_buffer_insert_unordered_at_start() {
     buffer.insert(&config, ValidatorStake::new(2, 300)).unwrap();
     buffer.insert(&config, ValidatorStake::new(3, 50)).unwrap();
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
-    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 100);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 50);
+    assert_eq!(buffer.get(0).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get(1).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get(2).unwrap().stake_amount, 50);
 }
 
 #[test]
@@ -150,9 +150,9 @@ fn test_validator_stake_buffer_insert_partially_full_unordered() {
     buffer.insert(&config, ValidatorStake::new(2, 100)).unwrap();
     buffer.insert(&config, ValidatorStake::new(3, 200)).unwrap();
     assert_eq!(buffer.length(), 3);
-    assert_eq!(buffer.get_by_index(0).unwrap().stake_amount, 300);
-    assert_eq!(buffer.get_by_index(1).unwrap().stake_amount, 200);
-    assert_eq!(buffer.get_by_index(2).unwrap().stake_amount, 100);
+    assert_eq!(buffer.get(0).unwrap().stake_amount, 300);
+    assert_eq!(buffer.get(1).unwrap().stake_amount, 200);
+    assert_eq!(buffer.get(2).unwrap().stake_amount, 100);
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn test_validator_stake_buffer_finalized_error() {
     assert!(buffer.is_finalized());
     // Verify that the first element is the largest (descending sort)
     assert_eq!(
-        buffer.get_by_index(0).unwrap().stake_amount,
+        buffer.get(0).unwrap().stake_amount,
         100 + (max_len as u64 - 1)
     );
 }
@@ -233,7 +233,7 @@ fn test_validator_stake_buffer_finalized_with_monotonically_increasing_config() 
     assert!(buffer.is_finalized());
     // Verify that the first element is the largest (descending sort)
     assert_eq!(
-        buffer.get_by_index(0).unwrap().stake_amount,
+        buffer.get(0).unwrap().stake_amount,
         100 + (initial_max_len as u64 - 1)
     );
 }
@@ -262,7 +262,7 @@ fn test_stake_buffer_insert_duplicate_error() {
     // The buffer should remain unchanged in length
     assert_eq!(buffer.length(), 1);
 
-    // Attempt to insert a different entry with the same validator_id
+    // Attempt to insert a different entry with the same validator index
     let new_entry_same_id = ValidatorStake::new(1, 200);
     let result2 = buffer.insert(&config, new_entry_same_id);
     assert!(result2.is_err());
@@ -324,7 +324,7 @@ fn test_stake_buffer_insert_until_finalized() {
 }
 
 #[test]
-fn test_get_by_id_zero_total_stake() {
+fn test_get_by_validator_index_zero_total_stake() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
@@ -336,14 +336,14 @@ fn test_get_by_id_zero_total_stake() {
     assert_eq!(buffer.length(), 150);
     assert_eq!(buffer.total_stake(), 0);
 
-    let result = buffer.get_by_id(0);
+    let result = buffer.get_by_validator_index(0);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
         Error::from(ValidatorHistoryError::StakeBufferEmpty)
     );
 
-    let result = buffer.get_by_id(75);
+    let result = buffer.get_by_validator_index(75);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),
@@ -352,7 +352,7 @@ fn test_get_by_id_zero_total_stake() {
 }
 
 #[test]
-fn test_get_by_id_superminority_calculation() {
+fn test_get_by_validator_index_superminority_calculation() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
@@ -371,22 +371,22 @@ fn test_get_by_id_superminority_calculation() {
     assert_eq!(buffer.length(), 150);
 
     // Test validator at rank 0 (stake 100)
-    let (_, rank, is_superminority) = buffer.get_by_id(0).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(0).unwrap();
     assert_eq!(rank, 0);
     assert!(is_superminority);
 
     // Test validator at rank 1 (stake 100)
-    let (_, rank, is_superminority) = buffer.get_by_id(1).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(1).unwrap();
     assert_eq!(rank, 1);
     assert!(is_superminority);
 
     // Test validator outside superminority (rank 2, stake 100)
-    let (_, rank, is_superminority) = buffer.get_by_id(2).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(2).unwrap();
     assert_eq!(rank, 2);
     assert!(!is_superminority);
 
     // Test validator outside superminority (rank 3, stake 1)
-    let (_, rank, is_superminority) = buffer.get_by_id(3).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(3).unwrap();
     assert_eq!(rank, 3);
     assert!(!is_superminority);
 
@@ -401,29 +401,29 @@ fn test_get_by_id_superminority_calculation() {
     }
 
     // Test validator at rank 49
-    let (_, rank, is_superminority) = buffer.get_by_id(49).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(49).unwrap();
     assert_eq!(rank, 49);
     assert!(is_superminority);
 
     // Test validator at rank 50
-    let (_, rank, is_superminority) = buffer.get_by_id(50).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(50).unwrap();
     assert_eq!(rank, 50);
     assert!(is_superminority);
 
     // Test validator at rank 51
-    let (_, rank, is_superminority) = buffer.get_by_id(51).unwrap();
+    let (_, rank, is_superminority) = buffer.get_by_validator_index(51).unwrap();
     assert_eq!(rank, 51);
     assert!(!is_superminority);
 }
 
 #[test]
-fn test_get_by_id_basic_found_rank_and_stake() {
+fn test_get_by_validator_index_basic_found_rank_and_stake() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
         ..Default::default()
     };
-    // Values are stake_amount, validator_id
+    // Values are stake amount, validator index
     // Rank 0: (1000, 0)
     // Rank 1: (999, 1)
     // ...
@@ -439,32 +439,32 @@ fn test_get_by_id_basic_found_rank_and_stake() {
     assert_eq!(buffer.length(), 150);
 
     // Test finding validator at rank 0
-    let (stake, rank, is_superminority) = buffer.get_by_id(0).unwrap();
+    let (stake, rank, is_superminority) = buffer.get_by_validator_index(0).unwrap();
     assert_eq!(stake, 1000);
     assert_eq!(rank, 0);
     assert!(is_superminority);
 
     // Test finding validator in the middle (at threshold)
-    let (stake, rank, is_superminority) = buffer.get_by_id(47).unwrap();
+    let (stake, rank, is_superminority) = buffer.get_by_validator_index(47).unwrap();
     assert_eq!(stake, 1000 - 47);
     assert_eq!(rank, 47);
     assert!(is_superminority);
 
     // Test finding validator in the middle (after threshold)
-    let (stake, rank, is_superminority) = buffer.get_by_id(48).unwrap();
+    let (stake, rank, is_superminority) = buffer.get_by_validator_index(48).unwrap();
     assert_eq!(stake, 1000 - 48);
     assert_eq!(rank, 48);
     assert!(!is_superminority);
 
     // Test finding validator at the end of inserted range (after threshold)
-    let (stake, rank, is_superminority) = buffer.get_by_id(149).unwrap();
+    let (stake, rank, is_superminority) = buffer.get_by_validator_index(149).unwrap();
     assert_eq!(stake, 1000 - 149);
     assert_eq!(rank, 149);
     assert!(!is_superminority);
 }
 
 #[test]
-fn test_get_by_id_validator_not_found() {
+fn test_get_by_validator_index_validator_not_found() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
         counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
@@ -477,8 +477,8 @@ fn test_get_by_id_validator_not_found() {
     }
     assert_eq!(buffer.length(), 150);
 
-    // Attempt to get a validator_id that does not exist
-    let result = buffer.get_by_id(9999);
+    // Attempt to get a validator index that does not exist
+    let result = buffer.get_by_validator_index(9999);
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err(),

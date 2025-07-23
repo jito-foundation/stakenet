@@ -25,7 +25,7 @@ pub struct UpdateStakeBuffer<'info> {
 pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()> {
     // Get validator vote account and index for insertion
     let validator_history = ctx.accounts.validator_history_account.load()?;
-    let validator_id = validator_history.index;
+    let validator_index = validator_history.index;
     let vote_account_pubkey = validator_history.vote_account;
 
     // Build insert context
@@ -46,7 +46,7 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
     let stake_amount: u64 = get_epoch_stake_for_vote_account(&vote_account_pubkey);
 
     // Insert into buffer
-    let entry = ValidatorStake::new(validator_id, stake_amount);
+    let entry = ValidatorStake::new(validator_index, stake_amount);
     validator_stake_buffer.insert(config, entry)?;
 
     Ok(())

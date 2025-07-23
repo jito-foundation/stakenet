@@ -232,7 +232,7 @@ async fn test_stake_buffer_insert_cu_limit_min() {
 
     // Assert each entry
     for i in 0..stake_buffer_account.length() {
-        let acc = stake_buffer_account.get_by_index(i as usize).unwrap();
+        let acc = stake_buffer_account.get(i as usize).unwrap();
         let expected = 100 * 100_000_000 - i as u64;
         println!("expected: {}", expected);
         println!("actual: {}", acc.stake_amount);
@@ -353,7 +353,7 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
 
     // Assert each entry
     for i in 0..stake_buffer_account.length() {
-        let acc = stake_buffer_account.get_by_index(i as usize).unwrap();
+        let acc = stake_buffer_account.get(i as usize).unwrap();
         let expected = 10 * 100_000_000 + (10 - i as u64 - 1);
         assert!(acc.stake_amount == expected);
     }
@@ -465,8 +465,9 @@ async fn test_copy_stake_info() {
         let account: ValidatorHistory = test.load_and_deserialize(validator_history_address).await;
         assert!(account.history.idx == 0);
         assert!(account.history.arr[0].epoch == 1);
-        let (stake, rank, is_superminority) =
-            stake_buffer_account.get_by_id(account.index).unwrap();
+        let (stake, rank, is_superminority) = stake_buffer_account
+            .get_by_validator_index(account.index)
+            .unwrap();
         let is_superminority = match is_superminority {
             true => 1,
             false => 0,
