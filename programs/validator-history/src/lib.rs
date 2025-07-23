@@ -108,6 +108,10 @@ pub mod validator_history {
         handle_set_new_oracle_authority(ctx)
     }
 
+    pub fn copy_stake_info(ctx: Context<CopyStakeInfo>) -> Result<()> {
+        handle_copy_stake_info(ctx)
+    }
+
     pub fn update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()> {
         handle_update_stake_buffer(ctx)
     }
