@@ -276,6 +276,54 @@ fn test_stake_buffer_insert_duplicate_error() {
 }
 
 #[test]
+fn test_stake_buffer_insert_until_finalized() {
+    let mut buffer = ValidatorStakeBuffer::default();
+    let config = Config {
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32,
+        ..Default::default()
+    };
+
+    // Insert until finalized with max buffer length
+    for i in 0..MAX_STAKE_BUFFER_VALIDATORS {
+        // Insert an entry
+        let entry = ValidatorStake::new(i as u32, 100);
+        let res = buffer.insert(&config, entry);
+        assert!(res.is_ok())
+    }
+
+    // Try inserting again and assert err on is finalized
+    let entry = ValidatorStake::new(MAX_STAKE_BUFFER_VALIDATORS as u32 + 1, 100);
+    let res = buffer.insert(&config, entry);
+    assert_eq!(
+        res.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferFinalized)
+    );
+
+    // Build new buffer with counter less than max buffer length
+    let mut buffer = ValidatorStakeBuffer::default();
+    let config = Config {
+        counter: MAX_STAKE_BUFFER_VALIDATORS as u32 - 1,
+        ..Default::default()
+    };
+
+    // Insert until finalized with max buffer length
+    for i in 0..MAX_STAKE_BUFFER_VALIDATORS - 1 {
+        // Insert an entry
+        let entry = ValidatorStake::new(i as u32, 100);
+        let res = buffer.insert(&config, entry);
+        assert!(res.is_ok())
+    }
+
+    // Try inserting again and assert err on is finalized
+    let entry = ValidatorStake::new(MAX_STAKE_BUFFER_VALIDATORS as u32, 100);
+    let res = buffer.insert(&config, entry);
+    assert_eq!(
+        res.unwrap_err(),
+        Error::from(ValidatorHistoryError::StakeBufferFinalized)
+    );
+}
+
+#[test]
 fn test_get_by_id_zero_total_stake() {
     let mut buffer = ValidatorStakeBuffer::default();
     let config = Config {
