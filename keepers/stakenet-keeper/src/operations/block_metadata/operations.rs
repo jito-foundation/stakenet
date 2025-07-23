@@ -195,7 +195,10 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
+    // For lookback we do not want to overwrite the main keeper.
+    const NORMAL_KEEPER_LOOKBACK: u64 = 3;
+    let epoch_range = (current_epoch - lookback_epochs - NORMAL_KEEPER_LOOKBACK)
+        ..(current_epoch - NORMAL_KEEPER_LOOKBACK);
 
     // 1. Update Epoch Schedule
     {

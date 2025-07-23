@@ -66,11 +66,11 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
-  priority-fees-mainnet:
+  priority-fees-mainnet-backfill:
     build:
       context: .
       target: validator-history
-    container_name: priority-fees-mainnet
+    container_name: priority-fees-mainnet-backfill
     environment:
       - RUST_LOG=${RUST_LOG}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -99,7 +99,7 @@ services:
       - RUN_BLOCK_METADATA=true
       - BLOCK_METADATA_INTERVAL=1
       - SQLITE_PATH=/data/db
-      - RUN_PRIORITY_FEE_COMMISSION=true
+      - RUN_PRIORITY_FEE_COMMISSION=false
       - LOOKBACK_EPOCHS=${LOOKBACK_EPOCHS}
     volumes:
       - ./credentials:/credentials

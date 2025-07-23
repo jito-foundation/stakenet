@@ -92,11 +92,11 @@ async fn sleep_and_tick(tick: &mut u64) {
 
 /// To reduce transaction collisions, we sleep a random amount after any emit
 async fn random_cooldown(range: u8) {
-    let mut rng = rand::thread_rng();
-    let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
-
-    info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
-    sleep(Duration::from_secs(sleep_duration)).await;
+    //let mut rng = rand::thread_rng();
+    //let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
+    //
+    info!("\n\n⏰ Cooldown for 1/{} seconds\n", range);
+    sleep(Duration::from_secs(1)).await;
 }
 
 async fn run_keeper(keeper_config: KeeperConfig) {
