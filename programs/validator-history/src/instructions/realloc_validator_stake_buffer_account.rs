@@ -2,8 +2,6 @@ use anchor_lang::prelude::*;
 
 use crate::{constants::MAX_ALLOC_BYTES, errors::ValidatorHistoryError, ValidatorStakeBuffer};
 
-// TODO: Size trait such that this fn can be generic ?
-// (copy pasta'd 4 times now)
 fn get_realloc_size(account_info: &AccountInfo) -> usize {
     let account_size = account_info.data_len();
     // If account is already over-allocated, don't try to shrink
