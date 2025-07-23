@@ -66,11 +66,11 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
-  priority-fees:
+  priority-fees-mainnet:
     build:
       context: .
       target: validator-history
-    container_name: priority-fees
+    container_name: priority-fees-mainnet
     environment:
       - RUST_LOG=${RUST_LOG}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
