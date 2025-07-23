@@ -40,6 +40,11 @@ pub fn handle_copy_stake_info(ctx: Context<CopyStakeInfo>) -> Result<()> {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
 
+    // Assert stake buffer is finalized
+    if !validator_stake_buffer_account.is_finalized() {
+        return Err(ValidatorHistoryError::StakeBufferNotFinalized.into());
+    }
+
     // Look up stake info in buffer
     let (stake, rank, is_superminority) =
         validator_stake_buffer_account.get_by_id(validator_history_account.index)?;
