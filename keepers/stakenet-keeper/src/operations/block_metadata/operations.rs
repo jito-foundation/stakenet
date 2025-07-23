@@ -19,7 +19,8 @@ use solana_transaction_status::{
     RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
 };
 use stakenet_sdk::{
-    models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats}, utils::transactions::submit_chunk_instructions,
+    models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
+    utils::transactions::submit_chunk_instructions,
 };
 
 use crate::{
@@ -423,7 +424,7 @@ async fn update_block_metadata(
             retry_count,
             confirmation_time,
             None,
-            10,
+            5,
         )
         .await?;
 

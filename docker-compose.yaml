@@ -100,6 +100,7 @@ services:
       - BLOCK_METADATA_INTERVAL=1
       - SQLITE_PATH=/data/db
       - RUN_PRIORITY_FEE_COMMISSION=true
+      - LOOKBACK_EPOCHS=${LOOKBACK_EPOCHS}
     volumes:
       - ./credentials:/credentials
       - ./data:/data
