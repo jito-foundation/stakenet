@@ -246,9 +246,9 @@ impl TestFixture {
         }
     }
 
-    pub fn build_initialize_and_realloc_validator_stake_buffer_account_transaction<'a>(
-        &'a self,
-    ) -> Vec<impl FnOnce(Hash) -> Transaction + use<'a>> {
+    pub fn build_initialize_and_realloc_validator_stake_buffer_account_transaction(
+        &self,
+    ) -> Vec<impl FnOnce(Hash) -> Transaction + use<'_>> {
         let mut ixs = vec![];
         let init_ix = Instruction {
             program_id: validator_history::id(),
@@ -436,6 +436,16 @@ impl TestFixture {
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
         }
+    }
+
+    #[allow(clippy::await_holding_refcell_ref)]
+    pub async fn fresh_blockhash(&self) -> Hash {
+        self.ctx
+            .borrow()
+            .banks_client
+            .get_latest_blockhash()
+            .await
+            .unwrap()
     }
 }
 

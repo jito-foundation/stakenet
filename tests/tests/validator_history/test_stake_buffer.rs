@@ -28,10 +28,12 @@ pub async fn create_validator_accounts(
     validator_history_config: &Pubkey,
     vote_account: &Pubkey,
     stake_amount: u64,
+    hash: Hash,
 ) -> Pubkey {
-    let _ = create_stake_account(ctx, payer, vote_account, stake_amount).await;
+    let _ = create_stake_account(ctx, payer, vote_account, stake_amount, hash).await;
     let validator_history_account =
-        create_validator_history_account(ctx, payer, vote_account, validator_history_config).await;
+        create_validator_history_account(ctx, payer, vote_account, validator_history_config, hash)
+            .await;
     validator_history_account
 }
 
@@ -41,6 +43,7 @@ pub async fn create_validator_history_account(
     payer: &Keypair,
     vote_account: &Pubkey,
     validator_history_config: &Pubkey,
+    hash: Hash,
 ) -> Pubkey {
     let validator_history_account = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, vote_account.as_ref()],
@@ -75,10 +78,7 @@ pub async fn create_validator_history_account(
         };
         num_reallocs
     ]);
-    let latest_blockhash = fresh_blockhash(ctx).await;
-    let tx =
-        Transaction::new_signed_with_payer(&ixs, Some(&payer.pubkey()), &[payer], latest_blockhash);
-    ctx.borrow_mut().last_blockhash = latest_blockhash;
+    let tx = Transaction::new_signed_with_payer(&ixs, Some(&payer.pubkey()), &[payer], hash);
     ctx.borrow_mut()
         .banks_client
         .process_transaction(tx)
@@ -93,6 +93,7 @@ pub async fn create_stake_account(
     payer: &Keypair,
     vote_account: &Pubkey,
     stake_amount: u64,
+    hash: Hash,
 ) -> Pubkey {
     let stake_account = Keypair::new();
     let rent = ctx.borrow().banks_client.get_rent().await.unwrap();
@@ -114,29 +115,18 @@ pub async fn create_stake_account(
         stake_instruction::initialize(&stake_account.pubkey(), &authorized, &lockup),
         stake_instruction::delegate_stake(&stake_account.pubkey(), &payer.pubkey(), vote_account),
     ];
-    let latest_blockhash = fresh_blockhash(ctx).await;
     let tx = Transaction::new_signed_with_payer(
         &instructions,
         Some(&payer.pubkey()),
         &[payer, &stake_account],
-        latest_blockhash,
+        hash,
     );
-    ctx.borrow_mut().last_blockhash = latest_blockhash;
     ctx.borrow_mut()
         .banks_client
         .process_transaction(tx)
         .await
         .unwrap();
     stake_account.pubkey()
-}
-
-#[allow(clippy::await_holding_refcell_ref)]
-async fn fresh_blockhash(ctx: &Rc<RefCell<ProgramTestContext>>) -> Hash {
-    ctx.borrow()
-        .banks_client
-        .get_latest_blockhash()
-        .await
-        .unwrap()
 }
 
 /// This test inserts monotonically decreasing stake amounts into the buffer, which is best case
@@ -155,7 +145,7 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
         .into_iter()
     {
-        let hash = fresh_blockhash(&test.ctx).await;
+        let hash = test.fresh_blockhash().await;
         let tx = tx(hash);
         test.submit_transaction_assert_success(tx).await;
     }
@@ -177,12 +167,14 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         // as opposed to the lineary increasing test case where CUs are linearly increasing with every
         // sequential insert instruction.
         let stake_amount = (100 * 100_000_000) - i as u64;
+        let hash = test.fresh_blockhash().await;
         let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
             &test.validator_history_config,
             vote_account,
             stake_amount,
+            hash,
         )
         .await;
 
@@ -203,7 +195,7 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         let mut metas = accounts.to_account_metas(None);
         metas.push(AccountMeta::new_readonly(vote_account_address, false));
 
-        let latest_blockhash = fresh_blockhash(&test.ctx).await;
+        let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
@@ -219,7 +211,6 @@ async fn test_stake_buffer_insert_cu_limit_min() {
             &[&test.keypair],
             latest_blockhash,
         );
-        test.ctx.borrow_mut().last_blockhash = latest_blockhash;
         test.submit_transaction_assert_success(transaction).await;
     }
 
@@ -280,7 +271,7 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
         .into_iter()
     {
-        let hash = fresh_blockhash(&test.ctx).await;
+        let hash = test.fresh_blockhash().await;
         let tx = tx(hash);
         test.submit_transaction_assert_success(tx).await;
     }
@@ -300,12 +291,14 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
         // size.
         let stake_amount = (10 * 100_000_000) + i as u64;
+        let hash = test.fresh_blockhash().await;
         let validator_history_address = create_validator_accounts(
             &test.ctx,
             &test.keypair,
             &test.validator_history_config,
             vote_account,
             stake_amount,
+            hash,
         )
         .await;
 
@@ -326,7 +319,7 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         let mut metas = accounts.to_account_metas(None);
         metas.push(AccountMeta::new_readonly(vote_account_address, false));
 
-        let latest_blockhash = fresh_blockhash(&test.ctx).await;
+        let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[
                 solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
@@ -342,7 +335,6 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
             &[&test.keypair],
             latest_blockhash,
         );
-        test.ctx.borrow_mut().last_blockhash = latest_blockhash;
         test.submit_transaction_assert_success(transaction).await;
     }
 

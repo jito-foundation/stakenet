@@ -65,9 +65,14 @@ async fn test_initialize() {
     test.submit_transaction_assert_success(transaction).await;
 
     // Initialize stake buffer account
-    let transaction =
-        test.build_initialize_and_realloc_validator_stake_buffer_account_transaction();
-    test.submit_transaction_assert_success(transaction).await;
+    for tx in test
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = test.fresh_blockhash().await;
+        let tx = tx(hash);
+        test.submit_transaction_assert_success(tx).await;
+    }
 
     // Get stake aggregation account and assert exists and zero initialized
     let account = ctx
@@ -174,9 +179,14 @@ async fn test_extra_realloc_validator_stake_buffer() {
     let ctx = &fixture.ctx;
 
     // Initialize and relloc to the limit
-    let transaction =
-        fixture.build_initialize_and_realloc_validator_stake_buffer_account_transaction();
-    fixture.submit_transaction_assert_success(transaction).await;
+    for tx in fixture
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = fixture.fresh_blockhash().await;
+        let tx = tx(hash);
+        fixture.submit_transaction_assert_success(tx).await;
+    }
 
     // Assert than an additional realloc fails
     let instruction = fixture.build_initialize_validator_stake_buffer_account_instruction();
