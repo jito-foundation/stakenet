@@ -5,6 +5,8 @@ use crate::{
     ValidatorStakeBuffer,
 };
 
+// TODO: If we maintain the permissioned verion alongside this one (no oracle), anyone can
+// overwrite the oracle
 #[derive(Accounts)]
 pub struct CopyStakeInfo<'info> {
     #[account(
