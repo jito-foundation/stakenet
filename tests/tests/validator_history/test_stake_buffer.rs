@@ -31,10 +31,7 @@ pub async fn create_validator_accounts(
     hash: Hash,
 ) -> Pubkey {
     let _ = create_stake_account(ctx, payer, vote_account, stake_amount, hash).await;
-    let validator_history_account =
-        create_validator_history_account(ctx, payer, vote_account, validator_history_config, hash)
-            .await;
-    validator_history_account
+    create_validator_history_account(ctx, payer, vote_account, validator_history_config, hash).await
 }
 
 #[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
