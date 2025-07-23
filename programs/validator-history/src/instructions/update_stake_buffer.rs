@@ -42,7 +42,7 @@ pub fn handle_update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()>
     // Observe vote account stake
     //
     // If the provided vote address corresponds to an account that is not a vote
-    // account or does not exist, returns `0` for active stake.
+    // account or does not exist, returns `0` for active stake
     let stake_amount: u64 = get_epoch_stake_for_vote_account(&vote_account_pubkey);
 
     // Insert into buffer
