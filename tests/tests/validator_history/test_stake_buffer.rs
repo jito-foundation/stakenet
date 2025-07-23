@@ -181,16 +181,16 @@ async fn test_stake_buffer_insert_cu_limit_min() {
     test.advance_num_epochs(1).await;
 
     // Insert validators into stake buffer
-    for (vote_account_address, validator_history_address) in validator_accounts {
+    for (vote_account_address, validator_history_address) in validator_accounts.iter() {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
-            validator_history_account: validator_history_address,
+            validator_history_account: *validator_history_address,
         };
 
         let mut metas = accounts.to_account_metas(None);
-        metas.push(AccountMeta::new_readonly(vote_account_address, false));
+        metas.push(AccountMeta::new_readonly(*vote_account_address, false));
 
         let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
@@ -240,6 +240,43 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         println!("expected: {}", expected);
         println!("actual: {}", acc.stake_amount);
         assert!(acc.stake_amount == expected);
+    }
+
+    // Copy stake info from buffer into validator history accounts
+    for (_, validator_history_address) in validator_accounts.iter() {
+        // Build copy stake info instruction
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::CopyStakeInfo {
+                validator_history_account: *validator_history_address,
+                config: test.validator_history_config,
+                validator_stake_buffer_account: test.validator_stake_buffer_account,
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::CopyStakeInfo {}.data(),
+        };
+        // Pack transaction
+        let hash = test.fresh_blockhash().await;
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            hash,
+        );
+        test.submit_transaction_assert_success(transaction).await;
+        // Assert values
+        let account: ValidatorHistory = test.load_and_deserialize(validator_history_address).await;
+        assert!(account.history.idx == 0);
+        assert!(account.history.arr[0].epoch == 1);
+        let (stake, rank, is_superminority) =
+            stake_buffer_account.get_by_id(account.index).unwrap();
+        let is_superminority = match is_superminority {
+            true => 1,
+            false => 0,
+        };
+        assert!(account.history.arr[0].activated_stake_lamports == stake);
+        assert!(account.history.arr[0].is_superminority == is_superminority);
+        assert!(account.history.arr[0].rank == rank);
     }
 }
 
@@ -305,16 +342,16 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     test.advance_num_epochs(1).await;
 
     // Insert validators into stake buffer
-    for (vote_account_address, validator_history_address) in validator_accounts {
+    for (vote_account_address, validator_history_address) in validator_accounts.iter() {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
-            validator_history_account: validator_history_address,
+            validator_history_account: *validator_history_address,
         };
 
         let mut metas = accounts.to_account_metas(None);
-        metas.push(AccountMeta::new_readonly(vote_account_address, false));
+        metas.push(AccountMeta::new_readonly(*vote_account_address, false));
 
         let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
@@ -361,8 +398,43 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     for i in 0..stake_buffer_account.length() {
         let acc = stake_buffer_account.get_by_index(i as usize).unwrap();
         let expected = 10 * 100_000_000 + (10 - i as u64 - 1);
-        println!("expected: {}", expected);
-        println!("actual: {}", acc.stake_amount);
         assert!(acc.stake_amount == expected);
+    }
+
+    // Copy stake info from buffer into validator history accounts
+    for (_, validator_history_address) in validator_accounts.iter() {
+        // Build copy stake info instruction
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::CopyStakeInfo {
+                validator_history_account: *validator_history_address,
+                config: test.validator_history_config,
+                validator_stake_buffer_account: test.validator_stake_buffer_account,
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::CopyStakeInfo {}.data(),
+        };
+        // Pack transaction
+        let hash = test.fresh_blockhash().await;
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            hash,
+        );
+        test.submit_transaction_assert_success(transaction).await;
+        // Assert values
+        let account: ValidatorHistory = test.load_and_deserialize(validator_history_address).await;
+        assert!(account.history.idx == 0);
+        assert!(account.history.arr[0].epoch == 1);
+        let (stake, rank, is_superminority) =
+            stake_buffer_account.get_by_id(account.index).unwrap();
+        let is_superminority = match is_superminority {
+            true => 1,
+            false => 0,
+        };
+        assert!(account.history.arr[0].activated_stake_lamports == stake);
+        assert!(account.history.arr[0].is_superminority == is_superminority);
+        assert!(account.history.arr[0].rank == rank);
     }
 }
