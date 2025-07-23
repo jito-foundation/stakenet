@@ -6,7 +6,7 @@ use solana_sdk::stake::{
     state::{Authorized, Lockup, StakeStateV2},
 };
 use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
+    instruction::Instruction,
     pubkey::Pubkey,
     signer::{keypair::Keypair, Signer},
     system_instruction,
@@ -181,17 +181,14 @@ async fn test_stake_buffer_insert_cu_limit_min() {
     test.advance_num_epochs(1).await;
 
     // Insert validators into stake buffer
-    for (vote_account_address, validator_history_address) in validator_accounts.iter() {
+    for (_vote_account_address, validator_history_address) in validator_accounts.iter() {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
             validator_history_account: *validator_history_address,
         };
-
-        let mut metas = accounts.to_account_metas(None);
-        metas.push(AccountMeta::new_readonly(*vote_account_address, false));
-
+        let metas = accounts.to_account_metas(None);
         let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[
@@ -240,43 +237,6 @@ async fn test_stake_buffer_insert_cu_limit_min() {
         println!("expected: {}", expected);
         println!("actual: {}", acc.stake_amount);
         assert!(acc.stake_amount == expected);
-    }
-
-    // Copy stake info from buffer into validator history accounts
-    for (_, validator_history_address) in validator_accounts.iter() {
-        // Build copy stake info instruction
-        let instruction = Instruction {
-            program_id: validator_history::id(),
-            accounts: validator_history::accounts::CopyStakeInfo {
-                validator_history_account: *validator_history_address,
-                config: test.validator_history_config,
-                validator_stake_buffer_account: test.validator_stake_buffer_account,
-            }
-            .to_account_metas(None),
-            data: validator_history::instruction::CopyStakeInfo {}.data(),
-        };
-        // Pack transaction
-        let hash = test.fresh_blockhash().await;
-        let transaction = Transaction::new_signed_with_payer(
-            &[instruction],
-            Some(&test.keypair.pubkey()),
-            &[&test.keypair],
-            hash,
-        );
-        test.submit_transaction_assert_success(transaction).await;
-        // Assert values
-        let account: ValidatorHistory = test.load_and_deserialize(validator_history_address).await;
-        assert!(account.history.idx == 0);
-        assert!(account.history.arr[0].epoch == 1);
-        let (stake, rank, is_superminority) =
-            stake_buffer_account.get_by_id(account.index).unwrap();
-        let is_superminority = match is_superminority {
-            true => 1,
-            false => 0,
-        };
-        assert!(account.history.arr[0].activated_stake_lamports == stake);
-        assert!(account.history.arr[0].is_superminority == is_superminority);
-        assert!(account.history.arr[0].rank == rank);
     }
 }
 
@@ -342,17 +302,14 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     test.advance_num_epochs(1).await;
 
     // Insert validators into stake buffer
-    for (vote_account_address, validator_history_address) in validator_accounts.iter() {
+    for (_vote_account_address, validator_history_address) in validator_accounts.iter() {
         let ix_data = validator_history::instruction::UpdateStakeBuffer {};
         let accounts = validator_history::accounts::UpdateStakeBuffer {
             config: test.validator_history_config,
             validator_stake_buffer_account: test.validator_stake_buffer_account,
             validator_history_account: *validator_history_address,
         };
-
-        let mut metas = accounts.to_account_metas(None);
-        metas.push(AccountMeta::new_readonly(*vote_account_address, false));
-
+        let metas = accounts.to_account_metas(None);
         let latest_blockhash = test.fresh_blockhash().await;
         let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
             &[
@@ -400,6 +357,87 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         let expected = 10 * 100_000_000 + (10 - i as u64 - 1);
         assert!(acc.stake_amount == expected);
     }
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_arguments, clippy::await_holding_refcell_ref)]
+async fn test_copy_stake_info() {
+    let test = TestFixture::new().await;
+
+    // Initialize validator history config and stake buffer accounts
+    test.initialize_config().await;
+    for tx in test
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = test.fresh_blockhash().await;
+        let tx = tx(hash);
+        test.submit_transaction_assert_success(tx).await;
+    }
+
+    // Create several mock validator history accounts
+    let num_validators = 10;
+    let mut validator_accounts = Vec::new();
+    for (i, vote_account) in test
+        .additional_vote_accounts
+        .clone()
+        .iter()
+        .enumerate()
+        .take(num_validators)
+    {
+        // Set linearly increasing stake amounts
+        // such that we iterate the entire buffer onchain on every insert instruction, simulating
+        // the worst cast scenario and guaranteeing that we have actually maxed out the buffer
+        // size.
+        let stake_amount = (10 * 100_000_000) + i as u64;
+        let hash = test.fresh_blockhash().await;
+        let validator_history_address = create_validator_accounts(
+            &test.ctx,
+            &test.keypair,
+            &test.validator_history_config,
+            vote_account,
+            stake_amount,
+            hash,
+        )
+        .await;
+
+        validator_accounts.push((*vote_account, validator_history_address));
+    }
+    // Advance epoch to finalize stake delegations
+    test.advance_num_epochs(1).await;
+
+    // Insert validators into stake buffer
+    for (_vote_account_address, validator_history_address) in validator_accounts.iter() {
+        let ix_data = validator_history::instruction::UpdateStakeBuffer {};
+        let accounts = validator_history::accounts::UpdateStakeBuffer {
+            config: test.validator_history_config,
+            validator_stake_buffer_account: test.validator_stake_buffer_account,
+            validator_history_account: *validator_history_address,
+        };
+        let metas = accounts.to_account_metas(None);
+        let latest_blockhash = test.fresh_blockhash().await;
+        let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
+            &[
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                    1_400_000,
+                ),
+                Instruction {
+                    program_id: validator_history::id(),
+                    accounts: metas,
+                    data: ix_data.data(),
+                },
+            ],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            latest_blockhash,
+        );
+        test.submit_transaction_assert_success(transaction).await;
+    }
+
+    // Deserialize buffer account
+    let stake_buffer_account: ValidatorStakeBuffer = test
+        .load_and_deserialize(&test.validator_stake_buffer_account)
+        .await;
 
     // Copy stake info from buffer into validator history accounts
     for (_, validator_history_address) in validator_accounts.iter() {
@@ -436,5 +474,91 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
         assert!(account.history.arr[0].activated_stake_lamports == stake);
         assert!(account.history.arr[0].is_superminority == is_superminority);
         assert!(account.history.arr[0].rank == rank);
+    }
+
+    // Advance epoch and try copying stake infos and assert they fail with stale buffer
+    test.advance_num_epochs(1).await;
+
+    // Try copying stake info
+    for (_, validator_history_address) in validator_accounts.iter() {
+        // Build copy stake info instruction
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::CopyStakeInfo {
+                validator_history_account: *validator_history_address,
+                config: test.validator_history_config,
+                validator_stake_buffer_account: test.validator_stake_buffer_account,
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::CopyStakeInfo {}.data(),
+        };
+        // Pack transaction
+        let hash = test.fresh_blockhash().await;
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            hash,
+        );
+        test.submit_transaction_assert_error(transaction, "EpochOutOfRange")
+            .await;
+    }
+
+    // Now insert into the buffer again with the new epoch and assert that only after the last
+    // insert does copy stake info succeed (buffer needs to be finalized)
+    for (i, (_vote_account_address, validator_history_address)) in
+        validator_accounts.iter().enumerate()
+    {
+        // Insert into buffer
+        let ix_data = validator_history::instruction::UpdateStakeBuffer {};
+        let accounts = validator_history::accounts::UpdateStakeBuffer {
+            config: test.validator_history_config,
+            validator_stake_buffer_account: test.validator_stake_buffer_account,
+            validator_history_account: *validator_history_address,
+        };
+        let metas = accounts.to_account_metas(None);
+        let latest_blockhash = test.fresh_blockhash().await;
+        let transaction = solana_sdk::transaction::Transaction::new_signed_with_payer(
+            &[
+                solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(
+                    1_400_000,
+                ),
+                Instruction {
+                    program_id: validator_history::id(),
+                    accounts: metas,
+                    data: ix_data.data(),
+                },
+            ],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            latest_blockhash,
+        );
+        test.submit_transaction_assert_success(transaction).await;
+        // Build copy stake info instruction
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::CopyStakeInfo {
+                validator_history_account: *validator_history_address,
+                config: test.validator_history_config,
+                validator_stake_buffer_account: test.validator_stake_buffer_account,
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::CopyStakeInfo {}.data(),
+        };
+        // Pack transaction
+        let hash = test.fresh_blockhash().await;
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&test.keypair.pubkey()),
+            &[&test.keypair],
+            hash,
+        );
+        if i == num_validators - 1 {
+            // Last validator should succeed because buffer is finalized
+            test.submit_transaction_assert_success(transaction).await;
+        } else {
+            test.submit_transaction_assert_error(transaction, "StakeBufferNotFinalized")
+                .await;
+        }
     }
 }
