@@ -224,8 +224,7 @@ async fn test_stake_buffer_insert_cu_limit_min() {
     // Assert total stake amount
     let base_stake_per_validator = 100 * 100_000_000;
     let sum_of_decrements = num_validators as u64 * (num_validators as u64 - 1) / 2; /* sum of arithmetic series */
-    let expected_total_stake =
-        num_validators as u64 * base_stake_per_validator - sum_of_decrements;
+    let expected_total_stake = num_validators as u64 * base_stake_per_validator - sum_of_decrements;
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
@@ -345,8 +344,7 @@ async fn test_stake_buffer_insert_until_cu_limit_max() {
     // Assert total stake amount
     let base_stake_per_validator = 10 * 100_000_000;
     let sum_of_increments = num_validators as u64 * (num_validators as u64 - 1) / 2; /* sum of arithmetic series */
-    let expected_total_stake =
-        num_validators as u64 * base_stake_per_validator + sum_of_increments;
+    let expected_total_stake = num_validators as u64 * base_stake_per_validator + sum_of_increments;
     assert_eq!(stake_buffer_account.length(), num_validators as u32);
     assert_eq!(stake_buffer_account.last_observed_epoch(), current_epoch);
     assert_eq!(stake_buffer_account.total_stake(), expected_total_stake);
