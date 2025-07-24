@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 mod allocator;
+pub mod bitmask;
 pub mod constants;
 pub mod crds_value;
 pub mod errors;
@@ -66,6 +67,18 @@ pub mod validator_history {
         handle_realloc_cluster_history_account(ctx)
     }
 
+    pub fn initialize_validator_stake_buffer_account(
+        ctx: Context<InitializeValidatorStakeBufferAccount>,
+    ) -> Result<()> {
+        handle_initialize_validator_stake_buffer_account(ctx)
+    }
+
+    pub fn realloc_validator_stake_buffer_account(
+        ctx: Context<ReallocValidatorStakeBufferAccount>,
+    ) -> Result<()> {
+        handle_realloc_validator_stake_buffer_account(ctx)
+    }
+
     pub fn copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
         handle_copy_vote_account(ctx)
     }
@@ -93,6 +106,14 @@ pub mod validator_history {
 
     pub fn set_new_oracle_authority(ctx: Context<SetNewOracleAuthority>) -> Result<()> {
         handle_set_new_oracle_authority(ctx)
+    }
+
+    pub fn copy_stake_info(ctx: Context<CopyStakeInfo>) -> Result<()> {
+        handle_copy_stake_info(ctx)
+    }
+
+    pub fn update_stake_buffer(ctx: Context<UpdateStakeBuffer>) -> Result<()> {
+        handle_update_stake_buffer(ctx)
     }
 
     pub fn update_stake_history(

@@ -34,4 +34,14 @@ pub enum ValidatorHistoryError {
     DuplicateEpoch,
     #[msg("Account already sized properly")]
     NoReallocNeeded,
+    #[msg("Stake buffer has been finalized")]
+    StakeBufferFinalized,
+    #[msg("Stake buffer has not been finalized")]
+    StakeBufferNotFinalized,
+    #[msg("Stake buffer out of bounds")]
+    StakeBufferOutOfBounds,
+    #[msg("Stake buffer is empty")]
+    StakeBufferEmpty,
+    #[msg("Stake buffer already contains entry")]
+    StakeBufferDuplicate,
 }
