@@ -6,7 +6,7 @@ use crate::{constants::MAX_ALLOC_BYTES, ValidatorStakeBuffer};
 pub struct InitializeValidatorStakeBufferAccount<'info> {
     #[account(
         init,
-        payer = signer,
+        payer = payer,
         space = MAX_ALLOC_BYTES,
         seeds = [ValidatorStakeBuffer::SEED],
         bump
@@ -14,7 +14,7 @@ pub struct InitializeValidatorStakeBufferAccount<'info> {
     pub validator_stake_buffer_account: AccountLoader<'info, ValidatorStakeBuffer>,
     pub system_program: Program<'info, System>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub payer: Signer<'info>,
 }
 
 /// Initializes the [ValidatorStakeBuffer] account

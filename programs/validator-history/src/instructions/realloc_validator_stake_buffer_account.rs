@@ -26,14 +26,14 @@ pub struct ReallocValidatorStakeBufferAccount<'info> {
     #[account(
         mut,
         realloc = get_realloc_size(validator_stake_buffer_account.as_ref()),
-        realloc::payer = signer,
+        realloc::payer = payer,
         realloc::zero = false,
         seeds = [ValidatorStakeBuffer::SEED],
         bump
     )]
     pub validator_stake_buffer_account: AccountLoader<'info, ValidatorStakeBuffer>,
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub payer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 

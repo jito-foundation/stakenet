@@ -239,7 +239,7 @@ impl TestFixture {
             accounts: validator_history::accounts::ReallocValidatorStakeBufferAccount {
                 validator_stake_buffer_account: self.validator_stake_buffer_account,
                 system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
+                payer: self.keypair.pubkey(),
             }
             .to_account_metas(None),
             data: validator_history::instruction::ReallocValidatorStakeBufferAccount {}.data(),
@@ -255,7 +255,7 @@ impl TestFixture {
             accounts: validator_history::accounts::InitializeValidatorStakeBufferAccount {
                 validator_stake_buffer_account: self.validator_stake_buffer_account,
                 system_program: anchor_lang::solana_program::system_program::id(),
-                signer: self.keypair.pubkey(),
+                payer: self.keypair.pubkey(),
             }
             .to_account_metas(None),
             data: validator_history::instruction::InitializeValidatorStakeBufferAccount {}.data(),
