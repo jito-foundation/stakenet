@@ -1392,7 +1392,7 @@ pub struct ValidatorStakeBuffer {
 
     // Accumulator of total stake in pool
     // Not useful until buffer is finalized
-    total_stake: [u8; 16], /* u128, 1 aligned */
+    total_stake: u64,
 
     // Bitmask of inserted validators
     inserted_validators: BitMask,
@@ -1408,7 +1408,7 @@ impl Default for ValidatorStakeBuffer {
             length: 0,
             finalized: 0,
             _padding0: [0; 131],
-            total_stake: [0; 16],
+            total_stake: 0,
             inserted_validators: BitMask::default(),
             buffer: [ValidatorStake::default(); MAX_STAKE_BUFFER_VALIDATORS],
         }
@@ -1425,7 +1425,7 @@ impl ValidatorStakeBuffer {
     /// Resets aggregation for new epoch
     pub fn reset(&mut self, epoch: u64) {
         self.last_observed_epoch = epoch;
-        self.total_stake = [0; 16];
+        self.total_stake = 0;
         self.length = 0;
         self.finalized = 0;
         self.inserted_validators.reset();
@@ -1460,8 +1460,8 @@ impl ValidatorStakeBuffer {
         Ok(self.buffer[index])
     }
 
-    pub fn total_stake(&self) -> u128 {
-        u128::from_le_bytes(self.total_stake)
+    pub fn total_stake(&self) -> u64 {
+        self.total_stake
     }
 
     /// Get element by validator index
@@ -1473,7 +1473,7 @@ impl ValidatorStakeBuffer {
             return Err(ValidatorHistoryError::StakeBufferEmpty.into());
         }
         // Accumulators
-        let mut cumulative_stake: u128 = 0;
+        let mut cumulative_stake: u64 = 0;
         let mut is_superminority = true;
         let superminority_threshold = total_stake / 3;
         // Search for validator rank and superminority threshold
@@ -1483,7 +1483,7 @@ impl ValidatorStakeBuffer {
             if cumulative_stake > superminority_threshold && is_superminority {
                 is_superminority = false;
             } else {
-                cumulative_stake = cumulative_stake.saturating_add(entry.stake_amount as u128);
+                cumulative_stake = cumulative_stake.saturating_add(entry.stake_amount);
             }
             // Rank
             if entry.validator_index == validator_index {
@@ -1523,9 +1523,9 @@ impl ValidatorStakeBuffer {
         self.buffer[i] = entry;
         self.length += 1;
         // Increment total stake
-        let mut total_stake = self.total_stake();
-        total_stake = total_stake.saturating_add(entry.stake_amount as u128);
-        self.total_stake = total_stake.to_le_bytes();
+        let mut total_stake = self.total_stake;
+        total_stake = total_stake.saturating_add(entry.stake_amount);
+        self.total_stake = total_stake;
         // Set finalized flag if the buffer is now full
         let max_length = config.counter.min(MAX_STAKE_BUFFER_VALIDATORS as u32);
         if self.length == max_length {
