@@ -1483,7 +1483,7 @@ impl ValidatorStakeBuffer {
             if cumulative_stake > superminority_threshold && is_superminority {
                 is_superminority = false;
             } else {
-                cumulative_stake += entry.stake_amount as u128;
+                cumulative_stake = cumulative_stake.saturating_add(entry.stake_amount as u128);
             }
             // Rank
             if entry.validator_index == validator_index {
@@ -1524,7 +1524,7 @@ impl ValidatorStakeBuffer {
         self.length += 1;
         // Increment total stake
         let mut total_stake = self.total_stake();
-        total_stake += entry.stake_amount as u128;
+        total_stake = total_stake.saturating_add(entry.stake_amount as u128);
         self.total_stake = total_stake.to_le_bytes();
         // Set finalized flag if the buffer is now full
         let max_length = config.counter.min(MAX_STAKE_BUFFER_VALIDATORS as u32);
