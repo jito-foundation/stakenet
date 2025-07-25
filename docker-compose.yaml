@@ -66,11 +66,11 @@ services:
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
-  priority-fees:
+  priority-fees-mainnet:
     build:
       context: .
       target: validator-history
-    container_name: priority-fees
+    container_name: priority-fees-mainnet
     environment:
       - RUST_LOG=${RUST_LOG}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -82,6 +82,7 @@ services:
       - VALIDATOR_HISTORY_PROGRAM_ID=${VALIDATOR_HISTORY_PROGRAM_ID}
       - TIP_DISTRIBUTION_PROGRAM_ID=${TIP_DISTRIBUTION_PROGRAM_ID}
       - PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID=${PRIORITY_FEE_DISTRIBUTION_PROGRAM_ID}
+      - PRIORITY_FEES=${PRIORITY_FEES}
       - STEWARD_PROGRAM_ID=${STEWARD_PROGRAM_ID}
       - STEWARD_CONFIG=${STEWARD_CONFIG}
       - METRICS_INTERVAL=${METRICS_INTERVAL}
@@ -99,6 +100,7 @@ services:
       - BLOCK_METADATA_INTERVAL=1
       - SQLITE_PATH=/data/db
       - RUN_PRIORITY_FEE_COMMISSION=true
+      - LOOKBACK_EPOCHS=${LOOKBACK_EPOCHS}
     volumes:
       - ./credentials:/credentials
       - ./data:/data

@@ -20,7 +20,7 @@ use solana_transaction_status::{
 };
 use stakenet_sdk::{
     models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
-    utils::transactions::submit_instructions,
+    utils::transactions::submit_chunk_instructions,
 };
 
 use crate::{
@@ -101,6 +101,7 @@ pub async fn fire(
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
             keeper_config.cluster,
+            keeper_config.lookback_epochs,
         )
         .await
         {
@@ -147,6 +148,7 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     no_pack: bool,
     cluster: Cluster,
+    lookback_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -162,6 +164,7 @@ async fn _process(
         priority_fee_in_microlamports,
         no_pack,
         cluster,
+        lookback_epochs,
     )
     .await
 }
@@ -181,6 +184,7 @@ async fn update_block_metadata(
     priority_fee_in_microlamports: u64,
     _no_pack: bool, //TODO take out
     cluster: Cluster,
+    lookback_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -191,7 +195,6 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 3;
     let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule
@@ -200,7 +203,7 @@ async fn update_block_metadata(
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
         let epoch_leader_schedule = get_leader_schedule_safe(client, epoch_starting_slot).await?;
-        match DBSlotInfo::upsert_leader_schedule(
+        match DBSlotInfo::insert_leader_schedule(
             sqlite_connection,
             current_epoch,
             epoch_schedule,
@@ -345,7 +348,6 @@ async fn update_block_metadata(
         for epoch in epoch_range {
             let update_map = match DBSlotInfo::get_priority_fee_and_block_metadata_entries(
                 sqlite_connection,
-                epoch_schedule,
                 epoch,
                 program_id,
                 &priority_fee_oracle_authority_keypair.pubkey(),
@@ -381,14 +383,14 @@ async fn update_block_metadata(
                   ("blocks-missed", entry.blocks_missed, i64),
                   ("blocks-produced", entry.blocks_produced, i64),
                   ("epoch", entry.epoch, i64),
-                  ("highest-slot", entry.highest_slot, i64),
+                  ("highest-slot", entry.highest_done_slot, i64),
                   ("total-leader-slots", entry.total_leader_slots, i64),
                   ("total-priority-fees", entry.total_priority_fees, i64),
                   ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
                   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
                   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
                   ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
-                  ("update-slot", entry.update_slot, i64),
+                  ("update-slot", entry.highest_global_done_slot, i64),
                   "cluster" => cluster.to_string(),
                   "vote" => vote_account.to_string(),
                   "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
@@ -414,7 +416,7 @@ async fn update_block_metadata(
         info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
 
         let start_time = std::time::Instant::now();
-        let submit_result = submit_instructions(
+        let submit_result = submit_chunk_instructions(
             client,
             ixs,
             priority_fee_oracle_authority_keypair,
@@ -422,7 +424,7 @@ async fn update_block_metadata(
             retry_count,
             confirmation_time,
             None,
-            true,
+            5,
         )
         .await?;
 

@@ -76,7 +76,7 @@ impl DBSlotInfo {
     // -------------------- STAGES -----------------------------
 
     // 1. Updates the leader schedule such that we know we have every entry for a given epoch
-    pub fn upsert_leader_schedule(
+    pub fn insert_leader_schedule(
         connection: &mut Connection,
         epoch: u64,
         epoch_schedule: &EpochSchedule,
@@ -380,11 +380,11 @@ impl DBSlotInfo {
     // To Entry
     pub fn get_priority_fee_and_block_metadata_entries(
         connection: &Connection,
-        epoch_schedule: &EpochSchedule,
         epoch: u64,
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
     ) -> Result<HashMap<String, PriorityFeeAndBlockMetadataEntry>, BlockMetadataKeeperError> {
+
         // Fetch all entries for the given vote account and epoch
         let mut statement = connection.prepare(
             "SELECT
@@ -397,13 +397,15 @@ impl DBSlotInfo {
                 state,
                 error_string
             FROM slot_info
-            WHERE epoch = ? AND state = ? AND vote_key != ''
+            WHERE epoch = ? AND vote_key != ''
             ORDER BY absolute_slot ASC",
         )?;
         let slot_infos = statement
-            .query_map(params![epoch, DBSlotInfoState::Done as u8], |row| {
+            .query_map(params![epoch], |row| {
                 Ok(Self::from_db_row(row))
             })?;
+
+        let highest_global_done_slot = get_highest_done_slot(connection)?.unwrap_or(0);
 
         let mut map = HashMap::<String, PriorityFeeAndBlockMetadataEntry>::new();
         for slot_info in slot_infos {
@@ -451,16 +453,32 @@ impl DBSlotInfo {
                 }
             }
 
-            entry.highest_slot = slot_info.absolute_slot.max(entry.highest_slot);
-            entry.update_slot = if entry.blocks_left > 0 {
-                entry.highest_slot
-            } else {
-                epoch_schedule.get_first_slot_in_epoch(entry.epoch + 1)
-            };
+            if slot_info.state as u8 == DBSlotInfoState::Done as u8 {
+                entry.highest_done_slot = slot_info.absolute_slot.max(entry.highest_done_slot);
+            }
+
+            entry.highest_global_done_slot = highest_global_done_slot;
         }
 
         Ok(map)
     }
+}
+
+pub fn get_highest_done_slot(
+    connection: &Connection,
+) -> Result<Option<u64>, BlockMetadataKeeperError> {
+    let mut statement = connection.prepare(
+        "SELECT MAX(absolute_slot)
+         FROM slot_info
+         WHERE state = ?",
+    )?;
+
+    let result = statement.query_row(
+        params![DBSlotInfoState::Done as u8],
+        |row| row.get::<_, Option<u64>>(0),
+    )?;
+
+    Ok(result)
 }
 
 /// Create all necessary tables and indexes. Uses IF NOT EXISTS to be safe
