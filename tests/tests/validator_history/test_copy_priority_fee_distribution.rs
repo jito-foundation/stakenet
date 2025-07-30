@@ -148,7 +148,7 @@ async fn test_priority_fee_commission_earned() {
         epoch,
     )
     .0;
-    // No PriorityFees earned
+
     ctx.borrow_mut().set_account(
         &distribution_account,
         &new_priority_fee_distribution_account(

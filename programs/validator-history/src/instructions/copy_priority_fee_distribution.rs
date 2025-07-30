@@ -71,6 +71,8 @@ pub fn handle_copy_priority_fee_distribution_account(
         .iter_mut()
         .find(|entry| entry.epoch == epoch);
 
+    // This ensures there is no possibility to overwrite a validator history entry after the PFDA
+    // rent has been reclaimed and introduce an erroneous unstake.
     if let Some(entry) = validator_history_entry_for_epoch {
         if entry.priority_fee_merkle_root_upload_authority != MerkleRootUploadAuthority::Unset {
             return Err(ValidatorHistoryError::PriorityFeeDistributionAccountAlreadyCopied.into());
