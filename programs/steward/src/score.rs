@@ -571,7 +571,7 @@ pub fn calculate_priority_fee_commission(
     // if there are no realized commissions due to Unset PFDA, return score 1, default
     // to not penalize the validator for not having a PFDA copied into their history
     if realized_commissions.is_empty() {
-        return Ok((1.0, 0, end_epoch));
+        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
     }
 
     let num_epochs: u64 = realized_commissions.len() as u64;
