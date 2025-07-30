@@ -5,7 +5,6 @@ use anchor_lang::{
 
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
-use std::str::FromStr;
 use tests::{
     priority_fee_distribution_helpers::derive_priority_fee_distribution_account_address,
     validator_history_fixtures::{new_priority_fee_distribution_account, TestFixture},
