@@ -85,15 +85,15 @@ pub fn handle_copy_priority_fee_distribution_account(
         PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data).unwrap_or_default();
     // If the distribution account is not found, we set the default values of 0 for the commission and priority fees earned
     let commission_bps = distribution_account.validator_commission_bps;
-    let priority_fees_earned = distribution_account.total_lamports_transferred;
+    let priority_fees_transferred = distribution_account.total_lamports_transferred;
     // If the distribution account is not found, we set '11111111111111111111111111111111' as the merkle root upload authority
     // passing this to MerkleRootUploadAuthority::from_pubkey resolve to a DNE authority
     let merkle_root_upload_authority = distribution_account.merkle_root_upload_authority;
 
-    validator_history_account.set_priority_fees_earned_and_commission(
+    validator_history_account.set_priority_fees_transferred_and_commission(
         epoch,
         commission_bps,
-        priority_fees_earned,
+        priority_fees_transferred,
         MerkleRootUploadAuthority::from_pubkey(&merkle_root_upload_authority),
     )?;
 

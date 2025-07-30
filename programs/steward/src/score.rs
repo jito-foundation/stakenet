@@ -502,7 +502,7 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
     let validators_rake = total_fees.saturating_sub(tips);
     // We scale by BASIS_POINTS_MAX before division, so the output is in bps
     let numerator = validators_rake.saturating_mul(BASIS_POINTS_MAX as u64);
-    let commission = numerator.checked_div(total_fees).unwrap_or(0u64);
+    let commission = numerator.checked_div(total_fees).unwrap_or(0 as u64);
     u16::try_from(commission).unwrap_or(BASIS_POINTS_MAX)
 }
 
@@ -522,6 +522,9 @@ pub fn calculate_priority_fee_commission(
     let total_priority_fees = validator
         .history
         .total_priority_fees_range(start_epoch, end_epoch);
+    let priority_fee_merkle_root_upload_authority = validator
+        .history
+        .priority_fee_merkle_root_upload_authority_range(start_epoch, end_epoch);
 
     // determine the highest priority fee commission
     let mut max_priority_fee_commission: u16 = 0;
@@ -529,27 +532,46 @@ pub fn calculate_priority_fee_commission(
     let realized_commissions: Vec<u16> = priority_fee_tips
         .iter()
         .zip(&total_priority_fees)
+        .zip(&priority_fee_merkle_root_upload_authority)
         .enumerate()
-        .map(|(relative_epoch, (tips, total_fees))| {
-            let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
-
-            if max_priority_fee_commission < commission_bps {
-                let max_commission_epoch: u16 = start_epoch.saturating_add(relative_epoch as u16);
-                max_priority_fee_commission = commission_bps;
-                max_priority_fee_commission_epoch = max_commission_epoch;
-            }
-            Ok(commission_bps)
-        })
-        .collect::<Result<Vec<u16>>>()?;
+        .flat_map(
+            |(relative_epoch, ((tips, total_fees), priority_fee_merkle_root_upload_authority))| {
+                let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
+                // this should not happen, but we should not score the epoch if the upload authority is None
+                if priority_fee_merkle_root_upload_authority.is_none() {
+                    return vec![];
+                }
+                if let Some(upload_authority) = priority_fee_merkle_root_upload_authority {
+                    // do not include this epoch in scoring if the upload authority is Unset
+                    if matches!(upload_authority, MerkleRootUploadAuthority::Unset) {
+                        return vec![];
+                    }
+                    // commission is 100% if the PFDA does not exist, validator keeps all fees
+                    if matches!(upload_authority, MerkleRootUploadAuthority::DNE) {
+                        return vec![BASIS_POINTS_MAX];
+                    }
+                }
+                if max_priority_fee_commission < commission_bps {
+                    let max_commission_epoch: u16 =
+                        start_epoch.saturating_add(relative_epoch as u16);
+                    max_priority_fee_commission = commission_bps;
+                    max_priority_fee_commission_epoch = max_commission_epoch;
+                }
+                vec![commission_bps]
+            },
+        )
+        .collect::<Vec<u16>>();
 
     // return score 1 when there's not enough history. We assume both fields being None means the
     // priority fee data is non-existent for this epoch.
     if priority_fee_tips[0].is_none() && total_priority_fees[0].is_none() {
-        return Ok((
-            1.0,
-            max_priority_fee_commission,
-            max_priority_fee_commission_epoch,
-        ));
+        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
+    }
+
+    // if there are no realized commissions due to Unset PFDA, return score 1, default
+    // to not penalize the validator for not having a PFDA copied into their history
+    if realized_commissions.is_empty() {
+        return Ok((1.0, 0, end_epoch));
     }
 
     let num_epochs: u64 = realized_commissions.len() as u64;

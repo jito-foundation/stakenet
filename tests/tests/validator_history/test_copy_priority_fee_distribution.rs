@@ -1,5 +1,7 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
+use anchor_lang::{
+    pubkey, solana_program::instruction::Instruction, InstructionData, ToAccountMetas,
+};
 
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
@@ -10,7 +12,7 @@ use tests::{
 };
 use validator_history::{Config, MerkleRootUploadAuthority, ValidatorHistory};
 
-const TIP_ROUTER_AUTHORITY: &str = "8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt";
+const TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[tokio::test]
 async fn test_priority_fee_distribution_account_does_not_exist() {
@@ -66,7 +68,7 @@ async fn test_priority_fee_distribution_account_does_not_exist() {
 }
 
 #[tokio::test]
-async fn test_priority_fee_commission_none_earned() {
+async fn test_priority_fee_commission_none_transferred() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
@@ -74,14 +76,14 @@ async fn test_priority_fee_commission_none_earned() {
     fixture.initialize_validator_history_account().await;
 
     let epoch = 0;
-    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
+    let tda_merkle_root_upload_authority = TIP_ROUTER_AUTHORITY;
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
         &fixture.vote_account,
         epoch,
     )
     .0;
-    // No PriorityFees earned
+    // No PriorityFees transferred
     ctx.borrow_mut().set_account(
         &distribution_account,
         &new_priority_fee_distribution_account(
@@ -140,7 +142,7 @@ async fn test_priority_fee_commission_earned() {
     fixture.initialize_validator_history_account().await;
 
     let epoch = 0;
-    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
+    let tda_merkle_root_upload_authority = TIP_ROUTER_AUTHORITY;
     let priority_fees_earned: u64 = 123_236_567_899;
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
@@ -246,7 +248,7 @@ async fn test_priority_fee_commission_fail_double_copy() {
 
     let epoch = 0;
     let priority_fees_earned: u64 = 123_236_567_899;
-    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
+    let tda_merkle_root_upload_authority = TIP_ROUTER_AUTHORITY;
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
         &fixture.vote_account,

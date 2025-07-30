@@ -48,10 +48,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
     // We don't check the state here because we force it below
     state_checks(&clock, &config, &state_account, validator_list, None)?;
 
-    if !validator_history.can_score() {
-        return Err(StewardError::ValidatorHistoryEntryIncomplete.into());
-    }
-
     let validator_stake_info =
         get_validator_stake_info_at_index(validator_list, validator_list_index)?;
     require!(

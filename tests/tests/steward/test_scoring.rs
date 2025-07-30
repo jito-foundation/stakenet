@@ -67,6 +67,8 @@ fn create_validator_history(
             is_superminority: super_min,
             priority_fee_tips,
             total_priority_fees,
+            priority_fee_merkle_root_upload_authority:
+                validator_history::MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
     }

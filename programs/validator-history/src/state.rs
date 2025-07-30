@@ -717,7 +717,7 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    pub fn set_priority_fees_earned_and_commission(
+    pub fn set_priority_fees_transferred_and_commission(
         &mut self,
         epoch: u16,
         commission: u16,
@@ -1167,15 +1167,6 @@ impl ValidatorHistory {
         };
         self.history.push(entry);
         Ok(())
-    }
-
-    /// Boolean representing if fields required for scoring have been set
-    pub fn can_score(&self) -> bool {
-        !matches!(
-            self.history
-                .priority_fee_merkle_root_upload_authority_latest(),
-            Some(MerkleRootUploadAuthority::Unset)
-        )
     }
 }
 
