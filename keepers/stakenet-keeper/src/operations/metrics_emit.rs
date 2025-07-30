@@ -11,7 +11,7 @@ use spl_stake_pool::state::StakeStatus;
 use stakenet_sdk::utils::debug::{
     format_simple_steward_state_string, format_steward_state_string, steward_state_to_state_code,
 };
-use validator_history::ValidatorHistoryEntry;
+use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
@@ -74,6 +74,8 @@ pub fn emit_validator_history_metrics(
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
+    let mut priority_fees = 0;
+    let mut merkle_root_upload_authorities = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
 
@@ -106,6 +108,12 @@ pub fn emit_validator_history_metrics(
             }
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
+            }
+            if entry.total_priority_fees > 0 {
+                priority_fees += 1;
+            }
+            if entry.merkle_root_upload_authority != MerkleRootUploadAuthority::Unset {
+                merkle_root_upload_authorities += 1;
             }
         }
 
@@ -158,6 +166,12 @@ pub fn emit_validator_history_metrics(
         (
             "num_get_vote_accounts_voting",
             get_vote_accounts_voting,
+            i64
+        ),
+        ("num_priority_fees_set", priority_fees, i64),
+        (
+            "num_merkle_root_upload_authorities",
+            merkle_root_upload_authorities,
             i64
         ),
     );
