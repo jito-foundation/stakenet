@@ -1171,13 +1171,11 @@ impl ValidatorHistory {
 
     /// Boolean representing if fields required for scoring have been set
     pub fn can_score(&self) -> bool {
-        match self
-            .history
-            .priority_fee_merkle_root_upload_authority_latest()
-        {
-            Some(MerkleRootUploadAuthority::Unset) => false,
-            _ => true,
-        }
+        !matches!(
+            self.history
+                .priority_fee_merkle_root_upload_authority_latest(),
+            Some(MerkleRootUploadAuthority::Unset)
+        )
     }
 }
 
