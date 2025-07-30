@@ -502,7 +502,7 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
     let validators_rake = total_fees.saturating_sub(tips);
     // We scale by BASIS_POINTS_MAX before division, so the output is in bps
     let numerator = validators_rake.saturating_mul(BASIS_POINTS_MAX as u64);
-    let commission = numerator.checked_div(total_fees).unwrap_or(0 as u64);
+    let commission = numerator.checked_div(total_fees).unwrap_or(0u64);
     u16::try_from(commission).unwrap_or(BASIS_POINTS_MAX)
 }
 
