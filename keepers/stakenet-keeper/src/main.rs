@@ -6,7 +6,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use clap::Parser;
 use dotenv::dotenv;
 use log::*;
-use rand::Rng;
+//use rand::Rng;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
@@ -96,7 +96,7 @@ async fn random_cooldown(range: u8) {
     // let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
     info!("\n\n⏰ Cooldown for {} seconds\n", range);
-    sleep(Duration::from_secs(range)).await;
+    sleep(Duration::from_secs(range as u64)).await;
 }
 
 async fn run_keeper(keeper_config: KeeperConfig) {
