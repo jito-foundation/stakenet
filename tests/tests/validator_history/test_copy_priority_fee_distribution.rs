@@ -3,21 +3,78 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 
 use solana_program_test::*;
 use solana_sdk::{pubkey::Pubkey, signer::Signer, transaction::Transaction};
+use std::str::FromStr;
 use tests::{
     priority_fee_distribution_helpers::derive_priority_fee_distribution_account_address,
     validator_history_fixtures::{new_priority_fee_distribution_account, TestFixture},
 };
-use validator_history::{Config, ValidatorHistory};
+use validator_history::{Config, MerkleRootUploadAuthority, ValidatorHistory};
+
+const TIP_ROUTER_AUTHORITY: &str = "8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt";
 
 #[tokio::test]
-async fn test_priority_fee_commission() {
+async fn test_priority_fee_distribution_account_does_not_exist() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
+    fixture.advance_num_epochs(1).await;
     fixture.initialize_validator_history_account().await;
 
     let epoch = 0;
-    let priority_fees_earned: u64 = 123_236_567_899;
+    let distribution_account = derive_priority_fee_distribution_account_address(
+        &jito_priority_fee_distribution::id(),
+        &fixture.vote_account,
+        epoch,
+    )
+    .0;
+
+    // Account does not exist on-chain
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyPriorityFeeDistribution { epoch }.data(),
+        accounts: validator_history::accounts::CopyPriorityFeeDistribution {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            config: fixture.validator_history_config,
+            distribution_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert!(account.history.idx == 0);
+    assert!(account.history.arr[0].epoch == 0);
+    assert!(account.history.arr[0].priority_fee_commission == 0);
+    assert!(account.history.arr[0].priority_fee_tips == 0);
+    assert!(
+        account.history.arr[0].priority_fee_merkle_root_upload_authority
+            == MerkleRootUploadAuthority::DNE
+    );
+}
+
+#[tokio::test]
+async fn test_priority_fee_commission_none_earned() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.advance_num_epochs(1).await;
+    fixture.initialize_validator_history_account().await;
+
+    let epoch = 0;
+    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
     let distribution_account = derive_priority_fee_distribution_account_address(
         &jito_priority_fee_distribution::id(),
         &fixture.vote_account,
@@ -27,8 +84,13 @@ async fn test_priority_fee_commission() {
     // No PriorityFees earned
     ctx.borrow_mut().set_account(
         &distribution_account,
-        &new_priority_fee_distribution_account(fixture.vote_account, 42, None, Pubkey::default())
-            .into(),
+        &new_priority_fee_distribution_account(
+            fixture.vote_account,
+            42,
+            None,
+            tda_merkle_root_upload_authority,
+        )
+        .into(),
     );
 
     // update priority fee commission
@@ -63,21 +125,58 @@ async fn test_priority_fee_commission() {
     assert!(account.history.arr[0].epoch == 0);
     assert!(account.history.arr[0].priority_fee_commission == 42);
     assert!(account.history.arr[0].priority_fee_tips == 0);
+    assert!(
+        account.history.arr[0].priority_fee_merkle_root_upload_authority
+            == MerkleRootUploadAuthority::TipRouter
+    );
+}
 
+#[tokio::test]
+async fn test_priority_fee_commission_earned() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.advance_num_epochs(1).await;
+    fixture.initialize_validator_history_account().await;
+
+    let epoch = 0;
+    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
+    let priority_fees_earned: u64 = 123_236_567_899;
+    let distribution_account = derive_priority_fee_distribution_account_address(
+        &jito_priority_fee_distribution::id(),
+        &fixture.vote_account,
+        epoch,
+    )
+    .0;
+    // No PriorityFees earned
     ctx.borrow_mut().set_account(
         &distribution_account,
         &new_priority_fee_distribution_account(
             fixture.vote_account,
             42,
             Some(priority_fees_earned),
-            Pubkey::default(),
+            tda_merkle_root_upload_authority,
         )
         .into(),
     );
 
+    // update priority fee commission
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyPriorityFeeDistribution { epoch }.data(),
+        accounts: validator_history::accounts::CopyPriorityFeeDistribution {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            config: fixture.validator_history_config,
+            distribution_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[instruction.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -85,13 +184,17 @@ async fn test_priority_fee_commission() {
 
     fixture.submit_transaction_assert_success(transaction).await;
 
-    // assert Priority Fee earned no longer default
+    // assert values, Priority Fee earned default
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    assert_eq!(
-        account.history.arr[0].priority_fee_tips,
-        priority_fees_earned
+    assert!(account.history.idx == 0);
+    assert!(account.history.arr[0].epoch == 0);
+    assert!(account.history.arr[0].priority_fee_commission == 42);
+    assert!(account.history.arr[0].priority_fee_tips == priority_fees_earned);
+    assert!(
+        account.history.arr[0].priority_fee_merkle_root_upload_authority
+            == MerkleRootUploadAuthority::TipRouter
     );
 }
 
@@ -103,9 +206,9 @@ async fn test_priority_fee_commission_fail() {
     fixture.initialize_validator_history_account().await;
     let epoch = 0;
 
-    // test update Priority Fee commission with uninitialized PFDA
+    // test update Priority Fee commission with incorrect PDA
     let distribution_account = derive_priority_fee_distribution_account_address(
-        &jito_priority_fee_distribution::id(),
+        &Pubkey::new_unique(),
         &fixture.vote_account,
         epoch,
     )
@@ -129,16 +232,42 @@ async fn test_priority_fee_commission_fail() {
         ctx.borrow().last_blockhash,
     );
     fixture
-        .submit_transaction_assert_error(transaction, "ConstraintOwner")
+        .submit_transaction_assert_error(transaction, "ConstraintSeeds")
         .await;
+}
 
+#[tokio::test]
+async fn test_priority_fee_commission_fail_double_copy() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
     fixture.advance_num_epochs(1).await;
-    // test update Priority Fee commission with wrong epoch
-    // note that just advancing the fixture's epoch cause a failure bc we relaxed the epoch constraints in the instruction/on distribution_account
-    // explicitly pass the instruction a different epoch than the one used to generate the distribution pda
+    fixture.initialize_validator_history_account().await;
+
+    let epoch = 0;
+    let priority_fees_earned: u64 = 123_236_567_899;
+    let tda_merkle_root_upload_authority = Pubkey::from_str(TIP_ROUTER_AUTHORITY).unwrap();
+    let distribution_account = derive_priority_fee_distribution_account_address(
+        &jito_priority_fee_distribution::id(),
+        &fixture.vote_account,
+        epoch,
+    )
+    .0;
+
+    ctx.borrow_mut().set_account(
+        &distribution_account,
+        &new_priority_fee_distribution_account(
+            fixture.vote_account,
+            42,
+            Some(priority_fees_earned),
+            tda_merkle_root_upload_authority,
+        )
+        .into(),
+    );
+
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::CopyPriorityFeeDistribution { epoch: 1 }.data(),
+        data: validator_history::instruction::CopyPriorityFeeDistribution { epoch }.data(),
         accounts: validator_history::accounts::CopyPriorityFeeDistribution {
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
@@ -148,56 +277,30 @@ async fn test_priority_fee_commission_fail() {
         }
         .to_account_metas(None),
     };
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[instruction.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        blockhash,
     );
+
     fixture
-        .submit_transaction_assert_error(transaction, "ConstraintSeeds")
+        .submit_transaction_assert_success(transaction.clone())
         .await;
 
-    let new_vote_account = Pubkey::new_unique();
-    let distribution_account = derive_priority_fee_distribution_account_address(
-        &jito_priority_fee_distribution::id(),
-        &new_vote_account,
-        1,
-    )
-    .0;
-    ctx.borrow_mut().set_account(
-        &distribution_account,
-        &new_priority_fee_distribution_account(
-            new_vote_account,
-            42,
-            Some(123456),
-            Pubkey::default(),
-        )
-        .into(),
-    );
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
 
-    // test update Priority Fee commission with wrong validator's PFDA
-    let instruction = Instruction {
-        program_id: validator_history::id(),
-        data: validator_history::instruction::CopyPriorityFeeDistribution { epoch }.data(),
-        accounts: validator_history::accounts::CopyPriorityFeeDistribution {
-            validator_history_account: fixture.validator_history_account,
-            vote_account: new_vote_account,
-            config: fixture.validator_history_config,
-            distribution_account,
-            signer: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-    };
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction],
+        &[instruction.clone()],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
+        blockhash,
     );
 
     fixture
-        .submit_transaction_assert_error(transaction, "ConstraintSeeds")
+        .submit_transaction_assert_error(transaction, "PriorityFeeDistributionAccountAlreadyCopied")
         .await;
 }
 

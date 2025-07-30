@@ -66,4 +66,6 @@ pub enum StewardError {
     ValidatorNeedsToBeMarkedForRemoval,
     #[msg("Invalid stake state")]
     InvalidStakeState,
+    #[msg("ValidatorHistoryEntry has not yet been updated with required fields")]
+    ValidatorHistoryEntryIncomplete,
 }
