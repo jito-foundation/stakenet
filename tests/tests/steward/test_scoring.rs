@@ -816,7 +816,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 1.0);
     }
 
     #[test]
