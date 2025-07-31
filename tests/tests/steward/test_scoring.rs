@@ -791,6 +791,32 @@ mod test_calculate_priority_fee_commission {
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(score, 0.0);
+
+        // All MerkleRootUploadAuthority values can be processed
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[100; 12],
+            &[100; 12],
+            &[
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::OldJitoLabs,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
     }
 
     #[test]

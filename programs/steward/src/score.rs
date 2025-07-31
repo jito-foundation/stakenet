@@ -536,19 +536,16 @@ pub fn calculate_priority_fee_commission(
         .enumerate()
         .flat_map(
             |(relative_epoch, ((tips, total_fees), priority_fee_merkle_root_upload_authority))| {
-                let commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
-                // this should not happen, but we should not score the epoch if the upload authority is None
+                let mut commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
                 if priority_fee_merkle_root_upload_authority.is_none() {
                     return vec![];
                 }
                 if let Some(upload_authority) = priority_fee_merkle_root_upload_authority {
-                    // do not include this epoch in scoring if the upload authority is Unset
                     if matches!(upload_authority, MerkleRootUploadAuthority::Unset) {
                         return vec![];
                     }
-                    // commission is 100% if the PFDA does not exist, validator keeps all fees
                     if matches!(upload_authority, MerkleRootUploadAuthority::DNE) {
-                        return vec![BASIS_POINTS_MAX];
+                        commission_bps = BASIS_POINTS_MAX;
                     }
                 }
                 if max_priority_fee_commission < commission_bps {

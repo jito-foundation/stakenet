@@ -57,7 +57,7 @@ pub fn handle_copy_priority_fee_distribution_account(
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
 
-    // The PFDA cannot be updated outside of its own epoch - this guarantees the immutability of the data we copy
+    // The PDFA's priority_fee data is not valid until epoch n+1
     if epoch == Clock::get()?.epoch {
         return Err(ValidatorHistoryError::PriorityFeeDistributionAccountNotFinalized.into());
     }
@@ -81,8 +81,17 @@ pub fn handle_copy_priority_fee_distribution_account(
 
     let mut pdfa_data: &[u8] = &ctx.accounts.distribution_account.try_borrow_data()?;
 
-    let distribution_account =
-        PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data).unwrap_or_default();
+    let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)
+        .unwrap_or(PriorityFeeDistributionAccount {
+            validator_vote_account: Pubkey::default(),
+            merkle_root_upload_authority: Pubkey::default(),
+            validator_commission_bps: 0,
+            total_lamports_transferred: 0,
+            merkle_root: None,
+            epoch_created_at: 0,
+            expires_at: 0,
+            bump: 0,
+        });
     // If the distribution account is not found, we set the default values of 0 for the commission and priority fees earned
     let commission_bps = distribution_account.validator_commission_bps;
     let priority_fees_transferred = distribution_account.total_lamports_transferred;
