@@ -674,7 +674,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
         validator.history.arr_mut()[6].priority_fee_tips = 10;
-        let (_, max_commission, max_commission_epoch) =
+        let (_, _max_commission, _max_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         // TODO: uncomment when priority fee scoring launches
         //assert_eq!(max_commission, 9_000);

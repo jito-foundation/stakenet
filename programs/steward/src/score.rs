@@ -512,7 +512,7 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
 pub fn calculate_priority_fee_commission(
     _config: &Config,
     _validator: &ValidatorHistory,
-    current_epoch: u16,
+    _current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
     // TODO: Remove this for priority fee scoring launch
     Ok((1.0, 0, EPOCH_DEFAULT))
