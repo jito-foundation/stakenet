@@ -515,7 +515,7 @@ pub fn calculate_priority_fee_commission(
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
     // TODO: Remove this for priority fee scoring launch
-    Ok((1.0, 0, current_epoch))
+    Ok((1.0, 0, EPOCH_DEFAULT))
     /*if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
         return Ok((1.0, 0, EPOCH_DEFAULT));
     }
