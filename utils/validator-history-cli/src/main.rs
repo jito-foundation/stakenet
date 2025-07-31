@@ -103,6 +103,14 @@ struct History {
     /// Start epoch
     #[arg(short, long, env)]
     start_epoch: Option<u64>,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 #[derive(Parser)]
@@ -288,7 +296,7 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
 }
 
 #[allow(unused_variables)]
-fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
+fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
     let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
         "[NULL]".to_string()
     } else {
