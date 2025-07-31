@@ -474,7 +474,7 @@ pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Re
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
 pub fn calculate_priority_fee_merkle_root_authority(_validator: &ValidatorHistory) -> Result<f64> {
     // TODO: Remove this for priority fee scoring launch
-    return Ok(1.0);
+    Ok(1.0)
     /*if calculate_instant_unstake_merkle_root_upload_auth(
         &validator
             .history
@@ -515,7 +515,7 @@ pub fn calculate_priority_fee_commission(
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
     // TODO: Remove this for priority fee scoring launch
-    return Ok((1.0, 0, current_epoch));
+    Ok((1.0, 0, current_epoch))
     /*if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
         return Ok((1.0, 0, EPOCH_DEFAULT));
     }
