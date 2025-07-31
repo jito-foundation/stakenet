@@ -23,9 +23,9 @@ use {
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 392);
 
-static DNE_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
-static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
-static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
+pub static DNE_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
+pub static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
+pub static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[account]
 pub struct Config {

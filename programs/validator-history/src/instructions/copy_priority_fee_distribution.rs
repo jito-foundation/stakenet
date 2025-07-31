@@ -4,7 +4,7 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
-    MerkleRootUploadAuthority,
+    MerkleRootUploadAuthority, DNE_AUTHORITY,
 };
 
 use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
@@ -84,7 +84,7 @@ pub fn handle_copy_priority_fee_distribution_account(
     let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)
         .unwrap_or(PriorityFeeDistributionAccount {
             validator_vote_account: Pubkey::default(),
-            merkle_root_upload_authority: Pubkey::default(),
+            merkle_root_upload_authority: DNE_AUTHORITY,
             validator_commission_bps: 0,
             total_lamports_transferred: 0,
             merkle_root: None,
