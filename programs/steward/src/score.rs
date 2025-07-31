@@ -472,8 +472,10 @@ pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Re
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_priority_fee_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
-    if calculate_instant_unstake_merkle_root_upload_auth(
+pub fn calculate_priority_fee_merkle_root_authority(_validator: &ValidatorHistory) -> Result<f64> {
+    // TODO: Remove this for priority fee scoring launch
+    return Ok(1.0);
+    /*if calculate_instant_unstake_merkle_root_upload_auth(
         &validator
             .history
             .priority_fee_merkle_root_upload_authority_latest(),
@@ -481,7 +483,7 @@ pub fn calculate_priority_fee_merkle_root_authority(validator: &ValidatorHistory
         Ok(0.0)
     } else {
         Ok(1.0)
-    }
+    }*/
 }
 
 /// Given a validator's tips and total fees, determine their realized commission rate
@@ -508,11 +510,13 @@ pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option
 
 /// Checks if validator is maintaining < X% realized commission rates over some history of epochs
 pub fn calculate_priority_fee_commission(
-    config: &Config,
-    validator: &ValidatorHistory,
+    _config: &Config,
+    _validator: &ValidatorHistory,
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
-    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
+    // TODO: Remove this for priority fee scoring launch
+    return Ok((1.0, 0, current_epoch));
+    /*if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
         return Ok((1.0, 0, EPOCH_DEFAULT));
     }
     let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
@@ -598,7 +602,7 @@ pub fn calculate_priority_fee_commission(
             max_priority_fee_commission,
             max_priority_fee_commission_epoch,
         ))
-    }
+    }*/
 }
 
 #[event]
