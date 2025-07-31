@@ -76,6 +76,7 @@ pub fn emit_validator_history_metrics(
     let mut stakes = 0;
     let mut priority_fees = 0;
     let mut merkle_root_upload_authorities = 0;
+    let mut priority_fee_merkle_root_upload_authorities = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
 
@@ -114,6 +115,9 @@ pub fn emit_validator_history_metrics(
             }
             if entry.merkle_root_upload_authority != MerkleRootUploadAuthority::Unset {
                 merkle_root_upload_authorities += 1;
+            }
+            if entry.priority_fee_merkle_root_upload_authority != MerkleRootUploadAuthority::Unset {
+                priority_fee_merkle_root_upload_authorities += 1;
             }
         }
 
@@ -172,6 +176,11 @@ pub fn emit_validator_history_metrics(
         (
             "num_merkle_root_upload_authorities",
             merkle_root_upload_authorities,
+            i64
+        ),
+        (
+            "num_priority_fee_merkle_root_upload_authorities",
+            priority_fee_merkle_root_upload_authorities,
             i64
         ),
     );
