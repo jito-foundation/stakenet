@@ -1833,6 +1833,7 @@ impl Default for StateMachineFixtures {
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1854,6 +1855,7 @@ impl Default for StateMachineFixtures {
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1875,6 +1877,7 @@ impl Default for StateMachineFixtures {
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
