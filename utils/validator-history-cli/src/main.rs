@@ -2,7 +2,6 @@ use std::{path::PathBuf, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
-use log::info;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -650,8 +649,10 @@ fn command_get_config(client: RpcClient) {
         config_account.priority_fee_oracle_authority
     );
     println!("Tip Distro: {}", config_account.tip_distribution_program);
-    println!("PF Distro: {}", config_account.priority_fee_distribution_program);
-
+    println!(
+        "PF Distro: {}",
+        config_account.priority_fee_distribution_program
+    );
 }
 
 fn main() {

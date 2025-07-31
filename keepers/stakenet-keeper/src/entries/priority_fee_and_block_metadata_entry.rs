@@ -17,7 +17,7 @@ pub struct PriorityFeeAndBlockMetadataEntry {
     pub total_leader_slots: u32,
     pub blocks_produced: u32,
     pub highest_global_done_slot: u64, // Highest Done slot globally
-    pub highest_done_slot: u64, // Highest Done slot within an epoch
+    pub highest_done_slot: u64,        // Highest Done slot within an epoch
     // Aux Data
     pub blocks_left: u32,
     pub blocks_error: u32,

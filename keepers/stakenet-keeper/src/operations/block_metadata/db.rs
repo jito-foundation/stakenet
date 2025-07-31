@@ -384,7 +384,6 @@ impl DBSlotInfo {
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
     ) -> Result<HashMap<String, PriorityFeeAndBlockMetadataEntry>, BlockMetadataKeeperError> {
-
         // Fetch all entries for the given vote account and epoch
         let mut statement = connection.prepare(
             "SELECT
@@ -400,10 +399,7 @@ impl DBSlotInfo {
             WHERE epoch = ? AND vote_key != ''
             ORDER BY absolute_slot ASC",
         )?;
-        let slot_infos = statement
-            .query_map(params![epoch], |row| {
-                Ok(Self::from_db_row(row))
-            })?;
+        let slot_infos = statement.query_map(params![epoch], |row| Ok(Self::from_db_row(row)))?;
 
         let highest_global_done_slot = get_highest_done_slot(connection)?.unwrap_or(0);
 
@@ -473,10 +469,9 @@ pub fn get_highest_done_slot(
          WHERE state = ?",
     )?;
 
-    let result = statement.query_row(
-        params![DBSlotInfoState::Done as u8],
-        |row| row.get::<_, Option<u64>>(0),
-    )?;
+    let result = statement.query_row(params![DBSlotInfoState::Done as u8], |row| {
+        row.get::<_, Option<u64>>(0)
+    })?;
 
     Ok(result)
 }
