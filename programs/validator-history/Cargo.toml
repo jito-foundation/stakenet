@@ -33,6 +33,7 @@ jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.co
 semver = "1.0.17"
 serde = "1.0.183"
 serde_derive = "1.0.183"
+solana-program = "1.18"
 solana-security-txt = "1.1.0"
 static_assertions = "1.1.0"
 thiserror = "1.0.37"

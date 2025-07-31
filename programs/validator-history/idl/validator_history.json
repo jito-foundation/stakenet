@@ -805,6 +805,26 @@
       }
     },
     {
+      "name": "MerkleRootUploadAuthority",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Empty"
+          },
+          {
+            "name": "Other"
+          },
+          {
+            "name": "OldJitoLabs"
+          },
+          {
+            "name": "TipRouter"
+          }
+        ]
+      }
+    },
+    {
       "name": "ValidatorHistory",
       "serialization": "bytemuck",
       "repr": {
@@ -917,8 +937,15 @@
             }
           },
           {
-            "name": "padding0",
-            "type": "u8"
+            "name": "merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
           },
           {
             "name": "is_superminority",
