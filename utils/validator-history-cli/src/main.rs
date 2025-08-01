@@ -10,13 +10,13 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
-    transaction::Transaction,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
 };
+use validator_history_cli::validator_history_entry_output::ValidatorHistoryEntryOutput;
 
 #[derive(Parser)]
 #[command(about = "CLI for validator history program", version)]
@@ -304,160 +304,27 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
 }
 
 fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
+    let entry_output = ValidatorHistoryEntryOutput::from(entry);
     if print_json {
-        // JSON format
-        let mut map = serde_json::Map::new();
-
-        let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
-            "[NULL]".to_string()
-        } else {
-            entry.commission.to_string()
-        };
-        map.insert(
-            "Commission".to_string(),
-            serde_json::Value::String(commission_str),
-        );
-
-        let epoch_credits_str =
-            if entry.epoch_credits == ValidatorHistoryEntry::default().epoch_credits {
-                "[NULL]".to_string()
-            } else {
-                entry.epoch_credits.to_string()
-            };
-        map.insert(
-            "Epoch Credits".to_string(),
-            serde_json::Value::String(epoch_credits_str),
-        );
-
-        let mev_commission_str =
-            if entry.mev_commission == ValidatorHistoryEntry::default().mev_commission {
-                "[NULL]".to_string()
-            } else {
-                entry.mev_commission.to_string()
-            };
-        map.insert(
-            "MEV Commission".to_string(),
-            serde_json::Value::String(mev_commission_str),
-        );
-
-        let mev_earned_str = if entry.mev_earned == ValidatorHistoryEntry::default().mev_earned {
-            "[NULL]".to_string()
-        } else {
-            (entry.mev_earned as f64 / 100.0).to_string()
-        };
-        map.insert(
-            "MEV Earned".to_string(),
-            serde_json::Value::String(mev_earned_str),
-        );
-
-        let stake_str = if entry.activated_stake_lamports
-            == ValidatorHistoryEntry::default().activated_stake_lamports
-        {
-            "[NULL]".to_string()
-        } else {
-            entry.activated_stake_lamports.to_string()
-        };
-        map.insert(
-            "Activated Stake".to_string(),
-            serde_json::Value::String(stake_str),
-        );
-
-        let ip_str = if entry.ip == ValidatorHistoryEntry::default().ip {
-            "[NULL]".to_string()
-        } else {
-            format!(
-                "{}.{}.{}.{}",
-                entry.ip[0], entry.ip[1], entry.ip[2], entry.ip[3]
-            )
-        };
-        map.insert("IP".to_string(), serde_json::Value::String(ip_str));
-
-        let client_type_str = if entry.client_type == ValidatorHistoryEntry::default().client_type {
-            "[NULL]".to_string()
-        } else {
-            entry.client_type.to_string()
-        };
-        map.insert(
-            "Client Type".to_string(),
-            serde_json::Value::String(client_type_str),
-        );
-
-        let client_version_str = if entry.version.major
-            == ValidatorHistoryEntry::default().version.major
-            && entry.version.minor == ValidatorHistoryEntry::default().version.minor
-            && entry.version.patch == ValidatorHistoryEntry::default().version.patch
-        {
-            "[NULL]".to_string()
-        } else {
-            format!(
-                "{}.{}.{}",
-                entry.version.major, entry.version.minor, entry.version.patch
-            )
-        };
-        map.insert(
-            "Client Version".to_string(),
-            serde_json::Value::String(client_version_str),
-        );
-
-        let rank_str = if entry.rank == ValidatorHistoryEntry::default().rank {
-            "[NULL]".to_string()
-        } else {
-            entry.rank.to_string()
-        };
-        map.insert("Rank".to_string(), serde_json::Value::String(rank_str));
-
-        let superminority_str =
-            if entry.is_superminority == ValidatorHistoryEntry::default().is_superminority {
-                "[NULL]".to_string()
-            } else {
-                entry.is_superminority.to_string()
-            };
-        map.insert(
-            "Is Superminority".to_string(),
-            serde_json::Value::String(superminority_str),
-        );
-
-        let last_update_slot = if entry.vote_account_last_update_slot
-            == ValidatorHistoryEntry::default().vote_account_last_update_slot
-        {
-            "[NULL]".to_string()
-        } else {
-            entry.vote_account_last_update_slot.to_string()
-        };
-        map.insert(
-            "Last Update Slot".to_string(),
-            serde_json::Value::String(last_update_slot),
-        );
-
-        // Add priority fee info as nested object or individual fields
-        map.insert(
-            "Priority Fee Tips".to_string(),
-            serde_json::Value::String(lamports_to_sol(entry.priority_fee_tips).to_string()),
-        );
-        map.insert(
-            "Total Priority Fees".to_string(),
-            serde_json::Value::String(lamports_to_sol(entry.total_priority_fees).to_string()),
-        );
-        map.insert(
-            "Priority Fee Commission".to_string(),
-            serde_json::Value::String(entry.priority_fee_commission.to_string()),
-        );
-        map.insert(
-            "Total Leader Slots".to_string(),
-            serde_json::Value::String(entry.total_leader_slots.to_string()),
-        );
-
-        // Convert to JSON string
-        serde_json::to_string_pretty(&serde_json::Value::Object(map))
-            .unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string_pretty(&entry_output).unwrap_or_else(|_| "{}".to_string())
     } else {
-        // Human-readable format (your original logic)
         format!(
-            "Tips {} | Total {} | Commission {} | Slots {}",
-            lamports_to_sol(entry.priority_fee_tips),
-            lamports_to_sol(entry.total_priority_fees),
-            entry.priority_fee_commission,
-            entry.total_leader_slots
+            "Commission: {} | Epoch Credits: {} | MEV Commission: {} | MEV Earned: {} | Stake: {} | IP: {} | Client Type: {} | Client Version: {} | Rank: {} | Superminority: {} | Last Update: {} | Tips: {} | Total Fees: {} | Fee Commission: {} | Leader Slots: {}",
+            entry_output.commission,
+            entry_output.epoch_credits,
+            entry_output.mev_commission,
+            entry_output.mev_earned,
+            entry_output.stake,
+            entry_output.ip,
+            entry_output.client_type,
+            entry_output.client_version,
+            entry_output.rank,
+            entry_output.superminority,
+            entry_output.last_update_slot,
+            entry_output.priority_fee_tips,
+            entry_output.total_priority_fees,
+            entry_output.priority_fee_commission,
+            entry_output.total_leader_slots
         )
     }
 }

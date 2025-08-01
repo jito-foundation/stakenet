@@ -8,9 +8,11 @@ description = "CLI to manage validator history program"
 anchor-lang = "0.31.1"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 log = "0.4.18"
+serde = { workspace = true }
 serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
+solana-native-token = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
