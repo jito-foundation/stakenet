@@ -40,7 +40,7 @@ enum Commands {
     ReallocConfig(ReallocConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
-    ClusterHistoryStatus,
+    ClusterHistoryStatus(ClusterHistoryStatus),
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
     GetConfig(GetConfig),
@@ -93,6 +93,18 @@ struct CrankerStatus {
     #[arg(short, long, env)]
     epoch: Option<u64>,
 
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Get cluster history status")]
+struct ClusterHistoryStatus {
     /// Print account information in JSON format
     #[arg(
         long,
@@ -305,6 +317,7 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
 
 fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
     let entry_output = ValidatorHistoryEntryOutput::from(entry);
+
     if print_json {
         serde_json::to_string_pretty(&entry_output).unwrap_or_else(|_| "{}".to_string())
     } else {
@@ -359,12 +372,12 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         },
         ..RpcProgramAccountsConfig::default()
     };
-    let mut validator_history_accounts = client
+    let validator_history_accounts = client
         .get_program_accounts_with_config(&validator_history::id(), gpa_config)
         .expect("Failed to get validator history accounts");
 
     let mut validator_histories = validator_history_accounts
-        .iter_mut()
+        .into_iter()
         .map(|(_, account)| {
             let validator_history = ValidatorHistory::try_deserialize(&mut account.data.as_slice())
                 .expect("Failed to deserialize validator history account");
@@ -381,7 +394,8 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     validator_histories.sort_by(|a, b| a.index.cmp(&b.index));
 
     // For each validator history account, print out the status
-    println!("Epoch {} Report", epoch);
+    let default = ValidatorHistoryEntry::default();
+    let mut results = Vec::with_capacity(validator_histories.len());
     let mut ips = 0;
     let mut versions = 0;
     let mut types = 0;
@@ -392,7 +406,10 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let mut stakes = 0;
     let mut ranks = 0;
 
-    let default = ValidatorHistoryEntry::default();
+    if !args.print_json {
+        println!("Epoch {epoch} Report");
+    }
+
     for validator_history in validator_histories {
         match get_entry(validator_history, epoch) {
             Some(entry) => {
@@ -426,33 +443,91 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 if entry.rank != default.rank {
                     ranks += 1;
                 }
-                println!(
-                    "{}.\tVote Account: {} | {}",
-                    validator_history.index,
-                    validator_history.vote_account,
-                    formatted_entry(entry, args.print_json)
-                );
+
+                if args.print_json {
+                    let json_str = formatted_entry(entry, args.print_json);
+                    match serde_json::from_str::<serde_json::Value>(&json_str) {
+                        Ok(validator_data) => {
+                            results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                                        "validator_history": validator_data
+                                    }));
+                        }
+                        Err(_) => {
+                            results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                                "validator_history": json_str
+                            }));
+                        }
+                    }
+                } else {
+                    println!(
+                        "{}.\tVote Account: {} | {}",
+                        validator_history.index,
+                        validator_history.vote_account,
+                        formatted_entry(entry, false)
+                    );
+                }
             }
             None => {
-                println!(
-                    "{}.\tVote Account: {} | {}",
-                    validator_history.index,
-                    validator_history.vote_account,
-                    formatted_entry(ValidatorHistoryEntry::default(), args.print_json)
-                );
+                if args.print_json {
+                    let json_str =
+                        formatted_entry(ValidatorHistoryEntry::default(), args.print_json);
+                    results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                        "validator_history": json_str,
+                    }));
+                } else {
+                    println!(
+                        "{}.\tVote Account: {} | {}",
+                        validator_history.index,
+                        validator_history.vote_account,
+                        formatted_entry(ValidatorHistoryEntry::default(), false)
+                    );
+                }
             }
-        };
+        }
     }
-    println!("Total Validators:\t\t{}", config.counter);
-    println!("Validators with IP:\t\t{}", ips);
-    println!("Validators with Version:\t{}", versions);
-    println!("Validators with Client Type:\t{}", types);
-    println!("Validators with MEV Commission: {}", mev_comms);
-    println!("Validators with MEV Earned: \t{}", mev_earned);
-    println!("Validators with Commission:\t{}", comms);
-    println!("Validators with Epoch Credits:\t{}", epoch_credits);
-    println!("Validators with Stake:\t\t{}", stakes);
-    println!("Validators with Rank:\t\t{}", ranks);
+
+    if args.print_json {
+        // Print everything as one JSON object
+        let output = serde_json::json!({
+            "epoch": epoch,
+            "total_validators": config.counter,
+            "validators_with_ip": ips,
+            "validators_with_version": versions,
+            "validators_with_client_type": types,
+            "validators_with_mev_commission": mev_comms,
+            "validators_with_mev_earned": mev_earned,
+            "validators_with_commission": comms,
+            "validators_with_epoch_credits": epoch_credits,
+            "validators_with_stake": stakes,
+            "validators_with_rank": ranks,
+            "validators": results,
+        });
+
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Total Validators:\t\t{}", config.counter);
+        println!("Validators with IP:\t\t{}", ips);
+        println!("Validators with Version:\t{}", versions);
+        println!("Validators with Client Type:\t{}", types);
+        println!("Validators with MEV Commission: {}", mev_comms);
+        println!("Validators with MEV Earned: \t{}", mev_earned);
+        println!("Validators with Commission:\t{}", comms);
+        println!("Validators with Epoch Credits:\t{}", epoch_credits);
+        println!("Validators with Stake:\t\t{}", stakes);
+        println!("Validators with Rank:\t\t{}", ranks);
+    }
 }
 
 fn command_history(args: History, client: RpcClient) {
@@ -488,7 +563,6 @@ fn command_history(args: History, client: RpcClient) {
         .epoch;
 
     if args.print_json {
-        // For JSON output, create a wrapper with metadata
         let mut results = Vec::new();
 
         for epoch in start_epoch..=current_epoch {
@@ -528,7 +602,6 @@ fn command_history(args: History, client: RpcClient) {
 
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        // For human-readable output, keep the original format
         println!(
             "History for validator {} | Validator History Account {}",
             args.validator, validator_history_pda
@@ -551,7 +624,7 @@ fn command_history(args: History, client: RpcClient) {
     }
 }
 
-fn command_cluster_history(client: RpcClient) {
+fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
 
@@ -562,15 +635,31 @@ fn command_cluster_history(client: RpcClient) {
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
             .expect("Failed to deserialize cluster history account");
 
+    let mut results = Vec::with_capacity(cluster_history.history.arr.len());
+
     for entry in cluster_history.history.arr.iter() {
-        println!(
-            "Epoch: {} | Total Blocks: {}",
-            entry.epoch, entry.total_blocks
-        );
+        if args.print_json {
+            results.push(serde_json::json!({
+                "epoch": entry.epoch,
+                "total_blocks": entry.total_blocks,
+            }));
+        } else {
+            println!(
+                "Epoch: {} | Total Blocks: {}",
+                entry.epoch, entry.total_blocks
+            );
+        }
 
         if entry.epoch == ClusterHistoryEntry::default().epoch {
             break;
         }
+    }
+
+    if args.print_json {
+        let output = serde_json::json!({
+            "cluster_history_status": results
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
     }
 }
 
@@ -654,7 +743,7 @@ fn main() {
         Commands::ReallocConfig(args) => command_realloc_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
-        Commands::ClusterHistoryStatus => command_cluster_history(client),
+        Commands::ClusterHistoryStatus(args) => command_cluster_history(args, client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::GetConfig(_) => command_get_config(client),
