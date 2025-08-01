@@ -11519,6 +11519,7 @@ dependencies = [
  "futures",
  "futures-util",
  "log",
+ "serde_json",
  "solana-account-decoder 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-client 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-metrics 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

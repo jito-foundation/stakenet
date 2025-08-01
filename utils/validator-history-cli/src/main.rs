@@ -10,8 +10,7 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
-    transaction::Transaction,
+    native_token::lamports_to_sol, pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction
 };
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -92,6 +91,14 @@ struct CrankerStatus {
     /// Epoch to get status for (default: current epoch)
     #[arg(short, long, env)]
     epoch: Option<u64>,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 #[derive(Parser)]
@@ -295,100 +302,112 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
-#[allow(unused_variables)]
 fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
-    let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
-        "[NULL]".to_string()
-    } else {
-        entry.commission.to_string()
-    };
-
-    let epoch_credits_str = if entry.epoch_credits == ValidatorHistoryEntry::default().epoch_credits
-    {
-        "[NULL]".to_string()
-    } else {
-        entry.epoch_credits.to_string()
-    };
-
-    let mev_commission_str =
-        if entry.mev_commission == ValidatorHistoryEntry::default().mev_commission {
+    if print_json {
+        // JSON format
+        let mut map = serde_json::Map::new();
+        
+        let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
+            "[NULL]".to_string()
+        } else {
+            entry.commission.to_string()
+        };
+        map.insert("Commission".to_string(), serde_json::Value::String(commission_str));
+        
+        let epoch_credits_str = if entry.epoch_credits == ValidatorHistoryEntry::default().epoch_credits {
+            "[NULL]".to_string()
+        } else {
+            entry.epoch_credits.to_string()
+        };
+        map.insert("Epoch Credits".to_string(), serde_json::Value::String(epoch_credits_str));
+        
+        let mev_commission_str = if entry.mev_commission == ValidatorHistoryEntry::default().mev_commission {
             "[NULL]".to_string()
         } else {
             entry.mev_commission.to_string()
         };
-
-    let mev_earned_str = if entry.mev_earned == ValidatorHistoryEntry::default().mev_earned {
-        "[NULL]".to_string()
-    } else {
-        (entry.mev_earned as f64 / 100.0).to_string()
-    };
-
-    let stake_str = if entry.activated_stake_lamports
-        == ValidatorHistoryEntry::default().activated_stake_lamports
-    {
-        "[NULL]".to_string()
-    } else {
-        entry.activated_stake_lamports.to_string()
-    };
-
-    let ip_str = if entry.ip == ValidatorHistoryEntry::default().ip {
-        "[NULL]".to_string()
-    } else {
-        format!(
-            "{}.{}.{}.{}",
-            entry.ip[0], entry.ip[1], entry.ip[2], entry.ip[3]
-        )
-    };
-
-    let client_type_str = if entry.client_type == ValidatorHistoryEntry::default().client_type {
-        "[NULL]".to_string()
-    } else {
-        entry.client_type.to_string()
-    };
-
-    let client_version_str = if entry.version.major
-        == ValidatorHistoryEntry::default().version.major
-        && entry.version.minor == ValidatorHistoryEntry::default().version.minor
-        && entry.version.patch == ValidatorHistoryEntry::default().version.patch
-    {
-        "[NULL]".to_string()
-    } else {
-        format!(
-            "{}.{}.{}",
-            entry.version.major, entry.version.minor, entry.version.patch
-        )
-    };
-
-    let rank_str = if entry.rank == ValidatorHistoryEntry::default().rank {
-        "[NULL]".to_string()
-    } else {
-        entry.rank.to_string()
-    };
-
-    let superminority_str =
-        if entry.is_superminority == ValidatorHistoryEntry::default().is_superminority {
+        map.insert("MEV Commission".to_string(), serde_json::Value::String(mev_commission_str));
+        
+        let mev_earned_str = if entry.mev_earned == ValidatorHistoryEntry::default().mev_earned {
+            "[NULL]".to_string()
+        } else {
+            (entry.mev_earned as f64 / 100.0).to_string()
+        };
+        map.insert("MEV Earned".to_string(), serde_json::Value::String(mev_earned_str));
+        
+        let stake_str = if entry.activated_stake_lamports == ValidatorHistoryEntry::default().activated_stake_lamports {
+            "[NULL]".to_string()
+        } else {
+            entry.activated_stake_lamports.to_string()
+        };
+        map.insert("Activated Stake".to_string(), serde_json::Value::String(stake_str));
+        
+        let ip_str = if entry.ip == ValidatorHistoryEntry::default().ip {
+            "[NULL]".to_string()
+        } else {
+            format!("{}.{}.{}.{}", entry.ip[0], entry.ip[1], entry.ip[2], entry.ip[3])
+        };
+        map.insert("IP".to_string(), serde_json::Value::String(ip_str));
+        
+        let client_type_str = if entry.client_type == ValidatorHistoryEntry::default().client_type {
+            "[NULL]".to_string()
+        } else {
+            entry.client_type.to_string()
+        };
+        map.insert("Client Type".to_string(), serde_json::Value::String(client_type_str));
+        
+        let client_version_str = if entry.version.major == ValidatorHistoryEntry::default().version.major
+            && entry.version.minor == ValidatorHistoryEntry::default().version.minor
+            && entry.version.patch == ValidatorHistoryEntry::default().version.patch {
+            "[NULL]".to_string()
+        } else {
+            format!("{}.{}.{}", entry.version.major, entry.version.minor, entry.version.patch)
+        };
+        map.insert("Client Version".to_string(), serde_json::Value::String(client_version_str));
+        
+        let rank_str = if entry.rank == ValidatorHistoryEntry::default().rank {
+            "[NULL]".to_string()
+        } else {
+            entry.rank.to_string()
+        };
+        map.insert("Rank".to_string(), serde_json::Value::String(rank_str));
+        
+        let superminority_str = if entry.is_superminority == ValidatorHistoryEntry::default().is_superminority {
             "[NULL]".to_string()
         } else {
             entry.is_superminority.to_string()
         };
-
-    let last_update_slot = if entry.vote_account_last_update_slot
-        == ValidatorHistoryEntry::default().vote_account_last_update_slot
-    {
-        "[NULL]".to_string()
+        map.insert("Is Superminority".to_string(), serde_json::Value::String(superminority_str));
+        
+        let last_update_slot = if entry.vote_account_last_update_slot == ValidatorHistoryEntry::default().vote_account_last_update_slot {
+            "[NULL]".to_string()
+        } else {
+            entry.vote_account_last_update_slot.to_string()
+        };
+        map.insert("Last Update Slot".to_string(), serde_json::Value::String(last_update_slot));
+        
+        // Add priority fee info as nested object or individual fields
+        map.insert("Priority Fee Tips".to_string(), 
+                  serde_json::Value::String(lamports_to_sol(entry.priority_fee_tips).to_string()));
+        map.insert("Total Priority Fees".to_string(), 
+                  serde_json::Value::String(lamports_to_sol(entry.total_priority_fees).to_string()));
+        map.insert("Priority Fee Commission".to_string(), 
+                  serde_json::Value::String(entry.priority_fee_commission.to_string()));
+        map.insert("Total Leader Slots".to_string(), 
+                  serde_json::Value::String(entry.total_leader_slots.to_string()));
+        
+        // Convert to JSON string
+        serde_json::to_string_pretty(&serde_json::Value::Object(map)).unwrap_or_else(|_| "{}".to_string())
     } else {
-        entry.vote_account_last_update_slot.to_string()
-    };
-
-    let priority_fee_info = format!(
-        "Tips {} | Total {} | Commission {} | Slots {}",
-        lamports_to_sol(entry.priority_fee_tips),
-        lamports_to_sol(entry.total_priority_fees),
-        entry.priority_fee_commission,
-        entry.total_leader_slots
-    );
-
-    priority_fee_info
+        // Human-readable format (your original logic)
+        format!(
+            "Tips {} | Total {} | Commission {} | Slots {}",
+            lamports_to_sol(entry.priority_fee_tips),
+            lamports_to_sol(entry.total_priority_fees),
+            entry.priority_fee_commission,
+            entry.total_leader_slots
+        )
+    }
 }
 
 fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
@@ -492,7 +511,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                     "{}.\tVote Account: {} | {}",
                     validator_history.index,
                     validator_history.vote_account,
-                    formatted_entry(entry)
+                    formatted_entry(entry, args.print_json)
                 );
             }
             None => {
@@ -500,7 +519,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                     "{}.\tVote Account: {} | {}",
                     validator_history.index,
                     validator_history.vote_account,
-                    formatted_entry(ValidatorHistoryEntry::default())
+                    formatted_entry(ValidatorHistoryEntry::default(), args.print_json)
                 );
             }
         };
@@ -548,21 +567,65 @@ fn command_history(args: History, client: RpcClient) {
         .get_epoch_info()
         .expect("Failed to get epoch info")
         .epoch;
-    println!(
-        "History for validator {} | Validator History Account {}",
-        args.validator, validator_history_pda
-    );
-    for epoch in start_epoch..=current_epoch {
-        match get_entry(validator_history, epoch) {
-            Some(entry) => {
-                println!("Epoch: {} | {}", epoch, formatted_entry(entry));
+
+        if args.print_json {
+            // For JSON output, create a wrapper with metadata
+            let mut results = Vec::new();
+            
+            for epoch in start_epoch..=current_epoch {
+                match get_entry(validator_history, epoch) {
+                    Some(entry) => {
+                        let json_str = formatted_entry(entry, args.print_json);
+                        match serde_json::from_str::<serde_json::Value>(&json_str) {
+                            Ok(validator_data) => {
+                                results.push(serde_json::json!({
+                                    "epoch": epoch,
+                                    "validator_history": validator_data
+                                }));
+                            }
+                            Err(_) => {
+                                results.push(serde_json::json!({
+                                    "epoch": epoch,
+                                    "validator_history": json_str
+                                }));
+                            }
+                        }
+                    }
+                    None => {
+                        results.push(serde_json::json!({
+                            "epoch": epoch,
+                            "validator_history": null
+                        }));
+                    }
+                }
             }
-            None => {
-                println!("Epoch {}:\tNo history", epoch);
-                continue;
+            
+            // Print everything as one JSON object
+            let output = serde_json::json!({
+                "validator": args.validator.to_string(),
+                "validator_history_account": validator_history_pda.to_string(),
+                "epochs": results
+            });
+            
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        } else {
+            // For human-readable output, keep the original format
+            println!(
+                "History for validator {} | Validator History Account {}",
+                args.validator, validator_history_pda
+            );
+            
+            for epoch in start_epoch..=current_epoch {
+                match get_entry(validator_history, epoch) {
+                    Some(entry) => {
+                        println!("Epoch: {} | {}", epoch, formatted_entry(entry, args.print_json));
+                    }
+                    None => {
+                        println!("Epoch {}:\tNo history", epoch);
+                    }
+                }
             }
         }
-    }
 }
 
 fn command_cluster_history(client: RpcClient) {

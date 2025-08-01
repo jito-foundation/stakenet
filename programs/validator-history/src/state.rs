@@ -138,6 +138,7 @@ impl IdlBuild for MerkleRootUploadAuthority {
 }
 
 #[derive(BorshSerialize, TypeLayout)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[zero_copy]
 pub struct ValidatorHistoryEntry {
     pub activated_stake_lamports: u64,

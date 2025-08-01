@@ -23,6 +23,7 @@ cpi = ["no-entrypoint"]
 default = ["custom-heap"]
 custom-heap = []
 idl-build = ["anchor-lang/idl-build", "no-entrypoint"]
+serde = []
 
 [dependencies]
 anchor-lang = "0.31.1"
