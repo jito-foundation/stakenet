@@ -12,8 +12,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
-solana-native-token = { workspace = true }
 solana-metrics = { workspace = true }
+solana-native-token = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
