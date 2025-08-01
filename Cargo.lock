@@ -11516,8 +11516,6 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "clap 4.5.41",
- "futures",
- "futures-util",
  "log",
  "serde_json",
  "solana-account-decoder 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -11525,8 +11523,6 @@ dependencies = [
  "solana-metrics 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-program",
  "solana-sdk",
- "thiserror 1.0.69",
- "tokio",
  "validator-history",
 ]
 
