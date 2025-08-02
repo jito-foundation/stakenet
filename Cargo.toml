@@ -20,6 +20,7 @@ solana-clap-utils = "=2.2.1"
 solana-client = "=2.2.1"
 solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
 solana-metrics = "=2.2.1"
+solana-native-token = "=2.2.1"
 solana-net-utils = "=2.2.1"
 solana-packet = "=2.2.1"
 solana-program = "=2.2.1"
