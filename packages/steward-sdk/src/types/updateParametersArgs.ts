@@ -8,12 +8,18 @@
 
 import {
   combineCodec,
+  getF64Decoder,
+  getF64Encoder,
   getOptionDecoder,
   getOptionEncoder,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
   getU16Encoder,
+  getU32Decoder,
+  getU32Encoder,
+  getU64Decoder,
+  getU64Encoder,
   getU8Decoder,
   getU8Encoder,
   type Codec,
@@ -24,38 +30,96 @@ import {
 } from '@solana/kit';
 
 export type UpdateParametersArgs = {
-  priorityFeeLookbackEpochs: Option<number>;
-  priorityFeeLookbackOffset: Option<number>;
-  priorityFeeMaxCommissionBps: Option<number>;
-  priorityFeeErrorMarginBps: Option<number>;
-  priorityFeeScoringStartEpoch: Option<number>;
+  mevCommissionRange: Option<number>;
+  epochCreditsRange: Option<number>;
+  commissionRange: Option<number>;
+  scoringDelinquencyThresholdRatio: Option<number>;
+  instantUnstakeDelinquencyThresholdRatio: Option<number>;
+  mevCommissionBpsThreshold: Option<number>;
+  commissionThreshold: Option<number>;
+  historicalCommissionThreshold: Option<number>;
+  numDelegationValidators: Option<number>;
+  scoringUnstakeCapBps: Option<number>;
+  instantUnstakeCapBps: Option<number>;
+  stakeDepositUnstakeCapBps: Option<number>;
+  instantUnstakeEpochProgress: Option<number>;
+  computeScoreSlotRange: Option<bigint>;
+  instantUnstakeInputsEpochProgress: Option<number>;
+  numEpochsBetweenScoring: Option<bigint>;
+  minimumStakeLamports: Option<bigint>;
+  minimumVotingEpochs: Option<bigint>;
 };
 
 export type UpdateParametersArgsArgs = {
-  priorityFeeLookbackEpochs: OptionOrNullable<number>;
-  priorityFeeLookbackOffset: OptionOrNullable<number>;
-  priorityFeeMaxCommissionBps: OptionOrNullable<number>;
-  priorityFeeErrorMarginBps: OptionOrNullable<number>;
-  priorityFeeScoringStartEpoch: OptionOrNullable<number>;
+  mevCommissionRange: OptionOrNullable<number>;
+  epochCreditsRange: OptionOrNullable<number>;
+  commissionRange: OptionOrNullable<number>;
+  scoringDelinquencyThresholdRatio: OptionOrNullable<number>;
+  instantUnstakeDelinquencyThresholdRatio: OptionOrNullable<number>;
+  mevCommissionBpsThreshold: OptionOrNullable<number>;
+  commissionThreshold: OptionOrNullable<number>;
+  historicalCommissionThreshold: OptionOrNullable<number>;
+  numDelegationValidators: OptionOrNullable<number>;
+  scoringUnstakeCapBps: OptionOrNullable<number>;
+  instantUnstakeCapBps: OptionOrNullable<number>;
+  stakeDepositUnstakeCapBps: OptionOrNullable<number>;
+  instantUnstakeEpochProgress: OptionOrNullable<number>;
+  computeScoreSlotRange: OptionOrNullable<number | bigint>;
+  instantUnstakeInputsEpochProgress: OptionOrNullable<number>;
+  numEpochsBetweenScoring: OptionOrNullable<number | bigint>;
+  minimumStakeLamports: OptionOrNullable<number | bigint>;
+  minimumVotingEpochs: OptionOrNullable<number | bigint>;
 };
 
 export function getUpdateParametersArgsEncoder(): Encoder<UpdateParametersArgsArgs> {
   return getStructEncoder([
-    ['priorityFeeLookbackEpochs', getOptionEncoder(getU8Encoder())],
-    ['priorityFeeLookbackOffset', getOptionEncoder(getU8Encoder())],
-    ['priorityFeeMaxCommissionBps', getOptionEncoder(getU16Encoder())],
-    ['priorityFeeErrorMarginBps', getOptionEncoder(getU16Encoder())],
-    ['priorityFeeScoringStartEpoch', getOptionEncoder(getU16Encoder())],
+    ['mevCommissionRange', getOptionEncoder(getU16Encoder())],
+    ['epochCreditsRange', getOptionEncoder(getU16Encoder())],
+    ['commissionRange', getOptionEncoder(getU16Encoder())],
+    ['scoringDelinquencyThresholdRatio', getOptionEncoder(getF64Encoder())],
+    [
+      'instantUnstakeDelinquencyThresholdRatio',
+      getOptionEncoder(getF64Encoder()),
+    ],
+    ['mevCommissionBpsThreshold', getOptionEncoder(getU16Encoder())],
+    ['commissionThreshold', getOptionEncoder(getU8Encoder())],
+    ['historicalCommissionThreshold', getOptionEncoder(getU8Encoder())],
+    ['numDelegationValidators', getOptionEncoder(getU32Encoder())],
+    ['scoringUnstakeCapBps', getOptionEncoder(getU32Encoder())],
+    ['instantUnstakeCapBps', getOptionEncoder(getU32Encoder())],
+    ['stakeDepositUnstakeCapBps', getOptionEncoder(getU32Encoder())],
+    ['instantUnstakeEpochProgress', getOptionEncoder(getF64Encoder())],
+    ['computeScoreSlotRange', getOptionEncoder(getU64Encoder())],
+    ['instantUnstakeInputsEpochProgress', getOptionEncoder(getF64Encoder())],
+    ['numEpochsBetweenScoring', getOptionEncoder(getU64Encoder())],
+    ['minimumStakeLamports', getOptionEncoder(getU64Encoder())],
+    ['minimumVotingEpochs', getOptionEncoder(getU64Encoder())],
   ]);
 }
 
 export function getUpdateParametersArgsDecoder(): Decoder<UpdateParametersArgs> {
   return getStructDecoder([
-    ['priorityFeeLookbackEpochs', getOptionDecoder(getU8Decoder())],
-    ['priorityFeeLookbackOffset', getOptionDecoder(getU8Decoder())],
-    ['priorityFeeMaxCommissionBps', getOptionDecoder(getU16Decoder())],
-    ['priorityFeeErrorMarginBps', getOptionDecoder(getU16Decoder())],
-    ['priorityFeeScoringStartEpoch', getOptionDecoder(getU16Decoder())],
+    ['mevCommissionRange', getOptionDecoder(getU16Decoder())],
+    ['epochCreditsRange', getOptionDecoder(getU16Decoder())],
+    ['commissionRange', getOptionDecoder(getU16Decoder())],
+    ['scoringDelinquencyThresholdRatio', getOptionDecoder(getF64Decoder())],
+    [
+      'instantUnstakeDelinquencyThresholdRatio',
+      getOptionDecoder(getF64Decoder()),
+    ],
+    ['mevCommissionBpsThreshold', getOptionDecoder(getU16Decoder())],
+    ['commissionThreshold', getOptionDecoder(getU8Decoder())],
+    ['historicalCommissionThreshold', getOptionDecoder(getU8Decoder())],
+    ['numDelegationValidators', getOptionDecoder(getU32Decoder())],
+    ['scoringUnstakeCapBps', getOptionDecoder(getU32Decoder())],
+    ['instantUnstakeCapBps', getOptionDecoder(getU32Decoder())],
+    ['stakeDepositUnstakeCapBps', getOptionDecoder(getU32Decoder())],
+    ['instantUnstakeEpochProgress', getOptionDecoder(getF64Decoder())],
+    ['computeScoreSlotRange', getOptionDecoder(getU64Decoder())],
+    ['instantUnstakeInputsEpochProgress', getOptionDecoder(getF64Decoder())],
+    ['numEpochsBetweenScoring', getOptionDecoder(getU64Decoder())],
+    ['minimumStakeLamports', getOptionDecoder(getU64Decoder())],
+    ['minimumVotingEpochs', getOptionDecoder(getU64Decoder())],
   ]);
 }
 

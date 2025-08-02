@@ -1,10 +1,9 @@
-# Steward Client
+# Validator History Client
 
 A client for interacting with the Validator History program.
 
 ## Installation
 
 ```bash
-pnpm install @jito-foundation/steward-sdk
+pnpm add @jito-foundation/validator-history-sdk
 ```
-

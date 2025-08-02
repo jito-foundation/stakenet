@@ -7,5 +7,3 @@ A client for interacting with the Steward program.
 ```bash
 pnpm add @jito-foundation/steward-sdk
 ```
-
-## 

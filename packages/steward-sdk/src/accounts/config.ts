@@ -43,7 +43,7 @@ import {
   getU8BoolEncoder,
   type LargeBitMask,
   type LargeBitMaskArgs,
-  type Parameters,
+  type Parameters as TypeParameters,
   type ParametersArgs,
   type U8Bool,
   type U8BoolArgs,
@@ -88,7 +88,7 @@ export type Config = {
    */
   validatorHistoryBlacklist: LargeBitMask;
   /** Parameters for scoring, delegation, and state machine */
-  parameters: Parameters;
+  parameters: TypeParameters;
   /** Halts any state machine progress */
   paused: U8Bool;
   /**

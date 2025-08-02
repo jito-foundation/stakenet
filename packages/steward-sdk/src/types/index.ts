@@ -34,4 +34,5 @@ export * from './stewardState';
 export * from './stewardStateEnum';
 export * from './u8Bool';
 export * from './updateParametersArgs';
+export * from './updatePriorityFeeParametersArgs';
 export * from './validatorHistoryEntry';
