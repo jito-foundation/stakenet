@@ -2,7 +2,8 @@
 .DS_Store
 **/target
 */debug
-*/node_modules
+**/node_modules/*
+**/dist/*
 */deps
 */dist
 */build

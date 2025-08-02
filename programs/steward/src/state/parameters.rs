@@ -498,7 +498,7 @@ pub struct UpdatePriorityFeeParametersArgs {
 impl IdlBuild for UpdatePriorityFeeParametersArgs {
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
-            name: "UpdateParametersArgs".to_string(),
+            name: "UpdatePriorityFeeParametersArgs".to_string(),
             ty: IdlTypeDefTy::Struct {
                 fields: Some(IdlDefinedFields::Named(vec![
                     IdlField {

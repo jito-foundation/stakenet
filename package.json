@@ -1,0 +1,23 @@
+{
+  "name": "stakenet",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "generate-clients": "ts-node generate-clients.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.14.0",
+  "dependencies": {
+    "@codama/nodes": "^1.3.1",
+    "@codama/nodes-from-anchor": "^1.2.3",
+    "@codama/renderers": "^1.0.28",
+    "@codama/renderers-core": "^1.0.17",
+    "@types/node": "^24.1.0",
+    "codama": "^1.3.1",
+    "ts-node": "^10.9.2"
+  }
+}
