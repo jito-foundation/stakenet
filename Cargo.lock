@@ -5878,36 +5878,7 @@ dependencies = [
  "solana-native-token",
  "solana-presigner",
  "solana-pubkey",
- "solana-remote-wallet 2.2.1",
- "solana-seed-phrase",
- "solana-signature",
- "solana-signer",
- "thiserror 2.0.12",
- "tiny-bip39",
- "uriparse",
- "url",
-]
-
-[[package]]
-name = "solana-clap-utils"
-version = "2.2.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65d599be9bb385d0299d781693992038be2cdfef436fd423526f2786e09a6654"
-dependencies = [
- "chrono",
- "clap 2.34.0",
- "rpassword",
- "solana-clock",
- "solana-cluster-type",
- "solana-commitment-config",
- "solana-derivation-path",
- "solana-hash",
- "solana-keypair",
- "solana-message",
- "solana-native-token",
- "solana-presigner",
- "solana-pubkey",
- "solana-remote-wallet 2.2.20",
+ "solana-remote-wallet",
  "solana-seed-phrase",
  "solana-signature",
  "solana-signer",
@@ -6616,7 +6587,7 @@ dependencies = [
  "serde_derive",
  "siphasher 0.3.11",
  "solana-bloom",
- "solana-clap-utils 2.2.1",
+ "solana-clap-utils",
  "solana-client 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
  "solana-connection-cache 2.2.1 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1)",
  "solana-entry",
@@ -7757,30 +7728,6 @@ dependencies = [
 name = "solana-remote-wallet"
 version = "2.2.1"
 source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.2.1#c17fbff7fd21190113c0d7b34c7d247ab1932cbf"
-dependencies = [
- "console",
- "dialoguer",
- "hidapi",
- "log",
- "num-derive",
- "num-traits",
- "parking_lot 0.12.4",
- "qstring",
- "semver",
- "solana-derivation-path",
- "solana-offchain-message",
- "solana-pubkey",
- "solana-signature",
- "solana-signer",
- "thiserror 2.0.12",
- "uriparse",
-]
-
-[[package]]
-name = "solana-remote-wallet"
-version = "2.2.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bece1535da0bc9c7febc7cffbfe6dd6a24aa2c2b4e6b05e30329661e9252d64"
 dependencies = [
  "console",
  "dialoguer",
@@ -11802,7 +11749,6 @@ dependencies = [
  "ipinfo",
  "log",
  "solana-account-decoder 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-clap-utils 2.2.20",
  "solana-client 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-metrics 2.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-program",
