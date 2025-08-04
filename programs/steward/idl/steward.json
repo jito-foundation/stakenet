@@ -3505,6 +3505,122 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "mev_commission_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "epoch_credits_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "commission_range",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "scoring_delinquency_threshold_ratio",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "instant_unstake_delinquency_threshold_ratio",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "mev_commission_bps_threshold",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "commission_threshold",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "historical_commission_threshold",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "num_delegation_validators",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "scoring_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "instant_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "stake_deposit_unstake_cap_bps",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "instant_unstake_epoch_progress",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "compute_score_slot_range",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "instant_unstake_inputs_epoch_progress",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "num_epochs_between_scoring",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "minimum_stake_lamports",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "minimum_voting_epochs",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdatePriorityFeeParametersArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
             "name": "priority_fee_lookback_epochs",
             "type": {
               "option": "u8"
