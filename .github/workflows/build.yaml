@@ -98,7 +98,7 @@ jobs:
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
-      - run: RUSTUP_TOOLCHAIN=nightly-2024-11-19 anchor build --idl idl
+      - run: RUSTUP_TOOLCHAIN=nightly-2025-04-01 anchor build --idl idl
       - name: Check for diff on IDL
         run: git diff --exit-code programs/validator-history/idl/validator_history.json programs/steward/idl/steward.json
 
