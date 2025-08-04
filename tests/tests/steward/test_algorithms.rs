@@ -967,16 +967,14 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                // TODO: change these to actual values for priority fee scoring launch
-                max_priority_fee_commission: 0,
-                max_priority_fee_commission_epoch: EPOCH_DEFAULT,
+                max_priority_fee_commission: 4_000,
+                max_priority_fee_commission_epoch: 8,
             }
         }
     );
 
-    // TODO: uncomment for priority fee scoring launch
     // Test permission fee commssion score 0
-    /*let mut validator = good_validator;
+    let mut validator = good_validator;
     let end_epoch =
         current_epoch as usize - config.parameters.priority_fee_lookback_offset as usize;
     let start_epoch = end_epoch - config.parameters.priority_fee_lookback_epochs as usize;
@@ -1024,7 +1022,7 @@ fn test_compute_score() {
                 max_priority_fee_commission_epoch: 8,
             }
         }
-    );*/
+    );
 }
 
 #[test]

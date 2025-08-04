@@ -643,10 +643,8 @@ mod test_calculate_priority_fee_commission {
             &[total_priority_fees; 12],
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
-
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: change this to 0.0 for priority fee scoring launch
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
 
         // Missing priority_fee_tips should be counted as no tips were given to stakers
         let mut validator = create_validator_history(
@@ -660,8 +658,7 @@ mod test_calculate_priority_fee_commission {
         );
         validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: change this to 0.0 for priority fee scoring launch
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
 
         // With max commission and max commission epoch
         let mut validator = create_validator_history(
@@ -674,7 +671,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
         validator.history.arr_mut()[6].priority_fee_tips = 10;
-        let (_, _max_commission, _max_commission_epoch) =
+        let (_, max_commission, max_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         assert_eq!(max_commission, 9_000);
         assert_eq!(max_commission_epoch, 5);
@@ -845,8 +842,7 @@ mod test_calculate_priority_fee_commission {
         );
         validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: change this to 0.0 for priority fee scoring launch
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
 
         config.parameters.priority_fee_scoring_start_epoch = EPOCH_DEFAULT;
         // Before priority_fee_scoring_start_epoch, result is always 1
