@@ -97,8 +97,6 @@ jobs:
         run: sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.1/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-      - name: Override proc-macro2 version
-        run: cargo update -p proc-macro2 --precise 1.0.94
       # build the program and IDL; exit if error
       - run: RUSTUP_TOOLCHAIN=nightly-2024-11-19 anchor build --idl idl
       - name: Check for diff on IDL
