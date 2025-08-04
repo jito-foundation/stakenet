@@ -10,10 +10,8 @@ use spl_stake_pool::instruction::set_staker;
 
 use crate::commands::command_args::SetStaker;
 
-use stakenet_sdk::utils::{
-    accounts::get_all_steward_accounts,
-    transactions::{configure_instruction, print_base58_tx},
-};
+use crate::utils::transactions::{configure_instruction, maybe_print_tx};
+use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
 pub async fn command_set_staker(
     args: SetStaker,
@@ -60,9 +58,10 @@ pub async fn command_set_staker(
         blockhash,
     );
 
-    if args.permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
+    if !maybe_print_tx(
+        &configured_ix,
+        &args.permissioned_parameters.transaction_parameters,
+    ) {
         let signature = client
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;

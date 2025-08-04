@@ -162,10 +162,21 @@ pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f
 /// stake_pool_lamports should have all stake accounts' base_lamports removed, since those are immovable.
 /// Note: Loses precision up to `denominator` lamports, which is acceptable
 pub fn get_target_lamports(delegation: &Delegation, stake_pool_lamports: u64) -> Result<u64> {
-    stake_pool_lamports
-        .checked_mul(delegation.numerator as u64)
-        .and_then(|x| x.checked_div(delegation.denominator as u64))
-        .ok_or_else(|| StewardError::ArithmeticError.into())
+    match delegation.numerator {
+        0 => Ok(0),
+        1 => stake_pool_lamports
+            .checked_div(delegation.denominator as u64)
+            .ok_or_else(|| StewardError::ArithmeticError.into()),
+        _ => {
+            let target: u64 = (stake_pool_lamports as u128)
+                .checked_mul(delegation.numerator as u128)
+                .and_then(|x| x.checked_div(delegation.denominator as u128))
+                .ok_or(StewardError::ArithmeticError)?
+                .try_into()
+                .map_err(|_| StewardError::ArithmeticCastError)?;
+            Ok(target)
+        }
+    }
 }
 
 /// Utility to efficiently extract stake lamports and transient stake from a validator list.

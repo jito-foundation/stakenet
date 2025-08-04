@@ -857,3 +857,25 @@ pub fn print_base58_tx(ixs: &[Instruction]) {
         println!("{}\n", base58_string);
     });
 }
+
+// TODO do this in a 2.x friendly manner
+// /// Prints each instruction as a spl-governance encoded InstructionData in base64.
+/*pub fn print_governance_ix(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ GOV IX ------\n");
+
+        // Convert the instruction to governance InstructionData format
+        let gov_ix_data = InstructionData::from(ix.clone());
+
+        let mut buffer = Cursor::new(Vec::new());
+        match gov_ix_data.serialize(&mut buffer) {
+            Ok(_) => {
+                let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
+                println!("Base64 InstructionData: {:?}\n", base64_ix);
+            }
+            Err(err) => {
+                println!("Failed to serialize InstructionData: {}", err);
+            }
+        }
+    });
+}*/
