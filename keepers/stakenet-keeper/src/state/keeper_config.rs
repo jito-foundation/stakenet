@@ -17,7 +17,11 @@ pub struct KeeperConfig {
     pub tx_retry_count: u16,
     pub tx_confirmation_seconds: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
-    pub gossip_entrypoint: Option<SocketAddr>,
+
+    /// Gossip URL
+    ///
+    /// Accept multiple URLs for Gossip URL.
+    pub gossip_entrypoints: Option<Vec<SocketAddr>>,
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
@@ -38,7 +42,7 @@ pub struct Args {
 
     /// Gossip entrypoint in the form of URL:PORT
     #[arg(long, env)]
-    pub gossip_entrypoint: Option<String>,
+    pub gossip_entrypoints: Option<Vec<String>>,
 
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(long, env, default_value = "./credentials/keypair.json")]
@@ -198,7 +202,7 @@ impl fmt::Display for Args {
             Region: {}\n\
             -------------------------------",
             self.json_rpc_url,
-            self.gossip_entrypoint,
+            self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,
             self.validator_history_program_id,

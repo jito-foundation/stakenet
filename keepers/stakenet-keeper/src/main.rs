@@ -222,7 +222,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.oracle_authority_keypair.is_some()
-                && keeper_config.gossip_entrypoint.is_some()
+                && keeper_config.gossip_entrypoints.is_some()
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
@@ -326,9 +326,14 @@ async fn main() {
             )
         });
 
-    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
-        solana_net_utils::parse_host_port(&gossip_entrypoint)
-            .expect("Failed to parse host and port from gossip entrypoint")
+    let gossip_entrypoints = args.gossip_entrypoints.map(|gossip_entrypoints| {
+        gossip_entrypoints
+            .iter()
+            .map(|entrypoint| {
+                solana_net_utils::parse_host_port(&entrypoint)
+                    .expect("Failed to parse host and port from gossip entrypoint")
+            })
+            .collect()
     });
 
     let config = KeeperConfig {
@@ -340,7 +345,7 @@ async fn main() {
         steward_program_id: args.steward_program_id,
         steward_config: args.steward_config,
         oracle_authority_keypair,
-        gossip_entrypoint,
+        gossip_entrypoints,
         validator_history_interval: args.validator_history_interval,
         metrics_interval: args.metrics_interval,
         steward_interval: args.steward_interval,
