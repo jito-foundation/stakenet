@@ -676,9 +676,8 @@ mod test_calculate_priority_fee_commission {
         validator.history.arr_mut()[6].priority_fee_tips = 10;
         let (_, _max_commission, _max_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: uncomment when priority fee scoring launches
-        //assert_eq!(max_commission, 9_000);
-        //assert_eq!(max_commission_epoch, 5);
+        assert_eq!(max_commission, 9_000);
+        assert_eq!(max_commission_epoch, 5);
 
         // With all pf MRUA Unset, score 1, default to not penalize validators
         let validator = create_validator_history(
@@ -717,8 +716,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: change this to 0.0 for priority fee scoring launch
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
 
         let validator = create_validator_history(
             &[0; 12],
@@ -795,8 +793,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        // TODO: change this to 0.0 for priority fee scoring launch
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 0.0);
 
         // All MerkleRootUploadAuthority values can be processed
         let validator = create_validator_history(
@@ -940,7 +937,7 @@ mod test_calculate_priority_fee_commission {
             &[0; 12],
             &[1_000_000_000; 12],
             &[1_000_000_000; 12],
-            &[MerkleRootUploadAuthority::TipRouter; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let res = calculate_priority_fee_commission(&config, &validator, 12);
         assert!(res.is_ok());
