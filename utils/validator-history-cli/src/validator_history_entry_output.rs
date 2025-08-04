@@ -5,41 +5,41 @@ use validator_history::ValidatorHistoryEntry;
 #[derive(Serialize, Deserialize)]
 pub struct ValidatorHistoryEntryOutput {
     /// Active stake amount, otherwitse NULL
-    pub activated_stake_lamports: String,
+    pub activated_stake_lamports: Option<String>,
 
     /// MEV commission in basis points, otherwise NULL
-    pub mev_commission: String,
+    pub mev_commission: Option<String>,
 
     /// Number of successful votes in current epoch. Not finalized until subsequent epoch,
     /// otherwise NULL
-    pub epoch_credits: String,
+    pub epoch_credits: Option<String>,
 
     /// Validator commission in points, otherwise NULL
-    pub commission: String,
+    pub commission: Option<String>,
 
     /// Client type, otherwise NULL
-    pub client_type: String,
+    pub client_type: Option<String>,
 
     /// Client version, otherwise NULL,
-    pub version: String,
+    pub version: Option<String>,
 
     /// IP address, otherwise NULL
-    pub ip: String,
+    pub ip: Option<String>,
 
     /// Validator's Tip Distribution Account's merkle root upload authority
     pub merkle_root_upload_authority: String,
 
     /// 0 if not superminority validator, 1 if superminority validator, otherwise NULL
-    pub is_superminority: String,
+    pub is_superminority: Option<String>,
 
     /// Rank of validator by stake amount, otherwise NULL
-    pub rank: String,
+    pub rank: Option<String>,
 
     /// Most recent updated slot for epoch credits and commission
-    pub vote_account_last_update_slot: String,
+    pub vote_account_last_update_slot: Option<String>,
 
     /// MEV earned, stored as 1/100th SOL, otherwise NULL
-    pub mev_earned: String,
+    pub mev_earned: Option<String>,
 
     /// Priority Fee commission in basis point
     pub priority_fee_commission: String,
@@ -72,72 +72,72 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
                 .activated_stake_lamports
                 .eq(&default_entry.activated_stake_lamports)
             {
-                "[NULL]".to_string()
+                None
             } else {
-                value.activated_stake_lamports.to_string()
+                Some(value.activated_stake_lamports.to_string())
             },
             mev_commission: if value.mev_commission.eq(&default_entry.mev_commission) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.mev_commission.to_string()
+                Some(value.mev_commission.to_string())
             },
             epoch_credits: if value.epoch_credits.eq(&default_entry.epoch_credits) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.epoch_credits.to_string()
+                Some(value.epoch_credits.to_string())
             },
             commission: if value.commission.eq(&default_entry.commission) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.commission.to_string()
+                Some(value.commission.to_string())
             },
             client_type: if value.client_type.eq(&default_entry.client_type) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.client_type.to_string()
+                Some(value.client_type.to_string())
             },
             version: if value.version.major.eq(&default_entry.version.major)
                 && value.version.minor.eq(&default_entry.version.minor)
                 && value.version.patch.eq(&default_entry.version.patch)
             {
-                "[NULL]".to_string()
+                None
             } else {
-                format!(
+                Some(format!(
                     "{}.{}.{}",
                     value.version.major, value.version.minor, value.version.patch
-                )
+                ))
             },
             ip: if value.ip.eq(&default_entry.ip) {
-                "[NULL]".to_string()
+                None
             } else {
-                format!(
+                Some(format!(
                     "{}.{}.{}.{}",
                     value.ip[0], value.ip[1], value.ip[2], value.ip[3]
-                )
+                ))
             },
             merkle_root_upload_authority: (value.merkle_root_upload_authority as u8).to_string(),
             is_superminority: if value.is_superminority.eq(&default_entry.is_superminority) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.is_superminority.to_string()
+                Some(value.is_superminority.to_string())
             },
             rank: if value.rank.eq(&default_entry.rank) {
-                "[NULL]".to_string()
+                None
             } else {
-                value.rank.to_string()
+                Some(value.rank.to_string())
             },
             vote_account_last_update_slot: if value
                 .vote_account_last_update_slot
                 .eq(&default_entry.vote_account_last_update_slot)
             {
-                "[NULL]".to_string()
+                None
             } else {
-                value.vote_account_last_update_slot.to_string()
+                Some(value.vote_account_last_update_slot.to_string())
             },
             mev_earned: if value.mev_earned.eq(&default_entry.mev_earned) {
-                "[NULL]".to_string()
+                None
             } else {
-                (value.mev_earned as f64 / 100.0).to_string()
+                Some((value.mev_earned as f64 / 100.0).to_string())
             },
             priority_fee_commission: value.priority_fee_commission.to_string(),
             priority_fee_tips: lamports_to_sol(value.priority_fee_tips).to_string(),
