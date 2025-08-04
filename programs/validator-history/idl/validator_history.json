@@ -756,6 +756,16 @@
       "code": 6013,
       "name": "NoReallocNeeded",
       "msg": "Account already sized properly"
+    },
+    {
+      "code": 6014,
+      "name": "PriorityFeeDistributionAccountAlreadyCopied",
+      "msg": "Priority Fee Distribution Account already copied"
+    },
+    {
+      "code": 6015,
+      "name": "PriorityFeeDistributionAccountNotFinalized",
+      "msg": "Priority Fee Distribution Account cannot be copied during its own epoch"
     }
   ],
   "types": [

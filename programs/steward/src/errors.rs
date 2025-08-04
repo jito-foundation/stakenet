@@ -66,4 +66,6 @@ pub enum StewardError {
     ValidatorNeedsToBeMarkedForRemoval,
     #[msg("Invalid stake state")]
     InvalidStakeState,
+    #[msg("Arithmetic casting error")]
+    ArithmeticCastError,
 }

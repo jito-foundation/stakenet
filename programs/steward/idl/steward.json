@@ -1890,6 +1890,11 @@
       "code": 6030,
       "name": "InvalidStakeState",
       "msg": "Invalid stake state"
+    },
+    {
+      "code": 6031,
+      "name": "ArithmeticCastError",
+      "msg": "Arithmetic casting error"
     }
   ],
   "types": [
