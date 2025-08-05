@@ -11742,7 +11742,9 @@ name = "validator-history-cli"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "clap 4.5.41",
+ "borsh 1.5.7",
+ "clap 4.5.42",
+ "ipinfo",
  "log",
  "serde",
  "serde_json",
@@ -11752,6 +11754,8 @@ dependencies = [
  "solana-native-token",
  "solana-program",
  "solana-sdk",
+ "spl-stake-pool",
+ "tokio",
  "validator-history",
 ]
 
