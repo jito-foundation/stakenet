@@ -591,6 +591,94 @@ mod test_calculate_realized_commission_bps {
     }
 }
 
+mod test_calculate_priority_fee_merkle_root_upload_authority {
+    use super::*;
+
+    // calculate_priority_fee_merkle_root_authority_score looks exclusively at the latest authority
+    // so we can test with a single epoch
+    #[test]
+    fn test_normal() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::TipRouter; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_no_data() {
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_unset() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::Unset; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_old_jito_labs() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::OldJitoLabs; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_other() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::Other; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_dne() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::DNE; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 0.0);
+    }
+}
+
 mod test_calculate_priority_fee_commission {
     use jito_steward::constants::{BASIS_POINTS_MAX, EPOCH_DEFAULT};
 

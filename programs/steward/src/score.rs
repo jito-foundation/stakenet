@@ -180,7 +180,7 @@ pub fn validator_score(
 
     let merkle_root_upload_authority_score = calculate_merkle_root_authority_score(validator)?;
     let priority_fee_merkle_root_upload_authority_score =
-        calculate_priority_fee_merkle_root_authority(validator)?;
+        calculate_priority_fee_merkle_root_authority_score(validator)?;
 
     let (
         priority_fee_commission_score,
@@ -201,7 +201,8 @@ pub fn validator_score(
         * running_jito_score
         * yield_score
         * merkle_root_upload_authority_score
-        * priority_fee_commission_score;
+        * priority_fee_commission_score
+        * priority_fee_merkle_root_upload_authority_score;
 
     Ok(ScoreComponentsV3 {
         score,
@@ -472,7 +473,9 @@ pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Re
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_priority_fee_merkle_root_authority(validator: &ValidatorHistory) -> Result<f64> {
+pub fn calculate_priority_fee_merkle_root_authority_score(
+    validator: &ValidatorHistory,
+) -> Result<f64> {
     if calculate_instant_unstake_merkle_root_upload_auth(
         &validator
             .history
@@ -820,6 +823,9 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
 ) -> Result<bool> {
     if let Some(merkle_root_upload_authority) = latest_authority {
         match merkle_root_upload_authority {
+            // Although the statement above will cover Unset, we want to be explicit about it
+            // and safegaurd against any future changes to the latest_authority that gets passed in
+            MerkleRootUploadAuthority::Unset => Ok(false),
             MerkleRootUploadAuthority::OldJitoLabs => Ok(false),
             MerkleRootUploadAuthority::TipRouter => Ok(false),
             _ => Ok(true),
