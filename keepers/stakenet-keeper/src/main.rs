@@ -324,10 +324,13 @@ fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
-        solana_net_utils::parse_host_port(&gossip_entrypoint)
-            .expect("Failed to parse host and port from gossip entrypoint")
-    }).expect("Failed to create socket address from gossip entrypoint");
+    let gossip_entrypoint = args
+        .gossip_entrypoint
+        .map(|gossip_entrypoint| {
+            solana_net_utils::parse_host_port(&gossip_entrypoint)
+                .expect("Failed to parse host and port from gossip entrypoint")
+        })
+        .expect("Failed to create socket address from gossip entrypoint");
 
     let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
         .expect("Failed to get public ip address for gossip node");
