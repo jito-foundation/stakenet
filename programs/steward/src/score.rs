@@ -512,9 +512,6 @@ pub fn calculate_priority_fee_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
 ) -> Result<(f64, u16, u16)> {
-    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
-        return Ok((1.0, 0, EPOCH_DEFAULT));
-    }
     let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
     let priority_fee_tips = validator
         .history
@@ -585,7 +582,10 @@ pub fn calculate_priority_fee_commission(
     let avg_commission: u16 = u16::try_from(avg_commission).map_err(|_| ArithmeticError)?;
 
     let max_commission = config.max_avg_commission();
-
+    // We would still like to emit avg_commission before the go-live epoch
+    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
+        return Ok((1.0, avg_commission, EPOCH_DEFAULT));
+    }
     if avg_commission <= max_commission {
         Ok((1.0, avg_commission, max_priority_fee_commission_epoch))
     } else {
