@@ -17,7 +17,7 @@ async fn test_mev_commission() {
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-
+    let tda_merkle_root_upload_authority = Pubkey::new_unique();
     let epoch = 0;
     let tip_distribution_account = derive_tip_distribution_account_address(
         &jito_tip_distribution::id(),
@@ -28,7 +28,13 @@ async fn test_mev_commission() {
     // No MEV earned
     ctx.borrow_mut().set_account(
         &tip_distribution_account,
-        &new_tip_distribution_account(fixture.vote_account, 42, None, Pubkey::default()).into(),
+        &new_tip_distribution_account(
+            fixture.vote_account,
+            42,
+            None,
+            tda_merkle_root_upload_authority,
+        )
+        .into(),
     );
 
     // update mev commission

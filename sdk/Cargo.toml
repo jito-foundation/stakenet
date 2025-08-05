@@ -12,7 +12,9 @@ name = "stakenet_sdk"
 
 [dependencies]
 anchor-lang = "0.31.1"
+base64 = "0.21"
 bincode = "1.3.3"
+borsh = "0.10"
 clap = { version = "4.3.0", features = ["derive"] }
 futures = "0.3.21"
 jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
@@ -29,3 +31,4 @@ spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
+

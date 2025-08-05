@@ -4,7 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 use clap::Parser;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use log::*;
 use rand::Rng;
 use rusqlite::Connection;
@@ -115,6 +115,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
     // Stateful data
     let mut keeper_state = KeeperState::default();
+    keeper_state.set_cluster_name(&keeper_config.cluster_name);
 
     let smallest_interval = intervals.iter().min().unwrap();
     let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
@@ -280,6 +281,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
+                keeper_config.cluster_name.as_str(),
             ));
         }
 
@@ -291,9 +293,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 &keeper_state.runs_for_epoch,
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
+                keeper_config.cluster_name.as_str(),
             );
 
-            KeeperCreates::emit(&keeper_state.created_accounts_for_epoch);
+            KeeperCreates::emit(
+                &keeper_state.created_accounts_for_epoch,
+                &keeper_state.cluster_name,
+            );
         }
 
         // ---------- CLEAR STARTUP ----------
@@ -395,6 +401,7 @@ async fn main() {
         priority_fee_oracle_authority_keypair,
         redundant_rpc_urls,
         cluster: args.cluster,
+        cluster_name: args.cluster.to_string(),
     };
 
     run_keeper(config).await;

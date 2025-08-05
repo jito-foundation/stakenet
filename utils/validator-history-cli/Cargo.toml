@@ -6,6 +6,7 @@ description = "CLI to manage validator history program"
 
 [dependencies]
 anchor-lang = "0.31.1"
+borsh = { package = "borsh", version = "1.5.7" }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 log = "0.4.18"
 serde = { workspace = true }

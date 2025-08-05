@@ -5,7 +5,6 @@
 
 
 */
-
 use crate::steward::serialize_validator_list;
 use anchor_lang::error::Error;
 use jito_steward::{
@@ -228,8 +227,6 @@ fn test_compute_scores() {
         state.num_pool_validators,
     );
     assert!(res.is_ok());
-    println!("{:?}", state.start_computing_scores_slot);
-    println!("{:?}", clock.slot);
     assert!(state.start_computing_scores_slot == clock.slot);
 }
 
@@ -790,7 +787,6 @@ fn test_rebalance_default_lamports() {
         &fixtures.config.parameters,
     );
 
-    println!("{:?}", res);
     assert!(res.is_ok());
     match res.unwrap() {
         RebalanceType::None => {}
@@ -830,7 +826,6 @@ fn test_rebalance_default_lamports() {
     );
 
     assert!(res.is_ok());
-    println!("{:?}", res);
     if let RebalanceType::Increase(increase_amount) = res.unwrap() {
         assert_eq!(
             state.validator_lamport_balances[0],
@@ -924,4 +919,46 @@ fn test_remove_validator_fails() {
     let res = state.remove_validator(state.num_pool_validators as usize);
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
+}
+
+#[test]
+fn test_rebalance_max_lamports() {
+    let mut fixtures = Box::<StateMachineFixtures>::default();
+    fixtures.config.parameters.scoring_unstake_cap_bps = 10000;
+    fixtures.config.parameters.instant_unstake_cap_bps = 10000;
+    fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
+
+    const MAX_SOLANA_LAMPORTS: u64 = 600_000_000 * LAMPORTS_PER_SOL;
+    let state = &mut fixtures.state;
+
+    state.state_tag = StewardStateEnum::Rebalance;
+    let mut validator_list_bytes = borsh1::to_vec(&fixtures.validator_list).unwrap();
+    let validator_list_bigvec = BigVec {
+        data: validator_list_bytes.as_mut_slice(),
+    };
+
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 2),
+        Delegation::new(1, 2),
+        Delegation::new(0, 1),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    // Second validator is instant unstakeable
+    state.instant_unstake.set(1, true).unwrap();
+
+    let res = state.rebalance(
+        fixtures.current_epoch,
+        1,
+        &validator_list_bigvec,
+        MAX_SOLANA_LAMPORTS,
+        1000 * LAMPORTS_PER_SOL,
+        u64::from(fixtures.validator_list[1].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+
+    assert!(res.is_ok());
 }
