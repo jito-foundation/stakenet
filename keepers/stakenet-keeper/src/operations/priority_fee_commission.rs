@@ -21,8 +21,9 @@ fn _get_operation() -> KeeperOperations {
     KeeperOperations::PriorityFeeCommission
 }
 
-fn _should_run() -> bool {
-    true
+fn _should_run(runs_for_epoch: u64) -> bool {
+    // Run 5 times per epoch
+    runs_for_epoch < 5
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -65,7 +66,7 @@ pub async fn fire(
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
-    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
+    let should_run = _should_run(runs_for_epoch) && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(

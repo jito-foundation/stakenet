@@ -38,8 +38,8 @@ fn _get_operation() -> KeeperOperations {
     KeeperOperations::BlockMetadataKeeper
 }
 
-fn _should_run() -> bool {
-    true
+fn _should_run(runs_for_epoch: u64) -> bool {
+    runs_for_epoch < 5
 }
 
 #[derive(Debug, Default)]
@@ -81,10 +81,12 @@ pub async fn fire(
         .unwrap();
 
     let operation = _get_operation();
-    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
+
+    let should_run = check_flag(keeper_config.run_flags, operation);
+    let should_submit_txs = _should_run(runs_for_epoch);
 
     if should_run {
         match _process(
@@ -102,6 +104,7 @@ pub async fn fire(
             keeper_config.no_pack,
             keeper_config.cluster,
             keeper_config.lookback_epochs,
+            should_submit_txs,
         )
         .await
         {
@@ -149,6 +152,7 @@ async fn _process(
     no_pack: bool,
     cluster: Cluster,
     lookback_epochs: u64,
+    should_submit_txs: bool,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -165,6 +169,7 @@ async fn _process(
         no_pack,
         cluster,
         lookback_epochs,
+        should_submit_txs,
     )
     .await
 }
@@ -185,6 +190,7 @@ async fn update_block_metadata(
     _no_pack: bool, //TODO take out
     cluster: Cluster,
     lookback_epochs: u64,
+    should_submit_txs: bool,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -412,7 +418,7 @@ async fn update_block_metadata(
     }
 
     // 5. Submit TXs
-    {
+    if should_submit_txs {
         info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
 
         let start_time = std::time::Instant::now();
@@ -437,6 +443,8 @@ async fn update_block_metadata(
         );
 
         Ok(submit_result)
+    } else {
+        Ok(SubmitStats::default())
     }
 }
 
