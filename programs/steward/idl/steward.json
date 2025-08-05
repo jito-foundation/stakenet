@@ -3149,7 +3149,7 @@
             "type": "u16"
           },
           {
-            "name": "max_priority_fee_commission",
+            "name": "avg_priority_fee_commission",
             "docs": [
               "Max realized priority fee commission observed"
             ],
