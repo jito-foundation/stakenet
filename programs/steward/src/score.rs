@@ -97,7 +97,7 @@ pub struct ScoreDetails {
     /// Epoch of max historical commission
     pub max_historical_commission_epoch: u16,
 
-    /// Max realized priority fee commission observed
+    /// Average realized priority fee commission observed
     pub avg_priority_fee_commission: u16,
 
     /// Epoch of realized priority fee commission
