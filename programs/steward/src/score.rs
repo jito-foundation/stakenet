@@ -98,7 +98,7 @@ pub struct ScoreDetails {
     pub max_historical_commission_epoch: u16,
 
     /// Max realized priority fee commission observed
-    pub max_priority_fee_commission: u16,
+    pub avg_priority_fee_commission: u16,
 
     /// Epoch of realized priority fee commission
     pub max_priority_fee_commission_epoch: u16,
@@ -184,7 +184,7 @@ pub fn validator_score(
 
     let (
         priority_fee_commission_score,
-        max_priority_fee_commission,
+        avg_priority_fee_commission,
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
@@ -227,7 +227,7 @@ pub fn validator_score(
             max_commission_epoch,
             max_historical_commission,
             max_historical_commission_epoch,
-            max_priority_fee_commission,
+            avg_priority_fee_commission,
             max_priority_fee_commission_epoch,
         },
         priority_fee_commission_score,
@@ -589,13 +589,13 @@ pub fn calculate_priority_fee_commission(
     if avg_commission <= max_commission {
         Ok((
             1.0,
-            max_priority_fee_commission,
+            avg_commission,
             max_priority_fee_commission_epoch,
         ))
     } else {
         Ok((
             0.0,
-            max_priority_fee_commission,
+            avg_commission,
             max_priority_fee_commission_epoch,
         ))
     }
