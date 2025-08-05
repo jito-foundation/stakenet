@@ -1,43 +1,45 @@
-# @stakenet/idl
+# @jito-foundation/stakenet-idl
 
 IDL files for Jito Stakenet Solana programs - Steward and Validator History
 
 ## Installation
 
 ```bash
-npm install @stakenet/idl
+npm install @jito-foundation/stakenet-idl
 ```
 
 ```bash
-yarn add @stakenet/idl
+yarn add @jito-foundation/stakenet-idl
 ```
 
 ```bash
-pnpm add @stakenet/idl
+pnpm add @jito-foundation/stakenet-idl
 ```
+
 
 ## Usage
 
 Import the IDL files you need:
 
 ```typescript
-import { stewardIdl } from '@stakenet/idl';
-import { historyIdl } from '@stakenet/idl';
+import { stewardIdl } from '@jito-foundation/stakenet-idl';
+import { validatorHistoryIdl } from '@jito-foundation/stakenet-idl';
 
 // Or import both at once
-import { stewardIdl, historyIdl } from '@stakenet/idl';
+import { stewardIdl, validatorHistoryIdl } from '@jito-foundation/stakenet-idl';
 ```
 
 ### With Anchor
 
 ```typescript
 import { Program } from '@coral-xyz/anchor';
-import { stewardIdl, historyIdl } from '@stakenet/idl';
+import { stewardIdl, validatorHistoryIdl } from '@jito-foundation/stakenet-idl';
 
 // Create program instances
 const stewardProgram = new Program(stewardIdl, provider);
-const historyProgram = new Program(historyIdl, provider);
+const historyProgram = new Program(validatorHistoryIdl, provider);
 ```
+
 
 ## Available IDL Files
 
@@ -47,21 +49,11 @@ Interface Definition Language for the Steward program, which handles validator s
 ### `validatorHistoryIdl` 
 Interface Definition Language for the Validator History program, which tracks validator performance metrics and historical data.
 
-## TypeScript Support
-
-This package includes TypeScript definitions for all IDL files, providing full type safety when working with Stakenet programs.
-
-```typescript
-import type { StewardIdl, HistoryIdl } from '@stakenet/idl';
-
-// IDL objects are fully typed
-const steward: StewardIdl = stewardIdl;
-const history: HistoryIdl = historyIdl;
-```
 
 ## Repository
 
 This package is part of the [Jito Stakenet](https://github.com/jito-foundation/stakenet) project.
+
 
 ## License
 
