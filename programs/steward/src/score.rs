@@ -587,17 +587,9 @@ pub fn calculate_priority_fee_commission(
     let max_commission = config.max_avg_commission();
 
     if avg_commission <= max_commission {
-        Ok((
-            1.0,
-            avg_commission,
-            max_priority_fee_commission_epoch,
-        ))
+        Ok((1.0, avg_commission, max_priority_fee_commission_epoch))
     } else {
-        Ok((
-            0.0,
-            avg_commission,
-            max_priority_fee_commission_epoch,
-        ))
+        Ok((0.0, avg_commission, max_priority_fee_commission_epoch))
     }
 }
 
