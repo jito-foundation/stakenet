@@ -1,6 +1,6 @@
 use jito_steward::{score::*, Config, LargeBitMask, Parameters};
 use solana_sdk::pubkey::Pubkey;
-use validator_history::{CircBuf, ValidatorHistory};
+use validator_history::{CircBuf, MerkleRootUploadAuthority, ValidatorHistory};
 
 // Fixtures
 
@@ -19,6 +19,10 @@ fn create_config(
             commission_range: 10,
             scoring_delinquency_threshold_ratio: 0.9,
             instant_unstake_delinquency_threshold_ratio: 0.8,
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
             ..Default::default()
         },
         stake_pool: Pubkey::new_unique(),
@@ -28,7 +32,9 @@ fn create_config(
         blacklist_authority: Pubkey::new_unique(),
         validator_history_blacklist: LargeBitMask::default(),
         paused: false.into(),
-        _padding: [0; 1023],
+        _padding_0: [0u8; 7],
+        priority_fee_parameters_authority: Pubkey::new_unique(),
+        _padding: [0; 984],
     }
 }
 
@@ -37,13 +43,25 @@ fn create_validator_history(
     commissions: &[u8],
     epoch_credits: &[u32],
     superminority: &[u8],
+    priority_fee_tips: &[u64],
+    total_priority_fees: &[u64],
+    priority_fee_merkle_root_upload_authorities: &[validator_history::MerkleRootUploadAuthority],
 ) -> ValidatorHistory {
     let mut history = CircBuf::default();
-    for (i, (((&mev, &comm), &credits), &super_min)) in mev_commissions
+    for (
+        i,
+        (
+            (((((&mev, &comm), &credits), &super_min), &priority_fee_tips), &total_priority_fees),
+            &priority_fee_merkle_root_upload_authority,
+        ),
+    ) in mev_commissions
         .iter()
         .zip(commissions)
         .zip(epoch_credits)
         .zip(superminority)
+        .zip(priority_fee_tips)
+        .zip(total_priority_fees)
+        .zip(priority_fee_merkle_root_upload_authorities)
         .enumerate()
     {
         history.push(validator_history::ValidatorHistoryEntry {
@@ -52,6 +70,9 @@ fn create_validator_history(
             commission: comm,
             epoch_credits: credits,
             is_superminority: super_min,
+            priority_fee_tips,
+            total_priority_fees,
+            priority_fee_merkle_root_upload_authority,
             ..Default::default()
         });
     }
@@ -260,6 +281,7 @@ mod test_calculate_commission {
 
 mod test_calculate_historical_commission {
     use jito_steward::constants::VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH;
+    use validator_history::MerkleRootUploadAuthority;
 
     use super::*;
 
@@ -270,6 +292,9 @@ mod test_calculate_historical_commission {
             &[5, 6, 7, 8, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
             &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let current_epoch = 9;
         let threshold = 8;
@@ -287,6 +312,9 @@ mod test_calculate_historical_commission {
             &[5, 6, 7, 9, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
             &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let (score, max_commission, max_epoch) =
             calculate_historical_commission(&validator, 9, 8).unwrap();
@@ -298,7 +326,7 @@ mod test_calculate_historical_commission {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let result = calculate_historical_commission(&validator, 0, 8);
         assert!(result.is_err());
 
@@ -308,6 +336,9 @@ mod test_calculate_historical_commission {
             &[5, 6, 7, 8, 7, 6, 5, 4, 3, 2],
             &[1000; 10],
             &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::Unset; 10],
         );
         validator
             .history
@@ -319,7 +350,15 @@ mod test_calculate_historical_commission {
         assert_eq!(max_epoch, 3);
 
         // Test all commissions none
-        let validator = create_validator_history(&[100; 10], &[u8::MAX; 10], &[1000; 10], &[0; 10]);
+        let validator = create_validator_history(
+            &[100; 10],
+            &[u8::MAX; 10],
+            &[1000; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::Unset; 10],
+        );
         let (score, max_comission, max_epoch) =
             calculate_historical_commission(&validator, 1, 8).unwrap();
         assert_eq!(score, 1.0);
@@ -330,6 +369,7 @@ mod test_calculate_historical_commission {
 
 mod test_calculate_superminority {
     use jito_steward::constants::EPOCH_DEFAULT;
+    use validator_history::MerkleRootUploadAuthority;
 
     use super::*;
 
@@ -341,6 +381,9 @@ mod test_calculate_superminority {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let (score, epoch) = calculate_superminority(&validator, 9, 10).unwrap();
         assert_eq!(score, 0.0);
@@ -351,6 +394,9 @@ mod test_calculate_superminority {
             &[5; 10],
             &[1000; 10],
             &[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let current_epoch = 9;
         let commission_range = 10;
@@ -367,6 +413,16 @@ mod test_calculate_superminority {
             &[5; 6],
             &[u32::MAX; 6],
             &[0, 0, 0, 1, u8::MAX, u8::MAX],
+            &[0; 6],
+            &[0; 6],
+            &[
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
         );
         let current_epoch = 5;
         let commission_range = 4;
@@ -381,6 +437,16 @@ mod test_calculate_superminority {
             &[5; 6],
             &[u32::MAX; 6],
             &[0, 0, 0, 0, u8::MAX, u8::MAX],
+            &[0; 6],
+            &[0; 6],
+            &[
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
         );
         let current_epoch = 5;
         let commission_range = 4;
@@ -393,17 +459,33 @@ mod test_calculate_superminority {
     #[test]
     fn test_edge_cases() {
         // Empty history
-        let validator = create_validator_history(&[], &[], &[], &[]);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let result = calculate_superminority(&validator, 0, 10);
         assert!(result.is_err());
 
         // Arithmetic error
-        let validator = create_validator_history(&[100; 10], &[5; 10], &[u32::MAX; 10], &[0; 10]);
+        let validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[u32::MAX; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
+        );
         let result = calculate_superminority(&validator, 0, 1);
         assert!(result.is_err());
 
         // History with None values
-        let mut validator = create_validator_history(&[100; 10], &[5; 10], &[1000; 10], &[0; 10]);
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::Unset; 10],
+        );
         validator
             .history
             .push(validator_history::ValidatorHistoryEntry::default());
@@ -421,10 +503,10 @@ mod test_calculate_blacklist {
         let mut config = create_config(300, 8, 10);
         config.validator_history_blacklist.set(5, true).unwrap();
 
-        let score = calculate_blacklist(&config, 5).unwrap();
+        let score = calculate_blacklist_score(&config, 5).unwrap();
         assert_eq!(score, 0.0);
 
-        let score = calculate_blacklist(&config, 6).unwrap();
+        let score = calculate_blacklist_score(&config, 6).unwrap();
         assert_eq!(score, 1.0);
     }
 
@@ -433,8 +515,432 @@ mod test_calculate_blacklist {
         let config = create_config(300, 8, 10);
 
         // Index out of bounds
-        let result = calculate_blacklist(&config, u32::MAX);
+        let result = calculate_blacklist_score(&config, u32::MAX);
         assert!(result.is_err());
+    }
+}
+
+mod test_calculate_merkle_root_authoirty {
+    use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
+
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
+        );
+
+        // When using MerkleRootUploadAuthority::Other it should be a 0 score always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 0.0);
+
+        // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+        // MerkleRootUploadAuthority::TipRouter returns score of 1 always
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let score = calculate_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let score = calculate_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+}
+
+mod test_calculate_realized_commission_bps {
+    use jito_steward::constants::BASIS_POINTS_MAX;
+    use test_case::test_case;
+
+    use super::*;
+
+    #[test_case(None, Some(1_000_000), BASIS_POINTS_MAX ; "when tips is None")]
+    #[test_case(Some(1_000_000), None, 0 ; "when total_fees is None")]
+    #[test_case(Some(0), Some(1_000_000), BASIS_POINTS_MAX ; "when tips are 0")]
+    #[test_case(Some(5_000_000), Some(10_000_000), 5_000 ; "when 50% commission")]
+    #[test_case(Some(4_000_001), Some(10_000_000), 5_999 ; "rounds the commission down in favor of the validator")]
+    fn test_commisison_calculation(
+        tips: Option<u64>,
+        total_fees: Option<u64>,
+        expected_commission: u16,
+    ) {
+        let commisison = calculate_realized_commission_bps(&tips, &total_fees);
+        assert_eq!(commisison, expected_commission);
+    }
+}
+
+mod test_calculate_priority_fee_commission {
+    use jito_steward::constants::{BASIS_POINTS_MAX, EPOCH_DEFAULT};
+
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let config = create_config(300, 8, 10);
+        let total_priority_fees: u64 = 1_000_000_000;
+        let min_tips_required: u64 = (BASIS_POINTS_MAX as u64
+            - u64::from(
+                config.parameters.priority_fee_error_margin_bps
+                    + config.parameters.priority_fee_max_commission_bps,
+            ))
+            * total_priority_fees
+            / BASIS_POINTS_MAX as u64;
+
+        // With < priority_fee_lookback_epochs + offset of history, score 1
+        let validator = create_validator_history(
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[0; 10],
+            &[min_tips_required; 10],
+            &[total_priority_fees; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
+        assert_eq!(score, 1.0);
+
+        // With > priority_fee_lookback_epochs + offset and < 50% commission, score 1
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[min_tips_required; 12],
+            &[total_priority_fees; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 12],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+        // With > priority_fee_lookback_epochs and > 50% commission, score 0
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[min_tips_required - (total_priority_fees / BASIS_POINTS_MAX as u64); 12],
+            &[total_priority_fees; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 12],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        // Missing priority_fee_tips should be counted as no tips were given to stakers
+        let mut validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[min_tips_required; 12],
+            &[total_priority_fees; 12],
+            &[MerkleRootUploadAuthority::DNE; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        // With max commission and max commission epoch
+        let mut validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[60; 12],
+            &[100; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = 10;
+        let (_, max_commission, max_commission_epoch) =
+            calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(max_commission, 9_000);
+        assert_eq!(max_commission_epoch, 5);
+
+        // With all pf MRUA Unset, score 1, default to not penalize validators
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[MerkleRootUploadAuthority::Unset; 12],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+
+        // Unset PF MRUA is not considered in scoring
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[100; 12],
+            &[100; 12],
+            &[
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+
+        // More valid MRUA than DNE with non-zero fees transferred should score 1
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[100; 12],
+            &[100; 12],
+            &[
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+
+        // More DNE than valid MRUA with non-zero fees transferred should score 0
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[100; 12],
+            &[100; 12],
+            &[
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        // All MerkleRootUploadAuthority values can be processed
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[100; 12],
+            &[100; 12],
+            &[
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::DNE,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Other,
+                MerkleRootUploadAuthority::Other,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::OldJitoLabs,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_starting_epoch_setting() {
+        let mut config = create_config(300, 8, 10);
+        let total_priority_fees: u64 = 1_000_000_000;
+        let min_tips_required: u64 = (BASIS_POINTS_MAX as u64
+            - u64::from(
+                config.parameters.priority_fee_error_margin_bps
+                    + config.parameters.priority_fee_max_commission_bps,
+            ))
+            * total_priority_fees
+            / BASIS_POINTS_MAX as u64;
+        // After priority_fee_scoring_start_epoch, result is standard calculation
+        let mut validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[min_tips_required; 12],
+            &[total_priority_fees; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 12],
+        );
+        validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 0.0);
+
+        config.parameters.priority_fee_scoring_start_epoch = EPOCH_DEFAULT;
+        // Before priority_fee_scoring_start_epoch, result is always 1
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) =
+            calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history, score 1
+        let config = create_config(300, 8, 10);
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
+        assert_eq!(score, 1.0);
+
+        // Case where middle epoch data is missing, score 1
+        let validator = create_validator_history(
+            &[u16::MAX; 12],
+            &[u8::MAX; 12],
+            &[u32::MAX; 12],
+            &[u8::MAX; 12],
+            &[
+                100,
+                100,
+                100,
+                100,
+                100,
+                u64::MAX,
+                u64::MAX,
+                100,
+                100,
+                100,
+                100,
+                100,
+            ],
+            &[
+                100,
+                100,
+                100,
+                100,
+                100,
+                u64::MAX,
+                u64::MAX,
+                100,
+                100,
+                100,
+                100,
+                100,
+            ],
+            &[
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::Unset,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+                MerkleRootUploadAuthority::TipRouter,
+            ],
+        );
+        let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let mut config = create_config(300, 8, 10);
+        config.parameters = Parameters::default();
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let res = calculate_priority_fee_commission(&config, &validator, 0);
+        assert!(res.is_ok());
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
+
+        let validator = create_validator_history(
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[0; 12],
+            &[1_000_000_000; 12],
+            &[1_000_000_000; 12],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
+        );
+        let res = calculate_priority_fee_commission(&config, &validator, 12);
+        assert!(res.is_ok());
+        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        assert_eq!(score, 1.0);
+        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
 }
 
@@ -505,8 +1011,15 @@ mod test_calculate_instant_unstake_mev_commission {
 
     #[test]
     fn test_normal() {
-        let validator =
-            create_validator_history(&[100, 200, 300, 400, 500], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 400, 500],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let current_epoch = 4;
         let threshold = 300;
 
@@ -520,8 +1033,15 @@ mod test_calculate_instant_unstake_mev_commission {
     #[test]
     fn test_edge_cases() {
         // MEV commission below threshold
-        let validator =
-            create_validator_history(&[100, 200, 300, 200, 100], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 200, 100],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let current_epoch = 4;
         let threshold = 300;
 
@@ -532,7 +1052,15 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 200);
 
         // No MEV commission data
-        let validator = create_validator_history(&[u16::MAX], &[5], &[1000], &[0]);
+        let validator = create_validator_history(
+            &[u16::MAX],
+            &[5],
+            &[1000],
+            &[0],
+            &[0],
+            &[0],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 0, threshold);
 
@@ -545,6 +1073,9 @@ mod test_calculate_instant_unstake_mev_commission {
             &[u8::MAX, 5],
             &[u32::MAX, 1000],
             &[u8::MAX, 0],
+            &[u64::MAX, 0],
+            &[u64::MAX, 0],
+            &[MerkleRootUploadAuthority::Unset; 5],
         );
         let (check, commission) =
             calculate_instant_unstake_mev_commission(&validator, 1, threshold);
@@ -553,8 +1084,15 @@ mod test_calculate_instant_unstake_mev_commission {
         assert_eq!(commission, 400);
 
         // Threshold at exactly the highest commission
-        let validator =
-            create_validator_history(&[100, 200, 300, 400, 500], &[5; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[100, 200, 300, 400, 500],
+            &[5; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let threshold = 500;
 
         let (check, commission) =
@@ -572,7 +1110,15 @@ mod test_calculate_instant_unstake_commission {
 
     #[test]
     fn test_normal() {
-        let validator = create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[1, 2, 3, 4, 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let threshold = 4;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -584,7 +1130,15 @@ mod test_calculate_instant_unstake_commission {
     #[test]
     fn test_edge_cases() {
         // Commission at threshold
-        let validator = create_validator_history(&[5; 5], &[1, 2, 3, 4, 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[1, 2, 3, 4, 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -593,7 +1147,15 @@ mod test_calculate_instant_unstake_commission {
         assert_eq!(commission, 5);
 
         // No commission data
-        let validator = create_validator_history(&[5; 5], &[u8::MAX; 5], &[1000; 5], &[0; 5]);
+        let validator = create_validator_history(
+            &[5; 5],
+            &[u8::MAX; 5],
+            &[1000; 5],
+            &[0; 5],
+            &[0; 5],
+            &[0; 5],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
+        );
         let threshold = 5;
 
         let (check, commission) = calculate_instant_unstake_commission(&validator, threshold);
@@ -607,6 +1169,9 @@ mod test_calculate_instant_unstake_commission {
             &[u8::MAX, 3],
             &[u32::MAX, 1000],
             &[u8::MAX, 1],
+            &[u64::MAX, 0],
+            &[u64::MAX, 0],
+            &[MerkleRootUploadAuthority::TipRouter; 5],
         );
         let threshold = 5;
 
@@ -634,4 +1199,104 @@ mod test_calculate_instant_unstake_blacklist {
     }
 
     /* single line fn, no edge cases */
+}
+
+mod test_calculate_instant_unstake_merkle_root_upload_auth {
+    use validator_history::{MerkleRootUploadAuthority, ValidatorHistoryEntry};
+
+    use super::*;
+
+    #[test]
+    fn test_normal() {
+        let mut validator = create_validator_history(
+            &[100; 10],
+            &[5; 10],
+            &[1000; 10],
+            &[0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            &[0; 10],
+            &[0; 10],
+            &[MerkleRootUploadAuthority::TipRouter; 10],
+        );
+
+        // When using MerkleRootUploadAuthority::Other should always instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(is_instant_unstake);
+
+        // MerkleRootUploadAuthority::OldJitoLabs should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+        // MerkleRootUploadAuthority::TipRouter should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+
+        // Priority fees: When using MerkleRootUploadAuthority::Other should always instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Other,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(is_instant_unstake);
+
+        // Priorty fees: MerkleRootUploadAuthority::OldJitoLabs should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::OldJitoLabs,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+        // Priority fees: MerkleRootUploadAuthority::TipRouter should never instant unstake
+        validator.history.push(ValidatorHistoryEntry {
+            priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+            ..Default::default()
+        });
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Empty history
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let is_instant_unstake = calculate_instant_unstake_merkle_root_upload_auth(
+            &validator.history.merkle_root_upload_authority_latest(),
+        )
+        .unwrap();
+        assert!(!is_instant_unstake);
+    }
 }

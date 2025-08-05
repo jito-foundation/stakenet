@@ -39,6 +39,8 @@ pub enum KeeperOperations {
     MevCommission,
     Steward,
     EmitMetrics,
+    BlockMetadataKeeper,
+    PriorityFeeCommission,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -54,7 +56,7 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 11;
+    pub const LEN: usize = 13;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
@@ -246,6 +248,22 @@ impl KeeperOperations {
             (
                 "num-steward-txs",
                 txs_for_epoch[KeeperOperations::Steward as usize],
+                i64
+            ),
+            // PRIORITY FEE COMMISSION
+            (
+                "num-pf-commission-runs",
+                runs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            (
+                "num-pf-commission-errors",
+                errors_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            (
+                "num-stewpf-commissionard-txs",
+                txs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
                 i64
             ),
             "cluster" => cluster,

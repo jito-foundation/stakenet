@@ -1,7 +1,10 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 
-use crate::spl_stake_pool_cli;
+use crate::{
+    spl_stake_pool_cli,
+    stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account},
+};
 use anchor_lang::{
     prelude::SolanaSysvar,
     solana_program::{
@@ -14,10 +17,10 @@ use anchor_lang::{
 use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
-    utils::StakePool,
-    utils::ValidatorList,
+    instructions::AuthorityType,
+    stake_pool_utils::{StakePool, ValidatorList},
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
-    StewardStateEnum, UpdateParametersArgs, STATE_PADDING_0_SIZE,
+    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -47,8 +50,8 @@ use spl_stake_pool::{
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
-    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, ValidatorHistory,
-    ValidatorHistoryEntry,
+    CircBuf, CircBufCluster, ClusterHistory, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    ValidatorHistory, ValidatorHistoryEntry,
 };
 
 pub struct StakePoolMetadata {
@@ -213,7 +216,7 @@ impl TestFixture {
         address: &Pubkey,
     ) -> T {
         let ai = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client.get_account(*address).await.unwrap().unwrap()
         };
 
@@ -222,7 +225,7 @@ impl TestFixture {
 
     pub async fn get_sysvar<T: SolanaSysvar>(&self) -> T {
         let sysvar = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client.get_sysvar().await.unwrap()
         };
 
@@ -231,7 +234,7 @@ impl TestFixture {
 
     pub async fn get_account(&self, address: &Pubkey) -> Account {
         let account = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client.get_account(*address).await.unwrap().unwrap()
         };
 
@@ -316,7 +319,11 @@ impl TestFixture {
         }
     }
 
-    pub async fn initialize_steward(&self, parameters: Option<UpdateParametersArgs>) {
+    pub async fn initialize_steward(
+        &self,
+        parameters: Option<UpdateParametersArgs>,
+        priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
+    ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -339,6 +346,15 @@ impl TestFixture {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
         });
 
+        let update_priority_fee_parameters_args =
+            priority_fee_parameters.unwrap_or(UpdatePriorityFeeParametersArgs {
+                priority_fee_lookback_epochs: Some(10),
+                priority_fee_lookback_offset: Some(2),
+                priority_fee_max_commission_bps: Some(5_000),
+                priority_fee_error_margin_bps: Some(10),
+                priority_fee_scoring_start_epoch: Some(0),
+            });
+
         let instruction = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::InitializeSteward {
@@ -352,6 +368,7 @@ impl TestFixture {
             .to_account_metas(None),
             data: jito_steward::instruction::InitializeSteward {
                 update_parameters_args,
+                update_priority_fee_parameters_args,
             }
             .data(),
         };
@@ -363,6 +380,34 @@ impl TestFixture {
             self.ctx.borrow().last_blockhash,
         );
         self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn set_new_authority(&self, authority_type: AuthorityType) -> Keypair {
+        let new_authority = Keypair::new();
+        self.ctx
+            .borrow_mut()
+            .set_account(&new_authority.pubkey(), &system_account(1_000_000).into());
+
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::SetNewAuthority {
+                config: self.steward_config.pubkey(),
+                new_authority: new_authority.pubkey(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::SetNewAuthority { authority_type }.data(),
+        };
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+
+        self.submit_transaction_assert_success(tx).await;
+
+        new_authority
     }
 
     pub async fn get_latest_blockhash(&self) -> Hash {
@@ -566,7 +611,7 @@ impl TestFixture {
         );
 
         let process_tx_result = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client.process_transaction_with_metadata(tx).await
         };
 
@@ -581,7 +626,7 @@ impl TestFixture {
 
     pub async fn fetch_stake_rent(&self) -> u64 {
         let rent: Rent = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client.get_sysvar().await.expect("Failed to get rent")
         };
 
@@ -590,14 +635,14 @@ impl TestFixture {
 
     pub async fn advance_num_epochs(&self, num_epochs: u64, additional_slots: u64) {
         let clock: Clock = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client
                 .get_sysvar()
                 .await
                 .expect("Failed getting clock")
         };
         let epoch_schedule: EpochSchedule = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client
                 .get_sysvar()
                 .await
@@ -614,7 +659,7 @@ impl TestFixture {
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
         let process_transaction_result = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client
                 .process_transaction_with_preflight(transaction)
                 .await
@@ -631,7 +676,7 @@ impl TestFixture {
         error_message: &str,
     ) {
         let process_transaction_result = {
-            let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
             banks_client
                 .process_transaction_with_preflight(transaction)
                 .await
@@ -1243,8 +1288,10 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             validator_history_blacklist: LargeBitMask::default(),
             parameters: Parameters::default(),
-            _padding: [0; 1023],
             paused: false.into(),
+            _padding_0: [0u8; 7],
+            priority_fee_parameters_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1296,6 +1343,10 @@ impl Default for FixtureDefaultAccounts {
             admin: keypair.pubkey(),
             oracle_authority: keypair.pubkey(),
             tip_distribution_program: jito_tip_distribution::id(),
+            padding0: [0u8; 3],
+            priority_fee_distribution_program: jito_priority_fee_distribution::id(),
+            priority_fee_oracle_authority: keypair.pubkey(),
+            reserve: [0u8; 224],
         };
         let cluster_history = cluster_history_default();
 
@@ -1414,12 +1465,12 @@ impl FixtureDefaultAccounts {
         let validator_list = stake_pool_meta.validator_list;
         let reserve_stake = stake_pool_meta.reserve;
         let stake_deposit_authority = Pubkey::find_program_address(
-            &[&stake_pool_address.as_ref(), b"deposit"],
+            &[stake_pool_address.as_ref(), b"deposit"],
             &spl_stake_pool::id(),
         )
         .0;
         let stake_withdraw_bump_seed = Pubkey::find_program_address(
-            &[&stake_pool_address.as_ref(), b"withdrawal"],
+            &[stake_pool_address.as_ref(), b"withdrawal"],
             &spl_stake_pool::id(),
         )
         .1;
@@ -1568,39 +1619,6 @@ pub fn closed_vote_account() -> Account {
     }
 }
 
-// TODO write a function to serialize any account with T: AnchorSerialize
-pub fn serialized_validator_list_account(
-    validator_list: SPLValidatorList,
-    account_size: Option<usize>,
-) -> Account {
-    // Passes in size because zeros at the end will be truncated during serialization
-    let mut data = vec![];
-    validator_list.serialize(&mut data).unwrap();
-    let account_size = account_size.unwrap_or(5 + 4 + 73 * validator_list.validators.len());
-    data.extend(vec![0; account_size - data.len()]);
-    Account {
-        lamports: 1_000_000_000,
-        data,
-        owner: spl_stake_pool::id(),
-        ..Account::default()
-    }
-}
-
-pub fn serialized_stake_pool_account(
-    stake_pool: spl_stake_pool::state::StakePool,
-    account_size: usize,
-) -> Account {
-    let mut data = vec![];
-    stake_pool.serialize(&mut data).unwrap();
-    data.extend(vec![0; account_size - data.len()]);
-    Account {
-        lamports: 10_000_000_000,
-        data,
-        owner: spl_stake_pool::id(),
-        ..Account::default()
-    }
-}
-
 pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> Account {
     let mut data = vec![];
     stake_account.serialize(&mut data).unwrap();
@@ -1615,8 +1633,8 @@ pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> A
 pub fn serialized_validator_history_account(validator_history: ValidatorHistory) -> Account {
     let mut data = vec![];
     validator_history.serialize(&mut data).unwrap();
-    for byte in ValidatorHistory::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in ValidatorHistory::DISCRIMINATOR.iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 1_000_000_000,
@@ -1629,8 +1647,8 @@ pub fn serialized_validator_history_account(validator_history: ValidatorHistory)
 pub fn serialized_steward_state_account(state: StewardStateAccount) -> Account {
     let mut data = vec![];
     state.serialize(&mut data).unwrap();
-    for byte in StewardStateAccount::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in StewardStateAccount::DISCRIMINATOR.iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 100_000_000_000,
@@ -1643,8 +1661,8 @@ pub fn serialized_steward_state_account(state: StewardStateAccount) -> Account {
 pub fn serialized_config(config: Config) -> Account {
     let mut data = vec![];
     config.serialize(&mut data).unwrap();
-    for byte in Config::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in Config::DISCRIMINATOR.iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 1_000_000_000,
@@ -1713,8 +1731,8 @@ pub fn cluster_history_default() -> ClusterHistory {
 pub fn serialized_cluster_history_account(cluster_history: ClusterHistory) -> Account {
     let mut data = vec![];
     cluster_history.serialize(&mut data).unwrap();
-    for byte in ClusterHistory::discriminator().into_iter().rev() {
-        data.insert(0, byte);
+    for byte in ClusterHistory::DISCRIMINATOR.iter().rev() {
+        data.insert(0, *byte);
     }
     Account {
         lamports: 10_000_000_000,
@@ -1753,7 +1771,6 @@ impl Default for StateMachineFixtures {
             instant_unstake_delinquency_threshold_ratio: 0.1,
             commission_threshold: 10,
             historical_commission_threshold: 10,
-            _padding_0: [0; 6],
             num_delegation_validators: 3,
             scoring_unstake_cap_bps: 1000,
             instant_unstake_cap_bps: 1000,
@@ -1764,7 +1781,13 @@ impl Default for StateMachineFixtures {
             num_epochs_between_scoring: 10,
             minimum_stake_lamports: 1,
             minimum_voting_epochs: 1,
-            _padding_1: [0; 32],
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
+            priority_fee_scoring_start_epoch: 0,
+            _padding_0: [0; 6],
+            _padding_1: [0; 31],
         };
 
         // Setup Config
@@ -1777,7 +1800,9 @@ impl Default for StateMachineFixtures {
             parameters_authority: Pubkey::new_unique(),
             blacklist_authority: Pubkey::new_unique(),
             validator_history_blacklist: LargeBitMask::default(),
-            _padding: [0; 1023],
+            _padding_0: [0u8; 7],
+            priority_fee_parameters_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -1807,6 +1832,8 @@ impl Default for StateMachineFixtures {
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1827,6 +1854,8 @@ impl Default for StateMachineFixtures {
                 is_superminority: 1,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -1847,6 +1876,8 @@ impl Default for StateMachineFixtures {
                 is_superminority: 0,
                 activated_stake_lamports: 10 * LAMPORTS_PER_SOL,
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
+                merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 ..ValidatorHistoryEntry::default()
             });
         }

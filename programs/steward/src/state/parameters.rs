@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{types::*, *};
 use anchor_lang::{prelude::Result, zero_copy};
@@ -144,6 +146,8 @@ impl IdlBuild for UpdateParametersArgs {
     }
 }
 
+static_assertions::const_assert_eq!(size_of::<Parameters>(), 352);
+
 #[derive(BorshSerialize, Default)]
 #[zero_copy]
 pub struct Parameters {
@@ -172,9 +176,20 @@ pub struct Parameters {
     /// Highest commission rate allowed in tracked history
     pub historical_commission_threshold: u8,
 
-    /// Required so that the struct is 8-byte aligned
-    /// https://doc.rust-lang.org/reference/type-layout.html#reprc-structs
-    pub _padding_0: [u8; 6],
+    /// The number of epochs the priority fee distribution check should lookback
+    pub priority_fee_lookback_epochs: u8,
+
+    /// The offset of epochs for the priority fee distribution. E.g. look at epochs from
+    /// (current_epoch - offset - priority_fee_lookback_epochs) to (current_epoch - offset)
+    pub priority_fee_lookback_offset: u8,
+
+    /// The maximum validator commission before the validator scores 0.
+    /// E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,
+    /// then score = 0
+    pub priority_fee_max_commission_bps: u16,
+
+    /// An error of margin for priority fee commission calculations
+    pub priority_fee_error_margin_bps: u16,
 
     /////// Delegation parameters ///////
     /// Number of validators to delegate to
@@ -208,7 +223,12 @@ pub struct Parameters {
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
 
-    pub _padding_1: [u64; 32],
+    /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
+    pub priority_fee_scoring_start_epoch: u16,
+
+    pub _padding_0: [u8; 6],
+
+    pub _padding_1: [u64; 31],
 }
 
 impl Parameters {
@@ -326,6 +346,47 @@ impl Parameters {
         Ok(new_parameters)
     }
 
+    pub fn priority_fee_parameters(
+        self,
+        args: &UpdatePriorityFeeParametersArgs,
+        current_epoch: u64,
+        slots_per_epoch: u64,
+    ) -> Result<Self> {
+        let UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs,
+            priority_fee_lookback_offset,
+            priority_fee_max_commission_bps,
+            priority_fee_error_margin_bps,
+            priority_fee_scoring_start_epoch,
+        } = *args;
+
+        let mut new_parameters = self;
+
+        if let Some(priority_fee_lookback_epochs) = priority_fee_lookback_epochs {
+            new_parameters.priority_fee_lookback_epochs = priority_fee_lookback_epochs;
+        }
+
+        if let Some(priority_fee_lookback_offset) = priority_fee_lookback_offset {
+            new_parameters.priority_fee_lookback_offset = priority_fee_lookback_offset;
+        }
+
+        if let Some(priority_fee_max_commission_bps) = priority_fee_max_commission_bps {
+            new_parameters.priority_fee_max_commission_bps = priority_fee_max_commission_bps;
+        }
+
+        if let Some(priority_fee_error_margin_bps) = priority_fee_error_margin_bps {
+            new_parameters.priority_fee_error_margin_bps = priority_fee_error_margin_bps;
+        }
+
+        if let Some(priority_fee_scoring_start_epoch) = priority_fee_scoring_start_epoch {
+            new_parameters.priority_fee_scoring_start_epoch = priority_fee_scoring_start_epoch;
+        }
+
+        new_parameters.validate(current_epoch, slots_per_epoch)?;
+
+        Ok(new_parameters)
+    }
+
     /// Validate reasonable bounds on parameters
     pub fn validate(&self, current_epoch: u64, slots_per_epoch: u64) -> Result<()> {
         // Cannot evaluate epochs before VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH or beyond the CircBuf length
@@ -411,6 +472,66 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
+        if self.priority_fee_max_commission_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.priority_fee_error_margin_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
         Ok(())
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+pub struct UpdatePriorityFeeParametersArgs {
+    // Priority fee parameters
+    pub priority_fee_lookback_epochs: Option<u8>,
+    pub priority_fee_lookback_offset: Option<u8>,
+    pub priority_fee_max_commission_bps: Option<u16>,
+    pub priority_fee_error_margin_bps: Option<u16>,
+    pub priority_fee_scoring_start_epoch: Option<u16>,
+}
+
+#[cfg(feature = "idl-build")]
+impl IdlBuild for UpdatePriorityFeeParametersArgs {
+    fn create_type() -> Option<IdlTypeDef> {
+        Some(IdlTypeDef {
+            name: "UpdatePriorityFeeParametersArgs".to_string(),
+            ty: IdlTypeDefTy::Struct {
+                fields: Some(IdlDefinedFields::Named(vec![
+                    IdlField {
+                        name: "priority_fee_lookback_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_lookback_offset".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_max_commission_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_error_margin_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "priority_fee_scoring_start_epoch".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                ])),
+            },
+            docs: Default::default(),
+            generics: Default::default(),
+            serialization: Default::default(),
+            repr: Default::default(),
+        })
     }
 }

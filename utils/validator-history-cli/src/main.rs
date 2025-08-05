@@ -1,8 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 
-use anchor_lang::{
-    AccountDeserialize, AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas,
-};
+use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use solana_client::{
@@ -19,9 +17,10 @@ use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
 };
+use validator_history_cli::validator_history_entry_output::ValidatorHistoryEntryOutput;
 
 #[derive(Parser)]
-#[command(about = "CLI for validator history program")]
+#[command(about = "CLI for validator history program", version)]
 struct Args {
     /// RPC URL for the cluster
     #[arg(
@@ -39,12 +38,14 @@ struct Args {
 #[derive(Subcommand)]
 enum Commands {
     InitConfig(InitConfig),
+    ReallocConfig(ReallocConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
-    ClusterHistoryStatus,
+    ClusterHistoryStatus(ClusterHistoryStatus),
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
     StakeByCountry(StakeByCountry),
+    GetConfig,
 }
 
 #[derive(Parser)]
@@ -72,6 +73,14 @@ struct InitConfig {
 }
 
 #[derive(Parser)]
+#[command(about = "Realloc Config")]
+struct ReallocConfig {
+    /// Path to keypair used to pay for account creation and execute transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+}
+
+#[derive(Parser)]
 #[command(about = "Initialize cluster history account")]
 struct InitClusterHistory {
     /// Path to keypair used to pay for account creation and execute transactions
@@ -85,6 +94,26 @@ struct CrankerStatus {
     /// Epoch to get status for (default: current epoch)
     #[arg(short, long, env)]
     epoch: Option<u64>,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Get cluster history status")]
+struct ClusterHistoryStatus {
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 #[derive(Parser)]
@@ -96,6 +125,14 @@ struct History {
     /// Start epoch
     #[arg(short, long, env)]
     start_epoch: Option<u64>,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 #[derive(Parser)]
@@ -113,6 +150,10 @@ struct BackfillClusterHistory {
     #[arg(short, long, env)]
     blocks_in_epoch: u32,
 }
+
+#[derive(Parser)]
+#[command(about = "Get Config info")]
+struct GetConfig {}
 
 #[derive(Parser)]
 #[command(about = "Display JitoSOL stake percentage by country")]
@@ -203,6 +244,37 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     println!("Signature: {}", signature);
 }
 
+fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let instructions = vec![Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::ReallocConfigAccount {
+            config_account: config_pda,
+            system_program: solana_program::system_program::id(),
+            payer: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::ReallocConfigAccount {}.data(),
+    }];
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+    println!("Signature: {}", signature);
+}
+
 fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     // Creates cluster history account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
@@ -261,104 +333,66 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
-fn formatted_entry(entry: ValidatorHistoryEntry) -> String {
-    let commission_str = if entry.commission == ValidatorHistoryEntry::default().commission {
-        "[NULL]".to_string()
+fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
+    let entry_output = ValidatorHistoryEntryOutput::from(entry);
+
+    if print_json {
+        serde_json::to_string_pretty(&entry_output).unwrap_or_else(|_| "{}".to_string())
     } else {
-        entry.commission.to_string()
-    };
+        let mut field_descriptions = Vec::new();
 
-    let epoch_credits_str = if entry.epoch_credits == ValidatorHistoryEntry::default().epoch_credits
-    {
-        "[NULL]".to_string()
-    } else {
-        entry.epoch_credits.to_string()
-    };
+        field_descriptions.push(format!(
+            "Activated Stake Lamports: {:?}",
+            entry_output.activated_stake_lamports
+        ));
+        field_descriptions.push(format!("MEV Commission: {:?}", entry_output.mev_commission));
+        field_descriptions.push(format!("Epoch Credits: {:?}", entry_output.epoch_credits));
+        field_descriptions.push(format!("Commission: {:?}", entry_output.commission));
+        field_descriptions.push(format!("Client Type: {:?}", entry_output.client_type));
+        field_descriptions.push(format!("Client Version: {:?}", entry_output.version));
+        field_descriptions.push(format!("IP: {:?}", entry_output.ip));
+        field_descriptions.push(format!(
+            "Merkle Root Upload Authority: {:?}",
+            entry_output.merkle_root_upload_authority
+        ));
+        field_descriptions.push(format!(
+            "Superminority: {:?}",
+            entry_output.is_superminority
+        ));
+        field_descriptions.push(format!("Rank: {:?}", entry_output.rank));
+        field_descriptions.push(format!(
+            "Last Update: {:?}",
+            entry_output.vote_account_last_update_slot
+        ));
+        field_descriptions.push(format!("MEV Earned: {:?}", entry_output.mev_earned));
+        field_descriptions.push(format!(
+            "Priority Fee Commission: {}",
+            entry_output.priority_fee_commission
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Tips: {}",
+            entry_output.priority_fee_tips
+        ));
+        field_descriptions.push(format!(
+            "Total Priority Fees: {}",
+            entry_output.total_priority_fees
+        ));
+        field_descriptions.push(format!(
+            "Total Leader Slots: {}",
+            entry_output.total_leader_slots
+        ));
+        field_descriptions.push(format!("Blocks Produced: {}", entry_output.blocks_produced));
+        field_descriptions.push(format!(
+            "Block Data Updated At Slot: {}",
+            entry_output.block_data_updated_at_slot
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Merkle Root Upload Authority: {}",
+            entry_output.priority_fee_merkle_root_upload_authority
+        ));
 
-    let mev_commission_str =
-        if entry.mev_commission == ValidatorHistoryEntry::default().mev_commission {
-            "[NULL]".to_string()
-        } else {
-            entry.mev_commission.to_string()
-        };
-
-    let mev_earned_str = if entry.mev_earned == ValidatorHistoryEntry::default().mev_earned {
-        "[NULL]".to_string()
-    } else {
-        (entry.mev_earned as f64 / 100.0).to_string()
-    };
-
-    let stake_str = if entry.activated_stake_lamports
-        == ValidatorHistoryEntry::default().activated_stake_lamports
-    {
-        "[NULL]".to_string()
-    } else {
-        entry.activated_stake_lamports.to_string()
-    };
-
-    let ip_str = if entry.ip == ValidatorHistoryEntry::default().ip {
-        "[NULL]".to_string()
-    } else {
-        format!(
-            "{}.{}.{}.{}",
-            entry.ip[0], entry.ip[1], entry.ip[2], entry.ip[3]
-        )
-    };
-
-    let client_type_str = if entry.client_type == ValidatorHistoryEntry::default().client_type {
-        "[NULL]".to_string()
-    } else {
-        entry.client_type.to_string()
-    };
-
-    let client_version_str = if entry.version.major
-        == ValidatorHistoryEntry::default().version.major
-        && entry.version.minor == ValidatorHistoryEntry::default().version.minor
-        && entry.version.patch == ValidatorHistoryEntry::default().version.patch
-    {
-        "[NULL]".to_string()
-    } else {
-        format!(
-            "{}.{}.{}",
-            entry.version.major, entry.version.minor, entry.version.patch
-        )
-    };
-
-    let rank_str = if entry.rank == ValidatorHistoryEntry::default().rank {
-        "[NULL]".to_string()
-    } else {
-        entry.rank.to_string()
-    };
-
-    let superminority_str =
-        if entry.is_superminority == ValidatorHistoryEntry::default().is_superminority {
-            "[NULL]".to_string()
-        } else {
-            entry.is_superminority.to_string()
-        };
-
-    let last_update_slot = if entry.vote_account_last_update_slot
-        == ValidatorHistoryEntry::default().vote_account_last_update_slot
-    {
-        "[NULL]".to_string()
-    } else {
-        entry.vote_account_last_update_slot.to_string()
-    };
-
-    format!(
-        "Commission: {}\t| Epoch Credits: {}\t| MEV Commission: {}\t| MEV Earned: {}\t| Stake: {}\t| Rank: {}\t| Superminority: {}\t| IP: {}\t| Client Type: {}\t| Client Version: {}\t| Last Updated: {}",
-        commission_str,
-        epoch_credits_str,
-        mev_commission_str,
-        mev_earned_str,
-        stake_str,
-        rank_str,
-        superminority_str,
-        ip_str,
-        client_type_str,
-        client_version_str,
-        last_update_slot
-    )
+        field_descriptions.join(" | ")
+    }
 }
 
 fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
@@ -383,7 +417,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let gpa_config = RpcProgramAccountsConfig {
         filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
             0,
-            ValidatorHistory::discriminator().into(),
+            ValidatorHistory::DISCRIMINATOR.into(),
         ))]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
@@ -391,12 +425,12 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         },
         ..RpcProgramAccountsConfig::default()
     };
-    let mut validator_history_accounts = client
+    let validator_history_accounts = client
         .get_program_accounts_with_config(&validator_history::id(), gpa_config)
         .expect("Failed to get validator history accounts");
 
     let mut validator_histories = validator_history_accounts
-        .iter_mut()
+        .into_iter()
         .map(|(_, account)| {
             let validator_history = ValidatorHistory::try_deserialize(&mut account.data.as_slice())
                 .expect("Failed to deserialize validator history account");
@@ -413,7 +447,8 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     validator_histories.sort_by(|a, b| a.index.cmp(&b.index));
 
     // For each validator history account, print out the status
-    println!("Epoch {} Report", epoch);
+    let default = ValidatorHistoryEntry::default();
+    let mut results = Vec::with_capacity(validator_histories.len());
     let mut ips = 0;
     let mut versions = 0;
     let mut types = 0;
@@ -424,7 +459,10 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     let mut stakes = 0;
     let mut ranks = 0;
 
-    let default = ValidatorHistoryEntry::default();
+    if !args.print_json {
+        println!("Epoch {epoch} Report");
+    }
+
     for validator_history in validator_histories {
         match get_entry(validator_history, epoch) {
             Some(entry) => {
@@ -458,33 +496,91 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
                 if entry.rank != default.rank {
                     ranks += 1;
                 }
-                println!(
-                    "{}.\tVote Account: {} | {}",
-                    validator_history.index,
-                    validator_history.vote_account,
-                    formatted_entry(entry)
-                );
+
+                if args.print_json {
+                    let json_str = formatted_entry(entry, args.print_json);
+                    match serde_json::from_str::<serde_json::Value>(&json_str) {
+                        Ok(validator_data) => {
+                            results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                                        "validator_history": validator_data
+                                    }));
+                        }
+                        Err(_) => {
+                            results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                                "validator_history": json_str
+                            }));
+                        }
+                    }
+                } else {
+                    println!(
+                        "{}.\tVote Account: {} | {}",
+                        validator_history.index,
+                        validator_history.vote_account,
+                        formatted_entry(entry, false)
+                    );
+                }
             }
             None => {
-                println!(
-                    "{}.\tVote Account: {} | {}",
-                    validator_history.index,
-                    validator_history.vote_account,
-                    formatted_entry(ValidatorHistoryEntry::default())
-                );
+                if args.print_json {
+                    let json_str =
+                        formatted_entry(ValidatorHistoryEntry::default(), args.print_json);
+                    results.push(serde_json::json!({
+                                        "vote_account_index":
+                            validator_history.index,
+                                        "vote_account":
+                            validator_history.vote_account.to_string(),
+                        "validator_history": json_str,
+                    }));
+                } else {
+                    println!(
+                        "{}.\tVote Account: {} | {}",
+                        validator_history.index,
+                        validator_history.vote_account,
+                        formatted_entry(ValidatorHistoryEntry::default(), false)
+                    );
+                }
             }
-        };
+        }
     }
-    println!("Total Validators:\t\t{}", config.counter);
-    println!("Validators with IP:\t\t{}", ips);
-    println!("Validators with Version:\t{}", versions);
-    println!("Validators with Client Type:\t{}", types);
-    println!("Validators with MEV Commission: {}", mev_comms);
-    println!("Validators with MEV Earned: \t{}", mev_earned);
-    println!("Validators with Commission:\t{}", comms);
-    println!("Validators with Epoch Credits:\t{}", epoch_credits);
-    println!("Validators with Stake:\t\t{}", stakes);
-    println!("Validators with Rank:\t\t{}", ranks);
+
+    if args.print_json {
+        // Print everything as one JSON object
+        let output = serde_json::json!({
+            "epoch": epoch,
+            "total_validators": config.counter,
+            "validators_with_ip": ips,
+            "validators_with_version": versions,
+            "validators_with_client_type": types,
+            "validators_with_mev_commission": mev_comms,
+            "validators_with_mev_earned": mev_earned,
+            "validators_with_commission": comms,
+            "validators_with_epoch_credits": epoch_credits,
+            "validators_with_stake": stakes,
+            "validators_with_rank": ranks,
+            "validators": results,
+        });
+
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("Total Validators:\t\t{}", config.counter);
+        println!("Validators with IP:\t\t{}", ips);
+        println!("Validators with Version:\t{}", versions);
+        println!("Validators with Client Type:\t{}", types);
+        println!("Validators with MEV Commission: {}", mev_comms);
+        println!("Validators with MEV Earned: \t{}", mev_earned);
+        println!("Validators with Commission:\t{}", comms);
+        println!("Validators with Epoch Credits:\t{}", epoch_credits);
+        println!("Validators with Stake:\t\t{}", stakes);
+        println!("Validators with Rank:\t\t{}", ranks);
+    }
 }
 
 fn command_history(args: History, client: RpcClient) {
@@ -518,24 +614,70 @@ fn command_history(args: History, client: RpcClient) {
         .get_epoch_info()
         .expect("Failed to get epoch info")
         .epoch;
-    println!(
-        "History for validator {} | Validator History Account {}",
-        args.validator, validator_history_pda
-    );
-    for epoch in start_epoch..=current_epoch {
-        match get_entry(validator_history, epoch) {
-            Some(entry) => {
-                println!("Epoch: {} | {}", epoch, formatted_entry(entry));
+
+    if args.print_json {
+        let mut results = Vec::new();
+
+        for epoch in start_epoch..=current_epoch {
+            match get_entry(validator_history, epoch) {
+                Some(entry) => {
+                    let json_str = formatted_entry(entry, args.print_json);
+                    match serde_json::from_str::<serde_json::Value>(&json_str) {
+                        Ok(validator_data) => {
+                            results.push(serde_json::json!({
+                                "epoch": epoch,
+                                "validator_history": validator_data
+                            }));
+                        }
+                        Err(_) => {
+                            results.push(serde_json::json!({
+                                "epoch": epoch,
+                                "validator_history": json_str
+                            }));
+                        }
+                    }
+                }
+                None => {
+                    results.push(serde_json::json!({
+                        "epoch": epoch,
+                        "validator_history": null
+                    }));
+                }
             }
-            None => {
-                println!("Epoch {}:\tNo history", epoch);
-                continue;
+        }
+
+        // Print everything as one JSON object
+        let output = serde_json::json!({
+            "validator": args.validator.to_string(),
+            "validator_history_account": validator_history_pda.to_string(),
+            "epochs": results
+        });
+
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!(
+            "History for validator {} | Validator History Account {}",
+            args.validator, validator_history_pda
+        );
+
+        for epoch in start_epoch..=current_epoch {
+            match get_entry(validator_history, epoch) {
+                Some(entry) => {
+                    println!(
+                        "Epoch: {} | {}",
+                        epoch,
+                        formatted_entry(entry, args.print_json)
+                    );
+                }
+                None => {
+                    println!("Epoch {}:\tNo history", epoch);
+                }
             }
         }
     }
 }
 
-fn command_cluster_history(client: RpcClient) {
+fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
 
@@ -546,15 +688,31 @@ fn command_cluster_history(client: RpcClient) {
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
             .expect("Failed to deserialize cluster history account");
 
+    let mut results = Vec::with_capacity(cluster_history.history.arr.len());
+
     for entry in cluster_history.history.arr.iter() {
-        println!(
-            "Epoch: {} | Total Blocks: {}",
-            entry.epoch, entry.total_blocks
-        );
+        if args.print_json {
+            results.push(serde_json::json!({
+                "epoch": entry.epoch,
+                "total_blocks": entry.total_blocks,
+            }));
+        } else {
+            println!(
+                "Epoch: {} | Total Blocks: {}",
+                entry.epoch, entry.total_blocks
+            );
+        }
 
         if entry.epoch == ClusterHistoryEntry::default().epoch {
             break;
         }
+    }
+
+    if args.print_json {
+        let output = serde_json::json!({
+            "cluster_history_status": results
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
     }
 }
 
@@ -624,7 +782,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             return;
         }
     };
-    let stake_pool = match StakePool::deserialize(&mut stake_pool_acc_raw.data.as_slice()) {
+    let stake_pool = match borsh::from_slice::<StakePool>(stake_pool_acc_raw.data.as_slice()) {
         Ok(pool) => pool,
         Err(err) => {
             eprintln!("Error deserializing stake pool: {err}");
@@ -640,7 +798,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
         }
     };
     let validator_list =
-        match ValidatorList::deserialize(&mut validator_list_acc_raw.data.as_slice()) {
+        match borsh::from_slice::<ValidatorList>(validator_list_acc_raw.data.as_slice()) {
             Ok(list) => list,
             Err(err) => {
                 eprintln!("Error deserializing validator list: {err}");
@@ -827,17 +985,54 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     }
 }
 
+fn command_get_config(client: RpcClient) {
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    match client.get_account(&config_pda) {
+        Ok(account) => match Config::try_deserialize(&mut account.data.as_slice()) {
+            Ok(config) => {
+                println!("Validator History Config:");
+                println!("  Pubkey: {}", config_pda);
+                println!(
+                    "  Tip Distribution Program: {}",
+                    config.tip_distribution_program
+                );
+                println!(
+                    "  Priority Fee Distribution Program: {}",
+                    config.priority_fee_distribution_program
+                );
+                println!("  Admin: {}", config.admin);
+                println!("  Oracle Authority: {}", config.oracle_authority);
+                println!(
+                    "  Priority Fee Oracle Authority: {}",
+                    config.priority_fee_oracle_authority
+                );
+                println!("  Counter: {}", config.counter);
+                println!("  Bump: {}", config.bump);
+            }
+            Err(err) => {
+                eprintln!("Error deserializing config: {err}");
+            }
+        },
+        Err(err) => {
+            eprintln!("Error fetching config account: {err}");
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
+        Commands::ReallocConfig(args) => command_realloc_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
-        Commands::ClusterHistoryStatus => command_cluster_history(client),
+        Commands::ClusterHistoryStatus(args) => command_cluster_history(args, client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
+        Commands::GetConfig => command_get_config(client),
     };
 }

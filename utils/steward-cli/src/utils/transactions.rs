@@ -13,8 +13,6 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use stakenet_sdk::utils::transactions::print_governance_ix;
-
 use crate::commands::command_args::TransactionParameters;
 
 /// Decides whether to print the transaction in raw or governance format.
@@ -22,9 +20,6 @@ use crate::commands::command_args::TransactionParameters;
 pub fn maybe_print_tx(ixs: &[Instruction], params: &TransactionParameters) -> bool {
     if params.print_tx {
         stakenet_sdk::utils::transactions::print_base58_tx(ixs);
-        true
-    } else if params.print_gov_tx {
-        print_governance_ix(ixs);
         true
     } else {
         false

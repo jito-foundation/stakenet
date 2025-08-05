@@ -1,7 +1,7 @@
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::LAMPORT_BALANCE_DEFAULT, utils::ValidatorList, Config, Delegation,
+    constants::LAMPORT_BALANCE_DEFAULT, stake_pool_utils::ValidatorList, Config, Delegation,
     StewardStateAccount,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;

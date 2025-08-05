@@ -1,5 +1,5 @@
 use clap::{arg, command, Parser, Subcommand};
-use jito_steward::UpdateParametersArgs;
+use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
@@ -130,6 +130,41 @@ impl From<ConfigParameters> for UpdateParametersArgs {
 }
 
 #[derive(Parser)]
+pub struct ConfigPriorityFeeParameters {
+    /// The number of epochs the priority fee distribution check should lookback
+    #[arg(long, env)]
+    pub priority_fee_lookback_epochs: Option<u8>,
+
+    /// The offset of epochs for the priority fee distribution
+    #[arg(long, env)]
+    pub priority_fee_lookback_offset: Option<u8>,
+
+    /// The maximum validator commission before the validator scores 0
+    #[arg(long, env)]
+    pub priority_fee_max_commission_bps: Option<u16>,
+
+    /// An error of margin for priority fee commission calculations
+    #[arg(long, env)]
+    pub priority_fee_error_margin_bps: Option<u16>,
+
+    /// The epoch for when priority fee commission scoring starts
+    #[arg(long, env)]
+    pub priority_fee_scoring_start_epoch: Option<u16>,
+}
+
+impl From<ConfigPriorityFeeParameters> for UpdatePriorityFeeParametersArgs {
+    fn from(config: ConfigPriorityFeeParameters) -> Self {
+        UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs: config.priority_fee_lookback_epochs,
+            priority_fee_lookback_offset: config.priority_fee_lookback_offset,
+            priority_fee_max_commission_bps: config.priority_fee_max_commission_bps,
+            priority_fee_error_margin_bps: config.priority_fee_error_margin_bps,
+            priority_fee_scoring_start_epoch: config.priority_fee_scoring_start_epoch,
+        }
+    }
+}
+
+#[derive(Parser)]
 pub struct TransactionParameters {
     /// priority fee in microlamports
     #[arg(long, env)]
@@ -208,6 +243,7 @@ pub enum Commands {
 
     UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
+    UpdatePriorityFeeConfig(UpdatePriorityFeeConfig),
     ResetState(ResetState),
     ResetValidatorLamportBalances(ResetValidatorLamportBalances),
 
@@ -293,6 +329,9 @@ pub struct InitSteward {
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+
+    #[command(flatten)]
+    pub config_priority_fee_parameters: ConfigPriorityFeeParameters,
 }
 
 #[derive(Parser)]
@@ -334,6 +373,16 @@ pub struct UpdateConfig {
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Updates config priority fee parameters")]
+pub struct UpdatePriorityFeeConfig {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigPriorityFeeParameters,
 }
 
 #[derive(Parser)]

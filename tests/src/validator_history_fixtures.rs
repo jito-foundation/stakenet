@@ -8,10 +8,11 @@ use {
         },
         AccountSerialize, InstructionData, ToAccountMetas,
     },
-    jito_tip_distribution::{
-        sdk::derive_tip_distribution_account_address,
-        state::{MerkleRoot, TipDistributionAccount},
+    jito_priority_fee_distribution::state::{
+        MerkleRoot as PfMerkleRoot, PriorityFeeDistributionAccount,
     },
+    jito_tip_distribution::state::{MerkleRoot, TipDistributionAccount},
+    jito_tip_distribution_sdk::derive_tip_distribution_account_address,
     solana_program_test::*,
     solana_sdk::{
         account::Account, instruction::Instruction, signature::Keypair, signer::Signer,
@@ -30,6 +31,7 @@ pub struct TestFixture {
     pub validator_history_config: Pubkey,
     pub tip_distribution_account: Pubkey,
     pub keypair: Keypair,
+    pub priority_fee_oracle_keypair: Keypair,
 }
 
 impl TestFixture {
@@ -45,6 +47,11 @@ impl TestFixture {
         // make sure the program is compiled and SBF_OUT_DIR is set correctly when running this!
         let mut program = ProgramTest::new("validator_history", validator_history::ID, None);
         program.add_program("jito_tip_distribution", jito_tip_distribution::id(), None);
+        program.add_program(
+            "jito_priority_fee_distribution",
+            jito_priority_fee_distribution::id(),
+            None,
+        );
 
         let epoch = 0;
         let vote_account = Pubkey::new_unique();
@@ -72,6 +79,7 @@ impl TestFixture {
         )
         .0;
         let keypair = Keypair::new();
+        let priority_fee_oracle_keypair = Keypair::new();
 
         program.add_account(
             vote_account,
@@ -79,6 +87,10 @@ impl TestFixture {
         );
         program.add_account(keypair.pubkey(), system_account(100_000_000_000));
         program.add_account(identity_pubkey, system_account(100_000_000_000));
+        program.add_account(
+            priority_fee_oracle_keypair.pubkey(),
+            system_account(100_000_000_000),
+        );
 
         let ctx = Rc::new(RefCell::new(program.start_with_context().await));
 
@@ -91,6 +103,7 @@ impl TestFixture {
             vote_account,
             tip_distribution_account,
             keypair,
+            priority_fee_oracle_keypair,
         }
     }
 
@@ -134,9 +147,23 @@ impl TestFixture {
             .to_account_metas(None),
             data: validator_history::instruction::SetNewTipDistributionProgram {}.data(),
         };
+        let set_priority_fee_distribution_program = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::SetNewPriorityFeeDistributionProgram {
+                config: self.validator_history_config,
+                new_priority_fee_distribution_program: jito_priority_fee_distribution::id(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::SetNewPriorityFeeDistributionProgram {}.data(),
+        };
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction, set_tip_distribution_instruction],
+            &[
+                instruction,
+                set_tip_distribution_instruction,
+                set_priority_fee_distribution_program,
+            ],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
@@ -150,6 +177,28 @@ impl TestFixture {
         {
             panic!("Error: {}", e);
         }
+
+        self.set_priority_fee_oracle_authority().await;
+    }
+
+    pub async fn set_priority_fee_oracle_authority(&self) {
+        let instruction = Instruction {
+            program_id: validator_history::id(),
+            accounts: validator_history::accounts::SetNewPriorityFeeOracleAuthority {
+                config: self.validator_history_config,
+                new_priority_fee_oracle_authority: self.priority_fee_oracle_keypair.pubkey(),
+                admin: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: validator_history::instruction::SetNewPriorityFeeOracleAuthority {}.data(),
+        };
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(transaction).await;
     }
 
     pub async fn initialize_validator_history_account(&self) {
@@ -280,7 +329,7 @@ impl TestFixture {
     }
 
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
-        let mut ctx = self.ctx.borrow_mut();
+        let ctx = self.ctx.borrow_mut();
         if let Err(e) = ctx
             .banks_client
             .process_transaction_with_preflight(transaction)
@@ -302,6 +351,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
+            println!("{} {}", e, error_message);
             assert!(e.to_string().contains(error_message));
         } else {
             panic!("Error: Transaction succeeded. Expected {}", error_message);
@@ -358,6 +408,7 @@ pub fn new_tip_distribution_account(
     vote_account: Pubkey,
     mev_commission_bps: u16,
     mev_earned: Option<u64>,
+    merkle_root_upload_authority: Pubkey,
 ) -> Account {
     let merkle_root = mev_earned.map(|max_total_claim| MerkleRoot {
         max_total_claim,
@@ -367,6 +418,7 @@ pub fn new_tip_distribution_account(
         validator_vote_account: vote_account,
         validator_commission_bps: mev_commission_bps,
         merkle_root,
+        merkle_root_upload_authority,
         ..TipDistributionAccount::default()
     };
     let mut data = vec![];
@@ -375,6 +427,34 @@ pub fn new_tip_distribution_account(
         lamports: 1000000,
         data,
         owner: jito_tip_distribution::id(),
+        ..Account::default()
+    }
+}
+
+pub fn new_priority_fee_distribution_account(
+    vote_account: Pubkey,
+    priority_fee_commission_bps: u16,
+    priority_fees_earned: Option<u64>,
+    merkle_root_upload_authority: Pubkey,
+) -> Account {
+    let merkle_root = priority_fees_earned.map(|max_total_claim| PfMerkleRoot {
+        max_total_claim,
+        ..Default::default()
+    });
+    let tda = PriorityFeeDistributionAccount {
+        validator_vote_account: vote_account,
+        validator_commission_bps: priority_fee_commission_bps,
+        total_lamports_transferred: priority_fees_earned.unwrap_or(0),
+        merkle_root,
+        merkle_root_upload_authority,
+        ..PriorityFeeDistributionAccount::default()
+    };
+    let mut data = vec![];
+    tda.try_serialize(&mut data).unwrap();
+    Account {
+        lamports: 1000000,
+        data,
+        owner: jito_priority_fee_distribution::id(),
         ..Account::default()
     }
 }
