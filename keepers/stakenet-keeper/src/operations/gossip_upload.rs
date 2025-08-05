@@ -56,6 +56,7 @@ async fn _process(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
+    gossip_ip: IpAddr,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
@@ -66,6 +67,7 @@ async fn _process(
         keeper_state,
         retry_count,
         confirmation_time,
+        gossip_ip,
     )
     .await
 }
@@ -73,6 +75,7 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
+    gossip_ip: IpAddr,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
@@ -102,6 +105,7 @@ pub async fn fire(
             keeper_state,
             retry_count,
             confirmation_time,
+            gossip_ip,
         )
         .await
         {
@@ -268,6 +272,7 @@ pub async fn upload_gossip_values(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
+    gossip_ip: IpAddr,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -275,7 +280,6 @@ pub async fn upload_gossip_values(
     // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
-    let gossip_ip = solana_net_utils::get_public_ip_addr(entrypoint)?;
     let gossip_addr = SocketAddr::new(
         gossip_ip,
         solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))

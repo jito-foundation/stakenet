@@ -23,7 +23,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{process::Command, sync::Arc, time::Duration};
+use std::{net::IpAddr, process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig) {
+async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -237,7 +237,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ip).await,
                 );
             }
 
@@ -312,8 +312,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     info!("\n👋 Welcome to the Jito Stakenet Keeper!\n\n");
 
     dotenv().ok();
@@ -325,84 +324,91 @@ async fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    let hostname_cmd = Command::new("hostname")
-        .output()
-        .expect("Failed to execute hostname command");
+    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
+        solana_net_utils::parse_host_port(&gossip_entrypoint)
+            .expect("Failed to parse host and port from gossip entrypoint")
+    }).expect("Failed to create socket address from gossip entrypoint");
 
-    let hostname = String::from_utf8_lossy(&hostname_cmd.stdout)
-        .trim()
-        .to_string();
+    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
+        .expect("Failed to get public ip address for gossip node");
 
-    set_host_id(format!(
-        "stakenet-keeper_{}_{}_{}",
-        args.region, args.cluster, hostname
-    ));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let hostname_cmd = Command::new("hostname")
+            .output()
+            .expect("Failed to execute hostname command");
 
-    let client = Arc::new(RpcClient::new_with_timeout(
-        args.json_rpc_url.clone(),
-        Duration::from_secs(60),
-    ));
+        let hostname = String::from_utf8_lossy(&hostname_cmd.stdout)
+            .trim()
+            .to_string();
 
-    let keypair = Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
+        set_host_id(format!(
+            "stakenet-keeper_{}_{}_{}",
+            args.region, args.cluster, hostname
+        ));
 
-    let oracle_authority_keypair = args
-        .oracle_authority_keypair
-        .map(|oracle_authority_keypair| {
-            Arc::new(
-                read_keypair_file(oracle_authority_keypair)
-                    .expect("Failed reading oracle_authority_keypair keypair file"),
-            )
-        });
+        let client = Arc::new(RpcClient::new_with_timeout(
+            args.json_rpc_url.clone(),
+            Duration::from_secs(60),
+        ));
 
-    let priority_fee_oracle_authority_keypair =
-        args.priority_fee_oracle_authority_keypair
-            .map(|priority_fee_oracle_authority_keypair| {
+        let keypair =
+            Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));
+
+        let oracle_authority_keypair =
+            args.oracle_authority_keypair
+                .map(|oracle_authority_keypair| {
+                    Arc::new(
+                        read_keypair_file(oracle_authority_keypair)
+                            .expect("Failed reading oracle_authority_keypair keypair file"),
+                    )
+                });
+
+        let priority_fee_oracle_authority_keypair = args.priority_fee_oracle_authority_keypair.map(
+            |priority_fee_oracle_authority_keypair| {
                 Arc::new(
                     read_keypair_file(priority_fee_oracle_authority_keypair)
                         .expect("Failed reading priority_fee_oracle_authority_keypair file"),
                 )
-            });
+            },
+        );
 
-    let gossip_entrypoint = args.gossip_entrypoint.map(|gossip_entrypoint| {
-        solana_net_utils::parse_host_port(&gossip_entrypoint)
-            .expect("Failed to parse host and port from gossip entrypoint")
+        let redundant_rpc_urls = args
+            .redundant_rpc_urls
+            .map(|x| Arc::new(x.into_iter().map(RpcClient::new).collect()));
+
+        let connection = Connection::open(args.sqlite_path.clone()).unwrap();
+        create_sqlite_tables(&connection).expect("SQLite tables created");
+
+        let config = KeeperConfig {
+            client,
+            keypair,
+            validator_history_program_id: args.validator_history_program_id,
+            tip_distribution_program_id: args.tip_distribution_program_id,
+            priority_fee_distribution_program_id: args.priority_fee_distribution_program_id,
+            priority_fee_in_microlamports: args.priority_fees,
+            steward_program_id: args.steward_program_id,
+            steward_config: args.steward_config,
+            oracle_authority_keypair,
+            gossip_entrypoint: Some(gossip_entrypoint),
+            validator_history_interval: args.validator_history_interval,
+            metrics_interval: args.metrics_interval,
+            steward_interval: args.steward_interval,
+            block_metadata_interval: args.block_metadata_interval,
+            run_flags,
+            full_startup: args.full_startup,
+            no_pack: args.no_pack,
+            pay_for_new_accounts: args.pay_for_new_accounts,
+            cool_down_range: args.cool_down_range,
+            tx_retry_count: args.tx_retry_count,
+            tx_confirmation_seconds: args.tx_confirmation_seconds,
+            sqlite_connection: Arc::new(Mutex::new(connection)),
+            priority_fee_oracle_authority_keypair,
+            redundant_rpc_urls,
+            cluster: args.cluster,
+            cluster_name: args.cluster.to_string(),
+        };
+
+        run_keeper(config, gossip_ip).await;
     });
-
-    let redundant_rpc_urls = args
-        .redundant_rpc_urls
-        .map(|x| Arc::new(x.into_iter().map(RpcClient::new).collect()));
-
-    let connection = Connection::open(args.sqlite_path.clone()).unwrap();
-    create_sqlite_tables(&connection).expect("SQLite tables created");
-
-    let config = KeeperConfig {
-        client,
-        keypair,
-        validator_history_program_id: args.validator_history_program_id,
-        tip_distribution_program_id: args.tip_distribution_program_id,
-        priority_fee_distribution_program_id: args.priority_fee_distribution_program_id,
-        priority_fee_in_microlamports: args.priority_fees,
-        steward_program_id: args.steward_program_id,
-        steward_config: args.steward_config,
-        oracle_authority_keypair,
-        gossip_entrypoint,
-        validator_history_interval: args.validator_history_interval,
-        metrics_interval: args.metrics_interval,
-        steward_interval: args.steward_interval,
-        block_metadata_interval: args.block_metadata_interval,
-        run_flags,
-        full_startup: args.full_startup,
-        no_pack: args.no_pack,
-        pay_for_new_accounts: args.pay_for_new_accounts,
-        cool_down_range: args.cool_down_range,
-        tx_retry_count: args.tx_retry_count,
-        tx_confirmation_seconds: args.tx_confirmation_seconds,
-        sqlite_connection: Arc::new(Mutex::new(connection)),
-        priority_fee_oracle_authority_keypair,
-        redundant_rpc_urls,
-        cluster: args.cluster,
-        cluster_name: args.cluster.to_string(),
-    };
-
-    run_keeper(config).await;
 }
