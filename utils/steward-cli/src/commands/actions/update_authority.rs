@@ -8,9 +8,11 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use std::str::FromStr;
 
 use crate::commands::command_args::UpdateAuthority;
 
+use crate::utils::transactions::maybe_print_tx;
 use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
 pub async fn command_update_authority(
@@ -45,9 +47,9 @@ pub async fn command_update_authority(
         ),
     };
 
-    // Creates config account
-    let authority = read_keypair_file(permissioned_parameters.authority_keypair_path)
-        .expect("Failed reading keypair file ( Authority )");
+    // Use hardcoded authority address
+    let authority_pubkey = Pubkey::from_str("5eosrve6LktMZgVNszYzebgmmC7BjLK8NoWyRQtcmGTF")
+        .expect("Failed to parse hardcoded authority pubkey");
 
     let steward_config = permissioned_parameters.steward_config;
 
@@ -56,7 +58,7 @@ pub async fn command_update_authority(
         accounts: jito_steward::accounts::SetNewAuthority {
             config: steward_config,
             new_authority,
-            admin: authority.pubkey(),
+            admin: authority_pubkey,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetNewAuthority { authority_type }.data(),
@@ -74,6 +76,18 @@ pub async fn command_update_authority(
         permissioned_parameters.transaction_parameters.heap_size,
     );
 
+    // Check if we should print the transaction instead of executing it
+    if maybe_print_tx(
+        &configured_ix,
+        &permissioned_parameters.transaction_parameters,
+    ) {
+        return Ok(());
+    }
+
+    // For actual execution, we still need a keypair for signing
+    let authority = read_keypair_file(permissioned_parameters.authority_keypair_path)
+        .expect("Failed reading keypair file ( Authority )");
+
     let transaction = Transaction::new_signed_with_payer(
         &configured_ix,
         Some(&authority.pubkey()),
@@ -81,15 +95,11 @@ pub async fn command_update_authority(
         blockhash,
     );
 
-    if permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .await?;
 
-        println!("Signature: {}", signature);
-    }
+    println!("Signature: {}", signature);
 
     Ok(())
 }
