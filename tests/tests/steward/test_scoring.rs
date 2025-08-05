@@ -848,8 +848,10 @@ mod test_calculate_priority_fee_commission {
         // Before priority_fee_scoring_start_epoch, result is always 1
         let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        // Despite defaulting to 1.0 before go-live epoch, the avg_priority_fee_commission should
+        // wire through
         assert_eq!(score, 1.0);
-        assert_eq!(avg_priority_fee_commission, 0);
+        assert_eq!(avg_priority_fee_commission, 5464);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
 
