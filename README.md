@@ -40,18 +40,14 @@ On-chain Steward accounts for JitoSOL:
 | Authority       | 9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6|
 
 
-# Audits
+## Prerequisites
 
-| Program | Date | Commit |
-|---------|------|--------|
-| Steward | [2024-07-29](security-audits/jito_steward_audit.pdf) | [f4ea93a](https://github.com/jito-foundation/stakenet/commit/f4ea93a) |
-| Validator History | [2024-01-12](security-audits/jito_validator_history_audit.pdf) | [fc34c25](https://github.com/jito-foundation/stakenet/commit/fc34c25) |
+### Required Versions
 
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
+- **Rust**: 1.84.1
+- **Cargo**: 1.84.1
+- **Anchor CLI**: 0.31.1
+- **Solana CLI**: 2.2.1
 
 ## Build and Test
 
@@ -80,64 +76,21 @@ All tests can be run by running ( root directory ):
 
 Check out the [Keeper Bot Quick Start](./keeper-bot-quick-start.md)
 
+
 ## CLIs
 
 ### Validator History
 
-This CLI can be used to see the status of on-chain validator history data.
-
-Build: `cargo b -r --package validator-history-cli`
-
-To see the current epoch state of all validator history accounts:
-
-`./target/release/validator-history-cli --json-rpc-url <YOUR RPC URL> cranker-status`
-
-To see the historical state of a single validator history account:
-
-`./target/release/validator-history-cli --json-rpc-url <YOUR RPC URL> history <VOTE ACCOUNT>`
+For detailed information on using the Validator History CLI, see the [CLI documentation](https://www.jito.network/docs/stakenet/validator-history/developers/cli/).
 
 ### Steward
 
-This CLI can be used to see the status of on-chain steward data.
+For detailed information on using the Jito Steward CLI, see the [CLI documentation](https://www.jito.network/docs/stakenet/jito-steward/developers/cli/).
 
-Build:
 
-```bash
-cargo b -r --package steward-cli
-```
+## Audits
 
-To view the config:
-
-```bash
-./target/release/steward-cli --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-config --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
-```
-
-To view the state:
-(Note: This fetches a lot of accounts, you may want to use your own RPC)
-
-```bash
-./target/release/steward-cli --json-rpc-url YOUR_RPC view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
-```
-
-To see the state of each validator in the context of the steward add `--verbose`
-
-```bash
-./target/release/steward-cli --json-rpc-url YOUR_RPC view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --verbose
-```
-
-> TIP: To use your own RPC configured in your solana config, use the following:
-> `--json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}')`
-
-To see all of the available commands:
-
-```bash
-./target/release/steward-cli -h
-```
-
-To see more info on the Steward CLI check out the [CLI notes](./utils/steward-cli/steward_cli_notes.md)
-
----
-
-## 📖 Documentation
-
-The comprehensive documentation for Stakenet has moved to [jito.network/docs/stakenet](https://jito.network/docs/stakenet). The source files are maintained in the [Jito Omnidocs repository](https://github.com/jito-foundation/jito-omnidocs/tree/master/stakenet).
+| Program | Date | Commit |
+|---------|------|--------|
+| Steward | [2024-07-29](security-audits/jito_steward_audit.pdf) | [f4ea93a](https://github.com/jito-foundation/stakenet/commit/f4ea93a) |
+| Validator History | [2024-01-12](security-audits/jito_validator_history_audit.pdf) | [fc34c25](https://github.com/jito-foundation/stakenet/commit/fc34c25) |
