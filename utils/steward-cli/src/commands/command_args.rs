@@ -4,7 +4,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "CLI for the steward program")]
+#[command(about = "CLI for the steward program", version)]
 pub struct Args {
     /// RPC URL for the cluster
     #[arg(
