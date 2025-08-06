@@ -15,8 +15,8 @@ use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
 use stakenet_sdk::utils::transactions::submit_instructions;
-use validator_history::MerkleRootUploadAuthority;
 use std::sync::Arc;
+use validator_history::MerkleRootUploadAuthority;
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::PriorityFeeCommission
@@ -139,22 +139,26 @@ pub async fn update_priority_fee_commission(
     let update_instructions = existing_entries
         .iter()
         .filter_map(|vote_account| {
-
             if let Some(validator_history) = keeper_state.validator_history_map.get(vote_account) {
-                let should_update = validator_history.history.arr.iter().any(|entry| entry.epoch as u64 == previous_epoch && entry.merkle_root_upload_authority == MerkleRootUploadAuthority::Unset);
+                let should_update = validator_history.history.arr.iter().any(|entry| {
+                    entry.epoch as u64 == previous_epoch
+                        && entry.merkle_root_upload_authority == MerkleRootUploadAuthority::Unset
+                });
                 if !should_update {
                     return None;
                 }
             }
 
-            Some(ValidatorPriorityFeeCommissionEntry::new(
-                vote_account,
-                previous_epoch,
-                program_id,
-                priority_fee_distribution_program_id,
-                &keypair.pubkey(),
+            Some(
+                ValidatorPriorityFeeCommissionEntry::new(
+                    vote_account,
+                    previous_epoch,
+                    program_id,
+                    priority_fee_distribution_program_id,
+                    &keypair.pubkey(),
+                )
+                .update_instruction(),
             )
-            .update_instruction())
         })
         .collect::<Vec<_>>();
 

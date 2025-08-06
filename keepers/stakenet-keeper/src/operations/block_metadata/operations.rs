@@ -200,7 +200,8 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1 - loopback_start_offset);
+    let epoch_range =
+        (current_epoch - lookback_epochs)..(current_epoch + 1 - loopback_start_offset);
 
     // 1. Update Epoch Schedule
     for epoch in epoch_range.clone() {
@@ -405,9 +406,10 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-
                 // Only update validator history if it's not already updated
-                if let Some(validator_history) = keeper_state.validator_history_map.get(&entry.vote_account) {
+                if let Some(validator_history) =
+                    keeper_state.validator_history_map.get(&entry.vote_account)
+                {
                     let needs_update = validator_history.history.arr.iter().any(|history| {
                         history.epoch as u64 == epoch
                             && history.block_data_updated_at_slot < first_slot_in_next_epoch
