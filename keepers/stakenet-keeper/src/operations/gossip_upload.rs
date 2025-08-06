@@ -180,18 +180,11 @@ fn build_gossip_entry(
     crds: &RwLockReadGuard<'_, Crds>,
     program_id: Pubkey,
     keypair: &Arc<Keypair>,
-    cluster_name: &str,
 ) -> Option<Vec<GossipEntry>> {
     let validator_identity = Pubkey::from_str(&vote_account.node_pubkey).ok()?;
     let validator_vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
 
     let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(validator_identity);
-
-    datapoint_info!(
-        "gossip-upload-info",
-        ("gossip_nodes", crds.num_nodes(), i64),
-        "cluster" => cluster_name,
-    );
 
     // ContactInfo is the only gossip message we are interested in. Legacy* and Version
     // are fully deprecated and will not be transmitted on the gossip network.
@@ -275,12 +268,17 @@ pub async fn upload_gossip_values(
                     &crds,
                     *program_id,
                     keypair,
-                    cluster_name,
                 )
             })
             .flatten()
             .collect::<Vec<_>>()
     };
+
+    datapoint_info!(
+        "gossip-upload-info",
+        ("validator_gossip_nodes", gossip_entries.len(), i64),
+        "cluster" => cluster_name,
+    );
 
     exit.store(true, Ordering::Relaxed);
 
