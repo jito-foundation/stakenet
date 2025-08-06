@@ -27,7 +27,7 @@ pub struct ValidatorHistoryEntryOutput {
     pub ip: Option<String>,
 
     /// Validator's Tip Distribution Account's merkle root upload authority
-    pub merkle_root_upload_authority: String,
+    pub merkle_root_upload_authority: Option<String>,
 
     /// 0 if not superminority validator, 1 if superminority validator, otherwise NULL
     pub is_superminority: Option<String>,
@@ -42,25 +42,25 @@ pub struct ValidatorHistoryEntryOutput {
     pub mev_earned: Option<String>,
 
     /// Priority Fee commission in basis point
-    pub priority_fee_commission: String,
+    pub priority_fee_commission: Option<String>,
 
     /// Priority Fee tips that were transferred to the distribution account in lamports
-    pub priority_fee_tips: String,
+    pub priority_fee_tips: Option<String>,
 
     /// The total priority fees the validator earned for the epoch
-    pub total_priority_fees: String,
+    pub total_priority_fees: Option<String>,
 
     /// The number of leader slots the validator had during the epoch
-    pub total_leader_slots: String,
+    pub total_leader_slots: Option<String>,
 
     /// The final number of blocks the validator produced during an epoch
-    pub blocks_produced: String,
+    pub blocks_produced: Option<String>,
 
     /// The last slot the block data was last updated at
-    pub block_data_updated_at_slot: String,
+    pub block_data_updated_at_slot: Option<String>,
 
     /// Validator's Tip Distribution Account's merkle root upload authority
-    pub priority_fee_merkle_root_upload_authority: String,
+    pub priority_fee_merkle_root_upload_authority: Option<String>,
 }
 
 impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
@@ -115,7 +115,14 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
                     value.ip[0], value.ip[1], value.ip[2], value.ip[3]
                 ))
             },
-            merkle_root_upload_authority: (value.merkle_root_upload_authority as u8).to_string(),
+            merkle_root_upload_authority: if value
+                .merkle_root_upload_authority
+                .eq(&default_entry.merkle_root_upload_authority)
+            {
+                None
+            } else {
+                Some((value.merkle_root_upload_authority as u8).to_string())
+            },
             is_superminority: if value.is_superminority.eq(&default_entry.is_superminority) {
                 None
             } else {
@@ -139,16 +146,56 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
             } else {
                 Some((value.mev_earned as f64 / 100.0).to_string())
             },
-            priority_fee_commission: value.priority_fee_commission.to_string(),
-            priority_fee_tips: lamports_to_sol(value.priority_fee_tips).to_string(),
-            total_priority_fees: lamports_to_sol(value.total_priority_fees).to_string(),
-            total_leader_slots: value.total_leader_slots.to_string(),
-            blocks_produced: value.blocks_produced.to_string(),
-            block_data_updated_at_slot: value.block_data_updated_at_slot.to_string(),
-            priority_fee_merkle_root_upload_authority: (value
+            priority_fee_commission: if value
+                .priority_fee_commission
+                .eq(&default_entry.priority_fee_commission)
+            {
+                None
+            } else {
+                Some(value.priority_fee_commission.to_string())
+            },
+            priority_fee_tips: if value.priority_fee_tips.eq(&default_entry.priority_fee_tips) {
+                None
+            } else {
+                Some(lamports_to_sol(value.priority_fee_tips).to_string())
+            },
+            total_priority_fees: if value
+                .total_priority_fees
+                .eq(&default_entry.total_priority_fees)
+            {
+                None
+            } else {
+                Some(lamports_to_sol(value.total_priority_fees).to_string())
+            },
+            total_leader_slots: if value
+                .total_leader_slots
+                .eq(&default_entry.total_leader_slots)
+            {
+                None
+            } else {
+                Some(value.total_leader_slots.to_string())
+            },
+            blocks_produced: if value.blocks_produced.eq(&default_entry.blocks_produced) {
+                None
+            } else {
+                Some(value.blocks_produced.to_string())
+            },
+            block_data_updated_at_slot: if value
+                .block_data_updated_at_slot
+                .eq(&default_entry.block_data_updated_at_slot)
+            {
+                None
+            } else {
+                Some(value.block_data_updated_at_slot.to_string())
+            },
+            priority_fee_merkle_root_upload_authority: if value
                 .priority_fee_merkle_root_upload_authority
-                as u8)
-                .to_string(),
+                .eq(&default_entry.priority_fee_merkle_root_upload_authority)
+            {
+                None
+            } else {
+                Some((value.priority_fee_merkle_root_upload_authority as u8).to_string())
+            },
         }
     }
 }
