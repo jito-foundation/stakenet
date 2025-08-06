@@ -224,6 +224,14 @@ pub struct ViewParameters {
     /// Steward account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 // ---------- COMMANDS ------------
