@@ -21,4 +21,6 @@ pub enum BlockMetadataKeeperError {
     SlotInFuture(u64),
     #[error("Other Error {0}")]
     OtherError(String),
+    #[error("No done slot found")]
+    NoDoneSlotFound,
 }

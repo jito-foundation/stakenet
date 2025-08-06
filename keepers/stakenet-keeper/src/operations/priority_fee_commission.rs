@@ -15,6 +15,7 @@ use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
 use stakenet_sdk::utils::transactions::submit_instructions;
+use validator_history::MerkleRootUploadAuthority;
 use std::sync::Arc;
 
 fn _get_operation() -> KeeperOperations {
@@ -125,25 +126,35 @@ pub async fn update_priority_fee_commission(
     priority_fee_in_microlamports: u64,
     _no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
+    // Only update Epoch N-1 since, priority fees are not yet finalized
     let epoch_info = &keeper_state.epoch_info;
-    let current_epoch_tip_distribution_map = &keeper_state.current_epoch_tip_distribution_map;
+    let previous_epoch = epoch_info.epoch.saturating_sub(1);
+    let previous_epoch_tip_distribution_map = &keeper_state.previous_epoch_tip_distribution_map;
 
-    let existing_entries = current_epoch_tip_distribution_map
+    let existing_entries = previous_epoch_tip_distribution_map
         .iter()
         .filter_map(|(pubkey, account)| account.as_ref().map(|_| *pubkey))
         .collect::<Vec<_>>();
 
     let update_instructions = existing_entries
         .iter()
-        .map(|vote_account| {
-            ValidatorPriorityFeeCommissionEntry::new(
+        .filter_map(|vote_account| {
+
+            if let Some(validator_history) = keeper_state.validator_history_map.get(vote_account) {
+                let should_update = validator_history.history.arr.iter().any(|entry| entry.epoch as u64 == previous_epoch && entry.merkle_root_upload_authority == MerkleRootUploadAuthority::Unset);
+                if !should_update {
+                    return None;
+                }
+            }
+
+            Some(ValidatorPriorityFeeCommissionEntry::new(
                 vote_account,
-                epoch_info.epoch,
+                previous_epoch,
                 program_id,
                 priority_fee_distribution_program_id,
                 &keypair.pubkey(),
             )
-            .update_instruction()
+            .update_instruction())
         })
         .collect::<Vec<_>>();
 

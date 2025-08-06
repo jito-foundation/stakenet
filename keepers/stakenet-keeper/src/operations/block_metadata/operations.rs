@@ -20,7 +20,7 @@ use solana_transaction_status::{
 };
 use stakenet_sdk::{
     models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
-    utils::transactions::submit_instructions,
+    utils::transactions::submit_chunk_instructions,
 };
 
 use crate::{
@@ -81,10 +81,11 @@ pub async fn fire(
         .unwrap();
 
     let operation = _get_operation();
-    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
+
+    let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
         match _process(
@@ -101,6 +102,8 @@ pub async fn fire(
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
             keeper_config.cluster,
+            keeper_config.lookback_epochs,
+            keeper_config.loopback_start_offset,
         )
         .await
         {
@@ -147,6 +150,8 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     no_pack: bool,
     cluster: Cluster,
+    lookback_epochs: u64,
+    loopback_start_offset: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -162,6 +167,8 @@ async fn _process(
         priority_fee_in_microlamports,
         no_pack,
         cluster,
+        lookback_epochs,
+        loopback_start_offset,
     )
     .await
 }
@@ -181,6 +188,8 @@ async fn update_block_metadata(
     priority_fee_in_microlamports: u64,
     _no_pack: bool, //TODO take out
     cluster: Cluster,
+    lookback_epochs: u64,
+    loopback_start_offset: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -191,18 +200,17 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let lookback_epochs = 3;
-    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
+    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1 - loopback_start_offset);
 
     // 1. Update Epoch Schedule
-    {
+    for epoch in epoch_range.clone() {
         info!("\n\n\n1. Update Epoch Schedule\n\n\n");
         let start_time = std::time::Instant::now();
-        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
+        let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
         let epoch_leader_schedule = get_leader_schedule_safe(client, epoch_starting_slot).await?;
-        match DBSlotInfo::upsert_leader_schedule(
+        match DBSlotInfo::insert_leader_schedule(
             sqlite_connection,
-            current_epoch,
+            epoch,
             epoch_schedule,
             &epoch_leader_schedule,
             None,
@@ -212,7 +220,7 @@ async fn update_block_metadata(
                 info!(
                     "Wrote {} leaders for epoch {} in {:.3}s",
                     write_count,
-                    current_epoch,
+                    epoch,
                     time_ms as f64 / 1000.0
                 )
             }
@@ -223,7 +231,7 @@ async fn update_block_metadata(
         for leader in epoch_leader_schedule.keys() {
             if !identity_to_vote_map.contains_key(leader) {
                 // TODO
-                error!("TODO Could not find Vote for {}", leader)
+                error!("TODO Could not find Vote for {} in epoch {}", leader, epoch)
             }
         }
     }
@@ -259,7 +267,7 @@ async fn update_block_metadata(
         );
     }
 
-    // 3. Update Blocks
+    // 3. Update Blocks ( Tries to update all blocks )
     {
         info!("\n\n\n3. Update Blocks\n\n\n");
         let start_total_time = std::time::Instant::now();
@@ -343,9 +351,9 @@ async fn update_block_metadata(
 
         let start_time = std::time::Instant::now();
         for epoch in epoch_range {
+            let first_slot_in_next_epoch = epoch_schedule.get_first_slot_in_epoch(epoch + 1);
             let update_map = match DBSlotInfo::get_priority_fee_and_block_metadata_entries(
                 sqlite_connection,
-                epoch_schedule,
                 epoch,
                 program_id,
                 &priority_fee_oracle_authority_keypair.pubkey(),
@@ -381,14 +389,14 @@ async fn update_block_metadata(
                   ("blocks-missed", entry.blocks_missed, i64),
                   ("blocks-produced", entry.blocks_produced, i64),
                   ("epoch", entry.epoch, i64),
-                  ("highest-slot", entry.highest_slot, i64),
+                  ("highest-slot", entry.highest_done_slot, i64),
                   ("total-leader-slots", entry.total_leader_slots, i64),
                   ("total-priority-fees", entry.total_priority_fees, i64),
                   ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
                   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
                   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
                   ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
-                  ("update-slot", entry.update_slot, i64),
+                  ("update-slot", entry.highest_global_done_slot, i64),
                   "cluster" => cluster.to_string(),
                   "vote" => vote_account.to_string(),
                   "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
@@ -397,7 +405,19 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-                ixs.push(entry.update_instruction());
+
+                // Only update validator history if it's not already updated
+                if let Some(validator_history) = keeper_state.validator_history_map.get(&entry.vote_account) {
+                    let needs_update = validator_history.history.arr.iter().any(|history| {
+                        history.epoch as u64 == epoch
+                            && history.block_data_updated_at_slot < first_slot_in_next_epoch
+                    });
+
+                    // Only update on N-1.. epochs
+                    if needs_update {
+                        ixs.push(entry.update_instruction());
+                    }
+                }
             }
         }
 
@@ -414,7 +434,7 @@ async fn update_block_metadata(
         info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
 
         let start_time = std::time::Instant::now();
-        let submit_result = submit_instructions(
+        let submit_result = submit_chunk_instructions(
             client,
             ixs,
             priority_fee_oracle_authority_keypair,
@@ -422,7 +442,7 @@ async fn update_block_metadata(
             retry_count,
             confirmation_time,
             None,
-            true,
+            5,
         )
         .await?;
 

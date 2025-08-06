@@ -102,9 +102,9 @@ async fn random_cooldown(range: u8) {
 async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
-    let validator_history_interval = 60;
+    let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
-    let block_metadata_interval = 60;
+    let block_metadata_interval = keeper_config.block_metadata_interval;
 
     let intervals = vec![
         validator_history_interval,
@@ -410,6 +410,8 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
+            lookback_epochs: args.lookback_epochs,
+            loopback_start_offset: args.loopback_start_offset,
         };
 
         run_keeper(config, gossip_ip).await;
