@@ -1,12 +1,14 @@
 #![allow(clippy::await_holding_refcell_ref)]
 use std::collections::HashMap;
 
+#[allow(deprecated)]
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
 use solana_program_test::*;
+#[allow(deprecated)]
 use solana_sdk::{
     clock::Clock, epoch_schedule::EpochSchedule, signature::Keypair, signer::Signer,
     system_program, transaction::Transaction,

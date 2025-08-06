@@ -1,20 +1,19 @@
 use std::sync::Arc;
 
+use crate::commands::command_args::CrankRebalance;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
-use validator_history::id as validator_history_id;
-
+#[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
-
-use crate::commands::command_args::CrankRebalance;
+use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_validator_history_address},
     transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
+use validator_history::id as validator_history_id;
 
 pub async fn command_crank_rebalance(
     args: CrankRebalance,
