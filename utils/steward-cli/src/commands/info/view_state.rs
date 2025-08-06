@@ -1,3 +1,5 @@
+use std::{collections::HashMap, sync::Arc};
+
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
@@ -10,19 +12,21 @@ use solana_sdk::{account::Account, native_token::lamports_to_sol, pubkey::Pubkey
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, state::StakeStatus,
 };
-use std::{collections::HashMap, sync::Arc};
-use validator_history::ValidatorHistory;
-
-use crate::commands::command_args::ViewState;
-
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_validator_history_address},
     debug::{format_simple_steward_state_string, format_steward_state_string},
 };
+use validator_history::ValidatorHistory;
 
+use crate::commands::command_args::ViewState;
+
+/// Represents a balance in both lamports and SOL
 #[derive(Serialize, Deserialize, Debug)]
 struct LamportBalance {
+    /// Lamport amount
     lamports: u64,
+
+    /// SOL amount
     sol: f64,
 }
 
@@ -35,101 +39,235 @@ impl LamportBalance {
     }
 }
 
+/// Publlic keys for jito-steward program accounts
 #[derive(Serialize, Deserialize, Debug)]
 struct AccountAddresses {
+    /// Steward configuratioin account public key
     config: String,
+
+    /// Steward state account public key
     state: String,
 }
 
+/// Tracks progress through validator processing cycles
 #[derive(Serialize, Deserialize, Debug)]
 struct StateProgress {
+    /// Completed
     completed: usize,
+
+    /// Total
     total: u64,
+
+    /// Remaining
     remaining: u64,
 }
 
+/// Steward's current state and configuration
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StateInfo {
+    /// Current state of the steward state machine
+    ///
+    /// Possible values:
+    /// - ComputeScores
+    /// - ComputeDelegations
+    /// - Idle
+    /// - ComputeInstantUnstake
+    /// - Rebalance
     state_tag: String,
+
+    /// State progress
     progress: StateProgress,
+
+    /// Count of validator lamport balance entries tracked internally
     validator_lamport_balances_count: usize,
+
+    /// Count of computed validator performance scores
+    /// Overall scores used to determine delegates and delegation order
     scores_count: usize,
+
+    /// Count of validator indices sorted by score (descending)
+    /// Used for efficient ranking and delegation decisions
     sorted_score_indices_count: usize,
+
+    /// Count of computed yield component scores
+    /// Used as secondary priority for unstaking order decisions
     yield_scores_count: usize,
+
+    /// Count of validator indices sorted by yield score (descending)
+    /// Used for efficient yield-based ranking
     sorted_yield_score_indices_count: usize,
+
+    /// Count of delegation entries (target stake allocations)
+    /// Each entry represents target share of pool as a proportion
     delegations_count: usize,
+
+    /// Count of validators marked for instant unstaking
+    /// Each bit in the BitMask represents a validator flagged for immediate unstake
     instant_unstake_count: usize,
+
+    /// Slot number when the first ComputeScores instruction was called
+    /// Marks the beginning of the current scoring cycle
     start_computing_scores_slot: u64,
+
+    /// Internal current epoch used for tracking epoch changes
+    /// Updated when steward detects epoch transitions
     current_epoch: u64,
+
+    /// Epoch when the next steward cycle will begin
+    /// Determines when to start new scoring and delegation cycle
     next_cycle_epoch: u64,
+
+    /// Total number of validators in the stake pool
+    /// Updated at cycle start and when validators are removed
+    /// Used to determine how many validators to score
     num_pool_validators: u64,
+
+    /// Total lamports scheduled for unstaking due to scoring decisions
+    /// Accumulated during the current cycle
     scoring_unstake_total: u64,
+
+    /// Total lamports scheduled for instant unstaking
+    /// Accumulated during the current cycle  
     instant_unstake_total: u64,
+
+    /// Total lamports from stake deposits scheduled for unstaking
+    /// Tracks deposits that need to be withdrawn
     stake_deposit_unstake_total: u64,
+
+    /// Count of validators marked for removal from the pool
+    /// Cleaned up in the next epoch after removal
     validators_to_remove_count: usize,
+
+    /// Count of validators marked for immediate removal
+    /// Applied when validator can be removed within the same epoch
     validators_for_immediate_removal_count: usize,
+
+    /// Number of validators added to the pool in the current cycle
+    /// Used to track pool growth
     validators_added: u16,
+
+    /// Count of validators with non-zero performance scores
+    /// Indicates how many validators are currently eligible for delegation
     non_zero_scores: u32,
 }
 
+/// Summary of all lamport balances in the stake pool
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LamportSummary {
+    /// Total lamports actively staked across all validators
     total_staked: LamportBalance,
+
+    /// Total lamports in transient stake accounts (pending activation/deactivation)
     total_transient: LamportBalance,
+
+    /// Lamports held in the reserve stake account
     reserve: LamportBalance,
 }
 
+/// Count of validators by their current stake status
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorCounts {
+    /// Validators with active stake
     active: u32,
+
+    /// Validators currently deactivating transient stake
     deactivating_transient: u32,
+
+    /// Validators deactivating all stake (both active and transient)
     deactivating_all: u32,
+
+    /// Validators with stake being deactivated
     deactivating: u32,
+
+    /// Validators ready to be removed from the pool
     ready_for_removal: u32,
 }
 
+/// Human-readable string representations of the steward state
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StateStrings {
+    /// Detailed state description with additional context
     detailed: String,
+
+    /// Simple, concise state description
     simple: String,
 }
 
+/// Complete output for the default (non-verbose) state view
+///
+/// This provides a high-level overview of the steward's current state,
+/// including account information, processing progress, and stake distribution.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DefaultStateOutput {
+    /// Public keys for steward accounts
     accounts: AccountAddresses,
+
+    /// Detailed state information and progress
     state: StateInfo,
+
+    /// Summary of stake balances
     lamports: LamportSummary,
+
+    /// Count of validators by status
     validator_counts: ValidatorCounts,
+
+    /// Human-readable state descriptions
     state_strings: StateStrings,
 }
 
+/// Public keys for validator-related accounts
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorAddresses {
+    /// Validator's vote account public key
     vote_account: String,
+
+    /// Validator's stake account public key in the pool
     stake_account: String,
+
+    /// Validator's transient stake account public key
     transient_stake_account: String,
 }
 
+/// Information from the validator_history program
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorHistoryOutput {
+    /// Index of this validator in the validator history program
     index: u32,
+
+    /// Whether this validator is blacklisted based on historical performance
     is_blacklisted: bool,
 }
 
+/// Lamport balances for a specific validator across different account types
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorLamports {
+    /// Lamports in the validator's active stake account
     active: LamportBalance,
+
+    /// Lamports in the validator's transient stake account
     transient: LamportBalance,
+
+    /// Internal lamport balance tracked by steward (None if unset)
     steward_internal: Option<u64>,
 }
 
+/// Current status of a validator's stake in the pool
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidatorStatus {
+    /// Validator has active stake and is participating normally
     Active,
+
+    /// Validator is deactivating all stake (active + transient)
     DeactivatingAll,
+
+    /// Validator is deactivating only transient stake
     DeactivatingTransient,
+
+    /// Validator's active stake is being deactivated
     DeactivatingValidator,
+
+    /// Validator is ready to be completely removed from the pool
     ReadyForRemoval,
 }
 
@@ -145,41 +283,91 @@ impl From<StakeStatus> for ValidatorStatus {
     }
 }
 
+/// Comprehensive details about a single validator in the stake pool
+///
+/// Contains all relevant information about a validator's performance,
+/// stake allocation, status, and steward-specific data.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatorDetails {
-    addresses: ValidatorAddresses,
-    steward_list_index: usize,
-    overall_rank: Option<usize>,
-    score: u32,
-    yield_score: u32,
-    passing_eligibility_criteria: String,
-    target_delegation_percent: f64,
-    is_instant_unstake: bool,
-    validator_history_output: Option<ValidatorHistoryOutput>,
-    lamports: ValidatorLamports,
-    status: ValidatorStatus,
-    marked_for_removal: bool,
-    marked_for_immediate_removal: bool,
+    /// Public keys for validator-related accounts
+    pub addresses: ValidatorAddresses,
+
+    /// Position of this validator in the steward's validator list
+    pub steward_list_index: usize,
+
+    /// Overall rank among all validators (1-based, None if unranked)
+    /// Ranking is based on score (primary) and yield score (secondary)
+    pub overall_rank: Option<usize>,
+
+    /// Performance score assigned by the steward (0 = failing, >0 = passing)
+    pub score: u32,
+
+    /// Yield score based on staking rewards performance
+    pub yield_score: u32,
+
+    /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
+    pub passing_eligibility_criteria: String,
+
+    /// Target percentage of total pool stake to delegate to this validator
+    pub target_delegation_percent: f64,
+
+    /// Whether this validator is marked for instant unstaking
+    pub is_instant_unstake: bool,
+
+    /// Historical performance data (None if not available)
+    pub validator_history_output: Option<ValidatorHistoryOutput>,
+
+    /// Lamport balances across different account types
+    pub lamports: ValidatorLamports,
+
+    /// Current stake status in the pool
+    pub status: ValidatorStatus,
+
+    /// Whether validator is marked for removal in next cycle
+    pub marked_for_removal: bool,
+
+    /// Whether validator is marked for immediate removal
+    pub marked_for_immediate_removal: bool,
 }
 
+/// A validator with its performance score for ranking purposes
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RankedValidator {
-    vote_account: String,
-    score: u32,
+    /// Validator's vote account public key
+    pub vote_account: String,
+
+    /// Performance score assigned by the steward
+    pub score: u32,
 }
 
+/// Summary of all validators with non-zero scores, sorted by performance
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RankedValidatorsSummary {
-    count: usize,
-    validators: Vec<RankedValidator>,
+    /// Total number of validators with non-zero scores
+    pub count: usize,
+
+    /// List of validators sorted by score (highest first)
+    pub validators: Vec<RankedValidator>,
 }
 
+/// Complete output for the verbose state view
+///
+/// Provides detailed information about individual validators,
+/// including their performance metrics, stake allocations, and rankings.
+/// Optionally includes a ranked summary when viewing all validators.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerboseStateOutput {
-    validators: Vec<ValidatorDetails>,
-    ranked_validators: Option<RankedValidatorsSummary>,
+    /// Detailed information for each validator
+    pub validators: Vec<ValidatorDetails>,
+
+    /// Ranked summary of all validators (None when viewing a specific validator)
+    pub ranked_validators: Option<RankedValidatorsSummary>,
 }
 
+/// View steward state information
+///
+/// Fetches steward accounts and display either a summary view or detailed validator information
+/// based on the provided arguments.
 pub async fn command_view_state(
     args: ViewState,
     client: &Arc<RpcClient>,
@@ -246,6 +434,11 @@ pub async fn command_view_state(
     Ok(())
 }
 
+/// Constructs a structured representation of the steward's default state
+///
+/// Processes raw steward state data into a well-structured output format
+/// that can be easily serialized to JSON or displayed as formatted text.
+/// This function aggregates validator information and computes summary statistics.
 fn build_default_state_output(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
@@ -330,6 +523,7 @@ fn build_default_state_output(
     }
 }
 
+/// Display the information of [`DefaultStateOutput`]
 fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
@@ -473,6 +667,7 @@ fn _print_default_state(
     }
 }
 
+/// Computes overall ranking of validators based on performance metrics
 fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usize> {
     let state = &steward_state_account.state;
     let num_pool_validators = state.num_pool_validators as usize;
@@ -497,6 +692,11 @@ fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usi
     ranks
 }
 
+/// Constructs detailed validator information for verbose output
+///
+/// Processes individual validator data, historical performance, and steward-specific
+/// metrics to create comprehensive validator details. Handles filtering for specific
+/// vote accounts and builds ranked summaries when appropriate.
 fn build_verbose_state_output(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
@@ -643,6 +843,7 @@ fn build_verbose_state_output(
     }
 }
 
+/// Display the information of [`VerboseStateOutput`]
 fn _print_verbose_state(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
