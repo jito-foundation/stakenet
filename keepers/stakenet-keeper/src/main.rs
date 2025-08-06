@@ -235,15 +235,15 @@ async fn run_keeper(
                 );
             }
 
-            // if keeper_config.oracle_authority_keypair.is_some()
-            //     && keeper_config.gossip_entrypoints.is_some()
-            // {
-            info!("Updating gossip accounts...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                // operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ips).await,
-                operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
-            );
-            // }
+            if keeper_config.oracle_authority_keypair.is_some()
+                && keeper_config.gossip_data.is_some()
+            {
+                info!("Updating gossip accounts...");
+                keeper_state.set_runs_errors_and_txs_for_epoch(
+                    // operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ips).await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+                );
+            }
 
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
@@ -330,16 +330,20 @@ fn main() {
 
     let gossip_data = args
         .gossip_entrypoints
-        .iter()
-        .map(|entrypoint| {
-            let socket_addr = solana_net_utils::parse_host_port(entrypoint.as_str())
-                .expect("Failed to parse host and port from gossip entrypoint");
-            let ip_addr = solana_net_utils::get_public_ip_addr(&socket_addr)
-                .expect("Failed to get public ip address for gossip node");
+        .map(|gossip_entrypoints| {
+            gossip_entrypoints
+                .iter()
+                .map(|entrypoint| {
+                    let socket_addr = solana_net_utils::parse_host_port(entrypoint.as_str())
+                        .expect("Failed to parse host and port from gossip entrypoint");
+                    let ip_addr = solana_net_utils::get_public_ip_addr(&socket_addr)
+                        .expect("Failed to get public ip address for gossip node");
 
-            (socket_addr, ip_addr)
+                    (socket_addr, ip_addr)
+                })
+                .collect()
         })
-        .collect();
+        .expect("");
 
     // let gossip_ips: Vec<IpAddr> = gossip_entrypoints
     //     .iter()
@@ -407,7 +411,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_data,
+            gossip_data: Some(gossip_data),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,

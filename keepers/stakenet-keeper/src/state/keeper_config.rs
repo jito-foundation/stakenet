@@ -24,7 +24,7 @@ pub struct KeeperConfig {
     /// Gossip data
     ///
     /// - Accept multiple URLs for Gossip URL to make sure retrieving gossip entries data
-    pub gossip_data: Vec<(SocketAddr, IpAddr)>,
+    pub gossip_data: Option<Vec<(SocketAddr, IpAddr)>>,
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
@@ -56,7 +56,7 @@ pub struct Args {
 
     /// Gossip entrypoint in the form of URL:PORT
     #[arg(long, env)]
-    pub gossip_entrypoints: Vec<String>,
+    pub gossip_entrypoints: Option<Vec<String>>,
 
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(long, env, default_value = "./credentials/keypair.json")]

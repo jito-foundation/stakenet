@@ -46,7 +46,6 @@ fn _should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         || (epoch_info.slot_index > epoch_info.slots_in_epoch * 9 / 10 && runs_for_epoch < 3)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn _process(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -80,10 +79,10 @@ pub async fn fire(
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
-    // let entrypoints = keeper_config
-    //     .gossip_entrypoints
-    //     .clone()
-    //     .expect("Entry point not set");
+    let gossip_data = keeper_config
+        .gossip_data
+        .clone()
+        .expect("Entry point not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let retry_count = keeper_config.tx_retry_count;
@@ -105,7 +104,7 @@ pub async fn fire(
             keeper_state,
             retry_count,
             confirmation_time,
-            &keeper_config.gossip_data,
+            &gossip_data,
         )
         .await
         {
