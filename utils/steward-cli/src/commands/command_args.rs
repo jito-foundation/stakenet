@@ -4,7 +4,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "CLI for the steward program")]
+#[command(about = "CLI for the steward program", version)]
 pub struct Args {
     /// RPC URL for the cluster
     #[arg(
@@ -224,6 +224,14 @@ pub struct ViewParameters {
     /// Steward account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 // ---------- COMMANDS ------------
