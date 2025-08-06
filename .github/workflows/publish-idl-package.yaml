@@ -1,6 +1,9 @@
 name: Publish IDL Package
+
 on:
   workflow_dispatch:
+    branches:
+      - master
 
 jobs:
   publish:
