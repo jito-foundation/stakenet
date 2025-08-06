@@ -45,6 +45,7 @@ enum Commands {
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
     StakeByCountry(StakeByCountry),
+    FetchAllValidatorHistories(FetchAllValidatorHistories),
     GetConfig,
 }
 
@@ -169,6 +170,26 @@ struct StakeByCountry {
     /// IP Info Token
     #[arg(short, long, env)]
     ip_info_token: String,
+}
+
+#[derive(Parser)]
+#[command(about = "Fetch all validator history accounts for each epoch")]
+struct FetchAllValidatorHistories {
+    /// Number of epochs to fetch (default: 10, going backwards from current epoch)
+    #[arg(short = 'n', long, default_value = "10")]
+    num_epochs: u64,
+
+    /// Starting epoch (default: current epoch)
+    #[arg(short, long)]
+    start_epoch: Option<u64>,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 fn command_init_config(args: InitConfig, client: RpcClient) {
@@ -985,6 +1006,107 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     }
 }
 
+fn command_fetch_all_validator_histories(args: FetchAllValidatorHistories, client: RpcClient) {
+    // epoch bounds
+    let current_epoch = client
+        .get_epoch_info()
+        .expect("Failed to get epoch info")
+        .epoch;
+
+    let start_epoch = args.start_epoch.unwrap_or(current_epoch);
+    let end_epoch = start_epoch.saturating_sub(args.num_epochs - 1);
+    println!(
+        "Fetching validator history accounts from epoch {} to {}",
+        start_epoch, end_epoch
+    );
+
+    // for each epoch in bounds
+    let mut all_results = Vec::new();
+    for epoch in (end_epoch..=start_epoch).rev() {
+        // get program accounts
+        println!("Fetching validator history accounts for epoch {}...", epoch);
+        let gpa_config = RpcProgramAccountsConfig {
+            filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                0,
+                ValidatorHistory::DISCRIMINATOR.into(),
+            ))]),
+            account_config: RpcAccountInfoConfig {
+                encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+                ..RpcAccountInfoConfig::default()
+            },
+            ..RpcProgramAccountsConfig::default()
+        };
+        let validator_history_accounts =
+            match client.get_program_accounts_with_config(&validator_history::id(), gpa_config) {
+                Ok(accounts) => accounts,
+                Err(err) => {
+                    eprintln!(
+                        "Error fetching validator history accounts for epoch {}: {}",
+                        epoch, err
+                    );
+                    continue;
+                }
+            };
+        // parse accounts
+        let mut epoch_validators = Vec::new();
+        let mut validators_with_data = 0;
+        for (pubkey, account) in validator_history_accounts.iter() {
+            match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
+                Ok(validator_history) => {
+                    if let Some(entry) = get_entry(validator_history, epoch) {
+                        validators_with_data += 1;
+                        if args.print_json {
+                            let entry_output = ValidatorHistoryEntryOutput::from(entry);
+                            epoch_validators.push(serde_json::json!({
+                                "validator_history_account": pubkey.to_string(),
+                                "vote_account": validator_history.vote_account.to_string(),
+                                "index": validator_history.index,
+                                "entry": entry_output,
+                            }));
+                        } else {
+                            println!(
+                                "  Validator {} (index: {}, vote: {})",
+                                pubkey, validator_history.index, validator_history.vote_account
+                            );
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!(
+                        "Error deserializing validator history account {}: {}",
+                        pubkey, err
+                    );
+                }
+            }
+        }
+        // summarize
+        println!(
+            "Epoch {}: Found {} total validator history accounts, {} with data for this epoch",
+            epoch,
+            validator_history_accounts.len(),
+            validators_with_data
+        );
+        if args.print_json {
+            all_results.push(serde_json::json!({
+                "epoch": epoch,
+                "total_accounts": validator_history_accounts.len(),
+                "accounts_with_data": validators_with_data,
+                "validators": epoch_validators,
+            }));
+        }
+    }
+
+    // print summary
+    if args.print_json {
+        let output = serde_json::json!({
+            "start_epoch": start_epoch,
+            "end_epoch": end_epoch,
+            "epochs": all_results,
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    }
+}
+
 fn command_get_config(client: RpcClient) {
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
 
@@ -1033,6 +1155,9 @@ async fn main() {
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
+        Commands::FetchAllValidatorHistories(args) => {
+            command_fetch_all_validator_histories(args, client)
+        }
         Commands::GetConfig => command_get_config(client),
     };
 }
