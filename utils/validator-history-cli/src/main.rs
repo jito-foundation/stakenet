@@ -1017,8 +1017,11 @@ fn fetch_validator_histories_by_epoch(
     client: &RpcClient,
 ) -> Vec<(Epoch, Vec<Validator>)> {
     let end_epoch = start_epoch.saturating_sub(num_epochs - 1);
-    println!("📈 Fetching validator histories for epochs {} to {}", end_epoch, start_epoch);
-    
+    println!(
+        "📈 Fetching validator histories for epochs {} to {}",
+        end_epoch, start_epoch
+    );
+
     // Fetch all validator history accounts once
     print!("🔍 Fetching all validator history accounts... ");
     let gpa_config = RpcProgramAccountsConfig {
@@ -1037,7 +1040,7 @@ fn fetch_validator_histories_by_epoch(
             Ok(accounts) => {
                 println!("✅ Found {} validator history accounts", accounts.len());
                 accounts
-            },
+            }
             Err(err) => {
                 eprintln!("❌ Error fetching validator history accounts: {}", err);
                 return vec![];
@@ -1056,7 +1059,10 @@ fn fetch_validator_histories_by_epoch(
 
     // For each epoch, find validators with data
     let mut results = Vec::new();
-    println!("🔍 Searching for validator data across {} epochs...", num_epochs);
+    println!(
+        "🔍 Searching for validator data across {} epochs...",
+        num_epochs
+    );
     for (i, epoch) in (end_epoch..=start_epoch).rev().enumerate() {
         print!("  📅 Epoch {} ({}/{}): ", epoch, i + 1, num_epochs);
         let mut epoch_histories = Vec::new();
@@ -1072,69 +1078,130 @@ fn fetch_validator_histories_by_epoch(
     results
 }
 
-fn fetch_tip_distribution_accounts_by_epoch(
+async fn fetch_tip_distribution_accounts_by_epoch(
     validator_histories_by_epoch: &[(Epoch, Vec<Validator>)],
     client: &RpcClient,
 ) -> Vec<(Epoch, Vec<(Validator, Option<TipDistributionAccount>)>)> {
     let total_epochs = validator_histories_by_epoch.len();
-    let total_validators: usize = validator_histories_by_epoch.iter().map(|(_, v)| v.len()).sum();
-    println!("💰 Fetching tip distribution accounts for {} validators across {} epochs", total_validators, total_epochs);
-    
-    let mut results = Vec::new();
-    for (epoch_idx, (epoch, validator_histories)) in validator_histories_by_epoch.iter().enumerate() {
-        println!("  💰 Epoch {} ({}/{}): checking {} validators", epoch, epoch_idx + 1, total_epochs, validator_histories.len());
-        // Derive tip distribution accounts
-        let tip_distribution_addresses: Vec<(Validator, Pubkey)> = validator_histories
-            .iter()
-            .map(|(vote_account, entry)| {
-                let tda_address = derive_tip_distribution_account_address(
-                    &jito_tip_distribution::id(),
-                    &vote_account,
-                    *epoch,
-                )
-                .0;
-                ((*vote_account, *entry), tda_address)
-            })
-            .collect();
+    let total_validators: usize = validator_histories_by_epoch
+        .iter()
+        .map(|(_, v)| v.len())
+        .sum();
+    println!(
+        "💰 Fetching tip distribution accounts for {} validators across {} epochs (in parallel)",
+        total_validators, total_epochs
+    );
 
-        // Fetch accounts sequentially
-        let total_validators = validator_histories.len();
-        println!("    🔍 Fetching {} tip distribution accounts sequentially...", total_validators);
-        let mut found_count = 0;
-        let epoch_results: Vec<(Validator, Option<TipDistributionAccount>)> = tip_distribution_addresses
-            .iter()
-            .enumerate()
-            .map(|(i, (validator, tda_address))| {
-                // Progress logging every 10 accounts and at key milestones
-                if i % 10 == 0 || i == total_validators - 1 {
-                    let progress_pct = ((i + 1) as f64 / total_validators as f64) * 100.0;
-                    print!("\r      📊 Progress: {}/{} ({:.1}%) - Found: {}", 
-                           i + 1, total_validators, progress_pct, found_count);
-                    use std::io::{self, Write};
-                    io::stdout().flush().unwrap();
-                }
-                
-                let tda_res = client.get_account(tda_address).ok();
-                let tda_res = tda_res.and_then(|account| {
-                    TipDistributionAccount::try_deserialize(&mut account.data.as_slice()).ok()
-                });
-                if tda_res.is_some() {
-                    found_count += 1;
-                }
-                (*validator, tda_res)
-            })
-            .collect();
-        println!("\n    ✅ Completed: Found {}/{} tip distribution accounts ({:.1}%)", 
-                 found_count, total_validators, 
-                 (found_count as f64 / total_validators as f64) * 100.0);
+    // Process epochs in parallel using tokio::spawn
+    let mut tasks = Vec::new();
 
-        results.push((*epoch, epoch_results))
+    for (epoch_idx, (epoch, validator_histories)) in validator_histories_by_epoch.iter().enumerate()
+    {
+        let epoch = *epoch;
+        let epoch_idx = epoch_idx;
+        let total_epochs = total_epochs;
+        let validator_histories = validator_histories.clone();
+        let client_url = client.url();
+
+        let task = tokio::spawn(async move {
+            // Create a new client for this task
+            let client = RpcClient::new(client_url);
+
+            println!(
+                "  💰 Epoch {} ({}/{}): checking {} validators",
+                epoch,
+                epoch_idx + 1,
+                total_epochs,
+                validator_histories.len()
+            );
+
+            // Derive tip distribution accounts
+            let tip_distribution_addresses: Vec<(Validator, Pubkey)> = validator_histories
+                .iter()
+                .map(|(vote_account, entry)| {
+                    let tda_address = derive_tip_distribution_account_address(
+                        &jito_tip_distribution::id(),
+                        &vote_account,
+                        epoch,
+                    )
+                    .0;
+                    ((*vote_account, *entry), tda_address)
+                })
+                .collect();
+
+            // Fetch accounts sequentially within this epoch
+            let total_validators = validator_histories.len();
+            println!(
+                "    🔍 Epoch {}: Fetching {} tip distribution accounts sequentially...",
+                epoch, total_validators
+            );
+            let mut found_count = 0;
+            let epoch_results: Vec<(Validator, Option<TipDistributionAccount>)> =
+                tip_distribution_addresses
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (validator, tda_address))| {
+                        // Progress logging every 50 accounts and at key milestones
+                        if i % 50 == 0 || i == total_validators - 1 {
+                            let progress_pct = ((i + 1) as f64 / total_validators as f64) * 100.0;
+                            print!(
+                                "\r      📊 Epoch {}: {}/{} ({:.1}%) - Found: {}",
+                                epoch,
+                                i + 1,
+                                total_validators,
+                                progress_pct,
+                                found_count
+                            );
+                            use std::io::{self, Write};
+                            io::stdout().flush().unwrap();
+                        }
+
+                        let tda_res = client.get_account(tda_address).ok();
+                        let tda_res = tda_res.and_then(|account| {
+                            TipDistributionAccount::try_deserialize(&mut account.data.as_slice())
+                                .ok()
+                        });
+                        if tda_res.is_some() {
+                            found_count += 1;
+                        }
+                        (*validator, tda_res)
+                    })
+                    .collect();
+            println!(
+                "\n    ✅ Epoch {}: Found {}/{} tip distribution accounts ({:.1}%)",
+                epoch,
+                found_count,
+                total_validators,
+                (found_count as f64 / total_validators as f64) * 100.0
+            );
+
+            (epoch, epoch_results)
+        });
+
+        tasks.push(task);
     }
 
+    // Wait for all tasks to complete and collect results
+    println!(
+        "⏳ Waiting for all {} epoch tasks to complete...",
+        total_epochs
+    );
+    let mut results = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok(result) => results.push(result),
+            Err(e) => eprintln!("❌ Task failed: {}", e),
+        }
+    }
+
+    // Sort results by epoch to maintain order
+    results.sort_by_key(|(epoch, _)| *epoch);
+
+    println!("🎉 All epochs completed!");
     results
 }
 
-fn command_find_missing_tip_distribution_accounts(
+async fn command_find_missing_tip_distribution_accounts(
     args: FindMissingTipDistributionAccounts,
     client: RpcClient,
 ) {
@@ -1158,7 +1225,7 @@ fn command_find_missing_tip_distribution_accounts(
 
     // Fetch tip distribution accounts
     let tip_distributions_by_epoch =
-        fetch_tip_distribution_accounts_by_epoch(&validator_histories_by_epoch, &client);
+        fetch_tip_distribution_accounts_by_epoch(&validator_histories_by_epoch, &client).await;
 
     if !args.print_json {
         println!("\n📊 Analyzing missing accounts...");
@@ -1210,12 +1277,19 @@ fn command_find_missing_tip_distribution_accounts(
             if epoch_missing_count > 0 {
                 println!(
                     "  📅 Epoch {} ({}/{}): {}/{} validators missing tip distribution accounts",
-                    epoch, epoch_idx + 1, tip_distributions_by_epoch.len(), epoch_missing_count, tip_distributions.len()
+                    epoch,
+                    epoch_idx + 1,
+                    tip_distributions_by_epoch.len(),
+                    epoch_missing_count,
+                    tip_distributions.len()
                 );
             } else {
                 println!(
                     "  ✅ Epoch {} ({}/{}): All {} validators have tip distribution accounts",
-                    epoch, epoch_idx + 1, tip_distributions_by_epoch.len(), tip_distributions.len()
+                    epoch,
+                    epoch_idx + 1,
+                    tip_distributions_by_epoch.len(),
+                    tip_distributions.len()
                 );
             }
         }
@@ -1233,7 +1307,10 @@ fn command_find_missing_tip_distribution_accounts(
     } else {
         println!("\n📊 Final Summary:");
         println!("✅ Total validators checked: {}", total_validators);
-        println!("❌ Total missing tip distribution accounts: {}", total_missing);
+        println!(
+            "❌ Total missing tip distribution accounts: {}",
+            total_missing
+        );
         if total_validators > 0 {
             let missing_percentage = (total_missing as f64 / total_validators as f64) * 100.0;
             println!("📈 Missing percentage: {:.2}%", missing_percentage);
@@ -1297,7 +1374,7 @@ async fn main() {
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::FindMissingTipDistributionAccounts(args) => {
-            command_find_missing_tip_distribution_accounts(args, client)
+            command_find_missing_tip_distribution_accounts(args, client).await
         }
         Commands::GetConfig => command_get_config(client),
     };
