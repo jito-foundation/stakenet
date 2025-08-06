@@ -3,6 +3,8 @@ use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
+use jito_tip_distribution::state::TipDistributionAccount;
+use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -45,7 +47,7 @@ enum Commands {
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
     StakeByCountry(StakeByCountry),
-    FetchAllValidatorHistories(FetchAllValidatorHistories),
+    FindMissingTipDistributionAccounts(FindMissingTipDistributionAccounts),
     GetConfig,
 }
 
@@ -173,9 +175,9 @@ struct StakeByCountry {
 }
 
 #[derive(Parser)]
-#[command(about = "Fetch all validator history accounts for each epoch")]
-struct FetchAllValidatorHistories {
-    /// Number of epochs to fetch (default: 10, going backwards from current epoch)
+#[command(about = "Find validator history accounts missing tip distribution accounts")]
+struct FindMissingTipDistributionAccounts {
+    /// Number of epochs to check (default: 10, going backwards from current epoch)
     #[arg(short = 'n', long, default_value = "10")]
     num_epochs: u64,
 
@@ -1006,104 +1008,243 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     }
 }
 
-fn command_fetch_all_validator_histories(args: FetchAllValidatorHistories, client: RpcClient) {
-    // epoch bounds
+type Epoch = u64;
+type VoteAccunt = Pubkey;
+type Validator = (VoteAccunt, ValidatorHistoryEntry);
+fn fetch_validator_histories_by_epoch(
+    start_epoch: Epoch,
+    num_epochs: u64,
+    client: &RpcClient,
+) -> Vec<(Epoch, Vec<Validator>)> {
+    let end_epoch = start_epoch.saturating_sub(num_epochs - 1);
+    println!("📈 Fetching validator histories for epochs {} to {}", end_epoch, start_epoch);
+    
+    // Fetch all validator history accounts once
+    print!("🔍 Fetching all validator history accounts... ");
+    let gpa_config = RpcProgramAccountsConfig {
+        filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            0,
+            ValidatorHistory::DISCRIMINATOR.into(),
+        ))]),
+        account_config: RpcAccountInfoConfig {
+            encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
+            ..RpcAccountInfoConfig::default()
+        },
+        ..RpcProgramAccountsConfig::default()
+    };
+    let validator_history_accounts =
+        match client.get_program_accounts_with_config(&validator_history::id(), gpa_config) {
+            Ok(accounts) => {
+                println!("✅ Found {} validator history accounts", accounts.len());
+                accounts
+            },
+            Err(err) => {
+                eprintln!("❌ Error fetching validator history accounts: {}", err);
+                return vec![];
+            }
+        };
+
+    // Parse all accounts
+    print!("🔧 Parsing validator history accounts... ");
+    let parsed_histories: Vec<ValidatorHistory> = validator_history_accounts
+        .iter()
+        .filter_map(|(_, account)| {
+            ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+        })
+        .collect();
+    println!("✅ Parsed {} valid accounts", parsed_histories.len());
+
+    // For each epoch, find validators with data
+    let mut results = Vec::new();
+    println!("🔍 Searching for validator data across {} epochs...", num_epochs);
+    for (i, epoch) in (end_epoch..=start_epoch).rev().enumerate() {
+        print!("  📅 Epoch {} ({}/{}): ", epoch, i + 1, num_epochs);
+        let mut epoch_histories = Vec::new();
+        for validator_history in &parsed_histories {
+            if let Some(entry) = get_entry(*validator_history, epoch) {
+                epoch_histories.push((validator_history.vote_account, entry))
+            }
+        }
+        println!("found {} validators with data", epoch_histories.len());
+        results.push((epoch, epoch_histories));
+    }
+
+    results
+}
+
+fn fetch_tip_distribution_accounts_by_epoch(
+    validator_histories_by_epoch: &[(Epoch, Vec<Validator>)],
+    client: &RpcClient,
+) -> Vec<(Epoch, Vec<(Validator, Option<TipDistributionAccount>)>)> {
+    let total_epochs = validator_histories_by_epoch.len();
+    let total_validators: usize = validator_histories_by_epoch.iter().map(|(_, v)| v.len()).sum();
+    println!("💰 Fetching tip distribution accounts for {} validators across {} epochs", total_validators, total_epochs);
+    
+    let mut results = Vec::new();
+    for (epoch_idx, (epoch, validator_histories)) in validator_histories_by_epoch.iter().enumerate() {
+        println!("  💰 Epoch {} ({}/{}): checking {} validators", epoch, epoch_idx + 1, total_epochs, validator_histories.len());
+        // Derive tip distribution accounts
+        let tip_distribution_addresses: Vec<(Validator, Pubkey)> = validator_histories
+            .iter()
+            .map(|(vote_account, entry)| {
+                let tda_address = derive_tip_distribution_account_address(
+                    &jito_tip_distribution::id(),
+                    &vote_account,
+                    *epoch,
+                )
+                .0;
+                ((*vote_account, *entry), tda_address)
+            })
+            .collect();
+
+        // Fetch accounts sequentially
+        let total_validators = validator_histories.len();
+        println!("    🔍 Fetching {} tip distribution accounts sequentially...", total_validators);
+        let mut found_count = 0;
+        let epoch_results: Vec<(Validator, Option<TipDistributionAccount>)> = tip_distribution_addresses
+            .iter()
+            .enumerate()
+            .map(|(i, (validator, tda_address))| {
+                // Progress logging every 10 accounts and at key milestones
+                if i % 10 == 0 || i == total_validators - 1 {
+                    let progress_pct = ((i + 1) as f64 / total_validators as f64) * 100.0;
+                    print!("\r      📊 Progress: {}/{} ({:.1}%) - Found: {}", 
+                           i + 1, total_validators, progress_pct, found_count);
+                    use std::io::{self, Write};
+                    io::stdout().flush().unwrap();
+                }
+                
+                let tda_res = client.get_account(tda_address).ok();
+                let tda_res = tda_res.and_then(|account| {
+                    TipDistributionAccount::try_deserialize(&mut account.data.as_slice()).ok()
+                });
+                if tda_res.is_some() {
+                    found_count += 1;
+                }
+                (*validator, tda_res)
+            })
+            .collect();
+        println!("\n    ✅ Completed: Found {}/{} tip distribution accounts ({:.1}%)", 
+                 found_count, total_validators, 
+                 (found_count as f64 / total_validators as f64) * 100.0);
+
+        results.push((*epoch, epoch_results))
+    }
+
+    results
+}
+
+fn command_find_missing_tip_distribution_accounts(
+    args: FindMissingTipDistributionAccounts,
+    client: RpcClient,
+) {
+    // Epoch range
     let current_epoch = client
         .get_epoch_info()
         .expect("Failed to get epoch info")
         .epoch;
-
     let start_epoch = args.start_epoch.unwrap_or(current_epoch);
     let end_epoch = start_epoch.saturating_sub(args.num_epochs - 1);
-    println!(
-        "Fetching validator history accounts from epoch {} to {}",
-        start_epoch, end_epoch
-    );
+    if !args.print_json {
+        println!(
+            "🔍 Checking for missing tip distribution accounts from epoch {} to {}",
+            start_epoch, end_epoch
+        );
+    }
 
-    // for each epoch in bounds
+    // Fetch validator histories by epoch
+    let validator_histories_by_epoch =
+        fetch_validator_histories_by_epoch(start_epoch, args.num_epochs, &client);
+
+    // Fetch tip distribution accounts
+    let tip_distributions_by_epoch =
+        fetch_tip_distribution_accounts_by_epoch(&validator_histories_by_epoch, &client);
+
+    if !args.print_json {
+        println!("\n📊 Analyzing missing accounts...");
+    }
+
+    // Cross-reference and find missing accounts
     let mut all_results = Vec::new();
-    for epoch in (end_epoch..=start_epoch).rev() {
-        // get program accounts
-        println!("Fetching validator history accounts for epoch {}...", epoch);
-        let gpa_config = RpcProgramAccountsConfig {
-            filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
-                0,
-                ValidatorHistory::DISCRIMINATOR.into(),
-            ))]),
-            account_config: RpcAccountInfoConfig {
-                encoding: Some(solana_account_decoder::UiAccountEncoding::Base64),
-                ..RpcAccountInfoConfig::default()
-            },
-            ..RpcProgramAccountsConfig::default()
-        };
-        let validator_history_accounts =
-            match client.get_program_accounts_with_config(&validator_history::id(), gpa_config) {
-                Ok(accounts) => accounts,
-                Err(err) => {
-                    eprintln!(
-                        "Error fetching validator history accounts for epoch {}: {}",
-                        epoch, err
-                    );
-                    continue;
-                }
-            };
-        // parse accounts
-        let mut epoch_validators = Vec::new();
-        let mut validators_with_data = 0;
-        for (pubkey, account) in validator_history_accounts.iter() {
-            match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
-                Ok(validator_history) => {
-                    if let Some(entry) = get_entry(validator_history, epoch) {
-                        validators_with_data += 1;
-                        if args.print_json {
-                            let entry_output = ValidatorHistoryEntryOutput::from(entry);
-                            epoch_validators.push(serde_json::json!({
-                                "validator_history_account": pubkey.to_string(),
-                                "vote_account": validator_history.vote_account.to_string(),
-                                "index": validator_history.index,
-                                "entry": entry_output,
-                            }));
-                        } else {
-                            println!(
-                                "  Validator {} (index: {}, vote: {})",
-                                pubkey, validator_history.index, validator_history.vote_account
-                            );
-                        }
-                    }
-                }
-                Err(err) => {
-                    eprintln!(
-                        "Error deserializing validator history account {}: {}",
-                        pubkey, err
+    let mut total_missing = 0;
+    let mut total_validators = 0;
+
+    for (epoch_idx, (epoch, tip_distributions)) in tip_distributions_by_epoch.iter().enumerate() {
+        let mut missing_for_epoch = Vec::new();
+        let mut epoch_missing_count = 0;
+
+        for ((vote_account, _val_hist_entry), tip_dist_opt) in tip_distributions.iter() {
+            total_validators += 1;
+            if tip_dist_opt.is_none() {
+                total_missing += 1;
+                epoch_missing_count += 1;
+                let tip_distribution_address = derive_tip_distribution_account_address(
+                    &jito_tip_distribution::id(),
+                    vote_account,
+                    *epoch,
+                )
+                .0;
+
+                if args.print_json {
+                    missing_for_epoch.push(serde_json::json!({
+                        "vote_account": vote_account.to_string(),
+                        "tip_distribution_address": tip_distribution_address.to_string(),
+                    }));
+                } else {
+                    println!(
+                        "    ❌ Missing: Vote Account {} -> TDA {}",
+                        vote_account, tip_distribution_address
                     );
                 }
             }
         }
-        // summarize
-        println!(
-            "Epoch {}: Found {} total validator history accounts, {} with data for this epoch",
-            epoch,
-            validator_history_accounts.len(),
-            validators_with_data
-        );
+
         if args.print_json {
             all_results.push(serde_json::json!({
                 "epoch": epoch,
-                "total_accounts": validator_history_accounts.len(),
-                "accounts_with_data": validators_with_data,
-                "validators": epoch_validators,
+                "total_validators": tip_distributions.len(),
+                "missing_tip_distributions": missing_for_epoch.len(),
+                "missing_accounts": missing_for_epoch,
             }));
+        } else {
+            if epoch_missing_count > 0 {
+                println!(
+                    "  📅 Epoch {} ({}/{}): {}/{} validators missing tip distribution accounts",
+                    epoch, epoch_idx + 1, tip_distributions_by_epoch.len(), epoch_missing_count, tip_distributions.len()
+                );
+            } else {
+                println!(
+                    "  ✅ Epoch {} ({}/{}): All {} validators have tip distribution accounts",
+                    epoch, epoch_idx + 1, tip_distributions_by_epoch.len(), tip_distributions.len()
+                );
+            }
         }
     }
 
-    // print summary
     if args.print_json {
         let output = serde_json::json!({
             "start_epoch": start_epoch,
             "end_epoch": end_epoch,
+            "total_validators_checked": total_validators,
+            "total_missing_tip_distributions": total_missing,
             "epochs": all_results,
         });
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
+    } else {
+        println!("\n📊 Final Summary:");
+        println!("✅ Total validators checked: {}", total_validators);
+        println!("❌ Total missing tip distribution accounts: {}", total_missing);
+        if total_validators > 0 {
+            let missing_percentage = (total_missing as f64 / total_validators as f64) * 100.0;
+            println!("📈 Missing percentage: {:.2}%", missing_percentage);
+            if missing_percentage > 50.0 {
+                println!("⚠️  High percentage of missing accounts - consider investigating tip distribution setup");
+            } else if missing_percentage > 0.0 {
+                println!("ℹ️  Some accounts missing - this may be expected for newer validators");
+            } else {
+                println!("🎉 All validators have tip distribution accounts!");
+            }
+        }
     }
 }
 
@@ -1155,8 +1296,8 @@ async fn main() {
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
-        Commands::FetchAllValidatorHistories(args) => {
-            command_fetch_all_validator_histories(args, client)
+        Commands::FindMissingTipDistributionAccounts(args) => {
+            command_find_missing_tip_distribution_accounts(args, client)
         }
         Commands::GetConfig => command_get_config(client),
     };
