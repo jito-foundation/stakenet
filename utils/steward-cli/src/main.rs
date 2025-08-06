@@ -1,3 +1,5 @@
+use std::{sync::Arc, time::Duration};
+
 use anyhow::Result;
 use clap::Parser;
 use commands::{
@@ -36,7 +38,6 @@ use commands::{
 };
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use std::{sync::Arc, time::Duration};
 
 pub mod commands;
 pub mod utils;
@@ -127,14 +128,9 @@ async fn main() -> Result<()> {
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
 
-    match result {
-        Ok(_) => {
-            println!("\n✅ DONE\n");
-        }
-        Err(e) => {
-            eprintln!("\n❌ Error: \n\n{:?}\n", e);
-            std::process::exit(1);
-        }
+    if let Err(e) = result {
+        eprintln!("\n❌ Error: \n\n{:?}\n", e);
+        std::process::exit(1);
     }
 
     Ok(())
