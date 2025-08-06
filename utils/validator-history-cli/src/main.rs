@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
+use std::{collections::HashMap, fs, path::PathBuf, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
@@ -1068,7 +1068,10 @@ fn fetch_validator_histories_by_epoch(
         let mut epoch_histories = Vec::new();
         for validator_history in &parsed_histories {
             if let Some(entry) = get_entry(*validator_history, epoch) {
-                epoch_histories.push((validator_history.vote_account, entry))
+                // Only include validators in the top 100 by stake rank
+                if entry.rank <= 100 {
+                    epoch_histories.push((validator_history.vote_account, entry))
+                }
             }
         }
         println!("found {} validators with data", epoch_histories.len());
@@ -1098,8 +1101,6 @@ async fn fetch_tip_distribution_accounts_by_epoch(
     for (epoch_idx, (epoch, validator_histories)) in validator_histories_by_epoch.iter().enumerate()
     {
         let epoch = *epoch;
-        let epoch_idx = epoch_idx;
-        let total_epochs = total_epochs;
         let validator_histories = validator_histories.clone();
         let client_url = client.url();
 
@@ -1121,7 +1122,7 @@ async fn fetch_tip_distribution_accounts_by_epoch(
                 .map(|(vote_account, entry)| {
                     let tda_address = derive_tip_distribution_account_address(
                         &jito_tip_distribution::id(),
-                        &vote_account,
+                        vote_account,
                         epoch,
                     )
                     .0;
@@ -1303,7 +1304,28 @@ async fn command_find_missing_tip_distribution_accounts(
             "total_missing_tip_distributions": total_missing,
             "epochs": all_results,
         });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+
+        let json_string = serde_json::to_string_pretty(&output).unwrap();
+
+        // Write to file
+        let filename = "./results.json";
+        match fs::write(filename, &json_string) {
+            Ok(()) => {
+                println!("✅ Results written to {}", filename);
+                println!(
+                    "📄 File contains {} epochs with {} total validators checked",
+                    all_results.len(),
+                    total_validators
+                );
+            }
+            Err(e) => {
+                eprintln!("❌ Error writing to {}: {}", filename, e);
+                println!("📺 Output to console instead:");
+            }
+        }
+
+        // Also print to console
+        println!("{}", json_string);
     } else {
         println!("\n📊 Final Summary:");
         println!("✅ Total validators checked: {}", total_validators);
