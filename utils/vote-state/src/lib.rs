@@ -8,6 +8,7 @@ use std::{
     mem::size_of,
 };
 
+#[allow(deprecated)]
 use anchor_lang::{error::ErrorCode::ConstraintOwner, prelude::*, solana_program::vote};
 
 use serde::{Deserialize, Serialize};
