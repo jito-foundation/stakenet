@@ -474,9 +474,6 @@ fn _print_default_state(
 }
 
 fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usize> {
-    // For all validators from index 0 to num_pool_validators, we want to determine an overall rank with primary key of score, and secondary key of yield score, both descending.
-    // The final vector created will be a vector of length num_pool_validators, with the index being the rank, and the value being the index of the validator in the steward list.
-
     let state = &steward_state_account.state;
     let num_pool_validators = state.num_pool_validators as usize;
 
@@ -500,6 +497,152 @@ fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usi
     ranks
 }
 
+fn build_verbose_state_output(
+    steward_state_account: &StewardStateAccount,
+    config_account: &Config,
+    validator_list_account: &ValidatorList,
+    validator_histories: &HashMap<Pubkey, Option<Account>>,
+    maybe_vote_account: Option<Pubkey>,
+) -> VerboseStateOutput {
+    let overall_ranks = compute_overall_ranks(steward_state_account);
+    let mut validators = Vec::new();
+    let mut top_scores = Vec::new();
+
+    for (index, validator) in validator_list_account.validators.iter().enumerate() {
+        let history_info = validator_histories
+            .get(&validator.vote_account_address)
+            .and_then(|account| account.as_ref())
+            .and_then(|account| {
+                ValidatorHistory::try_deserialize(&mut account.data.as_slice()).ok()
+            });
+
+        if let Some(vote_account) = maybe_vote_account {
+            if vote_account != validator.vote_account_address {
+                continue;
+            }
+        }
+
+        let vote_account = validator.vote_account_address;
+
+        let (stake_address, _) = find_stake_program_address(
+            &spl_stake_pool::id(),
+            &vote_account,
+            &config_account.stake_pool,
+            None,
+        );
+
+        let (transient_stake_address, _) = find_transient_stake_program_address(
+            &spl_stake_pool::id(),
+            &vote_account,
+            &config_account.stake_pool,
+            validator.transient_seed_suffix.into(),
+        );
+
+        let score = steward_state_account.state.scores.get(index).unwrap_or(&0);
+        let yield_score = steward_state_account
+            .state
+            .yield_scores
+            .get(index)
+            .unwrap_or(&0);
+
+        let eligibility_criteria = match score {
+            0 => "No".to_string(),
+            _ => "Yes".to_string(),
+        };
+
+        let overall_rank = overall_ranks.get(index).map(|r| r + 1);
+
+        let delegation_default = Delegation::default();
+        let delegation = steward_state_account
+            .state
+            .delegations
+            .get(index)
+            .unwrap_or(&delegation_default);
+
+        let target_delegation_percent = if delegation.denominator != 0 {
+            delegation.numerator as f64 / delegation.denominator as f64 * 100.0
+        } else {
+            0.0
+        };
+
+        let steward_internal_lamports = match steward_state_account
+            .state
+            .validator_lamport_balances
+            .get(index)
+        {
+            Some(&LAMPORT_BALANCE_DEFAULT) | None => None,
+            Some(&lamports) => Some(lamports),
+        };
+
+        let validator_details = ValidatorDetails {
+            addresses: ValidatorAddresses {
+                vote_account: vote_account.to_string(),
+                stake_account: stake_address.to_string(),
+                transient_stake_account: transient_stake_address.to_string(),
+            },
+            steward_list_index: index,
+            overall_rank,
+            score: *score,
+            yield_score: *yield_score,
+            passing_eligibility_criteria: eligibility_criteria,
+            target_delegation_percent,
+            is_instant_unstake: steward_state_account
+                .state
+                .instant_unstake
+                .get(index)
+                .unwrap_or_default(),
+            validator_history_output: history_info.as_ref().map(|info| ValidatorHistoryOutput {
+                index: info.index,
+                is_blacklisted: config_account
+                    .validator_history_blacklist
+                    .get_unsafe(info.index as usize),
+            }),
+            lamports: ValidatorLamports {
+                active: LamportBalance::new(u64::from(validator.active_stake_lamports)),
+                transient: LamportBalance::new(u64::from(validator.transient_stake_lamports)),
+                steward_internal: steward_internal_lamports,
+            },
+            status: StakeStatus::try_from(validator.status).unwrap().into(),
+            marked_for_removal: steward_state_account
+                .state
+                .validators_to_remove
+                .get(index)
+                .unwrap_or_default(),
+            marked_for_immediate_removal: steward_state_account
+                .state
+                .validators_for_immediate_removal
+                .get(index)
+                .unwrap_or_default(),
+        };
+
+        validators.push(validator_details);
+
+        if *score != 0 {
+            top_scores.push(RankedValidator {
+                vote_account: vote_account.to_string(),
+                score: *score,
+            });
+        }
+    }
+
+    // Sort top scores by score (descending)
+    top_scores.sort_by(|a, b| b.score.cmp(&a.score));
+
+    let ranked_validators = if maybe_vote_account.is_none() {
+        Some(RankedValidatorsSummary {
+            count: top_scores.len(),
+            validators: top_scores,
+        })
+    } else {
+        None
+    };
+
+    VerboseStateOutput {
+        validators,
+        ranked_validators,
+    }
+}
+
 fn _print_verbose_state(
     steward_state_account: &StewardStateAccount,
     config_account: &Config,
@@ -509,9 +652,16 @@ fn _print_verbose_state(
     print_json: bool,
 ) {
     if print_json {
+        let output = build_verbose_state_output(
+            steward_state_account,
+            config_account,
+            validator_list_account,
+            validator_histories,
+            maybe_vote_account,
+        );
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
         let mut top_scores: Vec<(Pubkey, u32)> = vec![];
-
         let overall_ranks = compute_overall_ranks(steward_state_account);
 
         for (index, validator) in validator_list_account.validators.iter().enumerate() {
@@ -545,17 +695,6 @@ fn _print_verbose_state(
                 &config_account.stake_pool,
                 validator.transient_seed_suffix.into(),
             );
-
-            // let score_index = steward_state_account
-            //     .state
-            //     .sorted_score_indices
-            //     .iter()
-            //     .position(|&i| i == index as u16);
-            // let yield_score_index = steward_state_account
-            //     .state
-            //     .sorted_yield_score_indices
-            //     .iter()
-            //     .position(|&i| i == index as u16);
 
             let score = steward_state_account.state.scores.get(index);
 
