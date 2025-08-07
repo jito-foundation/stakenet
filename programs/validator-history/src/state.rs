@@ -4,11 +4,10 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
-use crate::{bitmask::BitMask, constants::MAX_STAKE_BUFFER_VALIDATORS};
-
 use {
     crate::{
-        constants::TVC_MULTIPLIER,
+        bitmask::BitMask,
+        constants::{MAX_STAKE_BUFFER_VALIDATORS, TVC_MULTIPLIER},
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
         utils::{cast_epoch, find_insert_position, get_max_epoch, get_min_epoch},
