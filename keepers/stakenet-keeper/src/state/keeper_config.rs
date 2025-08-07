@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, net::IpAddr};
 
 use clap::{arg, command, Parser};
 use rusqlite::Connection;
@@ -21,6 +21,7 @@ pub struct KeeperConfig {
     pub tx_confirmation_seconds: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
+    pub gossip_ip: Option<IpAddr>,
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
