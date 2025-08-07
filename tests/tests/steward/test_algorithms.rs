@@ -76,7 +76,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -122,7 +122,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -166,7 +166,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -210,7 +210,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -258,7 +258,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -304,7 +304,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -351,7 +351,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -399,7 +399,7 @@ fn test_compute_score() {
                 max_commission_epoch: 0,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -444,7 +444,7 @@ fn test_compute_score() {
                 max_commission_epoch: current_epoch as u16,
                 max_historical_commission: 11,
                 max_historical_commission_epoch: current_epoch as u16,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -497,7 +497,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 14,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -540,7 +540,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 16,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -590,7 +590,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -635,7 +635,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -685,7 +685,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -733,7 +733,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -818,7 +818,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -867,7 +867,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -916,7 +916,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 0,
+                avg_priority_fee_commission: 0,
                 max_priority_fee_commission_epoch: EPOCH_DEFAULT,
             }
         }
@@ -967,7 +967,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 4_000,
+                avg_priority_fee_commission: 4_000,
                 max_priority_fee_commission_epoch: 8,
             }
         }
@@ -1018,7 +1018,7 @@ fn test_compute_score() {
                 max_commission_epoch: 10,
                 max_historical_commission: 0,
                 max_historical_commission_epoch: 0,
-                max_priority_fee_commission: 9_000,
+                avg_priority_fee_commission: 9_000,
                 max_priority_fee_commission_epoch: 8,
             }
         }
