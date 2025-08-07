@@ -41,9 +41,6 @@ enum Commands {
     ReallocConfig(ReallocConfig),
     InitClusterHistory(InitClusterHistory),
     CrankerStatus(CrankerStatus),
-    ClusterHistoryStatus,
-    History(History),
-    BackfillClusterHistory(BackfillClusterHistory),
     ClusterHistoryStatus(ClusterHistoryStatus),
     ViewConfig,
     History(History),
@@ -168,6 +165,7 @@ struct UpdateOracleAuthority {
     oracle_authority: Pubkey,
 }
 
+#[derive(Parser)]
 #[command(about = "Get Config info")]
 struct GetConfig {}
 
@@ -1102,7 +1100,7 @@ async fn main() {
         Commands::ReallocConfig(args) => command_realloc_config(args, client),
         Commands::CrankerStatus(args) => command_cranker_status(args, client),
         Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
-        Commands::ClusterHistoryStatus => command_cluster_history(client),
+        Commands::ClusterHistoryStatus(args) => command_cluster_history(args, client),
         Commands::ViewConfig => command_view_config(client),
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
