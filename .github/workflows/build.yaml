@@ -4,14 +4,14 @@ on:
     branches:
       - master
       - steward-test-branch
-      - feat/add-priority-fee-support
+      - ck/pfh-merge
     tags:
       - "v*"
   pull_request:
     branches:
       - master
       - steward-test-branch
-      - feat/add-priority-fee-support
+      - ck/pfh-merge
 jobs:
   security_audit:
     name: security_audit

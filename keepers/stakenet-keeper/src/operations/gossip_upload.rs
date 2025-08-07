@@ -56,7 +56,7 @@ async fn _process(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
+    gossip_ip: &IpAddr,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
@@ -75,7 +75,6 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-    gossip_ip: IpAddr,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
@@ -83,6 +82,7 @@ pub async fn fire(
     let entrypoint = &keeper_config
         .gossip_entrypoint
         .expect("Entry point not set");
+    let gossip_ip = &keeper_config.gossip_ip.expect("Gossip IP not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let retry_count = keeper_config.tx_retry_count;
@@ -272,7 +272,7 @@ pub async fn upload_gossip_values(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
+    gossip_ip: &IpAddr,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -281,7 +281,7 @@ pub async fn upload_gossip_values(
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     let gossip_addr = SocketAddr::new(
-        gossip_ip,
+        gossip_ip.clone(),
         solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
             .expect("unable to find an available gossip port"),
     );
