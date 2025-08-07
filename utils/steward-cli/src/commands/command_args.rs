@@ -1,10 +1,10 @@
 use clap::{arg, command, Parser, Subcommand};
-use jito_steward::UpdateParametersArgs;
+use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(about = "CLI for the steward program")]
+#[command(about = "CLI for the steward program", version)]
 pub struct Args {
     /// RPC URL for the cluster
     #[arg(
@@ -86,7 +86,7 @@ pub struct ConfigParameters {
     #[arg(long, env)]
     pub instant_unstake_epoch_progress: Option<f64>,
 
-    /// Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress
+    /// Inputs to "Compute Instant Unstake" need to be updated past this point in epoch progress
     #[arg(long, env)]
     pub instant_unstake_inputs_epoch_progress: Option<f64>,
 
@@ -130,6 +130,41 @@ impl From<ConfigParameters> for UpdateParametersArgs {
 }
 
 #[derive(Parser)]
+pub struct ConfigPriorityFeeParameters {
+    /// The number of epochs the priority fee distribution check should lookback
+    #[arg(long, env)]
+    pub priority_fee_lookback_epochs: Option<u8>,
+
+    /// The offset of epochs for the priority fee distribution
+    #[arg(long, env)]
+    pub priority_fee_lookback_offset: Option<u8>,
+
+    /// The maximum validator commission before the validator scores 0
+    #[arg(long, env)]
+    pub priority_fee_max_commission_bps: Option<u16>,
+
+    /// An error of margin for priority fee commission calculations
+    #[arg(long, env)]
+    pub priority_fee_error_margin_bps: Option<u16>,
+
+    /// The epoch for when priority fee commission scoring starts
+    #[arg(long, env)]
+    pub priority_fee_scoring_start_epoch: Option<u16>,
+}
+
+impl From<ConfigPriorityFeeParameters> for UpdatePriorityFeeParametersArgs {
+    fn from(config: ConfigPriorityFeeParameters) -> Self {
+        UpdatePriorityFeeParametersArgs {
+            priority_fee_lookback_epochs: config.priority_fee_lookback_epochs,
+            priority_fee_lookback_offset: config.priority_fee_lookback_offset,
+            priority_fee_max_commission_bps: config.priority_fee_max_commission_bps,
+            priority_fee_error_margin_bps: config.priority_fee_error_margin_bps,
+            priority_fee_scoring_start_epoch: config.priority_fee_scoring_start_epoch,
+        }
+    }
+}
+
+#[derive(Parser)]
 pub struct TransactionParameters {
     /// priority fee in microlamports
     #[arg(long, env)]
@@ -150,6 +185,10 @@ pub struct TransactionParameters {
     /// This will print out the raw TX instead of running it
     #[arg(long, env, default_value = "false")]
     pub print_tx: bool,
+
+    /// When enabled, prints the transaction as a spl-governance encoded InstructionData (Base64)
+    #[arg(long, env, default_value_t = false)]
+    pub print_gov_tx: bool,
 }
 
 #[derive(Parser)]
@@ -185,6 +224,14 @@ pub struct ViewParameters {
     /// Steward account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
 }
 
 // ---------- COMMANDS ------------
@@ -204,6 +251,7 @@ pub enum Commands {
 
     UpdateAuthority(UpdateAuthority),
     UpdateConfig(UpdateConfig),
+    UpdatePriorityFeeConfig(UpdatePriorityFeeConfig),
     ResetState(ResetState),
     ResetValidatorLamportBalances(ResetValidatorLamportBalances),
 
@@ -289,6 +337,9 @@ pub struct InitSteward {
 
     #[command(flatten)]
     pub config_parameters: ConfigParameters,
+
+    #[command(flatten)]
+    pub config_priority_fee_parameters: ConfigPriorityFeeParameters,
 }
 
 #[derive(Parser)]
@@ -333,6 +384,16 @@ pub struct UpdateConfig {
 }
 
 #[derive(Parser)]
+#[command(about = "Updates config priority fee parameters")]
+pub struct UpdatePriorityFeeConfig {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[command(flatten)]
+    pub config_parameters: ConfigPriorityFeeParameters,
+}
+
+#[derive(Parser)]
 #[command(about = "Initialize state account")]
 pub struct ReallocState {
     #[command(flatten)]
@@ -359,9 +420,23 @@ pub struct AddToBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
-    pub validator_history_index_to_blacklist: u64,
+    /// Validator indices of validator list to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
+    pub validator_history_indices_to_blacklist: Vec<u32>,
+
+    /// Vote accounts of validators to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
+    pub vote_accounts_to_blacklist: Vec<Pubkey>,
+}
+
+fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+    s.parse()
+}
+
+// Add helper to parse a Pubkey from string
+fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+    use std::str::FromStr;
+    Pubkey::from_str(s)
 }
 
 #[derive(Parser)]
@@ -370,9 +445,9 @@ pub struct RemoveFromBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
-    pub validator_history_index_to_deblacklist: u64,
+    /// Validator indices of validator list to remove (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
+    pub validator_history_indices_to_deblacklist: Vec<u32>,
 }
 
 #[derive(Parser)]

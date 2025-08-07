@@ -12,7 +12,7 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, StateTransition},
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV2, ScoreComponentsV2,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV3,
     },
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
@@ -609,7 +609,7 @@ impl StewardState {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-    ) -> Result<Option<ScoreComponentsV2>> {
+    ) -> Result<Option<ScoreComponentsV3>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -771,7 +771,7 @@ impl StewardState {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-    ) -> Result<Option<InstantUnstakeComponentsV2>> {
+    ) -> Result<Option<InstantUnstakeComponentsV3>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeInstantUnstake) {
             if clock.epoch >= self.next_cycle_epoch {
                 return Err(StewardError::InvalidState.into());
@@ -939,18 +939,24 @@ impl StewardState {
             let rebalance = if !some_transient_lamports
                 && (target_lamports < current_lamports || self.instant_unstake.get(index)?)
             {
-                let scoring_unstake_cap = stake_pool_lamports
-                    .checked_mul(parameters.scoring_unstake_cap_bps as u64)
-                    .and_then(|x| x.checked_div(10000))
-                    .ok_or(StewardError::ArithmeticError)?;
-                let instant_unstake_cap = stake_pool_lamports
-                    .checked_mul(parameters.instant_unstake_cap_bps as u64)
-                    .and_then(|x| x.checked_div(10000))
-                    .ok_or(StewardError::ArithmeticError)?;
-                let stake_deposit_unstake_cap = stake_pool_lamports
-                    .checked_mul(parameters.stake_deposit_unstake_cap_bps as u64)
-                    .and_then(|x| x.checked_div(10000))
-                    .ok_or(StewardError::ArithmeticError)?;
+                let scoring_unstake_cap: u64 = (stake_pool_lamports as u128)
+                    .checked_mul(parameters.scoring_unstake_cap_bps as u128)
+                    .and_then(|x| x.checked_div(10_000))
+                    .ok_or(StewardError::ArithmeticError)?
+                    .try_into()
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
+                let instant_unstake_cap: u64 = (stake_pool_lamports as u128)
+                    .checked_mul(parameters.instant_unstake_cap_bps as u128)
+                    .and_then(|x| x.checked_div(10_000))
+                    .ok_or(StewardError::ArithmeticError)?
+                    .try_into()
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
+                let stake_deposit_unstake_cap: u64 = (stake_pool_lamports as u128)
+                    .checked_mul(parameters.stake_deposit_unstake_cap_bps as u128)
+                    .and_then(|x| x.checked_div(10_000))
+                    .ok_or(StewardError::ArithmeticError)?
+                    .try_into()
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
 
                 let unstake_state = UnstakeState {
                     stake_deposit_unstake_total: self.stake_deposit_unstake_total,

@@ -1,9 +1,12 @@
 #[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 use anchor_lang::{
-    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize, Result,
+    prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,
+    Discriminator, Result,
 };
-use validator_history::{constants::TVC_MULTIPLIER, ClusterHistory, ValidatorHistory};
+use validator_history::{
+    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
+};
 
 use crate::{
     constants::{
@@ -15,7 +18,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV2 {
+pub struct ScoreComponentsV3 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -43,6 +46,9 @@ pub struct ScoreComponentsV2 {
     /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
     pub historical_commission_score: f64,
 
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
+    pub merkle_root_upload_authority_score: f64,
+
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
     pub vote_credits_ratio: f64,
@@ -53,6 +59,13 @@ pub struct ScoreComponentsV2 {
 
     /// Details about why a given score was calculated
     pub details: ScoreDetails,
+
+    /// If validator has realized priority fee commissions > config limits over a lookback range,
+    /// score 0.
+    pub priority_fee_commission_score: f64,
+
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
+    pub priority_fee_merkle_root_upload_authority_score: f64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
@@ -83,6 +96,12 @@ pub struct ScoreDetails {
 
     /// Epoch of max historical commission
     pub max_historical_commission_epoch: u16,
+
+    /// Average realized priority fee commission observed
+    pub avg_priority_fee_commission: u16,
+
+    /// Epoch of realized priority fee commission
+    pub max_priority_fee_commission_epoch: u16,
 }
 
 pub fn validator_score(
@@ -91,7 +110,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV2> {
+) -> Result<ScoreComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -157,7 +176,17 @@ pub fn validator_score(
     let (superminority_score, superminority_epoch) =
         calculate_superminority(validator, current_epoch, params.commission_range)?;
 
-    let blacklisted_score = calculate_blacklist(config, validator.index)?;
+    let blacklisted_score = calculate_blacklist_score(config, validator.index)?;
+
+    let merkle_root_upload_authority_score = calculate_merkle_root_authority_score(validator)?;
+    let priority_fee_merkle_root_upload_authority_score =
+        calculate_priority_fee_merkle_root_authority_score(validator)?;
+
+    let (
+        priority_fee_commission_score,
+        avg_priority_fee_commission,
+        max_priority_fee_commission_epoch,
+    ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
     /////// Formula ///////
 
@@ -170,9 +199,12 @@ pub fn validator_score(
         * superminority_score
         * delinquency_score
         * running_jito_score
-        * yield_score;
+        * yield_score
+        * merkle_root_upload_authority_score
+        * priority_fee_commission_score
+        * priority_fee_merkle_root_upload_authority_score;
 
-    Ok(ScoreComponentsV2 {
+    Ok(ScoreComponentsV3 {
         score,
         yield_score,
         mev_commission_score,
@@ -182,6 +214,7 @@ pub fn validator_score(
         running_jito_score,
         commission_score,
         historical_commission_score,
+        merkle_root_upload_authority_score,
         vote_credits_ratio,
         vote_account: validator.vote_account,
         epoch: current_epoch,
@@ -195,7 +228,11 @@ pub fn validator_score(
             max_commission_epoch,
             max_historical_commission,
             max_historical_commission_epoch,
+            avg_priority_fee_commission,
+            max_priority_fee_commission_epoch,
         },
+        priority_fee_commission_score,
+        priority_fee_merkle_root_upload_authority_score,
     })
 }
 
@@ -411,7 +448,7 @@ pub fn calculate_superminority(
 }
 
 /// Checks if validator is blacklisted using the validator history index in the config's blacklist
-pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64> {
+pub fn calculate_blacklist_score(config: &Config, validator_index: u32) -> Result<f64> {
     if config
         .validator_history_blacklist
         .get(validator_index as usize)?
@@ -422,9 +459,146 @@ pub fn calculate_blacklist(config: &Config, validator_index: u32) -> Result<f64>
     }
 }
 
+/// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
+pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Result<f64> {
+    // calculate_instant_unstake_merkle_root_upload_auth returns whether or not
+    // instant unstake should be triggered, so we invert the result to get the score
+    if calculate_instant_unstake_merkle_root_upload_auth(
+        &validator.history.merkle_root_upload_authority_latest(),
+    )? {
+        Ok(0.0)
+    } else {
+        Ok(1.0)
+    }
+}
+
+/// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
+pub fn calculate_priority_fee_merkle_root_authority_score(
+    validator: &ValidatorHistory,
+) -> Result<f64> {
+    if calculate_instant_unstake_merkle_root_upload_auth(
+        &validator
+            .history
+            .priority_fee_merkle_root_upload_authority_latest(),
+    )? {
+        Ok(0.0)
+    } else {
+        Ok(1.0)
+    }
+}
+
+/// Given a validator's tips and total fees, determine their realized commission rate
+pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
+    // total_fees is None when the ValidatorHistoryEntry has been created, but the
+    //  priority_fee_oracle_authority has not called UpdatePriorityFeeHistory
+    if total_fees.is_none() || total_fees.iter().all(|&f| f == 0) {
+        return 0;
+    }
+    // Default the tips to 0 because we assume the PFDA was not created and the validator is not
+    // distributing priority fees. This forces inverse_commission to 0 and commission to
+    // BASIS_POINTS_MAX
+    let tips = tips.unwrap_or(0);
+    // Default the total_fees to u64::MAX to force inverse_commission towards 0 and commission
+    // to BASIS_POINTS_MAX
+    let total_fees = total_fees.unwrap_or(u64::MAX);
+
+    let validators_rake = total_fees.saturating_sub(tips);
+    // We scale by BASIS_POINTS_MAX before division, so the output is in bps
+    let numerator = validators_rake.saturating_mul(BASIS_POINTS_MAX as u64);
+    let commission = numerator.checked_div(total_fees).unwrap_or(0u64);
+    u16::try_from(commission).unwrap_or(BASIS_POINTS_MAX)
+}
+
+/// Checks if validator is maintaining < X% realized commission rates over some history of epochs
+pub fn calculate_priority_fee_commission(
+    config: &Config,
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+) -> Result<(f64, u16, u16)> {
+    let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
+    let priority_fee_tips = validator
+        .history
+        .priority_fee_tips_range(start_epoch, end_epoch);
+    let total_priority_fees = validator
+        .history
+        .total_priority_fees_range(start_epoch, end_epoch);
+    let priority_fee_merkle_root_upload_authority = validator
+        .history
+        .priority_fee_merkle_root_upload_authority_range(start_epoch, end_epoch);
+
+    // determine the highest priority fee commission
+    let mut max_priority_fee_commission: u16 = 0;
+    let mut max_priority_fee_commission_epoch: u16 = EPOCH_DEFAULT;
+    let realized_commissions: Vec<u16> = priority_fee_tips
+        .iter()
+        .zip(&total_priority_fees)
+        .zip(&priority_fee_merkle_root_upload_authority)
+        .enumerate()
+        .flat_map(
+            |(relative_epoch, ((tips, total_fees), priority_fee_merkle_root_upload_authority))| {
+                let mut commission_bps: u16 = calculate_realized_commission_bps(tips, total_fees);
+                if priority_fee_merkle_root_upload_authority.is_none() {
+                    return vec![];
+                }
+                if let Some(upload_authority) = priority_fee_merkle_root_upload_authority {
+                    if matches!(upload_authority, MerkleRootUploadAuthority::Unset) {
+                        return vec![];
+                    }
+                    if matches!(upload_authority, MerkleRootUploadAuthority::DNE) {
+                        commission_bps = BASIS_POINTS_MAX;
+                    }
+                }
+                if max_priority_fee_commission < commission_bps {
+                    let max_commission_epoch: u16 =
+                        start_epoch.saturating_add(relative_epoch as u16);
+                    max_priority_fee_commission = commission_bps;
+                    max_priority_fee_commission_epoch = max_commission_epoch;
+                }
+                vec![commission_bps]
+            },
+        )
+        .collect::<Vec<u16>>();
+
+    // return score 1 when there's not enough history. We assume both fields being None means the
+    // priority fee data is non-existent for this epoch.
+    if priority_fee_tips[0].is_none() && total_priority_fees[0].is_none() {
+        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
+    }
+
+    // if there are no realized commissions due to Unset PFDA, return score 1, default
+    // to not penalize the validator for not having a PFDA copied into their history
+    if realized_commissions.is_empty() {
+        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
+    }
+
+    let num_epochs: u64 = realized_commissions.len() as u64;
+    let total_commission: u64 = realized_commissions
+        .into_iter()
+        .fold(0, |agg, val| agg.checked_add(u64::from(val)).unwrap());
+    // We calculate the avg commission bps, rounding up to the nearest bp
+    let avg_commission: u64 = total_commission
+        // this addition of (denominator - 1) is used to round up if there is any remainder
+        .checked_add(num_epochs.checked_sub(1).ok_or(ArithmeticError)?)
+        .ok_or(ArithmeticError)?
+        .checked_div(num_epochs)
+        .ok_or(ArithmeticError)?;
+    let avg_commission: u16 = u16::try_from(avg_commission).map_err(|_| ArithmeticError)?;
+
+    let max_commission = config.max_avg_commission();
+    // We would still like to emit avg_commission before the go-live epoch
+    if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
+        return Ok((1.0, avg_commission, EPOCH_DEFAULT));
+    }
+    if avg_commission <= max_commission {
+        Ok((1.0, avg_commission, max_priority_fee_commission_epoch))
+    } else {
+        Ok((0.0, avg_commission, max_priority_fee_commission_epoch))
+    }
+}
+
 #[event]
 #[derive(Debug, PartialEq, Eq)]
-pub struct InstantUnstakeComponentsV2 {
+pub struct InstantUnstakeComponentsV3 {
     /// Aggregate of all checks
     pub instant_unstake: bool,
 
@@ -439,6 +613,12 @@ pub struct InstantUnstakeComponentsV2 {
 
     /// Checks if validator was added to blacklist
     pub is_blacklisted: bool,
+
+    /// Checks if validator has an unacceptable merkle root upload authority
+    pub is_bad_merkle_root_upload_authority: bool,
+
+    /// Checks if validator has an unacceptable priority fee merkle root upload authority
+    pub is_bad_priority_fee_merkle_root_upload_authority: bool,
 
     pub vote_account: Pubkey,
 
@@ -478,7 +658,7 @@ pub fn instant_unstake_validator(
     epoch_start_slot: u64,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<InstantUnstakeComponentsV2> {
+) -> Result<InstantUnstakeComponentsV3> {
     let params = &config.parameters;
 
     /////// Shared calculations ///////
@@ -526,15 +706,32 @@ pub fn instant_unstake_validator(
 
     let is_blacklisted = calculate_instant_unstake_blacklist(config, validator.index)?;
 
-    let instant_unstake =
-        delinquency_check || commission_check || mev_commission_check || is_blacklisted;
+    let is_bad_merkle_root_upload_authority = calculate_instant_unstake_merkle_root_upload_auth(
+        &validator.history.merkle_root_upload_authority_latest(),
+    )?;
 
-    Ok(InstantUnstakeComponentsV2 {
+    let is_bad_priority_fee_merkle_root_upload_authority =
+        calculate_instant_unstake_merkle_root_upload_auth(
+            &validator
+                .history
+                .priority_fee_merkle_root_upload_authority_latest(),
+        )?;
+
+    let instant_unstake = delinquency_check
+        || commission_check
+        || mev_commission_check
+        || is_blacklisted
+        || is_bad_merkle_root_upload_authority
+        || is_bad_priority_fee_merkle_root_upload_authority;
+
+    Ok(InstantUnstakeComponentsV3 {
         instant_unstake,
         delinquency_check,
         commission_check,
         mev_commission_check,
         is_blacklisted,
+        is_bad_merkle_root_upload_authority,
+        is_bad_priority_fee_merkle_root_upload_authority,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: InstantUnstakeDetails {
@@ -610,4 +807,25 @@ pub fn calculate_instant_unstake_blacklist(config: &Config, validator_index: u32
     config
         .validator_history_blacklist
         .get(validator_index as usize)
+}
+
+/// Checks if the validator is using allowed Tip Distribution merkle root upload authority
+pub fn calculate_instant_unstake_merkle_root_upload_auth(
+    latest_authority: &Option<MerkleRootUploadAuthority>,
+) -> Result<bool> {
+    if let Some(merkle_root_upload_authority) = latest_authority {
+        match merkle_root_upload_authority {
+            // Although the statement above will cover Unset, we want to be explicit about it
+            // and safegaurd against any future changes to the latest_authority that gets passed in
+            MerkleRootUploadAuthority::Unset => Ok(false),
+            MerkleRootUploadAuthority::OldJitoLabs => Ok(false),
+            MerkleRootUploadAuthority::TipRouter => Ok(false),
+            _ => Ok(true),
+        }
+    } else {
+        // Default to false (score 1) to be conservative. There are plenty of other mechanisms
+        // that prevent a validator with no history from getting stake, so we don't want this to be
+        // the hidden linchpin
+        Ok(false)
+    }
 }

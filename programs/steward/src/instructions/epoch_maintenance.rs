@@ -1,9 +1,10 @@
 use crate::{
     errors::StewardError,
     events::EpochMaintenanceEvent,
+    stake_pool_utils::deserialize_stake_pool,
     utils::{
-        check_validator_list_has_stake_status_other_than, deserialize_stake_pool,
-        get_stake_pool_address, get_validator_list, get_validator_list_length,
+        check_validator_list_has_stake_status_other_than, get_stake_pool_address,
+        get_validator_list, get_validator_list_length,
     },
     Config, StewardStateAccount, COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE,
     PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,

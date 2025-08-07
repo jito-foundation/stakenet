@@ -8,17 +8,21 @@ use jito_steward::{
     Config, Parameters, UpdateParametersArgs,
 };
 use solana_program_test::*;
-use solana_sdk::{signer::Signer, transaction::Transaction};
+use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::TestFixture;
 
 // ---------- INTEGRATION TESTS ----------
-async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParametersArgs) {
+async fn _set_parameter(
+    fixture: &TestFixture,
+    update_parameters: &UpdateParametersArgs,
+    authority: &Keypair,
+) {
     let ctx = &fixture.ctx;
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::UpdateParameters {
             config: fixture.steward_config.pubkey(),
-            authority: fixture.keypair.pubkey(),
+            authority: authority.pubkey(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::UpdateParameters {
@@ -28,8 +32,8 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
     };
     let tx = Transaction::new_signed_with_payer(
         &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
+        Some(&authority.pubkey()),
+        &[&authority],
         ctx.borrow().last_blockhash,
     );
 
@@ -174,7 +178,7 @@ async fn _set_parameter(fixture: &TestFixture, update_parameters: &UpdateParamet
 async fn test_update_parameters() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None).await;
+    fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
     _set_parameter(
@@ -182,6 +186,7 @@ async fn test_update_parameters() {
         &UpdateParametersArgs {
             ..UpdateParametersArgs::default()
         },
+        &fixture.keypair,
     )
     .await;
 
@@ -209,10 +214,9 @@ async fn test_update_parameters() {
             minimum_stake_lamports: Some(1),
             minimum_voting_epochs: Some(1),
         },
+        &fixture.keypair,
     )
     .await;
-
-    drop(fixture);
 }
 
 // ---------- UNIT TESTS ----------
@@ -242,8 +246,13 @@ fn _test_parameter(
         num_epochs_between_scoring: 10,
         minimum_stake_lamports: 5_000_000_000_000,
         minimum_voting_epochs: 5,
+        priority_fee_lookback_epochs: 10,
+        priority_fee_lookback_offset: 2,
+        priority_fee_max_commission_bps: 5_000,
+        priority_fee_error_margin_bps: 10,
+        priority_fee_scoring_start_epoch: 0,
         _padding_0: [0; 6],
-        _padding_1: [0; 32],
+        _padding_1: [0; 31],
     });
 
     // First Valid Epoch

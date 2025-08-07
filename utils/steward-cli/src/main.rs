@@ -1,3 +1,5 @@
+use std::{sync::Arc, time::Duration};
+
 use anyhow::Result;
 use clap::Parser;
 use commands::{
@@ -16,6 +18,7 @@ use commands::{
         resume::command_resume, revert_staker::command_revert_staker,
         set_staker::command_set_staker, update_authority::command_update_authority,
         update_config::command_update_config,
+        update_priority_fee_config::command_update_priority_fee_config,
         update_validator_list_balance::command_update_validator_list_balance,
     },
     command_args::{Args, Commands},
@@ -33,11 +36,11 @@ use commands::{
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use std::{sync::Arc, time::Duration};
 
 pub mod commands;
+pub mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -66,6 +69,9 @@ async fn main() -> Result<()> {
         Commands::CloseSteward(args) => command_close_steward(args, &client, program_id).await,
         Commands::InitSteward(args) => command_init_steward(args, &client, program_id).await,
         Commands::UpdateConfig(args) => command_update_config(args, &client, program_id).await,
+        Commands::UpdatePriorityFeeConfig(args) => {
+            command_update_priority_fee_config(args, &client, program_id).await
+        }
         Commands::UpdateAuthority(args) => {
             command_update_authority(args, &client, program_id).await
         }
@@ -122,14 +128,9 @@ async fn main() -> Result<()> {
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
 
-    match result {
-        Ok(_) => {
-            println!("\n✅ DONE\n");
-        }
-        Err(e) => {
-            eprintln!("\n❌ Error: \n\n{:?}\n", e);
-            std::process::exit(1);
-        }
+    if let Err(e) = result {
+        eprintln!("\n❌ Error: \n\n{:?}\n", e);
+        std::process::exit(1);
     }
 
     Ok(())

@@ -8,7 +8,7 @@ pub enum KeeperCreates {
 impl KeeperCreates {
     pub const LEN: usize = 1;
 
-    pub fn emit(created_accounts_for_epoch: &[u64; KeeperCreates::LEN]) {
+    pub fn emit(created_accounts_for_epoch: &[u64; KeeperCreates::LEN], cluster: &str) {
         let aggregate_creates = created_accounts_for_epoch.iter().sum::<u64>();
 
         datapoint_info!(
@@ -21,6 +21,7 @@ impl KeeperCreates {
                 created_accounts_for_epoch[KeeperCreates::CreateValidatorHistory as usize],
                 i64
             ),
+            "cluster" => cluster,
         );
     }
 }
@@ -38,6 +39,8 @@ pub enum KeeperOperations {
     MevCommission,
     Steward,
     EmitMetrics,
+    BlockMetadataKeeper,
+    PriorityFeeCommission,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -53,12 +56,13 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 11;
+    pub const LEN: usize = 13;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
         errors_for_epoch: &[u64; KeeperOperations::LEN],
         txs_for_epoch: &[u64; KeeperOperations::LEN],
+        cluster: &str,
     ) {
         let aggregate_actions = runs_for_epoch.iter().sum::<u64>();
         let aggregate_errors = errors_for_epoch.iter().sum::<u64>();
@@ -246,6 +250,23 @@ impl KeeperOperations {
                 txs_for_epoch[KeeperOperations::Steward as usize],
                 i64
             ),
+            // PRIORITY FEE COMMISSION
+            (
+                "num-pf-commission-runs",
+                runs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            (
+                "num-pf-commission-errors",
+                errors_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            (
+                "num-stewpf-commissionard-txs",
+                txs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            "cluster" => cluster,
         );
     }
 }

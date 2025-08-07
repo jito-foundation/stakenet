@@ -32,4 +32,10 @@ pub enum ValidatorHistoryError {
     EpochTooLarge,
     #[msg("Inserting duplicate epoch")]
     DuplicateEpoch,
+    #[msg("Account already sized properly")]
+    NoReallocNeeded,
+    #[msg("Priority Fee Distribution Account already copied")]
+    PriorityFeeDistributionAccountAlreadyCopied,
+    #[msg("Priority Fee Distribution Account cannot be copied during its own epoch")]
+    PriorityFeeDistributionAccountNotFinalized,
 }

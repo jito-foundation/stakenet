@@ -946,6 +946,14 @@
               "name": "UpdateParametersArgs"
             }
           }
+        },
+        {
+          "name": "update_priority_fee_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdatePriorityFeeParametersArgs"
+            }
+          }
         }
       ]
     },
@@ -1502,6 +1510,43 @@
           }
         }
       ]
+    },
+    {
+      "name": "update_priority_fee_parameters",
+      "docs": [
+        "For priority fee parameters that are present in args, the instruction checks that they",
+        "are within sensible bounds and saves them to config struct"
+      ],
+      "discriminator": [
+        244,
+        245,
+        159,
+        167,
+        235,
+        54,
+        76,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "update_priority_fee_parameters_args",
+          "type": {
+            "defined": {
+              "name": "UpdatePriorityFeeParametersArgs"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1625,16 +1670,16 @@
       ]
     },
     {
-      "name": "InstantUnstakeComponentsV2",
+      "name": "InstantUnstakeComponentsV3",
       "discriminator": [
-        138,
-        62,
-        181,
-        14,
-        9,
-        48,
-        109,
-        47
+        5,
+        64,
+        24,
+        200,
+        42,
+        152,
+        222,
+        172
       ]
     },
     {
@@ -1664,16 +1709,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV2",
+      "name": "ScoreComponentsV3",
       "discriminator": [
-        140,
-        182,
-        108,
-        49,
-        246,
-        38,
-        247,
-        181
+        255,
+        128,
+        115,
+        82,
+        192,
+        199,
+        160,
+        185
       ]
     },
     {
@@ -1845,6 +1890,11 @@
       "code": 6030,
       "name": "InvalidStakeState",
       "msg": "Invalid stake state"
+    },
+    {
+      "code": 6031,
+      "name": "ArithmeticCastError",
+      "msg": "Arithmetic casting error"
     }
   ],
   "types": [
@@ -1880,6 +1930,17 @@
             "fields": [
               {
                 "name": "SetParameterAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetPriorityFeeParameterAuthority",
+            "fields": [
+              {
+                "name": "SetPriorityFeeParameterAuthority",
                 "type": {
                   "option": "u8"
                 }
@@ -2251,6 +2312,26 @@
             }
           },
           {
+            "name": "_padding_0",
+            "docs": [
+              "Required so that the struct is 8-byte aligned",
+              "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_parameters_authority",
+            "docs": [
+              "The authority that can update the priority fee configs"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -2258,7 +2339,7 @@
             "type": {
               "array": [
                 "u8",
-                1023
+                984
               ]
             }
           }
@@ -2385,7 +2466,7 @@
       }
     },
     {
-      "name": "InstantUnstakeComponentsV2",
+      "name": "InstantUnstakeComponentsV3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2421,6 +2502,20 @@
             "name": "is_blacklisted",
             "docs": [
               "Checks if validator was added to blacklist"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "is_bad_merkle_root_upload_authority",
+            "docs": [
+              "Checks if validator has an unacceptable merkle root upload authority"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "is_bad_priority_fee_merkle_root_upload_authority",
+            "docs": [
+              "Checks if validator has an unacceptable priority fee merkle root upload authority"
             ],
             "type": "bool"
           },
@@ -2524,6 +2619,29 @@
       }
     },
     {
+      "name": "MerkleRootUploadAuthority",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unset"
+          },
+          {
+            "name": "Empty"
+          },
+          {
+            "name": "Other"
+          },
+          {
+            "name": "OldJitoLabs"
+          },
+          {
+            "name": "TipRouter"
+          }
+        ]
+      }
+    },
+    {
       "name": "Parameters",
       "serialization": "bytemuck",
       "repr": {
@@ -2589,17 +2707,35 @@
             "type": "u8"
           },
           {
-            "name": "_padding_0",
+            "name": "priority_fee_lookback_epochs",
             "docs": [
-              "Required so that the struct is 8-byte aligned",
-              "https://doc.rust-lang.org/reference/type-layout.html#reprc-structs"
+              "The number of epochs the priority fee distribution check should lookback"
             ],
-            "type": {
-              "array": [
-                "u8",
-                6
-              ]
-            }
+            "type": "u8"
+          },
+          {
+            "name": "priority_fee_lookback_offset",
+            "docs": [
+              "The offset of epochs for the priority fee distribution. E.g. look at epochs from",
+              "(current_epoch - offset - priority_fee_lookback_epochs) to (current_epoch - offset)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "priority_fee_max_commission_bps",
+            "docs": [
+              "The maximum validator commission before the validator scores 0.",
+              "E.g. 5_000 bps (50%) would mean: if the validator keeps > 50% of priority fees,",
+              "then score = 0"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "priority_fee_error_margin_bps",
+            "docs": [
+              "An error of margin for priority fee commission calculations"
+            ],
+            "type": "u16"
           },
           {
             "name": "num_delegation_validators",
@@ -2669,11 +2805,27 @@
             "type": "u64"
           },
           {
+            "name": "priority_fee_scoring_start_epoch",
+            "docs": [
+              "The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_padding_0",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
             "name": "_padding_1",
             "type": {
               "array": [
                 "u64",
-                32
+                31
               ]
             }
           }
@@ -2809,7 +2961,7 @@
       }
     },
     {
-      "name": "ScoreComponentsV2",
+      "name": "ScoreComponentsV3",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2877,6 +3029,13 @@
             "type": "f64"
           },
           {
+            "name": "merkle_root_upload_authority_score",
+            "docs": [
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "vote_credits_ratio",
             "docs": [
               "Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs",
@@ -2902,6 +3061,21 @@
                 "name": "ScoreDetails"
               }
             }
+          },
+          {
+            "name": "priority_fee_commission_score",
+            "docs": [
+              "If validator has realized priority fee commissions > config limits over a lookback range,",
+              "score 0."
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "priority_fee_merkle_root_upload_authority_score",
+            "docs": [
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
+            ],
+            "type": "f64"
           }
         ]
       }
@@ -2971,6 +3145,20 @@
             "name": "max_historical_commission_epoch",
             "docs": [
               "Epoch of max historical commission"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "avg_priority_fee_commission",
+            "docs": [
+              "Average realized priority fee commission observed"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_priority_fee_commission_epoch",
+            "docs": [
+              "Epoch of realized priority fee commission"
             ],
             "type": "u16"
           }
@@ -3428,6 +3616,44 @@
       }
     },
     {
+      "name": "UpdatePriorityFeeParametersArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "priority_fee_lookback_epochs",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "priority_fee_lookback_offset",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "priority_fee_max_commission_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "priority_fee_error_margin_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "priority_fee_scoring_start_epoch",
+            "type": {
+              "option": "u16"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "ValidatorHistory",
       "serialization": "bytemuck",
       "repr": {
@@ -3540,8 +3766,15 @@
             }
           },
           {
-            "name": "padding0",
-            "type": "u8"
+            "name": "merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
           },
           {
             "name": "is_superminority",
@@ -3560,11 +3793,55 @@
             "type": "u32"
           },
           {
+            "name": "priority_fee_commission",
+            "type": "u16"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "priority_fee_tips",
+            "type": "u64"
+          },
+          {
+            "name": "total_priority_fees",
+            "type": "u64"
+          },
+          {
+            "name": "total_leader_slots",
+            "type": "u32"
+          },
+          {
+            "name": "blocks_produced",
+            "type": "u32"
+          },
+          {
+            "name": "block_data_updated_at_slot",
+            "type": "u64"
+          },
+          {
+            "name": "priority_fee_merkle_root_upload_authority",
+            "docs": [
+              "The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerkleRootUploadAuthority"
+              }
+            }
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                84
+                47
               ]
             }
           }

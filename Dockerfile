@@ -1,4 +1,4 @@
-FROM rust:1.75-slim-buster as builder
+FROM rust:1.85 as builder
 
 RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
 
@@ -14,11 +14,10 @@ RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
 
 #########
 
-FROM debian:buster as validator-history
+FROM ubuntu:22.04 as validator-history
 RUN apt-get update && apt-get install -y ca-certificates
 ENV APP="stakenet-keeper"
 
 COPY --from=builder /usr/src/app/target/release/$APP ./$APP
 
 ENTRYPOINT ./$APP
- 

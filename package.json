@@ -1,0 +1,14 @@
+{
+  "name": "stakenet",
+  "version": "0.0.1",
+  "description": "Jito StakeNet is a decentralized Solana stake pool manager, blending Validator History and Steward Programs for secure, transparent validator management and autonomous stake operations.",
+  "license": "Apache-2.0",
+  "private": true,
+  "workspaces": [
+    "packages/idl"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "packageManager": "pnpm@10.14.0"
+}

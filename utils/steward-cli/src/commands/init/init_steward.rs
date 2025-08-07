@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::{derive_steward_state_address, UpdateParametersArgs};
+use jito_steward::{
+    derive_steward_state_address, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
+};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
@@ -45,6 +47,8 @@ pub async fn command_init_steward(
     let (state_account, _) = derive_steward_state_address(&steward_config.pubkey());
 
     let update_parameters_args: UpdateParametersArgs = args.config_parameters.into();
+    let update_priority_fee_parameters_args: UpdatePriorityFeeParametersArgs =
+        args.config_priority_fee_parameters.into();
 
     // Check if already created
     match client.get_account(&steward_config.pubkey()).await {
@@ -70,6 +74,7 @@ pub async fn command_init_steward(
         .to_account_metas(None),
         data: jito_steward::instruction::InitializeSteward {
             update_parameters_args,
+            update_priority_fee_parameters_args,
         }
         .data(),
     };
