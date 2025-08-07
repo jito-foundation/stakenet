@@ -527,7 +527,7 @@ pub async fn get_leader_schedule_safe(
     match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
         Some(schedule) => Ok(schedule),
         None => Err(BlockMetadataKeeperError::OtherError(
-            "Could not get leader schedule".to_string(),
+            format!("Could not get leader schedule for starting slot {}", starting_slot),
         )),
     }
 }
