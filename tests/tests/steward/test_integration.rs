@@ -1,6 +1,7 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
 /// Basic integration test
+#[allow(deprecated)]
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,

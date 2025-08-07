@@ -3,6 +3,9 @@ This program starts several threads to manage the creation of validator history 
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
+
+use std::{process::Command, sync::Arc, time::Duration};
+
 use clap::Parser;
 use dotenvy::dotenv;
 use log::*;
@@ -23,7 +26,6 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{net::IpAddr, process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -99,7 +101,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
+async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -233,11 +235,11 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
             }
 
             if keeper_config.oracle_authority_keypair.is_some()
-                && keeper_config.gossip_entrypoint.is_some()
+                && keeper_config.gossip_data.is_some()
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ip).await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
 
@@ -324,16 +326,27 @@ fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    let gossip_entrypoint = args
-        .gossip_entrypoint
-        .map(|gossip_entrypoint| {
-            solana_net_utils::parse_host_port(&gossip_entrypoint)
-                .expect("Failed to parse host and port from gossip entrypoint")
+    let gossip_data = args
+        .gossip_entrypoints
+        .map(|gossip_entrypoints| {
+            gossip_entrypoints
+                .iter()
+                .map(|gossip_entrypoint| {
+                    let entrypoint = solana_net_utils::parse_host_port(gossip_entrypoint)
+                        .expect("Failed to parse host and port from gossip entrypoint");
+
+                    let gossip_ip = solana_net_utils::get_public_ip_addr(&entrypoint)
+                        .expect("Failed to get public ip address for gossip node");
+
+                    let cluster_shred_version =
+                        solana_net_utils::get_cluster_shred_version(&entrypoint)
+                            .expect("Failed to get cluster shred version from gossip entrypoint");
+
+                    (entrypoint, gossip_ip, cluster_shred_version)
+                })
+                .collect()
         })
         .expect("Failed to create socket address from gossip entrypoint");
-
-    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
-        .expect("Failed to get public ip address for gossip node");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -393,7 +406,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_entrypoint: Some(gossip_entrypoint),
+            gossip_data: Some(gossip_data),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
@@ -412,6 +425,7 @@ fn main() {
             cluster_name: args.cluster.to_string(),
         };
 
-        run_keeper(config, gossip_ip).await;
+        // run_keeper(config, gossip_ip, cluster_shred_version).await;
+        run_keeper(config).await;
     });
 }

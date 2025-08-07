@@ -1,5 +1,5 @@
 #![allow(clippy::await_holding_refcell_ref)]
-
+#[allow(deprecated)]
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas,
@@ -13,6 +13,7 @@ use jito_steward::{
 use rand::prelude::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
 use solana_program_test::*;
+#[allow(deprecated)]
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule, signature::Keypair,
     signer::Signer, stake::state::StakeStateV2, system_program, transaction::Transaction,
