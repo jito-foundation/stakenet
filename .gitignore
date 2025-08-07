@@ -2,9 +2,9 @@
 .DS_Store
 **/target
 */debug
-*/node_modules
+**/node_modules/*
 */deps
-*/dist
+**/dist/*
 */build
 test-ledger
 */test-ledger

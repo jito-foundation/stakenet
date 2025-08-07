@@ -1,0 +1,30 @@
+name: Publish IDL Package
+
+on:
+  workflow_dispatch:
+    branches:
+      - master
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.14.0
+      
+      - name: Install dependencies
+        run: cd packages/idl && pnpm install
+        
+      - name: Build
+        run: cd packages/idl && pnpm build
+        
+      - name: Publish to npm
+        run: cd packages/idl && pnpm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
