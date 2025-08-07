@@ -7,6 +7,7 @@ mod test_realloc_config;
 mod test_set_new_priority_fee_oracle_authority;
 mod test_set_new_priority_fee_program;
 mod test_stake;
+mod test_stake_buffer;
 mod test_total_priority_fees;
 mod test_vote_account;
 
