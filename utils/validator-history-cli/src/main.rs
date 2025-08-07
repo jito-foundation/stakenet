@@ -717,7 +717,6 @@ fn command_view_config(client: RpcClient) {
     println!("Validator History Account Counter: {}\n", config.counter);
 }
 
-
 fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
     let (cluster_history_pda, _) =
         Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
