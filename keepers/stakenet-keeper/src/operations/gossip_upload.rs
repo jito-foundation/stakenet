@@ -1,11 +1,8 @@
-use crate::entries::gossip_entry::GossipEntry;
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
-use crate::state::keeper_config::KeeperConfig;
-use crate::state::keeper_state::KeeperState;
 use bytemuck::{bytes_of, Pod, Zeroable};
 use log::*;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -33,6 +30,10 @@ use tokio::time::sleep;
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
+use crate::entries::gossip_entry::GossipEntry;
+use crate::state::keeper_config::KeeperConfig;
+use crate::state::keeper_state::KeeperState;
+
 use super::keeper_operations::{check_flag, KeeperOperations};
 
 fn _get_operation() -> KeeperOperations {
@@ -52,12 +53,10 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-    entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
+    gossip_data: &[(SocketAddr, IpAddr, u16)],
     cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
@@ -65,12 +64,10 @@ async fn _process(
         keypair,
         program_id,
         priority_fee_in_microlamports,
-        entrypoint,
         keeper_state,
         retry_count,
         confirmation_time,
-        gossip_ip,
-        cluster_shred_version,
+        gossip_data,
         cluster_name,
     )
     .await
@@ -79,15 +76,16 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
+    // gossip_ip: IpAddr,
+    // cluster_shred_version: u16,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
-    let entrypoint = &keeper_config
-        .gossip_entrypoint
-        .expect("Entry point not set");
+    let gossip_data = &keeper_config
+        .gossip_data
+        .as_ref()
+        .expect("Gossip data not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let retry_count = keeper_config.tx_retry_count;
@@ -106,12 +104,10 @@ pub async fn fire(
             keypair,
             program_id,
             priority_fee_in_microlamports,
-            entrypoint,
             keeper_state,
             retry_count,
             confirmation_time,
-            gossip_ip,
-            cluster_shred_version,
+            gossip_data,
             &keeper_config.cluster_name,
         )
         .await
@@ -205,18 +201,24 @@ fn build_gossip_entry(
     None
 }
 
+/// Handles uploading gossip information
+///
+/// # Process Overview
+///
+/// 1. Connects to each gossip entrypoint to discover validators (cli args allows multiple URLs)
+/// 2. Waits for network discovery (150 seconds per entrypoint)
+/// 3. Builds update transaction (copy_gossip_contract_info ixs) for discovered validators
+/// 4. Submit all transactions with retry logic
 #[allow(clippy::too_many_arguments)]
 pub async fn upload_gossip_values(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-    entrypoint: &SocketAddr,
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
+    gossip_data: &[(SocketAddr, IpAddr, u16)],
     cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
@@ -225,78 +227,91 @@ pub async fn upload_gossip_values(
     // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
-    let gossip_addr = SocketAddr::new(
-        gossip_ip,
-        solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
+    for gossip in gossip_data {
+        let entrypoint = gossip.0;
+        let gossip_ip = gossip.1;
+        let cluster_shred_version = gossip.2;
+
+        let gossip_addr = SocketAddr::new(
+            gossip_ip,
+            solana_net_utils::find_available_port_in_range(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                (0, 1),
+            )
             .expect("unable to find an available gossip port"),
-    );
+        );
 
-    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
-        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
-        Some(entrypoint),
-        exit.clone(),
-        Some(&gossip_addr),
-        cluster_shred_version,
-        true,
-        SocketAddrSpace::Global,
-    );
+        let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
+            Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+            Some(&entrypoint),
+            exit.clone(),
+            Some(&gossip_addr),
+            cluster_shred_version,
+            true,
+            SocketAddrSpace::Global,
+        );
 
-    info!(
-        "Gossip service started on {} with entrypoint {}. Waiting for validators to be discovered...",
-        gossip_addr,
-        entrypoint
-    );
-    // Wait for all active validators to be received
-    sleep(Duration::from_secs(150)).await;
+        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...",);
 
-    let gossip_entries = {
-        let crds = cluster_info
-            .gossip
-            .crds
-            .read()
-            .map_err(|e: std::sync::PoisonError<RwLockReadGuard<Crds>>| e.to_string())?;
+        // Wait for all active validators to be received
+        sleep(Duration::from_secs(150)).await;
 
-        vote_accounts
+        let gossip_entries = {
+            let crds = cluster_info
+                .gossip
+                .crds
+                .read()
+                .map_err(|e: std::sync::PoisonError<RwLockReadGuard<Crds>>| e.to_string())?;
+
+            vote_accounts
+                .iter()
+                .filter_map(|vote_account| {
+                    let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
+                    let validator_history_account =
+                        validator_history_map.get(&vote_account_pubkey)?;
+
+                    build_gossip_entry(
+                        vote_account,
+                        validator_history_account,
+                        &crds,
+                        *program_id,
+                        keypair,
+                    )
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        if gossip_entries.is_empty() {
+            continue;
+        }
+
+        datapoint_info!(
+            "gossip-upload-info",
+            ("validator_gossip_nodes", gossip_entries.len(), i64),
+            "cluster" => cluster_name,
+        );
+
+        exit.store(true, Ordering::Relaxed);
+
+        let update_transactions = gossip_entries
             .iter()
-            .filter_map(|vote_account| {
-                let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
-                let validator_history_account = validator_history_map.get(&vote_account_pubkey)?;
+            .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
+            .collect::<Vec<_>>();
 
-                build_gossip_entry(
-                    vote_account,
-                    validator_history_account,
-                    &crds,
-                    *program_id,
-                    keypair,
-                )
-            })
-            .flatten()
-            .collect::<Vec<_>>()
-    };
+        let submit_result = submit_transactions(
+            client,
+            update_transactions,
+            keypair,
+            retry_count,
+            confirmation_time,
+        )
+        .await;
 
-    datapoint_info!(
-        "gossip-upload-info",
-        ("validator_gossip_nodes", gossip_entries.len(), i64),
-        "cluster" => cluster_name,
-    );
+        return submit_result.map_err(|e| e.into());
+    }
 
-    exit.store(true, Ordering::Relaxed);
-
-    let update_transactions = gossip_entries
-        .iter()
-        .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
-        .collect::<Vec<_>>();
-
-    let submit_result = submit_transactions(
-        client,
-        update_transactions,
-        keypair,
-        retry_count,
-        confirmation_time,
-    )
-    .await;
-
-    submit_result.map_err(|e| e.into())
+    Err("No valid entrypoints found or processed successfully".into())
 }
 
 fn _gossip_data_uploaded(
