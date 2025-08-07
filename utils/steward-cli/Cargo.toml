@@ -7,8 +7,9 @@ description = "CLI to manage the steward program"
 [dependencies]
 anchor-lang = "0.31.1"
 anyhow = "1.0.86"
+borsh = { version = "1.5.7" }
 clap = { version = "4.3.0", features = ["derive", "env"] }
-dotenv = "0.15.0"
+dotenvy = { workspace = true }
 futures = "0.3.21"
 futures-util = "0.3.21"
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }

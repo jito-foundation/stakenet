@@ -34,6 +34,7 @@ pub struct KeeperConfig {
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
+    pub cluster_name: String,
 }
 
 impl KeeperConfig {

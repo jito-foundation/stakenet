@@ -7,19 +7,22 @@ resolver = "2"
 anchor-lang = "0.31.1"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
+dotenvy = "0.15.7"
 http = { version = "0.2.1" }
-jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "24ec5d8a170ac86412167056df8aa4af9b12667c" }
-jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", rev = "24ec5d8a170ac86412167056df8aa4af9b12667c" }
-jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", rev = "24ec5d8a170ac86412167056df8aa4af9b12667c" }
+ipinfo = "3.1.1"
+jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
+jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
+jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
 serde = "1.0.183"
 serde_derive = "1.0.183"
 serde_json = "1.0.102"
 solana-account-decoder = "=2.2.1"
 solana-bincode = "=2.2.1"
-solana-clap-utils = "=2.2.1"
+solana-clap-utils = "=1.8.26"
 solana-client = "=2.2.1"
 solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
 solana-metrics = "=2.2.1"
+solana-native-token = "=2.2.1"
 solana-net-utils = "=2.2.1"
 solana-packet = "=2.2.1"
 solana-program = "=2.2.1"
@@ -32,8 +35,9 @@ solana-transaction-status = "=2.2.1"
 solana-version = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.2.1" }
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-pod = "0.5.1"
-spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.2" }
+spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
+reqwest = { version = "0.11.27", features = ["json"] }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }

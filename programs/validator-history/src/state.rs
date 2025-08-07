@@ -25,8 +25,9 @@ use {
 
 static_assertions::const_assert_eq!(size_of::<Config>(), 392);
 
-static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
-static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
+pub static DNE_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
+pub static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
+pub static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[account]
 pub struct Config {
@@ -84,6 +85,7 @@ pub enum MerkleRootUploadAuthority {
     Other = 1,
     OldJitoLabs = 2,
     TipRouter = 3,
+    DNE = 4,
 }
 
 unsafe impl Zeroable for MerkleRootUploadAuthority {}
@@ -96,6 +98,8 @@ impl MerkleRootUploadAuthority {
             Self::OldJitoLabs
         } else if tda_authority.eq(&TIP_ROUTER_AUTHORITY) {
             Self::TipRouter
+        } else if tda_authority.eq(&DNE_AUTHORITY) {
+            Self::DNE
         } else {
             Self::Other
         }
@@ -715,7 +719,7 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    pub fn set_priority_fees_earned_and_commission(
+    pub fn set_priority_fees_transferred_and_commission(
         &mut self,
         epoch: u16,
         commission: u16,
@@ -751,7 +755,7 @@ impl ValidatorHistory {
             epoch,
             priority_fee_commission: commission,
             priority_fee_tips,
-            merkle_root_upload_authority,
+            priority_fee_merkle_root_upload_authority: merkle_root_upload_authority,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);

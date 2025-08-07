@@ -4,7 +4,7 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
     utils::cast_epoch,
-    MerkleRootUploadAuthority,
+    MerkleRootUploadAuthority, DNE_AUTHORITY,
 };
 
 use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
@@ -41,7 +41,6 @@ pub struct CopyPriorityFeeDistribution<'info> {
         ],
         bump,
         seeds::program = config.priority_fee_distribution_program.key(),
-        owner = config.priority_fee_distribution_program.key()
     )]
     pub distribution_account: UncheckedAccount<'info>,
 
@@ -57,20 +56,53 @@ pub fn handle_copy_priority_fee_distribution_account(
     if epoch > Clock::get()?.epoch {
         return Err(ValidatorHistoryError::EpochOutOfRange.into());
     }
+
+    // The PDFA's priority_fee data is not valid until epoch n+1
+    if epoch == Clock::get()?.epoch {
+        return Err(ValidatorHistoryError::PriorityFeeDistributionAccountNotFinalized.into());
+    }
+
     let epoch = cast_epoch(epoch)?;
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
 
+    let validator_history_entry_for_epoch = validator_history_account
+        .history
+        .arr_mut()
+        .iter_mut()
+        .find(|entry| entry.epoch == epoch);
+
+    // This ensures there is no possibility to overwrite a validator history entry after the PFDA
+    // rent has been reclaimed and introduce an erroneous unstake.
+    if let Some(entry) = validator_history_entry_for_epoch {
+        if entry.priority_fee_merkle_root_upload_authority != MerkleRootUploadAuthority::Unset {
+            return Err(ValidatorHistoryError::PriorityFeeDistributionAccountAlreadyCopied.into());
+        }
+    }
+
     let mut pdfa_data: &[u8] = &ctx.accounts.distribution_account.try_borrow_data()?;
 
-    let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)?;
+    let distribution_account = PriorityFeeDistributionAccount::try_deserialize(&mut pdfa_data)
+        .unwrap_or(PriorityFeeDistributionAccount {
+            validator_vote_account: Pubkey::default(),
+            merkle_root_upload_authority: DNE_AUTHORITY,
+            validator_commission_bps: 0,
+            total_lamports_transferred: 0,
+            merkle_root: None,
+            epoch_created_at: 0,
+            expires_at: 0,
+            bump: 0,
+        });
+    // If the distribution account is not found, we set the default values of 0 for the commission and priority fees earned
     let commission_bps = distribution_account.validator_commission_bps;
-    let priority_fees_earned = distribution_account.total_lamports_transferred;
+    let priority_fees_transferred = distribution_account.total_lamports_transferred;
+    // If the distribution account is not found, we set '11111111111111111111111111111111' as the merkle root upload authority
+    // passing this to MerkleRootUploadAuthority::from_pubkey resolve to a DNE authority
     let merkle_root_upload_authority = distribution_account.merkle_root_upload_authority;
 
-    validator_history_account.set_priority_fees_earned_and_commission(
+    validator_history_account.set_priority_fees_transferred_and_commission(
         epoch,
         commission_bps,
-        priority_fees_earned,
+        priority_fees_transferred,
         MerkleRootUploadAuthority::from_pubkey(&merkle_root_upload_authority),
     )?;
 

@@ -86,7 +86,7 @@ pub struct ConfigParameters {
     #[arg(long, env)]
     pub instant_unstake_epoch_progress: Option<f64>,
 
-    /// Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress
+    /// Inputs to "Compute Instant Unstake" need to be updated past this point in epoch progress
     #[arg(long, env)]
     pub instant_unstake_inputs_epoch_progress: Option<f64>,
 
@@ -185,6 +185,10 @@ pub struct TransactionParameters {
     /// This will print out the raw TX instead of running it
     #[arg(long, env, default_value = "false")]
     pub print_tx: bool,
+
+    /// When enabled, prints the transaction as a spl-governance encoded InstructionData (Base64)
+    #[arg(long, env, default_value_t = false)]
+    pub print_gov_tx: bool,
 }
 
 #[derive(Parser)]
@@ -408,9 +412,23 @@ pub struct AddToBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
-    pub validator_history_index_to_blacklist: u64,
+    /// Validator indices of validator list to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
+    pub validator_history_indices_to_blacklist: Vec<u32>,
+
+    /// Vote accounts of validators to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
+    pub vote_accounts_to_blacklist: Vec<Pubkey>,
+}
+
+fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+    s.parse()
+}
+
+// Add helper to parse a Pubkey from string
+fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+    use std::str::FromStr;
+    Pubkey::from_str(s)
 }
 
 #[derive(Parser)]
@@ -419,9 +437,9 @@ pub struct RemoveFromBlacklist {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
-    /// Validator index of validator list to remove
-    #[arg(long, env)]
-    pub validator_history_index_to_deblacklist: u64,
+    /// Validator indices of validator list to remove (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
+    pub validator_history_indices_to_deblacklist: Vec<u32>,
 }
 
 #[derive(Parser)]
