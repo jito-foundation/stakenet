@@ -366,28 +366,31 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
         ));
         field_descriptions.push(format!("MEV Earned: {:?}", entry_output.mev_earned));
         field_descriptions.push(format!(
-            "Priority Fee Commission: {}",
+            "Priority Fee Commission: {:?}",
             entry_output.priority_fee_commission
         ));
         field_descriptions.push(format!(
-            "Priority Fee Tips: {}",
+            "Priority Fee Tips: {:?}",
             entry_output.priority_fee_tips
         ));
         field_descriptions.push(format!(
-            "Total Priority Fees: {}",
+            "Total Priority Fees: {:?}",
             entry_output.total_priority_fees
         ));
         field_descriptions.push(format!(
-            "Total Leader Slots: {}",
+            "Total Leader Slots: {:?}",
             entry_output.total_leader_slots
         ));
-        field_descriptions.push(format!("Blocks Produced: {}", entry_output.blocks_produced));
         field_descriptions.push(format!(
-            "Block Data Updated At Slot: {}",
+            "Blocks Produced: {:?}",
+            entry_output.blocks_produced
+        ));
+        field_descriptions.push(format!(
+            "Block Data Updated At Slot: {:?}",
             entry_output.block_data_updated_at_slot
         ));
         field_descriptions.push(format!(
-            "Priority Fee Merkle Root Upload Authority: {}",
+            "Priority Fee Merkle Root Upload Authority: {:?}",
             entry_output.priority_fee_merkle_root_upload_authority
         ));
 
