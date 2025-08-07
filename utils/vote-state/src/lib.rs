@@ -376,6 +376,7 @@ mod tests {
         AuthorizedVoters, BlockTimestamp, CircBuf, Lockout, VoteState0_23_5, VoteStateVersions,
         MAX_LOCKOUT_HISTORY,
     };
+    #[allow(deprecated)]
     use anchor_lang::{
         prelude::{AccountInfo, Pubkey},
         solana_program::{clock::Epoch, vote},
