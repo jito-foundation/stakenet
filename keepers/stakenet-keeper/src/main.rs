@@ -330,19 +330,27 @@ fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    let gossip_entrypoint = args
-        .gossip_entrypoint
-        .map(|gossip_entrypoint| {
-            solana_net_utils::parse_host_port(&gossip_entrypoint)
-                .expect("Failed to parse host and port from gossip entrypoint")
+    let gossip_data = args
+        .gossip_entrypoints
+        .map(|gossip_entrypoints| {
+            gossip_entrypoints
+                .iter()
+                .map(|gossip_entrypoint| {
+                    let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
+                        .expect("Failed to parse host and port from gossip entrypoint");
+
+                    let gossip_ip = solana_net_utils::get_public_ip_addr(&entrypoint)
+                        .expect("Failed to get public ip address for gossip node");
+
+                    let cluster_shred_version =
+                        solana_net_utils::get_cluster_shred_version(&entrypoint)
+                            .expect("Failed to get cluster shred version from gossip entrypoint");
+
+                    (entrypoint, gossip_ip, cluster_shred_version)
+                })
+                .collect()
         })
         .expect("Failed to create socket address from gossip entrypoint");
-
-    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
-        .expect("Failed to get public ip address for gossip node");
-
-    let cluster_shred_version = solana_net_utils::get_cluster_shred_version(&gossip_entrypoint)
-        .expect("Failed to get cluster shred version from gossip entrypoint");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -402,7 +410,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_entrypoint: Some(gossip_entrypoint),
+            gossip_data: Some(gossip_data),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
