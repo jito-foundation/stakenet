@@ -332,7 +332,7 @@ fn main() {
             gossip_entrypoints
                 .iter()
                 .map(|gossip_entrypoint| {
-                    let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
+                    let entrypoint = solana_net_utils::parse_host_port(gossip_entrypoint)
                         .expect("Failed to parse host and port from gossip entrypoint");
 
                     let gossip_ip = solana_net_utils::get_public_ip_addr(&entrypoint)
