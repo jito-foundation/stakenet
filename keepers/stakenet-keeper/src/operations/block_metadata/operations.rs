@@ -208,7 +208,14 @@ async fn update_block_metadata(
         info!("\n\n\n1. Update Epoch Schedule\n\n\n");
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
-        let epoch_leader_schedule = get_leader_schedule_safe(client, epoch_starting_slot).await?;
+        let epoch_leader_schedule_result = get_leader_schedule_safe(client, epoch_starting_slot).await;
+
+        if epoch_leader_schedule_result.is_err() {
+            info!("Could not find leader schedule for epoch {}", epoch);
+            continue;
+        }
+
+        let epoch_leader_schedule = epoch_leader_schedule_result.expect("Could not unwrap epoch schedule");
         match DBSlotInfo::insert_leader_schedule(
             sqlite_connection,
             epoch,
