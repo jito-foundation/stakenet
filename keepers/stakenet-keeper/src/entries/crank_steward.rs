@@ -91,27 +91,23 @@ pub fn _get_update_stake_pool_ixs(
     }
 
     let mut deactivate_delinquent_instructions: Vec<Instruction> = vec![];
-    let reference_vote_account = validator_list
-        .validators
-        .iter()
-        .find(|validator_info| {
-            let raw_vote_account = all_validator_accounts
-                .all_vote_account_map
-                .get(&validator_info.vote_account_address)
-                .expect("Vote account not found");
+    let reference_vote_account = validator_list.validators.iter().find(|validator_info| {
+        let raw_vote_account = all_validator_accounts
+            .all_vote_account_map
+            .get(&validator_info.vote_account_address)
+            .expect("Vote account not found");
 
-            if raw_vote_account.is_none() {
-                return false;
-            }
+        if raw_vote_account.is_none() {
+            return false;
+        }
 
-            let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
-                .expect("Could not deserialize vote account");
+        let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
+            .expect("Could not deserialize vote account");
 
-            let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+        let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
-            latest_epoch == epoch || latest_epoch == epoch - 1
-        })
-        .expect("Need at least one okay validator");
+        latest_epoch == epoch || latest_epoch == epoch - 1
+    });
 
     for validator_info in validator_list.validators.iter() {
         let raw_vote_account = all_validator_accounts
@@ -162,14 +158,14 @@ pub fn _get_update_stake_pool_ixs(
             (_, None) => false,
         };
 
-        if should_deactivate {
+        if should_deactivate && reference_vote_account.is_some() {
             let stake_account =
                 get_stake_address(&validator_info.vote_account_address, stake_pool_address);
 
             let ix = deactivate_delinquent_stake(
                 &stake_account,
                 &validator_info.vote_account_address,
-                &reference_vote_account.vote_account_address,
+                &reference_vote_account.unwrap().vote_account_address,
             );
 
             deactivate_delinquent_instructions.push(ix);
