@@ -1,25 +1,30 @@
 use std::sync::Arc;
 
+use crate::commands::command_args::TransactionParameters;
 use anyhow::Result;
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
+use borsh::BorshSerialize;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    transaction::Transaction,
+};
 use stakenet_sdk::{
     models::{errors::JitoTransactionExecutionError, submit_stats::SubmitStats},
     utils::transactions::parallel_execute_transactions,
 };
-
-use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
-    transaction::Transaction,
-};
-
-use crate::commands::command_args::TransactionParameters;
+use std::io::Cursor;
 
 /// Decides whether to print the transaction in raw or governance format.
 /// Returns true if a print happened and caller should skip executing.
 pub fn maybe_print_tx(ixs: &[Instruction], params: &TransactionParameters) -> bool {
     if params.print_tx {
         stakenet_sdk::utils::transactions::print_base58_tx(ixs);
+        true
+    } else if params.print_gov_tx {
+        print_governance_ix(ixs);
         true
     } else {
         false
@@ -126,4 +131,68 @@ pub async fn debug_send_single_transaction(
     }
 
     result
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize)]
+pub struct InstructionData {
+    /// Pubkey of the instruction processor that executes this instruction
+    pub program_id: Pubkey,
+    /// Metadata for what accounts should be passed to the instruction processor
+    pub accounts: Vec<AccountMetaData>,
+    /// Opaque data passed to the instruction processor
+    pub data: Vec<u8>,
+}
+
+/// Account metadata used to define Instructions
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize)]
+pub struct AccountMetaData {
+    /// An account's public key
+    pub pubkey: Pubkey,
+    /// True if an Instruction requires a Transaction signature matching
+    /// `pubkey`.
+    pub is_signer: bool,
+    /// True if the `pubkey` can be loaded as a read-write account.
+    pub is_writable: bool,
+}
+
+impl From<Instruction> for InstructionData {
+    fn from(instruction: Instruction) -> Self {
+        InstructionData {
+            program_id: instruction.program_id,
+            accounts: instruction
+                .accounts
+                .iter()
+                .map(|a| AccountMetaData {
+                    pubkey: a.pubkey,
+                    is_signer: a.is_signer,
+                    is_writable: a.is_writable,
+                })
+                .collect(),
+            data: instruction.data,
+        }
+    }
+}
+
+pub fn print_governance_ix(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ GOV IX ------\n");
+
+        // Convert the instruction to governance InstructionData format
+        let gov_ix_data = InstructionData::from(ix.clone());
+
+        let mut buffer = Cursor::new(Vec::new());
+        match gov_ix_data.serialize(&mut buffer) {
+            Ok(_) => {
+                for account in gov_ix_data.accounts {
+                    println!("Account: {:?}", account.pubkey);
+                }
+                println!("Data: {:?}", gov_ix_data.data);
+                let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
+                println!("Base64 InstructionData: {:?}\n", base64_ix);
+            }
+            Err(err) => {
+                println!("Failed to serialize InstructionData: {}", err);
+            }
+        }
+    });
 }
