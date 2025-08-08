@@ -174,17 +174,38 @@ impl From<&InstructionData> for Instruction {
     }
 }
 
+impl From<Instruction> for InstructionData {
+    fn from(instruction: Instruction) -> Self {
+        InstructionData {
+            program_id: instruction.program_id,
+            accounts: instruction
+                .accounts
+                .iter()
+                .map(|a| AccountMetaData {
+                    pubkey: a.pubkey,
+                    is_signer: a.is_signer,
+                    is_writable: a.is_writable,
+                })
+                .collect(),
+            data: instruction.data,
+        }
+    }
+}
 
 pub fn print_governance_ix(ixs: &[Instruction]) {
     ixs.iter().for_each(|ix| {
         println!("\n------ GOV IX ------\n");
 
         // Convert the instruction to governance InstructionData format
-        //let gov_ix_data = InstructionData::from(ix.clone());
+        let gov_ix_data = InstructionData::from(ix.clone());
 
         let mut buffer = Cursor::new(Vec::new());
-        match ix.serialize(&mut buffer) {
+        match gov_ix_data.serialize(&mut buffer) {
             Ok(_) => {
+                for account in gov_ix_data.accounts {
+                    println!("Account: {:?}", account.pubkey);
+                }
+                println!("Data: {:?}", gov_ix_data.data);
                 let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
                 println!("Base64 InstructionData: {:?}\n", base64_ix);
             }
