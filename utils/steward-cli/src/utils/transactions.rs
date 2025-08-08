@@ -21,6 +21,9 @@ pub fn maybe_print_tx(ixs: &[Instruction], params: &TransactionParameters) -> bo
     if params.print_tx {
         stakenet_sdk::utils::transactions::print_base58_tx(ixs);
         true
+    } else if params.print_gov_tx {
+        print_governance_ix(ixs);
+        true
     } else {
         false
     }
@@ -126,4 +129,24 @@ pub async fn debug_send_single_transaction(
     }
 
     result
+}
+
+pub fn print_governance_ix(ixs: &[Instruction]) {
+    ixs.iter().for_each(|ix| {
+        println!("\n------ GOV IX ------\n");
+
+        // Convert the instruction to governance InstructionData format
+        let gov_ix_data = InstructionData::from(ix.clone());
+
+        let mut buffer = Cursor::new(Vec::new());
+        match gov_ix_data.serialize(&mut buffer) {
+            Ok(_) => {
+                let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
+                println!("Base64 InstructionData: {:?}\n", base64_ix);
+            }
+            Err(err) => {
+                println!("Failed to serialize InstructionData: {}", err);
+            }
+        }
+    });
 }
