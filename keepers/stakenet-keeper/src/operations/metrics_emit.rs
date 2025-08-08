@@ -73,6 +73,7 @@ pub fn emit_validator_history_metrics(
     let mut versions = 0;
     let mut types = 0;
     let mut mev_comms = 0;
+    let mut mev_earns = 0;
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
@@ -99,6 +100,9 @@ pub fn emit_validator_history_metrics(
             }
             if entry.mev_commission != default.mev_commission {
                 mev_comms += 1;
+            }
+            if entry.mev_earned != default.mev_earned {
+                mev_earns += 1;
             }
             if entry.commission != default.commission {
                 comms += 1;
@@ -147,6 +151,7 @@ pub fn emit_validator_history_metrics(
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
         ("num_mev_commissions", mev_comms, i64),
+        ("num_mev_earns", mev_earns, i64),
         ("num_commissions", comms, i64),
         ("num_epoch_credits", epoch_credits, i64),
         ("num_stakes", stakes, i64),
