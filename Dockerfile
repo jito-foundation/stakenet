@@ -1,6 +1,6 @@
-FROM rust:1.85 as builder
+FROM rust:1.86 as builder
 
-RUN apt-get update && apt-get install -y libudev-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
+RUN apt-get update && apt-get install -y libudev-dev libclang-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
 
 RUN update-ca-certificates
 

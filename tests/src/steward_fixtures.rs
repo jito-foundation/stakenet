@@ -23,6 +23,7 @@ use jito_steward::{
     StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
 use solana_program_test::*;
+#[allow(deprecated)]
 use solana_sdk::{
     account::Account,
     compute_budget::ComputeBudgetInstruction,

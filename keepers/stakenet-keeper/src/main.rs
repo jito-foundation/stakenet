@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
+async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shred_version: u16) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -237,7 +237,13 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ip).await,
+                    operations::gossip_upload::fire(
+                        &keeper_config,
+                        &keeper_state,
+                        gossip_ip,
+                        cluster_shred_version,
+                    )
+                    .await,
                 );
             }
 
@@ -335,6 +341,9 @@ fn main() {
     let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
         .expect("Failed to get public ip address for gossip node");
 
+    let cluster_shred_version = solana_net_utils::get_cluster_shred_version(&gossip_entrypoint)
+        .expect("Failed to get cluster shred version from gossip entrypoint");
+
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
         let hostname_cmd = Command::new("hostname")
@@ -412,6 +421,6 @@ fn main() {
             cluster_name: args.cluster.to_string(),
         };
 
-        run_keeper(config, gossip_ip).await;
+        run_keeper(config, gossip_ip, cluster_shred_version).await;
     });
 }
