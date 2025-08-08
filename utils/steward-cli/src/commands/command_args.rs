@@ -240,6 +240,7 @@ pub enum Commands {
     // Views
     ViewState(ViewState),
     ViewConfig(ViewConfig),
+    ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
 
     // Actions
@@ -300,6 +301,13 @@ pub struct ViewState {
 #[derive(Parser)]
 #[command(about = "View the current steward config account")]
 pub struct ViewConfig {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View the current steward priority fee config parameters")]
+pub struct ViewPriorityFeeConfig {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
 }
@@ -367,6 +375,13 @@ pub enum AuthoritySubcommand {
     },
     /// Manages parameters authority
     Parameters {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages priority fee parameters authority
+    PriorityFeeParameters {
         #[command(flatten)]
         permissioned_parameters: PermissionedParameters,
         #[arg(long, env)]

@@ -43,6 +43,14 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetParametersAuthority,
         ),
+        crate::commands::command_args::AuthoritySubcommand::PriorityFeeParameters {
+            permissioned_parameters,
+            new_authority,
+        } => (
+            permissioned_parameters,
+            new_authority,
+            jito_steward::instructions::set_new_authority::AuthorityType::SetPriorityFeeParameterAuthority,
+        ),
     };
 
     // Creates config account
