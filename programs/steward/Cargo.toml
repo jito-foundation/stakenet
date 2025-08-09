@@ -11,6 +11,7 @@ crate-type = ["cdylib", "lib"]
 name = "jito_steward"
 
 [features]
+anchor-debug = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
@@ -19,6 +20,7 @@ testnet = []
 cpi = ["no-entrypoint"]
 default = ["custom-heap"]
 custom-heap = []
+custom-panic = []
 idl-build = ["anchor-lang/idl-build", "validator-history/idl-build", "no-entrypoint"]
 
 [dependencies]

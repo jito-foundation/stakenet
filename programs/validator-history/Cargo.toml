@@ -14,6 +14,7 @@ crate-type = ["cdylib", "lib"]
 name = "validator_history"
 
 [features]
+anchor-debug = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
@@ -22,6 +23,7 @@ testnet = []
 cpi = ["no-entrypoint"]
 default = ["custom-heap"]
 custom-heap = []
+custom-panic = []
 idl-build = ["anchor-lang/idl-build", "no-entrypoint"]
 
 [dependencies]
@@ -34,7 +36,6 @@ jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
 semver = "1.0.17"
 serde = "1.0.183"
 serde_derive = "1.0.183"
-solana-program = { workspace = true }
 solana-security-txt = "1.1.0"
 static_assertions = "1.1.0"
 thiserror = "1.0.37"
