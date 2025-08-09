@@ -11731,6 +11731,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_derive",
+ "solana-program",
  "solana-security-txt",
  "static_assertions",
  "thiserror 1.0.69",
