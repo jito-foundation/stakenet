@@ -14,7 +14,7 @@ use solana_gossip::crds::Crds;
 use solana_gossip::crds_data::CrdsData;
 use solana_gossip::crds_value::{CrdsValue, CrdsValueLabel};
 use solana_gossip::gossip_service::make_gossip_node;
-use solana_metrics::datapoint_error;
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::signature::Signable;
 use solana_sdk::{
     epoch_info::EpochInfo,
@@ -57,6 +57,8 @@ async fn _process(
     retry_count: u16,
     confirmation_time: u64,
     gossip_ip: IpAddr,
+    cluster_shred_version: u16,
+    cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
@@ -68,6 +70,8 @@ async fn _process(
         retry_count,
         confirmation_time,
         gossip_ip,
+        cluster_shred_version,
+        cluster_name,
     )
     .await
 }
@@ -76,6 +80,7 @@ pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
     gossip_ip: IpAddr,
+    cluster_shred_version: u16,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
@@ -106,6 +111,8 @@ pub async fn fire(
             retry_count,
             confirmation_time,
             gossip_ip,
+            cluster_shred_version,
+            &keeper_config.cluster_name,
         )
         .await
         {
@@ -143,21 +150,6 @@ fn check_entry_valid(
     // 1. Entry timestamp is not too old
     // 2. Entry is for the correct validator
     match &entry.data {
-        CrdsData::LegacyContactInfo(legacy_contact_info) => {
-            if legacy_contact_info.wallclock < validator_history.last_ip_timestamp {
-                return false;
-            }
-        }
-        CrdsData::LegacyVersion(legacy_version) => {
-            if legacy_version.wallclock < validator_history.last_version_timestamp {
-                return false;
-            }
-        }
-        CrdsData::Version(version) => {
-            if version.wallclock < validator_history.last_version_timestamp {
-                return false;
-            }
-        }
         CrdsData::ContactInfo(contact_info) => {
             if contact_info.wallclock() < validator_history.last_ip_timestamp
                 || contact_info.wallclock() < validator_history.last_version_timestamp
@@ -193,73 +185,24 @@ fn build_gossip_entry(
     let validator_vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
 
     let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(validator_identity);
-    let legacy_contact_info_key: CrdsValueLabel =
-        CrdsValueLabel::LegacyContactInfo(validator_identity);
-    let version_key: CrdsValueLabel = CrdsValueLabel::Version(validator_identity);
-    let legacy_version_key: CrdsValueLabel = CrdsValueLabel::LegacyVersion(validator_identity);
 
-    // Current ContactInfo has both IP and Version, but LegacyContactInfo has only IP.
-    // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
+    // ContactInfo is the only gossip message we are interested in. Legacy* and Version
+    // are fully deprecated and will not be transmitted on the gossip network.
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
             println!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
         }
-        Some(vec![GossipEntry::new(
+        return Some(vec![GossipEntry::new(
             &validator_vote_pubkey,
             &entry.get_signature(),
             &entry.signable_data(),
             &program_id,
             &entry.pubkey(),
             &keypair.pubkey(),
-        )])
-    } else {
-        let mut entries = vec![];
-        if let Some(entry) = crds.get::<&CrdsValue>(&legacy_contact_info_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        }
-
-        if let Some(entry) = crds.get::<&CrdsValue>(&version_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        } else if let Some(entry) = crds.get::<&CrdsValue>(&legacy_version_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        }
-
-        Some(entries)
+        )]);
     }
+    None
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -273,6 +216,8 @@ pub async fn upload_gossip_values(
     retry_count: u16,
     confirmation_time: u64,
     gossip_ip: IpAddr,
+    cluster_shred_version: u16,
+    cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -291,11 +236,16 @@ pub async fn upload_gossip_values(
         Some(entrypoint),
         exit.clone(),
         Some(&gossip_addr),
-        0,
+        cluster_shred_version,
         true,
         SocketAddrSpace::Global,
     );
 
+    info!(
+        "Gossip service started on {} with entrypoint {}. Waiting for validators to be discovered...",
+        gossip_addr,
+        entrypoint
+    );
     // Wait for all active validators to be received
     sleep(Duration::from_secs(150)).await;
 
@@ -323,6 +273,12 @@ pub async fn upload_gossip_values(
             .flatten()
             .collect::<Vec<_>>()
     };
+
+    datapoint_info!(
+        "gossip-upload-info",
+        ("validator_gossip_nodes", gossip_entries.len(), i64),
+        "cluster" => cluster_name,
+    );
 
     exit.store(true, Ordering::Relaxed);
 

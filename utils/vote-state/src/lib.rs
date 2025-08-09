@@ -8,6 +8,7 @@ use std::{
     mem::size_of,
 };
 
+#[allow(deprecated)]
 use anchor_lang::{error::ErrorCode::ConstraintOwner, prelude::*, solana_program::vote};
 
 use serde::{Deserialize, Serialize};
@@ -375,6 +376,7 @@ mod tests {
         AuthorizedVoters, BlockTimestamp, CircBuf, Lockout, VoteState0_23_5, VoteStateVersions,
         MAX_LOCKOUT_HISTORY,
     };
+    #[allow(deprecated)]
     use anchor_lang::{
         prelude::{AccountInfo, Pubkey},
         solana_program::{clock::Epoch, vote},

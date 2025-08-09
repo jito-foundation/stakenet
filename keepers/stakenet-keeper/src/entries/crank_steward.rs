@@ -10,6 +10,7 @@ use solana_program::instruction::Instruction;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
 use solana_sdk::vote::state::VoteState;
+#[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
 #[allow(deprecated)]
 use spl_stake_pool::instruction::{
