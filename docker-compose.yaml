@@ -63,6 +63,7 @@ services:
       - RUN_STAKE_UPLOAD=false
       - RUN_GOSSIP_UPLOAD=false
       - RUN_EMIT_METRICS=true
+      - GOSSIP_ENTRYPOINT=${GOSSIP_ENTRYPOINT}
       - REGION=${REGION}
     volumes:
       - ./credentials:/credentials
