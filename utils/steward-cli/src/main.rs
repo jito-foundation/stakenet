@@ -30,6 +30,7 @@ use commands::{
         rebalance::command_crank_rebalance, steward::command_crank_steward,
     },
     info::{
+        analyze_scores::command_analyze_scores,
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_state::command_view_state,
@@ -59,6 +60,7 @@ async fn main() -> Result<()> {
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
+        Commands::AnalyzeScores(args) => command_analyze_scores(args, &client, program_id).await,
 
         // --- Helpers ---
         Commands::ManuallyCopyVoteAccount(args) => {
