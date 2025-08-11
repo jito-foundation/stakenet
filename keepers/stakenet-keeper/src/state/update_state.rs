@@ -313,13 +313,13 @@ async fn get_tip_distribution_accounts(
     Ok(result)
 }
 
-/// Create missing [`ValidatorHistory`] account
+/// Create missing [`ValidatorHistory`] accounts
 ///
 /// # Process
 ///
 /// - Filter validators having activated stake amount more than `validator_history_min_stake`
 /// - Retrieve validator validator history addresses, then accounts
-/// - Submit transaction for creating new [`ValidatorHistory`] account
+/// - Submit transactions for creating new [`ValidatorHistory`] account
 async fn create_missing_validator_history_accounts(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -329,13 +329,6 @@ async fn create_missing_validator_history_accounts(
     confirmation_time: u64,
     validator_history_min_stake: u64,
 ) -> Result<usize, Box<dyn Error>> {
-    // let vote_accounts = &keeper_state
-    //     .vote_account_map
-    //     .keys()
-    //     .collect::<Vec<&Pubkey>>();
-
-    // let vote_accounts = &keeper_state.vote_account_map.values().collect::<Vec<_>>();
-
     let vote_accounts = &keeper_state
         .vote_account_map
         .iter()
@@ -354,8 +347,6 @@ async fn create_missing_validator_history_accounts(
         .collect::<Vec<Pubkey>>();
 
     let history_accounts = get_multiple_accounts_batched(all_history_addresses, client).await?;
-
-    // assert!(vote_accounts.len() == history_accounts.len());
 
     let create_transactions = vote_accounts
         .iter()
