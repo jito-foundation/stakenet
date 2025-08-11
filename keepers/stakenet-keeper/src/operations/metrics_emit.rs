@@ -113,7 +113,7 @@ pub fn emit_validator_history_metrics(
             }
         }
         // Check previous epoch for state
-        let previous_epoch = epoch_info.epoch - 1;
+        let previous_epoch = epoch_info.epoch - 1 as u16;
         if let Some(entry) = validator_history
             .history
             .arr
