@@ -54,7 +54,7 @@ impl From<&[u8]> for Ipv4EchoResponse {
         let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
         let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
         // Skip the option flag byte
-        let shred_version = if &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
+        let shred_version = if data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
             None
         } else {
             Some(u16::from_le_bytes([
@@ -99,7 +99,7 @@ impl Ipv4EchoClient {
                 ),
             )));
         }
-        return Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]));
+        Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]))
     }
 }
 
