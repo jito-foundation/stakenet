@@ -77,19 +77,27 @@ impl Ipv4EchoClient {
         }
     }
 
-    pub async fn fetch_ip_and_shred_version(&mut self) -> Result<Ipv4EchoResponse, ()> {
+    pub async fn fetch_ip_and_shred_version(
+        &mut self,
+    ) -> Result<Ipv4EchoResponse, Box<dyn std::error::Error>> {
         let mut tcp_stream = TcpStream::connect(&self.gossip_entrypoint)
             .await
-            .expect("Failed to connect to gossip entrypoint");
+            .map_err(|e| format!("Failed to connect to {}: {}", self.gossip_entrypoint, e))?;
         tcp_stream
             .write_all(IP_ECHO_REQUEST)
             .await
-            .expect("Failed to write to TCP stream");
+            .map_err(|e| format!("Failed to write to {}: {}", self.gossip_entrypoint, e))?;
         tcp_stream.flush().await.expect("can flush");
         let mut buffer = vec![0u8; IP_ECHO_RESPONSE_LEN];
         let response_bytes = tcp_stream.read(&mut buffer).await.expect("can read");
         if response_bytes != IP_ECHO_RESPONSE_LEN {
-            return Err(());
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected {} bytes, got {} bytes from {}",
+                    IP_ECHO_RESPONSE_LEN, response_bytes, self.gossip_entrypoint
+                ),
+            )));
         }
         return Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]));
     }
