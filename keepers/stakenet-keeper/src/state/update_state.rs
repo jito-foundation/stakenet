@@ -317,9 +317,10 @@ async fn get_tip_distribution_accounts(
 ///
 /// # Process
 ///
-/// - Filter validators having activated stake amount more than `validator_history_min_stake`
-/// - Retrieve validator validator history addresses, then accounts
-/// - Submit transactions for creating new [`ValidatorHistory`] account
+/// - Filter validators with activated stake amount more than `validator_history_min_stake`
+/// - Retrieve validator validator history addresses and accounts
+/// - Build transactions for missing [`ValidatorHistory`] accounts
+/// - Submit all transactions
 async fn create_missing_validator_history_accounts(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
