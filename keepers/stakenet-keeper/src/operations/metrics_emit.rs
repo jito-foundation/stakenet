@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /*
 This program starts several threads to manage the creation of validator history accounts,
 and the updating of the various data feeds within the accounts.
@@ -6,6 +8,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
+use solana_pubkey::Pubkey;
 use spl_stake_pool::state::StakeStatus;
 
 use stakenet_sdk::utils::debug::{
@@ -57,6 +60,14 @@ pub fn fire(
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
+/// Emit validator history metrics
+///
+/// # Overview
+///
+/// Every `metrics_interval` (default 60 sec), the keeper emit metrics of validator history
+/// information. Since we do not create [`ValidatorHistory`] account for validator which does not
+/// have `activated_stake` more than `validator_history_min_stake` (default: 500 SOL), so we should
+/// remove those from number.
 pub fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
     cluster: &str,
@@ -130,8 +141,17 @@ pub fn emit_validator_history_metrics(
     let get_vote_accounts_voting = get_vote_accounts
         .iter()
         .filter(|x| {
-            // Check if the last epoch credit ( most recent ) is the current epoch
-            x.epoch_credits.last().unwrap().0 == epoch_info.epoch
+            let is_voting = x
+                .epoch_credits
+                .last()
+                .map(|credit| credit.0 == epoch_info.epoch)
+                .unwrap_or(false);
+
+            let has_history = Pubkey::from_str(&x.vote_pubkey)
+                .map(|pubkey| keeper_state.validator_history_map.contains_key(&pubkey))
+                .unwrap_or(false);
+
+            is_voting && has_history
         })
         .count();
 
