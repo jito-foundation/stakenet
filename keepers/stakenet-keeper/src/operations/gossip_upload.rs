@@ -89,7 +89,6 @@ impl Ipv4EchoClient {
         let mut buffer = vec![0u8; IP_ECHO_RESPONSE_LEN];
         let response_bytes = tcp_stream.read(&mut buffer).await.expect("can read");
         if response_bytes != IP_ECHO_RESPONSE_LEN {
-            println!("Unexpected response length: {}", response_bytes);
             return Err(());
         }
         return Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]));
