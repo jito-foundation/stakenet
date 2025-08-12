@@ -60,20 +60,54 @@ pub fn fire(
 }
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
+
 /// Emit validator history metrics
 ///
 /// # Overview
 ///
-/// Every `metrics_interval` (default 60 sec), the keeper emit metrics of validator history
-/// information. Since we do not create [`ValidatorHistory`] account for validator which does not
-/// have `activated_stake` more than `validator_history_min_stake` (default: 500 SOL), so we should
-/// remove those from number.
+/// Every `metrics_interval` (default 60 sec), the keeper emits metrics of validator history
+/// information. This function is called after the validator history map has been updated with
+/// the latest validator data for the current epoch.
+///
+/// This function only processes validators that have corresponding entries in the
+/// validator history map, effectively filtering out validators that don't meet the minimum
+/// stake requirement (`validator_history_min_stake`, default: 500 SOL) since we do not create
+/// [`ValidatorHistory`] accounts for such validators.
+///
+/// # Metrics Emitted
+///
+/// ## Validator Counts
+/// - `num_validator_histories`: Total number of validator history accounts
+/// - `num_live_validator_histories`: Number of currently active validator
+/// - `num_get_vote_accounts_responses`: Vote accounts that have validator history entries
+/// - `num_get_vote_accounts_voting`: Subset of above that are actively voting in current epoch
+///
+/// ## Validator Properties (for current epoch)
+/// - `num_ips`: Validators with non-default IP addresses
+/// - `num_versions`: Validators with non-default client versions
+/// - `num_client_types`: Validators with non-default client types
+/// - `num_mev_commissions`: Validators with non-default MEV commissions
+/// - `num_commissions`: Validators with non-default commissions
+/// - `num_epoch_credits`: Validators with non-default epoch credits
+/// - `num_stakes`: Validators with non-default stake amounts
+///
+/// ## Cluster State
+/// - `cluster_history_blocks`: Whether cluster history is updated for current epoch (0 or 1)
+/// - `slot_index`: Current slot index from epoch info
 pub fn emit_validator_history_metrics(
     keeper_state: &KeeperState,
     cluster: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let epoch_info = &keeper_state.epoch_info;
-    let get_vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
+    let get_vote_accounts = keeper_state
+        .vote_account_map
+        .values()
+        .filter(|x| {
+            Pubkey::from_str(&x.vote_pubkey)
+                .map(|pubkey| keeper_state.validator_history_map.contains_key(&pubkey))
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
     let validator_histories = &keeper_state
         .validator_history_map
         .values()
@@ -141,17 +175,10 @@ pub fn emit_validator_history_metrics(
     let get_vote_accounts_voting = get_vote_accounts
         .iter()
         .filter(|x| {
-            let is_voting = x
-                .epoch_credits
+            x.epoch_credits
                 .last()
                 .map(|credit| credit.0 == epoch_info.epoch)
-                .unwrap_or(false);
-
-            let has_history = Pubkey::from_str(&x.vote_pubkey)
-                .map(|pubkey| keeper_state.validator_history_map.contains_key(&pubkey))
-                .unwrap_or(false);
-
-            is_voting && has_history
+                .unwrap_or(false)
         })
         .count();
 
