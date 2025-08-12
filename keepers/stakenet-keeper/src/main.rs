@@ -23,7 +23,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{net::IpAddr, process::Command, sync::Arc, time::Duration};
+use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -331,12 +331,6 @@ fn main() {
                 .expect("Failed to parse host and port from gossip entrypoint")
         })
         .expect("Failed to create socket address from gossip entrypoint");
-
-    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
-        .expect("Failed to get public ip address for gossip node");
-
-    let cluster_shred_version = solana_net_utils::get_cluster_shred_version(&gossip_entrypoint)
-        .expect("Failed to get cluster shred version from gossip entrypoint");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
