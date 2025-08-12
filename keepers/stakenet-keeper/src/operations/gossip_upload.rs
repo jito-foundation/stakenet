@@ -99,9 +99,19 @@ impl Ipv4EchoClient {
             .write_all(IP_ECHO_REQUEST)
             .await
             .map_err(|e| format!("Failed to write to {}: {}", self.gossip_entrypoint, e))?;
-        tcp_stream.flush().await.expect("can flush");
+        tcp_stream.flush().await.map_err(|e| {
+            format!(
+                "Failed to flush TCP stream to {}: {}",
+                self.gossip_entrypoint, e
+            )
+        })?;
         let mut buffer = vec![0u8; IP_ECHO_RESPONSE_LEN];
-        let response_bytes = tcp_stream.read(&mut buffer).await.expect("can read");
+        let response_bytes = tcp_stream.read(&mut buffer).await.map_err(|e| {
+            format!(
+                "Failed to read response from {}: {}",
+                self.gossip_entrypoint, e
+            )
+        })?;
         if response_bytes != IP_ECHO_RESPONSE_LEN {
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
