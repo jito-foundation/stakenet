@@ -34,6 +34,67 @@ use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
+const IP_ECHO_HEADER_LEN: usize = 4;
+const IP_ADDR_OFFSET_V4: usize = 8;
+const SHRED_VERSION_OFFSET: usize = IP_ECHO_HEADER_LEN + IP_ADDR_OFFSET_V4;
+const IP_ECHO_REQUEST: &[u8] = &[0x00; 21]; // IP echo server expects 21 bytes
+const IP_ECHO_RESPONSE_LEN: usize = 27; // IP echo server will always respond with 27 bytes
+
+struct Ipv4EchoResponse {
+    ip: IpAddr,
+    shred_version: Option<u16>,
+}
+
+impl From<&[u8]> for Ipv4EchoResponse {
+    fn from(data: &[u8]) -> Self {
+        let octets = &data[IP_ADDR_OFFSET_V4..IP_ADDR_OFFSET_V4 + 4];
+        let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
+        let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
+        // Skip the option flag byte
+        let shred_version = if &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
+            None
+        } else {
+            Some(u16::from_le_bytes([
+                shred_version_bytes[1],
+                shred_version_bytes[2],
+            ]))
+        };
+        Ipv4EchoResponse { ip, shred_version }
+    }
+}
+
+struct Ipv4EchoClient {
+    gossip_entrypoint: String,
+}
+
+impl Ipv4EchoClient {
+    pub fn new<S: AsRef<str>>(gossip_entrypoint: S) -> Self {
+        Self {
+            gossip_entrypoint: gossip_entrypoint.as_ref().to_string(),
+        }
+    }
+
+    pub async fn fetch_ip_and_shred_version(&mut self) -> Result<Ipv4EchoResponse, ()> {
+        let mut tcp_stream = TcpStream::connect(&self.gossip_entrypoint)
+            .await
+            .expect("Failed to connect to gossip entrypoint");
+        tcp_stream
+            .write_all(IP_ECHO_REQUEST)
+            .await
+            .expect("Failed to write to TCP stream");
+        tcp_stream.flush().await.expect("can flush");
+        let mut buffer = vec![0u8; IP_ECHO_RESPONSE_LEN];
+        let response_bytes = tcp_stream.read(&mut buffer).await.expect("can read");
+        if response_bytes != IP_ECHO_RESPONSE_LEN {
+            println!("Unexpected response length: {}", response_bytes);
+            return Err(());
+        }
+        return Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]));
+    }
+}
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::GossipUpload
@@ -56,8 +117,6 @@ async fn _process(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
     cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
@@ -69,8 +128,6 @@ async fn _process(
         keeper_state,
         retry_count,
         confirmation_time,
-        gossip_ip,
-        cluster_shred_version,
         cluster_name,
     )
     .await
@@ -79,8 +136,6 @@ async fn _process(
 pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
 ) -> (KeeperOperations, u64, u64, u64) {
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
@@ -110,8 +165,6 @@ pub async fn fire(
             keeper_state,
             retry_count,
             confirmation_time,
-            gossip_ip,
-            cluster_shred_version,
             &keeper_config.cluster_name,
         )
         .await
@@ -215,8 +268,6 @@ pub async fn upload_gossip_values(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: IpAddr,
-    cluster_shred_version: u16,
     cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
@@ -224,6 +275,15 @@ pub async fn upload_gossip_values(
 
     // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+
+    let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
+    let ip_echo_response = ip_echo_client
+        .fetch_ip_and_shred_version()
+        .await
+        .map_err(|_| "Failed to fetch IP and shred version from gossip entrypoint")?;
+
+    let gossip_ip = ip_echo_response.ip;
+    let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);
 
     let gossip_addr = SocketAddr::new(
         gossip_ip,

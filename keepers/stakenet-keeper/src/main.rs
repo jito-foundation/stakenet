@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shred_version: u16) {
+async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -237,13 +237,7 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shre
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(
-                        &keeper_config,
-                        &keeper_state,
-                        gossip_ip,
-                        cluster_shred_version,
-                    )
-                    .await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
 
@@ -421,6 +415,6 @@ fn main() {
             cluster_name: args.cluster.to_string(),
         };
 
-        run_keeper(config, gossip_ip, cluster_shred_version).await;
+        run_keeper(config).await;
     });
 }
