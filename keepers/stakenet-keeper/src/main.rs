@@ -322,7 +322,7 @@ fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{}\n\n", args.to_string());
+    info!("{}\n\n", args);
 
     let gossip_entrypoint = args
         .gossip_entrypoint

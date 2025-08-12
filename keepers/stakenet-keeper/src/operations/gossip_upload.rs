@@ -48,8 +48,20 @@ struct Ipv4EchoResponse {
     shred_version: Option<u16>,
 }
 
-impl From<&[u8]> for Ipv4EchoResponse {
-    fn from(data: &[u8]) -> Self {
+impl TryFrom<&[u8]> for Ipv4EchoResponse {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        if data.len() < IP_ECHO_RESPONSE_LEN {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected at least {} bytes, got {} bytes",
+                    IP_ECHO_RESPONSE_LEN,
+                    data.len()
+                ),
+            )));
+        }
         let octets = &data[IP_ADDR_OFFSET_V4..IP_ADDR_OFFSET_V4 + 4];
         let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
         let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
@@ -62,7 +74,7 @@ impl From<&[u8]> for Ipv4EchoResponse {
                 shred_version_bytes[2],
             ]))
         };
-        Ipv4EchoResponse { ip, shred_version }
+        Ok(Ipv4EchoResponse { ip, shred_version })
     }
 }
 
@@ -99,7 +111,7 @@ impl Ipv4EchoClient {
                 ),
             )));
         }
-        Ok(Ipv4EchoResponse::from(&buffer[..response_bytes]))
+        Ipv4EchoResponse::try_from(&buffer[..response_bytes])
     }
 }
 
