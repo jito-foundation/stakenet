@@ -379,15 +379,16 @@ pub async fn upload_gossip_values(
 
         exit.store(true, Ordering::Relaxed);
 
-        if gossip_entries.is_empty() {
-            continue;
-        }
-
         datapoint_info!(
             "gossip-upload-info",
             ("validator_gossip_nodes", gossip_entries.len(), i64),
+            ("entrypoint", entrypoint.to_string(), String),
             "cluster" => cluster_name,
         );
+
+        if gossip_entries.is_empty() {
+            continue;
+        }
 
         let update_transactions = gossip_entries
             .iter()

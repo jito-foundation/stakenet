@@ -330,8 +330,9 @@ fn main() {
             gossip_entrypoints
                 .iter()
                 .map(|gossip_entrypoint| {
-                    solana_net_utils::parse_host_port(gossip_entrypoint)
-                        .expect("Failed to parse host and port from gossip entrypoint")
+                    solana_net_utils::parse_host_port(gossip_entrypoint).expect(&format!(
+                        "Failed to parse host and port from gossip entrypoint: {gossip_entrypoint}"
+                    ))
                 })
                 .collect()
         })
