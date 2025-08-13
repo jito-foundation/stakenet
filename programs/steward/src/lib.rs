@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+#![allow(deprecated)]
 #![allow(clippy::redundant_pub_crate)]
 use anchor_lang::prelude::*;
 #[cfg(feature = "idl-build")]

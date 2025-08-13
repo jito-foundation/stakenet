@@ -9,6 +9,7 @@ use crate::state::keeper_state::KeeperState;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
+#[allow(deprecated)]
 use solana_sdk::{
     compute_budget,
     epoch_info::EpochInfo,
