@@ -318,38 +318,24 @@ pub async fn upload_gossip_values(
     // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
-    let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
-    let ip_echo_response = ip_echo_client
-        .fetch_ip_and_shred_version()
-        .await
-        .map_err(|_| "Failed to fetch IP and shred version from gossip entrypoint")?;
+    for entrypoint in entrypoints {
+        let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
+        let ip_echo_response = ip_echo_client
+            .fetch_ip_and_shred_version()
+            .await
+            .map_err(|_| "Failed to fetch IP and shred version from gossip entrypoint")?;
 
-    let gossip_ip = ip_echo_response.ip;
-    let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);
+        let gossip_ip = ip_echo_response.ip;
+        let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);
 
-    let gossip_addr = SocketAddr::new(
-        gossip_ip,
-        solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
+        let gossip_addr = SocketAddr::new(
+            gossip_ip,
+            solana_net_utils::find_available_port_in_range(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                (0, 1),
+            )
             .expect("unable to find an available gossip port"),
-    );
-
-    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
-        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
-        Some(entrypoint),
-        exit.clone(),
-        Some(&gossip_addr),
-        cluster_shred_version,
-        true,
-        SocketAddrSpace::Global,
-    );
-
-    info!(
-        "Gossip service started on {} with entrypoint {}. Waiting for validators to be discovered...",
-        gossip_addr,
-        entrypoint
-    );
-    // Wait for all active validators to be received
-    sleep(Duration::from_secs(150)).await;
+        );
 
         let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
             Keypair::from_base58_string(keypair.to_base58_string().as_str()),
@@ -361,7 +347,7 @@ pub async fn upload_gossip_values(
             SocketAddrSpace::Global,
         );
 
-        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...",);
+        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...");
 
         // Wait for all active validators to be received
         sleep(Duration::from_secs(150)).await;
@@ -418,13 +404,8 @@ pub async fn upload_gossip_values(
         )
         .await;
 
-    datapoint_info!(
-        "gossip-upload-info",
-        ("validator_gossip_nodes", gossip_entries.len(), i64),
-        "cluster" => cluster_name,
-    );
-
-    exit.store(true, Ordering::Relaxed);
+        return submit_result.map_err(|e| e.into());
+    }
 
     Err("No valid entrypoints found or processed successfully".into())
 }
