@@ -10728,6 +10728,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "rusqlite",
+ "serde",
  "solana-account-decoder 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-bincode",
  "solana-client 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -8,6 +8,7 @@ use crate::state::keeper_config::KeeperConfig;
 use crate::state::keeper_state::KeeperState;
 use bytemuck::{bytes_of, Pod, Zeroable};
 use log::*;
+use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_response::RpcVoteAccountInfo;
 use solana_gossip::crds::Crds;
@@ -38,44 +39,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 const IP_ECHO_HEADER_LEN: usize = 4;
-const IP_ADDR_OFFSET_V4: usize = 8;
-const SHRED_VERSION_OFFSET: usize = IP_ECHO_HEADER_LEN + IP_ADDR_OFFSET_V4;
 const IP_ECHO_REQUEST: &[u8] = &[0x00; 21]; // IP echo server expects 21 bytes
 const IP_ECHO_RESPONSE_LEN: usize = 27; // IP echo server will always respond with 27 bytes
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Ipv4EchoResponse {
     ip: IpAddr,
     shred_version: Option<u16>,
-}
-
-impl TryFrom<&[u8]> for Ipv4EchoResponse {
-    type Error = Box<dyn std::error::Error>;
-
-    fn try_from(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-        if data.len() < IP_ECHO_RESPONSE_LEN {
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "Expected at least {} bytes, got {} bytes",
-                    IP_ECHO_RESPONSE_LEN,
-                    data.len()
-                ),
-            )));
-        }
-        let octets = &data[IP_ADDR_OFFSET_V4..IP_ADDR_OFFSET_V4 + 4];
-        let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
-        let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
-        // Skip the option flag byte
-        let shred_version = if data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
-            None
-        } else {
-            Some(u16::from_le_bytes([
-                shred_version_bytes[1],
-                shred_version_bytes[2],
-            ]))
-        };
-        Ok(Ipv4EchoResponse { ip, shred_version })
-    }
 }
 
 struct Ipv4EchoClient {
@@ -89,6 +59,8 @@ impl Ipv4EchoClient {
         }
     }
 
+    /// Fetch and deserialize from ip echo server
+    /// https://github.com/anza-xyz/agave/blob/3517d23b247a7a0a0cfe22682a5d2c6892b3b47e/net-utils/src/ip_echo_server.rs
     pub async fn fetch_ip_and_shred_version(
         &mut self,
     ) -> Result<Ipv4EchoResponse, Box<dyn std::error::Error>> {
@@ -121,7 +93,12 @@ impl Ipv4EchoClient {
                 ),
             )));
         }
-        Ipv4EchoResponse::try_from(&buffer[..response_bytes])
+
+        // Skip the 4-byte header and deserialize the response
+        let response = bincode::deserialize::<Ipv4EchoResponse>(&buffer[IP_ECHO_HEADER_LEN..])
+            .map_err(|e| format!("Failed to deserialize IP echo response: {}", e))?;
+
+        Ok(response)
     }
 }
 
