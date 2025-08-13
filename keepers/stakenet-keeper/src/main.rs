@@ -407,6 +407,7 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
+            validator_history_min_stake: args.validator_history_min_stake,
         };
 
         run_keeper(config).await;

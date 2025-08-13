@@ -95,6 +95,9 @@ COOL_DOWN_RANGE=20
 
 # Metrics upload influx server (optional)
 SOLANA_METRICS_CONFIG=""
+
+#  Minimum activated stake threshold for creating validator history accounts (in lamports)
+VALIDATOR_HISTORY_MIN_STAKE=500000000000
 ```
 
 ## Running Docker image from source

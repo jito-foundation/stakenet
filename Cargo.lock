@@ -10736,6 +10736,7 @@ dependencies = [
  "solana-net-utils 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-packet",
  "solana-program",
+ "solana-pubkey",
  "solana-sdk",
  "solana-streamer 2.3.3 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.3.3)",
  "solana-transaction-status 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
