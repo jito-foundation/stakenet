@@ -335,7 +335,7 @@ fn main() {
                 })
                 .collect()
         })
-        .expect("Failed to create socket address from gossip entrypoint");
+        .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {

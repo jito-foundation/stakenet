@@ -176,7 +176,7 @@ pub async fn fire(
     let entrypoints = &keeper_config
         .gossip_entrypoints
         .as_ref()
-        .expect("Entry point not set");
+        .expect("Entry points not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let retry_count = keeper_config.tx_retry_count;
@@ -315,10 +315,9 @@ pub async fn upload_gossip_values(
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
 
-    // Modified from solana-gossip::main::process_spy and discover
-    let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-
     for entrypoint in entrypoints {
+        // Modified from solana-gossip::main::process_spy and discover
+        let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
         let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
         let ip_echo_response = ip_echo_client
             .fetch_ip_and_shred_version()
@@ -378,6 +377,8 @@ pub async fn upload_gossip_values(
                 .collect::<Vec<_>>()
         };
 
+        exit.store(true, Ordering::Relaxed);
+
         if gossip_entries.is_empty() {
             continue;
         }
@@ -387,8 +388,6 @@ pub async fn upload_gossip_values(
             ("validator_gossip_nodes", gossip_entries.len(), i64),
             "cluster" => cluster_name,
         );
-
-        exit.store(true, Ordering::Relaxed);
 
         let update_transactions = gossip_entries
             .iter()
@@ -407,7 +406,7 @@ pub async fn upload_gossip_values(
         return submit_result.map_err(|e| e.into());
     }
 
-    Err("No valid entrypoints found or processed successfully".into())
+    Err("Failed to discover gossip entries from any of the provided entrypoints".into())
 }
 
 fn _gossip_data_uploaded(
