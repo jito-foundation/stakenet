@@ -37,11 +37,16 @@ use super::keeper_operations::{check_flag, KeeperOperations};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
+// Constants for the IP echo server protocol
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/ip_echo_server.rs
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/lib.rs
 const IP_ECHO_HEADER_LEN: usize = 4;
+const IP_ECHO_RESPONSE_LEN: usize = 27; // IP echo server will always respond with 27 bytes
 const IP_ADDR_OFFSET_V4: usize = 8;
 const SHRED_VERSION_OFFSET: usize = IP_ECHO_HEADER_LEN + IP_ADDR_OFFSET_V4;
+// When joining the Gossip network, IpEchoServerMessage is set it its default value
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/lib.rs#L60
 const IP_ECHO_REQUEST: &[u8] = &[0x00; 21]; // IP echo server expects 21 bytes
-const IP_ECHO_RESPONSE_LEN: usize = 27; // IP echo server will always respond with 27 bytes
 
 struct Ipv4EchoResponse {
     ip: IpAddr,
@@ -65,7 +70,6 @@ impl TryFrom<&[u8]> for Ipv4EchoResponse {
         let octets = &data[IP_ADDR_OFFSET_V4..IP_ADDR_OFFSET_V4 + 4];
         let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
         let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
-        // Skip the option flag byte
         let shred_version = if data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
             None
         } else {
