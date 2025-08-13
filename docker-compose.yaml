@@ -31,7 +31,7 @@ services:
       - NO_PACK=${NO_PACK}
       - PAY_FOR_NEW_ACCOUNTS=${PAY_FOR_NEW_ACCOUNTS}
       - COOL_DOWN_RANGE=${COOL_DOWN_RANGE}
-      - GOSSIP_ENTRYPOINT=${GOSSIP_ENTRYPOINT}
+      - GOSSIP_ENTRYPOINTS=${GOSSIP_ENTRYPOINTS}
       - REGION=${REGION}
     volumes:
       - ./credentials:/credentials

@@ -33,6 +33,9 @@ CLUSTER=mainnet
 # Region to specify for metrics purposes (us-east, eu-west, local, etc.)
 REGION=local
 
+# Gossip entrypoints
+GOSSIP_ENTRYPOINTS=GOSSIP_ENTRY_1,GOSSIP_ENTRY_2
+
 # Log levels
 RUST_LOG="info,solana_gossip=error,solana_metrics=info"
 

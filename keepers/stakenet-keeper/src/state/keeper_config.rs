@@ -58,7 +58,7 @@ pub struct Args {
     /// Gossip entrypoints in the form of URL:PORT
     ///
     /// - Accept multiple URLs
-    #[arg(long, env)]
+    #[arg(long, env, value_delimiter = ',')]
     pub gossip_entrypoints: Option<Vec<String>>,
 
     /// Path to keypair used to pay for account creation and execute transactions
