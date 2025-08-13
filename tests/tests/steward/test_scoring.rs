@@ -591,6 +591,94 @@ mod test_calculate_realized_commission_bps {
     }
 }
 
+mod test_calculate_priority_fee_merkle_root_upload_authority {
+    use super::*;
+
+    // calculate_priority_fee_merkle_root_authority_score looks exclusively at the latest authority
+    // so we can test with a single epoch
+    #[test]
+    fn test_normal() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::TipRouter; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_no_data() {
+        let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_unset() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::Unset; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_old_jito_labs() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::OldJitoLabs; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_other() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::Other; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_dne() {
+        let validator = create_validator_history(
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[0; 1],
+            &[MerkleRootUploadAuthority::DNE; 1],
+        );
+        let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
+        assert_eq!(score, 0.0);
+    }
+}
+
 mod test_calculate_priority_fee_commission {
     use jito_steward::constants::{BASIS_POINTS_MAX, EPOCH_DEFAULT};
 
@@ -671,9 +759,9 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
         validator.history.arr_mut()[6].priority_fee_tips = 10;
-        let (_, max_commission, max_commission_epoch) =
+        let (_, avg_commission, max_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(max_commission, 9_000);
+        assert_eq!(avg_commission, 4455);
         assert_eq!(max_commission_epoch, 5);
 
         // With all pf MRUA Unset, score 1, default to not penalize validators
@@ -846,10 +934,12 @@ mod test_calculate_priority_fee_commission {
 
         config.parameters.priority_fee_scoring_start_epoch = EPOCH_DEFAULT;
         // Before priority_fee_scoring_start_epoch, result is always 1
-        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) =
+        let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) =
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
+        // Despite defaulting to 1.0 before go-live epoch, the avg_priority_fee_commission should
+        // wire through
         assert_eq!(score, 1.0);
-        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(avg_priority_fee_commission, 5464);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
 
@@ -921,9 +1011,9 @@ mod test_calculate_priority_fee_commission {
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let res = calculate_priority_fee_commission(&config, &validator, 0);
         assert!(res.is_ok());
-        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
         assert_eq!(score, 1.0);
-        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(avg_priority_fee_commission, 0);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
 
         let validator = create_validator_history(
@@ -937,9 +1027,9 @@ mod test_calculate_priority_fee_commission {
         );
         let res = calculate_priority_fee_commission(&config, &validator, 12);
         assert!(res.is_ok());
-        let (score, max_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
+        let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
         assert_eq!(score, 1.0);
-        assert_eq!(max_priority_fee_commission, 0);
+        assert_eq!(avg_priority_fee_commission, 0);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
 }

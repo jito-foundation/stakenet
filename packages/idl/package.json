@@ -15,6 +15,9 @@
     "type": "git",
     "url": "https://github.com/jito-foundation/stakenet"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist"
