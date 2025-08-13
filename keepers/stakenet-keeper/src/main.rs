@@ -23,7 +23,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{net::IpAddr, process::Command, sync::Arc, time::Duration};
+use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
+async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -237,7 +237,7 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr) {
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state, gossip_ip).await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
 
@@ -322,7 +322,7 @@ fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{}\n\n", args.to_string());
+    info!("{}\n\n", args);
 
     let gossip_entrypoint = args
         .gossip_entrypoint
@@ -331,9 +331,6 @@ fn main() {
                 .expect("Failed to parse host and port from gossip entrypoint")
         })
         .expect("Failed to create socket address from gossip entrypoint");
-
-    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
-        .expect("Failed to get public ip address for gossip node");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -413,6 +410,6 @@ fn main() {
             validator_history_min_stake: args.validator_history_min_stake,
         };
 
-        run_keeper(config, gossip_ip).await;
+        run_keeper(config).await;
     });
 }
