@@ -20,7 +20,12 @@ pub struct KeeperConfig {
     pub tx_retry_count: u16,
     pub tx_confirmation_seconds: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
-    pub gossip_entrypoint: Option<SocketAddr>,
+
+    /// Gossip entrypoints
+    ///
+    /// Allow multiple gossip entries to re-run the discovery process with next URL if gossip
+    /// entries are not found
+    pub gossip_entrypoints: Option<Vec<SocketAddr>>,
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
@@ -53,9 +58,11 @@ pub struct Args {
     #[arg(long, env, default_value = "https://api.mainnet-beta.solana.com")]
     pub json_rpc_url: String,
 
-    /// Gossip entrypoint in the form of URL:PORT
-    #[arg(long, env)]
-    pub gossip_entrypoint: Option<String>,
+    /// Gossip entrypoints in the form of URL:PORT
+    ///
+    /// - Accept multiple URLs
+    #[arg(long, env, value_delimiter = ',')]
+    pub gossip_entrypoints: Option<Vec<String>>,
 
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(long, env, default_value = "./credentials/keypair.json")]
@@ -226,7 +233,7 @@ impl fmt::Display for Args {
             "Stakenet Keeper Configuration:\n\
             -------------------------------\n\
             JSON RPC URL: {}\n\
-            Gossip Entrypoint: {:?}\n\
+            Gossip Entrypoints: {:?}\n\
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
             Priority Fee Oracle Authority Keypair Path: {:?}\n\
@@ -263,7 +270,7 @@ impl fmt::Display for Args {
             Validator History Min Stake: {:?} lamports\n\
             -------------------------------",
             self.json_rpc_url,
-            self.gossip_entrypoint,
+            self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,
             self.priority_fee_oracle_authority_keypair,
