@@ -22,6 +22,7 @@ services:
       - RUN_MEV_EARNED=${RUN_MEV_EARNED}
       - RUN_STEWARD=${RUN_STEWARD}
       - VALIDATOR_HISTORY_INTERVAL=${VALIDATOR_HISTORY_INTERVAL}
+      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
       - STEWARD_INTERVAL=${STEWARD_INTERVAL}
       - METRICS_INTERVAL=${METRICS_INTERVAL}
       - RUN_STAKE_UPLOAD=${RUN_STAKE_UPLOAD}
@@ -33,7 +34,6 @@ services:
       - COOL_DOWN_RANGE=${COOL_DOWN_RANGE}
       - GOSSIP_ENTRYPOINT=${GOSSIP_ENTRYPOINT}
       - REGION=${REGION}
-      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
@@ -42,7 +42,6 @@ services:
     build:
       context: .
       target: validator-history
-    container_name: metrics-only
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -56,6 +55,7 @@ services:
       - METRICS_INTERVAL=${METRICS_INTERVAL}
       - STEWARD_INTERVAL=1000000000000
       - VALIDATOR_HISTORY_INTERVAL=1000000000000
+      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
       - RUN_CLUSTER_HISTORY=false
       - RUN_COPY_VOTE_ACCOUNTS=false
       - RUN_MEV_COMMISSION=false
@@ -65,7 +65,6 @@ services:
       - RUN_GOSSIP_UPLOAD=false
       - RUN_EMIT_METRICS=true
       - REGION=${REGION}
-      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
