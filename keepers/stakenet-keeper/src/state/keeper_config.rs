@@ -20,7 +20,12 @@ pub struct KeeperConfig {
     pub tx_retry_count: u16,
     pub tx_confirmation_seconds: u64,
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
-    pub gossip_entrypoint: Option<SocketAddr>,
+
+    /// Gossip entrypoints
+    ///
+    /// Allow multiple gossip entries to re-run the discovery process with next URL if gossip
+    /// entries are not found
+    pub gossip_entrypoints: Option<Vec<SocketAddr>>,
     pub validator_history_interval: u64,
     pub steward_interval: u64,
     pub metrics_interval: u64,
@@ -35,9 +40,6 @@ pub struct KeeperConfig {
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
     pub cluster_name: String,
-
-    /// Minimum activated stake threshold for creating validator history accounts (in lamports)
-    pub validator_history_min_stake: u64,
 }
 
 impl KeeperConfig {
@@ -53,9 +55,11 @@ pub struct Args {
     #[arg(long, env, default_value = "https://api.mainnet-beta.solana.com")]
     pub json_rpc_url: String,
 
-    /// Gossip entrypoint in the form of URL:PORT
-    #[arg(long, env)]
-    pub gossip_entrypoint: Option<String>,
+    /// Gossip entrypoints in the form of URL:PORT
+    ///
+    /// - Accept multiple URLs
+    #[arg(long, env, value_delimiter = ',')]
+    pub gossip_entrypoints: Option<Vec<String>>,
 
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(long, env, default_value = "./credentials/keypair.json")]
@@ -213,10 +217,6 @@ pub struct Args {
     /// Run Priority Fee Commission
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
-
-    /// Minimum activated stake threshold for creating validator history accounts (in lamports)
-    #[arg(long, env, default_value = "500000000000")]
-    pub validator_history_min_stake: u64,
 }
 
 impl fmt::Display for Args {
@@ -226,7 +226,7 @@ impl fmt::Display for Args {
             "Stakenet Keeper Configuration:\n\
             -------------------------------\n\
             JSON RPC URL: {}\n\
-            Gossip Entrypoint: {:?}\n\
+            Gossip Entrypoints: {:?}\n\
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
             Priority Fee Oracle Authority Keypair Path: {:?}\n\
@@ -260,10 +260,9 @@ impl fmt::Display for Args {
             Region: {}\n\
             Redundant RPC URLs: {:?}\n\
             Run Priority Fee Commission: {:?}\n\
-            Validator History Min Stake: {:?} lamports\n\
             -------------------------------",
             self.json_rpc_url,
-            self.gossip_entrypoint,
+            self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,
             self.priority_fee_oracle_authority_keypair,
@@ -297,7 +296,6 @@ impl fmt::Display for Args {
             self.region,
             self.redundant_rpc_urls,
             self.run_priority_fee_commission,
-            self.validator_history_min_stake
         )
     }
 }

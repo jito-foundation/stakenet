@@ -113,7 +113,6 @@ pub async fn create_missing_accounts(
         keeper_state,
         keeper_config.tx_retry_count,
         keeper_config.tx_confirmation_seconds,
-        keeper_config.validator_history_min_stake,
     )
     .await?;
     created_accounts_for_epoch.push((
@@ -313,14 +312,6 @@ async fn get_tip_distribution_accounts(
     Ok(result)
 }
 
-/// Create missing [`ValidatorHistory`] accounts
-///
-/// # Process
-///
-/// - Filter validators with activated stake amount more than `validator_history_min_stake`
-/// - Retrieve validator validator history addresses and accounts
-/// - Build transactions for missing [`ValidatorHistory`] accounts
-/// - Submit all transactions
 async fn create_missing_validator_history_accounts(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
@@ -328,18 +319,10 @@ async fn create_missing_validator_history_accounts(
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    validator_history_min_stake: u64,
 ) -> Result<usize, Box<dyn Error>> {
     let vote_accounts = &keeper_state
         .vote_account_map
-        .iter()
-        .filter_map(|(vote_account_pubkey, vote_account)| {
-            if vote_account.activated_stake > validator_history_min_stake {
-                Some(vote_account_pubkey)
-            } else {
-                None
-            }
-        })
+        .keys()
         .collect::<Vec<&Pubkey>>();
 
     let all_history_addresses = &vote_accounts
@@ -348,6 +331,8 @@ async fn create_missing_validator_history_accounts(
         .collect::<Vec<Pubkey>>();
 
     let history_accounts = get_multiple_accounts_batched(all_history_addresses, client).await?;
+
+    assert!(vote_accounts.len() == history_accounts.len());
 
     let create_transactions = vote_accounts
         .iter()
