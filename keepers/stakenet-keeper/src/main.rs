@@ -281,24 +281,25 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
-                keeper_config.cluster_name.as_str(),
             ));
         }
 
         if should_emit(tick, &intervals) {
             info!("Emitting metrics...");
-            keeper_state.emit();
+            keeper_state.emit(&keeper_config.region);
 
             KeeperOperations::emit(
                 &keeper_state.runs_for_epoch,
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
                 keeper_config.cluster_name.as_str(),
+                keeper_config.region.as_str(),
             );
 
             KeeperCreates::emit(
                 &keeper_state.created_accounts_for_epoch,
                 &keeper_state.cluster_name,
+                &keeper_config.region,
             );
         }
 
@@ -392,6 +393,7 @@ fn main() {
             oracle_authority_keypair,
             gossip_entrypoint: Some(gossip_entrypoint),
             validator_history_interval: args.validator_history_interval,
+            validator_history_min_stake: args.validator_history_min_stake,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
             block_metadata_interval: args.block_metadata_interval,
@@ -407,7 +409,7 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
-            validator_history_min_stake: args.validator_history_min_stake,
+            region: args.region.clone(),
         };
 
         run_keeper(config).await;

@@ -113,6 +113,8 @@ pub async fn fire(
                             "steward-error",
                             ("error", format_steward_error_log(e), String),
                             ("error_code", error_code, i64),
+                            "cluster" => keeper_config.cluster_name.as_str(),
+                            "region" => keeper_config.region.as_str(),
                         );
                     } else {
                         txs_for_epoch += 1;
@@ -124,7 +126,7 @@ pub async fn fire(
                 }
             }
             Err(e) => {
-                datapoint_error!("steward-error", ("error", e.to_string(), String),);
+                datapoint_error!("steward-error", ("error", e.to_string(), String), "cluster" => keeper_config.cluster_name.as_str(), "region" => keeper_config.region.as_str(),);
                 errors_for_epoch += 1;
             }
         };

@@ -260,7 +260,7 @@ impl KeeperState {
             .collect()
     }
 
-    pub fn emit(&self) {
+    pub fn emit(&self, region: &str) {
         datapoint_info!(
             "keeper-state",
             // EPOCH INFO
@@ -302,6 +302,7 @@ impl KeeperState {
                 i64
             ),
             ("cluster", &self.cluster_name, String),
+            ("region", region, String),
         )
     }
 

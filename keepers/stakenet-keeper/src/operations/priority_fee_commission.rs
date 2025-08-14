@@ -88,6 +88,8 @@ pub async fn fire(
                         datapoint_error!(
                             "priority-fee-commission-error",
                             ("error", e.to_string(), String),
+                            "cluster" => keeper_config.cluster_name.as_str(),
+                            "region" => keeper_config.region.as_str(),
                         );
                         errors_for_epoch += 1;
                     } else {
@@ -102,6 +104,7 @@ pub async fn fire(
                 datapoint_error!(
                     "priority-fee-commission-error",
                     ("error", e.to_string(), String),
+                    "cluster" => keeper_config.cluster_name.as_str(),
                 );
                 errors_for_epoch += 1;
             }

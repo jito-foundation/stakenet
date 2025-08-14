@@ -151,6 +151,7 @@ async fn _process(
     retry_count: u16,
     confirmation_time: u64,
     cluster_name: &str,
+    region: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
@@ -162,6 +163,7 @@ async fn _process(
         retry_count,
         confirmation_time,
         cluster_name,
+        region,
     )
     .await
 }
@@ -199,13 +201,14 @@ pub async fn fire(
             retry_count,
             confirmation_time,
             &keeper_config.cluster_name,
+            &keeper_config.region,
         )
         .await
         {
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
-                        datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
+                        datapoint_error!("gossip-upload-error", ("error", e.to_string(), String), "cluster" => keeper_config.cluster_name.as_str(), "region" => keeper_config.region.as_str(),);
                     } else {
                         txs_for_epoch += 1;
                     }
@@ -215,7 +218,7 @@ pub async fn fire(
                 }
             }
             Err(e) => {
-                datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
+                datapoint_error!("gossip-upload-error", ("error", e.to_string(), String), "cluster" => keeper_config.cluster_name.as_str(), "region" => keeper_config.region.as_str(),);
                 errors_for_epoch += 1;
             }
         }
@@ -302,6 +305,7 @@ pub async fn upload_gossip_values(
     retry_count: u16,
     confirmation_time: u64,
     cluster_name: &str,
+    region: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
@@ -371,6 +375,7 @@ pub async fn upload_gossip_values(
         "gossip-upload-info",
         ("validator_gossip_nodes", gossip_entries.len(), i64),
         "cluster" => cluster_name,
+        "region" => region,
     );
 
     exit.store(true, Ordering::Relaxed);

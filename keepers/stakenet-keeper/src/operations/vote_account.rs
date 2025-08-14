@@ -99,7 +99,7 @@ pub async fn fire(
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
-                        datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                        datapoint_error!("vote-account-error", ("error", e.to_string(), String), "cluster" => keeper_config.cluster_name.as_str(), "region" => keeper_config.region.as_str(),);
                     } else {
                         txs_for_epoch += 1;
                     }
@@ -109,7 +109,7 @@ pub async fn fire(
                 }
             }
             Err(e) => {
-                datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
+                datapoint_error!("vote-account-error", ("error", e.to_string(), String), "cluster" => keeper_config.cluster_name.as_str(), "region" => keeper_config.region.as_str(),);
                 errors_for_epoch += 1;
             }
         };

@@ -22,6 +22,7 @@ pub struct KeeperConfig {
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
     pub validator_history_interval: u64,
+    pub validator_history_min_stake: u64, /* Minimum activated stake threshold for creating validator history accounts (in lamports) */
     pub steward_interval: u64,
     pub metrics_interval: u64,
     pub block_metadata_interval: u64,
@@ -35,9 +36,7 @@ pub struct KeeperConfig {
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
     pub cluster_name: String,
-
-    /// Minimum activated stake threshold for creating validator history accounts (in lamports)
-    pub validator_history_min_stake: u64,
+    pub region: String,
 }
 
 impl KeeperConfig {
