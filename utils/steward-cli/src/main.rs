@@ -32,7 +32,7 @@ use commands::{
     info::{
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
-        view_state::command_view_state,
+        view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
@@ -55,6 +55,9 @@ async fn main() -> Result<()> {
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
+        Commands::ViewPriorityFeeConfig(args) => {
+            command_view_priority_fee_config(args, &client, program_id).await
+        }
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await

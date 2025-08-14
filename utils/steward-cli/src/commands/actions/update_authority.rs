@@ -3,14 +3,13 @@ use std::sync::Arc;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 
+use crate::commands::command_args::UpdateAuthority;
+use crate::utils::transactions::maybe_print_tx;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-
-use crate::commands::command_args::UpdateAuthority;
-
 use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
 pub async fn command_update_authority(
@@ -43,6 +42,14 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetParametersAuthority,
         ),
+        crate::commands::command_args::AuthoritySubcommand::PriorityFeeParameters {
+            permissioned_parameters,
+            new_authority,
+        } => (
+            permissioned_parameters,
+            new_authority,
+            jito_steward::instructions::set_new_authority::AuthorityType::SetPriorityFeeParameterAuthority,
+        ),
     };
 
     // Creates config account
@@ -73,6 +80,13 @@ pub async fn command_update_authority(
         permissioned_parameters.transaction_parameters.compute_limit,
         permissioned_parameters.transaction_parameters.heap_size,
     );
+
+    if maybe_print_tx(
+        &configured_ix,
+        &permissioned_parameters.transaction_parameters,
+    ) {
+        return Ok(());
+    }
 
     let transaction = Transaction::new_signed_with_payer(
         &configured_ix,
