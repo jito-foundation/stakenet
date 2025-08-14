@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 mod test_algorithms;
 mod test_cycle;
 mod test_epoch_maintenance;

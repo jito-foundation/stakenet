@@ -22,6 +22,7 @@ pub struct KeeperConfig {
     pub oracle_authority_keypair: Option<Arc<Keypair>>,
     pub gossip_entrypoint: Option<SocketAddr>,
     pub validator_history_interval: u64,
+    pub validator_history_min_stake: u64, /* Minimum activated stake threshold for creating validator history accounts (in lamports) */
     pub steward_interval: u64,
     pub metrics_interval: u64,
     pub block_metadata_interval: u64,
@@ -35,6 +36,7 @@ pub struct KeeperConfig {
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
     pub cluster_name: String,
+    pub region: String,
 }
 
 impl KeeperConfig {
@@ -210,6 +212,10 @@ pub struct Args {
     /// Run Priority Fee Commission
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
+
+    /// Minimum activated stake threshold for creating validator history accounts (in lamports)
+    #[arg(long, env, default_value = "500000000000")]
+    pub validator_history_min_stake: u64,
 }
 
 impl fmt::Display for Args {
@@ -253,6 +259,7 @@ impl fmt::Display for Args {
             Region: {}\n\
             Redundant RPC URLs: {:?}\n\
             Run Priority Fee Commission: {:?}\n\
+            Validator History Min Stake: {:?} lamports\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoint,
@@ -289,6 +296,7 @@ impl fmt::Display for Args {
             self.region,
             self.redundant_rpc_urls,
             self.run_priority_fee_commission,
+            self.validator_history_min_stake
         )
     }
 }

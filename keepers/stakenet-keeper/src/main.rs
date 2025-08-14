@@ -23,7 +23,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use std::{net::IpAddr, process::Command, sync::Arc, time::Duration};
+use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
-async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shred_version: u16) {
+async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
     let validator_history_interval = 60;
@@ -237,13 +237,7 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shre
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(
-                        &keeper_config,
-                        &keeper_state,
-                        gossip_ip,
-                        cluster_shred_version,
-                    )
-                    .await,
+                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
 
@@ -287,24 +281,25 @@ async fn run_keeper(keeper_config: KeeperConfig, gossip_ip: IpAddr, cluster_shre
             keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
                 &keeper_config,
                 &keeper_state,
-                keeper_config.cluster_name.as_str(),
             ));
         }
 
         if should_emit(tick, &intervals) {
             info!("Emitting metrics...");
-            keeper_state.emit();
+            keeper_state.emit(&keeper_config.region);
 
             KeeperOperations::emit(
                 &keeper_state.runs_for_epoch,
                 &keeper_state.errors_for_epoch,
                 &keeper_state.txs_for_epoch,
                 keeper_config.cluster_name.as_str(),
+                keeper_config.region.as_str(),
             );
 
             KeeperCreates::emit(
                 &keeper_state.created_accounts_for_epoch,
                 &keeper_state.cluster_name,
+                &keeper_config.region,
             );
         }
 
@@ -328,7 +323,7 @@ fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{}\n\n", args.to_string());
+    info!("{}\n\n", args);
 
     let gossip_entrypoint = args
         .gossip_entrypoint
@@ -337,12 +332,6 @@ fn main() {
                 .expect("Failed to parse host and port from gossip entrypoint")
         })
         .expect("Failed to create socket address from gossip entrypoint");
-
-    let gossip_ip = solana_net_utils::get_public_ip_addr(&gossip_entrypoint)
-        .expect("Failed to get public ip address for gossip node");
-
-    let cluster_shred_version = solana_net_utils::get_cluster_shred_version(&gossip_entrypoint)
-        .expect("Failed to get cluster shred version from gossip entrypoint");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -404,6 +393,7 @@ fn main() {
             oracle_authority_keypair,
             gossip_entrypoint: Some(gossip_entrypoint),
             validator_history_interval: args.validator_history_interval,
+            validator_history_min_stake: args.validator_history_min_stake,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
             block_metadata_interval: args.block_metadata_interval,
@@ -419,8 +409,9 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
+            region: args.region.clone(),
         };
 
-        run_keeper(config, gossip_ip, cluster_shred_version).await;
+        run_keeper(config).await;
     });
 }

@@ -101,6 +101,7 @@ pub async fn fire(
             keeper_config.priority_fee_in_microlamports,
             keeper_config.no_pack,
             keeper_config.cluster,
+            &keeper_config.region,
         )
         .await
         {
@@ -110,6 +111,7 @@ pub async fn fire(
                         datapoint_error!(
                             "block-metadata-keeper-error",
                             ("error", e.to_string(), String),
+                            "cluster" => keeper_config.cluster_name.as_str(),
                         );
                     } else {
                         txs_for_epoch += 1;
@@ -123,6 +125,7 @@ pub async fn fire(
                 datapoint_error!(
                     "block-metadata-keeper-error",
                     ("error", e.to_string(), String),
+                    "cluster" => keeper_config.cluster_name.as_str(),
                 );
                 errors_for_epoch += 1;
             }
@@ -147,6 +150,7 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     no_pack: bool,
     cluster: Cluster,
+    region: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -162,6 +166,7 @@ async fn _process(
         priority_fee_in_microlamports,
         no_pack,
         cluster,
+        region,
     )
     .await
 }
@@ -181,6 +186,7 @@ async fn update_block_metadata(
     priority_fee_in_microlamports: u64,
     _no_pack: bool, //TODO take out
     cluster: Cluster,
+    region: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -390,6 +396,7 @@ async fn update_block_metadata(
                   ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
                   ("update-slot", entry.update_slot, i64),
                   "cluster" => cluster.to_string(),
+                  "region" => region,
                   "vote" => vote_account.to_string(),
                   "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
                   "priority-fee-oracle-authority" => priority_fee_oracle_authority_keypair.pubkey().to_string(),

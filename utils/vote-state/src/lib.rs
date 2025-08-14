@@ -2,7 +2,7 @@
 //! In all current releases [VoteState] is defined in the `solana-vote-program` crate which is not compatible
 //! with programs targeting BPF bytecode due to some BPF-incompatible libraries being pulled in.
 //! Additional methods added here for deserializing specific fields to get around runtime compute limits.
-
+#![allow(unexpected_cfgs)]
 use std::{
     collections::{BTreeMap, VecDeque},
     mem::size_of,
