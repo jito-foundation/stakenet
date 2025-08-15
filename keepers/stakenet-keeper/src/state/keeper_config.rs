@@ -1,4 +1,4 @@
-use std::{fmt, net::IpAddr};
+use std::fmt;
 
 use clap::{arg, command, Parser};
 use rusqlite::Connection;
