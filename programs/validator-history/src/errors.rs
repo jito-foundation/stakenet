@@ -38,4 +38,14 @@ pub enum ValidatorHistoryError {
     PriorityFeeDistributionAccountAlreadyCopied,
     #[msg("Priority Fee Distribution Account cannot be copied during its own epoch")]
     PriorityFeeDistributionAccountNotFinalized,
+    #[msg("Stake buffer has been finalized")]
+    StakeBufferFinalized,
+    #[msg("Stake buffer has not been finalized")]
+    StakeBufferNotFinalized,
+    #[msg("Stake buffer out of bounds")]
+    StakeBufferOutOfBounds,
+    #[msg("Stake buffer is empty")]
+    StakeBufferEmpty,
+    #[msg("Stake buffer already contains entry")]
+    StakeBufferDuplicate,
 }
