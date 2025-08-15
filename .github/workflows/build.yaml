@@ -3,15 +3,11 @@ on:
   push:
     branches:
       - master
-      - steward-test-branch
-      - ck/pfh-merge
     tags:
       - "v*"
   pull_request:
     branches:
       - master
-      - steward-test-branch
-      - ck/pfh-merge
 jobs:
   security_audit:
     name: security_audit

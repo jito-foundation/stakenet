@@ -324,16 +324,16 @@ fn main() {
 
     info!("{}\n\n", args.to_string());
 
-    let (gossip_entrypoint, gossip_ip) = match args
-        .gossip_entrypoint {
-            Some(gossip_entrypoint) => {
-                let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint).expect("Failed to parse host and port from gossip entrypoint");
-                let ip = solana_net_utils::get_public_ip_addr(&entrypoint)
-                    .expect("Failed to get public ip address for gossip node");
-                (Some(entrypoint), Some(ip))
-            },
-            None => (None, None),
-        };
+    let (gossip_entrypoint, gossip_ip) = match args.gossip_entrypoint {
+        Some(gossip_entrypoint) => {
+            let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
+                .expect("Failed to parse host and port from gossip entrypoint");
+            let ip = solana_net_utils::get_public_ip_addr(&entrypoint)
+                .expect("Failed to get public ip address for gossip node");
+            (Some(entrypoint), Some(ip))
+        }
+        None => (None, None),
+    };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {

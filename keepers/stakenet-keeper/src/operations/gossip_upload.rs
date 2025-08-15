@@ -281,7 +281,7 @@ pub async fn upload_gossip_values(
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     let gossip_addr = SocketAddr::new(
-        gossip_ip.clone(),
+        *gossip_ip,
         solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
             .expect("unable to find an available gossip port"),
     );

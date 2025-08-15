@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{prelude::SlotHistory, AnchorDeserialize};
 use futures::future::join_all;
@@ -196,7 +196,6 @@ async fn update_block_metadata(
     let epoch_schedule = &keeper_state.epoch_schedule;
     let current_epoch_info = &keeper_state.epoch_info;
     let current_epoch = current_epoch_info.epoch;
-    let validator_history = &keeper_state.validator_history_map;
     let current_finalized_slot = client
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
@@ -209,14 +208,16 @@ async fn update_block_metadata(
         info!("\n\n\n1. Update Epoch Schedule\n\n\n");
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
-        let epoch_leader_schedule_result = get_leader_schedule_safe(client, epoch_starting_slot).await;
+        let epoch_leader_schedule_result =
+            get_leader_schedule_safe(client, epoch_starting_slot).await;
 
         if epoch_leader_schedule_result.is_err() {
             info!("Could not find leader schedule for epoch {}", epoch);
             continue;
         }
 
-        let epoch_leader_schedule = epoch_leader_schedule_result.expect("Could not unwrap epoch schedule");
+        let epoch_leader_schedule =
+            epoch_leader_schedule_result.expect("Could not unwrap epoch schedule");
         match DBSlotInfo::insert_leader_schedule(
             sqlite_connection,
             epoch,
@@ -385,20 +386,33 @@ async fn update_block_metadata(
                     mut validator_history_entry_priority_fee_commission,
                     mut validator_history_entry_block_data_updated_at_slot,
                     mut validator_history_priority_fee_tips,
-                    mut validator_history_entry_blocks_produced
-                ): (i64, i64, i64, i64, i64, i64, i64) = (-1, -1, -1, -1, -1, -1, -1,);
+                    mut validator_history_entry_blocks_produced,
+                ): (i64, i64, i64, i64, i64, i64, i64) = (-1, -1, -1, -1, -1, -1, -1);
                 if let Some(validator_history) =
-                    keeper_state.validator_history_map.get(&entry.vote_account) {
-
-                    if let Some(validator_history_entry) = validator_history.history.arr.iter().find(|history| history.epoch as u64 == epoch) {
+                    keeper_state.validator_history_map.get(&entry.vote_account)
+                {
+                    if let Some(validator_history_entry) = validator_history
+                        .history
+                        .arr
+                        .iter()
+                        .find(|history| history.epoch as u64 == epoch)
+                    {
                         // Process validator history
-                        validator_history_entry_total_priority_fees = validator_history_entry.total_priority_fees as i64;
-                        validator_history_entry_total_leader_slots = validator_history_entry.total_leader_slots as i64;
-                        validator_history_priority_fee_merkle_root_upload_authority = validator_history_entry.priority_fee_merkle_root_upload_authority as i64;
-                        validator_history_entry_priority_fee_commission = validator_history_entry.priority_fee_commission as i64;
-                        validator_history_entry_block_data_updated_at_slot = validator_history_entry.block_data_updated_at_slot as i64;
-                        validator_history_priority_fee_tips = validator_history_entry.priority_fee_tips as i64;
-                        validator_history_entry_blocks_produced = validator_history_entry.blocks_produced as i64;
+                        validator_history_entry_total_priority_fees =
+                            validator_history_entry.total_priority_fees as i64;
+                        validator_history_entry_total_leader_slots =
+                            validator_history_entry.total_leader_slots as i64;
+                        validator_history_priority_fee_merkle_root_upload_authority =
+                            validator_history_entry.priority_fee_merkle_root_upload_authority
+                                as i64;
+                        validator_history_entry_priority_fee_commission =
+                            validator_history_entry.priority_fee_commission as i64;
+                        validator_history_entry_block_data_updated_at_slot =
+                            validator_history_entry.block_data_updated_at_slot as i64;
+                        validator_history_priority_fee_tips =
+                            validator_history_entry.priority_fee_tips as i64;
+                        validator_history_entry_blocks_produced =
+                            validator_history_entry.blocks_produced as i64;
                     }
                 }
 
@@ -566,9 +580,10 @@ pub async fn get_leader_schedule_safe(
 ) -> Result<HashMap<String, Vec<usize>>, BlockMetadataKeeperError> {
     match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
         Some(schedule) => Ok(schedule),
-        None => Err(BlockMetadataKeeperError::OtherError(
-            format!("Could not get leader schedule for starting slot {}", starting_slot),
-        )),
+        None => Err(BlockMetadataKeeperError::OtherError(format!(
+            "Could not get leader schedule for starting slot {}",
+            starting_slot
+        ))),
     }
 }
 
