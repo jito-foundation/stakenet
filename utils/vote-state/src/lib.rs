@@ -2,12 +2,13 @@
 //! In all current releases [VoteState] is defined in the `solana-vote-program` crate which is not compatible
 //! with programs targeting BPF bytecode due to some BPF-incompatible libraries being pulled in.
 //! Additional methods added here for deserializing specific fields to get around runtime compute limits.
-
+#![allow(unexpected_cfgs)]
 use std::{
     collections::{BTreeMap, VecDeque},
     mem::size_of,
 };
 
+#[allow(deprecated)]
 use anchor_lang::{error::ErrorCode::ConstraintOwner, prelude::*, solana_program::vote};
 
 use serde::{Deserialize, Serialize};
@@ -375,6 +376,7 @@ mod tests {
         AuthorizedVoters, BlockTimestamp, CircBuf, Lockout, VoteState0_23_5, VoteStateVersions,
         MAX_LOCKOUT_HISTORY,
     };
+    #[allow(deprecated)]
     use anchor_lang::{
         prelude::{AccountInfo, Pubkey},
         solana_program::{clock::Epoch, vote},

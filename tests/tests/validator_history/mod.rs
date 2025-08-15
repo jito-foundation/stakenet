@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)]
 mod test_cluster_history;
 mod test_copy_priority_fee_distribution;
 mod test_gossip;

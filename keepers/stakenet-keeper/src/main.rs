@@ -233,7 +233,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.oracle_authority_keypair.is_some()
-                && keeper_config.gossip_entrypoint.is_some()
+                && keeper_config.gossip_entrypoints.is_some()
             {
                 info!("Updating gossip accounts...");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
@@ -322,18 +322,27 @@ fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{}\n\n", args.to_string());
+    info!("{}\n\n", args);
 
-    let (gossip_entrypoint, gossip_ip) = match args.gossip_entrypoint {
-        Some(gossip_entrypoint) => {
-            let entrypoint = solana_net_utils::parse_host_port(&gossip_entrypoint)
-                .expect("Failed to parse host and port from gossip entrypoint");
-            let ip = solana_net_utils::get_public_ip_addr(&entrypoint)
-                .expect("Failed to get public ip address for gossip node");
-            (Some(entrypoint), Some(ip))
-        }
-        None => (None, None),
-    };
+    let gossip_entrypoints = args
+        .gossip_entrypoints
+        .map(|gossip_entrypoints| {
+            gossip_entrypoints
+                .iter()
+                .enumerate()
+                .map(|(index, gossip_entrypoint)| {
+                    solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
+                        panic!(
+                            "Failed to parse gossip entrypoint #{} '{}': {}",
+                            index + 1,
+                            gossip_entrypoint,
+                            err
+                        )
+                    })
+                })
+                .collect()
+        })
+        .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -393,8 +402,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_entrypoint,
-            gossip_ip,
+            gossip_entrypoints: Some(gossip_entrypoints),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
@@ -413,6 +421,7 @@ fn main() {
             cluster_name: args.cluster.to_string(),
             lookback_epochs: args.lookback_epochs,
             loopback_start_offset: args.loopback_start_offset,
+            validator_history_min_stake: args.validator_history_min_stake,
         };
 
         run_keeper(config).await;

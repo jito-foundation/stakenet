@@ -31,8 +31,9 @@ services:
       - NO_PACK=${NO_PACK}
       - PAY_FOR_NEW_ACCOUNTS=${PAY_FOR_NEW_ACCOUNTS}
       - COOL_DOWN_RANGE=${COOL_DOWN_RANGE}
-      - GOSSIP_ENTRYPOINT=${GOSSIP_ENTRYPOINT}
+      - GOSSIP_ENTRYPOINTS=${GOSSIP_ENTRYPOINTS}
       - REGION=${REGION}
+      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
@@ -63,6 +64,7 @@ services:
       - RUN_GOSSIP_UPLOAD=false
       - RUN_EMIT_METRICS=true
       - REGION=${REGION}
+      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
@@ -141,6 +143,8 @@ services:
       - SQLITE_PATH=/data/db
       - LOOKBACK_EPOCHS=100
       - LOOPBACK_START_OFFSET=5
+      - RUN_PRIORITY_FEE_COMMISSION=true
+      - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
     volumes:
       - ./credentials:/credentials
       - ./data:/data

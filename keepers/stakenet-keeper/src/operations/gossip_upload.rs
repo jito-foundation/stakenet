@@ -14,7 +14,7 @@ use solana_gossip::crds::Crds;
 use solana_gossip::crds_data::CrdsData;
 use solana_gossip::crds_value::{CrdsValue, CrdsValueLabel};
 use solana_gossip::gossip_service::make_gossip_node;
-use solana_metrics::datapoint_error;
+use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::signature::Signable;
 use solana_sdk::{
     epoch_info::EpochInfo,
@@ -34,6 +34,100 @@ use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+
+// Constants for the IP echo server protocol
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/ip_echo_server.rs
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/lib.rs
+const IP_ECHO_HEADER_LEN: usize = 4;
+const IP_ECHO_RESPONSE_LEN: usize = 27; // IP echo server will always respond with 27 bytes
+const IP_ADDR_OFFSET_V4: usize = 8;
+const SHRED_VERSION_OFFSET: usize = IP_ECHO_HEADER_LEN + IP_ADDR_OFFSET_V4;
+// When joining the Gossip network, IpEchoServerMessage is set it its default value
+// https://github.com/anza-xyz/agave/blob/master/net-utils/src/lib.rs#L60
+const IP_ECHO_REQUEST: &[u8] = &[0x00; 21]; // IP echo server expects 21 bytes
+
+struct Ipv4EchoResponse {
+    ip: IpAddr,
+    shred_version: Option<u16>,
+}
+
+impl TryFrom<&[u8]> for Ipv4EchoResponse {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(data: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        if data.len() < IP_ECHO_RESPONSE_LEN {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected at least {} bytes, got {} bytes",
+                    IP_ECHO_RESPONSE_LEN,
+                    data.len()
+                ),
+            )));
+        }
+        let octets = &data[IP_ADDR_OFFSET_V4..IP_ADDR_OFFSET_V4 + 4];
+        let shred_version_bytes = &data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 3];
+        let ip = IpAddr::V4(Ipv4Addr::new(octets[0], octets[1], octets[2], octets[3]));
+        let shred_version = if data[SHRED_VERSION_OFFSET..SHRED_VERSION_OFFSET + 1] == [0] {
+            None
+        } else {
+            Some(u16::from_le_bytes([
+                shred_version_bytes[1],
+                shred_version_bytes[2],
+            ]))
+        };
+        Ok(Ipv4EchoResponse { ip, shred_version })
+    }
+}
+
+struct Ipv4EchoClient {
+    gossip_entrypoint: String,
+}
+
+impl Ipv4EchoClient {
+    pub fn new<S: AsRef<str>>(gossip_entrypoint: S) -> Self {
+        Self {
+            gossip_entrypoint: gossip_entrypoint.as_ref().to_string(),
+        }
+    }
+
+    pub async fn fetch_ip_and_shred_version(
+        &mut self,
+    ) -> Result<Ipv4EchoResponse, Box<dyn std::error::Error>> {
+        let mut tcp_stream = TcpStream::connect(&self.gossip_entrypoint)
+            .await
+            .map_err(|e| format!("Failed to connect to {}: {}", self.gossip_entrypoint, e))?;
+        tcp_stream
+            .write_all(IP_ECHO_REQUEST)
+            .await
+            .map_err(|e| format!("Failed to write to {}: {}", self.gossip_entrypoint, e))?;
+        tcp_stream.flush().await.map_err(|e| {
+            format!(
+                "Failed to flush TCP stream to {}: {}",
+                self.gossip_entrypoint, e
+            )
+        })?;
+        let mut buffer = vec![0u8; IP_ECHO_RESPONSE_LEN];
+        let response_bytes = tcp_stream.read(&mut buffer).await.map_err(|e| {
+            format!(
+                "Failed to read response from {}: {}",
+                self.gossip_entrypoint, e
+            )
+        })?;
+        if response_bytes != IP_ECHO_RESPONSE_LEN {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected {} bytes, got {} bytes from {}",
+                    IP_ECHO_RESPONSE_LEN, response_bytes, self.gossip_entrypoint
+                ),
+            )));
+        }
+        Ipv4EchoResponse::try_from(&buffer[..response_bytes])
+    }
+}
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::GossipUpload
@@ -52,22 +146,22 @@ async fn _process(
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-    entrypoint: &SocketAddr,
+    entrypoints: &[SocketAddr],
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: &IpAddr,
+    cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     upload_gossip_values(
         client,
         keypair,
         program_id,
         priority_fee_in_microlamports,
-        entrypoint,
+        entrypoints,
         keeper_state,
         retry_count,
         confirmation_time,
-        gossip_ip,
+        cluster_name,
     )
     .await
 }
@@ -79,10 +173,11 @@ pub async fn fire(
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
-    let entrypoint = &keeper_config
-        .gossip_entrypoint
-        .expect("Entry point not set");
-    let gossip_ip = &keeper_config.gossip_ip.expect("Gossip IP not set");
+
+    let entrypoints = &keeper_config
+        .gossip_entrypoints
+        .as_ref()
+        .expect("Entry points not set");
 
     let priority_fee_in_microlamports = keeper_config.priority_fee_in_microlamports;
     let retry_count = keeper_config.tx_retry_count;
@@ -101,11 +196,11 @@ pub async fn fire(
             keypair,
             program_id,
             priority_fee_in_microlamports,
-            entrypoint,
+            entrypoints,
             keeper_state,
             retry_count,
             confirmation_time,
-            gossip_ip,
+            &keeper_config.cluster_name,
         )
         .await
         {
@@ -143,21 +238,6 @@ fn check_entry_valid(
     // 1. Entry timestamp is not too old
     // 2. Entry is for the correct validator
     match &entry.data {
-        CrdsData::LegacyContactInfo(legacy_contact_info) => {
-            if legacy_contact_info.wallclock < validator_history.last_ip_timestamp {
-                return false;
-            }
-        }
-        CrdsData::LegacyVersion(legacy_version) => {
-            if legacy_version.wallclock < validator_history.last_version_timestamp {
-                return false;
-            }
-        }
-        CrdsData::Version(version) => {
-            if version.wallclock < validator_history.last_version_timestamp {
-                return false;
-            }
-        }
         CrdsData::ContactInfo(contact_info) => {
             if contact_info.wallclock() < validator_history.last_ip_timestamp
                 || contact_info.wallclock() < validator_history.last_version_timestamp
@@ -193,154 +273,142 @@ fn build_gossip_entry(
     let validator_vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
 
     let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(validator_identity);
-    let legacy_contact_info_key: CrdsValueLabel =
-        CrdsValueLabel::LegacyContactInfo(validator_identity);
-    let version_key: CrdsValueLabel = CrdsValueLabel::Version(validator_identity);
-    let legacy_version_key: CrdsValueLabel = CrdsValueLabel::LegacyVersion(validator_identity);
 
-    // Current ContactInfo has both IP and Version, but LegacyContactInfo has only IP.
-    // So if there is not ContactInfo, we need to submit tx for LegacyContactInfo + one of (Version, LegacyVersion)
+    // ContactInfo is the only gossip message we are interested in. Legacy* and Version
+    // are fully deprecated and will not be transmitted on the gossip network.
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
             println!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
         }
-        Some(vec![GossipEntry::new(
+        return Some(vec![GossipEntry::new(
             &validator_vote_pubkey,
             &entry.get_signature(),
             &entry.signable_data(),
             &program_id,
             &entry.pubkey(),
             &keypair.pubkey(),
-        )])
-    } else {
-        let mut entries = vec![];
-        if let Some(entry) = crds.get::<&CrdsValue>(&legacy_contact_info_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        }
-
-        if let Some(entry) = crds.get::<&CrdsValue>(&version_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        } else if let Some(entry) = crds.get::<&CrdsValue>(&legacy_version_key) {
-            if !check_entry_valid(entry, validator_history, validator_identity) {
-                println!("Invalid entry for validator {}", validator_vote_pubkey);
-                return None;
-            }
-            entries.push(GossipEntry::new(
-                &validator_vote_pubkey,
-                &entry.get_signature(),
-                &entry.signable_data(),
-                &program_id,
-                &entry.pubkey(),
-                &keypair.pubkey(),
-            ))
-        }
-
-        Some(entries)
+        )]);
     }
+    None
 }
 
+/// Handles uploading gossip information
+///
+/// # Process
+///
+/// 1. Connects to each gossip entrypoint to discover validators (cli args allows multiple URLs)
+/// 2. Waits for network discovery (150 seconds per entrypoint)
+/// 3. Builds update transaction (copy_gossip_contract_info ixs) for discovered validators
+/// 4. Submit all transactions with retry logic
 #[allow(clippy::too_many_arguments)]
 pub async fn upload_gossip_values(
     client: &Arc<RpcClient>,
     keypair: &Arc<Keypair>,
     program_id: &Pubkey,
     priority_fee_in_microlamports: u64,
-    entrypoint: &SocketAddr,
+    entrypoints: &[SocketAddr],
     keeper_state: &KeeperState,
     retry_count: u16,
     confirmation_time: u64,
-    gossip_ip: &IpAddr,
+    cluster_name: &str,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let validator_history_map = &keeper_state.validator_history_map;
 
-    // Modified from solana-gossip::main::process_spy and discover
-    let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    for entrypoint in entrypoints {
+        // Modified from solana-gossip::main::process_spy and discover
+        let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+        let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
+        let ip_echo_response = ip_echo_client
+            .fetch_ip_and_shred_version()
+            .await
+            .map_err(|_| "Failed to fetch IP and shred version from gossip entrypoint")?;
 
-    let gossip_addr = SocketAddr::new(
-        *gossip_ip,
-        solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
+        let gossip_ip = ip_echo_response.ip;
+        let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);
+
+        let gossip_addr = SocketAddr::new(
+            gossip_ip,
+            solana_net_utils::find_available_port_in_range(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                (0, 1),
+            )
             .expect("unable to find an available gossip port"),
-    );
+        );
 
-    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
-        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
-        Some(entrypoint),
-        exit.clone(),
-        Some(&gossip_addr),
-        0,
-        true,
-        SocketAddrSpace::Global,
-    );
+        let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
+            Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+            Some(entrypoint),
+            exit.clone(),
+            Some(&gossip_addr),
+            cluster_shred_version,
+            true,
+            SocketAddrSpace::Global,
+        );
 
-    // Wait for all active validators to be received
-    sleep(Duration::from_secs(150)).await;
+        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...");
 
-    let gossip_entries = {
-        let crds = cluster_info
-            .gossip
-            .crds
-            .read()
-            .map_err(|e: std::sync::PoisonError<RwLockReadGuard<Crds>>| e.to_string())?;
+        // Wait for all active validators to be received
+        sleep(Duration::from_secs(150)).await;
 
-        vote_accounts
+        let gossip_entries = {
+            let crds = cluster_info
+                .gossip
+                .crds
+                .read()
+                .map_err(|e: std::sync::PoisonError<RwLockReadGuard<Crds>>| e.to_string())?;
+
+            vote_accounts
+                .iter()
+                .filter_map(|vote_account| {
+                    let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
+                    let validator_history_account =
+                        validator_history_map.get(&vote_account_pubkey)?;
+
+                    build_gossip_entry(
+                        vote_account,
+                        validator_history_account,
+                        &crds,
+                        *program_id,
+                        keypair,
+                    )
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        exit.store(true, Ordering::Relaxed);
+
+        datapoint_info!(
+            "gossip-upload-info",
+            ("validator_gossip_nodes", gossip_entries.len(), i64),
+            ("entrypoint", entrypoint.to_string(), String),
+            "cluster" => cluster_name,
+        );
+
+        if gossip_entries.is_empty() {
+            continue;
+        }
+
+        let update_transactions = gossip_entries
             .iter()
-            .filter_map(|vote_account| {
-                let vote_account_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
-                let validator_history_account = validator_history_map.get(&vote_account_pubkey)?;
+            .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
+            .collect::<Vec<_>>();
 
-                build_gossip_entry(
-                    vote_account,
-                    validator_history_account,
-                    &crds,
-                    *program_id,
-                    keypair,
-                )
-            })
-            .flatten()
-            .collect::<Vec<_>>()
-    };
+        let submit_result = submit_transactions(
+            client,
+            update_transactions,
+            keypair,
+            retry_count,
+            confirmation_time,
+        )
+        .await;
 
-    exit.store(true, Ordering::Relaxed);
+        return submit_result.map_err(|e| e.into());
+    }
 
-    let update_transactions = gossip_entries
-        .iter()
-        .map(|entry| entry.build_update_tx(priority_fee_in_microlamports))
-        .collect::<Vec<_>>();
-
-    let submit_result = submit_transactions(
-        client,
-        update_transactions,
-        keypair,
-        retry_count,
-        confirmation_time,
-    )
-    .await;
-
-    submit_result.map_err(|e| e.into())
+    Err("Failed to discover gossip entries from any of the provided entrypoints".into())
 }
 
 fn _gossip_data_uploaded(

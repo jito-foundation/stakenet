@@ -1,3 +1,5 @@
+use std::{sync::Arc, time::Duration};
+
 use anyhow::Result;
 use clap::Parser;
 use commands::{
@@ -30,13 +32,12 @@ use commands::{
     info::{
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
-        view_state::command_view_state,
+        view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use std::{sync::Arc, time::Duration};
 
 pub mod commands;
 pub mod utils;
@@ -54,6 +55,9 @@ async fn main() -> Result<()> {
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
+        Commands::ViewPriorityFeeConfig(args) => {
+            command_view_priority_fee_config(args, &client, program_id).await
+        }
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
@@ -127,14 +131,9 @@ async fn main() -> Result<()> {
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
 
-    match result {
-        Ok(_) => {
-            println!("\n✅ DONE\n");
-        }
-        Err(e) => {
-            eprintln!("\n❌ Error: \n\n{:?}\n", e);
-            std::process::exit(1);
-        }
+    if let Err(e) = result {
+        eprintln!("\n❌ Error: \n\n{:?}\n", e);
+        std::process::exit(1);
     }
 
     Ok(())

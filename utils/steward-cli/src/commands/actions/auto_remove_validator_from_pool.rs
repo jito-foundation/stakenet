@@ -5,17 +5,17 @@ use anyhow::Result;
 
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_program::instruction::Instruction;
+#[allow(deprecated)]
+use solana_sdk::{
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, stake, system_program, transaction::Transaction,
+};
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_validator_history_address},
     transactions::{configure_instruction, print_base58_tx},
 };
 use validator_history::id as validator_history_id;
-
-use solana_sdk::{
-    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
-    signer::Signer, stake, system_program, transaction::Transaction,
-};
 
 use crate::commands::command_args::AutoRemoveValidatorFromPool;
 
