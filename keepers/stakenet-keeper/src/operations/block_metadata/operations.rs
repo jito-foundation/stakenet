@@ -414,6 +414,12 @@ async fn update_block_metadata(
                         validator_history_entry_blocks_produced =
                             validator_history_entry.blocks_produced as i64;
                     }
+                } else {
+                    error!("Validator history entry is missing");
+                    error!("Vote Account: {}", entry.vote_account);
+                    error!("Epoch: {}", epoch);
+                    error!("Map: {:?}", keeper_state.validator_history_map);
+                    return Err("Could not find validator history entry");
                 }
 
                 // Calculate total lamports transferred
@@ -460,20 +466,23 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-                // Only update validator history if it's not already updated
-                if let Some(validator_history) =
-                    keeper_state.validator_history_map.get(&entry.vote_account)
-                {
-                    let needs_update = validator_history.history.arr.iter().any(|history| {
-                        history.epoch as u64 == epoch
-                            && history.block_data_updated_at_slot < first_slot_in_next_epoch
-                    });
+                ixs.push(entry.update_instruction());
 
-                    // Only update on N-1.. epochs
-                    if needs_update {
-                        ixs.push(entry.update_instruction());
-                    }
-                }
+
+                // // Only update validator history if it's not already updated
+                // if let Some(validator_history) =
+                //     keeper_state.validator_history_map.get(&entry.vote_account)
+                // {
+                //     let needs_update = validator_history.history.arr.iter().any(|history| {
+                //         history.epoch as u64 == epoch
+                //             && history.block_data_updated_at_slot < first_slot_in_next_epoch
+                //     });
+
+                //     // Only update on N-1.. epochs
+                //     if needs_update {
+                //         ixs.push(entry.update_instruction());
+                //     }
+                // }
             }
         }
 
