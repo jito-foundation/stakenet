@@ -418,8 +418,8 @@ async fn update_block_metadata(
                     error!("Validator history entry is missing");
                     error!("Vote Account: {}", entry.vote_account);
                     error!("Epoch: {}", epoch);
-                    error!("Map: {:?}", keeper_state.validator_history_map);
-                    return Err("Could not find validator history entry");
+                    error!("Map: {}", keeper_state.validator_history_map.get(&entry.vote_account));
+                    // return Err("Could not find validator history entry");
                 }
 
                 // Calculate total lamports transferred
