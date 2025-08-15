@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{prelude::SlotHistory, AnchorDeserialize};
 use futures::future::join_all;
@@ -196,6 +196,7 @@ async fn update_block_metadata(
     let epoch_schedule = &keeper_state.epoch_schedule;
     let current_epoch_info = &keeper_state.epoch_info;
     let current_epoch = current_epoch_info.epoch;
+    let validator_history = &keeper_state.validator_history_map;
     let current_finalized_slot = client
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
@@ -376,6 +377,31 @@ async fn update_block_metadata(
             for entry in update_map.clone() {
                 let (vote_account, entry) = entry;
 
+                // info! out everything that is on chain
+                let (
+                    mut validator_history_entry_total_priority_fees,
+                    mut validator_history_entry_total_leader_slots,
+                    mut validator_history_priority_fee_merkle_root_upload_authority,
+                    mut validator_history_entry_priority_fee_commission,
+                    mut validator_history_entry_block_data_updated_at_slot,
+                    mut validator_history_priority_fee_tips,
+                    mut validator_history_entry_blocks_produced
+                ): (i64, i64, i64, i64, i64, i64, i64) = (-1, -1, -1, -1, -1, -1, -1,);
+                if let Some(validator_history) =
+                    keeper_state.validator_history_map.get(&entry.vote_account) {
+
+                    if let Some(validator_history_entry) = validator_history.history.arr.iter().find(|history| history.epoch as u64 == epoch) {
+                        // Process validator history
+                        validator_history_entry_total_priority_fees = validator_history_entry.total_priority_fees as i64;
+                        validator_history_entry_total_leader_slots = validator_history_entry.total_leader_slots as i64;
+                        validator_history_priority_fee_merkle_root_upload_authority = validator_history_entry.priority_fee_merkle_root_upload_authority as i64;
+                        validator_history_entry_priority_fee_commission = validator_history_entry.priority_fee_commission as i64;
+                        validator_history_entry_block_data_updated_at_slot = validator_history_entry.block_data_updated_at_slot as i64;
+                        validator_history_priority_fee_tips = validator_history_entry.priority_fee_tips as i64;
+                        validator_history_entry_blocks_produced = validator_history_entry.blocks_produced as i64;
+                    }
+                }
+
                 // Calculate total lamports transferred
                 let (
                     priority_fee_distribution_account,
@@ -404,6 +430,13 @@ async fn update_block_metadata(
                   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
                   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
                   ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
+                  ("vhe-total-priority-fees", validator_history_entry_total_priority_fees, i64),
+                  ("vhe-total-leader-slots", validator_history_entry_total_leader_slots, i64),
+                  ("vhe-priority-fee-merkle-root-upload-authority", validator_history_priority_fee_merkle_root_upload_authority, i64),
+                  ("vhe-priority-fee-commission", validator_history_entry_priority_fee_commission, i64),
+                  ("vhe-block-data-updated-at-slot", validator_history_entry_block_data_updated_at_slot, i64),
+                  ("vhe-priority-fee-tips", validator_history_priority_fee_tips, i64),
+                  ("vhe-blocks-produced", validator_history_entry_blocks_produced, i64),
                   ("update-slot", entry.highest_global_done_slot, i64),
                   "cluster" => cluster.to_string(),
                   "vote" => vote_account.to_string(),
