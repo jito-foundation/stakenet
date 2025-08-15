@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::TVC_ACTIVATION_EPOCH, score::validator_score, Config as StewardConfig,
+    constants::TVC_ACTIVATION_EPOCH, score::instant_unstake_validator, Config as StewardConfig,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
@@ -15,28 +15,23 @@ use stakenet_sdk::utils::accounts::{
 };
 
 #[derive(clap::Parser)]
-#[command(about = "Analyze validator scores off-chain with overridden priority fee params")]
-pub struct AnalyzeScores {
+#[command(about = "Analyze instant-unstake checks off-chain for all validators")]
+pub struct AnalyzeInstantUnstake {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
 }
 
-pub async fn command_analyze_scores(
-    args: AnalyzeScores,
+pub async fn command_analyze_instant_unstake(
+    args: AnalyzeInstantUnstake,
     client: &Arc<RpcClient>,
     _steward_program_id: Pubkey,
 ) -> Result<()> {
     let steward_config = args.view_parameters.steward_config;
 
     // Fetch config
-    let mut config: Box<StewardConfig> =
-        get_steward_config_account(client, &steward_config).await?;
+    let config: Box<StewardConfig> = get_steward_config_account(client, &steward_config).await?;
 
-    // Override local config parameters per request (does not persist on-chain)
-    config.parameters.priority_fee_scoring_start_epoch = u16::MAX;
-    config.parameters.priority_fee_max_commission_bps = 5000;
-    config.parameters.priority_fee_lookback_epochs = 10;
-    config.parameters.priority_fee_lookback_offset = 2;
+    // No parameter overrides required for instant-unstake analysis
 
     // Fetch ClusterHistory
     let vh_program_id = validator_history::id();
@@ -50,115 +45,168 @@ pub async fn command_analyze_scores(
     let validator_histories: Vec<ValidatorHistory> =
         get_all_validator_history_accounts(client, vh_program_id).await?;
 
-    // Current epoch
+    // Current epoch and epoch start slot
     let epoch_info = client.get_epoch_info().await?;
+    let epoch_schedule = client.get_epoch_schedule().await?;
     let current_epoch_u16: u16 = validator_history::utils::cast_epoch(epoch_info.epoch)?;
+    let epoch_start_slot: u64 = epoch_schedule.get_first_slot_in_epoch(epoch_info.epoch);
 
-    // Compute scores
-    let mut results: Vec<(Pubkey, f64, f64, f64, f64)> =
-        Vec::with_capacity(validator_histories.len());
+    // Compute instant-unstake checks
+    let mut results: Vec<(
+        Pubkey,
+        bool, // instant_unstake
+        bool, // delinquency_check
+        bool, // commission_check
+        bool, // mev_commission_check
+        bool, // is_blacklisted
+        bool, // is_bad_merkle_root_upload_authority
+        bool, // is_bad_priority_fee_merkle_root_upload_authority
+    )> = Vec::with_capacity(validator_histories.len());
     let mut skipped: usize = 0;
     for vh in validator_histories.iter() {
-        match validator_score(
+        match instant_unstake_validator(
             vh,
             &cluster_history,
             &config,
+            epoch_start_slot,
             current_epoch_u16,
             TVC_ACTIVATION_EPOCH,
         ) {
-            Ok(score) => {
-                results.push((
-                    vh.vote_account,
-                    score.score,
-                    score.priority_fee_commission_score,
-                    score.priority_fee_merkle_root_upload_authority_score,
-                    score.merkle_root_upload_authority_score,
-                ));
-            }
+            Ok(unstake) => results.push((
+                vh.vote_account,
+                unstake.instant_unstake,
+                unstake.delinquency_check,
+                unstake.commission_check,
+                unstake.mev_commission_check,
+                unstake.is_blacklisted,
+                unstake.is_bad_merkle_root_upload_authority,
+                unstake.is_bad_priority_fee_merkle_root_upload_authority,
+            )),
             Err(_) => skipped += 1,
         }
     }
 
     // Aggregate stats
     let total = results.len();
-    let non_zero_scores = results.iter().filter(|(_, s, _, _, _)| *s > 0.0).count();
+    let mut total_instant_unstake = 0usize;
+    let mut delinquency_true = 0usize;
+    let mut commission_true = 0usize;
+    let mut mev_commission_true = 0usize;
+    let mut blacklisted_true = 0usize;
+    let mut bad_merkle_true = 0usize;
+    let mut bad_pf_merkle_true = 0usize;
 
-    let (mut pf_commission_ones, mut pf_commission_zeros) = (0usize, 0usize);
-    let (mut pf_merkle_ones, mut pf_merkle_zeros) = (0usize, 0usize);
-    let (mut merkle_ones, mut merkle_zeros) = (0usize, 0usize);
+    let mut instant_unstake_validators: Vec<Pubkey> = Vec::new();
+    let mut delinquency_validators: Vec<Pubkey> = Vec::new();
+    let mut commission_validators: Vec<Pubkey> = Vec::new();
+    let mut mev_commission_validators: Vec<Pubkey> = Vec::new();
+    let mut blacklisted_validators: Vec<Pubkey> = Vec::new();
+    let mut bad_merkle_validators: Vec<Pubkey> = Vec::new();
+    let mut bad_pf_merkle_validators: Vec<Pubkey> = Vec::new();
 
-    let mut pf_commission_zero_validators: Vec<Pubkey> = Vec::new();
-    let mut pf_merkle_zero_validators: Vec<Pubkey> = Vec::new();
-    let mut merkle_zero_validators: Vec<Pubkey> = Vec::new();
-
-    for (vote, _, pf_commission, pf_merkle, merkle) in results.iter() {
-        if (*pf_commission - 1.0).abs() < f64::EPSILON {
-            pf_commission_ones += 1;
-        } else if (*pf_commission - 0.0).abs() < f64::EPSILON {
-            pf_commission_zeros += 1;
-            pf_commission_zero_validators.push(*vote);
+    for (vote, iu, d, c, m, b, bad_m, bad_pm) in results.iter() {
+        if *iu {
+            total_instant_unstake += 1;
+            instant_unstake_validators.push(*vote);
         }
-
-        if (*pf_merkle - 1.0).abs() < f64::EPSILON {
-            pf_merkle_ones += 1;
-        } else if (*pf_merkle - 0.0).abs() < f64::EPSILON {
-            pf_merkle_zeros += 1;
-            pf_merkle_zero_validators.push(*vote);
+        if *d {
+            delinquency_true += 1;
+            delinquency_validators.push(*vote);
         }
-
-        if (*merkle - 1.0).abs() < f64::EPSILON {
-            merkle_ones += 1;
-        } else if (*merkle - 0.0).abs() < f64::EPSILON {
-            merkle_zeros += 1;
-            merkle_zero_validators.push(*vote);
+        if *c {
+            commission_true += 1;
+            commission_validators.push(*vote);
+        }
+        if *m {
+            mev_commission_true += 1;
+            mev_commission_validators.push(*vote);
+        }
+        if *b {
+            blacklisted_true += 1;
+            blacklisted_validators.push(*vote);
+        }
+        if *bad_m {
+            bad_merkle_true += 1;
+            bad_merkle_validators.push(*vote);
+        }
+        if *bad_pm {
+            bad_pf_merkle_true += 1;
+            bad_pf_merkle_validators.push(*vote);
         }
     }
 
-    println!("----- Validator Score Analysis -----");
+    println!("----- Instant Unstake Analysis -----");
     println!("Current epoch: {}", current_epoch_u16);
     println!("Total validators processed: {}", total);
     println!("Skipped due to missing data/errors: {}", skipped);
-    println!("Non-zero final scores: {}", non_zero_scores);
-    println!("\nComponent 1.0 / 0.0 counts:");
+    println!("Instant-unstake flagged: {}", total_instant_unstake);
+    println!("\nChecks (true counts):");
+    println!("delinquency_check: {}", delinquency_true);
+    println!("commission_check: {}", commission_true);
+    println!("mev_commission_check: {}", mev_commission_true);
+    println!("is_blacklisted: {}", blacklisted_true);
+    println!("is_bad_merkle_root_upload_authority: {}", bad_merkle_true);
     println!(
-        "priority_fee_commission_score -> 1.0: {}, 0.0: {}",
-        pf_commission_ones, pf_commission_zeros
+        "is_bad_priority_fee_merkle_root_upload_authority: {}",
+        bad_pf_merkle_true
     );
-    if !pf_commission_zero_validators.is_empty() {
-        let list = pf_commission_zero_validators
+
+    if !instant_unstake_validators.is_empty() {
+        let list = instant_unstake_validators
             .iter()
             .map(|k| k.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        println!("priority_fee_commission_score 0.0 validators: {}", list);
+        println!("instant_unstake validators: {}", list);
     }
-    println!(
-        "priority_fee_merkle_root_upload_authority_score -> 1.0: {}, 0.0: {}",
-        pf_merkle_ones, pf_merkle_zeros
-    );
-    if !pf_merkle_zero_validators.is_empty() {
-        let list = pf_merkle_zero_validators
+    if !delinquency_validators.is_empty() {
+        let list = delinquency_validators
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("delinquency_check validators: {}", list);
+    }
+    if !commission_validators.is_empty() {
+        let list = commission_validators
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("commission_check validators: {}", list);
+    }
+    if !mev_commission_validators.is_empty() {
+        let list = mev_commission_validators
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("mev_commission_check validators: {}", list);
+    }
+    if !blacklisted_validators.is_empty() {
+        let list = blacklisted_validators
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("is_blacklisted validators: {}", list);
+    }
+    if !bad_merkle_validators.is_empty() {
+        let list = bad_merkle_validators
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("is_bad_merkle_root_upload_authority validators: {}", list);
+    }
+    if !bad_pf_merkle_validators.is_empty() {
+        let list = bad_pf_merkle_validators
             .iter()
             .map(|k| k.to_string())
             .collect::<Vec<_>>()
             .join(", ");
         println!(
-            "priority_fee_merkle_root_upload_authority_score 0.0 validators: {}",
-            list
-        );
-    }
-    println!(
-        "merkle_root_upload_authority_score -> 1.0: {}, 0.0: {}",
-        merkle_ones, merkle_zeros
-    );
-    if !merkle_zero_validators.is_empty() {
-        let list = merkle_zero_validators
-            .iter()
-            .map(|k| k.to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        println!(
-            "merkle_root_upload_authority_score 0.0 validators: {}",
+            "is_bad_priority_fee_merkle_root_upload_authority validators: {}",
             list
         );
     }

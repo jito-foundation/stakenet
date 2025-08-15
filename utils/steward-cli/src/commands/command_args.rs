@@ -241,7 +241,7 @@ pub enum Commands {
     ViewState(ViewState),
     ViewConfig(ViewConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
-    AnalyzeScores(super::info::analyze_scores::AnalyzeScores),
+    AnalyzeInstantUnstake(super::info::analyze_scores::AnalyzeInstantUnstake),
 
     // Actions
     InitSteward(InitSteward),
