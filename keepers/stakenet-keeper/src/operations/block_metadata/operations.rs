@@ -466,8 +466,7 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-                // ixs.push(entry.update_instruction());
-
+                ixs.push(entry.update_instruction());
 
                 // Only update validator history if it's not already updated
                 if let Some(validator_history) =
@@ -480,7 +479,8 @@ async fn update_block_metadata(
 
                     // Only update on N-1.. epochs
                     if needs_update {
-                        ixs.push(entry.update_instruction());
+                        info!("Updating validator history for {} - {}", entry.vote_account, epoch);
+                        // ixs.push(entry.update_instruction());
                     }
                 }
             }
