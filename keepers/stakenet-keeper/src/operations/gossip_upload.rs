@@ -173,6 +173,7 @@ pub async fn fire(
     let client = &keeper_config.client;
     let keypair = &keeper_config.keypair;
     let program_id = &keeper_config.validator_history_program_id;
+
     let entrypoints = &keeper_config
         .gossip_entrypoints
         .as_ref()
