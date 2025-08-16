@@ -466,23 +466,23 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-                ixs.push(entry.update_instruction());
+                // ixs.push(entry.update_instruction());
 
 
-                // // Only update validator history if it's not already updated
-                // if let Some(validator_history) =
-                //     keeper_state.validator_history_map.get(&entry.vote_account)
-                // {
-                //     let needs_update = validator_history.history.arr.iter().any(|history| {
-                //         history.epoch as u64 == epoch
-                //             && history.block_data_updated_at_slot < first_slot_in_next_epoch
-                //     });
+                // Only update validator history if it's not already updated
+                if let Some(validator_history) =
+                    keeper_state.validator_history_map.get(&entry.vote_account)
+                {
+                    let needs_update = validator_history.history.arr.iter().any(|history| {
+                        history.epoch as u64 == epoch
+                            && history.block_data_updated_at_slot < first_slot_in_next_epoch
+                    });
 
-                //     // Only update on N-1.. epochs
-                //     if needs_update {
-                //         ixs.push(entry.update_instruction());
-                //     }
-                // }
+                    // Only update on N-1.. epochs
+                    if needs_update {
+                        ixs.push(entry.update_instruction());
+                    }
+                }
             }
         }
 
