@@ -104,6 +104,7 @@ services:
       - SQLITE_PATH=/data/db
       - RUN_PRIORITY_FEE_COMMISSION=true
       - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
+      - GOSSIP_ENTRYPOINTS=${GOSSIP_ENTRYPOINTS}
     volumes:
       - ./credentials:/credentials
       - ./data:/data
