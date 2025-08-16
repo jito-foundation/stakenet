@@ -324,25 +324,25 @@ fn main() {
 
     info!("{}\n\n", args);
 
-    let gossip_entrypoints = args
-        .gossip_entrypoints
-        .map(|gossip_entrypoints| {
-            gossip_entrypoints
-                .iter()
-                .enumerate()
-                .map(|(index, gossip_entrypoint)| {
-                    solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
-                        panic!(
-                            "Failed to parse gossip entrypoint #{} '{}': {}",
-                            index + 1,
-                            gossip_entrypoint,
-                            err
-                        )
-                    })
-                })
-                .collect()
-        })
-        .expect("Failed to create socket addresses from gossip entrypoints");
+    // let gossip_entrypoints = args
+    //     .gossip_entrypoints
+    //     .map(|gossip_entrypoints| {
+    //         gossip_entrypoints
+    //             .iter()
+    //             .enumerate()
+    //             .map(|(index, gossip_entrypoint)| {
+    //                 solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
+    //                     panic!(
+    //                         "Failed to parse gossip entrypoint #{} '{}': {}",
+    //                         index + 1,
+    //                         gossip_entrypoint,
+    //                         err
+    //                     )
+    //                 })
+    //             })
+    //             .collect()
+    //     })
+    //     .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -402,7 +402,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_entrypoints: Some(gossip_entrypoints),
+            gossip_entrypoints: None,//Some(gossip_entrypoints),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,
