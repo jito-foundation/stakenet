@@ -286,7 +286,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         if should_emit(tick, &intervals) {
-            info!("Emitting metrics...");
+            // info!("Emitting metrics...");
             // keeper_state.emit();
 
             // KeeperOperations::emit(
