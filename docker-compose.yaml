@@ -100,7 +100,7 @@ services:
       - RUN_STEWARD=false
       - RUN_STAKE_UPLOAD=false
       - RUN_GOSSIP_UPLOAD=false
-      - RUN_EMIT_METRICS=false
+      - RUN_EMIT_METRICS=true
       - RUN_BLOCK_METADATA=true
       - RUN_PRIORITY_FEE_COMMISSION=true
       - SQLITE_PATH=/data/db

@@ -129,7 +129,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...");
+            info!("Pre-fetching data for update...({})", tick);
             match pre_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -146,7 +146,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...");
+                info!("Creating missing accounts...({})", tick);
                 match create_missing_accounts(&keeper_config, &keeper_state).await {
                     Ok(new_accounts_created) => {
                         keeper_state.increment_update_run_for_epoch(
@@ -182,7 +182,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Post-fetching data for update...");
+            info!("Post-fetching data for update...({})", tick);
             match post_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
@@ -278,28 +278,28 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // ---------------------- EMIT ---------------------------------
 
         if should_fire(tick, metrics_interval) {
-            keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
-                &keeper_config,
-                &keeper_state,
-                keeper_config.cluster_name.as_str(),
-            ));
+            // keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
+            //     &keeper_config,
+            //     &keeper_state,
+            //     keeper_config.cluster_name.as_str(),
+            // ));
         }
 
         if should_emit(tick, &intervals) {
             info!("Emitting metrics...");
-            keeper_state.emit();
+            // keeper_state.emit();
 
-            KeeperOperations::emit(
-                &keeper_state.runs_for_epoch,
-                &keeper_state.errors_for_epoch,
-                &keeper_state.txs_for_epoch,
-                keeper_config.cluster_name.as_str(),
-            );
+            // KeeperOperations::emit(
+            //     &keeper_state.runs_for_epoch,
+            //     &keeper_state.errors_for_epoch,
+            //     &keeper_state.txs_for_epoch,
+            //     keeper_config.cluster_name.as_str(),
+            // );
 
-            KeeperCreates::emit(
-                &keeper_state.created_accounts_for_epoch,
-                &keeper_state.cluster_name,
-            );
+            // KeeperCreates::emit(
+            //     &keeper_state.created_accounts_for_epoch,
+            //     &keeper_state.cluster_name,
+            // );
         }
 
         // ---------- CLEAR STARTUP ----------
