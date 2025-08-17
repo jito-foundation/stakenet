@@ -184,11 +184,14 @@ struct DunePriorityFeeBackfill {
     #[arg(long, env, default_value = "5598354")]
     query_id: String,
 
-    #[arg(long, env, default_value_t = 1000)]
+    #[arg(long, env, default_value_t = 32000)]
     batch_size: usize,
 
-    #[arg(long, env, default_value_t = 100)]
+    #[arg(long, env, default_value_t = 32000)]
     chunk_size: usize,
+
+    #[arg(long, env, default_value_t = 0)]
+    starting_offset: usize,
 }
 
 #[derive(Parser)]
@@ -1131,6 +1134,7 @@ async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, clien
             &epoch_schedule,
             args.chunk_size,
             args.batch_size,
+            args.starting_offset
         )
     })
     .await

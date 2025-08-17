@@ -506,6 +506,7 @@ impl DBSlotInfo {
         epoch_schedule: &EpochSchedule,
         batch_size: usize,
         chunk_size: usize,
+        starting_offset: usize,
     ) -> Result<u64, BlockMetadataKeeperError> {
 
         let client = reqwest::blocking::Client::new();
@@ -515,7 +516,7 @@ impl DBSlotInfo {
         );
 
         let mut total_written = 0u64;
-        let mut offset = 0;
+        let mut offset = starting_offset;
         let mut has_more = true;
 
         info!("Starting Dune API fetch for query {}", query_id);
@@ -553,6 +554,7 @@ impl DBSlotInfo {
             // Convert Dune rows to DBSlotInfo entries
             let mut entries_to_insert = Vec::new();
 
+            let rows_length = rows.len();
             for row in rows {
 
                 // Calculate relative slot
@@ -589,7 +591,7 @@ impl DBSlotInfo {
             }
 
             // Check if there are more results
-            offset += batch_size;
+            offset += rows_length;
             has_more = api_response.next_uri.is_some();
 
             // Optional: Add a small delay to avoid rate limiting
