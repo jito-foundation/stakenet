@@ -1116,22 +1116,24 @@ fn command_get_config(client: RpcClient) {
 }
 
 fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
-    // Example usage
-    let mut connection = Connection::open(args.sqlite_path).expect("Failed to open database");
-    let api_key = args.dune_api_key;
-    let query_id = args.query_id;
-    let chunk_size = args.chunk_size;
-    let batch_size = args.batch_size;
     let epoch_schedule = client.get_epoch_schedule().expect("Could not get epoch schedule");
 
-    let entries_written = DBSlotInfo::fetch_and_insert_from_dune(
-        &mut connection,
-        &api_key,
-        &query_id,
-        &epoch_schedule,
-        chunk_size,  // fetch 1000 records per API call
-        batch_size,   // insert 100 records per transaction
-    ).expect("Error running backfill");
+    // Move the blocking operations into spawn_blocking
+    let entries_written = tokio::task::spawn_blocking(move || {
+        let mut connection = Connection::open(args.sqlite_path).expect("Failed to open database");
+
+        DBSlotInfo::fetch_and_insert_from_dune(
+            &mut connection,
+            &args.dune_api_key,
+            &args.query_id,
+            &epoch_schedule,
+            args.chunk_size,
+            args.batch_size,
+        )
+    })
+    .await
+    .expect("Task panicked")
+    .expect("Error running backfill");
 
     println!("Total entries written: {}", entries_written);
 }
