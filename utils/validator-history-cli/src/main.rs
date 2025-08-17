@@ -1,4 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
+use dotenvy::dotenv;
+use log::*;
 use rusqlite::Connection;
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
@@ -1140,6 +1142,8 @@ async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, clien
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    env_logger::init();
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
