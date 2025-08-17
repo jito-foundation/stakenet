@@ -1115,7 +1115,7 @@ fn command_get_config(client: RpcClient) {
     }
 }
 
-fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
+async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
     let epoch_schedule = client.get_epoch_schedule().expect("Could not get epoch schedule");
 
     // Move the blocking operations into spawn_blocking
@@ -1154,6 +1154,6 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
-        Commands::DunePriorityFeeBackfill(args) => command_dune_priority_fee_backfill(args, client),
+        Commands::DunePriorityFeeBackfill(args) => command_dune_priority_fee_backfill(args, client).await,
     };
 }
