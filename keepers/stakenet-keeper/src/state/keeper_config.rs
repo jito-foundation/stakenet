@@ -40,7 +40,6 @@ pub struct KeeperConfig {
     pub cluster: Cluster,
     pub cluster_name: String,
     pub lookback_epochs: u64,
-    pub loopback_start_offset: u64,
 
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     pub validator_history_min_stake: u64,
@@ -173,6 +172,11 @@ pub struct Args {
     #[arg(long, env, default_value = "false")]
     pub run_gossip_upload: bool,
 
+    /// Run Dune Backfill
+    /// Requires Dune API key
+    #[arg(long, env, default_value = "false")]
+    pub run_dune_backfill: bool,
+
     /// Run stake upload
     #[arg(long, env, default_value = "false")]
     pub run_steward: bool,
@@ -226,13 +230,10 @@ pub struct Args {
     #[arg(long, env, default_value = "3")]
     pub lookback_epochs: u64,
 
-    /// Epoch offset to start looking back for block metadata
-    #[arg(long, env, default_value = "0")]
-    pub loopback_start_offset: u64,
-
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     #[arg(long, env, default_value = "500000000000")]
     pub validator_history_min_stake: u64,
+
 }
 
 impl fmt::Display for Args {
@@ -272,7 +273,6 @@ impl fmt::Display for Args {
             Cool Down Range: {} minutes\n\
             Run Block Metadata {}\n\
             Block Metadata Interval: {} seconds\n\
-            Loopback Start Offset: {} seconds\n\
             Lookback Epochs: {}\n\
             SQLite path: {:?}\n\
             Region: {}\n\
@@ -311,7 +311,6 @@ impl fmt::Display for Args {
             self.cool_down_range,
             self.run_block_metadata,
             self.block_metadata_interval,
-            self.loopback_start_offset,
             self.lookback_epochs,
             self.sqlite_path,
             self.region,

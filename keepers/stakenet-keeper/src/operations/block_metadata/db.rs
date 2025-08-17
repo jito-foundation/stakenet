@@ -1,5 +1,6 @@
-use std::{collections::HashMap, str::FromStr};
-
+use std::{collections::{HashMap}, str::FromStr};
+use reqwest;
+use serde::{Deserialize};
 use anchor_lang::prelude::EpochSchedule;
 use log::{error, info};
 use rusqlite::{params, Connection};
@@ -10,9 +11,39 @@ use crate::entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMe
 
 use super::errors::BlockMetadataKeeperError;
 
+// -------------------------- DUNE SCHEMA ----------------------------
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneApiResponse {
+    result: DuneResult,
+    next_uri: Option<String>,
+    next_offset: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneResult {
+    rows: Vec<DuneRow>,
+    metadata: DuneMetadata,
+}
+
+#[derive(Debug, Deserialize)]
+struct DuneRow {
+    leader: String,
+    slot: u64,
+    epoch: u64,
+    priority_fees_lamports: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneMetadata {
+    total_row_count: u64,
+}
+
 // -------------------------- NEW SCHEMA -----------------------------
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DBSlotInfoState {
     Created = 0x10,
     Done = 0x11,
@@ -457,6 +488,161 @@ impl DBSlotInfo {
         }
 
         Ok(map)
+    }
+
+    /// Fetches data from Dune API and inserts into the database
+    ///
+    /// # Arguments
+    /// * `connection` - Database connection
+    /// * `api_key` - Dune API key
+    /// * `query_id` - Dune query ID
+    /// * `epoch_schedule` - Solana epoch schedule for calculating relative slots
+    /// * `batch_size` - Number of records to fetch per API call (default: 1000)
+    /// * `chunk_size` - Number of records to insert per database transaction (default: 100)
+    pub fn fetch_and_insert_from_dune(
+        connection: &mut Connection,
+        api_key: &str,
+        query_id: &str,
+        epoch_schedule: &EpochSchedule,
+        batch_size: usize,
+        chunk_size: usize,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+
+        let client = reqwest::blocking::Client::new();
+        let base_url = format!(
+            "https://api.dune.com/api/v1/query/{}/results",
+            query_id
+        );
+
+        let mut total_written = 0u64;
+        let mut offset = 0;
+        let mut has_more = true;
+
+        info!("Starting Dune API fetch for query {}", query_id);
+
+        while has_more {
+            // Build URL with pagination
+            let url = format!("{}?limit={}&offset={}", base_url, batch_size, offset);
+
+            info!("Fetching batch from Dune API, offset: {}", offset);
+
+            // Make API request
+            let response = client
+                .get(&url)
+                .header("X-Dune-API-Key", api_key)
+                .send()
+                .map_err(|e| BlockMetadataKeeperError::OtherError(format!("API request failed: {}", e)))?;
+
+            if !response.status().is_success() {
+                return Err(BlockMetadataKeeperError::OtherError(format!(
+                    "API returned error status: {}",
+                    response.status()
+                )));
+            }
+
+            let api_response: DuneApiResponse = response
+                .json()
+                .map_err(|e| BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {}", e)))?;
+
+            let rows = api_response.result.rows;
+            if rows.is_empty() {
+                has_more = false;
+                continue;
+            }
+
+            // Convert Dune rows to DBSlotInfo entries
+            let mut entries_to_insert = Vec::new();
+
+            for row in rows {
+
+                // Calculate relative slot
+                let first_slot_in_epoch = epoch_schedule.get_first_slot_in_epoch(row.epoch);
+                let relative_slot = row.slot - first_slot_in_epoch;
+
+                entries_to_insert.push(DBSlotInfo {
+                    identity_key: row.leader,
+                    vote_key: None,
+                    epoch: row.epoch,
+                    absolute_slot: row.slot,
+                    relative_slot,
+                    priority_fees: row.priority_fees_lamports,
+                    state: DBSlotInfoState::Done,
+                    error_string: None,
+                });
+            }
+
+            if !entries_to_insert.is_empty() {
+                // Insert in chunks
+                let slots_start = entries_to_insert.first().unwrap().absolute_slot;
+                let slots_end = entries_to_insert.last().unwrap().absolute_slot;
+
+                let written = Self::insert_dune_entries(connection, &entries_to_insert, chunk_size)?;
+                total_written += written;
+
+                info!(
+                    "Wrote {} entries for slots {}-{} (epoch {})",
+                    written,
+                    slots_start,
+                    slots_end,
+                    entries_to_insert.first().unwrap().epoch
+                );
+            }
+
+            // Check if there are more results
+            offset += batch_size;
+            has_more = api_response.next_uri.is_some();
+
+            // Optional: Add a small delay to avoid rate limiting
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        info!("Completed Dune API fetch. Total entries written: {}", total_written);
+        Ok(total_written)
+    }
+
+    /// Helper function to insert Dune entries into the database
+    fn insert_dune_entries(
+        connection: &mut Connection,
+        entries: &[DBSlotInfo],
+        chunk_size: usize,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let sql = "INSERT OR IGNORE INTO slot_info (
+            absolute_slot,
+            relative_slot,
+            epoch,
+            vote_key,
+            identity_key,
+            priority_fees,
+            state,
+            error_string
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        let mut write_counter = 0;
+        let mut transaction = connection.transaction()?;
+
+        for chunk in entries.chunks(chunk_size) {
+            for entry in chunk {
+                write_counter += 1;
+                transaction.execute(
+                    sql,
+                    params![
+                        entry.absolute_slot,
+                        entry.relative_slot,
+                        entry.epoch,
+                        entry.vote_key.as_deref().unwrap_or(""),
+                        entry.identity_key,
+                        entry.priority_fees,
+                        entry.state.clone() as u8,
+                        entry.error_string.as_deref().unwrap_or("")
+                    ],
+                )?;
+            }
+
+            transaction.commit()?;
+            transaction = connection.transaction()?;
+        }
+
+        Ok(write_counter)
     }
 }
 

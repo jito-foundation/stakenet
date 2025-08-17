@@ -420,7 +420,6 @@ fn main() {
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
             lookback_epochs: args.lookback_epochs,
-            loopback_start_offset: args.loopback_start_offset,
             validator_history_min_stake: args.validator_history_min_stake,
         };
 
