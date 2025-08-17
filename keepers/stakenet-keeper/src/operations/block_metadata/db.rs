@@ -179,19 +179,18 @@ impl DBSlotInfo {
     // 2. Update the Vote Identity Mapping only for the current epoch.
     pub fn upsert_vote_identity_mapping(
         connection: &mut Connection,
-        epoch: u64,
         mapping: &HashMap<String, String>, // identity, vote
         chunk_size: Option<usize>,
     ) -> Result<u64, BlockMetadataKeeperError> {
-        let chunk_size = chunk_size.unwrap_or(100);
-        let unmapped = match Self::get_unmapped_identity_accounts(connection, epoch) {
+        let chunk_size = chunk_size.unwrap_or(3000);
+        let unmapped = match Self::get_unmapped_identity_accounts(connection) {
             Ok(list) => list,
             Err(_) => mapping.keys().cloned().collect(),
         };
 
         let sql = "UPDATE slot_info
          SET vote_key = ?
-         WHERE epoch = ? AND identity_key = ? AND vote_key = ''";
+         WHERE identity_key = ? AND vote_key = ''";
 
         let mut write_counter = 0;
         let mut transaction = connection.transaction()?;
@@ -209,7 +208,7 @@ impl DBSlotInfo {
                 let vote_key = entry.1.to_string();
 
                 write_counter += 1;
-                transaction.execute(sql, params![vote_key, epoch, identity_key])?;
+                transaction.execute(sql, params![vote_key, identity_key])?;
             }
             transaction.commit()?;
             transaction = connection.transaction()?;
@@ -298,18 +297,17 @@ impl DBSlotInfo {
 
     pub fn get_unmapped_identity_accounts(
         connection: &Connection,
-        epoch: u64,
     ) -> Result<Vec<String>, BlockMetadataKeeperError> {
         // Prepare query to find all distinct identity_keys where vote_key is empty
         let mut statement = connection.prepare(
             "SELECT DISTINCT identity_key
              FROM slot_info
-             WHERE vote_key = '' AND epoch = ?
+             WHERE vote_key = ''
              ORDER BY identity_key ASC",
         )?;
 
         // Execute query and map the results to a Vec<String>
-        let unmapped_results = statement.query_map(params![epoch], |row| {
+        let unmapped_results = statement.query_map(params![], |row| {
             let identity_key: String = row.get(0)?;
             Ok(identity_key)
         })?;

@@ -245,12 +245,11 @@ async fn update_block_metadata(
     // 2. Update Mapping
     // NOTE: The mapping is only good for the current epoch, however
     // we need some mapping for backfilling the epochs
-    for epoch in epoch_range.clone() {
+    {
         info!("\n\n\n2. Map Identity to Vote\n\n\n");
         let start_time = std::time::Instant::now();
         match DBSlotInfo::upsert_vote_identity_mapping(
             sqlite_connection,
-            epoch,
             identity_to_vote_map,
             None,
         ) {
