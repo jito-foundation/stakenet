@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 use dotenvy::dotenv;
-use log::*;
 use rusqlite::Connection;
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};

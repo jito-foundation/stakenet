@@ -157,6 +157,9 @@ pub async fn update_priority_fee_commission(
                 }
             }
 
+            //TODO Remove
+            info!("PFC: {} ({})", vote_account, epoch);
+
             Some(
                 ValidatorPriorityFeeCommissionEntry::new(
                     vote_account,
@@ -173,6 +176,8 @@ pub async fn update_priority_fee_commission(
         all_update_instructions.extend(update_instructions);
     }
 
+    //TODO Remove
+    all_update_instructions = vec![];
 
     let submit_result = submit_instructions(
         client,
