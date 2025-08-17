@@ -7,6 +7,7 @@ use crate::{
 use log::{error as log_error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
+use solana_sdk::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -36,6 +37,7 @@ async fn _process(
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
+    lookback_epochs: u64,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     update_priority_fee_commission(
@@ -47,6 +49,7 @@ async fn _process(
         retry_count,
         confirmation_time,
         priority_fee_in_microlamports,
+        lookback_epochs,
         no_pack,
     )
     .await
@@ -79,6 +82,7 @@ pub async fn fire(
             keeper_config.tx_retry_count,
             keeper_config.tx_confirmation_seconds,
             priority_fee_in_microlamports,
+            keeper_config.lookback_epochs,
             keeper_config.no_pack,
         )
         .await
@@ -126,24 +130,26 @@ pub async fn update_priority_fee_commission(
     retry_count: u16,
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
+    lookback_epochs: u64,
     _no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     // Only update Epoch N-1 since, priority fees are not yet finalized
     let epoch_info = &keeper_state.epoch_info;
+    let current_epoch = epoch_info.epoch;
     let previous_epoch = epoch_info.epoch.saturating_sub(1);
-    let previous_epoch_tip_distribution_map = &keeper_state.previous_epoch_tip_distribution_map;
 
-    let existing_entries = previous_epoch_tip_distribution_map
-        .iter()
-        .filter_map(|(pubkey, account)| account.as_ref().map(|_| *pubkey))
-        .collect::<Vec<_>>();
+    let mut all_update_instructions: Vec<Instruction> = Vec::new();
 
-    let update_instructions = existing_entries
-        .iter()
+    let epoch_range =
+        (current_epoch - lookback_epochs)..(current_epoch);
+    for epoch in epoch_range {
+
+        let update_instructions = keeper_state.validator_history_map.keys()
         .filter_map(|vote_account| {
+
             if let Some(validator_history) = keeper_state.validator_history_map.get(vote_account) {
                 let should_update = validator_history.history.arr.iter().any(|entry| {
-                    entry.epoch as u64 == previous_epoch
+                    entry.epoch as u64 == epoch
                         && entry.priority_fee_merkle_root_upload_authority == MerkleRootUploadAuthority::Unset
                 });
                 if !should_update {
@@ -164,9 +170,13 @@ pub async fn update_priority_fee_commission(
         })
         .collect::<Vec<_>>();
 
+        all_update_instructions.extend(update_instructions);
+    }
+
+
     let submit_result = submit_instructions(
         client,
-        update_instructions,
+        all_update_instructions,
         keypair,
         priority_fee_in_microlamports,
         retry_count,

@@ -242,13 +242,15 @@ async fn update_block_metadata(
         }
     }
 
-    // 2. Update Mapping ( Only for current epoch )
-    {
+    // 2. Update Mapping
+    // NOTE: The mapping is only good for the current epoch, however
+    // we need some mapping for backfilling the epochs
+    for epoch in epoch_range.clone() {
         info!("\n\n\n2. Map Identity to Vote\n\n\n");
         let start_time = std::time::Instant::now();
         match DBSlotInfo::upsert_vote_identity_mapping(
             sqlite_connection,
-            current_epoch,
+            epoch,
             identity_to_vote_map,
             None,
         ) {
@@ -264,13 +266,13 @@ async fn update_block_metadata(
         }
 
         // 2b. Print out all
-        let all_unmapped_identities =
-            DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection, current_epoch)?;
-        error!(
-            "Unmapped identities ({}) \n{:?}\n",
-            all_unmapped_identities.len(),
-            all_unmapped_identities
-        );
+        // let all_unmapped_identities =
+        //     DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection, epoch)?;
+        // error!(
+        //     "Unmapped identities ({}) \n{:?}\n",
+        //     all_unmapped_identities.len(),
+        //     all_unmapped_identities
+        // );
     }
 
     // 3. Update Blocks ( Tries to update all blocks )
@@ -376,6 +378,7 @@ async fn update_block_metadata(
 
                 // info! out everything that is on chain
                 let (
+                    mut needs_update,
                     mut validator_history_entry_total_priority_fees,
                     mut validator_history_entry_total_leader_slots,
                     mut validator_history_priority_fee_merkle_root_upload_authority,
@@ -383,7 +386,7 @@ async fn update_block_metadata(
                     mut validator_history_entry_block_data_updated_at_slot,
                     mut validator_history_priority_fee_tips,
                     mut validator_history_entry_blocks_produced,
-                ): (i64, i64, i64, i64, i64, i64, i64) = (-1, -1, -1, -1, -1, -1, -1);
+                ): (bool, i64, i64, i64, i64, i64, i64, i64) = (false, -1, -1, -1, -1, -1, -1, -1);
                 if let Some(validator_history) =
                     keeper_state.validator_history_map.get(&entry.vote_account)
                 {
@@ -409,13 +412,9 @@ async fn update_block_metadata(
                             validator_history_entry.priority_fee_tips as i64;
                         validator_history_entry_blocks_produced =
                             validator_history_entry.blocks_produced as i64;
+
+                        needs_update = validator_history_entry.block_data_updated_at_slot < first_slot_in_next_epoch || validator_history_entry.block_data_updated_at_slot == u64::MAX;
                     }
-                } else {
-                    error!("Validator history entry is missing");
-                    error!("Vote Account: {}", entry.vote_account);
-                    error!("Epoch: {}", epoch);
-                    // error!("Map: {:?}", keeper_state.validator_history_map.get(&entry.vote_account));
-                    // return Err("Could not find validator history entry");
                 }
 
                 // Calculate total lamports transferred
@@ -453,6 +452,7 @@ async fn update_block_metadata(
                   ("vhe-block-data-updated-at-slot", validator_history_entry_block_data_updated_at_slot, i64),
                   ("vhe-priority-fee-tips", validator_history_priority_fee_tips, i64),
                   ("vhe-blocks-produced", validator_history_entry_blocks_produced, i64),
+                  ("vhe-needs-update", needs_update, bool),
                   ("update-slot", entry.highest_global_done_slot, i64),
                   "cluster" => cluster.to_string(),
                   "vote" => vote_account.to_string(),
@@ -462,22 +462,8 @@ async fn update_block_metadata(
                   "epoch" => format!("{}", epoch),
                 );
 
-                ixs.push(entry.update_instruction());
-
-                // Only update validator history if it's not already updated
-                if let Some(validator_history) =
-                    keeper_state.validator_history_map.get(&entry.vote_account)
-                {
-                    let needs_update = validator_history.history.arr.iter().any(|history| {
-                        history.epoch as u64 == epoch
-                            && history.block_data_updated_at_slot < first_slot_in_next_epoch
-                    });
-
-                    // Only update on N-1.. epochs
-                    if needs_update {
-                        info!("Updating validator history for {} - {}", entry.vote_account, epoch);
-                        // ixs.push(entry.update_instruction());
-                    }
+                if needs_update {
+                    ixs.push(entry.update_instruction());
                 }
             }
         }

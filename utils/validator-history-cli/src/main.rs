@@ -1115,7 +1115,7 @@ fn command_get_config(client: RpcClient) {
     }
 }
 
-async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
+fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
     // Example usage
     let mut connection = Connection::open(args.sqlite_path).expect("Failed to open database");
     let api_key = args.dune_api_key;
@@ -1152,6 +1152,6 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
-        Commands::DunePriorityFeeBackfill(args) => command_dune_priority_fee_backfill(args, client).await,
+        Commands::DunePriorityFeeBackfill(args) => command_dune_priority_fee_backfill(args, client),
     };
 }
