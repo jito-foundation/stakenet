@@ -21,3 +21,5 @@ solana-sdk = { workspace = true }
 spl-stake-pool = { workspace = true }
 tokio = { workspace = true }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
+stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
+rusqlite = { version = "0.32.1", features = ["bundled"] }
