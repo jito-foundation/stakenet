@@ -309,6 +309,12 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
+
+        info!("-                              -");
+        info!("-                              -");
+        info!("------------ TICK {} -----------", tick);
+        info!("-                              -");
+        info!("-                              -");
     }
 }
 
