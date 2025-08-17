@@ -357,6 +357,8 @@ async fn update_block_metadata(
     {
         info!("\n\n\n4. Aggregate Update TXs\n\n\n");
 
+        let mut needs_update_counter = 0;
+
         let start_time = std::time::Instant::now();
         for epoch in epoch_range {
             let first_slot_in_next_epoch = epoch_schedule.get_first_slot_in_epoch(epoch + 1);
@@ -464,7 +466,8 @@ async fn update_block_metadata(
                 // );
 
                 if needs_update {
-                    info!("Block Metadata: {} ({})", vote_account, epoch);
+                    // info!("Block Metadata: {} ({})", vote_account, epoch);
+                    needs_update_counter += 1;
                     //TODO uncomment
                     // ixs.push(entry.update_instruction());
                 }
@@ -476,8 +479,12 @@ async fn update_block_metadata(
             "Aggregated {} in {:.3}s",
             ixs.len(),
             time_ms as f64 / 1000.0,
-        )
+        );
+        info!("Block Metadata: {}", needs_update_counter);
+
     }
+
+
 
     // 5. Submit TXs
     {

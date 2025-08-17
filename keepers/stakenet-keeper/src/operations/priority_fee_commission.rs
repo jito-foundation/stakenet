@@ -158,7 +158,7 @@ pub async fn update_priority_fee_commission(
             }
 
             //TODO Remove
-            info!("PFC: {} ({})", vote_account, epoch);
+            // info!("PFC: {} ({})", vote_account, epoch);
 
             Some(
                 ValidatorPriorityFeeCommissionEntry::new(
@@ -175,6 +175,8 @@ pub async fn update_priority_fee_commission(
 
         all_update_instructions.extend(update_instructions);
     }
+
+    info!("PFC: {}", all_update_instructions.len());
 
     //TODO Remove
     all_update_instructions = vec![];
