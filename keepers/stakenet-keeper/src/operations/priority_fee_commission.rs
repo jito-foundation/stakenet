@@ -179,7 +179,7 @@ pub async fn update_priority_fee_commission(
     info!("PFC: {}", all_update_instructions.len());
 
     //TODO Remove
-    all_update_instructions = vec![];
+    // all_update_instructions = vec![];
 
     let submit_result = submit_instructions(
         client,

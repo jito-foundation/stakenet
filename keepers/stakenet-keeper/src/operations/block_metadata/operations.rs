@@ -433,42 +433,42 @@ async fn update_block_metadata(
                 .await;
 
                 //TODO uncomment
-                // datapoint_info!(
-                //   "pfh-block-info-0.0.9",
-                //   ("blocks-error", entry.blocks_error, i64),
-                //   ("blocks-left", entry.blocks_left, i64),
-                //   ("blocks-missed", entry.blocks_missed, i64),
-                //   ("blocks-produced", entry.blocks_produced, i64),
-                //   ("epoch", entry.epoch, i64),
-                //   ("highest-slot", entry.highest_done_slot, i64),
-                //   ("total-leader-slots", entry.total_leader_slots, i64),
-                //   ("total-priority-fees", entry.total_priority_fees, i64),
-                //   ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
-                //   ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
-                //   ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
-                //   ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
-                //   ("vhe-total-priority-fees", validator_history_entry_total_priority_fees, i64),
-                //   ("vhe-total-leader-slots", validator_history_entry_total_leader_slots, i64),
-                //   ("vhe-priority-fee-merkle-root-upload-authority", validator_history_priority_fee_merkle_root_upload_authority, i64),
-                //   ("vhe-priority-fee-commission", validator_history_entry_priority_fee_commission, i64),
-                //   ("vhe-block-data-updated-at-slot", validator_history_entry_block_data_updated_at_slot, i64),
-                //   ("vhe-priority-fee-tips", validator_history_priority_fee_tips, i64),
-                //   ("vhe-blocks-produced", validator_history_entry_blocks_produced, i64),
-                //   ("vhe-needs-update", needs_update, bool),
-                //   ("update-slot", entry.highest_global_done_slot, i64),
-                //   "cluster" => cluster.to_string(),
-                //   "vote" => vote_account.to_string(),
-                //   "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
-                //   "priority-fee-oracle-authority" => priority_fee_oracle_authority_keypair.pubkey().to_string(),
-                //   "validator-history-program" => program_id.to_string(),
-                //   "epoch" => format!("{}", epoch),
-                // );
+                datapoint_info!(
+                  "pfh-block-info-0.0.9",
+                  ("blocks-error", entry.blocks_error, i64),
+                  ("blocks-left", entry.blocks_left, i64),
+                  ("blocks-missed", entry.blocks_missed, i64),
+                  ("blocks-produced", entry.blocks_produced, i64),
+                  ("epoch", entry.epoch, i64),
+                  ("highest-slot", entry.highest_done_slot, i64),
+                  ("total-leader-slots", entry.total_leader_slots, i64),
+                  ("total-priority-fees", entry.total_priority_fees, i64),
+                  ("pfs-total-lamports-transferred", total_lamports_transferred, i64),
+                  ("pfs-validator-commission-bps", validator_commission_bps, i64 ),
+                  ("pfs-priority-fee-distribution-account", priority_fee_distribution_account.to_string(), String),
+                  ("pfs-priority-fee-distribution-account-error", error_string, Option<String>),
+                  ("vhe-total-priority-fees", validator_history_entry_total_priority_fees, i64),
+                  ("vhe-total-leader-slots", validator_history_entry_total_leader_slots, i64),
+                  ("vhe-priority-fee-merkle-root-upload-authority", validator_history_priority_fee_merkle_root_upload_authority, i64),
+                  ("vhe-priority-fee-commission", validator_history_entry_priority_fee_commission, i64),
+                  ("vhe-block-data-updated-at-slot", validator_history_entry_block_data_updated_at_slot, i64),
+                  ("vhe-priority-fee-tips", validator_history_priority_fee_tips, i64),
+                  ("vhe-blocks-produced", validator_history_entry_blocks_produced, i64),
+                  ("vhe-needs-update", needs_update, bool),
+                  ("update-slot", entry.highest_global_done_slot, i64),
+                  "cluster" => cluster.to_string(),
+                  "vote" => vote_account.to_string(),
+                  "priority-fee-distribution-program" => priority_fee_distribution_program_id.to_string(),
+                  "priority-fee-oracle-authority" => priority_fee_oracle_authority_keypair.pubkey().to_string(),
+                  "validator-history-program" => program_id.to_string(),
+                  "epoch" => format!("{}", epoch),
+                );
 
                 if needs_update {
                     // info!("Block Metadata: {} ({})", vote_account, epoch);
                     needs_update_counter += 1;
                     //TODO uncomment
-                    // ixs.push(entry.update_instruction());
+                    ixs.push(entry.update_instruction());
                 }
             }
         }
