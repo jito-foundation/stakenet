@@ -151,14 +151,10 @@ pub async fn update_priority_fee_commission(
                     entry.epoch as u64 == epoch
                         && entry.priority_fee_merkle_root_upload_authority == MerkleRootUploadAuthority::Unset
                 });
+
                 if !should_update {
-                    info!("Skipping {} {}", vote_account, epoch);
                     return None;
-                } else {
-                    info!("Updating {} {}", vote_account, epoch);
                 }
-            } else {
-                info!("No validator history found {} {}", vote_account, epoch)
             }
 
             Some(
@@ -179,6 +175,11 @@ pub async fn update_priority_fee_commission(
 
     info!("PFC: {}", all_update_instructions.len());
 
+    let chunk_size = match all_update_instructions.len() {
+        0..=100 => 1,
+        _ => 8,
+    };
+
     let submit_result = submit_chunk_instructions(
         client,
         all_update_instructions,
@@ -187,7 +188,7 @@ pub async fn update_priority_fee_commission(
         retry_count,
         confirmation_time,
         None,
-        8,
+        chunk_size,
     )
     .await;
 
