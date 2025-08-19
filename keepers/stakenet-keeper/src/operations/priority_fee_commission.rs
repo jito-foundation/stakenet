@@ -136,7 +136,6 @@ pub async fn update_priority_fee_commission(
     // Only update Epoch N-1 since, priority fees are not yet finalized
     let epoch_info = &keeper_state.epoch_info;
     let current_epoch = epoch_info.epoch;
-    let previous_epoch = epoch_info.epoch.saturating_sub(1);
 
     let mut all_update_instructions: Vec<Instruction> = Vec::new();
 
@@ -157,13 +156,10 @@ pub async fn update_priority_fee_commission(
                 }
             }
 
-            //TODO Remove
-            // info!("PFC: {} ({})", vote_account, epoch);
-
             Some(
                 ValidatorPriorityFeeCommissionEntry::new(
                     vote_account,
-                    previous_epoch,
+                    epoch,
                     program_id,
                     priority_fee_distribution_program_id,
                     &keypair.pubkey(),
@@ -176,7 +172,6 @@ pub async fn update_priority_fee_commission(
         all_update_instructions.extend(update_instructions);
     }
 
-    // all_update_instructions.truncate(10_000);
     info!("PFC: {}", all_update_instructions.len());
 
     let submit_result = submit_chunk_instructions(
