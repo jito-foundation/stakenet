@@ -176,7 +176,7 @@ pub async fn update_priority_fee_commission(
     info!("PFC: {}", all_update_instructions.len());
 
     let chunk_size = match all_update_instructions.len() {
-        0..=100 => 1,
+        0..=160 => 1,
         _ => 8,
     };
 

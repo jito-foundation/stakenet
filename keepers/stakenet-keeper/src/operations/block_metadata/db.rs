@@ -358,7 +358,7 @@ impl DBSlotInfo {
              FROM slot_info
              WHERE state = ? AND absolute_slot < ?
              ORDER BY absolute_slot ASC
-             LIMIT 100000",
+             LIMIT 10000",
         )?;
 
         // Execute query with parameters
