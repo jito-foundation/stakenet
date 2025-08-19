@@ -238,6 +238,7 @@ fn load_cached_data(cache_file: &std::path::Path) -> Result<CachedBacktestData> 
 pub async fn run_backtest_with_cached_data(
     cached_data: &CachedBacktestData,
     target_epochs: Vec<u64>,
+    use_production_scoring: bool,
 ) -> Result<Vec<BacktestResult>> {
     use anchor_lang::AccountDeserialize;
     use jito_steward::Config;
@@ -309,8 +310,12 @@ pub async fn run_backtest_with_cached_data(
                         TVC_ACTIVATION_EPOCH,
                     );
 
-                    // For MEV strategy, use mev_ranking_score as the comparison score
-                    let score_for_backtest_comparison = mev_ranking_score;
+                    // Set comparison score based on scoring strategy
+                    let score_for_backtest_comparison = if use_production_scoring {
+                        score.score  // Production uses overall score
+                    } else {
+                        mev_ranking_score  // MEV strategy uses MEV ranking
+                    };
 
                     let result = ValidatorScoreResult::from_components(
                         score,
@@ -347,19 +352,26 @@ pub async fn run_backtest_with_cached_data(
             }
         }
 
-        // Sort by MEV commission first, then by validator age as tiebreaker
-        validator_scores.sort_by(|a, b| {
-            // Primary: Compare MEV ranking scores (higher = better, meaning lower MEV commission)
-            match b.mev_ranking_score.partial_cmp(&a.mev_ranking_score) {
-                Some(std::cmp::Ordering::Equal) => {
-                    // Tiebreaker: Compare validator age (higher = better, meaning more consecutive epochs)
-                    b.validator_age
-                        .partial_cmp(&a.validator_age)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+        // Sort based on scoring strategy
+        if use_production_scoring {
+            // Production: Sort by overall score descending
+            validator_scores.sort_by(|a, b| {
+                b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+            });
+        } else {
+            // MEV strategy: Sort by MEV commission first, then by validator age as tiebreaker
+            validator_scores.sort_by(|a, b| {
+                match b.mev_ranking_score.partial_cmp(&a.mev_ranking_score) {
+                    Some(std::cmp::Ordering::Equal) => {
+                        // Tiebreaker: Compare validator age
+                        b.validator_age
+                            .partial_cmp(&a.validator_age)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                    other => other.unwrap_or(std::cmp::Ordering::Equal),
                 }
-                other => other.unwrap_or(std::cmp::Ordering::Equal),
-            }
-        });
+            });
+        }
 
         info!(
             "Epoch {} complete: {} validators scored, {} skipped",
@@ -466,8 +478,18 @@ pub async fn command_view_backtest(
 
     info!("Starting backtest analysis for epochs: {:?}", target_epochs);
 
+    // Log scoring strategy being used
+    info!(
+        "Using {} scoring strategy",
+        if args.use_production_scoring {
+            "production"
+        } else {
+            "MEV commission + validator age"
+        }
+    );
+    
     // Run backtest with cached data
-    let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
+    let results = run_backtest_with_cached_data(&cached_data, target_epochs, args.use_production_scoring).await?;
 
     info!("Backtest analysis complete for {} epochs", results.len());
 

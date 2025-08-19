@@ -366,6 +366,10 @@ pub struct BacktestParameters {
     #[arg(long, default_value = "false")]
     pub force_fetch: bool,
 
+    /// Use production scoring (default is MEV commission + validator age)
+    #[arg(long, default_value = "false")]
+    pub use_production_scoring: bool,
+
     /// Output file for saving results in JSON format (required)
     #[arg(long)]
     pub output_file: PathBuf,
