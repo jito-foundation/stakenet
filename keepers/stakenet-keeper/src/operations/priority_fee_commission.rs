@@ -152,8 +152,11 @@ pub async fn update_priority_fee_commission(
                         && entry.priority_fee_merkle_root_upload_authority == MerkleRootUploadAuthority::Unset
                 });
                 if !should_update {
+                    info!("Skipping {} {}", vote_account, epoch);
                     return None;
                 }
+            } else {
+                info!("No validator history found {} {}", vote_account, epoch)
             }
 
             Some(
