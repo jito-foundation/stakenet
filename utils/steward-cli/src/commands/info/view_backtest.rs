@@ -43,10 +43,65 @@ pub struct ValidatorScoreResult {
     pub commission_score: f64,
     pub historical_commission_score: f64,
     pub vote_credits_ratio: f64,
+    pub mev_ranking_score: f64, // New: 1.0 - (max_mev_commission / 10000.0)
+    pub validator_age: f64,     // New: consecutive voting epochs above threshold
+}
+
+/// Calculate validator age as consecutive epochs above voting threshold
+fn calculate_validator_age(
+    validator_history: &validator_history::ValidatorHistory,
+    cluster_history: &validator_history::ClusterHistory,
+    current_epoch: u16,
+    voting_threshold: f64,
+    tvc_activation_epoch: u64,
+) -> f64 {
+    let mut consecutive_epochs = 0.0;
+
+    // Go backwards from current epoch - 1 (exclude current epoch like epoch credits window)
+    for i in 1..=current_epoch.saturating_sub(1) {
+        let epoch = current_epoch.saturating_sub(i);
+
+        // Get vote credits ratio for this epoch
+        let epoch_credits_window = validator_history.history.epoch_credits_range_normalized(
+            epoch,
+            epoch,
+            tvc_activation_epoch,
+        );
+
+        let total_blocks_window = cluster_history.history.total_blocks_range(epoch, epoch);
+
+        // Check if we have data for this epoch
+        if let (Some(credits), Some(blocks)) = (
+            epoch_credits_window.first().and_then(|&c| c),
+            total_blocks_window.first().and_then(|&b| b),
+        ) {
+            if blocks > 0 {
+                let ratio =
+                    credits as f64 / (blocks * validator_history::constants::TVC_MULTIPLIER) as f64;
+                if ratio >= voting_threshold {
+                    consecutive_epochs += 1.0;
+                } else {
+                    break; // Stop at first failure
+                }
+            } else {
+                break; // Stop if no blocks data
+            }
+        } else {
+            break; // Stop if no data
+        }
+    }
+
+    consecutive_epochs
 }
 
 impl ValidatorScoreResult {
-    fn from_components(components: ScoreComponentsV3, vote_account: Pubkey, index: usize) -> Self {
+    fn from_components(
+        components: ScoreComponentsV3,
+        vote_account: Pubkey,
+        index: usize,
+        mev_ranking_score: f64,
+        validator_age: f64,
+    ) -> Self {
         ValidatorScoreResult {
             vote_account,
             validator_index: index,
@@ -60,6 +115,8 @@ impl ValidatorScoreResult {
             commission_score: components.commission_score,
             historical_commission_score: components.historical_commission_score,
             vote_credits_ratio: components.vote_credits_ratio,
+            mev_ranking_score,
+            validator_age,
         }
     }
 }
@@ -241,7 +298,26 @@ pub async fn run_backtest_with_cached_data(
                 TVC_ACTIVATION_EPOCH,
             ) {
                 Ok(score) => {
-                    let result = ValidatorScoreResult::from_components(score, *vote_account, i);
+                    // Calculate MEV ranking score (1.0 - max_mev_commission / 10000.0)
+                    let mev_ranking_score =
+                        1.0 - (score.details.max_mev_commission as f64 / 10000.0);
+
+                    // Calculate validator age (consecutive voting epochs above threshold)
+                    let validator_age = calculate_validator_age(
+                        &validator_history,
+                        &cluster_history,
+                        *epoch as u16,
+                        config.parameters.scoring_delinquency_threshold_ratio,
+                        TVC_ACTIVATION_EPOCH,
+                    );
+
+                    let result = ValidatorScoreResult::from_components(
+                        score,
+                        *vote_account,
+                        i,
+                        mev_ranking_score,
+                        validator_age,
+                    );
                     validator_scores.push(result);
                     scored_count += 1;
                 }
@@ -269,8 +345,19 @@ pub async fn run_backtest_with_cached_data(
             }
         }
 
-        // Sort by score descending
-        validator_scores.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        // Sort by MEV commission first, then by validator age as tiebreaker
+        validator_scores.sort_by(|a, b| {
+            // Primary: Compare MEV ranking scores (higher = better, meaning lower MEV commission)
+            match b.mev_ranking_score.partial_cmp(&a.mev_ranking_score) {
+                Some(std::cmp::Ordering::Equal) => {
+                    // Tiebreaker: Compare validator age (higher = better, meaning more consecutive epochs)
+                    b.validator_age
+                        .partial_cmp(&a.validator_age)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                }
+                other => other.unwrap_or(std::cmp::Ordering::Equal),
+            }
+        });
 
         info!(
             "Epoch {} complete: {} validators scored, {} skipped",
@@ -342,6 +429,13 @@ pub async fn command_view_backtest(
     program_id: Pubkey,
     args: BacktestParameters,
 ) -> Result<()> {
+    // Check if output file already exists
+    if args.output_file.exists() {
+        return Err(anyhow::anyhow!(
+            "Output file {:?} already exists. Please choose a different filename or delete the existing file.",
+            args.output_file
+        ));
+    }
     // Determine cache file path
     let cache_file = args.cache_file.as_ref().map(|p| p.as_path());
 
@@ -425,14 +519,15 @@ pub async fn command_view_backtest(
     let report = generate_comparison_report(&results);
     println!("{}", report);
 
-    // Optionally save results to file
-    if let Some(output_file) = args.output_file {
-        info!("Saving detailed results to file...");
-        let json = serde_json::to_string_pretty(&results)?;
-        let json_len = json.len();
-        fs::write(&output_file, json)?;
-        info!("Results saved to {:?} ({} bytes)", output_file, json_len);
-    }
+    // Save results to file
+    info!("Saving detailed results to file...");
+    let json = serde_json::to_string_pretty(&results)?;
+    let json_len = json.len();
+    fs::write(&args.output_file, json)?;
+    info!(
+        "Results saved to {:?} ({} bytes)",
+        args.output_file, json_len
+    );
 
     info!("Backtest complete!");
 

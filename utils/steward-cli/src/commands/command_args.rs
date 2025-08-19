@@ -243,6 +243,7 @@ pub enum Commands {
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewBacktest(ViewBacktest),
+    DiffBacktest(DiffBacktest),
 
     // Actions
     InitSteward(InitSteward),
@@ -328,6 +329,18 @@ pub struct ViewBacktest {
 }
 
 #[derive(Parser)]
+#[command(about = "Compare results from two backtest runs")]
+pub struct DiffBacktest {
+    /// First backtest results file
+    #[arg(long)]
+    pub file1: PathBuf,
+
+    /// Second backtest results file  
+    #[arg(long)]
+    pub file2: PathBuf,
+}
+
+#[derive(Parser)]
 pub struct BacktestParameters {
     /// Steward config account
     #[arg(
@@ -353,9 +366,9 @@ pub struct BacktestParameters {
     #[arg(long, default_value = "false")]
     pub force_fetch: bool,
 
-    /// Output file for saving results in JSON format
-    #[arg(long, default_value = "backtest_results.json")]
-    pub output_file: Option<PathBuf>,
+    /// Output file for saving results in JSON format (required)
+    #[arg(long)]
+    pub output_file: PathBuf,
 }
 
 // ---------- ACTIONS ------------
