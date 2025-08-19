@@ -354,8 +354,8 @@ pub struct BacktestParameters {
     #[arg(long)]
     pub start_epoch: Option<u64>,
 
-    /// Number of epochs to look back from start epoch (defaults to 3)
-    #[arg(long, default_value = "3")]
+    /// Number of epochs to look back from start epoch (defaults to 10)
+    #[arg(long, default_value = "10")]
     pub lookback_epochs: u64,
 
     /// Path to cache file for storing/loading fetched data
