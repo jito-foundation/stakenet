@@ -187,7 +187,7 @@ pub async fn update_priority_fee_commission(
         retry_count,
         confirmation_time,
         None,
-        10,
+        8,
     )
     .await;
 
