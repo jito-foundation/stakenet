@@ -353,12 +353,13 @@ impl DBSlotInfo {
     ) -> Result<Vec<u64>, BlockMetadataKeeperError> {
         // Prepare query to find slots in Created state before current_slot
         // Ordered by absolute_slot ASC (oldest first) with a limit
+        //TODO return back to 100000
         let mut statement = connection.prepare(
             "SELECT absolute_slot
              FROM slot_info
              WHERE state = ? AND absolute_slot < ?
              ORDER BY absolute_slot ASC
-             LIMIT 10000",
+             LIMIT 100000",
         )?;
 
         // Execute query with parameters
