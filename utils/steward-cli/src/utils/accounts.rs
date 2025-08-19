@@ -129,3 +129,73 @@ pub fn get_validator_history_config_address(validator_history_program_id: &Pubke
 
     address
 }
+
+pub async fn get_cluster_history(
+    client: &RpcClient,
+    validator_history_program_id: &Pubkey,
+) -> Result<ClusterHistory> {
+    let cluster_history_address = get_cluster_history_address(validator_history_program_id);
+    let cluster_history_account_raw = client.get_account(&cluster_history_address).await?;
+
+    Ok(ClusterHistory::try_deserialize(
+        &mut cluster_history_account_raw.data.as_slice(),
+    )?)
+}
+
+pub async fn get_validator_history_accounts_with_retry(
+    client: &RpcClient,
+    validator_history_program_id: &Pubkey,
+    vote_accounts: Vec<Pubkey>,
+) -> Result<Vec<(Pubkey, ValidatorHistory)>> {
+    let mut validator_histories = Vec::new();
+
+    for vote_account in vote_accounts {
+        let validator_history_address =
+            get_validator_history_address(&vote_account, validator_history_program_id);
+
+        // Try to fetch with retries
+        let mut attempts = 0;
+        const MAX_ATTEMPTS: u32 = 3;
+
+        loop {
+            match client.get_account(&validator_history_address).await {
+                Ok(account_data) => {
+                    match ValidatorHistory::try_deserialize(&mut account_data.data.as_slice()) {
+                        Ok(history) => {
+                            validator_histories.push((vote_account, history));
+                            break;
+                        }
+                        Err(e) => {
+                            // Log but continue - validator may not have history account
+                            log::debug!(
+                                "Could not deserialize validator history for {}: {:?}",
+                                vote_account,
+                                e
+                            );
+                            // Skip validators without valid history
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    attempts += 1;
+                    if attempts >= MAX_ATTEMPTS {
+                        // Log but continue - validator may not have history account
+                        log::debug!(
+                            "Could not fetch validator history for {} after {} attempts: {:?}",
+                            vote_account,
+                            MAX_ATTEMPTS,
+                            e
+                        );
+                        // Skip validators without history account
+                        break;
+                    }
+                    // Wait before retry
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
+    }
+
+    Ok(validator_histories)
+}

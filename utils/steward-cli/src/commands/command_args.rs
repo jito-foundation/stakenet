@@ -242,6 +242,7 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewBacktest(ViewBacktest),
 
     // Actions
     InitSteward(InitSteward),
@@ -317,6 +318,36 @@ pub struct ViewPriorityFeeConfig {
 pub struct ViewNextIndexToRemove {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Run backtests on past epochs with current or modified scoring parameters")]
+pub struct ViewBacktest {
+    #[command(flatten)]
+    pub backtest_parameters: BacktestParameters,
+}
+
+#[derive(Parser)]
+pub struct BacktestParameters {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Target epochs to backtest (comma-separated list, e.g., "690,691,692")
+    #[arg(long, value_delimiter = ',')]
+    pub target_epochs: Option<Vec<u64>>,
+
+    /// Path to cache file for storing/loading fetched data
+    #[arg(long)]
+    pub cache_file: Option<PathBuf>,
+
+    /// Force fetching fresh data even if cache exists
+    #[arg(long, default_value = "false")]
+    pub force_fetch: bool,
+
+    /// Output file for saving results in JSON format
+    #[arg(long)]
+    pub output_file: Option<PathBuf>,
 }
 
 // ---------- ACTIONS ------------
