@@ -37,7 +37,7 @@ impl Default for ValidatorMetadata {
 
 #[derive(Debug, Deserialize)]
 struct ValidatorsAppResponse {
-    pub vote_account: String,         // vote account pubkey
+    pub vote_account: String, // vote account pubkey
     pub name: Option<String>,
     pub www_url: Option<String>,
     pub keybase_id: Option<String>,
@@ -139,12 +139,7 @@ async fn fetch_validator_metadata_from_api(
     let client = Client::new();
     let url = "https://www.validators.app/api/v1/validators/mainnet.json";
 
-    let response = match client
-        .get(url)
-        .header("Token", &api_token)
-        .send()
-        .await
-    {
+    let response = match client.get(url).header("Token", &api_token).send().await {
         Ok(resp) => resp,
         Err(e) => {
             info!("Failed to fetch from validators.app API: {:?}", e);
@@ -160,13 +155,14 @@ async fn fetch_validator_metadata_from_api(
         }
     };
 
-    info!("Received {} validators from validators.app API", validators.len());
+    info!(
+        "Received {} validators from validators.app API",
+        validators.len()
+    );
 
     // Create lookup map for vote accounts we care about
-    let vote_account_set: std::collections::HashSet<String> = vote_accounts
-        .iter()
-        .map(|v| v.to_string())
-        .collect();
+    let vote_account_set: std::collections::HashSet<String> =
+        vote_accounts.iter().map(|v| v.to_string()).collect();
 
     let mut metadata_map = HashMap::new();
     let mut found_count = 0;
@@ -187,8 +183,7 @@ async fn fetch_validator_metadata_from_api(
             if found_count <= 10 {
                 info!(
                     "✅ Found validator {} -> {:?}",
-                    validator.vote_account,
-                    validator.name
+                    validator.vote_account, validator.name
                 );
             }
         }
@@ -451,9 +446,9 @@ pub async fn run_backtest_with_cached_data(
 
                     // Set comparison score based on scoring strategy
                     let score_for_backtest_comparison = if use_production_scoring {
-                        score.score  // Production uses overall score
+                        score.score // Production uses overall score
                     } else {
-                        mev_ranking_score  // MEV strategy uses MEV ranking
+                        mev_ranking_score // MEV strategy uses MEV ranking
                     };
 
                     // Get metadata for this validator
@@ -503,7 +498,9 @@ pub async fn run_backtest_with_cached_data(
         if use_production_scoring {
             // Production: Sort by overall score descending
             validator_scores.sort_by(|a, b| {
-                b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
         } else {
             // MEV strategy: Sort by MEV commission first, then by validator age as tiebreaker
@@ -612,7 +609,7 @@ pub async fn command_view_backtest(
     // Find the most recent rebalancing epoch at or before start_epoch
     let rebalancing_interval = 10u64;
     let latest_rebalancing_epoch = (start_epoch / rebalancing_interval) * rebalancing_interval;
-    
+
     let mut target_epochs = Vec::new();
     for i in 0..args.lookback_epochs {
         if let Some(epoch) = latest_rebalancing_epoch.checked_sub(i * rebalancing_interval) {
@@ -634,9 +631,11 @@ pub async fn command_view_backtest(
             "MEV commission + validator age"
         }
     );
-    
+
     // Run backtest with cached data
-    let results = run_backtest_with_cached_data(&cached_data, target_epochs, args.use_production_scoring).await?;
+    let results =
+        run_backtest_with_cached_data(&cached_data, target_epochs, args.use_production_scoring)
+            .await?;
 
     info!("Backtest analysis complete for {} epochs", results.len());
 

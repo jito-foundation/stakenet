@@ -99,7 +99,6 @@ struct ScoreDistribution {
     file2_deciles: Vec<f64>,
 }
 
-
 /// Compare results from two backtest runs
 pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
     println!("🔍 Analyzing differences between backtest strategies...\n");
@@ -171,13 +170,15 @@ fn analyze_scoring_strategies(
     }
 
     // Analyze File 1 scoring characteristics
-    let file1_scores: Vec<f64> = epoch1.validator_scores
+    let file1_scores: Vec<f64> = epoch1
+        .validator_scores
         .iter()
         .take(100)
         .map(|v| v.score_for_backtest_comparison)
         .collect();
 
-    let file2_scores: Vec<f64> = epoch2.validator_scores
+    let file2_scores: Vec<f64> = epoch2
+        .validator_scores
         .iter()
         .take(100)
         .map(|v| v.score_for_backtest_comparison)
@@ -186,26 +187,28 @@ fn analyze_scoring_strategies(
     // Determine if scores look like production (continuous) vs MEV (discrete)
     let file1_unique_scores: std::collections::HashSet<_> = file1_scores
         .iter()
-        .map(|&f| (f * 10000.0) as i32)  // Round to 4 decimal places
+        .map(|&f| (f * 10000.0) as i32) // Round to 4 decimal places
         .collect();
 
     let file2_unique_scores: std::collections::HashSet<_> = file2_scores
         .iter()
-        .map(|&f| (f * 100.0) as i32)  // Round to 2 decimal places for MEV scores
+        .map(|&f| (f * 100.0) as i32) // Round to 2 decimal places for MEV scores
         .collect();
 
     println!("🎯 SCORING STRATEGY ANALYSIS");
     println!("═══════════════════════════════════════════════════════════");
-    
+
     // Check if file2 has MEV-style discrete scores
-    let file2_has_mev_pattern = file2_unique_scores.len() <= 5 && 
-        file2_scores.iter().any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
+    let file2_has_mev_pattern = file2_unique_scores.len() <= 5
+        && file2_scores
+            .iter()
+            .any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
 
     if file2_has_mev_pattern {
         println!("📊 File 1: Production Scoring (continuous yield-based scores)");
         println!("📊 File 2: MEV Commission Strategy (discrete commission-based scores)");
         println!("   • 1.0 = 0% MEV commission");
-        println!("   • 0.92 = 8% MEV commission"); 
+        println!("   • 0.92 = 8% MEV commission");
         println!("   • 0.9 = 10% MEV commission");
     } else {
         println!("📊 File 1: Strategy A (continuous scores)");
@@ -213,23 +216,43 @@ fn analyze_scoring_strategies(
     }
 
     println!("📈 Score Characteristics:");
-    println!("   File 1: {} unique score values in sample", file1_unique_scores.len());
-    println!("   File 2: {} unique score values in sample", file2_unique_scores.len());
-    
-    let file1_range = file1_scores.iter().fold((f64::INFINITY, f64::NEG_INFINITY), 
-        |(min, max), &x| (min.min(x), max.max(x)));
-    let file2_range = file2_scores.iter().fold((f64::INFINITY, f64::NEG_INFINITY), 
-        |(min, max), &x| (min.min(x), max.max(x)));
-    
-    println!("   File 1 range: {:.6} - {:.6}", file1_range.0, file1_range.1);
-    println!("   File 2 range: {:.6} - {:.6}", file2_range.0, file2_range.1);
-    
+    println!(
+        "   File 1: {} unique score values in sample",
+        file1_unique_scores.len()
+    );
+    println!(
+        "   File 2: {} unique score values in sample",
+        file2_unique_scores.len()
+    );
+
+    let file1_range = file1_scores
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &x| {
+            (min.min(x), max.max(x))
+        });
+    let file2_range = file2_scores
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &x| {
+            (min.min(x), max.max(x))
+        });
+
+    println!(
+        "   File 1 range: {:.6} - {:.6}",
+        file1_range.0, file1_range.1
+    );
+    println!(
+        "   File 2 range: {:.6} - {:.6}",
+        file2_range.0, file2_range.1
+    );
+
     if file2_has_mev_pattern {
-        println!("\n⚠️  NOTE: High churn is expected when comparing continuous vs discrete scoring!");
+        println!(
+            "\n⚠️  NOTE: High churn is expected when comparing continuous vs discrete scoring!"
+        );
         println!("   Production scoring creates fine-grained rankings, while MEV strategy");
         println!("   groups validators into commission tiers, causing major rank changes.");
     }
-    
+
     println!();
     Ok(())
 }
@@ -272,8 +295,14 @@ fn analyze_epoch(
     let added_to_top_400 = file2_top_400_keys.difference(&file1_top_400_keys).count();
 
     // Get the actual validator objects for dropped/added lists
-    let dropped_keys: HashSet<_> = file1_top_400_keys.difference(&file2_top_400_keys).cloned().collect();
-    let added_keys: HashSet<_> = file2_top_400_keys.difference(&file1_top_400_keys).cloned().collect();
+    let dropped_keys: HashSet<_> = file1_top_400_keys
+        .difference(&file2_top_400_keys)
+        .cloned()
+        .collect();
+    let added_keys: HashSet<_> = file2_top_400_keys
+        .difference(&file1_top_400_keys)
+        .cloned()
+        .collect();
 
     let dropped_validators: Vec<_> = file1_top_400_validators
         .into_iter()
@@ -305,7 +334,6 @@ fn analyze_epoch(
         .map(|v| v.score_for_backtest_comparison)
         .collect();
 
-
     let score_distribution = ScoreDistribution {
         file2_deciles: calculate_deciles(&file2_scores),
     };
@@ -330,8 +358,11 @@ fn calculate_deciles(scores: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-
-fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJson, epoch2: &BacktestResultJson) {
+fn print_epoch_analysis(
+    comparison: &EpochComparison,
+    epoch1: &BacktestResultJson,
+    epoch2: &BacktestResultJson,
+) {
     println!("═══════════════════════════════════════════════════════════");
     println!("📊 EPOCH {} ANALYSIS", comparison.epoch);
     println!("═══════════════════════════════════════════════════════════");
@@ -351,10 +382,7 @@ fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJso
     );
     println!(
         "  • Churn rate: {:.1}%",
-        (comparison.top_400_churn.dropped_from_top_400 + comparison.top_400_churn.added_to_top_400)
-            as f64
-            / 400.0
-            * 100.0
+        comparison.top_400_churn.dropped_from_top_400 as f64 / 400.0 * 100.0
     );
 
     if !comparison.top_400_churn.dropped_validators.is_empty() {
@@ -367,8 +395,9 @@ fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJso
             .enumerate()
         {
             let mev_commission_pct = (1.0 - validator.mev_ranking_score) * 100.0;
-            println!("  {}. {} [MEV: {:.0}%]", 
-                i + 1, 
+            println!(
+                "  {}. {} [MEV: {:.0}%]",
+                i + 1,
                 format_validator_display(validator),
                 mev_commission_pct
             );
@@ -391,8 +420,9 @@ fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJso
             .enumerate()
         {
             let mev_commission_pct = (1.0 - validator.mev_ranking_score) * 100.0;
-            println!("  {}. {} [MEV: {:.0}%]", 
-                i + 1, 
+            println!(
+                "  {}. {} [MEV: {:.0}%]",
+                i + 1,
                 format_validator_display(validator),
                 mev_commission_pct
             );
@@ -407,48 +437,66 @@ fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJso
 
     // Add vote credit ratio analysis for top 400
     println!("\n📊 VOTE CREDIT RATIO DECILES (Top 400):");
-    let file1_top_400_vote_ratios: Vec<f64> = epoch1.validator_scores
+    let file1_top_400_vote_ratios: Vec<f64> = epoch1
+        .validator_scores
         .iter()
         .take(400)
         .map(|v| v.vote_credits_ratio)
         .collect();
-    let file2_top_400_vote_ratios: Vec<f64> = epoch2.validator_scores
+    let file2_top_400_vote_ratios: Vec<f64> = epoch2
+        .validator_scores
         .iter()
         .take(400)
         .map(|v| v.vote_credits_ratio)
         .collect();
-    
+
     let file1_vote_deciles = calculate_deciles(&file1_top_400_vote_ratios);
     let file2_vote_deciles = calculate_deciles(&file2_top_400_vote_ratios);
-    
-    println!("  File 1 vote credit ratios: {:?}", 
-             file1_vote_deciles.iter().map(|&x| format!("{:.4}", x)).collect::<Vec<_>>());
-    println!("  File 2 vote credit ratios: {:?}", 
-             file2_vote_deciles.iter().map(|&x| format!("{:.4}", x)).collect::<Vec<_>>());
+
+    println!(
+        "  File 1 vote credit ratios: {:?}",
+        file1_vote_deciles
+            .iter()
+            .map(|&x| format!("{:.4}", x))
+            .collect::<Vec<_>>()
+    );
+    println!(
+        "  File 2 vote credit ratios: {:?}",
+        file2_vote_deciles
+            .iter()
+            .map(|&x| format!("{:.4}", x))
+            .collect::<Vec<_>>()
+    );
 
     // Add MEV tier analysis if this looks like MEV vs production comparison
     let file2_scores: Vec<f64> = comparison.score_distribution.file2_deciles.clone();
-    let has_mev_pattern = file2_scores.iter().any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
-    
+    let has_mev_pattern = file2_scores
+        .iter()
+        .any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
+
     if has_mev_pattern {
         println!("\n🎯 MEV COMMISSION TIER ANALYSIS (File 2):");
-        
+
         // Show some examples of high-performing validators that got dropped due to MEV commission
         println!("💡 HIGH-YIELD VALIDATORS DROPPED (MEV commission > 0%):");
-        let high_yield_dropped: Vec<_> = comparison.top_400_churn.dropped_validators.iter()
-            .filter(|v| v.yield_score > 0.995)  // High yield score
+        let high_yield_dropped: Vec<_> = comparison
+            .top_400_churn
+            .dropped_validators
+            .iter()
+            .filter(|v| v.yield_score > 0.995) // High yield score
             .take(5)
             .collect();
-            
+
         for (i, validator) in high_yield_dropped.iter().enumerate() {
-            println!("  {}. {} (yield: {:.4}, MEV: {:.0}%)", 
-                i + 1, 
+            println!(
+                "  {}. {} (yield: {:.4}, MEV: {:.0}%)",
+                i + 1,
                 format_validator_display(validator),
                 validator.yield_score,
                 (1.0 - validator.mev_ranking_score) * 100.0
             );
         }
-        
+
         // Add comprehensive bucket analysis for File 2 (MEV strategy)
         println!("\n📊 FULL MEV SCORE DISTRIBUTION (File 2):");
         analyze_mev_score_buckets(epoch2);
@@ -459,50 +507,66 @@ fn print_epoch_analysis(comparison: &EpochComparison, epoch1: &BacktestResultJso
 
 fn analyze_mev_score_buckets(epoch: &BacktestResultJson) {
     use std::collections::BTreeMap;
-    
+
     // Group all validators by exact score_for_backtest_comparison value
     let mut score_buckets: BTreeMap<String, (usize, f64)> = BTreeMap::new();
-    
+
     for validator in &epoch.validator_scores {
         let score = validator.score_for_backtest_comparison;
         let score_key = format!("{:.6}", score); // Exact score as key
         let entry = score_buckets.entry(score_key).or_insert((0, score));
         entry.0 += 1;
     }
-    
+
     // Convert to sorted vector (highest score first)
     let mut sorted_buckets: Vec<_> = score_buckets.into_iter().collect();
-    sorted_buckets.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap_or(std::cmp::Ordering::Equal));
-    
+    sorted_buckets.sort_by(|a, b| {
+        b.1 .1
+            .partial_cmp(&a.1 .1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     // Print exact score distribution
-    println!("  Exact score buckets (total {} validators, sorted by score):", epoch.validator_scores.len());
+    println!(
+        "  Exact score buckets (total {} validators, sorted by score):",
+        epoch.validator_scores.len()
+    );
     for (score_key, (count, score_val)) in &sorted_buckets {
         let percentage = *count as f64 / epoch.validator_scores.len() as f64 * 100.0;
         let commission_pct = (1.0 - score_val) * 100.0;
-        println!("    • {} ({:.0}% MEV commission): {} validators ({:.1}%)", 
-                 score_key, commission_pct, count, percentage);
+        println!(
+            "    • {} ({:.0}% MEV commission): {} validators ({:.1}%)",
+            score_key, commission_pct, count, percentage
+        );
     }
-    
+
     // Show top 400 qualification
     let mut top_400_scores: BTreeMap<String, (usize, f64)> = BTreeMap::new();
     for validator in epoch.validator_scores.iter().take(400) {
         let score_key = format!("{:.6}", validator.score_for_backtest_comparison);
-        let entry = top_400_scores.entry(score_key).or_insert((0, validator.score_for_backtest_comparison));
+        let entry = top_400_scores
+            .entry(score_key)
+            .or_insert((0, validator.score_for_backtest_comparison));
         entry.0 += 1;
     }
-    
+
     // Convert to sorted vector (highest score first)
     let mut sorted_top_400: Vec<_> = top_400_scores.into_iter().collect();
-    sorted_top_400.sort_by(|a, b| b.1.1.partial_cmp(&a.1.1).unwrap_or(std::cmp::Ordering::Equal));
-    
+    sorted_top_400.sort_by(|a, b| {
+        b.1 .1
+            .partial_cmp(&a.1 .1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
     println!("  Top 400 breakdown (sorted by score):");
     for (score_key, (count, score_val)) in &sorted_top_400 {
         let commission_pct = (1.0 - score_val) * 100.0;
-        println!("    • {} ({:.0}% MEV commission): {} validators in top 400", 
-                 score_key, commission_pct, count);
+        println!(
+            "    • {} ({:.0}% MEV commission): {} validators in top 400",
+            score_key, commission_pct, count
+        );
     }
 }
-
 
 fn print_overall_summary(
     file1_data: &[BacktestResultJson],
@@ -516,9 +580,8 @@ fn print_overall_summary(
 
     for (epoch1, epoch2) in file1_data.iter().zip(file2_data.iter()) {
         let comparison = analyze_epoch(epoch1, epoch2)?;
-        total_churn += comparison.top_400_churn.dropped_from_top_400
-            + comparison.top_400_churn.added_to_top_400;
-        total_opportunities += 800; // 400 slots × 2 (drop + add)
+        total_churn += comparison.top_400_churn.dropped_from_top_400;
+        total_opportunities += 400; // 400 slots
     }
 
     let average_churn_rate = total_churn as f64 / total_opportunities as f64 * 100.0;
