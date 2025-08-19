@@ -56,51 +56,37 @@ where
     serializer.serialize_str(&pubkey.to_string())
 }
 
-/// Calculate validator age as consecutive epochs above voting threshold
+/// Calculate validator age as number of epochs with non-null vote credits
 fn calculate_validator_age(
     validator_history: &validator_history::ValidatorHistory,
-    cluster_history: &validator_history::ClusterHistory,
+    _cluster_history: &validator_history::ClusterHistory,
     current_epoch: u16,
-    voting_threshold: f64,
+    _voting_threshold: f64,
     tvc_activation_epoch: u64,
 ) -> f64 {
-    let mut consecutive_epochs = 0.0;
+    let mut epochs_with_votes = 0.0;
 
     // Go backwards from current epoch - 1 (exclude current epoch like epoch credits window)
     for i in 1..=current_epoch.saturating_sub(1) {
         let epoch = current_epoch.saturating_sub(i);
 
-        // Get vote credits ratio for this epoch
+        // Get vote credits for this epoch
         let epoch_credits_window = validator_history.history.epoch_credits_range_normalized(
             epoch,
             epoch,
             tvc_activation_epoch,
         );
 
-        let total_blocks_window = cluster_history.history.total_blocks_range(epoch, epoch);
-
-        // Check if we have data for this epoch
-        if let (Some(credits), Some(blocks)) = (
-            epoch_credits_window.first().and_then(|&c| c),
-            total_blocks_window.first().and_then(|&b| b),
-        ) {
-            if blocks > 0 {
-                let ratio =
-                    credits as f64 / (blocks * validator_history::constants::TVC_MULTIPLIER) as f64;
-                if ratio >= voting_threshold {
-                    consecutive_epochs += 1.0;
-                } else {
-                    break; // Stop at first failure
-                }
-            } else {
-                break; // Stop if no blocks data
+        // If we have any vote credits data for this epoch, count it
+        if let Some(Some(credits)) = epoch_credits_window.first() {
+            if *credits > 0 {
+                epochs_with_votes += 1.0;
             }
-        } else {
-            break; // Stop if no data
         }
+        // Continue counting even if there are gaps (no break)
     }
 
-    consecutive_epochs
+    epochs_with_votes
 }
 
 impl ValidatorScoreResult {
