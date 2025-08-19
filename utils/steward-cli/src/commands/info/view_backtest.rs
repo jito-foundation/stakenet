@@ -37,15 +37,10 @@ impl Default for ValidatorMetadata {
 
 #[derive(Debug, Deserialize)]
 struct ValidatorsAppResponse {
-    pub account: Option<String>,      // identity pubkey
     pub vote_account: String,         // vote account pubkey
     pub name: Option<String>,
     pub www_url: Option<String>,
     pub keybase_id: Option<String>,
-    // Include other fields we might want
-    pub active_stake: Option<u64>,
-    pub commission: Option<f64>,
-    pub delinquent: Option<bool>,
 }
 
 // Cached data structure that stores raw account data
@@ -417,14 +412,29 @@ pub async fn run_backtest_with_cached_data(
                 continue;
             }
 
+            // For MEV strategy, use 99% delinquency threshold
+            let scoring_config = if use_production_scoring {
+                config.clone()
+            } else {
+                let mut mev_config = config.clone();
+                mev_config.parameters.scoring_delinquency_threshold_ratio = 0.99;
+                mev_config
+            };
+
             match validator_score(
                 &validator_history,
                 &cluster_history,
-                &config,
+                &scoring_config,
                 *epoch as u16,
                 TVC_ACTIVATION_EPOCH,
             ) {
                 Ok(score) => {
+                    // For MEV strategy, filter out validators that fail delinquency check
+                    if !use_production_scoring && score.delinquency_score == 0.0 {
+                        skipped_count += 1;
+                        continue;
+                    }
+
                     // Calculate MEV ranking score (1.0 - max_mev_commission / 10000.0)
                     let mev_ranking_score =
                         1.0 - (score.details.max_mev_commission as f64 / 10000.0);
