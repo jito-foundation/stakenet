@@ -31,6 +31,7 @@ pub struct BacktestResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ValidatorScoreResult {
+    #[serde(serialize_with = "serialize_pubkey_as_base58")]
     pub vote_account: Pubkey,
     pub validator_index: usize,
     pub score: f64,
@@ -46,6 +47,13 @@ pub struct ValidatorScoreResult {
     pub mev_ranking_score: f64, // New: 1.0 - (max_mev_commission / 10000.0)
     pub validator_age: f64,     // New: consecutive voting epochs above threshold
     pub score_for_backtest_comparison: f64, // Consistent comparison metric across strategies
+}
+
+fn serialize_pubkey_as_base58<S>(pubkey: &Pubkey, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&pubkey.to_string())
 }
 
 /// Calculate validator age as consecutive epochs above voting threshold
@@ -454,10 +462,14 @@ pub async fn command_view_backtest(
         cached_data.fetched_epoch.saturating_sub(1)
     };
 
-    // Calculate target epochs from start epoch going backwards
+    // Calculate target epochs aligned with rebalancing schedule (every 10 epochs)
+    // Find the most recent rebalancing epoch at or before start_epoch
+    let rebalancing_interval = 10u64;
+    let latest_rebalancing_epoch = (start_epoch / rebalancing_interval) * rebalancing_interval;
+    
     let mut target_epochs = Vec::new();
     for i in 0..args.lookback_epochs {
-        if let Some(epoch) = start_epoch.checked_sub(i) {
+        if let Some(epoch) = latest_rebalancing_epoch.checked_sub(i * rebalancing_interval) {
             target_epochs.push(epoch);
         }
     }
