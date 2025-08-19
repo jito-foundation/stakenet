@@ -21,7 +21,6 @@ pub struct CachedBacktestData {
     pub config_account: Account,
     pub cluster_history_account: Account,
     pub validator_histories: Vec<(Pubkey, Account)>,
-    pub validator_list_account: Account,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,64 +66,84 @@ impl ValidatorScoreResult {
 
 async fn fetch_and_cache_data(
     client: &RpcClient,
-    program_id: &Pubkey,
+    _program_id: &Pubkey,
     steward_config: &Pubkey,
     cache_file: Option<&std::path::Path>,
 ) -> Result<CachedBacktestData> {
-    use crate::utils::accounts::{
-        get_cluster_history_address, get_stake_pool_account, get_steward_config_account,
-        get_steward_state_account, get_validator_history_address,
-    };
-    use crate::utils::get_validator_list_account;
+    use crate::utils::accounts::get_cluster_history_address;
 
-    info!("Fetching steward config...");
-    let config = get_steward_config_account(client, steward_config).await?;
-    let config_account = client.get_account(steward_config).await?;
+    info!("Fetching steward config from {}...", steward_config);
+    let config_account = client
+        .get_account(steward_config)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get steward config account: {}", e))?;
 
     info!("Fetching cluster history...");
-    let cluster_history_address = get_cluster_history_address(program_id);
-    let cluster_history_account = client.get_account(&cluster_history_address).await?;
+    let validator_history_program_id = validator_history::id();
+    let cluster_history_address = get_cluster_history_address(&validator_history_program_id);
+    info!("Cluster history address: {}", cluster_history_address);
+    let cluster_history_account =
+        client
+            .get_account(&cluster_history_address)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to get cluster history account at {}: {}",
+                    cluster_history_address,
+                    e
+                )
+            })?;
 
-    info!("Fetching steward state...");
-    let (_steward_state, _) = get_steward_state_account(client, program_id, steward_config).await?;
+    info!("Discovering validator history accounts using getProgramAccounts...");
 
-    info!("Fetching stake pool...");
-    let stake_pool_account_data = get_stake_pool_account(client, &config.stake_pool).await?;
-
-    info!("Fetching validator list...");
-    let validator_list_address = &stake_pool_account_data.validator_list;
-    let validator_list_account = client.get_account(validator_list_address).await?;
-    let validator_list = get_validator_list_account(client, validator_list_address).await?;
-
-    // Extract vote accounts from validator list
-    let vote_accounts: Vec<Pubkey> = validator_list
-        .validators
-        .iter()
-        .map(|v| v.vote_account_address)
-        .collect();
+    // Use getProgramAccounts to find all validator history accounts
+    let validator_history_program_id = validator_history::id();
+    let validator_history_accounts = client
+        .get_program_accounts(&validator_history_program_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to fetch validator history accounts: {}", e))?;
 
     info!(
-        "Fetching validator histories for {} validators...",
-        vote_accounts.len()
+        "Found {} validator history accounts",
+        validator_history_accounts.len()
     );
 
-    // Fetch validator history accounts
+    // Filter for actual ValidatorHistory accounts and try to deserialize them
     let mut validator_histories = Vec::new();
-    for vote_account in vote_accounts {
-        let validator_history_address = get_validator_history_address(&vote_account, program_id);
-        match client.get_account(&validator_history_address).await {
-            Ok(account) => {
+    let mut processed_count = 0;
+    let total_accounts = validator_history_accounts.len();
+
+    for (address, account) in validator_history_accounts {
+        use anchor_lang::AccountDeserialize;
+        use validator_history::ValidatorHistory;
+
+        processed_count += 1;
+        if processed_count % 100 == 0 || processed_count == total_accounts {
+            info!(
+                "Processing validator accounts: {}/{}",
+                processed_count, total_accounts
+            );
+        }
+
+        // Try to deserialize to validate it's a ValidatorHistory account
+        match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
+            Ok(validator_history) => {
+                // Extract the vote account from the validated history
+                let vote_account = validator_history.vote_account;
                 validator_histories.push((vote_account, account));
+                log::debug!("Added validator history for vote account: {}", vote_account);
             }
-            Err(e) => {
-                log::debug!(
-                    "Could not fetch validator history for {}: {:?}",
-                    vote_account,
-                    e
-                );
+            Err(_) => {
+                // Skip accounts that aren't ValidatorHistory accounts (e.g., Config, ClusterHistory)
+                log::debug!("Skipping non-ValidatorHistory account: {}", address);
             }
         }
     }
+
+    info!(
+        "Successfully processed {} validator history accounts",
+        validator_histories.len()
+    );
 
     let current_slot = client.get_slot().await?;
     let current_epoch = client.get_epoch_info().await?.epoch;
@@ -136,15 +155,18 @@ async fn fetch_and_cache_data(
         config_account,
         cluster_history_account,
         validator_histories,
-        validator_list_account,
     };
 
     // Save to cache file if specified
     if let Some(cache_path) = cache_file {
-        info!("Saving data to cache file: {:?}", cache_path);
+        info!(
+            "Serializing and saving data to cache file: {:?}",
+            cache_path
+        );
         let json = serde_json::to_string_pretty(&cached_data)?;
+        let json_len = json.len();
         fs::write(cache_path, json)?;
-        info!("Cache saved successfully");
+        info!("Cache saved successfully ({} bytes)", json_len);
     }
 
     Ok(cached_data)
@@ -153,6 +175,7 @@ async fn fetch_and_cache_data(
 fn load_cached_data(cache_file: &std::path::Path) -> Result<CachedBacktestData> {
     info!("Loading data from cache file: {:?}", cache_file);
     let json = fs::read_to_string(cache_file)?;
+    info!("Deserializing cached data ({} bytes)...", json.len());
     let data = serde_json::from_str(&json)?;
     info!("Cache loaded successfully");
     Ok(data)
@@ -164,30 +187,31 @@ pub async fn run_backtest_with_cached_data(
 ) -> Result<Vec<BacktestResult>> {
     use anchor_lang::AccountDeserialize;
     use jito_steward::Config;
-    use spl_stake_pool::state::ValidatorList;
     use validator_history::{ClusterHistory, ValidatorHistory};
 
     // Deserialize accounts from cached data
-    let config: Config = Config::try_deserialize(&mut cached_data.config_account.data.as_slice())?;
+    let config: Config =
+        Config::try_deserialize(&mut cached_data.config_account.data.as_slice())
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize steward config: {}", e))?;
 
     let cluster_history: ClusterHistory =
-        ClusterHistory::try_deserialize(&mut cached_data.cluster_history_account.data.as_slice())?;
-
-    let validator_list: ValidatorList =
-        borsh::from_slice(&cached_data.validator_list_account.data)?;
-
-    // Extract vote accounts from validator list
-    let vote_accounts: Vec<Pubkey> = validator_list
-        .validators
-        .iter()
-        .map(|v| v.vote_account_address)
-        .collect();
+        ClusterHistory::try_deserialize(&mut cached_data.cluster_history_account.data.as_slice())
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize cluster history: {}", e))?;
 
     let mut results = Vec::new();
 
-    for epoch in target_epochs {
-        info!("Running backtest for epoch {}...", epoch);
+    let total_epochs = target_epochs.len();
+    for (epoch_idx, epoch) in target_epochs.iter().enumerate() {
+        info!(
+            "Running backtest for epoch {} ({}/{})...",
+            epoch,
+            epoch_idx + 1,
+            total_epochs
+        );
         let mut validator_scores = Vec::new();
+        let mut scored_count = 0;
+        let mut skipped_count = 0;
+        let total_validators = cached_data.validator_histories.len();
 
         for (i, (vote_account, account)) in cached_data.validator_histories.iter().enumerate() {
             let validator_history: ValidatorHistory =
@@ -205,11 +229,7 @@ pub async fn run_backtest_with_cached_data(
 
             // Skip if validator doesn't have sufficient history (check if it has any entries)
             if validator_history.history.idx == 0 {
-                continue;
-            }
-
-            // Only score validators that are in the validator list
-            if !vote_accounts.contains(vote_account) {
+                skipped_count += 1;
                 continue;
             }
 
@@ -217,12 +237,13 @@ pub async fn run_backtest_with_cached_data(
                 &validator_history,
                 &cluster_history,
                 &config,
-                epoch as u16,
+                *epoch as u16,
                 TVC_ACTIVATION_EPOCH,
             ) {
                 Ok(score) => {
                     let result = ValidatorScoreResult::from_components(score, *vote_account, i);
                     validator_scores.push(result);
+                    scored_count += 1;
                 }
                 Err(e) => {
                     // Log but continue - some validators may not have sufficient history
@@ -232,15 +253,32 @@ pub async fn run_backtest_with_cached_data(
                         epoch,
                         e
                     );
+                    skipped_count += 1;
                 }
+            }
+
+            // Progress update every 50 validators or at the end
+            if (i + 1) % 50 == 0 || (i + 1) == total_validators {
+                info!(
+                    "  Scoring progress: {}/{} validators processed, {} scored, {} skipped",
+                    i + 1,
+                    total_validators,
+                    scored_count,
+                    skipped_count
+                );
             }
         }
 
         // Sort by score descending
         validator_scores.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
 
+        info!(
+            "Epoch {} complete: {} validators scored, {} skipped",
+            epoch, scored_count, skipped_count
+        );
+
         results.push(BacktestResult {
-            epoch,
+            epoch: *epoch,
             validator_scores,
         });
     }
@@ -365,7 +403,7 @@ pub async fn command_view_backtest(
         // Default to current epoch - 1
         cached_data.fetched_epoch.saturating_sub(1)
     };
-    
+
     // Calculate target epochs from start epoch going backwards
     let mut target_epochs = Vec::new();
     for i in 0..args.lookback_epochs {
@@ -377,20 +415,26 @@ pub async fn command_view_backtest(
 
     info!("Running backtest for epochs: {:?}", target_epochs);
 
+    info!("Starting backtest analysis for epochs: {:?}", target_epochs);
+
     // Run backtest with cached data
     let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
 
+    info!("Generating summary report...");
     // Generate and print report
     let report = generate_comparison_report(&results);
     println!("{}", report);
 
     // Optionally save results to file
     if let Some(output_file) = args.output_file {
+        info!("Saving detailed results to file...");
         let json = serde_json::to_string_pretty(&results)?;
+        let json_len = json.len();
         fs::write(&output_file, json)?;
-        info!("Results saved to {:?}", output_file);
+        info!("Results saved to {:?} ({} bytes)", output_file, json_len);
     }
+
+    info!("Backtest complete!");
 
     Ok(())
 }
-

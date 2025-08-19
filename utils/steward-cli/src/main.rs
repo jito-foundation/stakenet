@@ -46,6 +46,9 @@ pub mod utils;
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
+    
+    // Initialize logger to show info! and debug! messages
+    env_logger::init();
     let args = Args::parse();
     let client = Arc::new(RpcClient::new_with_timeout(
         args.json_rpc_url.clone(),

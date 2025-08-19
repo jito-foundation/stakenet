@@ -81,10 +81,12 @@ pub async fn get_steward_state_account(
 }
 
 pub async fn get_stake_pool_account(client: &RpcClient, stake_pool: &Pubkey) -> Result<StakePool> {
+    use borsh::BorshDeserialize;
+
     let stake_pool_account_raw = client.get_account(stake_pool).await?;
 
-    Ok(borsh::from_slice::<StakePool>(
-        stake_pool_account_raw.data.as_slice(),
+    Ok(StakePool::deserialize(
+        &mut stake_pool_account_raw.data.as_slice(),
     )?)
 }
 
@@ -99,10 +101,12 @@ pub async fn get_validator_list_account(
     client: &RpcClient,
     validator_list: &Pubkey,
 ) -> Result<ValidatorList> {
+    use borsh::BorshDeserialize;
+
     let validator_list_account_raw = client.get_account(validator_list).await?;
 
-    Ok(borsh::from_slice::<ValidatorList>(
-        validator_list_account_raw.data.as_slice(),
+    Ok(ValidatorList::deserialize(
+        &mut validator_list_account_raw.data.as_slice(),
     )?)
 }
 
