@@ -45,6 +45,7 @@ pub struct ValidatorScoreResult {
     pub vote_credits_ratio: f64,
     pub mev_ranking_score: f64, // New: 1.0 - (max_mev_commission / 10000.0)
     pub validator_age: f64,     // New: consecutive voting epochs above threshold
+    pub score_for_backtest_comparison: f64, // Consistent comparison metric across strategies
 }
 
 /// Calculate validator age as consecutive epochs above voting threshold
@@ -101,6 +102,7 @@ impl ValidatorScoreResult {
         index: usize,
         mev_ranking_score: f64,
         validator_age: f64,
+        score_for_backtest_comparison: f64,
     ) -> Self {
         ValidatorScoreResult {
             vote_account,
@@ -117,6 +119,7 @@ impl ValidatorScoreResult {
             vote_credits_ratio: components.vote_credits_ratio,
             mev_ranking_score,
             validator_age,
+            score_for_backtest_comparison,
         }
     }
 }
@@ -311,12 +314,16 @@ pub async fn run_backtest_with_cached_data(
                         TVC_ACTIVATION_EPOCH,
                     );
 
+                    // For MEV strategy, use mev_ranking_score as the comparison score
+                    let score_for_backtest_comparison = mev_ranking_score;
+
                     let result = ValidatorScoreResult::from_components(
                         score,
                         *vote_account,
                         i,
                         mev_ranking_score,
                         validator_age,
+                        score_for_backtest_comparison,
                     );
                     validator_scores.push(result);
                     scored_count += 1;
@@ -371,57 +378,6 @@ pub async fn run_backtest_with_cached_data(
     }
 
     Ok(results)
-}
-
-pub fn generate_comparison_report(results: &[BacktestResult]) -> String {
-    let mut report = String::new();
-
-    report.push_str("=== Backtest Results ===\n\n");
-
-    for result in results {
-        report.push_str(&format!("Epoch {}\n", result.epoch));
-        report.push_str(&format!(
-            "Total validators scored: {}\n",
-            result.validator_scores.len()
-        ));
-
-        // Top 10 validators
-        report.push_str("\nTop 10 Validators:\n");
-        for (i, validator) in result.validator_scores.iter().take(10).enumerate() {
-            report.push_str(&format!(
-                "  {}. {} - Score: {:.6}, Yield: {:.6}\n",
-                i + 1,
-                validator.vote_account,
-                validator.score,
-                validator.yield_score
-            ));
-        }
-
-        // Score distribution
-        if !result.validator_scores.is_empty() {
-            let avg_score: f64 = result.validator_scores.iter().map(|v| v.score).sum::<f64>()
-                / result.validator_scores.len() as f64;
-            let max_score = result
-                .validator_scores
-                .iter()
-                .map(|v| v.score)
-                .fold(f64::MIN, f64::max);
-            let min_score = result
-                .validator_scores
-                .iter()
-                .map(|v| v.score)
-                .fold(f64::MAX, f64::min);
-
-            report.push_str("\nScore Statistics:\n");
-            report.push_str(&format!("  Average: {:.6}\n", avg_score));
-            report.push_str(&format!("  Max: {:.6}\n", max_score));
-            report.push_str(&format!("  Min: {:.6}\n", min_score));
-        }
-
-        report.push_str(&format!("\n{}\n\n", "=".repeat(50)));
-    }
-
-    report
 }
 
 pub async fn command_view_backtest(
@@ -514,10 +470,7 @@ pub async fn command_view_backtest(
     // Run backtest with cached data
     let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
 
-    info!("Generating summary report...");
-    // Generate and print report
-    let report = generate_comparison_report(&results);
-    println!("{}", report);
+    info!("Backtest analysis complete for {} epochs", results.len());
 
     // Save results to file
     info!("Saving detailed results to file...");
