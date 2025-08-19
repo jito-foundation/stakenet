@@ -154,6 +154,8 @@ pub async fn update_priority_fee_commission(
                 if !should_update {
                     info!("Skipping {} {}", vote_account, epoch);
                     return None;
+                } else {
+                    info!("Updating {} {}", vote_account, epoch);
                 }
             } else {
                 info!("No validator history found {} {}", vote_account, epoch)
