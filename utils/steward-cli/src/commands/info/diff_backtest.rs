@@ -1,4 +1,5 @@
 use crate::commands::command_args::DiffBacktest;
+use crate::commands::info::view_backtest::ValidatorMetadata;
 use anyhow::Result;
 use serde::{Deserialize, Deserializer};
 use solana_sdk::pubkey::Pubkey;
@@ -12,7 +13,7 @@ struct BacktestResultJson {
     pub validator_scores: Vec<ValidatorScoreResultJson>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct ValidatorScoreResultJson {
     #[serde(deserialize_with = "deserialize_pubkey_from_base58")]
     pub vote_account: Pubkey,
@@ -56,6 +57,8 @@ struct ValidatorScoreResultJson {
     #[allow(dead_code)]
     pub validator_age: f64,
     pub score_for_backtest_comparison: f64,
+    #[serde(default)]
+    pub metadata: ValidatorMetadata,
 }
 
 fn deserialize_pubkey_from_base58<'de, D>(deserializer: D) -> Result<Pubkey, D::Error>
@@ -64,6 +67,15 @@ where
 {
     let s: String = String::deserialize(deserializer)?;
     s.parse::<Pubkey>().map_err(serde::de::Error::custom)
+}
+
+/// Format validator display with name if available, fallback to truncated pubkey
+fn format_validator_display(validator: &ValidatorScoreResultJson) -> String {
+    if let Some(name) = &validator.metadata.name {
+        format!("{} ({}...)", name, &validator.vote_account.to_string()[..8])
+    } else {
+        format!("{}...", &validator.vote_account.to_string()[..12])
+    }
 }
 
 #[derive(Debug)]
@@ -78,8 +90,8 @@ struct ChurnAnalysis {
     stayed_in_top_400: usize,
     dropped_from_top_400: usize,
     added_to_top_400: usize,
-    dropped_validators: Vec<String>,
-    added_validators: Vec<String>,
+    dropped_validators: Vec<ValidatorScoreResultJson>,
+    added_validators: Vec<ValidatorScoreResultJson>,
 }
 
 #[derive(Debug)]
@@ -158,26 +170,48 @@ fn analyze_epoch(
     let file1_ranking: Vec<_> = epoch1.validator_scores.iter().enumerate().collect();
     let file2_ranking: Vec<_> = epoch2.validator_scores.iter().enumerate().collect();
 
-    // Get top 400 from each strategy
-    let file1_top_400: HashSet<_> = file1_ranking
+    // Get top 400 from each strategy - store both the pubkey and the validator object
+    let file1_top_400_validators: Vec<_> = file1_ranking
         .iter()
         .take(400.min(file1_ranking.len()))
-        .map(|(_, v)| v.vote_account.to_string())
+        .map(|(_, v)| (*v).clone())
         .collect();
 
-    let file2_top_400: HashSet<_> = file2_ranking
+    let file2_top_400_validators: Vec<_> = file2_ranking
         .iter()
         .take(400.min(file2_ranking.len()))
-        .map(|(_, v)| v.vote_account.to_string())
+        .map(|(_, v)| (*v).clone())
+        .collect();
+
+    // Create sets of vote account strings for intersection/difference operations
+    let file1_top_400_keys: HashSet<_> = file1_top_400_validators
+        .iter()
+        .map(|v| v.vote_account.to_string())
+        .collect();
+
+    let file2_top_400_keys: HashSet<_> = file2_top_400_validators
+        .iter()
+        .map(|v| v.vote_account.to_string())
         .collect();
 
     // Calculate churn
-    let stayed_in_top_400 = file1_top_400.intersection(&file2_top_400).count();
-    let dropped_from_top_400 = file1_top_400.difference(&file2_top_400).count();
-    let added_to_top_400 = file2_top_400.difference(&file1_top_400).count();
+    let stayed_in_top_400 = file1_top_400_keys.intersection(&file2_top_400_keys).count();
+    let dropped_from_top_400 = file1_top_400_keys.difference(&file2_top_400_keys).count();
+    let added_to_top_400 = file2_top_400_keys.difference(&file1_top_400_keys).count();
 
-    let dropped_validators: Vec<_> = file1_top_400.difference(&file2_top_400).cloned().collect();
-    let added_validators: Vec<_> = file2_top_400.difference(&file1_top_400).cloned().collect();
+    // Get the actual validator objects for dropped/added lists
+    let dropped_keys: HashSet<_> = file1_top_400_keys.difference(&file2_top_400_keys).cloned().collect();
+    let added_keys: HashSet<_> = file2_top_400_keys.difference(&file1_top_400_keys).cloned().collect();
+
+    let dropped_validators: Vec<_> = file1_top_400_validators
+        .into_iter()
+        .filter(|v| dropped_keys.contains(&v.vote_account.to_string()))
+        .collect();
+
+    let added_validators: Vec<_> = file2_top_400_validators
+        .into_iter()
+        .filter(|v| added_keys.contains(&v.vote_account.to_string()))
+        .collect();
 
     let churn = ChurnAnalysis {
         stayed_in_top_400,
@@ -292,7 +326,7 @@ fn print_epoch_analysis(comparison: &EpochComparison) {
             .take(10)
             .enumerate()
         {
-            println!("  {}. {}", i + 1, validator);
+            println!("  {}. {}", i + 1, format_validator_display(validator));
         }
         if comparison.top_400_churn.dropped_validators.len() > 10 {
             println!(
@@ -311,7 +345,7 @@ fn print_epoch_analysis(comparison: &EpochComparison) {
             .take(10)
             .enumerate()
         {
-            println!("  {}. {}", i + 1, validator);
+            println!("  {}. {}", i + 1, format_validator_display(validator));
         }
         if comparison.top_400_churn.added_validators.len() > 10 {
             println!(
