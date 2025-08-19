@@ -358,14 +358,22 @@ pub async fn command_view_backtest(
         fetch_and_cache_data(client, &program_id, &args.steward_config, None).await?
     };
 
-    // Parse target epochs
-    let target_epochs = if let Some(epochs) = args.target_epochs {
-        epochs
+    // Determine start epoch and calculate target epochs
+    let start_epoch = if let Some(epoch) = args.start_epoch {
+        epoch
     } else {
-        // Default to last 3 epochs based on cached data
-        let current_epoch = cached_data.fetched_epoch;
-        vec![current_epoch - 2, current_epoch - 1, current_epoch]
+        // Default to current epoch - 1
+        cached_data.fetched_epoch.saturating_sub(1)
     };
+    
+    // Calculate target epochs from start epoch going backwards
+    let mut target_epochs = Vec::new();
+    for i in 0..args.lookback_epochs {
+        if let Some(epoch) = start_epoch.checked_sub(i) {
+            target_epochs.push(epoch);
+        }
+    }
+    target_epochs.reverse(); // Order from oldest to newest
 
     info!("Running backtest for epochs: {:?}", target_epochs);
 

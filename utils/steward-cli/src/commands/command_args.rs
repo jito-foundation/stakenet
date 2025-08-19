@@ -330,15 +330,23 @@ pub struct ViewBacktest {
 #[derive(Parser)]
 pub struct BacktestParameters {
     /// Steward config account
-    #[arg(long, env)]
+    #[arg(
+        long,
+        env,
+        default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
+    )]
     pub steward_config: Pubkey,
 
-    /// Target epochs to backtest (comma-separated list, e.g., "690,691,692")
-    #[arg(long, value_delimiter = ',')]
-    pub target_epochs: Option<Vec<u64>>,
+    /// Start epoch for backtest (defaults to current epoch - 1)
+    #[arg(long)]
+    pub start_epoch: Option<u64>,
+
+    /// Number of epochs to look back from start epoch (defaults to 3)
+    #[arg(long, default_value = "3")]
+    pub lookback_epochs: u64,
 
     /// Path to cache file for storing/loading fetched data
-    #[arg(long)]
+    #[arg(long, default_value = "backtest_cache.json")]
     pub cache_file: Option<PathBuf>,
 
     /// Force fetching fresh data even if cache exists
@@ -346,7 +354,7 @@ pub struct BacktestParameters {
     pub force_fetch: bool,
 
     /// Output file for saving results in JSON format
-    #[arg(long)]
+    #[arg(long, default_value = "backtest_results.json")]
     pub output_file: Option<PathBuf>,
 }
 
