@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::fs;
 
 use anyhow::Result;
 use jito_steward::constants::TVC_ACTIVATION_EPOCH;
 use jito_steward::score::{validator_score, ScoreComponentsV3};
 use log::info;
+use reqwest::Client;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::pubkey::Pubkey;
 use solana_sdk::account::Account;
@@ -11,6 +13,40 @@ use solana_sdk::account::Account;
 use crate::commands::command_args::BacktestParameters;
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ValidatorMetadata {
+    pub name: Option<String>,
+    pub website: Option<String>,
+    pub keybase_username: Option<String>,
+    pub icon_url: Option<String>,
+    pub description: Option<String>,
+}
+
+impl Default for ValidatorMetadata {
+    fn default() -> Self {
+        Self {
+            name: None,
+            website: None,
+            keybase_username: None,
+            icon_url: None,
+            description: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ValidatorsAppResponse {
+    pub account: Option<String>,      // identity pubkey
+    pub vote_account: String,         // vote account pubkey
+    pub name: Option<String>,
+    pub www_url: Option<String>,
+    pub keybase_id: Option<String>,
+    // Include other fields we might want
+    pub active_stake: Option<u64>,
+    pub commission: Option<f64>,
+    pub delinquent: Option<bool>,
+}
 
 // Cached data structure that stores raw account data
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,6 +57,7 @@ pub struct CachedBacktestData {
     pub config_account: Account,
     pub cluster_history_account: Account,
     pub validator_histories: Vec<(Pubkey, Account)>,
+    pub validator_metadata: HashMap<String, ValidatorMetadata>, // vote_account -> metadata
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +84,7 @@ pub struct ValidatorScoreResult {
     pub mev_ranking_score: f64, // New: 1.0 - (max_mev_commission / 10000.0)
     pub validator_age: f64,     // New: consecutive voting epochs above threshold
     pub score_for_backtest_comparison: f64, // Consistent comparison metric across strategies
+    pub metadata: ValidatorMetadata, // New: validator name, website, etc.
 }
 
 fn serialize_pubkey_as_base58<S>(pubkey: &Pubkey, serializer: S) -> Result<S::Ok, S::Error>
@@ -89,6 +127,87 @@ fn calculate_validator_age(
     epochs_with_votes
 }
 
+/// Fetch validator metadata from validators.app API
+async fn fetch_validator_metadata_from_api(
+    vote_accounts: &[Pubkey],
+) -> HashMap<String, ValidatorMetadata> {
+    let api_token = match std::env::var("VALIDATORS_APP_TOKEN") {
+        Ok(token) => token,
+        Err(_) => {
+            info!("VALIDATORS_APP_TOKEN not set, skipping validator metadata fetch");
+            return HashMap::new();
+        }
+    };
+
+    info!("Fetching validator metadata from validators.app API...");
+
+    let client = Client::new();
+    let url = "https://www.validators.app/api/v1/validators/mainnet.json";
+
+    let response = match client
+        .get(url)
+        .header("Token", &api_token)
+        .send()
+        .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            info!("Failed to fetch from validators.app API: {:?}", e);
+            return HashMap::new();
+        }
+    };
+
+    let validators: Vec<ValidatorsAppResponse> = match response.json().await {
+        Ok(data) => data,
+        Err(e) => {
+            info!("Failed to parse validators.app API response: {:?}", e);
+            return HashMap::new();
+        }
+    };
+
+    info!("Received {} validators from validators.app API", validators.len());
+
+    // Create lookup map for vote accounts we care about
+    let vote_account_set: std::collections::HashSet<String> = vote_accounts
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+
+    let mut metadata_map = HashMap::new();
+    let mut found_count = 0;
+
+    for validator in validators {
+        if vote_account_set.contains(&validator.vote_account) {
+            let metadata = ValidatorMetadata {
+                name: validator.name.clone(),
+                website: validator.www_url.clone(),
+                keybase_username: validator.keybase_id.clone(),
+                icon_url: None, // validators.app doesn't provide icon_url in this format
+                description: None, // could be derived from other fields if needed
+            };
+
+            metadata_map.insert(validator.vote_account.clone(), metadata);
+            found_count += 1;
+
+            if found_count <= 10 {
+                info!(
+                    "✅ Found validator {} -> {:?}",
+                    validator.vote_account,
+                    validator.name
+                );
+            }
+        }
+    }
+
+    info!(
+        "Successfully mapped {}/{} validators to metadata",
+        found_count,
+        vote_accounts.len()
+    );
+
+    metadata_map
+}
+
 impl ValidatorScoreResult {
     fn from_components(
         components: ScoreComponentsV3,
@@ -97,6 +216,7 @@ impl ValidatorScoreResult {
         mev_ranking_score: f64,
         validator_age: f64,
         score_for_backtest_comparison: f64,
+        metadata: ValidatorMetadata,
     ) -> Self {
         ValidatorScoreResult {
             vote_account,
@@ -114,6 +234,7 @@ impl ValidatorScoreResult {
             mev_ranking_score,
             validator_age,
             score_for_backtest_comparison,
+            metadata,
         }
     }
 }
@@ -202,6 +323,13 @@ async fn fetch_and_cache_data(
     let current_slot = client.get_slot().await?;
     let current_epoch = client.get_epoch_info().await?.epoch;
 
+    // Fetch validator metadata for all vote accounts
+    let vote_accounts: Vec<Pubkey> = validator_histories
+        .iter()
+        .map(|(vote_account, _)| *vote_account)
+        .collect();
+    let validator_metadata = fetch_validator_metadata_from_api(&vote_accounts).await;
+
     let cached_data = CachedBacktestData {
         steward_config: *steward_config,
         fetched_epoch: current_epoch,
@@ -209,6 +337,7 @@ async fn fetch_and_cache_data(
         config_account,
         cluster_history_account,
         validator_histories,
+        validator_metadata,
     };
 
     // Save to cache file if specified
@@ -317,6 +446,13 @@ pub async fn run_backtest_with_cached_data(
                         mev_ranking_score  // MEV strategy uses MEV ranking
                     };
 
+                    // Get metadata for this validator
+                    let metadata = cached_data
+                        .validator_metadata
+                        .get(&vote_account.to_string())
+                        .cloned()
+                        .unwrap_or_default();
+
                     let result = ValidatorScoreResult::from_components(
                         score,
                         *vote_account,
@@ -324,6 +460,7 @@ pub async fn run_backtest_with_cached_data(
                         mev_ranking_score,
                         validator_age,
                         score_for_backtest_comparison,
+                        metadata,
                     );
                     validator_scores.push(result);
                     scored_count += 1;
