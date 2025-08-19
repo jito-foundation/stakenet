@@ -15,7 +15,7 @@ use solana_sdk::{
 use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
-use stakenet_sdk::utils::transactions::submit_instructions;
+use stakenet_sdk::utils::transactions::{submit_chunk_instructions};
 use std::sync::Arc;
 use validator_history::MerkleRootUploadAuthority;
 
@@ -176,12 +176,10 @@ pub async fn update_priority_fee_commission(
         all_update_instructions.extend(update_instructions);
     }
 
+    // all_update_instructions.truncate(10_000);
     info!("PFC: {}", all_update_instructions.len());
 
-    //TODO Remove
-    // all_update_instructions = vec![];
-
-    let submit_result = submit_instructions(
+    let submit_result = submit_chunk_instructions(
         client,
         all_update_instructions,
         keypair,
@@ -189,7 +187,7 @@ pub async fn update_priority_fee_commission(
         retry_count,
         confirmation_time,
         None,
-        true,
+        10,
     )
     .await;
 

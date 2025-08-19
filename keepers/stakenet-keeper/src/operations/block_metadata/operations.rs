@@ -200,10 +200,24 @@ async fn update_block_metadata(
         (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule
+    info!("\n\n\n1. Update Epoch Schedule\n\n\n");
     for epoch in epoch_range.clone() {
-        info!("\n\n\n1. Update Epoch Schedule\n\n\n");
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
+
+        // Check if slot exists
+        if DBSlotInfo::check_random_slot_exists_in_epoch(
+            sqlite_connection,
+            epoch,
+            epoch_schedule
+        )? {
+            info!("Epoch {} already exists", epoch);
+            continue;
+        } else {
+            info!("Updating epoch {}", epoch)
+        }
+
+
         let epoch_leader_schedule_result =
             get_leader_schedule_safe(client, epoch_starting_slot).await;
 

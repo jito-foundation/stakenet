@@ -1,4 +1,5 @@
 use std::{collections::{HashMap}, str::FromStr};
+use rand::Rng;
 use reqwest;
 use serde::{Deserialize};
 use anchor_lang::prelude::EpochSchedule;
@@ -295,6 +296,31 @@ impl DBSlotInfo {
         Ok(())
     }
 
+    pub fn check_random_slot_exists_in_epoch(
+        connection: &Connection,
+        epoch: u64,
+        epoch_schedule: &EpochSchedule,
+    ) -> Result<bool, BlockMetadataKeeperError> {
+        // Get the slot range for this epoch
+        let first_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
+        let slots_in_epoch = epoch_schedule.get_slots_in_epoch(epoch);
+        let last_slot = first_slot + slots_in_epoch - 1;
+
+        // Generate a random slot within the epoch range
+        let mut rng = rand::thread_rng();
+        let random_slot = rng.gen_range(first_slot..=last_slot);
+
+        // Check if this slot exists in the database
+        let mut statement = connection.prepare(
+            "SELECT COUNT(*) FROM slot_info WHERE absolute_slot = ?"
+        )?;
+
+        let count: i64 = statement.query_row(params![random_slot], |row| row.get(0))?;
+
+        Ok(count > 0)
+    }
+
+
     pub fn get_unmapped_identity_accounts(
         connection: &Connection,
     ) -> Result<Vec<String>, BlockMetadataKeeperError> {
@@ -332,7 +358,7 @@ impl DBSlotInfo {
              FROM slot_info
              WHERE state = ? AND absolute_slot < ?
              ORDER BY absolute_slot ASC
-             LIMIT 250000",
+             LIMIT 100000",
         )?;
 
         // Execute query with parameters
