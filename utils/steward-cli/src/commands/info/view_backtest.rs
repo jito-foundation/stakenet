@@ -314,11 +314,12 @@ pub async fn run_backtest_with_cached_data(
                         1.0 - (score.details.max_mev_commission as f64 / 10000.0);
 
                     // Calculate validator age (consecutive voting epochs above threshold)
+                    // Hardcoded to 0.99 for backtesting experiments
                     let validator_age = calculate_validator_age(
                         &validator_history,
                         &cluster_history,
                         *epoch as u16,
-                        config.parameters.scoring_delinquency_threshold_ratio,
+                        0.99,
                         TVC_ACTIVATION_EPOCH,
                     );
 

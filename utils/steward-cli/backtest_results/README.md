@@ -23,16 +23,14 @@ This directory contains backtest results for different scoring configurations.
 - **Ranking**: Primary by `mev_ranking_score` (1.0 - max_mev_commission/10000), tiebreaker by `validator_age`
 - **Description**: Alternative strategy prioritizing low MEV commission with validator age as tiebreaker
 - **Binary Filters**: Same as production (all must pass for validator to be eligible)
+- **Validator Age Definition**: Number of consecutive epochs (going backwards from current) where validator had vote credits above the voting threshold (0.99)
 - **Comparison Score**: Uses `mev_ranking_score` as `score_for_backtest_comparison`
 - **Date**: 2025-08-19
 
-## Schema Notes
+## Diff Analysis
 
-All files use the extended `ValidatorScoreResult` schema that includes:
-- All original scoring components
-- `mev_ranking_score`: 1.0 - (max_mev_commission / 10000.0) 
-- `validator_age`: Consecutive epochs above voting threshold
-- `score_for_backtest_comparison`: Consistent metric for comparing different strategies
-- `vote_account`: Encoded as base58 string for readability
+For computing diffs between strategies, only two fields are needed:
+- `vote_account`: Base58 string identifier for each validator
+- `score_for_backtest_comparison`: Normalized comparison score across strategies
 
-The `score_for_backtest_comparison` field enables meaningful comparisons across different scoring strategies, as the raw `score` field may have different interpretations depending on the strategy used.
+This enables ranking comparisons, position changes, and score distribution analysis between different backtest results.
