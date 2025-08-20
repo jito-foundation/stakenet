@@ -71,10 +71,9 @@ pub struct ValidatorScoreResult {
     pub production_score: f64,
     pub production_rank: Option<usize>, // Rank in production strategy (1-based)
 
-    // Proposed scoring (97% delinquency + 4-tier ranking)
-    pub proposed_score: f64,
+    // Proposed strategy results
     pub proposed_delinquency_score: f64, // With 97% threshold
-    pub proposed_rank: Option<usize>,    // Rank in proposed strategy (1-based)
+    pub proposed_rank: Option<usize>, // Overall rank using 4-tier sorting (1=best, 2=second best, etc.)
 
     // Delinquency failure tracking
     pub proposed_delinquency_epoch: Option<u16>, // Epoch where failed 97% threshold
@@ -275,15 +274,11 @@ impl ValidatorScoreResult {
         validator_age: f64,
         metadata: ValidatorMetadata,
     ) -> Self {
-        // No more proposed_score calculation - ranking will be determined by 4-tier sorting
-        let proposed_score = 0.0; // Placeholder, can be removed later
-
         ValidatorScoreResult {
             vote_account,
             validator_index: index,
             production_score: production_components.score,
             production_rank: None, // Will be set after sorting
-            proposed_score,
             proposed_delinquency_score,
             proposed_rank: None, // Will be set after sorting
             proposed_delinquency_epoch,

@@ -27,9 +27,7 @@ struct ValidatorScoreResultJson {
     #[serde(default)]
     pub production_rank: Option<usize>,
 
-    // Proposed scoring
-    #[serde(default)]
-    pub proposed_score: f64,
+    // Proposed strategy results
     #[serde(default)]
     pub proposed_delinquency_score: f64,
     #[serde(default)]

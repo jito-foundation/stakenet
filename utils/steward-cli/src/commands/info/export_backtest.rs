@@ -27,9 +27,7 @@ struct ValidatorScoreResultJson {
     #[serde(default)]
     pub production_rank: Option<usize>,
 
-    // Proposed scoring
-    #[serde(default)]
-    pub proposed_score: f64,
+    // Proposed strategy results
     #[serde(default)]
     pub proposed_delinquency_score: f64,
     #[serde(default)]
@@ -367,18 +365,17 @@ fn export_epoch_dropped_validators_csv(
     let path = output_dir.join(format!("epoch_{}_validators_dropped.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_churn.dropped_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
-            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
+            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
             format_validator_display(validator).replace("\"", "\"\""),
             validator.vote_account,
             validator_with_rank.production_rank.map_or("".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator.production_score,
-            validator.proposed_score,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -407,18 +404,17 @@ fn export_epoch_added_validators_csv(
     let path = output_dir.join(format!("epoch_{}_validators_added.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_churn.added_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
-            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
+            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
             format_validator_display(validator).replace("\"", "\"\""),
             validator.vote_account,
             validator_with_rank.production_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("".to_string(), |r| r.to_string()),
             validator.production_score,
-            validator.proposed_score,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -444,18 +440,17 @@ fn export_epoch_top400_proposed_csv(comparison: &EpochComparison, output_dir: &P
     let path = output_dir.join(format!("epoch_{}_top400_proposed.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Proposed Rank,Validator Name,Vote Account,Production Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Proposed Rank,Validator Name,Vote Account,Production Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_proposed {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
-            "{},\"{}\",{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
+            "{},\"{}\",{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
             validator_with_rank.proposed_rank.unwrap_or(0),
             format_validator_display(validator).replace("\"", "\"\""),
             validator.vote_account,
             validator_with_rank.production_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator.production_score,
-            validator.proposed_score,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
