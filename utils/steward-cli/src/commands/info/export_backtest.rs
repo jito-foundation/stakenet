@@ -18,6 +18,7 @@ struct ValidatorScoreResultJson {
     #[serde(deserialize_with = "deserialize_pubkey_from_base58")]
     pub vote_account: Pubkey,
     #[serde(default)]
+    #[allow(dead_code)]
     pub validator_index: usize,
     
     // Production scoring
@@ -75,24 +76,24 @@ where
 struct EpochComparison {
     epoch: u64,
     top_400_churn: ChurnAnalysis,
+    #[allow(dead_code)]
     validator_counts: ValidatorCounts,
+    #[allow(dead_code)]
     vote_credit_stats: VoteCreditStats,
+    #[allow(dead_code)]
     mev_distribution: MevDistribution,
 }
 
 #[derive(Debug)]
 struct ChurnAnalysis {
+    #[allow(dead_code)]
     stayed_in_top_400: usize,
+    #[allow(dead_code)]
     dropped_from_top_400: usize,
+    #[allow(dead_code)]
     added_to_top_400: usize,
     dropped_validators: Vec<ValidatorWithRank>,
     added_validators: Vec<ValidatorWithRank>,
-}
-
-#[derive(Debug)]
-enum FilterReason {
-    RankedBelowTop400(usize), // Still ranked but below 400
-    FailedProposedDelinquencyThreshold(u64, f64), // (failure_epoch, failure_ratio) Failed 99% delinquency threshold
 }
 
 #[derive(Debug)]
@@ -100,10 +101,10 @@ struct ValidatorWithRank {
     validator: ValidatorScoreResultJson,
     production_rank: Option<usize>,
     proposed_rank: Option<usize>,
-    filter_reason: Option<FilterReason>,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct ValidatorCounts {
     production_total: usize,
     proposed_total: usize,
@@ -112,12 +113,14 @@ struct ValidatorCounts {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct VoteCreditStats {
     production_deciles: Vec<f64>,
     proposed_deciles: Vec<f64>,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct MevDistribution {
     buckets: BTreeMap<String, (usize, usize)>, // (total_count, top_400_count)
 }
@@ -137,37 +140,6 @@ fn get_mev_commission_percent(validator: &ValidatorScoreResultJson) -> f64 {
 
 
 
-fn format_filter_reason(filter_reason: &Option<FilterReason>) -> String {
-    match filter_reason {
-        Some(FilterReason::RankedBelowTop400(rank)) => format!("Ranked #{} (below top 400)", rank),
-        Some(FilterReason::FailedProposedDelinquencyThreshold(epoch, ratio)) => format!("Failed 99% delinquency threshold (epoch {}: {:.4})", epoch, ratio),
-        None => "Strategy Change".to_string(),
-    }
-}
-
-fn get_change_reason(validator: &ValidatorScoreResultJson, is_dropped: bool) -> String {
-    let mev_commission = get_mev_commission_percent(validator);
-    
-    if is_dropped {
-        if mev_commission > 0.1 {
-            format!("MEV Commission Too High ({:.1}%)", mev_commission)
-        } else if validator.vote_credits_ratio < 0.99 {
-            "Performance Below Threshold".to_string()
-        } else if validator.yield_score < 0.95 {
-            "Low Yield Score".to_string()
-        } else {
-            "Strategy Change".to_string()
-        }
-    } else {
-        if mev_commission < 0.1 {
-            "0% MEV Commission".to_string()
-        } else if validator.vote_credits_ratio >= 0.99 {
-            "High Performance".to_string()
-        } else {
-            "Strategy Preference".to_string()
-        }
-    }
-}
 
 pub async fn command_export_backtest(args: ExportBacktest) -> Result<()> {
     println!("📦 Exporting validator added/dropped lists for each epoch...\n");
@@ -235,22 +207,10 @@ fn analyze_epoch_single_file(
             v.production_rank.map_or(false, |r| r <= 400) &&
             v.proposed_rank.map_or(true, |r| r > 400)
         })
-        .map(|v| {
-            let filter_reason = if v.proposed_rank.is_some() {
-                v.proposed_rank.map(|r| FilterReason::RankedBelowTop400(r))
-            } else {
-                Some(FilterReason::FailedProposedDelinquencyThreshold(
-                    epoch_data.epoch,
-                    v.vote_credits_ratio,
-                ))
-            };
-            
-            ValidatorWithRank {
-                validator: v.clone(),
-                production_rank: v.production_rank,
-                proposed_rank: v.proposed_rank,
-                filter_reason,
-            }
+        .map(|v| ValidatorWithRank {
+            validator: v.clone(),
+            production_rank: v.production_rank,
+            proposed_rank: v.proposed_rank,
         })
         .collect();
 
@@ -266,7 +226,6 @@ fn analyze_epoch_single_file(
             validator: v.clone(),
             production_rank: v.production_rank,
             proposed_rank: v.proposed_rank,
-            filter_reason: None,
         })
         .collect();
 
@@ -381,19 +340,18 @@ fn export_epoch_dropped_validators_csv(comparison: &EpochComparison, output_dir:
     let path = output_dir.join(format!("epoch_{}_validators_dropped.csv", comparison.epoch));
     let mut csv = String::new();
     
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,Yield Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %,Filter Reason\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %\n");
     
     for validator_with_rank in &comparison.top_400_churn.dropped_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
-            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},\"{}\"\n",
+            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1}\n",
             format_validator_display(validator).replace("\"", "\"\""),
             validator.vote_account,
             validator_with_rank.production_rank.map_or("".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator.production_score,
             validator.proposed_score,
-            validator.yield_score,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -405,7 +363,6 @@ fn export_epoch_dropped_validators_csv(comparison: &EpochComparison, output_dir:
             validator.vote_credits_ratio,
             validator.validator_age,
             get_mev_commission_percent(validator),
-            format_filter_reason(&validator_with_rank.filter_reason),
         ));
     }
     
@@ -417,19 +374,18 @@ fn export_epoch_added_validators_csv(comparison: &EpochComparison, output_dir: &
     let path = output_dir.join(format!("epoch_{}_validators_added.csv", comparison.epoch));
     let mut csv = String::new();
     
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,Yield Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %,Addition Reason\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %\n");
     
     for validator_with_rank in &comparison.top_400_churn.added_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
-            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},\"{}\"\n",
+            "\"{}\",{},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1}\n",
             format_validator_display(validator).replace("\"", "\"\""),
             validator.vote_account,
             validator_with_rank.production_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("".to_string(), |r| r.to_string()),
             validator.production_score,
             validator.proposed_score,
-            validator.yield_score,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -441,7 +397,6 @@ fn export_epoch_added_validators_csv(comparison: &EpochComparison, output_dir: &
             validator.vote_credits_ratio,
             validator.validator_age,
             get_mev_commission_percent(validator),
-            get_change_reason(validator, false),
         ));
     }
     

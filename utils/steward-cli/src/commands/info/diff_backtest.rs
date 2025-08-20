@@ -18,6 +18,7 @@ struct ValidatorScoreResultJson {
     #[serde(deserialize_with = "deserialize_pubkey_from_base58")]
     pub vote_account: Pubkey,
     #[serde(default)]
+    #[allow(dead_code)]
     pub validator_index: usize,
 
     // Production scoring
@@ -38,18 +39,24 @@ struct ValidatorScoreResultJson {
     #[serde(default)]
     pub yield_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub mev_commission_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub blacklisted_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub superminority_score: f64,
     #[serde(default)]
     pub delinquency_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub running_jito_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub commission_score: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub historical_commission_score: f64,
     #[serde(default)]
     pub vote_credits_ratio: f64,
@@ -58,6 +65,7 @@ struct ValidatorScoreResultJson {
     #[serde(default)]
     pub mev_commission_pct: f64,
     #[serde(default)]
+    #[allow(dead_code)]
     pub validator_age: f64,
     #[serde(default)]
     pub metadata: ValidatorMetadata,
@@ -222,6 +230,52 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             );
         }
 
+        // Show summary statistics
+        println!("\n📊 YIELD SCORE DISTRIBUTION STATISTICS:");
+        
+        // Top 400 validators - production strategy
+        let top_400_production_yields: Vec<f64> = epoch_data
+            .validator_scores
+            .iter()
+            .filter(|v| v.production_rank.map_or(false, |r| r <= 400))
+            .map(|v| v.yield_score)
+            .collect();
+            
+        // Top 400 validators - proposed strategy
+        let top_400_proposed_yields: Vec<f64> = epoch_data
+            .validator_scores
+            .iter()
+            .filter(|v| v.proposed_rank.map_or(false, |r| r <= 400))
+            .map(|v| v.yield_score)
+            .collect();
+            
+        println!("  Top 400 Production Yield Deciles: {:?}", 
+            format_deciles(&calculate_deciles(&top_400_production_yields)));
+        println!("  Top 400 Proposed Yield Deciles:   {:?}", 
+            format_deciles(&calculate_deciles(&top_400_proposed_yields)));
+            
+        // Dropped validators yield scores
+        if !dropped_validators.is_empty() {
+            let dropped_yields: Vec<f64> = dropped_validators
+                .iter()
+                .map(|v| v.yield_score)
+                .collect();
+                
+            println!("  Dropped Validators Yield Deciles:  {:?}", 
+                format_deciles(&calculate_deciles(&dropped_yields)));
+        }
+        
+        // Added validators yield scores
+        if !added_validators.is_empty() {
+            let added_yields: Vec<f64> = added_validators
+                .iter()
+                .map(|v| v.yield_score)
+                .collect();
+                
+            println!("  Added Validators Yield Deciles:    {:?}", 
+                format_deciles(&calculate_deciles(&added_yields)));
+        }
+
         println!();
     }
 
@@ -271,5 +325,26 @@ fn load_backtest_file(path: &std::path::PathBuf) -> Result<Vec<BacktestResultJso
     let contents = fs::read_to_string(path)?;
     let data: Vec<BacktestResultJson> = serde_json::from_str(&contents)?;
     Ok(data)
+}
+
+fn calculate_deciles(values: &[f64]) -> Vec<f64> {
+    if values.is_empty() {
+        return vec![0.0; 11];
+    }
+    
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    (0..=10)
+        .map(|i| {
+            let index = (i * sorted.len()) / 10;
+            let clamped_index = index.min(sorted.len().saturating_sub(1));
+            sorted[clamped_index]
+        })
+        .collect()
+}
+
+fn format_deciles(deciles: &[f64]) -> Vec<String> {
+    deciles.iter().map(|&x| format!("{:.4}", x)).collect()
 }
 
