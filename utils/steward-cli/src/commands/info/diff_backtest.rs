@@ -129,7 +129,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
         println!("  • Added to top 400: {}", added);
         println!("  • Churn rate: {:.1}%", dropped as f64 / 4.0);
 
-        // Get the actual dropped validators
+        // Get the actual dropped validators for statistics only
         let dropped_validators: Vec<&ValidatorScoreResultJson> = epoch_data
             .validator_scores
             .iter()
@@ -139,42 +139,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             })
             .collect();
 
-        if !dropped_validators.is_empty() {
-            println!(
-                "\n❌ VALIDATORS DROPPED FROM TOP 400 ({} total):",
-                dropped_validators.len()
-            );
-            for (i, validator) in dropped_validators.iter().take(10).enumerate() {
-                let reason = if validator.proposed_score == 0.0 {
-                    if validator.proposed_delinquency_score == 0.0 {
-                        "Failed 99% delinquency threshold"
-                    } else if validator.production_score == 0.0 {
-                        "Failed binary filter in production"
-                    } else {
-                        "Failed binary filter"
-                    }
-                } else {
-                    "Ranked below top 400"
-                };
-
-                println!(
-                    "  {}. {} [Prod rank: {}, Proposed rank: {}, MEV: {:.1}%] - {}",
-                    i + 1,
-                    format_validator_display(validator),
-                    validator.production_rank.unwrap_or(0),
-                    validator
-                        .proposed_rank
-                        .map_or("N/A".to_string(), |r| r.to_string()),
-                    validator.mev_commission_pct,
-                    reason
-                );
-            }
-            if dropped_validators.len() > 10 {
-                println!("  ... and {} more", dropped_validators.len() - 10);
-            }
-        }
-
-        // Get the actual added validators
+        // Get the actual added validators for statistics only
         let added_validators: Vec<&ValidatorScoreResultJson> = epoch_data
             .validator_scores
             .iter()
@@ -183,37 +148,6 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
                     && v.proposed_rank.map_or(false, |r| r <= 400)
             })
             .collect();
-
-        if !added_validators.is_empty() {
-            println!(
-                "\n✅ VALIDATORS ADDED TO TOP 400 ({} total):",
-                added_validators.len()
-            );
-            for (i, validator) in added_validators.iter().take(10).enumerate() {
-                let reason = if validator.mev_commission_pct < 0.1 {
-                    "0% MEV commission"
-                } else if validator.vote_credits_ratio >= 0.99 {
-                    "High performance"
-                } else {
-                    "MEV strategy preference"
-                };
-
-                println!(
-                    "  {}. {} [Prod rank: {}, Proposed rank: {}, MEV: {:.1}%] - {}",
-                    i + 1,
-                    format_validator_display(validator),
-                    validator
-                        .production_rank
-                        .map_or("N/A".to_string(), |r| r.to_string()),
-                    validator.proposed_rank.unwrap_or(0),
-                    validator.mev_commission_pct,
-                    reason
-                );
-            }
-            if added_validators.len() > 10 {
-                println!("  ... and {} more", added_validators.len() - 10);
-            }
-        }
 
         // Show delinquency threshold impact
         let failed_99_threshold = epoch_data
@@ -258,26 +192,6 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             format_deciles(&calculate_deciles(&top_400_proposed_yields))
         );
 
-        // Dropped validators yield scores
-        if !dropped_validators.is_empty() {
-            let dropped_yields: Vec<f64> =
-                dropped_validators.iter().map(|v| v.yield_score).collect();
-
-            println!(
-                "  Dropped Validators Yield Deciles:  {:?}",
-                format_deciles(&calculate_deciles(&dropped_yields))
-            );
-        }
-
-        // Added validators yield scores
-        if !added_validators.is_empty() {
-            let added_yields: Vec<f64> = added_validators.iter().map(|v| v.yield_score).collect();
-
-            println!(
-                "  Added Validators Yield Deciles:    {:?}",
-                format_deciles(&calculate_deciles(&added_yields))
-            );
-        }
 
         println!();
     }
