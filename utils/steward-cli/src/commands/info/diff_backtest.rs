@@ -232,7 +232,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
 
         // Show summary statistics
         println!("\n📊 YIELD SCORE DISTRIBUTION STATISTICS:");
-        
+
         // Top 400 validators - production strategy
         let top_400_production_yields: Vec<f64> = epoch_data
             .validator_scores
@@ -240,7 +240,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             .filter(|v| v.production_rank.map_or(false, |r| r <= 400))
             .map(|v| v.yield_score)
             .collect();
-            
+
         // Top 400 validators - proposed strategy
         let top_400_proposed_yields: Vec<f64> = epoch_data
             .validator_scores
@@ -248,32 +248,35 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             .filter(|v| v.proposed_rank.map_or(false, |r| r <= 400))
             .map(|v| v.yield_score)
             .collect();
-            
-        println!("  Top 400 Production Yield Deciles: {:?}", 
-            format_deciles(&calculate_deciles(&top_400_production_yields)));
-        println!("  Top 400 Proposed Yield Deciles:   {:?}", 
-            format_deciles(&calculate_deciles(&top_400_proposed_yields)));
-            
+
+        println!(
+            "  Top 400 Production Yield Deciles: {:?}",
+            format_deciles(&calculate_deciles(&top_400_production_yields))
+        );
+        println!(
+            "  Top 400 Proposed Yield Deciles:   {:?}",
+            format_deciles(&calculate_deciles(&top_400_proposed_yields))
+        );
+
         // Dropped validators yield scores
         if !dropped_validators.is_empty() {
-            let dropped_yields: Vec<f64> = dropped_validators
-                .iter()
-                .map(|v| v.yield_score)
-                .collect();
-                
-            println!("  Dropped Validators Yield Deciles:  {:?}", 
-                format_deciles(&calculate_deciles(&dropped_yields)));
+            let dropped_yields: Vec<f64> =
+                dropped_validators.iter().map(|v| v.yield_score).collect();
+
+            println!(
+                "  Dropped Validators Yield Deciles:  {:?}",
+                format_deciles(&calculate_deciles(&dropped_yields))
+            );
         }
-        
+
         // Added validators yield scores
         if !added_validators.is_empty() {
-            let added_yields: Vec<f64> = added_validators
-                .iter()
-                .map(|v| v.yield_score)
-                .collect();
-                
-            println!("  Added Validators Yield Deciles:    {:?}", 
-                format_deciles(&calculate_deciles(&added_yields)));
+            let added_yields: Vec<f64> = added_validators.iter().map(|v| v.yield_score).collect();
+
+            println!(
+                "  Added Validators Yield Deciles:    {:?}",
+                format_deciles(&calculate_deciles(&added_yields))
+            );
         }
 
         println!();
@@ -331,7 +334,7 @@ fn calculate_deciles(values: &[f64]) -> Vec<f64> {
     if values.is_empty() {
         return vec![0.0; 11];
     }
-    
+
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
@@ -347,4 +350,3 @@ fn calculate_deciles(values: &[f64]) -> Vec<f64> {
 fn format_deciles(deciles: &[f64]) -> Vec<String> {
     deciles.iter().map(|&x| format!("{:.4}", x)).collect()
 }
-

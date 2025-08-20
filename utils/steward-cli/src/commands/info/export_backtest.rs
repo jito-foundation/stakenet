@@ -20,13 +20,13 @@ struct ValidatorScoreResultJson {
     #[serde(default)]
     #[allow(dead_code)]
     pub validator_index: usize,
-    
+
     // Production scoring
     #[serde(default)]
     pub production_score: f64,
     #[serde(default)]
     pub production_rank: Option<usize>,
-    
+
     // Proposed scoring
     #[serde(default)]
     pub proposed_score: f64,
@@ -34,7 +34,7 @@ struct ValidatorScoreResultJson {
     pub proposed_delinquency_score: f64,
     #[serde(default)]
     pub proposed_rank: Option<usize>,
-    
+
     // Component scores
     #[serde(default)]
     pub yield_score: f64,
@@ -54,7 +54,7 @@ struct ValidatorScoreResultJson {
     pub historical_commission_score: f64,
     #[serde(default)]
     pub vote_credits_ratio: f64,
-    
+
     // Additional metrics
     #[serde(default)]
     pub mev_commission_pct: f64,
@@ -125,7 +125,6 @@ struct MevDistribution {
     buckets: BTreeMap<String, (usize, usize)>, // (total_count, top_400_count)
 }
 
-
 fn format_validator_display(validator: &ValidatorScoreResultJson) -> String {
     if let Some(name) = &validator.metadata.name {
         name.clone()
@@ -137,9 +136,6 @@ fn format_validator_display(validator: &ValidatorScoreResultJson) -> String {
 fn get_mev_commission_percent(validator: &ValidatorScoreResultJson) -> f64 {
     validator.mev_commission_pct
 }
-
-
-
 
 pub async fn command_export_backtest(args: ExportBacktest) -> Result<()> {
     println!("📦 Exporting validator added/dropped lists for each epoch...\n");
@@ -161,7 +157,7 @@ pub async fn command_export_backtest(args: ExportBacktest) -> Result<()> {
     println!("\n✅ Export completed successfully!");
     println!("📂 Output files saved to: {}", args.output_dir.display());
     println!("📋 Files created:");
-    
+
     for epoch_data in &data {
         println!("   • epoch_{}_validators_dropped.csv", epoch_data.epoch);
         println!("   • epoch_{}_validators_added.csv", epoch_data.epoch);
@@ -176,9 +172,7 @@ fn load_backtest_file(path: &std::path::PathBuf) -> Result<Vec<BacktestResultJso
     Ok(data)
 }
 
-fn analyze_epoch_single_file(
-    epoch_data: &BacktestResultJson,
-) -> Result<EpochComparison> {
+fn analyze_epoch_single_file(epoch_data: &BacktestResultJson) -> Result<EpochComparison> {
     // Get validators in top 400 for each strategy
     let production_top_400: HashSet<String> = epoch_data
         .validator_scores
@@ -204,8 +198,8 @@ fn analyze_epoch_single_file(
         .validator_scores
         .iter()
         .filter(|v| {
-            v.production_rank.map_or(false, |r| r <= 400) &&
-            v.proposed_rank.map_or(true, |r| r > 400)
+            v.production_rank.map_or(false, |r| r <= 400)
+                && v.proposed_rank.map_or(true, |r| r > 400)
         })
         .map(|v| ValidatorWithRank {
             validator: v.clone(),
@@ -219,8 +213,8 @@ fn analyze_epoch_single_file(
         .validator_scores
         .iter()
         .filter(|v| {
-            v.production_rank.map_or(true, |r| r > 400) &&
-            v.proposed_rank.map_or(false, |r| r <= 400)
+            v.production_rank.map_or(true, |r| r > 400)
+                && v.proposed_rank.map_or(false, |r| r <= 400)
         })
         .map(|v| ValidatorWithRank {
             validator: v.clone(),
@@ -264,7 +258,7 @@ fn analyze_epoch_single_file(
         .filter(|v| v.production_rank.map_or(false, |r| r <= 400))
         .map(|v| v.vote_credits_ratio)
         .collect();
-    
+
     let proposed_vote_ratios: Vec<f64> = epoch_data
         .validator_scores
         .iter()
@@ -302,7 +296,10 @@ fn calculate_deciles(values: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-fn calculate_mev_distribution_single(epoch: &BacktestResultJson, top_400_keys: &HashSet<String>) -> MevDistribution {
+fn calculate_mev_distribution_single(
+    epoch: &BacktestResultJson,
+    top_400_keys: &HashSet<String>,
+) -> MevDistribution {
     let mut buckets: BTreeMap<String, (usize, usize)> = BTreeMap::new();
 
     for validator in &epoch.validator_scores {
@@ -321,7 +318,7 @@ fn calculate_mev_distribution_single(epoch: &BacktestResultJson, top_400_keys: &
 
         let entry = buckets.entry(bucket).or_insert((0, 0));
         entry.0 += 1;
-        
+
         if top_400_keys.contains(&validator.vote_account.to_string()) {
             entry.1 += 1;
         }
@@ -336,12 +333,15 @@ fn export_epoch_validator_csvs(comparison: &EpochComparison, output_dir: &Path) 
     Ok(())
 }
 
-fn export_epoch_dropped_validators_csv(comparison: &EpochComparison, output_dir: &Path) -> Result<()> {
+fn export_epoch_dropped_validators_csv(
+    comparison: &EpochComparison,
+    output_dir: &Path,
+) -> Result<()> {
     let path = output_dir.join(format!("epoch_{}_validators_dropped.csv", comparison.epoch));
     let mut csv = String::new();
-    
+
     csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %\n");
-    
+
     for validator_with_rank in &comparison.top_400_churn.dropped_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
@@ -365,17 +365,20 @@ fn export_epoch_dropped_validators_csv(comparison: &EpochComparison, output_dir:
             get_mev_commission_percent(validator),
         ));
     }
-    
+
     fs::write(path, csv)?;
     Ok(())
 }
 
-fn export_epoch_added_validators_csv(comparison: &EpochComparison, output_dir: &Path) -> Result<()> {
+fn export_epoch_added_validators_csv(
+    comparison: &EpochComparison,
+    output_dir: &Path,
+) -> Result<()> {
     let path = output_dir.join(format!("epoch_{}_validators_added.csv", comparison.epoch));
     let mut csv = String::new();
-    
+
     csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Proposed Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,MEV Commission %\n");
-    
+
     for validator_with_rank in &comparison.top_400_churn.added_validators {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
@@ -399,8 +402,7 @@ fn export_epoch_added_validators_csv(comparison: &EpochComparison, output_dir: &
             get_mev_commission_percent(validator),
         ));
     }
-    
+
     fs::write(path, csv)?;
     Ok(())
 }
-
