@@ -34,6 +34,10 @@ struct ValidatorScoreResultJson {
     pub proposed_delinquency_score: f64,
     #[serde(default)]
     pub proposed_rank: Option<usize>,
+    #[serde(default)]
+    pub proposed_delinquency_epoch: Option<u16>,
+    #[serde(default)]
+    pub proposed_delinquency_ratio: Option<f64>,
 
     // Component scores
     #[serde(default)]

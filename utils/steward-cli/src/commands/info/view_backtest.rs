@@ -76,6 +76,10 @@ pub struct ValidatorScoreResult {
     pub proposed_delinquency_score: f64, // With 99% threshold
     pub proposed_rank: Option<usize>,    // Rank in proposed strategy (1-based)
 
+    // Delinquency failure tracking
+    pub proposed_delinquency_epoch: Option<u16>, // Epoch where failed 99% threshold
+    pub proposed_delinquency_ratio: Option<f64>, // Ratio at failure epoch
+
     // Shared component scores (from production scoring)
     pub yield_score: f64,
     pub mev_commission_score: f64,
@@ -98,6 +102,54 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_str(&pubkey.to_string())
+}
+
+/// Calculate delinquency details for a specific threshold
+fn calculate_delinquency_details(
+    validator_history: &validator_history::ValidatorHistory,
+    cluster_history: &validator_history::ClusterHistory,
+    current_epoch: u16,
+    epoch_credits_range: u16,
+    delinquency_threshold: f64,
+    tvc_activation_epoch: u64,
+) -> (f64, Option<u16>, Option<f64>) {
+    use validator_history::constants::TVC_MULTIPLIER;
+
+    let epoch_credits_start = current_epoch.saturating_sub(epoch_credits_range);
+    let epoch_credits_end = current_epoch.saturating_sub(1);
+
+    let epoch_credits_window = validator_history.history.epoch_credits_range_normalized(
+        epoch_credits_start,
+        epoch_credits_end,
+        tvc_activation_epoch,
+    );
+
+    let total_blocks_window = cluster_history
+        .history
+        .total_blocks_range(epoch_credits_start, epoch_credits_end);
+
+    let mut delinquency_score = 1.0;
+    let mut delinquency_epoch = None;
+    let mut delinquency_ratio = None;
+
+    for (i, (maybe_credits, maybe_blocks)) in epoch_credits_window
+        .iter()
+        .zip(total_blocks_window.iter())
+        .enumerate()
+    {
+        if let Some(blocks) = maybe_blocks {
+            let credits = maybe_credits.unwrap_or(0);
+            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
+            if ratio < delinquency_threshold {
+                delinquency_score = 0.0;
+                delinquency_epoch = Some(epoch_credits_start.saturating_add(i as u16));
+                delinquency_ratio = Some(ratio);
+                break;
+            }
+        }
+    }
+
+    (delinquency_score, delinquency_epoch, delinquency_ratio)
 }
 
 /// Calculate validator age as number of epochs with non-null vote credits
@@ -215,6 +267,8 @@ impl ValidatorScoreResult {
         index: usize,
         production_components: ScoreComponentsV3,
         proposed_delinquency_score: f64,
+        proposed_delinquency_epoch: Option<u16>,
+        proposed_delinquency_ratio: Option<f64>,
         mev_commission_pct: f64,
         validator_age: f64,
         metadata: ValidatorMetadata,
@@ -237,6 +291,8 @@ impl ValidatorScoreResult {
             proposed_score,
             proposed_delinquency_score,
             proposed_rank: None, // Will be set after sorting
+            proposed_delinquency_epoch,
+            proposed_delinquency_ratio,
             yield_score: production_components.yield_score,
             mev_commission_score: production_components.mev_commission_score,
             blacklisted_score: production_components.blacklisted_score,
@@ -439,22 +495,19 @@ pub async fn run_backtest_with_cached_data(
                 TVC_ACTIVATION_EPOCH,
             ) {
                 Ok(production_score) => {
-                    // Now compute proposed score with 99% delinquency threshold
-                    let mut proposed_config = config.clone();
-                    proposed_config
-                        .parameters
-                        .scoring_delinquency_threshold_ratio = 0.99;
-
-                    let proposed_delinquency_score = match validator_score(
+                    // Calculate delinquency details with 99% threshold
+                    let (
+                        proposed_delinquency_score,
+                        proposed_delinquency_epoch,
+                        proposed_delinquency_ratio,
+                    ) = calculate_delinquency_details(
                         &validator_history,
                         &cluster_history,
-                        &proposed_config,
                         *epoch as u16,
+                        config.parameters.epoch_credits_range,
+                        0.99,
                         TVC_ACTIVATION_EPOCH,
-                    ) {
-                        Ok(score) => score.delinquency_score,
-                        Err(_) => 0.0, // If scoring fails, treat as 0
-                    };
+                    );
 
                     // Calculate MEV commission percentage
                     let mev_commission_pct =
@@ -481,6 +534,8 @@ pub async fn run_backtest_with_cached_data(
                         i,
                         production_score,
                         proposed_delinquency_score,
+                        proposed_delinquency_epoch,
+                        proposed_delinquency_ratio,
                         mev_commission_pct,
                         validator_age,
                         metadata,

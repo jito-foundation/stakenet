@@ -34,6 +34,10 @@ struct ValidatorScoreResultJson {
     pub proposed_delinquency_score: f64,
     #[serde(default)]
     pub proposed_rank: Option<usize>,
+    #[serde(default)]
+    pub proposed_delinquency_epoch: Option<u16>,
+    #[serde(default)]
+    pub proposed_delinquency_ratio: Option<f64>,
 
     // Component scores
     #[serde(default)]
@@ -130,7 +134,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
         println!("  • Churn rate: {:.1}%", dropped as f64 / 4.0);
 
         // Get the actual dropped validators for statistics only
-        let dropped_validators: Vec<&ValidatorScoreResultJson> = epoch_data
+        let _dropped_validators: Vec<&ValidatorScoreResultJson> = epoch_data
             .validator_scores
             .iter()
             .filter(|v| {
@@ -140,7 +144,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             .collect();
 
         // Get the actual added validators for statistics only
-        let added_validators: Vec<&ValidatorScoreResultJson> = epoch_data
+        let _added_validators: Vec<&ValidatorScoreResultJson> = epoch_data
             .validator_scores
             .iter()
             .filter(|v| {
@@ -149,19 +153,50 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             })
             .collect();
 
-        // Show delinquency threshold impact
-        let failed_99_threshold = epoch_data
+        // Show delinquency threshold impact - only for validators that were in top 400 and got dropped
+        let dropped_due_to_99_threshold: Vec<&ValidatorScoreResultJson> = epoch_data
             .validator_scores
             .iter()
-            .filter(|v| v.delinquency_score > 0.0 && v.proposed_delinquency_score == 0.0)
-            .count();
+            .filter(|v| {
+                // Was in top 400 with production scoring
+                v.production_rank.map_or(false, |r| r <= 400) &&
+                // Dropped from top 400 with proposed scoring
+                v.proposed_rank.map_or(true, |r| r > 400) &&
+                // Specifically failed due to 99% threshold (passed production but failed proposed)
+                v.delinquency_score > 0.0 && 
+                v.proposed_delinquency_score == 0.0
+            })
+            .collect();
 
-        if failed_99_threshold > 0 {
-            println!("\n⚠️  DELINQUENCY THRESHOLD IMPACT:");
+        if !dropped_due_to_99_threshold.is_empty() {
+            println!("\n⚠️  DELINQUENCY THRESHOLD IMPACT ON TOP 400:");
             println!(
-                "  {} validators passed production threshold but failed 99% threshold",
-                failed_99_threshold
+                "  {} validators dropped from top 400 due to failing 99% threshold",
+                dropped_due_to_99_threshold.len()
             );
+            
+            // Show details for validators that were dropped
+            println!("\n  Validators dropped due to 99% threshold:");
+            for (i, validator) in dropped_due_to_99_threshold.iter().take(10).enumerate() {
+                let epoch_info = if let Some(epoch) = validator.proposed_delinquency_epoch {
+                    format!("Epoch {} (ratio: {:.4})", 
+                        epoch, 
+                        validator.proposed_delinquency_ratio.unwrap_or(0.0))
+                } else {
+                    "Unknown epoch".to_string()
+                };
+                
+                println!(
+                    "    {}. {} [Prod rank: {}] - Failed at {}",
+                    i + 1,
+                    format_validator_display(validator),
+                    validator.production_rank.unwrap_or(0),
+                    epoch_info
+                );
+            }
+            if dropped_due_to_99_threshold.len() > 10 {
+                println!("    ... and {} more", dropped_due_to_99_threshold.len() - 10);
+            }
         }
 
         // Show summary statistics
