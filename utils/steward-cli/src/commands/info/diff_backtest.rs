@@ -67,6 +67,8 @@ struct ValidatorScoreResultJson {
 
     // Additional metrics
     #[serde(default)]
+    pub inflation_commission_pct: f64,
+    #[serde(default)]
     pub mev_commission_pct: f64,
     #[serde(default)]
     #[allow(dead_code)]
@@ -162,7 +164,7 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
                 v.production_rank.map_or(false, |r| r <= 400) &&
                 // Dropped from top 400 with proposed scoring
                 v.proposed_rank.map_or(true, |r| r > 400) &&
-                // Specifically failed due to 99% threshold (passed production but failed proposed)
+                // Specifically failed due to 97% threshold (passed production but failed proposed)
                 v.delinquency_score > 0.0 && 
                 v.proposed_delinquency_score == 0.0
             })
@@ -171,12 +173,12 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
         if !dropped_due_to_99_threshold.is_empty() {
             println!("\n⚠️  DELINQUENCY THRESHOLD IMPACT ON TOP 400:");
             println!(
-                "  {} validators dropped from top 400 due to failing 99% threshold",
+                "  {} validators dropped from top 400 due to failing 97% threshold",
                 dropped_due_to_99_threshold.len()
             );
             
             // Show details for validators that were dropped
-            println!("\n  Validators dropped due to 99% threshold:");
+            println!("\n  Validators dropped due to 97% threshold:");
             for (i, validator) in dropped_due_to_99_threshold.iter().take(10).enumerate() {
                 let epoch_info = if let Some(epoch) = validator.proposed_delinquency_epoch {
                     format!("Epoch {} (ratio: {:.4})", 

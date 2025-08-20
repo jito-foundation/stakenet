@@ -71,13 +71,13 @@ pub struct ValidatorScoreResult {
     pub production_score: f64,
     pub production_rank: Option<usize>, // Rank in production strategy (1-based)
 
-    // Proposed scoring (99% delinquency + MEV ranking)
+    // Proposed scoring (97% delinquency + MEV ranking)
     pub proposed_score: f64,
-    pub proposed_delinquency_score: f64, // With 99% threshold
+    pub proposed_delinquency_score: f64, // With 97% threshold
     pub proposed_rank: Option<usize>,    // Rank in proposed strategy (1-based)
 
     // Delinquency failure tracking
-    pub proposed_delinquency_epoch: Option<u16>, // Epoch where failed 99% threshold
+    pub proposed_delinquency_epoch: Option<u16>, // Epoch where failed 97% threshold
     pub proposed_delinquency_ratio: Option<f64>, // Ratio at failure epoch
 
     // Shared component scores (from production scoring)
@@ -92,9 +92,10 @@ pub struct ValidatorScoreResult {
     pub vote_credits_ratio: f64,
 
     // Additional metrics
-    pub mev_commission_pct: f64,     // MEV commission percentage (0-100)
-    pub validator_age: f64,          // Consecutive voting epochs above threshold
-    pub metadata: ValidatorMetadata, // Validator name, website, etc.
+    pub inflation_commission_pct: f64, // Inflation commission percentage (0-100)
+    pub mev_commission_pct: f64,       // MEV commission percentage (0-100)
+    pub validator_age: f64,            // Consecutive voting epochs above threshold
+    pub metadata: ValidatorMetadata,   // Validator name, website, etc.
 }
 
 fn serialize_pubkey_as_base58<S>(pubkey: &Pubkey, serializer: S) -> Result<S::Ok, S::Error>
@@ -269,6 +270,7 @@ impl ValidatorScoreResult {
         proposed_delinquency_score: f64,
         proposed_delinquency_epoch: Option<u16>,
         proposed_delinquency_ratio: Option<f64>,
+        inflation_commission_pct: f64,
         mev_commission_pct: f64,
         validator_age: f64,
         metadata: ValidatorMetadata,
@@ -302,6 +304,7 @@ impl ValidatorScoreResult {
             commission_score: production_components.commission_score,
             historical_commission_score: production_components.historical_commission_score,
             vote_credits_ratio: production_components.vote_credits_ratio,
+            inflation_commission_pct,
             mev_commission_pct,
             validator_age,
             metadata,
@@ -495,7 +498,7 @@ pub async fn run_backtest_with_cached_data(
                 TVC_ACTIVATION_EPOCH,
             ) {
                 Ok(production_score) => {
-                    // Calculate delinquency details with 99% threshold
+                    // Calculate delinquency details with 97% threshold
                     let (
                         proposed_delinquency_score,
                         proposed_delinquency_epoch,
@@ -505,11 +508,12 @@ pub async fn run_backtest_with_cached_data(
                         &cluster_history,
                         *epoch as u16,
                         config.parameters.epoch_credits_range,
-                        0.99,
+                        0.97,
                         TVC_ACTIVATION_EPOCH,
                     );
 
-                    // Calculate MEV commission percentage
+                    // Calculate commission percentages
+                    let inflation_commission_pct = production_score.details.max_commission as f64;
                     let mev_commission_pct =
                         production_score.details.max_mev_commission as f64 / 100.0;
 
@@ -536,6 +540,7 @@ pub async fn run_backtest_with_cached_data(
                         proposed_delinquency_score,
                         proposed_delinquency_epoch,
                         proposed_delinquency_ratio,
+                        inflation_commission_pct,
                         mev_commission_pct,
                         validator_age,
                         metadata,
