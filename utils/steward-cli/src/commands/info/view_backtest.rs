@@ -71,7 +71,7 @@ pub struct ValidatorScoreResult {
     pub production_score: f64,
     pub production_rank: Option<usize>, // Rank in production strategy (1-based)
 
-    // Proposed scoring (97% delinquency + MEV ranking)
+    // Proposed scoring (97% delinquency + 4-tier ranking)
     pub proposed_score: f64,
     pub proposed_delinquency_score: f64, // With 97% threshold
     pub proposed_rank: Option<usize>,    // Rank in proposed strategy (1-based)
@@ -275,15 +275,8 @@ impl ValidatorScoreResult {
         validator_age: f64,
         metadata: ValidatorMetadata,
     ) -> Self {
-        // Calculate proposed score
-        // If any binary filter in production is 0, proposed must also be 0
-        // Otherwise, use MEV ranking score (1.0 - mev_commission_pct/100)
-        let proposed_score =
-            if production_components.score == 0.0 || proposed_delinquency_score == 0.0 {
-                0.0
-            } else {
-                1.0 - (mev_commission_pct / 100.0)
-            };
+        // No more proposed_score calculation - ranking will be determined by 4-tier sorting
+        let proposed_score = 0.0; // Placeholder, can be removed later
 
         ValidatorScoreResult {
             vote_account,
@@ -587,16 +580,46 @@ pub async fn run_backtest_with_cached_data(
         // Create a copy for proposed sorting
         let mut proposed_validators = validator_scores.clone();
 
-        // Sort by proposed score with validator age as tiebreaker
+        // Sort for proposed ranking using binary filters + 4-tier system
         proposed_validators.sort_by(|a, b| {
-            match b.proposed_score.partial_cmp(&a.proposed_score) {
-                Some(std::cmp::Ordering::Equal) => {
-                    // Tiebreaker: validator age
-                    b.validator_age
-                        .partial_cmp(&a.validator_age)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+            // Calculate if each validator passes ALL binary filters
+            let a_passes = a.production_score > 0.0 && a.proposed_delinquency_score > 0.0;
+            let b_passes = b.production_score > 0.0 && b.proposed_delinquency_score > 0.0;
+
+            // Validators that fail binary filters go to the bottom
+            match (a_passes, b_passes) {
+                (false, true) => return std::cmp::Ordering::Greater, // a failed, b passed
+                (true, false) => return std::cmp::Ordering::Less,    // a passed, b failed
+                (false, false) => return std::cmp::Ordering::Equal,  // both failed
+                (true, true) => {
+                    // Both passed all binary filters - apply 4-tier sorting
+
+                    // Tier 1: Inflation commission (lower is better)
+                    match a
+                        .inflation_commission_pct
+                        .partial_cmp(&b.inflation_commission_pct)
+                    {
+                        Some(std::cmp::Ordering::Equal) | None => {
+                            // Tier 2: MEV commission (lower is better)
+                            match a.mev_commission_pct.partial_cmp(&b.mev_commission_pct) {
+                                Some(std::cmp::Ordering::Equal) | None => {
+                                    // Tier 3: Validator age (higher is better)
+                                    match b.validator_age.partial_cmp(&a.validator_age) {
+                                        Some(std::cmp::Ordering::Equal) | None => {
+                                            // Tier 4: Vote credits ratio (higher is better)
+                                            b.vote_credits_ratio
+                                                .partial_cmp(&a.vote_credits_ratio)
+                                                .unwrap_or(std::cmp::Ordering::Equal)
+                                        }
+                                        Some(other) => other,
+                                    }
+                                }
+                                Some(other) => other,
+                            }
+                        }
+                        Some(other) => other,
+                    }
                 }
-                other => other.unwrap_or(std::cmp::Ordering::Equal),
             }
         });
 
