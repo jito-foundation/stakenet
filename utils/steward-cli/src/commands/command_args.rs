@@ -244,6 +244,7 @@ pub enum Commands {
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewBacktest(ViewBacktest),
     DiffBacktest(DiffBacktest),
+    ExportBacktest(ExportBacktest),
 
     // Actions
     InitSteward(InitSteward),
@@ -338,6 +339,30 @@ pub struct DiffBacktest {
     /// Second backtest results file  
     #[arg(long)]
     pub file2: PathBuf,
+}
+
+#[derive(Parser)]
+#[command(about = "Export backtest results to business-friendly formats")]
+pub struct ExportBacktest {
+    /// First backtest results file (Production strategy)
+    #[arg(long)]
+    pub file1: PathBuf,
+
+    /// Second backtest results file (Proposed strategy)
+    #[arg(long)]
+    pub file2: PathBuf,
+
+    /// Output directory for exported files
+    #[arg(long, default_value = "exports")]
+    pub output_dir: PathBuf,
+
+    /// Export formats (csv, markdown, json, all)
+    #[arg(long, default_value = "all")]
+    pub format: String,
+
+    /// Include complete validator lists without truncation
+    #[arg(long, default_value = "true")]
+    pub include_full_lists: bool,
 }
 
 #[derive(Parser)]

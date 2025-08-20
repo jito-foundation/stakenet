@@ -31,6 +31,7 @@ use commands::{
     },
     info::{
         diff_backtest::command_diff_backtest,
+        export_backtest::command_export_backtest,
         view_backtest::command_view_backtest,
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
@@ -72,6 +73,9 @@ async fn main() -> Result<()> {
         }
         Commands::DiffBacktest(args) => {
             command_diff_backtest(args).await
+        }
+        Commands::ExportBacktest(args) => {
+            command_export_backtest(args).await
         }
 
         // --- Helpers ---

@@ -205,23 +205,23 @@ fn analyze_scoring_strategies(
             .any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
 
     if file2_has_mev_pattern {
-        println!("📊 File 1: Production Scoring (continuous yield-based scores)");
-        println!("📊 File 2: MEV Commission Strategy (discrete commission-based scores)");
+        println!("📊 Production Strategy (File 1): Current live scoring (continuous yield-based scores)");
+        println!("📊 Proposed Strategy (File 2): MEV commission-based scoring (discrete commission tiers)");
         println!("   • 1.0 = 0% MEV commission");
         println!("   • 0.92 = 8% MEV commission");
         println!("   • 0.9 = 10% MEV commission");
     } else {
-        println!("📊 File 1: Strategy A (continuous scores)");
-        println!("📊 File 2: Strategy B (continuous scores)");
+        println!("📊 Production Strategy (File 1): Current live scoring (continuous scores)");
+        println!("📊 Proposed Strategy (File 2): Alternative scoring (continuous scores)");
     }
 
     println!("📈 Score Characteristics:");
     println!(
-        "   File 1: {} unique score values in sample",
+        "   Production (File 1): {} unique score values in sample",
         file1_unique_scores.len()
     );
     println!(
-        "   File 2: {} unique score values in sample",
+        "   Proposed (File 2): {} unique score values in sample",
         file2_unique_scores.len()
     );
 
@@ -237,11 +237,11 @@ fn analyze_scoring_strategies(
         });
 
     println!(
-        "   File 1 range: {:.6} - {:.6}",
+        "   Production range: {:.6} - {:.6}",
         file1_range.0, file1_range.1
     );
     println!(
-        "   File 2 range: {:.6} - {:.6}",
+        "   Proposed range: {:.6} - {:.6}",
         file2_range.0, file2_range.1
     );
 
@@ -386,12 +386,11 @@ fn print_epoch_analysis(
     );
 
     if !comparison.top_400_churn.dropped_validators.is_empty() {
-        println!("\n❌ DROPPED FROM TOP 400 (first 10):");
+        println!("\n❌ DROPPED FROM TOP 400 ({} total):", comparison.top_400_churn.dropped_validators.len());
         for (i, validator) in comparison
             .top_400_churn
             .dropped_validators
             .iter()
-            .take(10)
             .enumerate()
         {
             let mev_commission_pct = (1.0 - validator.mev_ranking_score) * 100.0;
@@ -400,23 +399,16 @@ fn print_epoch_analysis(
                 i + 1,
                 format_validator_display(validator),
                 mev_commission_pct
-            );
-        }
-        if comparison.top_400_churn.dropped_validators.len() > 10 {
-            println!(
-                "  ... and {} more",
-                comparison.top_400_churn.dropped_validators.len() - 10
             );
         }
     }
 
     if !comparison.top_400_churn.added_validators.is_empty() {
-        println!("\n✅ ADDED TO TOP 400 (first 10):");
+        println!("\n✅ ADDED TO TOP 400 ({} total):", comparison.top_400_churn.added_validators.len());
         for (i, validator) in comparison
             .top_400_churn
             .added_validators
             .iter()
-            .take(10)
             .enumerate()
         {
             let mev_commission_pct = (1.0 - validator.mev_ranking_score) * 100.0;
@@ -425,12 +417,6 @@ fn print_epoch_analysis(
                 i + 1,
                 format_validator_display(validator),
                 mev_commission_pct
-            );
-        }
-        if comparison.top_400_churn.added_validators.len() > 10 {
-            println!(
-                "  ... and {} more",
-                comparison.top_400_churn.added_validators.len() - 10
             );
         }
     }
@@ -454,14 +440,14 @@ fn print_epoch_analysis(
     let file2_vote_deciles = calculate_deciles(&file2_top_400_vote_ratios);
 
     println!(
-        "  File 1 vote credit ratios: {:?}",
+        "  Production Strategy: {:?}",
         file1_vote_deciles
             .iter()
             .map(|&x| format!("{:.4}", x))
             .collect::<Vec<_>>()
     );
     println!(
-        "  File 2 vote credit ratios: {:?}",
+        "  Proposed Strategy: {:?}",
         file2_vote_deciles
             .iter()
             .map(|&x| format!("{:.4}", x))
@@ -475,16 +461,15 @@ fn print_epoch_analysis(
         .any(|&s| s == 0.9 || s == 0.92 || s == 1.0);
 
     if has_mev_pattern {
-        println!("\n🎯 MEV COMMISSION TIER ANALYSIS (File 2):");
+        println!("\n🎯 MEV COMMISSION TIER ANALYSIS (Proposed Strategy):");
 
-        // Show some examples of high-performing validators that got dropped due to MEV commission
+        // Show all high-performing validators that got dropped due to MEV commission
         println!("💡 HIGH-YIELD VALIDATORS DROPPED (MEV commission > 0%):");
         let high_yield_dropped: Vec<_> = comparison
             .top_400_churn
             .dropped_validators
             .iter()
             .filter(|v| v.yield_score > 0.995) // High yield score
-            .take(5)
             .collect();
 
         for (i, validator) in high_yield_dropped.iter().enumerate() {
@@ -497,8 +482,8 @@ fn print_epoch_analysis(
             );
         }
 
-        // Add comprehensive bucket analysis for File 2 (MEV strategy)
-        println!("\n📊 FULL MEV SCORE DISTRIBUTION (File 2):");
+        // Add comprehensive bucket analysis for Proposed Strategy (MEV strategy)
+        println!("\n📊 FULL MEV SCORE DISTRIBUTION (Proposed Strategy):");
         analyze_mev_score_buckets(epoch2);
     }
 
