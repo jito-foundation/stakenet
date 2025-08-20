@@ -80,7 +80,7 @@ where
 struct EpochComparison {
     epoch: u64,
     top_400_churn: ChurnAnalysis,
-    top_400_proposed: Vec<ValidatorWithRank>,
+    all_validators_proposed: Vec<ValidatorWithRank>,
     #[allow(dead_code)]
     validator_counts: ValidatorCounts,
     #[allow(dead_code)]
@@ -170,7 +170,10 @@ pub async fn command_export_backtest(args: ExportBacktest) -> Result<()> {
     for epoch_data in &data {
         println!("   • epoch_{}_validators_dropped.csv", epoch_data.epoch);
         println!("   • epoch_{}_validators_added.csv", epoch_data.epoch);
-        println!("   • epoch_{}_top400_proposed.csv", epoch_data.epoch);
+        println!(
+            "   • epoch_{}_all_validators_proposed.csv",
+            epoch_data.epoch
+        );
     }
 
     Ok(())
@@ -233,18 +236,17 @@ fn analyze_epoch_single_file(epoch_data: &BacktestResultJson) -> Result<EpochCom
         })
         .collect();
 
-    // Get top 400 proposed validators (sorted by rank)
-    let mut top_400_proposed: Vec<ValidatorWithRank> = epoch_data
+    // Get all validators sorted by proposed rank
+    let mut all_validators_proposed: Vec<ValidatorWithRank> = epoch_data
         .validator_scores
         .iter()
-        .filter(|v| v.proposed_rank.map_or(false, |r| r <= 400))
         .map(|v| ValidatorWithRank {
             validator: v.clone(),
             production_rank: v.production_rank,
             proposed_rank: v.proposed_rank,
         })
         .collect();
-    top_400_proposed.sort_by_key(|v| v.proposed_rank.unwrap_or(999999));
+    all_validators_proposed.sort_by_key(|v| v.proposed_rank.unwrap_or(999999));
 
     let churn = ChurnAnalysis {
         stayed_in_top_400,
@@ -300,7 +302,7 @@ fn analyze_epoch_single_file(epoch_data: &BacktestResultJson) -> Result<EpochCom
     Ok(EpochComparison {
         epoch: epoch_data.epoch,
         top_400_churn: churn,
-        top_400_proposed,
+        all_validators_proposed,
         validator_counts,
         vote_credit_stats,
         mev_distribution,
@@ -354,7 +356,7 @@ fn calculate_mev_distribution_single(
 fn export_epoch_validator_csvs(comparison: &EpochComparison, output_dir: &Path) -> Result<()> {
     export_epoch_dropped_validators_csv(comparison, output_dir)?;
     export_epoch_added_validators_csv(comparison, output_dir)?;
-    export_epoch_top400_proposed_csv(comparison, output_dir)?;
+    export_epoch_all_validators_proposed_csv(comparison, output_dir)?;
     Ok(())
 }
 
@@ -436,13 +438,19 @@ fn export_epoch_added_validators_csv(
     Ok(())
 }
 
-fn export_epoch_top400_proposed_csv(comparison: &EpochComparison, output_dir: &Path) -> Result<()> {
-    let path = output_dir.join(format!("epoch_{}_top400_proposed.csv", comparison.epoch));
+fn export_epoch_all_validators_proposed_csv(
+    comparison: &EpochComparison,
+    output_dir: &Path,
+) -> Result<()> {
+    let path = output_dir.join(format!(
+        "epoch_{}_all_validators_proposed.csv",
+        comparison.epoch
+    ));
     let mut csv = String::new();
 
     csv.push_str("Proposed Rank,Validator Name,Vote Account,Production Rank,Production Score,Inflation Commission %,MEV Commission %,Validator Age,Vote Credits Ratio,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
-    for validator_with_rank in &comparison.top_400_proposed {
+    for validator_with_rank in &comparison.all_validators_proposed {
         let validator = &validator_with_rank.validator;
         csv.push_str(&format!(
             "{},\"{}\",{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.1},{:.1},{},{}\n",
