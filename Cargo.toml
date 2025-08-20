@@ -20,6 +20,7 @@ solana-account-decoder = "=2.3.3"
 solana-bincode = "=2.2.1"
 solana-clap-utils = "=1.8.26"
 solana-client = "=2.3.3"
+solana-config-program-client = "1.1.0"
 solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3.3" }
 solana-metrics = "=2.3.3"
 solana-native-token = "=2.2.2"
