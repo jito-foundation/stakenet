@@ -365,7 +365,7 @@ fn export_epoch_dropped_validators_csv(
     let path = output_dir.join(format!("epoch_{}_validators_dropped.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Inflation Commission %,MEV Commission %,Validator Age,Vote Credits Ratio,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_churn.dropped_validators {
         let validator = &validator_with_rank.validator;
@@ -376,6 +376,10 @@ fn export_epoch_dropped_validators_csv(
             validator_with_rank.production_rank.map_or("".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator.production_score,
+            get_inflation_commission_percent(validator),
+            get_mev_commission_percent(validator),
+            validator.validator_age,
+            validator.vote_credits_ratio,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -384,10 +388,6 @@ fn export_epoch_dropped_validators_csv(
             validator.running_jito_score,
             validator.commission_score,
             validator.historical_commission_score,
-            validator.vote_credits_ratio,
-            validator.validator_age,
-            get_inflation_commission_percent(validator),
-            get_mev_commission_percent(validator),
             validator.proposed_delinquency_epoch.map_or("N/A".to_string(), |e| e.to_string()),
             validator.proposed_delinquency_ratio.map_or("N/A".to_string(), |r| format!("{:.6}", r)),
         ));
@@ -404,7 +404,7 @@ fn export_epoch_added_validators_csv(
     let path = output_dir.join(format!("epoch_{}_validators_added.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Validator Name,Vote Account,Production Rank,Proposed Rank,Production Score,Inflation Commission %,MEV Commission %,Validator Age,Vote Credits Ratio,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_churn.added_validators {
         let validator = &validator_with_rank.validator;
@@ -415,6 +415,10 @@ fn export_epoch_added_validators_csv(
             validator_with_rank.production_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator_with_rank.proposed_rank.map_or("".to_string(), |r| r.to_string()),
             validator.production_score,
+            get_inflation_commission_percent(validator),
+            get_mev_commission_percent(validator),
+            validator.validator_age,
+            validator.vote_credits_ratio,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -423,10 +427,6 @@ fn export_epoch_added_validators_csv(
             validator.running_jito_score,
             validator.commission_score,
             validator.historical_commission_score,
-            validator.vote_credits_ratio,
-            validator.validator_age,
-            get_inflation_commission_percent(validator),
-            get_mev_commission_percent(validator),
             validator.proposed_delinquency_epoch.map_or("N/A".to_string(), |e| e.to_string()),
             validator.proposed_delinquency_ratio.map_or("N/A".to_string(), |r| format!("{:.6}", r)),
         ));
@@ -440,7 +440,7 @@ fn export_epoch_top400_proposed_csv(comparison: &EpochComparison, output_dir: &P
     let path = output_dir.join(format!("epoch_{}_top400_proposed.csv", comparison.epoch));
     let mut csv = String::new();
 
-    csv.push_str("Proposed Rank,Validator Name,Vote Account,Production Rank,Production Score,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Vote Credits Ratio,Validator Age,Inflation Commission %,MEV Commission %,Delinquent Epoch,Delinquent Epoch Ratio\n");
+    csv.push_str("Proposed Rank,Validator Name,Vote Account,Production Rank,Production Score,Inflation Commission %,MEV Commission %,Validator Age,Vote Credits Ratio,MEV Commission Score,Blacklisted Score,Superminority Score,Delinquency Score,Proposed Delinquency Score,Running Jito Score,Commission Score,Historical Commission Score,Delinquent Epoch,Delinquent Epoch Ratio\n");
 
     for validator_with_rank in &comparison.top_400_proposed {
         let validator = &validator_with_rank.validator;
@@ -451,6 +451,10 @@ fn export_epoch_top400_proposed_csv(comparison: &EpochComparison, output_dir: &P
             validator.vote_account,
             validator_with_rank.production_rank.map_or("N/A".to_string(), |r| r.to_string()),
             validator.production_score,
+            get_inflation_commission_percent(validator),
+            get_mev_commission_percent(validator),
+            validator.validator_age,
+            validator.vote_credits_ratio,
             validator.mev_commission_score,
             validator.blacklisted_score,
             validator.superminority_score,
@@ -459,10 +463,6 @@ fn export_epoch_top400_proposed_csv(comparison: &EpochComparison, output_dir: &P
             validator.running_jito_score,
             validator.commission_score,
             validator.historical_commission_score,
-            validator.vote_credits_ratio,
-            validator.validator_age,
-            get_inflation_commission_percent(validator),
-            get_mev_commission_percent(validator),
             validator.proposed_delinquency_epoch.map_or("N/A".to_string(), |e| e.to_string()),
             validator.proposed_delinquency_ratio.map_or("N/A".to_string(), |r| format!("{:.6}", r)),
         ));
