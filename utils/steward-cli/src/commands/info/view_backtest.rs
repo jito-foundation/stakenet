@@ -61,25 +61,36 @@ pub struct BacktestResult {
     pub validator_scores: Vec<ValidatorScoreResult>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ValidatorScoreResult {
     #[serde(serialize_with = "serialize_pubkey_as_base58")]
     pub vote_account: Pubkey,
     pub validator_index: usize,
-    pub score: f64,
+
+    // Production scoring (unmodified config)
+    pub production_score: f64,
+    pub production_rank: Option<usize>, // Rank in production strategy (1-based)
+
+    // Proposed scoring (99% delinquency + MEV ranking)
+    pub proposed_score: f64,
+    pub proposed_delinquency_score: f64, // With 99% threshold
+    pub proposed_rank: Option<usize>,    // Rank in proposed strategy (1-based)
+
+    // Shared component scores (from production scoring)
     pub yield_score: f64,
     pub mev_commission_score: f64,
     pub blacklisted_score: f64,
     pub superminority_score: f64,
-    pub delinquency_score: f64,
+    pub delinquency_score: f64, // Production delinquency score
     pub running_jito_score: f64,
     pub commission_score: f64,
     pub historical_commission_score: f64,
     pub vote_credits_ratio: f64,
-    pub mev_ranking_score: f64, // New: 1.0 - (max_mev_commission / 10000.0)
-    pub validator_age: f64,     // New: consecutive voting epochs above threshold
-    pub score_for_backtest_comparison: f64, // Consistent comparison metric across strategies
-    pub metadata: ValidatorMetadata, // New: validator name, website, etc.
+
+    // Additional metrics
+    pub mev_commission_pct: f64,     // MEV commission percentage (0-100)
+    pub validator_age: f64,          // Consecutive voting epochs above threshold
+    pub metadata: ValidatorMetadata, // Validator name, website, etc.
 }
 
 fn serialize_pubkey_as_base58<S>(pubkey: &Pubkey, serializer: S) -> Result<S::Ok, S::Error>
@@ -199,31 +210,44 @@ async fn fetch_validator_metadata_from_api(
 }
 
 impl ValidatorScoreResult {
-    fn from_components(
-        components: ScoreComponentsV3,
+    fn new(
         vote_account: Pubkey,
         index: usize,
-        mev_ranking_score: f64,
+        production_components: ScoreComponentsV3,
+        proposed_delinquency_score: f64,
+        mev_commission_pct: f64,
         validator_age: f64,
-        score_for_backtest_comparison: f64,
         metadata: ValidatorMetadata,
     ) -> Self {
+        // Calculate proposed score
+        // If any binary filter in production is 0, proposed must also be 0
+        // Otherwise, use MEV ranking score (1.0 - mev_commission_pct/100)
+        let proposed_score =
+            if production_components.score == 0.0 || proposed_delinquency_score == 0.0 {
+                0.0
+            } else {
+                1.0 - (mev_commission_pct / 100.0)
+            };
+
         ValidatorScoreResult {
             vote_account,
             validator_index: index,
-            score: components.score,
-            yield_score: components.yield_score,
-            mev_commission_score: components.mev_commission_score,
-            blacklisted_score: components.blacklisted_score,
-            superminority_score: components.superminority_score,
-            delinquency_score: components.delinquency_score,
-            running_jito_score: components.running_jito_score,
-            commission_score: components.commission_score,
-            historical_commission_score: components.historical_commission_score,
-            vote_credits_ratio: components.vote_credits_ratio,
-            mev_ranking_score,
+            production_score: production_components.score,
+            production_rank: None, // Will be set after sorting
+            proposed_score,
+            proposed_delinquency_score,
+            proposed_rank: None, // Will be set after sorting
+            yield_score: production_components.yield_score,
+            mev_commission_score: production_components.mev_commission_score,
+            blacklisted_score: production_components.blacklisted_score,
+            superminority_score: production_components.superminority_score,
+            delinquency_score: production_components.delinquency_score,
+            running_jito_score: production_components.running_jito_score,
+            commission_score: production_components.commission_score,
+            historical_commission_score: production_components.historical_commission_score,
+            vote_credits_ratio: production_components.vote_credits_ratio,
+            mev_commission_pct,
             validator_age,
-            score_for_backtest_comparison,
             metadata,
         }
     }
@@ -357,7 +381,6 @@ fn load_cached_data(cache_file: &std::path::Path) -> Result<CachedBacktestData> 
 pub async fn run_backtest_with_cached_data(
     cached_data: &CachedBacktestData,
     target_epochs: Vec<u64>,
-    use_production_scoring: bool,
 ) -> Result<Vec<BacktestResult>> {
     use anchor_lang::AccountDeserialize;
     use jito_steward::Config;
@@ -407,35 +430,37 @@ pub async fn run_backtest_with_cached_data(
                 continue;
             }
 
-            // For MEV strategy, use 99% delinquency threshold
-            let scoring_config = if use_production_scoring {
-                config.clone()
-            } else {
-                let mut mev_config = config.clone();
-                mev_config.parameters.scoring_delinquency_threshold_ratio = 0.99;
-                mev_config
-            };
-
+            // First compute production score with unmodified config
             match validator_score(
                 &validator_history,
                 &cluster_history,
-                &scoring_config,
+                &config,
                 *epoch as u16,
                 TVC_ACTIVATION_EPOCH,
             ) {
-                Ok(score) => {
-                    // For MEV strategy, filter out validators that fail delinquency check
-                    if !use_production_scoring && score.delinquency_score == 0.0 {
-                        skipped_count += 1;
-                        continue;
-                    }
+                Ok(production_score) => {
+                    // Now compute proposed score with 99% delinquency threshold
+                    let mut proposed_config = config.clone();
+                    proposed_config
+                        .parameters
+                        .scoring_delinquency_threshold_ratio = 0.99;
 
-                    // Calculate MEV ranking score (1.0 - max_mev_commission / 10000.0)
-                    let mev_ranking_score =
-                        1.0 - (score.details.max_mev_commission as f64 / 10000.0);
+                    let proposed_delinquency_score = match validator_score(
+                        &validator_history,
+                        &cluster_history,
+                        &proposed_config,
+                        *epoch as u16,
+                        TVC_ACTIVATION_EPOCH,
+                    ) {
+                        Ok(score) => score.delinquency_score,
+                        Err(_) => 0.0, // If scoring fails, treat as 0
+                    };
+
+                    // Calculate MEV commission percentage
+                    let mev_commission_pct =
+                        production_score.details.max_mev_commission as f64 / 100.0;
 
                     // Calculate validator age (consecutive voting epochs above threshold)
-                    // Hardcoded to 0.99 for backtesting experiments
                     let validator_age = calculate_validator_age(
                         &validator_history,
                         &cluster_history,
@@ -444,13 +469,6 @@ pub async fn run_backtest_with_cached_data(
                         TVC_ACTIVATION_EPOCH,
                     );
 
-                    // Set comparison score based on scoring strategy
-                    let score_for_backtest_comparison = if use_production_scoring {
-                        score.score // Production uses overall score
-                    } else {
-                        mev_ranking_score // MEV strategy uses MEV ranking
-                    };
-
                     // Get metadata for this validator
                     let metadata = cached_data
                         .validator_metadata
@@ -458,13 +476,13 @@ pub async fn run_backtest_with_cached_data(
                         .cloned()
                         .unwrap_or_default();
 
-                    let result = ValidatorScoreResult::from_components(
-                        score,
+                    let result = ValidatorScoreResult::new(
                         *vote_account,
                         i,
-                        mev_ranking_score,
+                        production_score,
+                        proposed_delinquency_score,
+                        mev_commission_pct,
                         validator_age,
-                        score_for_backtest_comparison,
                         metadata,
                     );
                     validator_scores.push(result);
@@ -494,27 +512,43 @@ pub async fn run_backtest_with_cached_data(
             }
         }
 
-        // Sort based on scoring strategy
-        if use_production_scoring {
-            // Production: Sort by overall score descending
-            validator_scores.sort_by(|a, b| {
-                b.score
-                    .partial_cmp(&a.score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-        } else {
-            // MEV strategy: Sort by MEV commission first, then by validator age as tiebreaker
-            validator_scores.sort_by(|a, b| {
-                match b.mev_ranking_score.partial_cmp(&a.mev_ranking_score) {
-                    Some(std::cmp::Ordering::Equal) => {
-                        // Tiebreaker: Compare validator age
-                        b.validator_age
-                            .partial_cmp(&a.validator_age)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    }
-                    other => other.unwrap_or(std::cmp::Ordering::Equal),
+        // Sort by production score and assign production ranks
+        validator_scores.sort_by(|a, b| {
+            b.production_score
+                .partial_cmp(&a.production_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Assign production ranks (1-based)
+        for (rank, validator) in validator_scores.iter_mut().enumerate() {
+            validator.production_rank = Some(rank + 1);
+        }
+
+        // Create a copy for proposed sorting
+        let mut proposed_validators = validator_scores.clone();
+
+        // Sort by proposed score with validator age as tiebreaker
+        proposed_validators.sort_by(|a, b| {
+            match b.proposed_score.partial_cmp(&a.proposed_score) {
+                Some(std::cmp::Ordering::Equal) => {
+                    // Tiebreaker: validator age
+                    b.validator_age
+                        .partial_cmp(&a.validator_age)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 }
-            });
+                other => other.unwrap_or(std::cmp::Ordering::Equal),
+            }
+        });
+
+        // Create a map of vote_account to proposed rank
+        let mut proposed_ranks = std::collections::HashMap::new();
+        for (rank, validator) in proposed_validators.iter().enumerate() {
+            proposed_ranks.insert(validator.vote_account, rank + 1);
+        }
+
+        // Update proposed ranks in the original vector
+        for validator in &mut validator_scores {
+            validator.proposed_rank = proposed_ranks.get(&validator.vote_account).copied();
         }
 
         info!(
@@ -622,20 +656,8 @@ pub async fn command_view_backtest(
 
     info!("Starting backtest analysis for epochs: {:?}", target_epochs);
 
-    // Log scoring strategy being used
-    info!(
-        "Using {} scoring strategy",
-        if args.use_production_scoring {
-            "production"
-        } else {
-            "MEV commission + validator age"
-        }
-    );
-
-    // Run backtest with cached data
-    let results =
-        run_backtest_with_cached_data(&cached_data, target_epochs, args.use_production_scoring)
-            .await?;
+    // Run backtest with cached data (computes both production and proposed scores)
+    let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
 
     info!("Backtest analysis complete for {} epochs", results.len());
 

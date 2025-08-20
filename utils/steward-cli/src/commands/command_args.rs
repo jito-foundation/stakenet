@@ -330,39 +330,23 @@ pub struct ViewBacktest {
 }
 
 #[derive(Parser)]
-#[command(about = "Compare results from two backtest runs")]
+#[command(about = "Compare production and proposed strategies within backtest results")]
 pub struct DiffBacktest {
-    /// First backtest results file
+    /// Backtest results file containing both production and proposed scores
     #[arg(long)]
-    pub file1: PathBuf,
-
-    /// Second backtest results file  
-    #[arg(long)]
-    pub file2: PathBuf,
+    pub file: PathBuf,
 }
 
 #[derive(Parser)]
 #[command(about = "Export backtest results to business-friendly formats")]
 pub struct ExportBacktest {
-    /// First backtest results file (Production strategy)
+    /// Backtest results file containing both production and proposed scores
     #[arg(long)]
-    pub file1: PathBuf,
-
-    /// Second backtest results file (Proposed strategy)
-    #[arg(long)]
-    pub file2: PathBuf,
+    pub file: PathBuf,
 
     /// Output directory for exported files
     #[arg(long, default_value = "exports")]
     pub output_dir: PathBuf,
-
-    /// Export formats (csv, markdown, json, all)
-    #[arg(long, default_value = "all")]
-    pub format: String,
-
-    /// Include complete validator lists without truncation
-    #[arg(long, default_value = "true")]
-    pub include_full_lists: bool,
 }
 
 #[derive(Parser)]
@@ -390,10 +374,6 @@ pub struct BacktestParameters {
     /// Force fetching fresh data even if cache exists
     #[arg(long, default_value = "false")]
     pub force_fetch: bool,
-
-    /// Use production scoring (default is MEV commission + validator age)
-    #[arg(long, default_value = "false")]
-    pub use_production_scoring: bool,
 
     /// Output file for saving results in JSON format (required)
     #[arg(long)]
