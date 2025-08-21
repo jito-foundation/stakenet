@@ -118,6 +118,7 @@ pub fn emit_validator_history_metrics(
     let mut versions = 0;
     let mut types = 0;
     let mut mev_comms = 0;
+    let mut mev_earns = 0;
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
@@ -126,6 +127,7 @@ pub fn emit_validator_history_metrics(
 
     let mut all_history_vote_accounts = Vec::new();
     for validator_history in validator_histories {
+        // Check current epoch for state
         if let Some(entry) = validator_history.history.last() {
             if entry.epoch as u64 != epoch_info.epoch {
                 continue;
@@ -153,6 +155,18 @@ pub fn emit_validator_history_metrics(
             }
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
+            }
+        }
+        // Check previous epoch for state
+        let previous_epoch = (epoch_info.epoch - 1) as u16;
+        if let Some(entry) = validator_history
+            .history
+            .arr
+            .into_iter()
+            .find(|entry| entry.epoch == previous_epoch)
+        {
+            if entry.mev_earned != default.mev_earned {
+                mev_earns += 1;
             }
         }
 
@@ -194,6 +208,7 @@ pub fn emit_validator_history_metrics(
         ("num_versions", versions, i64),
         ("num_client_types", types, i64),
         ("num_mev_commissions", mev_comms, i64),
+        ("num_mev_earns", mev_earns, i64),
         ("num_commissions", comms, i64),
         ("num_epoch_credits", epoch_credits, i64),
         ("num_stakes", stakes, i64),
