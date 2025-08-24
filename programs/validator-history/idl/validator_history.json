@@ -152,6 +152,32 @@
       ]
     },
     {
+      "name": "copy_stake_info",
+      "discriminator": [
+        154,
+        206,
+        202,
+        123,
+        87,
+        125,
+        60,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_stake_buffer_account"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "copy_tip_distribution_account",
       "discriminator": [
         208,
@@ -317,6 +343,34 @@
       "args": []
     },
     {
+      "name": "initialize_validator_stake_buffer_account",
+      "discriminator": [
+        184,
+        250,
+        142,
+        48,
+        78,
+        36,
+        131,
+        111
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake_buffer_account",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "realloc_cluster_history_account",
       "discriminator": [
         249,
@@ -406,6 +460,34 @@
           "name": "signer",
           "writable": true,
           "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "realloc_validator_stake_buffer_account",
+      "discriminator": [
+        56,
+        114,
+        33,
+        215,
+        109,
+        155,
+        244,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake_buffer_account",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": []
@@ -597,6 +679,32 @@
       ]
     },
     {
+      "name": "update_stake_buffer",
+      "discriminator": [
+        43,
+        154,
+        133,
+        214,
+        246,
+        39,
+        27,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "validator_stake_buffer_account",
+          "writable": true
+        },
+        {
+          "name": "validator_history_account"
+        },
+        {
+          "name": "config"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "update_stake_history",
       "discriminator": [
         213,
@@ -684,6 +792,19 @@
         2,
         146
       ]
+    },
+    {
+      "name": "ValidatorStakeBuffer",
+      "discriminator": [
+        53,
+        175,
+        63,
+        177,
+        129,
+        250,
+        119,
+        110
+      ]
     }
   ],
   "errors": [
@@ -766,9 +887,55 @@
       "code": 6015,
       "name": "PriorityFeeDistributionAccountNotFinalized",
       "msg": "Priority Fee Distribution Account cannot be copied during its own epoch"
+    },
+    {
+      "code": 6016,
+      "name": "StakeBufferFinalized",
+      "msg": "Stake buffer has been finalized"
+    },
+    {
+      "code": 6017,
+      "name": "StakeBufferNotFinalized",
+      "msg": "Stake buffer has not been finalized"
+    },
+    {
+      "code": 6018,
+      "name": "StakeBufferOutOfBounds",
+      "msg": "Stake buffer out of bounds"
+    },
+    {
+      "code": 6019,
+      "name": "StakeBufferEmpty",
+      "msg": "Stake buffer is empty"
+    },
+    {
+      "code": 6020,
+      "name": "StakeBufferDuplicate",
+      "msg": "Stake buffer already contains entry"
     }
   ],
   "types": [
+    {
+      "name": "BitMask",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "values",
+            "type": {
+              "array": [
+                "u64",
+                782
+              ]
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "CircBuf",
       "serialization": "bytemuck",
@@ -1235,6 +1402,88 @@
               "array": [
                 "u8",
                 47
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorStake",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator_index",
+            "type": "u32"
+          },
+          {
+            "name": "_padding0",
+            "type": "u32"
+          },
+          {
+            "name": "stake_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ValidatorStakeBuffer",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "last_observed_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "length",
+            "type": "u32"
+          },
+          {
+            "name": "finalized",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                131
+              ]
+            }
+          },
+          {
+            "name": "total_stake",
+            "type": "u64"
+          },
+          {
+            "name": "inserted_validators",
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "buffer",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "ValidatorStake"
+                  }
+                },
+                50000
               ]
             }
           }
