@@ -1,12 +1,12 @@
-use std::{collections::{HashMap}, str::FromStr};
-use rand::Rng;
-use reqwest;
-use serde::{Deserialize};
 use anchor_lang::prelude::EpochSchedule;
 use log::{error, info};
+use rand::Rng;
+use reqwest;
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use solana_client::rpc_response::RpcLeaderSchedule;
 use solana_sdk::pubkey::Pubkey;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry;
 
@@ -311,15 +311,13 @@ impl DBSlotInfo {
         let random_slot = rng.gen_range(first_slot..=last_slot);
 
         // Check if this slot exists in the database
-        let mut statement = connection.prepare(
-            "SELECT COUNT(*) FROM slot_info WHERE absolute_slot = ?"
-        )?;
+        let mut statement =
+            connection.prepare("SELECT COUNT(*) FROM slot_info WHERE absolute_slot = ?")?;
 
         let count: i64 = statement.query_row(params![random_slot], |row| row.get(0))?;
 
         Ok(count > 0)
     }
-
 
     pub fn get_unmapped_identity_accounts(
         connection: &Connection,
@@ -533,12 +531,8 @@ impl DBSlotInfo {
         chunk_size: usize,
         starting_offset: usize,
     ) -> Result<u64, BlockMetadataKeeperError> {
-
         let client = reqwest::blocking::Client::new();
-        let base_url = format!(
-            "https://api.dune.com/api/v1/query/{}/results",
-            query_id
-        );
+        let base_url = format!("https://api.dune.com/api/v1/query/{}/results", query_id);
 
         let mut total_written = 0u64;
         let mut offset = starting_offset;
@@ -557,7 +551,9 @@ impl DBSlotInfo {
                 .get(&url)
                 .header("X-Dune-API-Key", api_key)
                 .send()
-                .map_err(|e| BlockMetadataKeeperError::OtherError(format!("API request failed: {}", e)))?;
+                .map_err(|e| {
+                    BlockMetadataKeeperError::OtherError(format!("API request failed: {}", e))
+                })?;
 
             if !response.status().is_success() {
                 return Err(BlockMetadataKeeperError::OtherError(format!(
@@ -566,9 +562,9 @@ impl DBSlotInfo {
                 )));
             }
 
-            let api_response: DuneApiResponse = response
-                .json()
-                .map_err(|e| BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {}", e)))?;
+            let api_response: DuneApiResponse = response.json().map_err(|e| {
+                BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {}", e))
+            })?;
 
             let rows = api_response.result.rows;
             if rows.is_empty() {
@@ -581,7 +577,6 @@ impl DBSlotInfo {
 
             let rows_length = rows.len();
             for row in rows {
-
                 // Calculate relative slot
                 let first_slot_in_epoch = epoch_schedule.get_first_slot_in_epoch(row.epoch);
                 let relative_slot = row.slot - first_slot_in_epoch;
@@ -603,7 +598,8 @@ impl DBSlotInfo {
                 let slots_start = entries_to_insert.first().unwrap().absolute_slot;
                 let slots_end = entries_to_insert.last().unwrap().absolute_slot;
 
-                let written = Self::insert_dune_entries(connection, &entries_to_insert, chunk_size)?;
+                let written =
+                    Self::insert_dune_entries(connection, &entries_to_insert, chunk_size)?;
                 total_written += written;
 
                 info!(
@@ -623,7 +619,10 @@ impl DBSlotInfo {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        info!("Completed Dune API fetch. Total entries written: {}", total_written);
+        info!(
+            "Completed Dune API fetch. Total entries written: {}",
+            total_written
+        );
         Ok(total_written)
     }
 

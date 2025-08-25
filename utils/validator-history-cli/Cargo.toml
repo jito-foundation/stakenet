@@ -6,12 +6,13 @@ description = "CLI to manage validator history program"
 
 [dependencies]
 anchor-lang = "0.31.1"
-dotenvy = { workspace = true }
 borsh = { package = "borsh", version = "1.5.7" }
 clap = { version = "4.3.0", features = ["derive", "env"] }
+dotenvy = { workspace = true }
+env_logger = "0.10.0"
 ipinfo = { workspace = true }
 log = "0.4.18"
-env_logger = "0.10.0"
+rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
@@ -21,7 +22,6 @@ solana-native-token = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
 spl-stake-pool = { workspace = true }
+stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
 tokio = { workspace = true }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
-stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
-rusqlite = { version = "0.32.1", features = ["bundled"] }

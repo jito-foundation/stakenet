@@ -1,9 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
-use dotenvy::dotenv;
-use rusqlite::Connection;
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
+use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
+use rusqlite::Connection;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -15,6 +14,7 @@ use solana_sdk::{
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
+use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -167,7 +167,6 @@ struct UpdateOracleAuthority {
     #[arg(long, env)]
     oracle_authority: Pubkey,
 }
-
 
 #[derive(Parser)]
 #[command(about = "Backfills the Priority Fee DB from Dune from the last 99 epochs")]
@@ -1120,7 +1119,9 @@ fn command_get_config(client: RpcClient) {
 }
 
 async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
-    let epoch_schedule = client.get_epoch_schedule().expect("Could not get epoch schedule");
+    let epoch_schedule = client
+        .get_epoch_schedule()
+        .expect("Could not get epoch schedule");
 
     // Move the blocking operations into spawn_blocking
     let entries_written = tokio::task::spawn_blocking(move || {
@@ -1133,7 +1134,7 @@ async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, clien
             &epoch_schedule,
             args.chunk_size,
             args.batch_size,
-            args.starting_offset
+            args.starting_offset,
         )
     })
     .await
@@ -1161,6 +1162,8 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
-        Commands::DunePriorityFeeBackfill(args) => command_dune_priority_fee_backfill(args, client).await,
+        Commands::DunePriorityFeeBackfill(args) => {
+            command_dune_priority_fee_backfill(args, client).await
+        }
     };
 }

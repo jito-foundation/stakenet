@@ -196,8 +196,7 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let epoch_range =
-        (current_epoch - lookback_epochs)..(current_epoch + 1);
+    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
 
     // 1. Update Epoch Schedule
     info!("\n\n\n1. Update Epoch Schedule\n\n\n");
@@ -206,17 +205,13 @@ async fn update_block_metadata(
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
 
         // Check if slot exists
-        if DBSlotInfo::check_random_slot_exists_in_epoch(
-            sqlite_connection,
-            epoch,
-            epoch_schedule
-        )? {
+        if DBSlotInfo::check_random_slot_exists_in_epoch(sqlite_connection, epoch, epoch_schedule)?
+        {
             info!("Epoch {} already exists", epoch);
             continue;
         } else {
             info!("Updating epoch {}", epoch)
         }
-
 
         let epoch_leader_schedule_result =
             get_leader_schedule_safe(client, epoch_starting_slot).await;
@@ -428,7 +423,9 @@ async fn update_block_metadata(
                         validator_history_entry_blocks_produced =
                             validator_history_entry.blocks_produced as i64;
 
-                        needs_update = validator_history_entry.block_data_updated_at_slot < first_slot_in_next_epoch || validator_history_entry.block_data_updated_at_slot == u64::MAX;
+                        needs_update = validator_history_entry.block_data_updated_at_slot
+                            < first_slot_in_next_epoch
+                            || validator_history_entry.block_data_updated_at_slot == u64::MAX;
                     }
                 }
 
@@ -491,10 +488,7 @@ async fn update_block_metadata(
             time_ms as f64 / 1000.0,
         );
         info!("Block Metadata: {}", needs_update_counter);
-
     }
-
-
 
     // 5. Submit TXs
     {

@@ -24,7 +24,7 @@ use stakenet_sdk::utils::{
 };
 use validator_history::{constants::MIN_VOTE_EPOCHS, ClusterHistory, ValidatorHistory};
 
-use crate::{operations::keeper_operations::{KeeperCreates, KeeperOperations}};
+use crate::operations::keeper_operations::{KeeperCreates, KeeperOperations};
 
 use super::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 

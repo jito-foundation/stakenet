@@ -233,7 +233,6 @@ pub struct Args {
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     #[arg(long, env, default_value = "500000000000")]
     pub validator_history_min_stake: u64,
-
 }
 
 impl fmt::Display for Args {

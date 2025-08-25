@@ -4,7 +4,7 @@ use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
     state::keeper_state::KeeperState,
 };
-use log::{error as log_error};
+use log::error as log_error;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::instruction::Instruction;
@@ -15,7 +15,7 @@ use solana_sdk::{
 use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
-use stakenet_sdk::utils::transactions::{submit_chunk_instructions};
+use stakenet_sdk::utils::transactions::submit_chunk_instructions;
 use std::sync::Arc;
 use validator_history::MerkleRootUploadAuthority;
 
@@ -137,36 +137,38 @@ pub async fn update_priority_fee_commission(
 
     let mut all_update_instructions: Vec<Instruction> = Vec::new();
 
-    let epoch_range =
-        (current_epoch - lookback_epochs)..(current_epoch);
+    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch);
     for epoch in epoch_range {
+        let update_instructions = keeper_state
+            .validator_history_map
+            .keys()
+            .filter_map(|vote_account| {
+                if let Some(validator_history) =
+                    keeper_state.validator_history_map.get(vote_account)
+                {
+                    let should_update = validator_history.history.arr.iter().any(|entry| {
+                        entry.epoch as u64 == epoch
+                            && entry.priority_fee_merkle_root_upload_authority
+                                == MerkleRootUploadAuthority::Unset
+                    });
 
-        let update_instructions = keeper_state.validator_history_map.keys()
-        .filter_map(|vote_account| {
-
-            if let Some(validator_history) = keeper_state.validator_history_map.get(vote_account) {
-                let should_update = validator_history.history.arr.iter().any(|entry| {
-                    entry.epoch as u64 == epoch
-                        && entry.priority_fee_merkle_root_upload_authority == MerkleRootUploadAuthority::Unset
-                });
-
-                if !should_update {
-                    return None;
+                    if !should_update {
+                        return None;
+                    }
                 }
-            }
 
-            Some(
-                ValidatorPriorityFeeCommissionEntry::new(
-                    vote_account,
-                    epoch,
-                    program_id,
-                    priority_fee_distribution_program_id,
-                    &keypair.pubkey(),
+                Some(
+                    ValidatorPriorityFeeCommissionEntry::new(
+                        vote_account,
+                        epoch,
+                        program_id,
+                        priority_fee_distribution_program_id,
+                        &keypair.pubkey(),
+                    )
+                    .update_instruction(),
                 )
-                .update_instruction(),
-            )
-        })
-        .collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         all_update_instructions.extend(update_instructions);
     }
