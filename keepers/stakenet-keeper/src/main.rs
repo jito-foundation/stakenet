@@ -278,28 +278,28 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // ---------------------- EMIT ---------------------------------
 
         if should_fire(tick, metrics_interval) {
-            // keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
-            //     &keeper_config,
-            //     &keeper_state,
-            //     keeper_config.cluster_name.as_str(),
-            // ));
+            keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
+                &keeper_config,
+                &keeper_state,
+                keeper_config.cluster_name.as_str(),
+            ));
         }
 
         if should_emit(tick, &intervals) {
-            // info!("Emitting metrics...");
-            // keeper_state.emit();
+            info!("Emitting metrics...");
+            keeper_state.emit();
 
-            // KeeperOperations::emit(
-            //     &keeper_state.runs_for_epoch,
-            //     &keeper_state.errors_for_epoch,
-            //     &keeper_state.txs_for_epoch,
-            //     keeper_config.cluster_name.as_str(),
-            // );
+            KeeperOperations::emit(
+                &keeper_state.runs_for_epoch,
+                &keeper_state.errors_for_epoch,
+                &keeper_state.txs_for_epoch,
+                keeper_config.cluster_name.as_str(),
+            );
 
-            // KeeperCreates::emit(
-            //     &keeper_state.created_accounts_for_epoch,
-            //     &keeper_state.cluster_name,
-            // );
+            KeeperCreates::emit(
+                &keeper_state.created_accounts_for_epoch,
+                &keeper_state.cluster_name,
+            );
         }
 
         // ---------- CLEAR STARTUP ----------
@@ -309,12 +309,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
-
-        info!("-                              -");
-        info!("-                              -");
-        info!("------------ TICK {} -----------", tick);
-        info!("-                              -");
-        info!("-                              -");
     }
 }
 
@@ -330,25 +324,25 @@ fn main() {
 
     info!("{}\n\n", args);
 
-    // let gossip_entrypoints = args
-    //     .gossip_entrypoints
-    //     .map(|gossip_entrypoints| {
-    //         gossip_entrypoints
-    //             .iter()
-    //             .enumerate()
-    //             .map(|(index, gossip_entrypoint)| {
-    //                 solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
-    //                     panic!(
-    //                         "Failed to parse gossip entrypoint #{} '{}': {}",
-    //                         index + 1,
-    //                         gossip_entrypoint,
-    //                         err
-    //                     )
-    //                 })
-    //             })
-    //             .collect()
-    //     })
-    //     .expect("Failed to create socket addresses from gossip entrypoints");
+    let gossip_entrypoints = args
+        .gossip_entrypoints
+        .map(|gossip_entrypoints| {
+            gossip_entrypoints
+                .iter()
+                .enumerate()
+                .map(|(index, gossip_entrypoint)| {
+                    solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
+                        panic!(
+                            "Failed to parse gossip entrypoint #{} '{}': {}",
+                            index + 1,
+                            gossip_entrypoint,
+                            err
+                        )
+                    })
+                })
+                .collect()
+        })
+        .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -408,7 +402,7 @@ fn main() {
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
             oracle_authority_keypair,
-            gossip_entrypoints: None,//Some(gossip_entrypoints),
+            gossip_entrypoints: Some(gossip_entrypoints),
             validator_history_interval: args.validator_history_interval,
             metrics_interval: args.metrics_interval,
             steward_interval: args.steward_interval,

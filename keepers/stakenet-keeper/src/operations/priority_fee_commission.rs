@@ -4,7 +4,7 @@ use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
     state::keeper_state::KeeperState,
 };
-use log::{error as log_error, info};
+use log::{error as log_error};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::instruction::Instruction;
@@ -70,9 +70,8 @@ pub async fn fire(
         keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
 
     let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
-    info!("Should Run PFC: {}", should_run);
 
-    // if should_run {
+    if should_run {
         match _process(
             client,
             keypair,
@@ -88,7 +87,6 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                info!("Run PFC: {}/{}", stats.successes, stats.errors);
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
                         log_error!("ERROR: {}", e);
@@ -113,7 +111,7 @@ pub async fn fire(
                 errors_for_epoch += 1;
             }
         };
-    // }
+    }
 
     (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
 }
@@ -173,8 +171,7 @@ pub async fn update_priority_fee_commission(
         all_update_instructions.extend(update_instructions);
     }
 
-    info!("PFC: {}", all_update_instructions.len());
-
+    // Don't bundle under 160, such that TXs wont fail in larger bundles
     let chunk_size = match all_update_instructions.len() {
         0..=160 => 1,
         _ => 8,

@@ -446,7 +446,6 @@ async fn update_block_metadata(
                 )
                 .await;
 
-                //TODO uncomment
                 datapoint_info!(
                   "pfh-block-info-0.0.9",
                   ("blocks-error", entry.blocks_error, i64),
@@ -479,9 +478,7 @@ async fn update_block_metadata(
                 );
 
                 if needs_update {
-                    // info!("Block Metadata: {} ({})", vote_account, epoch);
                     needs_update_counter += 1;
-                    //TODO uncomment
                     ixs.push(entry.update_instruction());
                 }
             }
