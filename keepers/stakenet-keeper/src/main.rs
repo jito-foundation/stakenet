@@ -96,15 +96,15 @@ async fn random_cooldown(range: u8) {
     let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
     info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
-    sleep(Duration::from_secs(sleep_duration)).await;
+    sleep(Duration::from_secs(10)).await;
 }
 
 async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
-    let validator_history_interval = 60;
+    let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
-    let block_metadata_interval = 60;
+    let block_metadata_interval = keeper_config.block_metadata_interval;
 
     let intervals = vec![
         validator_history_interval,
@@ -129,7 +129,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...");
+            info!("Pre-fetching data for update...({})", tick);
             match pre_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -146,7 +146,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...");
+                info!("Creating missing accounts...({})", tick);
                 match create_missing_accounts(&keeper_config, &keeper_state).await {
                     Ok(new_accounts_created) => {
                         keeper_state.increment_update_run_for_epoch(
@@ -182,7 +182,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Post-fetching data for update...");
+            info!("Post-fetching data for update...({})", tick);
             match post_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
@@ -419,6 +419,7 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
+            lookback_epochs: args.lookback_epochs,
             validator_history_min_stake: args.validator_history_min_stake,
         };
 
