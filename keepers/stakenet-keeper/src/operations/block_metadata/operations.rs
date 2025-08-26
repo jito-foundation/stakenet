@@ -103,6 +103,7 @@ pub async fn fire(
             keeper_config.no_pack,
             keeper_config.cluster,
             keeper_config.lookback_epochs,
+            keeper_config.lookback_start_offset_epochs,
         )
         .await
         {
@@ -150,6 +151,7 @@ async fn _process(
     no_pack: bool,
     cluster: Cluster,
     lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     update_block_metadata(
         client,
@@ -166,6 +168,7 @@ async fn _process(
         no_pack,
         cluster,
         lookback_epochs,
+        lookback_start_offset_epochs,
     )
     .await
 }
@@ -186,6 +189,7 @@ async fn update_block_metadata(
     _no_pack: bool, //TODO take out
     cluster: Cluster,
     lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
 ) -> Result<SubmitStats, Box<dyn std::error::Error>> {
     let identity_to_vote_map = &keeper_state.identity_to_vote_map;
     let slot_history = &keeper_state.slot_history;
@@ -196,7 +200,7 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch + 1);
+    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)..(current_epoch + 1 - lookback_start_offset_epochs);
 
     // 1. Update Epoch Schedule
     info!("\n\n\n1. Update Epoch Schedule\n\n\n");

@@ -40,6 +40,7 @@ pub struct KeeperConfig {
     pub cluster: Cluster,
     pub cluster_name: String,
     pub lookback_epochs: u64,
+    pub lookback_start_offset_epochs: u64,
 
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     pub validator_history_min_stake: u64,
@@ -230,6 +231,10 @@ pub struct Args {
     #[arg(long, env, default_value = "3")]
     pub lookback_epochs: u64,
 
+    /// Number of epochs from current epoch to run ( for backfill )
+    #[arg(long, env, default_value = "0")]
+    pub lookback_start_offset_epochs: u64,
+
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     #[arg(long, env, default_value = "500000000000")]
     pub validator_history_min_stake: u64,
@@ -273,6 +278,7 @@ impl fmt::Display for Args {
             Run Block Metadata {}\n\
             Block Metadata Interval: {} seconds\n\
             Lookback Epochs: {}\n\
+            Lookback Start Offset Epochs: {}\n\
             SQLite path: {:?}\n\
             Region: {}\n\
             Redundant RPC URLs: {:?}\n\
@@ -311,6 +317,7 @@ impl fmt::Display for Args {
             self.run_block_metadata,
             self.block_metadata_interval,
             self.lookback_epochs,
+            self.lookback_start_offset_epochs,
             self.sqlite_path,
             self.region,
             self.redundant_rpc_urls,

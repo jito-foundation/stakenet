@@ -38,6 +38,7 @@ async fn _process(
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     update_priority_fee_commission(
@@ -50,6 +51,7 @@ async fn _process(
         confirmation_time,
         priority_fee_in_microlamports,
         lookback_epochs,
+        lookback_start_offset_epochs,
         no_pack,
     )
     .await
@@ -82,6 +84,7 @@ pub async fn fire(
             keeper_config.tx_confirmation_seconds,
             priority_fee_in_microlamports,
             keeper_config.lookback_epochs,
+            keeper_config.lookback_start_offset_epochs,
             keeper_config.no_pack,
         )
         .await
@@ -129,6 +132,7 @@ pub async fn update_priority_fee_commission(
     confirmation_time: u64,
     priority_fee_in_microlamports: u64,
     lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
     _no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     // Only update Epoch N-1 since, priority fees are not yet finalized
@@ -137,7 +141,7 @@ pub async fn update_priority_fee_commission(
 
     let mut all_update_instructions: Vec<Instruction> = Vec::new();
 
-    let epoch_range = (current_epoch - lookback_epochs)..(current_epoch);
+    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)..(current_epoch - lookback_start_offset_epochs);
     for epoch in epoch_range {
         let update_instructions = keeper_state
             .validator_history_map
