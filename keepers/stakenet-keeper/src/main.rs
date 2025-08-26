@@ -330,15 +330,19 @@ fn main() {
             gossip_entrypoints
                 .iter()
                 .enumerate()
-                .map(|(index, gossip_entrypoint)| {
-                    solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
-                        panic!(
-                            "Failed to parse gossip entrypoint #{} '{}': {}",
-                            index + 1,
-                            gossip_entrypoint,
-                            err
-                        )
-                    })
+                .filter_map(|(index, gossip_entrypoint)| {
+                    if gossip_entrypoint.is_empty() {
+                        None
+                    } else {
+                        Some(solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
+                            panic!(
+                                "Failed to parse gossip entrypoint #{} '{}': {}",
+                                index + 1,
+                                gossip_entrypoint,
+                                err
+                            )
+                        }))
+                    }
                 })
                 .collect()
         })
