@@ -487,6 +487,75 @@ pub fn calculate_priority_fee_merkle_root_authority_score(
     }
 }
 
+/// Calculates validator age by counting the number of epochs in the validator's history
+/// with non-zero vote credits. This metric indicates how long a validator has been
+/// actively participating in the network.
+pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16) -> Result<u16> {
+    Ok(validator.history.validator_age(current_epoch))
+}
+
+/// Encodes multiple scoring components into a single f64 value for efficient sorting.
+/// This creates a 4-tier tiebreaker system where validators are ranked by:
+/// 1. Inflation Commission % (lower is better)
+/// 2. MEV Commission % (lower is better)
+/// 3. Validator Age (higher is better)
+/// 4. Vote Credits (higher is better)
+///
+/// The encoding uses bit manipulation to pack values into a u64, then converts to f64.
+/// Higher order bits have higher priority in comparisons.
+///
+/// Bit layout:
+/// - Bits 48-63: Inflation commission (inverted: 100 - commission)
+/// - Bits 32-47: MEV commission (inverted: 10000 - commission)
+/// - Bits 16-31: Validator age (epochs with non-zero credits)
+/// - Bits 0-15: Vote credits ratio (normalized to 0-65535)
+///
+/// TODO Step 4: Update ScoreComponentsV3 structure to include validator_age field
+/// TODO Step 5: Modify score storage in compute_score() to use this encoded value
+/// TODO Step 6: Update tests to validate the new encoding and sorting behavior
+pub fn encode_tiebreaker_score(
+    inflation_commission: u8, // 0-100
+    mev_commission: u16,      // 0-10000 bps
+    validator_age: u16,       // 0-512 epochs max
+    vote_credits_ratio: f64,  // 0.0-1.0 normalized
+) -> Result<f64> {
+    // Validate inputs
+    if inflation_commission > 100 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+    if mev_commission > 10000 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+    if validator_age > 512 {
+        // CircBuf has MAX_ITEMS = 512, so this is the theoretical maximum
+        return Err(StewardError::ArithmeticError.into());
+    }
+    if vote_credits_ratio < 0.0 || vote_credits_ratio > 1.0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
+    // Invert commissions so lower commission = higher score
+    // This ensures validators with lower commissions sort higher
+    let inflation_score = ((100 - inflation_commission) as u64) << 48;
+    let mev_score = ((10000 - mev_commission) as u64) << 32;
+
+    // Validator age goes in directly (higher is better)
+    // Cap at 16 bits (65535) even though max is 512
+    let age_score = (validator_age as u64) << 16;
+
+    // Normalize vote credits ratio to 16-bit range
+    // vote_credits_ratio is already 0.0-1.0, scale to 0-65535
+    let vote_score = (vote_credits_ratio * 65535.0) as u64;
+
+    // Combine all components using bitwise OR
+    // Each component occupies its own bit range, no overlap
+    let combined = inflation_score | mev_score | age_score | vote_score;
+
+    // Convert to f64 for storage in existing score field
+    // This maintains bit pattern for proper numeric comparison
+    Ok(f64::from_bits(combined))
+}
+
 /// Given a validator's tips and total fees, determine their realized commission rate
 pub fn calculate_realized_commission_bps(tips: &Option<u64>, total_fees: &Option<u64>) -> u16 {
     // total_fees is None when the ValidatorHistoryEntry has been created, but the

@@ -637,6 +637,39 @@ impl CircBuf {
             u64
         )
     }
+
+    /// Calculates validator age by counting the number of epochs with non-zero vote credits.
+    /// This metric represents how long a validator has been actively participating in the network.
+    ///
+    /// Returns the count of epochs where the validator had epoch_credits > 0
+    pub fn validator_age(&self, current_epoch: u16) -> u16 {
+        if self.is_empty() {
+            return 0;
+        }
+
+        // Find the minimum epoch in the buffer
+        let min_epoch = {
+            let next_i = (self.idx as usize + 1) % self.arr.len();
+            if self.arr[next_i].epoch == ValidatorHistoryEntry::default().epoch {
+                // Buffer not full, start from first entry
+                self.arr[0].epoch
+            } else {
+                // Buffer is full, next_i points to oldest entry
+                self.arr[next_i].epoch
+            }
+        };
+
+        // Count epochs with non-zero credits
+        let mut age = 0u16;
+        for entry in self.epoch_range(min_epoch, current_epoch).iter().flatten() {
+            // Only count epochs where validator was actively voting
+            if entry.epoch_credits > 0 {
+                age += 1;
+            }
+        }
+
+        age
+    }
 }
 
 pub enum ValidatorHistoryVersion {
