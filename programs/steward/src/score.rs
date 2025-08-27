@@ -504,11 +504,11 @@ pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16)
 /// The encoding uses bit manipulation to pack values into a u64, then converts to f64.
 /// Higher order bits have higher priority in comparisons.
 ///
-/// Bit layout:
-/// - Bits 48-63: Inflation commission (inverted: 100 - commission)
-/// - Bits 32-47: MEV commission (inverted: 10000 - commission)
-/// - Bits 16-31: Validator age (epochs with non-zero credits)
-/// - Bits 0-15: Vote credits ratio (normalized to 0-65535)
+/// Optimized bit layout prioritizing vote credits precision:
+/// - Bits 57-63: Inflation commission (7 bits: 0-127, covers 0-100%)
+/// - Bits 44-56: MEV commission (13 bits: 0-8191, truncated from 0-10000 bps)
+/// - Bits 35-43: Validator age (9 bits: 0-511, covers full CircBuf)
+/// - Bits 0-34: Vote credits ratio (35 bits: ~34 billion levels of precision)
 ///
 /// TODO Step 4: Update ScoreComponentsV3 structure to include validator_age field
 /// TODO Step 5: Modify score storage in compute_score() to use this encoded value
@@ -526,8 +526,8 @@ pub fn encode_tiebreaker_score(
     if mev_commission > 10000 {
         return Err(StewardError::ArithmeticError.into());
     }
-    if validator_age > 512 {
-        // CircBuf has MAX_ITEMS = 512, so this is the theoretical maximum
+    if validator_age > 511 {
+        // 9 bits max = 511
         return Err(StewardError::ArithmeticError.into());
     }
     if vote_credits_ratio < 0.0 || vote_credits_ratio > 1.0 {
@@ -536,16 +536,23 @@ pub fn encode_tiebreaker_score(
 
     // Invert commissions so lower commission = higher score
     // This ensures validators with lower commissions sort higher
-    let inflation_score = ((100 - inflation_commission) as u64) << 48;
-    let mev_score = ((10000 - mev_commission) as u64) << 32;
 
-    // Validator age goes in directly (higher is better)
-    // Cap at 16 bits (65535) even though max is 512
-    let age_score = (validator_age as u64) << 16;
+    // Inflation: 7 bits (0-127), shift to bits 57-63
+    let inflation_inverted = (100_u64.saturating_sub(inflation_commission as u64)).min(127);
+    let inflation_score = inflation_inverted << 57;
 
-    // Normalize vote credits ratio to 16-bit range
-    // vote_credits_ratio is already 0.0-1.0, scale to 0-65535
-    let vote_score = (vote_credits_ratio * 65535.0) as u64;
+    // MEV: 13 bits (0-8191), shift to bits 44-56
+    // Truncate MEV commission to fit in 13 bits (max 8191)
+    let mev_inverted = (10000_u64.saturating_sub(mev_commission as u64)).min(8191);
+    let mev_score = mev_inverted << 44;
+
+    // Validator age: 9 bits (0-511), shift to bits 35-43
+    let age_score = (validator_age as u64) << 35;
+
+    // Vote credits: 35 bits for maximum precision (0 to ~34 billion)
+    // This gives us precision to 8-9 decimal places
+    let max_vote_credits = (1u64 << 35) - 1; // 2^35 - 1
+    let vote_score = (vote_credits_ratio * max_vote_credits as f64) as u64;
 
     // Combine all components using bitwise OR
     // Each component occupies its own bit range, no overlap
