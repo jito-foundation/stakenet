@@ -12,8 +12,6 @@ use crate::entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMe
 
 use super::errors::BlockMetadataKeeperError;
 
-const LEADER_SCHEDULE_VOTE_KEY_EPOCH: u64 = 830;
-
 // -------------------------- DUNE SCHEMA ----------------------------
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -145,9 +143,10 @@ impl DBSlotInfo {
             let identity_key = leader.0;
             let relative_slots = leader.1;
 
-            let vote_key: String = (epoch >= LEADER_SCHEDULE_VOTE_KEY_EPOCH)
-                .then_some(leader.0.to_string())
-                .unwrap_or_default();
+            //TODO Get leader schedule from new RPC call
+            // let vote_key: String = (epoch >= LEADER_SCHEDULE_VOTE_KEY_EPOCH)
+            //     .then_some(leader.0.to_string())
+            //     .unwrap_or_default();
 
             // Process each slot individually
             for relative_slots in relative_slots.chunks(chunk_size) {
@@ -165,7 +164,7 @@ impl DBSlotInfo {
                             absolute_slot,
                             relative_slot,
                             epoch,
-                            vote_key,
+                            "",                             // vote_key default to empty
                             identity_key,
                             0,                              // priority_fees default to 0
                             DBSlotInfoState::Created as u8, // Set initial state to Created
