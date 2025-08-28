@@ -96,7 +96,7 @@ async fn random_cooldown(range: u8) {
     let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
     info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
-    sleep(Duration::from_secs(10)).await;
+    sleep(Duration::from_secs(sleep_duration)).await;
 }
 
 async fn run_keeper(keeper_config: KeeperConfig) {

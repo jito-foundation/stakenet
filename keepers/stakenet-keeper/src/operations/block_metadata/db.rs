@@ -74,7 +74,6 @@ impl DBSlotInfoState {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct DBSlotInfo {
     pub identity_key: String, // As of mainnet epoch `LEADER_SCHEDULE_VOTE_KEY_EPOCH`, this is also the vote key

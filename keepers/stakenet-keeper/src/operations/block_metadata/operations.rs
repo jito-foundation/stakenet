@@ -277,15 +277,6 @@ async fn update_block_metadata(
             }
             Err(err) => error!("Error updating identity/vote mapping {:?}", err),
         }
-
-        // 2b. Print out all
-        // let all_unmapped_identities =
-        //     DBSlotInfo::get_unmapped_identity_accounts(sqlite_connection, epoch)?;
-        // error!(
-        //     "Unmapped identities ({}) \n{:?}\n",
-        //     all_unmapped_identities.len(),
-        //     all_unmapped_identities
-        // );
     }
 
     // 3. Update Blocks ( Tries to update all blocks )
