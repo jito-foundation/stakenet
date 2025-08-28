@@ -1,3 +1,6 @@
+use crate::errors::StewardError::{
+    AlreadyPermissioned, DirectedStakeStakerListFull, DirectedStakeValidatorListFull,
+};
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
@@ -127,4 +130,55 @@ pub struct DirectedStakeWhitelist {
     pub total_permissioned_validators: u16,
     // 256 bytes reserved for future use
     pub _padding0: [u8; 256],
+}
+
+impl DirectedStakeWhitelist {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const SEED: &'static [u8] = b"whitelist";
+
+    pub fn is_staker_permissioned(&self, staker: &Pubkey) -> bool {
+        self.permissioned_stakers
+            .iter()
+            .take(self.total_permissioned_stakers as usize)
+            .any(|pk| pk == staker)
+    }
+
+    pub fn is_validator_permissioned(&self, validator: &Pubkey) -> bool {
+        self.permissioned_validators
+            .iter()
+            .take(self.total_permissioned_validators as usize)
+            .any(|pk| pk == validator)
+    }
+
+    pub fn can_add_staker(&self) -> bool {
+        (self.total_permissioned_stakers as usize) < MAX_PERMISSIONED_DIRECTED_STAKERS
+    }
+
+    pub fn can_add_validator(&self) -> bool {
+        (self.total_permissioned_validators as usize) < MAX_PERMISSIONED_DIRECTED_VALIDATORS
+    }
+
+    pub fn add_staker(&mut self, staker: Pubkey) -> Result<()> {
+        if !self.can_add_staker() {
+            return Err(error!(DirectedStakeStakerListFull));
+        }
+        if self.is_staker_permissioned(&staker) {
+            return Err(error!(AlreadyPermissioned));
+        }
+        self.permissioned_stakers[self.total_permissioned_stakers as usize] = staker;
+        self.total_permissioned_stakers += 1;
+        Ok(())
+    }
+
+    pub fn add_validator(&mut self, validator: Pubkey) -> Result<()> {
+        if !self.can_add_validator() {
+            return Err(error!(DirectedStakeValidatorListFull));
+        }
+        if self.is_validator_permissioned(&validator) {
+            return Err(error!(DirectedStakeValidatorListFull));
+        }
+        self.permissioned_validators[self.total_permissioned_validators as usize] = validator;
+        self.total_permissioned_validators += 1;
+        Ok(())
+    }
 }

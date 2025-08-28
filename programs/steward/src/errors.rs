@@ -68,4 +68,11 @@ pub enum StewardError {
     InvalidStakeState,
     #[msg("Arithmetic casting error")]
     ArithmeticCastError,
+
+    #[msg("Directed stake validator whitelist is full")]
+    DirectedStakeValidatorListFull,
+    #[msg("Directed stake stakers list is full")]
+    DirectedStakeStakerListFull,
+    #[msg("Already permissioned")]
+    AlreadyPermissioned,
 }
