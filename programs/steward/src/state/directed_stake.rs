@@ -2,6 +2,7 @@ use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 
+pub const MAX_PERMISSIONED_DIRECTED_STAKERS: usize = 2048;
 pub const MAX_PERMISSIONED_DIRECTED_VALIDATORS: usize = 2048;
 pub const MAX_PREFERENCES_PER_TICKET: usize = 128;
 
@@ -48,4 +49,15 @@ pub struct DirectedStakeTicket {
     // 15 bytes required for alignment
     // + 112 bytes reserved for future use
     pub _padding0: [u8; 127],
+}
+
+#[derive(BorshSerialize)]
+#[account(zero_copy)]
+pub struct DirectedStakeWhitelist {
+    pub permissioned_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
+    pub permissioned_validators: [Pubkey; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    pub total_permissioned_stakers: u16,
+    pub total_permissioned_validators: u16,
+    // 256 bytes reserved for future use
+    pub _padding0: [u8; 256],
 }
