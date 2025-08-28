@@ -32,7 +32,7 @@ pub async fn command_crank_rebalance(
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::Rebalance => { /* Continue */ }
+        StewardStateEnum::RebalanceUndirectedStake => { /* Continue */ }
         _ => {
             println!(
                 "State account is not in Rebalance state: {}",

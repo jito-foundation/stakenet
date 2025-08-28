@@ -268,7 +268,10 @@ pub fn test_compute_instant_unstake_to_rebalance() {
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
-    assert!(matches!(state.state_tag, StewardStateEnum::Rebalance));
+    assert!(matches!(
+        state.state_tag,
+        StewardStateEnum::RebalanceUndirectedStake
+    ));
     assert!(state.progress.is_empty());
 }
 
@@ -336,11 +339,14 @@ pub fn test_rebalance_to_idle() {
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
 
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
 
     for i in 0..state.num_pool_validators as usize {
         let _ = state.progress.set(i, true);
-        assert!(matches!(state.state_tag, StewardStateEnum::Rebalance));
+        assert!(matches!(
+            state.state_tag,
+            StewardStateEnum::RebalanceUndirectedStake
+        ));
     }
 
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -348,7 +354,7 @@ pub fn test_rebalance_to_idle() {
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
 
     // Test didn't finish rebalance case
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     state.progress.reset();
     state.set_flag(RESET_TO_IDLE);
 
@@ -366,7 +372,7 @@ pub fn test_rebalance_to_compute_scores() {
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
 
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     clock.epoch += parameters.num_epochs_between_scoring;
     clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
 

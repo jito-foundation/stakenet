@@ -1046,7 +1046,7 @@ pub async fn crank_steward(
                     )
                     .await?
                 }
-                StewardStateEnum::Rebalance => {
+                StewardStateEnum::RebalanceUndirectedStake => {
                     println!("Cranking Rebalance...");
 
                     _handle_rebalance(
@@ -1058,6 +1058,11 @@ pub async fn crank_steward(
                     )
                     .await?
                 }
+                StewardStateEnum::ComputeDirectedStakeMeta => todo!(),
+                StewardStateEnum::CopyDirectedStakeMeta => todo!(),
+                StewardStateEnum::RebalanceDirectedStake => todo!(),
+                StewardStateEnum::LockReserve => todo!(),
+                StewardStateEnum::UnlockReserve => todo!(),
             };
 
             return_stats.combine(&stats);
