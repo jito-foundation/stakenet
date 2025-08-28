@@ -4,7 +4,6 @@ use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
-
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
 assert!(EXPECTED_SIZE == CONFIG_SIZE);*/

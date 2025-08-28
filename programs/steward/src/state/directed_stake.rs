@@ -1,7 +1,6 @@
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
-use bytemuck::{Pod, Zeroable};
 
 pub const MAX_PERMISSIONED_DIRECTED_VALIDATORS: usize = 2048;
 pub const MAX_PREFERENCES_PER_TICKET: usize = 128;
@@ -18,8 +17,8 @@ struct DirectedStakeMeta {
     targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
 }
 
-#[derive(BorshSerialize, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
+#[derive(BorshSerialize)]
+#[account(zero_copy)]
 struct DirectedStakeTarget {
     vote_pubkey: Pubkey,
     total_target_lamports: u128,
@@ -28,8 +27,8 @@ struct DirectedStakeTarget {
     _padding0: [u8; 64],
 }
 
-#[derive(BorshSerialize, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
+#[derive(BorshSerialize)]
+#[account(zero_copy)]
 pub struct DirectedStakePreference {
     pub vote_pubkey: Pubkey,
     /// Percentage of directed stake allocated towards this validator
