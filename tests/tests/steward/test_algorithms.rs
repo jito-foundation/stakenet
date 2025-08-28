@@ -12,7 +12,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
-        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV4, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -50,7 +50,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -59,6 +59,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -96,7 +97,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -105,6 +106,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -140,7 +142,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -149,6 +151,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -184,7 +187,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -193,6 +196,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -232,7 +236,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -241,6 +245,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -278,7 +283,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -287,6 +292,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -325,7 +331,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -334,6 +340,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -373,7 +380,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 0.0,
@@ -382,6 +389,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 0.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -418,7 +426,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 0.89,
             mev_commission_score: 1.0,
@@ -427,6 +435,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 0.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
@@ -471,7 +480,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -480,6 +489,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -514,7 +524,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -523,6 +533,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 0.0,
             merkle_root_upload_authority_score: 1.0,
@@ -564,7 +575,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.88,
             yield_score: 0.88,
             mev_commission_score: 1.0,
@@ -573,6 +584,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 0.88,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -609,7 +621,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 0.95,
             mev_commission_score: 1.0,
@@ -618,6 +630,7 @@ fn test_compute_score() {
             delinquency_score: 0.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 0.95,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -659,7 +672,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.9,
             yield_score: 0.9,
             mev_commission_score: 1.0,
@@ -668,6 +681,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 0.9,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -707,7 +721,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -716,6 +730,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -792,7 +807,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -801,6 +816,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 0.0,
@@ -841,7 +857,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -850,6 +866,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -890,7 +907,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -899,6 +916,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -941,7 +959,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 1.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -950,6 +968,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,
@@ -992,7 +1011,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
+        ScoreComponentsV4 {
             score: 0.0,
             yield_score: 1.0,
             mev_commission_score: 1.0,
@@ -1001,6 +1020,7 @@ fn test_compute_score() {
             delinquency_score: 1.0,
             running_jito_score: 1.0,
             vote_credits_ratio: 1.0,
+            validator_age: 0,
             commission_score: 1.0,
             historical_commission_score: 1.0,
             merkle_root_upload_authority_score: 1.0,

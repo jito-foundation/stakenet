@@ -18,7 +18,7 @@ use crate::{
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV3 {
+pub struct ScoreComponentsV4 {
     /// Product of all scoring components
     pub score: f64,
 
@@ -52,6 +52,9 @@ pub struct ScoreComponentsV3 {
     /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
     /// Excluding current epoch
     pub vote_credits_ratio: f64,
+
+    /// Validator age - number of epochs with non-zero vote credits
+    pub validator_age: u32,
 
     pub vote_account: Pubkey,
 
@@ -110,7 +113,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV3> {
+) -> Result<ScoreComponentsV4> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -188,6 +191,8 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
+    let validator_age = validator.validator_age;
+
     /////// Formula ///////
 
     let yield_score = vote_credits_ratio * (1. - max_commission as f64 / COMMISSION_MAX as f64);
@@ -204,7 +209,7 @@ pub fn validator_score(
         * priority_fee_commission_score
         * priority_fee_merkle_root_upload_authority_score;
 
-    Ok(ScoreComponentsV3 {
+    Ok(ScoreComponentsV4 {
         score,
         yield_score,
         mev_commission_score,
@@ -216,6 +221,7 @@ pub fn validator_score(
         historical_commission_score,
         merkle_root_upload_authority_score,
         vote_credits_ratio,
+        validator_age,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: ScoreDetails {
@@ -506,7 +512,7 @@ pub fn calculate_priority_fee_merkle_root_authority_score(
 /// Note: This encoding assumes validators with >10% commission are filtered out
 /// by the binary scoring filters (commission_score, mev_commission_score) before ranking.
 ///
-/// TODO Step 4: Update ScoreComponentsV3 structure to include validator_age field
+/// TODO Step 4: Update ScoreComponentsV4 structure to include validator_age field
 /// TODO Step 5: Modify score storage in compute_score() to use this encoded value
 /// TODO Step 6: Update tests to validate the new encoding and sorting behavior
 pub fn encode_tiebreaker_score(
