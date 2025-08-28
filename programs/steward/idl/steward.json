@@ -2357,6 +2357,27 @@
             "type": "pubkey"
           },
           {
+            "name": "directed_stake_meta_upload_authority",
+            "docs": [
+              "The authority that can update the DirectedStakeMeta for an epoch"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "reserve_lock_authority",
+            "docs": [
+              "The authority that can invoke lock_reserve and unlock_reserve instructions"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "directed_stake_whitelist_authority",
+            "docs": [
+              "The authority that can update the directed stake whitelist"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -2364,7 +2385,7 @@
             "type": {
               "array": [
                 "u8",
-                984
+                888
               ]
             }
           }
@@ -2837,11 +2858,25 @@
             "type": "u16"
           },
           {
+            "name": "directed_stake_unstake_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to be unstaked from directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "directed_stake_global_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to delegated via directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
           },

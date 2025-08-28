@@ -1292,7 +1292,10 @@ impl Default for FixtureDefaultAccounts {
             paused: false.into(),
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
-            _padding: [0; 984],
+            directed_stake_meta_upload_authority: Pubkey::new_unique(),
+            reserve_lock_authority: Pubkey::new_unique(),
+            directed_stake_whitelist_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1787,7 +1790,9 @@ impl Default for StateMachineFixtures {
             priority_fee_max_commission_bps: 5_000,
             priority_fee_error_margin_bps: 10,
             priority_fee_scoring_start_epoch: 0,
-            _padding_0: [0; 6],
+            directed_stake_unstake_cap_bps: 750,
+            directed_stake_global_cap_bps: 3_000,
+            _padding_0: [0; 2],
             _padding_1: [0; 31],
         };
 
@@ -1803,7 +1808,10 @@ impl Default for StateMachineFixtures {
             validator_history_blacklist: LargeBitMask::default(),
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
-            _padding: [0; 984],
+            directed_stake_meta_upload_authority: Pubkey::new_unique(),
+            reserve_lock_authority: Pubkey::new_unique(),
+            directed_stake_whitelist_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
 
         // Setup Sysvars: Clock, EpochSchedule

@@ -79,4 +79,6 @@ pub enum StewardError {
     StakerNotInWhitelist,
     #[msg("Validator not found in whitelist")]
     ValidatorNotInWhitelist,
+    #[msg("Whitelist not initialized")]
+    WhitelistAuthorityUnset,
 }

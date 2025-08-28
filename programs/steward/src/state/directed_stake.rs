@@ -10,7 +10,13 @@ use borsh::BorshSerialize;
 
 pub const MAX_PERMISSIONED_DIRECTED_STAKERS: usize = 2048;
 pub const MAX_PERMISSIONED_DIRECTED_VALIDATORS: usize = 2048;
-pub const MAX_PREFERENCES_PER_TICKET: usize = 128;
+pub const MAX_PREFERENCES_PER_TICKET: usize = 8;
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
+pub enum DirectedStakeRecordType {
+    Validator,
+    Staker,
+}
 
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
@@ -53,9 +59,9 @@ struct DirectedStakeTarget {
     /// Validator vote pubkey
     pub vote_pubkey: Pubkey,
     /// Total directed stake target for this validator
-    pub total_target_lamports: u128,
+    pub total_target_lamports: u64,
     /// Total directed stake already applied to this validator
-    pub total_applied_lamports: u128,
+    pub total_applied_lamports: u64,
     // Alignment compliant reserve space for future use
     _padding0: [u8; 64],
 }
@@ -68,6 +74,17 @@ pub struct DirectedStakePreference {
     /// Percentage of directed stake allocated towards this validator
     pub stake_share_bps: u16,
     pub _padding0: [u8; 94],
+}
+
+
+impl DirectedStakePreference {
+    pub fn empty() -> Self {
+        Self {
+            vote_pubkey: Pubkey::default(),
+            stake_share_bps: 0,
+            _padding0: [0; 94],
+        }
+    }
 }
 
 #[derive(BorshSerialize)]
