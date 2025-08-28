@@ -35,7 +35,7 @@ pub async fn command_crank_rebalance(
         StewardStateEnum::RebalanceUndirectedStake => { /* Continue */ }
         _ => {
             println!(
-                "State account is not in Rebalance state: {}",
+                "State account is not in RebalanceUndirectedStake state: {}",
                 steward_accounts.state_account.state.state_tag
             );
             return Ok(());
