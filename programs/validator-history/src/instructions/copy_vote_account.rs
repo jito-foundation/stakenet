@@ -32,7 +32,7 @@ pub fn handle_copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
 
     let epoch_credits = VoteStateVersions::deserialize_epoch_credits(&ctx.accounts.vote_account)?;
     validator_history_account.insert_missing_entries(&epoch_credits)?;
-    validator_history_account.set_epoch_credits(&epoch_credits)?;
+    validator_history_account.set_epoch_credits(&epoch_credits, epoch)?;
 
     Ok(())
 }

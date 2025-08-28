@@ -489,9 +489,10 @@ pub fn calculate_priority_fee_merkle_root_authority_score(
 
 /// Calculates validator age by counting the number of epochs in the validator's history
 /// with non-zero vote credits. This metric indicates how long a validator has been
-/// actively participating in the network.
-pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16) -> Result<u16> {
-    Ok(validator.history.validator_age(current_epoch))
+/// actively participating in the network. Uses persistent storage combined with recent epochs
+/// for unlimited historical tracking.
+pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16) -> Result<u32> {
+    Ok(validator.get_total_validator_age(current_epoch))
 }
 
 /// Encodes multiple scoring components into a single f64 value for efficient sorting.
@@ -504,11 +505,11 @@ pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16)
 /// The encoding uses bit manipulation to pack values into a u64, then converts to f64.
 /// Higher order bits have higher priority in comparisons.
 ///
-/// Highly optimized bit layout since we only rank validators with ≤10% commission:
-/// - Bits 60-63: Inflation commission (4 bits: 0-15, enough for 0-10% range)
+/// Optimized bit layout with full validator age support:
+/// - Bits 60-63: Inflation commission (4 bits: 0-15, covers 0-10%)
 /// - Bits 50-59: MEV commission (10 bits: 0-1023, covers 0-1000 bps = 0-10%)
-/// - Bits 41-49: Validator age (9 bits: 0-511, covers full CircBuf)
-/// - Bits 0-40: Vote credits ratio (41 bits: ~2.2 trillion levels, 12+ decimal places)
+/// - Bits 30-49: Validator age (20 bits: 0-1,048,575 epochs ~2,900 years)
+/// - Bits 0-29: Vote credits ratio (30 bits: ~1 billion levels, 9-10 decimal places)
 ///
 /// Note: This encoding assumes validators with >10% commission are filtered out
 /// by the binary scoring filters (commission_score, mev_commission_score) before ranking.
@@ -519,7 +520,7 @@ pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16)
 pub fn encode_tiebreaker_score(
     inflation_commission: u8, // 0-100 (but expect 0-10 in practice)
     mev_commission: u16,      // 0-10000 bps (but expect 0-1000 in practice)
-    validator_age: u16,       // 0-512 epochs max
+    validator_age: u32,       // Now u32 for unlimited history
     vote_credits_ratio: f64,  // 0.0-1.0 normalized
 ) -> Result<f64> {
     // Validate inputs
@@ -529,8 +530,8 @@ pub fn encode_tiebreaker_score(
     if mev_commission > 10000 {
         return Err(StewardError::ArithmeticError.into());
     }
-    if validator_age > 511 {
-        // 9 bits max = 511
+    if validator_age > 1048575 {
+        // 20 bits max = 1,048,575
         return Err(StewardError::ArithmeticError.into());
     }
     if vote_credits_ratio < 0.0 || vote_credits_ratio > 1.0 {
@@ -550,12 +551,13 @@ pub fn encode_tiebreaker_score(
     let mev_inverted = (1000_u64.saturating_sub(mev_commission.min(1000) as u64)).min(1023);
     let mev_score = mev_inverted << 50;
 
-    // Validator age: 9 bits (0-511), shift to bits 41-49
-    let age_score = (validator_age as u64) << 41;
+    // Validator age: 20 bits (0-1,048,575), shift to bits 30-49
+    // This supports ~2,900 years of validator history
+    let age_score = (validator_age.min(1048575) as u64) << 30;
 
-    // Vote credits: 41 bits for extreme precision (0 to ~2.2 trillion)
-    // This gives us precision to 12+ decimal places
-    let max_vote_credits = (1u64 << 41) - 1; // 2^41 - 1
+    // Vote credits: 30 bits for high precision (0 to ~1 billion)
+    // This still gives us 9-10 decimal places of precision
+    let max_vote_credits = (1u64 << 30) - 1; // 2^30 - 1
     let vote_score = (vote_credits_ratio * max_vote_credits as f64) as u64;
 
     // Combine all components using bitwise OR
