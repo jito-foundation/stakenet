@@ -1895,6 +1895,36 @@
       "code": 6031,
       "name": "ArithmeticCastError",
       "msg": "Arithmetic casting error"
+    },
+    {
+      "code": 6032,
+      "name": "DirectedStakeValidatorListFull",
+      "msg": "Directed stake validator whitelist is full"
+    },
+    {
+      "code": 6033,
+      "name": "DirectedStakeStakerListFull",
+      "msg": "Directed stake stakers list is full"
+    },
+    {
+      "code": 6034,
+      "name": "AlreadyPermissioned",
+      "msg": "Already permissioned"
+    },
+    {
+      "code": 6035,
+      "name": "StakerNotInWhitelist",
+      "msg": "Staker not found in whitelist"
+    },
+    {
+      "code": 6036,
+      "name": "ValidatorNotInWhitelist",
+      "msg": "Validator not found in whitelist"
+    },
+    {
+      "code": 6037,
+      "name": "WhitelistAuthorityUnset",
+      "msg": "Whitelist not initialized"
     }
   ],
   "types": [
@@ -2332,6 +2362,27 @@
             "type": "pubkey"
           },
           {
+            "name": "directed_stake_meta_upload_authority",
+            "docs": [
+              "The authority that can update the DirectedStakeMeta for an epoch"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "reserve_lock_authority",
+            "docs": [
+              "The authority that can invoke lock_reserve and unlock_reserve instructions"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "directed_stake_whitelist_authority",
+            "docs": [
+              "The authority that can update the directed stake whitelist"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -2339,7 +2390,7 @@
             "type": {
               "array": [
                 "u8",
-                984
+                888
               ]
             }
           }
@@ -2812,11 +2863,25 @@
             "type": "u16"
           },
           {
+            "name": "directed_stake_unstake_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to be unstaked from directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "directed_stake_global_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to delegated via directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
           },

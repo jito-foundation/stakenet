@@ -10,7 +10,7 @@ use spl_stake_pool::{
 };
 
 use crate::{
-    constants::{STAKE_STATUS_OFFSET, U64_SIZE, VEC_SIZE_BYTES},
+    constants::{PUBKEY_SIZE, STAKE_STATUS_OFFSET, U64_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET},
     errors::StewardError,
     Config, Delegation, StewardStateAccount, StewardStateEnum,
 };
@@ -201,6 +201,26 @@ pub fn stake_lamports_at_validator_list_index(
     let slice = &validator_list.data[transient_start_index..transient_end_index];
     let some_transient_stake = u64::from(*pod_from_bytes::<PodU64>(slice).unwrap()) != 0;
     Ok((u64::from(*active_stake_lamport_pod), some_transient_stake))
+}
+
+/// Utility to efficiently extract vote pubkey from a validator list.
+/// Frankenstein of spl_stake_pool::big_vec::BigVec::deserialize_slice
+/// and spl_stake_pool::state::ValidatorStakeInfo::active_lamports_greater_than
+#[inline(always)]
+pub fn vote_pubkey_at_validator_list_index(
+    validator_list: &BigVec<'_>,
+    index: usize,
+) -> Result<Pubkey> {
+    let pubkey_start_index = VEC_SIZE_BYTES
+        .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+        .saturating_add(VOTE_ADDRESS_OFFSET);
+    let pubkey_end_index = pubkey_start_index
+        .saturating_add(PUBKEY_SIZE);
+    let slice: [u8; PUBKEY_SIZE] = validator_list.data[pubkey_start_index..pubkey_end_index]
+        .try_into()
+        .map_err(|_| StewardError::ArithmeticError)?;
+    let pubkey = Pubkey::new_from_array(slice);
+    Ok(pubkey)
 }
 
 pub fn get_validator_stake_info_at_index(

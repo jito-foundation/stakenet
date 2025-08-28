@@ -242,6 +242,14 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
+    ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    GetJitosolBalance(GetJitosolBalance),
+    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
+    InitDirectedStakeMeta(InitDirectedStakeMeta),
+    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    InitDirectedStakeTicket(InitDirectedStakeTicket),
 
     // Actions
     InitSteward(InitSteward),
@@ -638,4 +646,153 @@ pub struct CrankComputeInstantUnstake {
 pub struct CrankRebalance {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeTickets using memcmp filter for discriminator")]
+pub struct ViewDirectedStakeTickets {
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeWhitelist account contents")]
+pub struct ViewDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeMeta account contents")]
+pub struct ViewDirectedStakeMeta {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Get JitoSOL balance for a specific token account")]
+pub struct GetJitosolBalance {
+    /// Token account pubkey to check balance for
+    #[arg(long, env)]
+    pub token_account: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeWhitelist account")]
+pub struct InitDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeMeta account")]
+pub struct InitDirectedStakeMeta {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Total number of stake targets to be uploaded
+    #[arg(long, env)]
+    pub total_stake_targets: u16,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeTicket account")]
+pub struct InitDirectedStakeTicket {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    /// Ticket update authority pubkey
+    #[arg(long, env)]
+    pub ticket_update_authority: Pubkey,
+
+    /// Ticket close authority pubkey
+    #[arg(long, env)]
+    pub ticket_close_authority: Pubkey,
+
+    /// Whether the ticket holder is a protocol (default: false)
+    #[arg(long, env, default_value = "false")]
+    pub ticket_holder_is_protocol: bool,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Compute directed stake metadata including tickets and JitoSOL balances")]
+pub struct ComputeDirectedStakeMeta {
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+
+    /// Copy stake targets on chain
+    #[arg(
+        long,
+        default_value = "false",
+        help = "Whether to copy the computed stake targets on-chain"
+    )]
+    pub copy_targets: bool,
+
+    /// Display progress bar
+    #[arg(long, env, default_value = "false")]
+    pub progress_bar: bool,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
 }

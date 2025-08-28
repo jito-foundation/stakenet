@@ -226,7 +226,13 @@ pub struct Parameters {
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
-    pub _padding_0: [u8; 6],
+    /// Maximum percentage of the pool to be unstaked from directed stake (in basis points)
+    pub directed_stake_unstake_cap_bps: u16,
+
+    /// Maximum percentage of the pool to delegated via directed stake (in basis points)
+    pub directed_stake_global_cap_bps: u16,
+
+    pub _padding_0: [u8; 2],
 
     pub _padding_1: [u64; 31],
 }

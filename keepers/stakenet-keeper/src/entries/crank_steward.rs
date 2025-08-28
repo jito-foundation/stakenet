@@ -1058,6 +1058,14 @@ pub async fn crank_steward(
                     )
                     .await?
                 }
+                StewardStateEnum::RebalanceDirected => {
+                    println!("[Unimplemented] Cranking Rebalance Directed...");
+                    SubmitStats {
+                        successes: 0,
+                        errors: 0,
+                        results: vec![],
+                    }
+                }
             };
 
             return_stats.combine(&stats);

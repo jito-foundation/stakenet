@@ -89,6 +89,7 @@ pub fn decrease_stake_calculation(
                 instant_unstake_lamports: unstake_amounts.instant_unstake_lamports,
                 stake_deposit_unstake_lamports: unstake_amounts.stake_deposit_unstake_lamports,
                 total_unstake_lamports,
+                directed_unstake_lamports: 0,
             }));
         }
     }
@@ -195,6 +196,8 @@ pub struct UnstakeState {
     pub stake_deposit_unstake_cap: u64,
     pub instant_unstake_cap: u64,
     pub scoring_unstake_cap: u64,
+    pub directed_unstake_total: u64,
+    pub directed_unstake_cap: u64,
 }
 
 impl UnstakeState {

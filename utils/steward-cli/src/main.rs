@@ -8,6 +8,9 @@ use commands::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
+        init_directed_stake_meta::command_init_directed_stake_meta,
+        init_directed_stake_ticket::command_init_directed_stake_ticket,
+        init_directed_stake_whitelist::command_init_directed_stake_whitelist,
         instant_remove_validator::command_instant_remove_validator,
         manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
@@ -22,6 +25,7 @@ use commands::{
         update_validator_list_balance::command_update_validator_list_balance,
     },
     command_args::{Args, Commands},
+    compute_directed_stake_meta::command_compute_directed_stake_meta,
     cranks::{
         compute_delegations::command_crank_compute_delegations,
         compute_instant_unstake::command_crank_compute_instant_unstake,
@@ -30,7 +34,10 @@ use commands::{
         rebalance::command_crank_rebalance, steward::command_crank_steward,
     },
     info::{
-        view_config::command_view_config,
+        get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
+        view_directed_stake_meta::command_view_directed_stake_meta,
+        view_directed_stake_tickets::command_view_directed_stake_tickets,
+        view_directed_stake_whitelist::command_view_directed_stake_whitelist,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
     },
@@ -61,6 +68,30 @@ async fn main() -> Result<()> {
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
+        }
+        Commands::ViewDirectedStakeTickets(args) => {
+            command_view_directed_stake_tickets(args, &client, program_id).await
+        }
+        Commands::ViewDirectedStakeWhitelist(args) => {
+            command_view_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::ViewDirectedStakeMeta(args) => {
+            command_view_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::GetJitosolBalance(args) => {
+            command_get_jitosol_balance(args, &client, program_id).await
+        }
+        Commands::ComputeDirectedStakeMeta(args) => {
+            command_compute_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::InitDirectedStakeMeta(args) => {
+            command_init_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::InitDirectedStakeWhitelist(args) => {
+            command_init_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::InitDirectedStakeTicket(args) => {
+            command_init_directed_stake_ticket(args, &client, program_id).await
         }
 
         // --- Helpers ---

@@ -14,6 +14,7 @@ pub enum AuthorityType {
     SetBlacklistAuthority = 1,
     SetParametersAuthority = 2,
     SetPriorityFeeParameterAuthority = 3,
+    SetDirectedStakeWhitelistAuthority = 4,
 }
 
 impl AuthorityType {
@@ -102,6 +103,9 @@ pub fn handler(ctx: Context<SetNewAuthority>, authority_type: AuthorityType) -> 
         }
         AuthorityType::SetPriorityFeeParameterAuthority => {
             config.priority_fee_parameters_authority = ctx.accounts.new_authority.key();
+        }
+        AuthorityType::SetDirectedStakeWhitelistAuthority => {
+            config.directed_stake_whitelist_authority = ctx.accounts.new_authority.key();
         }
     }
 
