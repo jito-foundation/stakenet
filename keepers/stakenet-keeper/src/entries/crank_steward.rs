@@ -1047,7 +1047,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::RebalanceUndirectedStake => {
-                    println!("Cranking Rebalance...");
+                    println!("Cranking RebalanceUndirectedStake...");
 
                     _handle_rebalance(
                         payer,
