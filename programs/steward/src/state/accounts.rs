@@ -1,10 +1,9 @@
 use std::mem::size_of;
 
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
-
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
