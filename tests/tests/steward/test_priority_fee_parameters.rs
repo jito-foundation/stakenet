@@ -198,7 +198,9 @@ fn test_priority_parameter_validation() {
         priority_fee_max_commission_bps: 5_000,
         priority_fee_error_margin_bps: 10,
         priority_fee_scoring_start_epoch: 0,
-        _padding_0: [0; 6],
+        directed_stake_unstake_cap_bps: 750,
+        directed_stake_global_cap_bps: 3_000,
+        _padding_0: [0; 2],
         _padding_1: [0; 31],
     };
 
