@@ -11,6 +11,7 @@ use crate::stake_pool_utils::PreferredValidatorType;
 mod allocator;
 pub mod constants;
 pub mod delegation;
+pub mod directed_delegation;
 pub mod errors;
 pub mod events;
 pub mod instructions;
@@ -149,6 +150,11 @@ pub mod steward {
     /// given constraints on increase/decrease priority, reserve balance, and unstaking caps
     pub fn rebalance(ctx: Context<Rebalance>, validator_list_index: u64) -> Result<()> {
         instructions::rebalance::handler(ctx, validator_list_index as usize)
+    }
+
+    /// Increases or decreases stake for a validator at `validator_list_index` using directed stake targets
+    pub fn rebalance_directed(ctx: Context<RebalanceDirected>, validator_list_index: u64) -> Result<()> {
+        instructions::rebalance_directed::handler(ctx, validator_list_index as usize)
     }
 
     /* Admin instructions */
@@ -336,5 +342,92 @@ pub mod steward {
             ctx,
             &update_priority_fee_parameters_args,
         )
+    }
+
+    /* Directed Stake Instructions */
+
+    /// Initialize DirectedStakeMeta account
+    pub fn initialize_directed_stake_meta(
+        ctx: Context<InitializeDirectedStakeMeta>,
+        total_stake_targets: u16,
+    ) -> Result<()> {
+        instructions::initialize_directed_stake_meta::handler(ctx, total_stake_targets)
+    }
+
+    /// Copy directed stake targets to the meta account
+    pub fn copy_directed_stake_targets(
+        ctx: Context<CopyDirectedStakeTargets>,
+        vote_pubkey: Pubkey,
+        total_target_lamports: u64,
+    ) -> Result<()> {
+        instructions::copy_directed_stake_targets::handler(ctx, vote_pubkey, total_target_lamports)
+    }
+
+    /// Initialize DirectedStakeWhitelist account
+    pub fn initialize_directed_stake_whitelist(
+        ctx: Context<InitializeDirectedStakeWhitelist>,
+    ) -> Result<()> {
+        instructions::initialize_directed_stake_whitelist::handler(ctx)
+    }
+
+    /// Initialize DirectedStakeTicket account
+    pub fn initialize_directed_stake_ticket(
+        ctx: Context<InitializeDirectedStakeTicket>,
+        ticket_update_authority: Pubkey,
+        ticket_close_authority: Pubkey,
+        ticket_holder_is_protocol: bool,
+    ) -> Result<()> {
+        instructions::initialize_directed_stake_ticket::handler(
+            ctx,
+            ticket_update_authority,
+            ticket_close_authority,
+            ticket_holder_is_protocol,
+        )
+    }
+
+    /// Reallocate DirectedStakeMeta account to proper size
+    pub fn realloc_directed_stake_meta(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
+        instructions::realloc_directed_stake_meta::handler(ctx)
+    }
+
+    /// Reallocate DirectedStakeWhitelist account to proper size
+    pub fn realloc_directed_stake_whitelist(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
+        instructions::realloc_directed_stake_whitelist::handler(ctx)
+    }
+
+    /// Add staker or validator to DirectedStakeWhitelist
+    pub fn add_to_directed_stake_whitelist(
+        ctx: Context<AddToDirectedStakeWhitelist>,
+        record_type: DirectedStakeRecordType,
+        record: Pubkey,
+    ) -> Result<()> {
+        instructions::add_to_directed_stake_whitelist::handler(ctx, record_type, record)
+    }
+
+    /// Remove staker or validator from DirectedStakeWhitelist
+    pub fn remove_from_directed_stake_whitelist(
+        ctx: Context<RemoveFromDirectedStakeWhitelist>,
+        record_type: DirectedStakeRecordType,
+        record: Pubkey,
+    ) -> Result<()> {
+        instructions::remove_from_directed_stake_whitelist::handler(ctx, record_type, record)
+    }
+
+    /// Update DirectedStakeTicket preferences
+    pub fn update_directed_stake_ticket(
+        ctx: Context<UpdateDirectedStakeTicket>,
+        preferences: Vec<DirectedStakePreference>,
+    ) -> Result<()> {
+        instructions::update_directed_stake_ticket::handler(ctx, preferences)
+    }
+
+    /// Close DirectedStakeTicket account
+    pub fn close_directed_stake_ticket(ctx: Context<CloseDirectedStakeTicket>) -> Result<()> {
+        instructions::close_directed_stake_ticket::handler(ctx)
+    }
+
+    /// Close DirectedStakeWhitelist account
+    pub fn close_directed_stake_whitelist(ctx: Context<CloseDirectedStakeWhitelist>) -> Result<()> {
+        instructions::close_directed_stake_whitelist::handler(ctx)
     }
 }

@@ -114,6 +114,9 @@ pub struct StewardState {
     /// Total lamports that have been due to stake deposits this cycle
     pub stake_deposit_unstake_total: u64,
 
+    /// Total lamports that have been due to directed stake unstake this cycle
+    pub directed_unstake_total: u64,
+
     /// Flags to track state transitions and operations
     pub status_flags: u32,
 
@@ -125,7 +128,7 @@ pub struct StewardState {
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 2;
+pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2)-8;
 
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u64)]
@@ -146,6 +149,9 @@ pub enum StewardStateEnum {
     /// Stake rebalances computed and executed, adjusting delegations if instant_unstake validators are hit
     /// Transition back to Idle, or ComputeScores if new cycle
     Rebalance,
+
+    /// Rebalance directed stake
+    RebalanceDirected,
 }
 
 #[derive(BorshSerialize, PartialEq, Eq)]
@@ -194,6 +200,7 @@ impl Display for StewardStateEnum {
                 write!(f, "ComputeInstantUnstake")
             }
             Self::Rebalance => write!(f, "Rebalance"),
+            Self::RebalanceDirected => write!(f, "RebalanceDirected"),
         }
     }
 }
@@ -225,6 +232,10 @@ impl IdlBuild for StewardStateEnum {
                         name: "Rebalance".to_string(),
                         fields: None,
                     },
+                    IdlEnumVariant {
+                        name: "RebalanceDirected".to_string(),
+                        fields: None,
+                    },
                 ],
             },
             docs: Default::default(),
@@ -244,6 +255,7 @@ pub const PRE_LOOP_IDLE: u32 = 1 << 3;
 pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
 pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
+pub const REBALANCE_DIRECTED: u32 = 1 << 7;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
@@ -304,6 +316,11 @@ impl StewardState {
                 params.num_epochs_between_scoring,
             ),
             StewardStateEnum::Rebalance => self.transition_rebalance(
+                current_epoch,
+                current_slot,
+                params.num_epochs_between_scoring,
+            ),
+            StewardStateEnum::RebalanceDirected => self.transition_rebalance_directed(
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
@@ -433,6 +450,18 @@ impl StewardState {
             self.state_tag = StewardStateEnum::Idle;
             self.set_flag(REBALANCE);
         }
+        Ok(())
+    }
+
+    #[inline]
+    fn transition_rebalance_directed(
+        &mut self,
+        current_epoch: u64,
+        current_slot: u64,
+        num_epochs_between_scoring: u64,
+    ) -> Result<()> {
+        // TODO: Implement directed rebalance transition
+        self.set_flag(REBALANCE_DIRECTED);
         Ok(())
     }
 
@@ -758,6 +787,39 @@ impl StewardState {
         Err(StewardError::InvalidState.into())
     }
 
+    /// Given list of scores, finds top `num_delegation_validators` and assigns an equal share
+    /// to each validator, represented as a fraction of total stake
+    ///
+    /// Mutates: delegations, compute_delegations_completed
+    pub fn compute_directed_delegations(&mut self, current_epoch: u64, config: &Config) -> Result<()> {
+        if matches!(self.state_tag, StewardStateEnum::ComputeDelegations) {
+            if current_epoch >= self.next_cycle_epoch {
+                return Err(StewardError::InvalidState.into());
+            }
+
+            let validators_to_delegate = select_validators_to_delegate(
+                &self.scores[..self.num_pool_validators as usize],
+                &self.sorted_score_indices[..self.num_pool_validators as usize],
+                config.parameters.num_delegation_validators as usize,
+            );
+
+            let num_delegation_validators = validators_to_delegate.len();
+
+            // Assign equal share of pool to each validator
+            for index in validators_to_delegate {
+                self.delegations[index as usize] = Delegation {
+                    numerator: 1,
+                    denominator: num_delegation_validators as u32,
+                };
+            }
+
+            self.set_flag(COMPUTE_DELEGATIONS);
+
+            return Ok(());
+        }
+        Err(StewardError::InvalidState.into())
+    }
+
     /// One instruction per validator.
     /// Check a set of criteria that determine whether a validator should be kicked from the pool
     /// If so, set the validator.index bit in `instant_unstake` to true
@@ -957,6 +1019,12 @@ impl StewardState {
                     .ok_or(StewardError::ArithmeticError)?
                     .try_into()
                     .map_err(|_| StewardError::ArithmeticCastError)?;
+                let directed_unstake_cap: u64 = (stake_pool_lamports as u128)
+                    .checked_mul(parameters.directed_stake_unstake_cap_bps as u128)
+                    .and_then(|x| x.checked_div(10_000))
+                    .ok_or(StewardError::ArithmeticError)?
+                    .try_into()
+                    .map_err(|_| StewardError::ArithmeticCastError)?;
 
                 let unstake_state = UnstakeState {
                     stake_deposit_unstake_total: self.stake_deposit_unstake_total,
@@ -965,6 +1033,8 @@ impl StewardState {
                     stake_deposit_unstake_cap,
                     instant_unstake_cap,
                     scoring_unstake_cap,
+                    directed_unstake_total: self.directed_unstake_total,
+                    directed_unstake_cap,
                 };
 
                 decrease_stake_calculation(
@@ -999,6 +1069,7 @@ impl StewardState {
                     instant_unstake_lamports,
                     stake_deposit_unstake_lamports,
                     total_unstake_lamports,
+                    directed_unstake_lamports,
                 }) => {
                     if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
                         self.validator_lamport_balances[index] = self.validator_lamport_balances
