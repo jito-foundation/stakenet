@@ -9,21 +9,47 @@ pub const MAX_PREFERENCES_PER_TICKET: usize = 128;
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 struct DirectedStakeMeta {
-    epoch: u64,
-    total_stake_targets: u16,
-    uploaded_stake_targets: u16,
+    /// Epoch for which the target calculations were made for
+    pub epoch: u64,
+    /// Total number of stake target calculations to be uploaded
+    pub total_stake_targets: u16,
+    /// Number of stake target calculations uploaded so far
+    pub uploaded_stake_targets: u16,
     // 4 bytes required for alignment
     // + 128 bytes reserved for future use
     _padding0: [u8; 132],
-    targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    /// Source of truth for directed stake targets for the epoch when
+    /// total_stake_targets == uploaded_stake_targets
+    pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+}
+
+#[allow(dead_code)]
+impl DirectedStakeMeta {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const SEED: &'static [u8] = b"meta";
+
+    /// Returns true if all stake targets have been copied to on-chain accounts
+    pub fn is_copy_complete(&self) -> bool {
+        self.total_stake_targets == self.uploaded_stake_targets
+    }
+
+    /// Get the index of a particular validator in the targets array
+    pub fn get_target_index(&self, vote_pubkey: &Pubkey) -> Option<usize> {
+        self.targets
+            .iter()
+            .position(|target| target.vote_pubkey == *vote_pubkey)
+    }
 }
 
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 struct DirectedStakeTarget {
-    vote_pubkey: Pubkey,
-    total_target_lamports: u128,
-    total_applied_lamports: u128,
+    /// Validator vote pubkey
+    pub vote_pubkey: Pubkey,
+    /// Total directed stake target for this validator
+    pub total_target_lamports: u128,
+    /// Total directed stake already applied to this validator
+    pub total_applied_lamports: u128,
     // Alignment compliant reserve space for future use
     _padding0: [u8; 64],
 }
@@ -31,6 +57,7 @@ struct DirectedStakeTarget {
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct DirectedStakePreference {
+    /// Validator vote pubkey
     pub vote_pubkey: Pubkey,
     /// Percentage of directed stake allocated towards this validator
     pub stake_share_bps: u16,
@@ -40,15 +67,55 @@ pub struct DirectedStakePreference {
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct DirectedStakeTicket {
-    pub directed_stake_type: [DirectedStakePreference; MAX_PREFERENCES_PER_TICKET],
+    pub num_preferences: u16,
+    /// The sum of staker preferences must be less than or equal to 10_000 bps
+    pub staker_preferences: [DirectedStakePreference; MAX_PREFERENCES_PER_TICKET],
+    /// Authority that can update the ticket preferences
     pub ticket_update_authority: Pubkey,
+    /// Authority that can close the ticket and withdraw remaining lamports
     pub ticket_close_authority: Pubkey,
-    pub active_directed_stake_lamports: u128,
     /// Is the ticket holder a protocol vs. an individual pubkey
     pub ticket_holder_is_protocol: U8Bool,
     // 15 bytes required for alignment
-    // + 112 bytes reserved for future use
-    pub _padding0: [u8; 127],
+    // + 110 bytes reserved for future use
+    pub _padding0: [u8; 125],
+}
+
+impl DirectedStakeTicket {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const SEED: &'static [u8] = b"ticket";
+
+    // Check validity of the preferences at initialization and update time
+    pub fn preferences_valid(&self) -> bool {
+        let total_bps: u16 = self
+            .staker_preferences
+            .iter()
+            .map(|pref| pref.stake_share_bps)
+            .sum();
+        total_bps <= 10_000
+    }
+
+    // This is intended to be called off-chain while computing directed stake meta
+    pub fn get_allocations(&self, total_lamports: u64) -> Vec<(Pubkey, u64)> {
+        let mut allocations: Vec<(Pubkey, u64)> = Vec::new();
+        let mut allocated_lamports: u64 = 0;
+        for pref in self
+            .staker_preferences
+            .iter()
+            .take(self.num_preferences as usize)
+        {
+            let lamports: u64 = (total_lamports as u128)
+                .saturating_mul(pref.stake_share_bps as u128)
+                .checked_div(10_000)
+                .and_then(|v| v.try_into().ok())
+                .unwrap_or(0);
+            if lamports > 0 {
+                allocations.push((pref.vote_pubkey, lamports));
+                allocated_lamports = allocated_lamports.saturating_add(lamports);
+            }
+        }
+        allocations
+    }
 }
 
 #[derive(BorshSerialize)]
