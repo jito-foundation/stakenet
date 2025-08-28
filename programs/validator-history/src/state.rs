@@ -637,39 +637,6 @@ impl CircBuf {
             u64
         )
     }
-
-    /// Calculates validator age by counting the number of epochs with non-zero vote credits.
-    /// This metric represents how long a validator has been actively participating in the network.
-    ///
-    /// Returns the count of epochs where the validator had epoch_credits > 0
-    pub fn validator_age(&self, current_epoch: u16) -> u16 {
-        if self.is_empty() {
-            return 0;
-        }
-
-        // Find the minimum epoch in the buffer
-        let min_epoch = {
-            let next_i = (self.idx as usize + 1) % self.arr.len();
-            if self.arr[next_i].epoch == ValidatorHistoryEntry::default().epoch {
-                // Buffer not full, start from first entry
-                self.arr[0].epoch
-            } else {
-                // Buffer is full, next_i points to oldest entry
-                self.arr[next_i].epoch
-            }
-        };
-
-        // Count epochs with non-zero credits
-        let mut age = 0u16;
-        for entry in self.epoch_range(min_epoch, current_epoch).iter().flatten() {
-            // Only count epochs where validator was actively voting
-            if entry.epoch_credits > 0 {
-                age += 1;
-            }
-        }
-
-        age
-    }
 }
 
 pub enum ValidatorHistoryVersion {
@@ -711,46 +678,44 @@ impl ValidatorHistory {
     pub const MAX_ITEMS: usize = MAX_ITEMS;
     pub const SEED: &'static [u8] = b"validator-history";
 
-    /// Gets the total validator age, combining persistent storage with recent epochs.
-    /// Performs automatic backfill on first use (when validator_age_last_updated_epoch == 0).
+    /// Updates validator age tracking. This is idempotent and safe to call multiple times.
+    /// Counts epochs where the validator had non-zero vote credits.
     ///
-    /// Returns total count of epochs where the validator had non-zero vote credits.
-    pub fn get_total_validator_age(&self, current_epoch: u16) -> u32 {
-        // If never initialized (epoch 0), do a one-time backfill from the buffer
+    /// Performs automatic backfill on first use (when validator_age_last_updated_epoch == 0).
+    pub fn update_validator_age(&mut self, current_epoch: u16) {
+        // Skip if already updated for this epoch
+        if current_epoch <= self.validator_age_last_updated_epoch {
+            return;
+        }
+
         if self.validator_age_last_updated_epoch == 0 {
-            // Count all epochs in buffer with non-zero credits as the initial backfill
-            let backfill_count = self
+            // Initial backfill: count all historical epochs with credits
+            self.validator_age = self
                 .history
                 .arr
                 .iter()
-                .filter(|entry| {
-                    entry.epoch != ValidatorHistoryEntry::default().epoch && entry.epoch_credits > 0
+                .filter(|e| {
+                    e.epoch != ValidatorHistoryEntry::default().epoch
+                        && e.epoch < current_epoch
+                        && e.epoch_credits > 0
                 })
                 .count() as u32;
-
-            return backfill_count;
-        }
-
-        // Otherwise use persistent count + any recent uncounted epochs
-        let mut total_age = self.validator_age;
-
-        // Add epochs since last update
-        if current_epoch > self.validator_age_last_updated_epoch {
-            // Count epochs with non-zero credits since last update
-            let recent_epochs = self
+        } else {
+            // Incremental update: count new epochs since last update
+            let new_epochs_with_credits = self
                 .history
                 .epoch_range(
                     self.validator_age_last_updated_epoch.saturating_add(1),
-                    current_epoch,
+                    current_epoch.saturating_sub(1), // Don't count current epoch as it's not finalized
                 )
                 .iter()
-                .filter(|entry| entry.is_some() && entry.unwrap().epoch_credits > 0)
+                .filter(|e| e.is_some() && e.unwrap().epoch_credits > 0)
                 .count() as u32;
 
-            total_age = total_age.saturating_add(recent_epochs);
+            self.validator_age = self.validator_age.saturating_add(new_epochs_with_credits);
         }
 
-        total_age
+        self.validator_age_last_updated_epoch = current_epoch;
     }
 
     pub fn set_mev_commission(
@@ -1013,36 +978,7 @@ impl ValidatorHistory {
         }
 
         // Update validator age tracking (idempotent - safe to call multiple times)
-        if current_epoch > self.validator_age_last_updated_epoch {
-            if self.validator_age_last_updated_epoch == 0 {
-                // Initial backfill: count all historical epochs with credits
-                self.validator_age = self
-                    .history
-                    .arr
-                    .iter()
-                    .filter(|e| {
-                        e.epoch != ValidatorHistoryEntry::default().epoch
-                            && e.epoch < current_epoch
-                            && e.epoch_credits > 0
-                    })
-                    .count() as u32;
-            } else {
-                // Incremental update: count new epochs since last update
-                let new_epochs_with_credits = self
-                    .history
-                    .epoch_range(
-                        self.validator_age_last_updated_epoch.saturating_add(1),
-                        current_epoch.saturating_sub(1), // Don't count current epoch as it's not finalized
-                    )
-                    .iter()
-                    .filter(|e| e.is_some() && e.unwrap().epoch_credits > 0)
-                    .count() as u32;
-
-                self.validator_age = self.validator_age.saturating_add(new_epochs_with_credits);
-            }
-
-            self.validator_age_last_updated_epoch = current_epoch;
-        }
+        self.update_validator_age(current_epoch);
 
         Ok(())
     }

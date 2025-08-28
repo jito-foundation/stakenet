@@ -487,14 +487,6 @@ pub fn calculate_priority_fee_merkle_root_authority_score(
     }
 }
 
-/// Calculates validator age by counting the number of epochs in the validator's history
-/// with non-zero vote credits. This metric indicates how long a validator has been
-/// actively participating in the network. Uses persistent storage combined with recent epochs
-/// for unlimited historical tracking.
-pub fn calculate_validator_age(validator: &ValidatorHistory, current_epoch: u16) -> Result<u32> {
-    Ok(validator.get_total_validator_age(current_epoch))
-}
-
 /// Encodes multiple scoring components into a single f64 value for efficient sorting.
 /// This creates a 4-tier tiebreaker system where validators are ranked by:
 /// 1. Inflation Commission % (lower is better)
