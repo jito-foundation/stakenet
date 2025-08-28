@@ -501,7 +501,7 @@ fn test_rebalance() {
     // validator_list: all validators have 1000 SOL
     // reserve_stake: 1000 SOL
     // give all possible SOL to validator 1
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(1, 1),
         Delegation::default(),
@@ -759,7 +759,7 @@ fn test_rebalance_default_lamports() {
 
     // Case 1: Lamports default, has transient stake
     state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(1, 1),
         Delegation::default(),
@@ -796,7 +796,7 @@ fn test_rebalance_default_lamports() {
 
     // Case 2: Lamports not default, no transient stake
     let mut state = fixtures.state;
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(1, 1),
         Delegation::default(),
@@ -931,7 +931,7 @@ fn test_rebalance_max_lamports() {
     const MAX_SOLANA_LAMPORTS: u64 = 600_000_000 * LAMPORTS_PER_SOL;
     let state = &mut fixtures.state;
 
-    state.state_tag = StewardStateEnum::Rebalance;
+    state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     let mut validator_list_bytes = borsh1::to_vec(&fixtures.validator_list).unwrap();
     let validator_list_bigvec = BigVec {
         data: validator_list_bytes.as_mut_slice(),

@@ -166,7 +166,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             &config,
             &state_account,
             &ctx.accounts.validator_list,
-            Some(StewardStateEnum::Rebalance),
+            Some(StewardStateEnum::RebalanceUndirectedStake),
         )?;
 
         let validator_stake_info =
