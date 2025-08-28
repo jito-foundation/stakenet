@@ -164,7 +164,7 @@ impl DBSlotInfo {
                             absolute_slot,
                             relative_slot,
                             epoch,
-                            "",                             // vote_key default to empty
+                            "", // vote_key default to empty
                             identity_key,
                             0,                              // priority_fees default to 0
                             DBSlotInfoState::Created as u8, // Set initial state to Created

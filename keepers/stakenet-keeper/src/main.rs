@@ -324,29 +324,32 @@ fn main() {
 
     info!("{}\n\n", args);
 
-    let gossip_entrypoints = args
-        .gossip_entrypoints
-        .map(|gossip_entrypoints| {
-            gossip_entrypoints
-                .iter()
-                .enumerate()
-                .filter_map(|(index, gossip_entrypoint)| {
-                    if gossip_entrypoint.is_empty() {
-                        None
-                    } else {
-                        Some(solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
-                            panic!(
-                                "Failed to parse gossip entrypoint #{} '{}': {}",
-                                index + 1,
-                                gossip_entrypoint,
-                                err
+    let gossip_entrypoints =
+        args.gossip_entrypoints
+            .map(|gossip_entrypoints| {
+                gossip_entrypoints
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, gossip_entrypoint)| {
+                        if gossip_entrypoint.is_empty() {
+                            None
+                        } else {
+                            Some(
+                                solana_net_utils::parse_host_port(gossip_entrypoint)
+                                    .unwrap_or_else(|err| {
+                                        panic!(
+                                            "Failed to parse gossip entrypoint #{} '{}': {}",
+                                            index + 1,
+                                            gossip_entrypoint,
+                                            err
+                                        )
+                                    }),
                             )
-                        }))
-                    }
-                })
-                .collect()
-        })
-        .expect("Failed to create socket addresses from gossip entrypoints");
+                        }
+                    })
+                    .collect()
+            })
+            .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {

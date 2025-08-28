@@ -200,7 +200,8 @@ async fn update_block_metadata(
         .get_slot_with_commitment(CommitmentConfig::finalized())
         .await?;
 
-    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)..(current_epoch + 1 - lookback_start_offset_epochs);
+    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)
+        ..(current_epoch + 1 - lookback_start_offset_epochs);
 
     // 1. Update Epoch Schedule
     info!("\n\n\n1. Update Epoch Schedule\n\n\n");

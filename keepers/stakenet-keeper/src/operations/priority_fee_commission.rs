@@ -141,7 +141,8 @@ pub async fn update_priority_fee_commission(
 
     let mut all_update_instructions: Vec<Instruction> = Vec::new();
 
-    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)..(current_epoch - lookback_start_offset_epochs);
+    let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)
+        ..(current_epoch - lookback_start_offset_epochs);
     for epoch in epoch_range {
         let update_instructions = keeper_state
             .validator_history_map
