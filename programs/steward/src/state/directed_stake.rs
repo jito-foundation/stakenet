@@ -103,22 +103,18 @@ impl DirectedStakeTicket {
     }
 
     // This is intended to be called off-chain while computing directed stake meta
-    pub fn get_allocations(&self, total_lamports: u64) -> Vec<(Pubkey, u64)> {
-        let mut allocations: Vec<(Pubkey, u64)> = Vec::new();
-        let mut allocated_lamports: u64 = 0;
+    pub fn get_allocations(&self, total_lamports: u64) -> Vec<(Pubkey, u128)> {
+        let mut allocations: Vec<(Pubkey, u128)> = Vec::new();
         for pref in self
             .staker_preferences
             .iter()
             .take(self.num_preferences as usize)
         {
-            let lamports: u64 = (total_lamports as u128)
+            let lamports: u128 = (total_lamports as u128)
                 .saturating_mul(pref.stake_share_bps as u128)
-                .checked_div(10_000)
-                .and_then(|v| v.try_into().ok())
-                .unwrap_or(0);
+                .saturating_div(10_000);
             if lamports > 0 {
                 allocations.push((pref.vote_pubkey, lamports));
-                allocated_lamports = allocated_lamports.saturating_add(lamports);
             }
         }
         allocations
