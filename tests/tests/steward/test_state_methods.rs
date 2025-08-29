@@ -14,10 +14,10 @@ use jito_steward::{
     Delegation, StewardState, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
+use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
-use solana_sdk::pubkey::Pubkey;
 
 #[test]
 fn test_compute_scores() {
@@ -966,10 +966,8 @@ fn test_rebalance_max_lamports() {
 
 #[test]
 fn test_directed_stake_preferences_valid() {
-    use jito_steward::{
-        DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET,
-    };
     use jito_steward::utils::U8Bool;
+    use jito_steward::{DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET};
 
     // Test case 1: Valid preferences under 10000 bps
     let mut ticket = DirectedStakeTicket {
@@ -1017,10 +1015,8 @@ fn test_directed_stake_preferences_valid() {
 
 #[test]
 fn test_directed_stake_get_allocations() {
-    use jito_steward::{
-        DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET,
-    };
     use jito_steward::utils::U8Bool;
+    use jito_steward::{DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET};
 
     // Test case 1: Basic allocation with 3 validators
     let mut ticket = DirectedStakeTicket {
@@ -1092,18 +1088,19 @@ fn test_directed_stake_get_allocations() {
     ticket.num_preferences = 2;
     ticket.staker_preferences[0].stake_share_bps = 3000; // 30%
     ticket.staker_preferences[1].stake_share_bps = 2000; // 20%
-    // Total: 50% (5000 bps), leaving 50% unallocated
+                                                         // Total: 50% (5000 bps), leaving 50% unallocated
     let allocations = ticket.get_allocations(10_000);
     assert_eq!(allocations.len(), 2);
     assert_eq!(allocations[0], (pk1, 3000)); // 30% of 10,000 = 3,000
     assert_eq!(allocations[1], (pk2, 2000)); // 20% of 10,000 = 2,000
-    // Total allocated: 5,000 out of 10,000 (50%)
+                                             // Total allocated: 5,000 out of 10,000 (50%)
 }
 
 #[test]
 fn test_directed_stake_whitelist_operations() {
     use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
+        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
@@ -1157,9 +1154,195 @@ fn test_directed_stake_whitelist_operations() {
 }
 
 #[test]
+fn test_directed_stake_whitelist_remove_operations() {
+    use jito_steward::{
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
+        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+    };
+
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 256],
+    };
+
+    // Test case 1: Remove staker successfully
+    let staker1 = Pubkey::new_unique();
+    let staker2 = Pubkey::new_unique();
+    let staker3 = Pubkey::new_unique();
+
+    assert!(whitelist.add_staker(staker1).is_ok());
+    assert!(whitelist.add_staker(staker2).is_ok());
+    assert!(whitelist.add_staker(staker3).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 3);
+
+    // Remove middle staker
+    let result = whitelist.remove_staker(&staker2);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 2);
+    assert!(whitelist.is_staker_permissioned(&staker1));
+    assert!(!whitelist.is_staker_permissioned(&staker2));
+    assert!(whitelist.is_staker_permissioned(&staker3));
+
+    // Test case 2: Remove validator successfully
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    let validator3 = Pubkey::new_unique();
+
+    assert!(whitelist.add_validator(validator1).is_ok());
+    assert!(whitelist.add_validator(validator2).is_ok());
+    assert!(whitelist.add_validator(validator3).is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 3);
+
+    // Remove first validator
+    let result = whitelist.remove_validator(&validator1);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 2);
+    assert!(!whitelist.is_validator_permissioned(&validator1));
+    assert!(whitelist.is_validator_permissioned(&validator2));
+    assert!(whitelist.is_validator_permissioned(&validator3));
+
+    // Test case 3: Remove non-existent staker should fail
+    let non_existent_staker = Pubkey::new_unique();
+    let result = whitelist.remove_staker(&non_existent_staker);
+    assert!(result.is_err());
+    assert!(result == Err(Error::from(StewardError::StakerNotInWhitelist)));
+
+    // Test case 4: Remove non-existent validator should fail
+    let non_existent_validator = Pubkey::new_unique();
+    let result = whitelist.remove_validator(&non_existent_validator);
+    assert!(result.is_err());
+    assert!(result == Err(Error::from(StewardError::ValidatorNotInWhitelist)));
+
+    // Test case 5: Remove from empty staker list should fail
+    let mut empty_whitelist = DirectedStakeWhitelist {
+        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 256],
+    };
+    let result = empty_whitelist.remove_staker(&Pubkey::new_unique());
+    assert!(result.is_err());
+    assert!(result == Err(Error::from(StewardError::StakerNotInWhitelist)));
+
+    // Test case 6: Remove from empty validator list should fail
+    let result = empty_whitelist.remove_validator(&Pubkey::new_unique());
+    assert!(result.is_err());
+    assert!(result == Err(Error::from(StewardError::ValidatorNotInWhitelist)));
+
+    // Test case 7: Remove last staker and verify can add again
+    assert!(whitelist.remove_staker(&staker1).is_ok());
+    assert!(whitelist.remove_staker(&staker3).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 0);
+    assert!(whitelist.can_add_staker());
+
+    let new_staker = Pubkey::new_unique();
+    assert!(whitelist.add_staker(new_staker).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 1);
+
+    // Test case 8: Remove last validator and verify can add again
+    assert!(whitelist.remove_validator(&validator2).is_ok());
+    assert!(whitelist.remove_validator(&validator3).is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 0);
+    assert!(whitelist.can_add_validator());
+
+    let new_validator = Pubkey::new_unique();
+    assert!(whitelist.add_validator(new_validator).is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 1);
+}
+
+#[test]
+fn test_directed_stake_whitelist_remove_array_shifting() {
+    use jito_steward::{
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
+        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+    };
+
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 256],
+    };
+
+    // Test case 1: Verify array shifting for stakers
+    let stakers = [
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+    ];
+
+    // Add all stakers
+    for staker in &stakers {
+        assert!(whitelist.add_staker(*staker).is_ok());
+    }
+    assert_eq!(whitelist.total_permissioned_stakers, 4);
+
+    // Remove staker at index 1 (middle)
+    assert!(whitelist.remove_staker(&stakers[1]).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 3);
+
+    // Verify remaining stakers are in correct order
+    assert!(whitelist.is_staker_permissioned(&stakers[0]));
+    assert!(!whitelist.is_staker_permissioned(&stakers[1]));
+    assert!(whitelist.is_staker_permissioned(&stakers[2]));
+    assert!(whitelist.is_staker_permissioned(&stakers[3]));
+
+    // Remove staker at index 0 (first)
+    assert!(whitelist.remove_staker(&stakers[0]).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 2);
+
+    // Verify remaining stakers
+    assert!(!whitelist.is_staker_permissioned(&stakers[0]));
+    assert!(!whitelist.is_staker_permissioned(&stakers[1]));
+    assert!(whitelist.is_staker_permissioned(&stakers[2]));
+    assert!(whitelist.is_staker_permissioned(&stakers[3]));
+
+    // Test case 2: Verify array shifting for validators
+    let validators = [
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+        Pubkey::new_unique(),
+    ];
+
+    // Add all validators
+    for validator in &validators {
+        assert!(whitelist.add_validator(*validator).is_ok());
+    }
+    assert_eq!(whitelist.total_permissioned_validators, 4);
+
+    // Remove validator at index 2 (third position)
+    assert!(whitelist.remove_validator(&validators[2]).is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 3);
+
+    // Verify remaining validators are in correct order
+    assert!(whitelist.is_validator_permissioned(&validators[0]));
+    assert!(whitelist.is_validator_permissioned(&validators[1]));
+    assert!(!whitelist.is_validator_permissioned(&validators[2]));
+    assert!(whitelist.is_validator_permissioned(&validators[3]));
+
+    // Remove validator at index 3 (last)
+    assert!(whitelist.remove_validator(&validators[3]).is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 2);
+
+    // Verify remaining validators
+    assert!(whitelist.is_validator_permissioned(&validators[0]));
+    assert!(whitelist.is_validator_permissioned(&validators[1]));
+    assert!(!whitelist.is_validator_permissioned(&validators[2]));
+    assert!(!whitelist.is_validator_permissioned(&validators[3]));
+}
+
+#[test]
 fn test_directed_stake_whitelist_capacity_limits() {
     use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
+        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
@@ -1198,5 +1381,3 @@ fn test_directed_stake_whitelist_capacity_limits() {
     let result = whitelist.add_validator(extra_validator);
     assert!(result.is_err());
 }
-
-

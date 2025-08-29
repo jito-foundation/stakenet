@@ -75,4 +75,8 @@ pub enum StewardError {
     DirectedStakeStakerListFull,
     #[msg("Already permissioned")]
     AlreadyPermissioned,
+    #[msg("Staker not found in whitelist")]
+    StakerNotInWhitelist,
+    #[msg("Validator not found in whitelist")]
+    ValidatorNotInWhitelist,
 }

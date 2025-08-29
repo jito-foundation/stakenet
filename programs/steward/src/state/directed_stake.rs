@@ -2,6 +2,7 @@ use std::mem::size_of;
 
 use crate::errors::StewardError::{
     AlreadyPermissioned, DirectedStakeStakerListFull, DirectedStakeValidatorListFull,
+    StakerNotInWhitelist, ValidatorNotInWhitelist,
 };
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
@@ -184,6 +185,60 @@ impl DirectedStakeWhitelist {
         self.total_permissioned_validators += 1;
         Ok(())
     }
+
+    pub fn remove_staker(&mut self, staker: &Pubkey) -> Result<()> {
+        if self.total_permissioned_stakers == 0 {
+            return Err(error!(StakerNotInWhitelist));
+        }
+
+        let mut found_index = None;
+        for i in 0..self.total_permissioned_stakers as usize {
+            if self.permissioned_stakers[i] == *staker {
+                found_index = Some(i);
+                break;
+            }
+        }
+
+        if let Some(index) = found_index {
+            // Shift remaining elements to the left
+            for i in index..(self.total_permissioned_stakers as usize - 1) {
+                self.permissioned_stakers[i] = self.permissioned_stakers[i + 1];
+            }
+            // Clear the last element
+            self.permissioned_stakers[self.total_permissioned_stakers as usize - 1] =
+                Pubkey::default();
+            self.total_permissioned_stakers -= 1;
+            Ok(())
+        } else {
+            Err(error!(StakerNotInWhitelist))
+        }
+    }
+
+    pub fn remove_validator(&mut self, validator: &Pubkey) -> Result<()> {
+        if self.total_permissioned_validators == 0 {
+            return Err(error!(ValidatorNotInWhitelist));
+        }
+
+        let mut found_index = None;
+        for i in 0..self.total_permissioned_validators as usize {
+            if self.permissioned_validators[i] == *validator {
+                found_index = Some(i);
+                break;
+            }
+        }
+
+        if let Some(index) = found_index {
+            // Shift remaining elements to the left
+            for i in index..(self.total_permissioned_validators as usize - 1) {
+                self.permissioned_validators[i] = self.permissioned_validators[i + 1];
+            }
+            // Clear the last element
+            self.permissioned_validators[self.total_permissioned_validators as usize - 1] =
+                Pubkey::default();
+            self.total_permissioned_validators -= 1;
+            Ok(())
+        } else {
+            Err(error!(ValidatorNotInWhitelist))
+        }
+    }
 }
-
-
