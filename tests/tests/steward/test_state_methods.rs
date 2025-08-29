@@ -17,6 +17,7 @@ use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
+use solana_sdk::pubkey::Pubkey;
 
 #[test]
 fn test_compute_scores() {
@@ -962,3 +963,240 @@ fn test_rebalance_max_lamports() {
 
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_directed_stake_preferences_valid() {
+    use jito_steward::{
+        DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET,
+    };
+    use jito_steward::utils::U8Bool;
+
+    // Test case 1: Valid preferences under 10000 bps
+    let mut ticket = DirectedStakeTicket {
+        num_preferences: 3,
+        staker_preferences: [DirectedStakePreference {
+            vote_pubkey: Pubkey::default(),
+            stake_share_bps: 4000,
+            _padding0: [0; 94],
+        }; MAX_PREFERENCES_PER_TICKET],
+        ticket_update_authority: Pubkey::default(),
+        ticket_close_authority: Pubkey::default(),
+        ticket_holder_is_protocol: U8Bool::from(false),
+        _padding0: [0; 125],
+    };
+    ticket.staker_preferences[1].stake_share_bps = 3000;
+    ticket.staker_preferences[2].stake_share_bps = 3000;
+    assert!(ticket.preferences_valid());
+
+    // Test case 2: Invalid preferences over 10000 bps
+    ticket.staker_preferences[2].stake_share_bps = 4000;
+    assert!(!ticket.preferences_valid());
+
+    // Test case 3: Edge case - exactly 10000 bps
+    ticket.staker_preferences[0].stake_share_bps = 5000;
+    ticket.staker_preferences[1].stake_share_bps = 3000;
+    ticket.staker_preferences[2].stake_share_bps = 2000;
+    assert!(ticket.preferences_valid());
+
+    // Test case 4: Single preference
+    ticket.num_preferences = 1;
+    ticket.staker_preferences[0].stake_share_bps = 5000;
+    assert!(ticket.preferences_valid());
+
+    // Test case 5: Zero preferences
+    ticket.num_preferences = 0;
+    assert!(ticket.preferences_valid());
+
+    // Test case 6: Multiple preferences with zero bps
+    ticket.num_preferences = 3;
+    ticket.staker_preferences[0].stake_share_bps = 0;
+    ticket.staker_preferences[1].stake_share_bps = 0;
+    ticket.staker_preferences[2].stake_share_bps = 0;
+    assert!(ticket.preferences_valid());
+}
+
+#[test]
+fn test_directed_stake_get_allocations() {
+    use jito_steward::{
+        DirectedStakePreference, DirectedStakeTicket, MAX_PREFERENCES_PER_TICKET,
+    };
+    use jito_steward::utils::U8Bool;
+
+    // Test case 1: Basic allocation with 3 validators
+    let mut ticket = DirectedStakeTicket {
+        num_preferences: 3,
+        staker_preferences: [DirectedStakePreference {
+            vote_pubkey: Pubkey::default(),
+            stake_share_bps: 4000,
+            _padding0: [0; 94],
+        }; MAX_PREFERENCES_PER_TICKET],
+        ticket_update_authority: Pubkey::default(),
+        ticket_close_authority: Pubkey::default(),
+        ticket_holder_is_protocol: U8Bool::from(false),
+        _padding0: [0; 125],
+    };
+    let pk1 = Pubkey::new_unique();
+    let pk2 = Pubkey::new_unique();
+    let pk3 = Pubkey::new_unique();
+    ticket.staker_preferences[0].vote_pubkey = pk1;
+    ticket.staker_preferences[1].vote_pubkey = pk2;
+    ticket.staker_preferences[1].stake_share_bps = 3000;
+    ticket.staker_preferences[2].vote_pubkey = pk3;
+    ticket.staker_preferences[2].stake_share_bps = 3000;
+
+    let allocations = ticket.get_allocations(10_000);
+    assert_eq!(allocations.len(), 3);
+    assert_eq!(allocations[0], (pk1, 4000));
+    assert_eq!(allocations[1], (pk2, 3000));
+    assert_eq!(allocations[2], (pk3, 3000));
+
+    // Test case 2: Allocation with zero bps preference
+    ticket.staker_preferences[2].stake_share_bps = 0;
+    let allocations = ticket.get_allocations(10_000);
+    assert_eq!(allocations.len(), 2);
+    assert_eq!(allocations[0], (pk1, 4000));
+    assert_eq!(allocations[1], (pk2, 3000));
+
+    // Test case 3: Large allocation amounts
+    ticket.staker_preferences[0].stake_share_bps = 5000;
+    ticket.staker_preferences[1].stake_share_bps = 5000;
+    ticket.staker_preferences[2].stake_share_bps = 0;
+    let allocations = ticket.get_allocations(1_000_000_000);
+    assert_eq!(allocations.len(), 2);
+    assert_eq!(allocations[0], (pk1, 500_000_000));
+    assert_eq!(allocations[1], (pk2, 500_000_000));
+
+    // Test case 4: Single preference allocation
+    ticket.num_preferences = 1;
+    let allocations = ticket.get_allocations(10_000);
+    assert_eq!(allocations.len(), 1);
+    assert_eq!(allocations[0], (pk1, 5000));
+
+    // Test case 5: Zero total lamports
+    let allocations = ticket.get_allocations(0);
+    assert_eq!(allocations.len(), 0);
+
+    // Test case 6: Rounding behavior with small amounts
+    ticket.num_preferences = 3;
+    ticket.staker_preferences[0].stake_share_bps = 3333;
+    ticket.staker_preferences[1].stake_share_bps = 3333;
+    ticket.staker_preferences[2].stake_share_bps = 3334;
+    let allocations = ticket.get_allocations(100);
+    assert_eq!(allocations.len(), 3);
+    // Should handle rounding appropriately
+    assert!(allocations[0].1 <= 34);
+    assert!(allocations[1].1 <= 34);
+    assert!(allocations[2].1 <= 34);
+
+    // Test case 7: Under 100% allocation (less than 10,000 bps total)
+    ticket.num_preferences = 2;
+    ticket.staker_preferences[0].stake_share_bps = 3000; // 30%
+    ticket.staker_preferences[1].stake_share_bps = 2000; // 20%
+    // Total: 50% (5000 bps), leaving 50% unallocated
+    let allocations = ticket.get_allocations(10_000);
+    assert_eq!(allocations.len(), 2);
+    assert_eq!(allocations[0], (pk1, 3000)); // 30% of 10,000 = 3,000
+    assert_eq!(allocations[1], (pk2, 2000)); // 20% of 10,000 = 2,000
+    // Total allocated: 5,000 out of 10,000 (50%)
+}
+
+#[test]
+fn test_directed_stake_whitelist_operations() {
+    use jito_steward::{
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+    };
+
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 256],
+    };
+
+    // Test case 1: Add staker successfully
+    let staker1 = Pubkey::new_unique();
+    let result = whitelist.add_staker(staker1);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 1);
+    assert!(whitelist.is_staker_permissioned(&staker1));
+
+    // Test case 2: Add validator successfully
+    let validator1 = Pubkey::new_unique();
+    let result = whitelist.add_validator(validator1);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_validators, 1);
+    assert!(whitelist.is_validator_permissioned(&validator1));
+
+    // Test case 3: Add duplicate staker should fail
+    let result = whitelist.add_staker(staker1);
+    assert!(result.is_err());
+
+    // Test case 4: Add duplicate validator should fail
+    let result = whitelist.add_validator(validator1);
+    assert!(result.is_err());
+
+    // Test case 5: Check can_add methods
+    assert!(whitelist.can_add_staker());
+    assert!(whitelist.can_add_validator());
+
+    // Test case 6: Add multiple stakers and validators
+    let staker2 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    assert!(whitelist.add_staker(staker2).is_ok());
+    assert!(whitelist.add_validator(validator2).is_ok());
+    assert_eq!(whitelist.total_permissioned_stakers, 2);
+    assert_eq!(whitelist.total_permissioned_validators, 2);
+    assert!(whitelist.is_staker_permissioned(&staker2));
+    assert!(whitelist.is_validator_permissioned(&validator2));
+
+    // Test case 7: Check non-permissioned entities
+    let non_permissioned = Pubkey::new_unique();
+    assert!(!whitelist.is_staker_permissioned(&non_permissioned));
+    assert!(!whitelist.is_validator_permissioned(&non_permissioned));
+}
+
+#[test]
+fn test_directed_stake_whitelist_capacity_limits() {
+    use jito_steward::{
+        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+    };
+
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 256],
+    };
+
+    // Test case 1: Fill staker list to capacity
+    for i in 0..MAX_PERMISSIONED_DIRECTED_STAKERS {
+        let staker = Pubkey::new_unique();
+        let result = whitelist.add_staker(staker);
+        assert!(result.is_ok());
+        assert_eq!(whitelist.total_permissioned_stakers as usize, i + 1);
+    }
+    assert!(!whitelist.can_add_staker());
+
+    // Test case 2: Try to add staker when full
+    let extra_staker = Pubkey::new_unique();
+    let result = whitelist.add_staker(extra_staker);
+    assert!(result.is_err());
+
+    // Test case 3: Fill validator list to capacity
+    for i in 0..MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+        let validator = Pubkey::new_unique();
+        let result = whitelist.add_validator(validator);
+        assert!(result.is_ok());
+        assert_eq!(whitelist.total_permissioned_validators as usize, i + 1);
+    }
+    assert!(!whitelist.can_add_validator());
+
+    // Test case 4: Try to add validator when full
+    let extra_validator = Pubkey::new_unique();
+    let result = whitelist.add_validator(extra_validator);
+    assert!(result.is_err());
+}
+
+

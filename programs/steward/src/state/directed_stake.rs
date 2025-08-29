@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::errors::StewardError::{
     AlreadyPermissioned, DirectedStakeStakerListFull, DirectedStakeValidatorListFull,
 };
@@ -88,12 +90,13 @@ impl DirectedStakeTicket {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"ticket";
 
-    // Check validity of the preferences at initialization and update time
+    // Total allocated bps must be calculated as u32 to avoid overflow
     pub fn preferences_valid(&self) -> bool {
-        let total_bps: u16 = self
+        let total_bps: u32 = self
             .staker_preferences
             .iter()
-            .map(|pref| pref.stake_share_bps)
+            .take(self.num_preferences as usize)
+            .map(|pref| pref.stake_share_bps as u32)
             .sum();
         total_bps <= 10_000
     }
@@ -182,3 +185,5 @@ impl DirectedStakeWhitelist {
         Ok(())
     }
 }
+
+
