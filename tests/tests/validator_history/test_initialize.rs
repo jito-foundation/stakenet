@@ -3,7 +3,10 @@ use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToA
 use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
-use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
+use validator_history::{
+    constants::{MAX_ALLOC_BYTES, MAX_STAKE_BUFFER_VALIDATORS},
+    Config, ValidatorHistory, ValidatorStakeBuffer,
+};
 
 #[tokio::test]
 async fn test_initialize() {
@@ -42,7 +45,6 @@ async fn test_initialize() {
     assert!(config.admin == test.keypair.pubkey());
 
     // Initialize validator history account
-
     let instruction = Instruction {
         program_id: validator_history::id(),
         accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
@@ -62,7 +64,32 @@ async fn test_initialize() {
     );
     test.submit_transaction_assert_success(transaction).await;
 
-    // Get account and Assert exists
+    // Initialize stake buffer account
+    for tx in test
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = test.fresh_blockhash().await;
+        let tx = tx(hash);
+        test.submit_transaction_assert_success(tx).await;
+    }
+
+    // Get stake aggregation account and assert exists and zero initialized
+    let account = ctx
+        .borrow_mut()
+        .banks_client
+        .get_account(test.validator_stake_buffer_account)
+        .await
+        .unwrap();
+    assert!(account.is_some());
+    let account = account.unwrap();
+    assert!(account.owner == validator_history::id());
+    assert!(account.data.len() >= MAX_ALLOC_BYTES);
+    let account =
+        bytemuck::try_from_bytes::<ValidatorStakeBuffer>(&account.data.as_slice()[8..]).unwrap();
+    assert!(account.size() == MAX_STAKE_BUFFER_VALIDATORS);
+
+    // Get validator history account and assert exists
     let account = ctx
         .borrow_mut()
         .banks_client
@@ -147,7 +174,35 @@ async fn test_initialize_fail() {
 }
 
 #[tokio::test]
-async fn test_extra_realloc() {
+async fn test_extra_realloc_validator_stake_buffer() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+
+    // Initialize and relloc to the limit
+    for tx in fixture
+        .build_initialize_and_realloc_validator_stake_buffer_account_transaction()
+        .into_iter()
+    {
+        let hash = fixture.fresh_blockhash().await;
+        let tx = tx(hash);
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+
+    // Assert than an additional realloc fails
+    let instruction = fixture.build_initialize_validator_stake_buffer_account_instruction();
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture
+        .submit_transaction_assert_error(transaction, "NoReallocNeeded")
+        .await;
+}
+
+#[tokio::test]
+async fn test_extra_realloc_validator_history() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
