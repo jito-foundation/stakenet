@@ -153,8 +153,8 @@ pub async fn update_priority_fee_commission(
                 {
                     let should_update = validator_history.history.arr.iter().any(|entry| {
                         entry.epoch as u64 == epoch
-                            && entry.priority_fee_merkle_root_upload_authority
-                                == MerkleRootUploadAuthority::Unset
+                            && (entry.priority_fee_merkle_root_upload_authority
+                                == MerkleRootUploadAuthority::Unset || entry.total_priority_fees == 0)
                     });
 
                     if !should_update {
