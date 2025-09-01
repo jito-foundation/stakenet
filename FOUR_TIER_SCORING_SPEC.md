@@ -118,7 +118,6 @@ pub struct StewardStateV2 {
 
 **Cons:**
 - Complex migration logic required
-- Risk during migration (one-time operation)
 - Need to maintain two struct versions temporarily
 
 ### Option 2: Add New Fields to Existing Struct
@@ -165,66 +164,6 @@ pub struct StewardState {
 - Struct becomes less clean (deprecated fields remain)
 - Current account ~184KB → new size ~264KB (still well within Solana's 10MB limit)
 
-## Recommendation: Option 2
-
-We recommend **Option 2 (Add New Fields)** for the following reasons:
-
-1. **Lower Risk**: No complex migration logic that could fail
-2. **Simpler Implementation**: Just realloc and add fields
-3. **Backward Compatible**: Old clients continue working during transition
-4. **Gradual Rollout**: Can update clients over time
-5. **Space Within Limits**: 40KB overhead and 264KB total size is well within Solana's 10MB account limit
-
-The implementation would proceed as:
-1. Deploy program update with new fields
-2. Realloc accounts on first use
-3. Start writing to both old and new arrays
-4. Gradually update off-chain clients to read new arrays
-5. Eventually stop writing to old arrays (keeping them for compatibility)
-
-## Event Structure Update (ScoreComponentsV3 → ScoreComponentsV4)
-
-### Updated Event Struct with u64 Fields
-```rust
-pub struct ScoreComponentsV4 {
-    /// Encoded 4-tier tiebreaker score (now u64)
-    pub score: u64,  // CHANGED from f64 to u64
-    
-    /// yield_score with full precision
-    pub yield_score: u64,  // CHANGED from f64 to u64
-    
-    /// Binary scores (0 or 1)
-    pub mev_commission_score: u8,  // CHANGED from f64 to u8
-    pub blacklisted_score: u8,  // CHANGED from f64 to u8
-    pub superminority_score: u8,  // CHANGED from f64 to u8
-    pub delinquency_score: u8,  // CHANGED from f64 to u8
-    pub running_jito_score: u8,  // CHANGED from f64 to u8
-    pub commission_score: u8,  // CHANGED from f64 to u8
-    pub historical_commission_score: u8,  // CHANGED from f64 to u8
-    pub merkle_root_upload_authority_score: u8,  // CHANGED from f64 to u8
-    pub priority_fee_commission_score: u8,  // CHANGED from f64 to u8
-    pub priority_fee_merkle_root_upload_authority_score: u8,  // CHANGED from f64 to u8
-    
-    /// Vote credits ratio with full precision (multiply by u32::MAX)
-    pub vote_credits_ratio: u32,  // CHANGED from f64
-    
-    /// Validator age - number of epochs with non-zero vote credits
-    pub validator_age: u32,  // NEW FIELD
-    
-    /// MEV commission in basis points
-    pub mev_commission_bps: u16,  // NEW FIELD for transparency
-    
-    /// Inflation commission in basis points
-    pub commission_bps: u16,  // NEW FIELD for transparency
-}
-```
-
-### Event Structure Benefits
-- **Binary scores as u8**: More efficient for true/false values
-- **Full u64 precision**: Matches the on-chain score storage
-- **Transparent components**: Individual commission values exposed
-- **Efficient serialization**: Smaller event size with appropriate types
-
 ## Validator History Account Extension
 
 ### New Persistent Fields for Validator Age Tracking
@@ -270,23 +209,23 @@ pub struct ValidatorHistory {
 - **Idempotent Initialization**: Automatically backfills historical data on first observation
 - **Unbounded Tracking**: Tracks validator age beyond 512-epoch buffer limit
 
-## Implementation Benefits
-
-1. **Deterministic Sorting**: Single u64 comparison for complex multi-tier ranking
-2. **Full Precision**: All metrics encoded without loss of granularity
-3. **Backward Compatibility**: Old clients continue functioning with deprecated fields
-4. **Historical Preservation**: Validator age tracked beyond buffer limits
-5. **Transparent Metrics**: All ranking components visible in events
-6. **Future Proof**: 64 bits provides ample space for metric precision
-
 ## Summary
 
-This implementation achieves a sophisticated 4-tier ranking system through:
+This specification outlines a 4-tier validator ranking system that requires migrating from u32 to u64 score storage:
 
-1. **Migration to u64**: Provides necessary bit space for all four ranking metrics
-2. **Account Reallocation**: One-time expansion to accommodate new arrays
-3. **Dual-Write Strategy**: Maintains backward compatibility during transition
-4. **Efficient Sorting**: Single u64 comparison determines ranking
-5. **Validator History Extension**: Long-term age tracking using existing padding
+### Key Findings
+- **u32 Insufficient**: Even with aggressive bucketing, 32 bits cannot provide the required 6 decimals of precision for vote credits ratio while encoding three other metrics
+- **u64 Required**: Allocates 4 bits for inflation commission, 10 bits for MEV commission, 20 bits for validator age, and 30 bits for vote credits ratio
 
-The design acknowledges that 32 bits, even with aggressive bucketing, cannot provide adequate precision for four distinct ranking metrics. The migration to u64, while requiring account reallocation, provides a clean path forward with minimal risk and maximum compatibility.
+### Migration Options
+1. **Option 1**: Create new struct version with migration instruction - cleaner but more complex
+2. **Option 2**: Add new u64 arrays to existing struct - simpler but wastes 40KB
+
+Both options are viable within Solana's 10MB account limit (current ~184KB → new ~264KB).
+
+### Validator Age Tracking
+- Adds two fields to ValidatorHistory using existing padding (no reallocation needed)
+- Idempotent initialization automatically backfills historical data
+- Enables unbounded age tracking beyond the 512-epoch circular buffer limit
+
+The design provides deterministic sorting through single u64 comparison while maintaining backward compatibility throughout the transition.
