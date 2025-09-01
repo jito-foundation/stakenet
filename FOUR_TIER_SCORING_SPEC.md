@@ -227,50 +227,48 @@ pub struct ScoreComponentsV4 {
 
 ## Validator History Account Extension
 
-### New Persistent Fields
-Two fields added to the ValidatorHistory account to track validator age beyond the 512-epoch circular buffer limit:
+### New Persistent Fields for Validator Age Tracking
+
+To track validator age beyond the 512-epoch circular buffer limit, we add two fields to the ValidatorHistory account:
 
 ```rust
 pub struct ValidatorHistory {
     // ... existing fields ...
     
     // Persistent validator age tracking
-    pub validator_age: u32,                      // 4 bytes - Total epochs with non-zero vote credits
-    pub validator_age_last_updated_epoch: u16,   // 2 bytes - Last epoch we updated the age counter
+    pub validator_age: u32,                      // 4 bytes - Accumulator: total epochs with non-zero vote credits
+    pub validator_age_last_updated_epoch: u16,   // 2 bytes - Last epoch when accumulator was updated
     
     pub _padding1: [u8; 226],  // Reduced from 232 bytes (was 232, now 226)
 }
 ```
 
-### Storage Optimization
-- **Total new storage**: 6 bytes (4 + 2)
-- **Source**: Repurposed from existing padding
-- **Account size**: Remains exactly 65,848 bytes
-- **Result**: Zero-copy struct maintains identical size
+### How It Works
 
-### Backward Compatibility
+1. **Initial Observation (when `validator_age_last_updated_epoch == 0`):**
+   - Scan the 512-epoch circular buffer
+   - Count all epochs with non-zero vote credits
+   - Set `validator_age` to this count
+   - Set `validator_age_last_updated_epoch` to current epoch
 
-#### Read Compatibility (Both Directions)
-1. **Old clients reading new accounts**: ✅
-   - See the 6 bytes as part of padding (harmless)
-   - All other fields at same offsets
-   - No deserialization errors
+2. **Subsequent Updates:**
+   - Check if current epoch has non-zero vote credits
+   - If yes and epoch > `validator_age_last_updated_epoch`:
+     - Increment `validator_age`
+     - Update `validator_age_last_updated_epoch`
 
-2. **New clients reading old accounts**: ✅
-   - Interpret padding bytes as `validator_age = 0` and `validator_age_last_updated_epoch = 0`
-   - Triggers automatic backfill on first write
-   - Idempotent design handles transition gracefully
+3. **Idempotent Design:**
+   - Safe to call multiple times in same epoch
+   - Automatically initializes on first use
+   - No migration needed - uses existing padding
 
-#### Write Safety
-- All writes go through the on-chain program
-- Once deployed, all writes use the new structure
-- No risk of data corruption
+### Key Benefits
 
-### Automatic Backfill Mechanism
-The implementation includes idempotent backfill logic:
-- When `validator_age_last_updated_epoch == 0`: Performs one-time historical backfill
-- Counts all epochs in the circular buffer with non-zero vote credits
-- Updates are idempotent - safe to call multiple times
+- **No Migration Required**: Uses 6 bytes from existing padding
+- **No Account Reallocation**: Account size remains exactly 65,848 bytes
+- **Backward Compatible**: Old clients see new fields as padding
+- **Idempotent Initialization**: Automatically backfills historical data on first observation
+- **Unbounded Tracking**: Tracks validator age beyond 512-epoch buffer limit
 
 ## Implementation Benefits
 
