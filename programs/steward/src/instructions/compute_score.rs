@@ -7,7 +7,7 @@ use crate::{
         get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
         state_checks,
     },
-    Config, StewardStateAccount, StewardStateEnum,
+    Config, StewardStateAccountV2, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -17,10 +17,10 @@ pub struct ComputeScore<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 

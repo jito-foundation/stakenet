@@ -6,7 +6,7 @@ use crate::{
         check_validator_list_has_stake_status_other_than, get_stake_pool_address,
         get_validator_list, get_validator_list_length,
     },
-    Config, StewardStateAccount, COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE,
+    Config, StewardStateAccountV2, COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE,
     PRE_LOOP_IDLE, REBALANCE, RESET_TO_IDLE,
 };
 use anchor_lang::prelude::*;
@@ -18,10 +18,10 @@ pub struct EpochMaintenance<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     /// CHECK: Correct account guaranteed if address is correct
     #[account(address = get_validator_list(&config)?)]

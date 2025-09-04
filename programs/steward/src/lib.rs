@@ -15,6 +15,7 @@ pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod score;
+pub mod score_v2;
 pub mod stake_pool_utils;
 pub mod state;
 pub mod utils;
@@ -228,6 +229,11 @@ pub mod steward {
     /// Reclaims lamports to authority
     pub fn close_steward_accounts(ctx: Context<CloseStewardAccounts>) -> Result<()> {
         instructions::close_steward_accounts::handler(ctx)
+    }
+
+    /// Migrates the state account from V1 (u32 scores) to V2 (u64 scores with 4-tier encoding)
+    pub fn migrate_state_to_v2(ctx: Context<MigrateStateToV2>) -> Result<()> {
+        instructions::migrate_state_to_v2::handler(ctx)
     }
 
     /* Passthrough instructions */

@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState, StewardStateV2};
 
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
@@ -87,7 +87,7 @@ impl Config {
     }
 }
 
-#[derive(BorshSerialize)]
+/// V1 State Account - for migration purposes
 #[account(zero_copy)]
 pub struct StewardStateAccount {
     pub state: StewardState,
@@ -96,7 +96,22 @@ pub struct StewardStateAccount {
     pub _padding: [u8; 6],
 }
 
+/// V2 State Account - current version
+#[account(zero_copy)]
+pub struct StewardStateAccountV2 {
+    pub state: StewardStateV2,
+    pub is_initialized: U8Bool,
+    pub bump: u8,
+    pub _padding: [u8; 6],
+}
+
 impl StewardStateAccount {
+    pub const SIZE: usize = 8 + size_of::<Self>();
+    pub const SEED: &'static [u8] = b"steward_state";
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
+}
+
+impl StewardStateAccountV2 {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"steward_state";
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;

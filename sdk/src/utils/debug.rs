@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use jito_steward::{
-    StewardState, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES, COMPUTE_SCORE, EPOCH_MAINTENANCE,
+    StewardStateV2, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES, COMPUTE_SCORE, EPOCH_MAINTENANCE,
     POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -53,7 +53,7 @@ pub enum StateCode {
     PostLoopIdle = 0x01 << 5,
 }
 
-pub fn steward_state_to_state_code(steward_state: &StewardState) -> StateCode {
+pub fn steward_state_to_state_code(steward_state: &StewardStateV2) -> StateCode {
     if steward_state.has_flag(POST_LOOP_IDLE) {
         StateCode::PostLoopIdle
     } else if steward_state.has_flag(REBALANCE) {
@@ -71,7 +71,7 @@ pub fn steward_state_to_state_code(steward_state: &StewardState) -> StateCode {
     }
 }
 
-pub fn format_steward_state_string(steward_state: &StewardState) -> String {
+pub fn format_steward_state_string(steward_state: &StewardStateV2) -> String {
     let mut state_string = String::new();
 
     if steward_state.has_flag(EPOCH_MAINTENANCE) {
@@ -123,7 +123,7 @@ pub fn format_steward_state_string(steward_state: &StewardState) -> String {
     state_string
 }
 
-pub fn format_simple_steward_state_string(steward_state: &StewardState) -> String {
+pub fn format_simple_steward_state_string(steward_state: &StewardStateV2) -> String {
     let mut state_string = String::new();
 
     if steward_state.has_flag(EPOCH_MAINTENANCE) {

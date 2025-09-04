@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount};
+use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccountV2};
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_program::instruction::Instruction;
@@ -43,8 +43,8 @@ pub async fn command_realloc_state(
 
     let steward_state_account_raw = client.get_account(&steward_state).await?;
 
-    if steward_state_account_raw.data.len() == StewardStateAccount::SIZE {
-        match StewardStateAccount::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
+    if steward_state_account_raw.data.len() == StewardStateAccountV2::SIZE {
+        match StewardStateAccountV2::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
             Ok(steward_state_account) => {
                 if steward_state_account.is_initialized.into() {
                     println!("State account already exists");
@@ -56,7 +56,7 @@ pub async fn command_realloc_state(
     }
 
     let data_length = steward_state_account_raw.data.len();
-    let whats_left = StewardStateAccount::SIZE - data_length.min(StewardStateAccount::SIZE);
+    let whats_left = StewardStateAccountV2::SIZE - data_length.min(StewardStateAccountV2::SIZE);
 
     let mut reallocs_left_to_run =
         (whats_left.max(MAX_ALLOC_BYTES) - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;

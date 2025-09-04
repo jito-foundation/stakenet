@@ -34,5 +34,8 @@ pub fn handle_copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
     validator_history_account.insert_missing_entries(&epoch_credits)?;
     validator_history_account.set_epoch_credits(&epoch_credits)?;
 
+    // Update validator age based on epoch credits
+    validator_history_account.update_validator_age(epoch)?;
+
     Ok(())
 }

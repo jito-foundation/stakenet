@@ -19,8 +19,8 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     instructions::AuthorityType,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
-    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
+    Config, Delegation, LargeBitMask, Parameters, StewardStateV2, StewardStateAccountV2,
+    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 use solana_program_test::*;
 #[allow(deprecated)]
@@ -126,7 +126,7 @@ impl TestFixture {
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
         let steward_state = Pubkey::find_program_address(
-            &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
+            &[StewardStateAccountV2::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
         )
         .0;
@@ -194,7 +194,7 @@ impl TestFixture {
             stake_pool_meta: accounts_fixture.stake_pool_meta,
             steward_config: accounts_fixture.steward_config_keypair,
             steward_state: Pubkey::find_program_address(
-                &[StewardStateAccount::SEED, steward_config_address.as_ref()],
+                &[StewardStateAccountV2::SEED, steward_config_address.as_ref()],
                 &jito_steward::id(),
             )
             .0,
@@ -425,7 +425,7 @@ impl TestFixture {
 
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
-        let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut num_reallocs = (StewardStateAccountV2::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let mut ixs = vec![];
 
         while num_reallocs > 0 {
@@ -1262,7 +1262,7 @@ pub struct FixtureDefaultAccounts {
     pub steward_config_keypair: Keypair,
     pub steward_config: Config,
     pub steward_state_address: Pubkey,
-    pub steward_state: StewardStateAccount,
+    pub steward_state: StewardStateAccountV2,
     pub validator_history_config: validator_history::state::Config,
     pub cluster_history: ClusterHistory,
     pub validators: Vec<ValidatorEntry>,
@@ -1297,19 +1297,19 @@ impl Default for FixtureDefaultAccounts {
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
             &[
-                StewardStateAccount::SEED,
+                StewardStateAccountV2::SEED,
                 steward_config_keypair.pubkey().as_ref(),
             ],
             &jito_steward::id(),
         );
 
-        let steward_state = StewardState {
+        let steward_state = StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores,
             validator_lamport_balances: [0; MAX_VALIDATORS],
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
-            yield_scores: [0; MAX_VALIDATORS],
-            sorted_yield_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            raw_scores: [0; MAX_VALIDATORS],
+            sorted_raw_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
             delegations: [Delegation::default(); MAX_VALIDATORS],
             instant_unstake: BitMask::default(),
             progress: BitMask::default(),
@@ -1324,9 +1324,9 @@ impl Default for FixtureDefaultAccounts {
             stake_deposit_unstake_total: 0,
             validators_added: 0,
             status_flags: 0,
-            _padding0: [0; STATE_PADDING_0_SIZE],
+            _padding0: [0; 2],
         };
-        let steward_state_account = StewardStateAccount {
+        let steward_state_account = StewardStateAccountV2 {
             state: steward_state,
             is_initialized: true.into(),
             bump: steward_state_bump,
@@ -1406,7 +1406,7 @@ impl FixtureDefaultAccounts {
             Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
         let steward_state_address = Pubkey::find_program_address(
             &[
-                StewardStateAccount::SEED,
+                StewardStateAccountV2::SEED,
                 self.steward_config_keypair.pubkey().as_ref(),
             ],
             &jito_steward::id(),
@@ -1645,12 +1645,12 @@ pub fn serialized_validator_history_account(validator_history: ValidatorHistory)
     }
 }
 
-pub fn serialized_steward_state_account(state: StewardStateAccount) -> Account {
-    let mut data = vec![];
-    state.serialize(&mut data).unwrap();
-    for byte in StewardStateAccount::DISCRIMINATOR.iter().rev() {
-        data.insert(0, *byte);
-    }
+pub fn serialized_steward_state_account(state: StewardStateAccountV2) -> Account {
+    let mut data = Vec::with_capacity(StewardStateAccountV2::SIZE);
+    // Add discriminator
+    data.extend_from_slice(&StewardStateAccountV2::DISCRIMINATOR);
+    // Add account data using bytemuck
+    data.extend_from_slice(bytemuck::bytes_of(&state));
     Account {
         lamports: 100_000_000_000,
         data,
@@ -1696,7 +1696,9 @@ pub fn validator_history_default(vote_account: Pubkey, index: u32) -> ValidatorH
         _padding0: [0; 7],
         last_ip_timestamp: 0,
         last_version_timestamp: 0,
-        _padding1: [0; 232],
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
         history,
     }
 }
@@ -1755,7 +1757,7 @@ pub struct StateMachineFixtures {
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
-    pub state: StewardState,
+    pub state: StewardStateV2,
 }
 
 impl Default for StateMachineFixtures {
@@ -1919,13 +1921,13 @@ impl Default for StateMachineFixtures {
         validator_lamport_balances[2] = LAMPORTS_PER_SOL * 1000;
 
         // Setup StewardState
-        let state = StewardState {
+        let state = StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
-            yield_scores: [0; MAX_VALIDATORS],
-            sorted_yield_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            raw_scores: [0; MAX_VALIDATORS],
+            sorted_raw_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
             start_computing_scores_slot: 20, // "Current" slot
             progress: BitMask::default(),
             current_epoch,
@@ -1940,7 +1942,7 @@ impl Default for StateMachineFixtures {
             validators_added: 0,
             validators_to_remove: BitMask::default(),
             validators_for_immediate_removal: BitMask::default(),
-            _padding0: [0; STATE_PADDING_0_SIZE],
+            _padding0: [0; 2],
         };
 
         StateMachineFixtures {

@@ -9,10 +9,10 @@ use anchor_lang::prelude::*;
 pub struct ResetValidatorLamportBalances<'info> {
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub steward_state: AccountLoader<'info, StewardStateAccount>,
+    pub steward_state: AccountLoader<'info, StewardStateAccountV2>,
 
     pub config: AccountLoader<'info, Config>,
 

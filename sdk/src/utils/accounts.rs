@@ -15,7 +15,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
     stake_pool_utils::{StakePool, ValidatorList},
-    Config as StewardConfig, StewardStateAccount,
+    Config as StewardConfig, StewardStateAccountV2,
 };
 
 use solana_sdk::account::Account;
@@ -283,12 +283,12 @@ pub async fn get_steward_state_account(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<Box<StewardStateAccount>, JitoTransactionError> {
+) -> Result<Box<StewardStateAccountV2>, JitoTransactionError> {
     let steward_state = get_steward_state_address(program_id, steward_config);
 
     let state_raw_account = client.get_account(&steward_state).await?;
 
-    StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
+    StewardStateAccountV2::try_deserialize(&mut state_raw_account.data.as_slice())
         .map_err(|e| {
             JitoTransactionError::Custom(format!(
                 "Failed to deserialize steward state account: {}",
@@ -366,7 +366,7 @@ pub async fn get_validator_list_account(
 
 pub fn get_steward_state_address(steward_program_id: &Pubkey, steward_config: &Pubkey) -> Pubkey {
     let (steward_state, _) = Pubkey::find_program_address(
-        &[StewardStateAccount::SEED, steward_config.as_ref()],
+        &[StewardStateAccountV2::SEED, steward_config.as_ref()],
         steward_program_id,
     );
 

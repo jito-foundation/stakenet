@@ -664,7 +664,11 @@ pub struct ValidatorHistory {
     pub last_ip_timestamp: u64,
     pub last_version_timestamp: u64,
 
-    pub _padding1: [u8; 232],
+    // Persistent validator age tracking
+    pub validator_age: u32,                      // Total epochs with non-zero vote credits
+    pub validator_age_last_updated_epoch: u16,   // Last epoch when age was updated
+    
+    pub _padding1: [u8; 226],  // Reduced from 232 bytes to accommodate age fields
 
     pub history: CircBuf,
 }
@@ -1167,6 +1171,56 @@ impl ValidatorHistory {
         };
         self.history.push(entry);
         Ok(())
+    }
+
+    /// Initialize validator age by counting epochs with non-zero vote credits in the circular buffer
+    /// This is idempotent - safe to call multiple times
+    pub fn initialize_validator_age(&mut self, _current_epoch: u16) -> Result<()> {
+        // If never initialized, scan the buffer and count epochs with vote credits
+        if self.validator_age_last_updated_epoch == 0 {
+            let mut age_count = 0u32;
+            let mut latest_epoch_with_credits = 0u16;
+            
+            // Scan through the circular buffer for epochs with non-zero vote credits
+            for entry in self.history.arr.iter() {
+                if entry.epoch != u16::MAX && entry.epoch_credits != u32::MAX && entry.epoch_credits > 0 {
+                    age_count = age_count.saturating_add(1);
+                    if entry.epoch > latest_epoch_with_credits {
+                        latest_epoch_with_credits = entry.epoch;
+                    }
+                }
+            }
+            
+            self.validator_age = age_count;
+            self.validator_age_last_updated_epoch = latest_epoch_with_credits.max(1); // Use 1 if no history
+        }
+        Ok(())
+    }
+    
+    /// Update validator age for the current epoch based on epoch credits
+    /// This is idempotent - safe to call multiple times in the same epoch
+    pub fn update_validator_age(&mut self, epoch: u16) -> Result<()> {
+        // Initialize if needed
+        if self.validator_age_last_updated_epoch == 0 {
+            self.initialize_validator_age(epoch)?;
+        }
+        
+        // Check if this epoch has non-zero vote credits
+        let has_vote_credits = self.history.arr.iter()
+            .any(|entry| entry.epoch == epoch && entry.epoch_credits != u32::MAX && entry.epoch_credits > 0);
+        
+        // Only update if this is a new epoch and validator had vote credits
+        if epoch > self.validator_age_last_updated_epoch && has_vote_credits {
+            self.validator_age = self.validator_age.saturating_add(1);
+            self.validator_age_last_updated_epoch = epoch;
+        }
+        
+        Ok(())
+    }
+    
+    /// Get the validator age (total epochs with non-zero vote credits)
+    pub fn validator_age(&self) -> u32 {
+        self.validator_age
     }
 }
 

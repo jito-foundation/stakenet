@@ -1,5 +1,5 @@
 use crate::{
-    state::{Config, StewardStateAccount},
+    state::{Config, StewardStateAccountV2},
     utils::get_config_admin,
 };
 use anchor_lang::prelude::*;
@@ -11,17 +11,17 @@ pub struct CloseStewardAccounts<'info> {
     #[account(
         mut,
         close = authority,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     #[account(mut, address = get_config_admin(&config)?)]
     pub authority: Signer<'info>,
 }
 
 /*
-    Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).
+    Closes Steward PDA accounts associated with a given Config (StewardStateAccountV2, and Staker).
     Config is not closed as it is a Keypair, so lamports can simply be withdrawn.
     Reclaims lamports to authority
 */

@@ -14,6 +14,7 @@ use crate::{
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV3,
     },
+    score_v2::calculate_validator_score_v2,
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
 };
@@ -29,7 +30,7 @@ use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub fn maybe_transition(
-    steward_state: &mut StewardState,
+    steward_state: &mut StewardStateV2,
     clock: &Clock,
     params: &Parameters,
     epoch_schedule: &EpochSchedule,
@@ -48,10 +49,8 @@ pub fn maybe_transition(
     Ok(None)
 }
 
-/// Tracks state of the stake pool.
-/// Follow state transitions here:
-/// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
-#[derive(BorshSerialize)]
+/// V1 State - Pure POD struct for deserialization of existing accounts
+/// DO NOT ADD ANY IMPLEMENTATIONS TO THIS STRUCT
 #[zero_copy]
 pub struct StewardState {
     /// Current state of the Steward
@@ -121,13 +120,88 @@ pub struct StewardState {
     pub validators_added: u16,
 
     /// Future state and #[repr(C)] alignment
+    pub _padding0: [u8; MAX_VALIDATORS * 8 + 2],
+}
+
+/// Tracks state of the stake pool.
+/// Follow state transitions here:
+/// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
+#[zero_copy]
+pub struct StewardStateV2 {
+    /// Current state of the Steward
+    pub state_tag: StewardStateEnum,
+
+    /////// Validator fields. Indices correspond to spl_stake_pool::ValidatorList index ///////
+    /// Internal lamport balance of each validator, used to track stake deposits that need to be unstaked,
+    /// so not always equal to the stake account balance.
+    pub validator_lamport_balances: [u64; MAX_VALIDATORS],
+
+    /// Overall score of validator, used to determine delegates and order for delegation.
+    pub scores: [u64; MAX_VALIDATORS],
+
+    /// Indices of validators, sorted by score descending
+    pub sorted_score_indices: [u16; MAX_VALIDATORS],
+
+    /// Raw score without binary filters applied. Used as secondary priority, to determine order for unstaking.
+    pub raw_scores: [u64; MAX_VALIDATORS],
+
+    /// Indices of validators, sorted by raw score descending
+    pub sorted_raw_score_indices: [u16; MAX_VALIDATORS],
+
+    /// Target share of pool represented as a proportion, indexed by spl_stake_pool::ValidatorList index
+    pub delegations: [Delegation; MAX_VALIDATORS],
+
+    /// Each bit represents a validator, true if validator should be unstaked
+    pub instant_unstake: BitMask,
+
+    /// Tracks progress of states that require one instruction per validator
+    pub progress: BitMask,
+
+    /// Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This happens when a validator is able to be removed within the same epoch as it was marked
+    pub validators_for_immediate_removal: BitMask,
+
+    /// Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool
+    /// This is cleaned up in the next epoch
+    pub validators_to_remove: BitMask,
+
+    ////// Cycle metadata fields //////
+    /// Slot of the first ComputeScores instruction in the current cycle
+    pub start_computing_scores_slot: u64,
+
+    /// Internal current epoch, for tracking when epoch has changed
+    pub current_epoch: u64,
+
+    /// Next cycle start
+    pub next_cycle_epoch: u64,
+
+    /// Number of validators in the stake pool, used to determine the number of validators to be scored.
+    /// Updated at the start of each cycle and when validators are removed.
+    pub num_pool_validators: u64,
+
+    /// Total lamports that have been due to scoring this cycle
+    pub scoring_unstake_total: u64,
+
+    /// Total lamports that have been due to instant unstaking this cycle
+    pub instant_unstake_total: u64,
+
+    /// Total lamports that have been due to stake deposits this cycle
+    pub stake_deposit_unstake_total: u64,
+
+    /// Flags to track state transitions and operations
+    pub status_flags: u32,
+
+    /// Number of validators added to the pool in the current cycle
+    pub validators_added: u16,
+
+    /// Future state and #[repr(C)] alignment
     pub _padding0: [u8; STATE_PADDING_0_SIZE],
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = MAX_VALIDATORS * 8 + 2;
+pub const STATE_PADDING_0_SIZE: usize = 2;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
 pub enum StewardStateEnum {
     /// Start state
@@ -252,7 +326,7 @@ pub const POST_LOOP_IDLE: u32 = 1 << 6;
 pub const RESET_TO_IDLE: u32 = 1 << 16;
 // BITS 24-31 RESERVED FOR FUTURE USE
 
-impl StewardState {
+impl StewardStateV2 {
     pub fn set_flag(&mut self, flag: u32) {
         self.status_flags |= flag;
     }
@@ -445,7 +519,7 @@ impl StewardState {
     ) -> Result<()> {
         self.state_tag = StewardStateEnum::ComputeScores;
         self.scores = [0; MAX_VALIDATORS];
-        self.yield_scores = [0; MAX_VALIDATORS];
+        self.raw_scores = [0; MAX_VALIDATORS];
         self.progress = BitMask::default();
         self.next_cycle_epoch = current_epoch
             .checked_add(num_epochs_between_scoring)
@@ -502,7 +576,7 @@ impl StewardState {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
             self.validator_lamport_balances[i] = self.validator_lamport_balances[next_i];
             self.scores[i] = self.scores[next_i];
-            self.yield_scores[i] = self.yield_scores[next_i];
+            self.raw_scores[i] = self.raw_scores[next_i];
             self.delegations[i] = self.delegations[next_i];
             self.instant_unstake
                 .set(i, self.instant_unstake.get(next_i)?)?;
@@ -519,8 +593,8 @@ impl StewardState {
         }
 
         // Update score indices
-        let yield_score_index = self
-            .sorted_yield_score_indices
+        let raw_score_index = self
+            .sorted_raw_score_indices
             .iter()
             .position(|&i| i == index as u16);
         let score_index = self
@@ -528,10 +602,10 @@ impl StewardState {
             .iter()
             .position(|&i| i == index as u16);
 
-        if let Some(yield_score_index) = yield_score_index {
-            for i in yield_score_index..num_pool_validators {
+        if let Some(raw_score_index) = raw_score_index {
+            for i in raw_score_index..num_pool_validators {
                 let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
-                self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[next_i];
+                self.sorted_raw_score_indices[i] = self.sorted_raw_score_indices[next_i];
             }
         }
 
@@ -543,8 +617,8 @@ impl StewardState {
         }
 
         for i in 0..num_pool_validators {
-            if self.sorted_yield_score_indices[i] as usize > index {
-                self.sorted_yield_score_indices[i] = self.sorted_yield_score_indices[i]
+            if self.sorted_raw_score_indices[i] as usize > index {
+                self.sorted_raw_score_indices[i] = self.sorted_raw_score_indices[i]
                     .checked_sub(1)
                     .ok_or(StewardError::ArithmeticError)?;
             }
@@ -558,9 +632,9 @@ impl StewardState {
         // Clear values on empty last index
         self.validator_lamport_balances[num_pool_validators] = LAMPORT_BALANCE_DEFAULT;
         self.scores[num_pool_validators] = 0;
-        self.yield_scores[num_pool_validators] = 0;
+        self.raw_scores[num_pool_validators] = 0;
         self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
-        self.sorted_yield_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
+        self.sorted_raw_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
         self.delegations[num_pool_validators] = Delegation::default();
         self.instant_unstake.set(num_pool_validators, false)?;
         self.progress.set(num_pool_validators, false)?;
@@ -650,8 +724,8 @@ impl StewardState {
             if self.validators_to_remove.get(index)?
                 || self.validators_for_immediate_removal.get(index)?
             {
-                self.scores[index] = 0_u32;
-                self.yield_scores[index] = 0_u32;
+                self.scores[index] = 0_u64;
+                self.raw_scores[index] = 0_u64;
 
                 let num_scores_calculated = self.progress.count();
                 insert_sorted_index(
@@ -662,10 +736,10 @@ impl StewardState {
                     num_scores_calculated,
                 )?;
                 insert_sorted_index(
-                    &mut self.sorted_yield_score_indices,
-                    &self.yield_scores,
+                    &mut self.sorted_raw_score_indices,
+                    &self.raw_scores,
                     index as u16,
-                    self.yield_scores[index],
+                    self.raw_scores[index],
                     num_scores_calculated,
                 )?;
 
@@ -690,6 +764,12 @@ impl StewardState {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
+            // Calculate the new v2 score (4-tier encoding)
+            // Note: validator age should already be updated by the validator history program
+            let score_v2 = calculate_validator_score_v2(validator, current_epoch as u16)?;
+            self.raw_scores[index] = score_v2;
+            
+            // Apply binary filters from the old scoring system to get final score
             let score = validator_score(
                 validator,
                 cluster,
@@ -697,9 +777,24 @@ impl StewardState {
                 current_epoch as u16,
                 TVC_ACTIVATION_EPOCH,
             )?;
-
-            self.scores[index] = (score.score * 1_000_000_000.) as u32;
-            self.yield_scores[index] = (score.yield_score * 1_000_000_000.) as u32;
+            
+            // Apply binary filters (multiply raw score by 0 or 1 based on filters)
+            let binary_filter_multiplier = if score.blacklisted_score > 0.0 
+                && score.superminority_score > 0.0
+                && score.delinquency_score > 0.0
+                && score.commission_score > 0.0
+                && score.historical_commission_score > 0.0
+                && score.mev_commission_score > 0.0
+                && score.running_jito_score > 0.0
+                && score.merkle_root_upload_authority_score > 0.0
+                && score.priority_fee_commission_score > 0.0
+                && score.priority_fee_merkle_root_upload_authority_score > 0.0 {
+                score_v2  // All filters pass, use raw score
+            } else {
+                0  // One or more filters failed
+            };
+            
+            self.scores[index] = binary_filter_multiplier;
 
             // Insertion sort scores into sorted_indices
             let num_scores_calculated = self.progress.count();
@@ -711,10 +806,10 @@ impl StewardState {
                 num_scores_calculated,
             )?;
             insert_sorted_index(
-                &mut self.sorted_yield_score_indices,
-                &self.yield_scores,
+                &mut self.sorted_raw_score_indices,
+                &self.raw_scores,
                 index as u16,
-                self.yield_scores[index],
+                self.raw_scores[index],
                 num_scores_calculated,
             )?;
 
@@ -1066,9 +1161,9 @@ impl StewardState {
 /// mutates `sorted_indices` in place
 pub fn insert_sorted_index(
     sorted_indices: &mut [u16],
-    scores: &[u32],
+    scores: &[u64],
     index: u16,
-    score: u32,
+    score: u64,
     current_len: usize,
 ) -> Result<()> {
     // Ensure the current_len is within the bounds of the sorted_indices slice
@@ -1096,7 +1191,7 @@ pub fn insert_sorted_index(
 /// Selects top `num_delegation_validators` validators by score descending.
 /// If there are fewer than `num_delegation_validators` validators with non-zero scores, all non-zero scores are selected.
 pub fn select_validators_to_delegate(
-    scores: &[u32],
+    scores: &[u64],
     sorted_score_indices: &[u16],
     num_delegation_validators: usize,
 ) -> Vec<u16> {

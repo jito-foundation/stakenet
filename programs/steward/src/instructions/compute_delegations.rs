@@ -1,5 +1,5 @@
 use crate::utils::{get_validator_list, state_checks};
-use crate::{maybe_transition, Config, StewardStateAccount, StewardStateEnum};
+use crate::{maybe_transition, Config, StewardStateAccountV2, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -8,10 +8,10 @@ pub struct ComputeDelegations<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     /// CHECK: Account owner checked, account type checked in get_validator_stake_info_at_index
     #[account(address = get_validator_list(&config)?)]

@@ -1,7 +1,7 @@
 use crate::constants::{MAX_VALIDATORS, STAKE_POOL_WITHDRAW_SEED};
 use crate::errors::StewardError;
 use crate::events::AutoAddValidatorEvent;
-use crate::state::{Config, StewardStateAccount};
+use crate::state::{Config, StewardStateAccountV2};
 use crate::{
     stake_pool_utils::deserialize_stake_pool,
     utils::{add_validator_check, get_stake_pool_address, get_validator_list_length},
@@ -18,10 +18,10 @@ pub struct AutoAddValidator<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub steward_state: AccountLoader<'info, StewardStateAccount>,
+    pub steward_state: AccountLoader<'info, StewardStateAccountV2>,
 
     // Only adding validators where this exists
     #[account(
@@ -179,7 +179,7 @@ pub fn handler(ctx: Context<AutoAddValidator>) -> Result<()> {
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.steward_state],
         ]],

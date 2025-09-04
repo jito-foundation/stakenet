@@ -2,7 +2,7 @@ use crate::{
     bitmask::BitMask,
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_ALLOC_BYTES, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
-    state::{Config, StewardStateAccount},
+    state::{Config, StewardStateAccountV2},
     utils::get_validator_list,
     Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
 };
@@ -13,8 +13,8 @@ fn get_realloc_size(account_info: &AccountInfo) -> Result<usize> {
     let account_size = account_info.data_len();
 
     // If account is already over-allocated, don't try to shrink
-    if account_size < StewardStateAccount::SIZE {
-        Ok(StewardStateAccount::SIZE.min(
+    if account_size < StewardStateAccountV2::SIZE {
+        Ok(StewardStateAccountV2::SIZE.min(
             account_size
                 .checked_add(MAX_ALLOC_BYTES)
                 .ok_or(StewardError::ArithmeticError)?,
@@ -26,8 +26,8 @@ fn get_realloc_size(account_info: &AccountInfo) -> Result<usize> {
 
 fn is_initialized(account_info: &AccountInfo) -> bool {
     // Checks position of is_initialized byte in account data
-    account_info.data_len() >= StewardStateAccount::SIZE
-        && account_info.data.borrow()[StewardStateAccount::IS_INITIALIZED_BYTE_POSITION] != 0
+    account_info.data_len() >= StewardStateAccountV2::SIZE
+        && account_info.data.borrow()[StewardStateAccountV2::IS_INITIALIZED_BYTE_POSITION] != 0
 }
 
 #[derive(Accounts)]
@@ -37,10 +37,10 @@ pub struct ReallocState<'info> {
         realloc = get_realloc_size(state_account.as_ref())?,
         realloc::payer = signer,
         realloc::zero = false,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     pub config: AccountLoader<'info, Config>,
 
@@ -59,7 +59,7 @@ Increases size of delegation account, assigning default values once reached desi
 */
 pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
     let account_size = ctx.accounts.state_account.as_ref().data_len();
-    if account_size >= StewardStateAccount::SIZE
+    if account_size >= StewardStateAccountV2::SIZE
         && !is_initialized(ctx.accounts.state_account.as_ref())
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
@@ -77,8 +77,8 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         state_account.state.validator_lamport_balances = [LAMPORT_BALANCE_DEFAULT; MAX_VALIDATORS];
         state_account.state.scores = [0; MAX_VALIDATORS];
         state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
-        state_account.state.yield_scores = [0; MAX_VALIDATORS];
-        state_account.state.sorted_yield_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
+        state_account.state.raw_scores = [0; MAX_VALIDATORS];
+        state_account.state.sorted_raw_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
         state_account.state.progress = BitMask::default();
         state_account.state.current_epoch = 0; // will be set by epoch_maintenance
         state_account.state.next_cycle_epoch = clock

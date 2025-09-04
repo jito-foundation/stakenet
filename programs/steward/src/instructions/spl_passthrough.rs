@@ -7,7 +7,7 @@
 use crate::constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS};
 use crate::errors::StewardError;
 use crate::state::Config;
-use crate::StewardStateAccount;
+use crate::StewardStateAccountV2;
 use crate::{
     stake_pool_utils::deserialize_stake_pool,
     utils::{
@@ -34,10 +34,10 @@ pub struct AddValidatorToPool<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -134,7 +134,7 @@ pub fn add_validator_to_pool_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -147,10 +147,10 @@ pub struct RemoveValidatorFromPool<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     /// CHECK: CPI program
     #[account(
@@ -238,7 +238,7 @@ pub fn remove_validator_from_pool_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -303,10 +303,10 @@ pub struct SetPreferredValidator<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -346,7 +346,7 @@ pub fn set_preferred_validator_handler(
             ctx.accounts.validator_list.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -359,10 +359,10 @@ pub struct IncreaseValidatorStake<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     #[account(
         mut,
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -471,7 +471,7 @@ pub fn increase_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -484,10 +484,10 @@ pub struct DecreaseValidatorStake<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     #[account(
         mut,
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -591,7 +591,7 @@ pub fn decrease_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -604,10 +604,10 @@ pub struct IncreaseAdditionalValidatorStake<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     #[account(
         mut,
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -718,7 +718,7 @@ pub fn increase_additional_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -731,10 +731,10 @@ pub struct DecreaseAdditionalValidatorStake<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     #[account(
         mut,
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],
@@ -841,7 +841,7 @@ pub fn decrease_additional_validator_stake_handler(
             ctx.accounts.stake_program.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
@@ -854,10 +854,10 @@ pub struct SetStaker<'info> {
     pub config: AccountLoader<'info, Config>,
     #[account(
         mut,
-        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
     /// CHECK: CPI program
     #[account(
         address = spl_stake_pool::ID
@@ -892,7 +892,7 @@ pub fn set_staker_handler(ctx: Context<SetStaker>) -> Result<()> {
             ctx.accounts.new_staker.to_account_info(),
         ],
         &[&[
-            StewardStateAccount::SEED,
+            StewardStateAccountV2::SEED,
             &ctx.accounts.config.key().to_bytes(),
             &[ctx.bumps.state_account],
         ]],
