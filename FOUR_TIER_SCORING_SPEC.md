@@ -10,7 +10,7 @@ The system ranks validators by four metrics in priority order:
 1. **Inflation Commission** (lower is better) - Existing metric
 2. **MEV Commission** (lower is better) - Existing metric  
 3. **Validator Age** (higher is better) - **NEW metric**
-4. **Vote Credits Ratio** (higher is better) - Existing metric
+4. **Epoch Credits** (higher is better) - Existing metric (modified from ratio to direct value)
 
 ## Why u64 is Required
 
@@ -32,137 +32,178 @@ Initial 32-bit layout (NOT ENOUGH PRECISION):
 - Inflation commission: 4 bits sufficient for 0-10% range (values 0-10)
 - MEV commission: 10 bits adequate for 0-10% range (0-1000 basis points)
 - Validator age: Forced to bucket by 16 epochs - loses granularity
-- **Vote credits: Only 10 bits cannot achieve 6 decimals of precision** 
-  - Even bucketing all values < 0.9 into a single value
-  - 10 bits = 1024 values for 0.9-1.0 range
-  - Only provides ~0.0001 precision (4 decimals)
-  - Need 6 decimals (0.000001) to distinguish 0.999884 from 0.999883
+- **Epoch credits: 10 bits insufficient for meaningful discrimination**
+  - Max epoch credits: 6,912,000 (requires 23 bits minimum)
+  - With only 10 bits (1024 values), would need to bucket by ~6,750 credits
+  - Loses ability to distinguish between validators with similar performance
+  - Critical for fair stake distribution among high-performing validators
 
-The critical issue is **vote credits ratio** requiring 6 decimals of precision for the 0.9-1.0 range. This would need at least 20 bits (1,000,000 values), leaving insufficient bits for the other three metrics in a u32.
+The critical issue is **epoch credits** requiring at least 23 bits to represent the full range (0-6,912,000). With only 10 bits available in u32, the bucketing would be too coarse to fairly rank validators, leaving insufficient bits for the other three metrics.
 
 ### u64 Bit Encoding Strategy
 
-With u64, we can properly encode all four metrics with appropriate precision:
+With u64, we can properly encode all four metrics with full precision for commissions and appropriate precision for age and vote credits:
 
 ```
 64-bit layout:
 ┌──────────────┬──────────────┬──────────────────┬────────────────────┐
-│ Bits 60-63   │ Bits 50-59   │ Bits 30-49       │ Bits 0-29          │
-│ (4 bits)     │ (10 bits)    │ (20 bits)        │ (30 bits)          │
+│ Bits 56-63   │ Bits 42-55   │ Bits 25-41       │ Bits 0-24          │
+│ (8 bits)     │ (14 bits)    │ (17 bits)        │ (25 bits)          │
 ├──────────────┼──────────────┼──────────────────┼────────────────────┤
-│ Inflation    │ MEV          │ Validator Age    │ Vote Credits       │
-│ Commission   │ Commission   │ (epochs)         │ Ratio              │
+│ Inflation    │ MEV          │ Validator Age    │ Epoch Credits      │
+│ Commission   │ Commission   │ (epochs)         │ (direct value)     │
 └──────────────┴──────────────┴──────────────────┴────────────────────┘
 ```
 
 ### u64 Field Specifications
 
-1. **Inflation Commission (4 bits)**
-   - Range: 0-15 (covers 0-10% range, values above 10% are filtered)
-   - Inverted: `15 - min(commission, 10)` (lower commission = higher value)
-   - Same as u32 version - sufficient for our needs
+1. **Inflation Commission (8 bits)**
+   - Range: 0-255 (full u8 range, covers 0-100% with full precision)
+   - Inverted: `100 - min(commission, 100)` (lower commission = higher value)
+   - Full precision matching the underlying u8 type
 
-2. **MEV Commission (10 bits)**  
-   - Range: 0-1023 (covers 0-1000 basis points = 0-10%)
-   - Inverted: `1023 - min(mev_commission_bps, 1000)` (lower commission = higher value)
-   - Same as u32 version - sufficient for our needs
+2. **MEV Commission (14 bits)**  
+   - Range: 0-16,383 (covers full 0-10,000 basis points range)
+   - Inverted: `10000 - min(mev_commission_bps, 10000)` (lower commission = higher value)
+   - Full precision for all possible basis point values
 
-3. **Validator Age (20 bits)**
-   - Range: 0-1,048,575 epochs directly (no bucketing needed!)
+3. **Validator Age (17 bits)**
+   - Range: 0-131,071 epochs directly (no bucketing needed!)
    - Direct encoding (older = higher value)
-   - Covers ~5,700 years at 2 days/epoch
+   - Covers ~716 years at 2 days/epoch (far exceeds 100-year requirement)
    - NEW METRIC: Counts epochs with non-zero vote credits
    - No bucketing required - exact epoch count preserved
 
-4. **Vote Credits Ratio (30 bits)**
-   - Range: 0-1,073,741,823 levels
-   - For 0.9-1.0 range: `((ratio - 0.9) * 10_000_000) as u64`
-   - For < 0.9: encoded as 0
-   - Precision: 7 decimals (0.0000001) - exceeds 6 decimal requirement
-   - Can distinguish 0.9500000 from 0.9500001
+4. **Epoch Credits (25 bits)**
+   - Range: 0-33,554,431 (covers full epoch credits range 0-6,912,000)
+   - Direct encoding of epoch credits value (max: 16 × 432,000 = 6,912,000)
+   - No ratio calculation needed - simpler implementation
+   - Perfect precision: every single credit difference is preserved
+   - Future proof: 4.85x headroom for any potential increases
 
-## Migration Strategy: Two Options
+## Migration Strategy: Memory Reuse with State Preservation
 
-Since the existing StewardState uses `scores: [u32; MAX_VALIDATORS]` arrays (where MAX_VALIDATORS = 5,000), we need to migrate to u64. Two approaches are possible:
+The migration leverages a perfect alignment in the existing memory layout that requires **NO account reallocation**.
 
-### Option 1: New Struct Version with Migration Instruction
+### Memory Layout Discovery
 
-Create a new `StewardStateV2` struct and implement a migration instruction to copy data from the old struct to the new one.
+**Current layout:**
+- `.scores`: [u32; 5,000] = 20,000 bytes
+- `.yield_scores`: [u32; 5,000] = 20,000 bytes
+- `_padding0`: [u8; 40,002] = 40,002 bytes (MAX_VALIDATORS * 8 + 2)
+
+**Reinterpreted layout:**
+- Old `.scores` + `.yield_scores` space → new `.scores: [u64; 5,000]` = 40,000 bytes
+- Old `_padding0` space → new `.yield_scores: [u64; 5,000]` = 40,000 bytes
+- Remaining padding: 2 bytes
+
+This perfect alignment means we can migrate without changing the account size!
+
+### Struct Versions
 
 ```rust
+// Version 1 (Current)
+pub struct StewardStateV1 {
+    pub state_tag: StewardStateEnum,
+    pub validator_lamport_balances: [u64; MAX_VALIDATORS],
+    pub scores: [u32; MAX_VALIDATORS],
+    pub sorted_score_indices: [u16; MAX_VALIDATORS],
+    pub yield_scores: [u32; MAX_VALIDATORS],
+    pub sorted_yield_score_indices: [u16; MAX_VALIDATORS],
+    // ... other fields ...
+    pub _padding0: [u8; 40002],
+}
+
+// Version 2 (After Migration)
 pub struct StewardStateV2 {
     pub state_tag: StewardStateEnum,
     pub validator_lamport_balances: [u64; MAX_VALIDATORS],
-    pub scores: [u64; MAX_VALIDATORS],  // UPGRADED from u32
+    pub scores: [u64; MAX_VALIDATORS],  // Reuses memory of old scores + yield_scores
     pub sorted_score_indices: [u16; MAX_VALIDATORS],
-    pub yield_scores: [u64; MAX_VALIDATORS],  // UPGRADED from u32
+    pub yield_scores: [u64; MAX_VALIDATORS],  // Uses former padding space
     pub sorted_yield_score_indices: [u16; MAX_VALIDATORS],
-    // ... rest of fields remain the same ...
+    // ... other fields unchanged ...
+    pub _padding0: [u8; 2],  // Reduced to 2 bytes
 }
 ```
 
-**Implementation:**
-1. Deploy new program with both struct versions
-2. Add `migrate_steward_state` instruction
-3. Migration instruction:
-   - Reallocates account with additional space
-   - Copies all fields from V1 to V2
-   - Converts u32 scores to u64
-   - Updates discriminator
-4. All subsequent instructions use V2
+### Migration Instruction Logic
 
-**Pros:**
-- Clean separation between versions
-- Optimal struct layout (no wasted space)
-- Clear migration point
-
-**Cons:**
-- Complex migration logic required
-- Need to maintain two struct versions temporarily
-
-### Option 2: Add New Fields to Existing Struct
-
-Keep the same `StewardState` struct but add new u64 arrays at the end, deprecating the old u32 arrays.
+The migration preserves operational continuity while upgrading the scoring system:
 
 ```rust
-pub struct StewardState {
-    // ... existing fields remain unchanged ...
+fn migrate_steward_state_v1_to_v2(ctx: Context<MigrateStewardState>) -> Result<()> {
+    // Read account data as V1
+    let v1_state = StewardStateV1::try_from_slice(&ctx.accounts.steward_state.data.borrow())?;
     
-    /// DEPRECATED - use scores_v2 instead
-    pub scores: [u32; MAX_VALIDATORS],
+    // Create V2 with preserved operational state
+    let v2_state = StewardStateV2 {
+        // Preserve state machine position - no disruption
+        state_tag: v1_state.state_tag,
+        
+        // Preserve validator tracking
+        validator_lamport_balances: v1_state.validator_lamport_balances,
+        
+        // Convert scores (preserves relative ordering)
+        scores: v1_state.scores.map(|s| s as u64),
+        sorted_score_indices: v1_state.sorted_score_indices,
+        
+        // Convert yield scores
+        yield_scores: v1_state.yield_scores.map(|s| s as u64),
+        sorted_yield_score_indices: v1_state.sorted_yield_score_indices,
+        
+        // Preserve all operational state
+        delegations: v1_state.delegations,
+        instant_unstake: v1_state.instant_unstake,
+        progress: v1_state.progress,
+        validators_for_immediate_removal: v1_state.validators_for_immediate_removal,
+        validators_to_remove: v1_state.validators_to_remove,
+        
+        // Preserve cycle metadata
+        start_computing_scores_slot: v1_state.start_computing_scores_slot,
+        current_epoch: v1_state.current_epoch,
+        next_cycle_epoch: v1_state.next_cycle_epoch,
+        num_pool_validators: v1_state.num_pool_validators,
+        scoring_unstake_total: v1_state.scoring_unstake_total,
+        instant_unstake_total: v1_state.instant_unstake_total,
+        stake_deposit_unstake_total: v1_state.stake_deposit_unstake_total,
+        status_flags: v1_state.status_flags,
+        validators_added: v1_state.validators_added,
+        
+        _padding0: [0u8; 2],
+    };
     
-    /// DEPRECATED - use yield_scores_v2 instead
-    pub yield_scores: [u32; MAX_VALIDATORS],
+    // Write back as V2 (same size, no realloc needed!)
+    v2_state.serialize(&mut &mut ctx.accounts.steward_state.data.borrow_mut()[..])?;
     
-    // ... other existing fields ...
-    
-    pub _padding0: [u8; STATE_PADDING_0_SIZE],
-    
-    // NEW FIELDS ADDED AT END:
-    /// Score array supporting 64-bit encoded 4-tier scoring
-    pub scores_v2: [u64; MAX_VALIDATORS],
-    
-    /// Yield scores with 64-bit precision
-    pub yield_scores_v2: [u64; MAX_VALIDATORS],
+    Ok(())
 }
 ```
 
-**Implementation:**
-1. Realloc existing accounts to add space for new arrays
-2. Update compute_score to write to new arrays
-3. Update sorting/delegation logic to use new arrays
-4. Old arrays remain for backward compatibility
+### Key Benefits
 
-**Pros:**
-- Simpler implementation
-- Backward compatible (old clients still work)
-- Single struct version to maintain
+1. **No Account Reallocation**: Reuses exact same memory footprint (184KB)
+2. **No Service Disruption**: State machine continues from current position
+3. **Preserved Stake Allocations**: Current delegations remain valid
+4. **Maintained Validator State**: Removal marks and balances preserved
+5. **Smooth Transition**: Next scoring cycle naturally uses new u64 encoding
+6. **No Rebalancing Storm**: Avoids mass unstaking attempts
 
-**Cons:**
-- Wasted space: 2 × 5,000 × 4 = 40,000 bytes (40KB) for deprecated fields
-- Account size increase: 80KB total (2 × 5,000 × 8 bytes for new arrays)
-- Struct becomes less clean (deprecated fields remain)
-- Current account ~184KB → new size ~264KB (still well within Solana's 10MB limit)
+### Post-Migration Behavior
+
+**Immediately after migration:**
+- State machine continues in current state
+- Existing u32 scores converted to u64 (simple zero-extension)
+- Relative validator ordering preserved
+- Current stake delegations unchanged
+
+**At next scoring cycle (within 2-3 days):**
+- New 4-tier bit encoding applied
+- Validator age metric incorporated
+- Full precision epoch credits
+- Deterministic tiebreaking enabled
+
+The migration provides seamless continuity with zero downtime or stake disruption
 
 ## Validator History Account Extension
 
@@ -215,17 +256,17 @@ This specification outlines a 4-tier validator ranking system that requires migr
 
 ### Key Findings
 - **u32 Insufficient**: Even with aggressive bucketing, 32 bits cannot provide the required 6 decimals of precision for vote credits ratio while encoding three other metrics
-- **u64 Required**: Allocates 4 bits for inflation commission, 10 bits for MEV commission, 20 bits for validator age, and 30 bits for vote credits ratio
+- **u64 Required**: Allocates 8 bits for inflation commission (full u8 precision), 14 bits for MEV commission (full basis points range), 17 bits for validator age (716+ years), and 25 bits for epoch credits (full 0-6,912,000 range)
 
-### Migration Options
-1. **Option 1**: Create new struct version with migration instruction - cleaner but more complex
-2. **Option 2**: Add new u64 arrays to existing struct - simpler but wastes 40KB
-
-Both options are viable within Solana's 10MB account limit (current ~184KB → new ~264KB).
+### Migration Strategy
+- **Memory Reuse**: Leverages perfect alignment in existing layout - NO reallocation needed
+- **State Preservation**: Maintains operational continuity by preserving validator state, delegations, and state machine position
+- **Zero Downtime**: Seamless transition with scores converted from u32 to u64, preserving relative ordering
+- **Account Size Unchanged**: Remains at ~184KB by reinterpreting existing memory
 
 ### Validator Age Tracking
 - Adds two fields to ValidatorHistory using existing padding (no reallocation needed)
 - Idempotent initialization automatically backfills historical data
 - Enables unbounded age tracking beyond the 512-epoch circular buffer limit
 
-The design provides deterministic sorting through single u64 comparison while maintaining backward compatibility throughout the transition.
+The design provides deterministic sorting through single u64 comparison while ensuring a smooth migration with no service disruption or stake rebalancing storms.
