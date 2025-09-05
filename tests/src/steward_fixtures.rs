@@ -325,6 +325,16 @@ impl TestFixture {
         parameters: Option<UpdateParametersArgs>,
         priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
     ) {
+        self.initialize_steward_v1(parameters, priority_fee_parameters).await;
+        // Always migrate to V2 after initialization
+        self.migrate_steward_state_to_v2().await;
+    }
+
+    pub async fn initialize_steward_v1(
+        &self,
+        parameters: Option<UpdateParametersArgs>,
+        priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
+    ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
             mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
@@ -381,6 +391,52 @@ impl TestFixture {
             self.ctx.borrow().last_blockhash,
         );
         self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn migrate_steward_state_to_v2(&self) {
+        let instruction = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::MigrateStateToV2 {
+                state_account: self.steward_state,
+                config: self.steward_config.pubkey(),
+                signer: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::MigrateStateToV2 {}.data(),
+        };
+
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(transaction).await;
+    }
+
+    pub async fn try_migrate_steward_state_to_v2(&self) -> Result<(), BanksClientError> {
+        let instruction = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::MigrateStateToV2 {
+                state_account: self.steward_state,
+                config: self.steward_config.pubkey(),
+                signer: self.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::MigrateStateToV2 {}.data(),
+        };
+
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        
+        let ctx = self.ctx.borrow_mut();
+        ctx.banks_client
+            .process_transaction_with_preflight(transaction)
+            .await
     }
 
     pub async fn set_new_authority(&self, authority_type: AuthorityType) -> Keypair {

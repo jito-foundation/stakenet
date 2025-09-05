@@ -52,7 +52,7 @@ pub fn maybe_transition(
 /// V1 State - Pure POD struct for deserialization of existing accounts
 /// DO NOT ADD ANY IMPLEMENTATIONS TO THIS STRUCT
 #[zero_copy]
-pub struct StewardState {
+pub struct StewardStateV1 {
     /// Current state of the Steward
     pub state_tag: StewardStateEnum,
 

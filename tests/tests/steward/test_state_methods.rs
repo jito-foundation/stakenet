@@ -11,7 +11,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
-    Delegation, StewardState, StewardStateEnum,
+    Delegation, StewardStateV1, StewardStateEnum,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
@@ -836,7 +836,7 @@ fn test_rebalance_default_lamports() {
     }
 }
 
-fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState {
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV1 {
     let mut state = fixtures.state;
     // Set values for all of the values that are gonna get shifted
     state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);

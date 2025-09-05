@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState, StewardStateV2};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardStateV1, StewardStateV2};
 
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
@@ -90,7 +90,7 @@ impl Config {
 /// V1 State Account - for migration purposes
 #[account(zero_copy)]
 pub struct StewardStateAccount {
-    pub state: StewardState,
+    pub state: StewardStateV1,
     pub is_initialized: U8Bool,
     pub bump: u8,
     pub _padding: [u8; 6],
@@ -119,7 +119,7 @@ impl StewardStateAccountV2 {
 
 pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[StewardStateAccount::SEED, steward_config.as_ref()],
+        &[StewardStateAccountV2::SEED, steward_config.as_ref()],
         &crate::id(),
     )
 }

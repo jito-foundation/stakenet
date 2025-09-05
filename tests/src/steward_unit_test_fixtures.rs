@@ -1,6 +1,6 @@
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
-    BitMask, Config, Delegation, Parameters, StewardState, StewardStateEnum,
+    BitMask, Config, Delegation, Parameters, StewardStateV1, StewardStateEnum,
 };
 use solana_sdk::{
     clock::Clock, epoch_schedule::EpochSchedule, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey,
@@ -13,7 +13,7 @@ use validator_history::{
 use crate::steward_fixtures::{cluster_history_default, validator_history_default};
 
 /*
-StewardState is large enough that you may need to heap-allocate this struct or request a larger stack size.
+StewardStateV1 is large enough that you may need to heap-allocate this struct or request a larger stack size.
 */
 pub struct StateMachineFixtures {
     pub current_epoch: u64,
@@ -23,7 +23,7 @@ pub struct StateMachineFixtures {
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
-    pub state: StewardState,
+    pub state: StewardStateV1,
 }
 
 impl Default for StateMachineFixtures {
@@ -152,8 +152,8 @@ impl Default for StateMachineFixtures {
         validator_lamport_balances[1] = LAMPORTS_PER_SOL * 1000;
         validator_lamport_balances[2] = LAMPORTS_PER_SOL * 1000;
 
-        // Setup StewardState
-        let state = StewardState {
+        // Setup StewardStateV1
+        let state = StewardStateV1 {
             state_tag: StewardStateEnum::ComputeScores, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
