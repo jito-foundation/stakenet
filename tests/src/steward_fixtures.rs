@@ -19,8 +19,8 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     instructions::AuthorityType,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, LargeBitMask, Parameters, StewardStateAccountV2, StewardStateEnum,
-    StewardStateV2, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
+    Config, Delegation, LargeBitMask, Parameters, StewardStateAccount, StewardStateAccountV2,
+    StewardStateEnum, StewardStateV2, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 use solana_program_test::*;
 #[allow(deprecated)]
@@ -1702,6 +1702,20 @@ pub fn serialized_validator_history_account(validator_history: ValidatorHistory)
         lamports: 1_000_000_000,
         data,
         owner: validator_history::id(),
+        ..Account::default()
+    }
+}
+
+pub fn serialized_steward_state_account_v1(state: StewardStateAccount) -> Account {
+    let mut data = Vec::with_capacity(StewardStateAccount::SIZE);
+    // Add discriminator
+    data.extend_from_slice(&StewardStateAccount::DISCRIMINATOR);
+    // Add account data using bytemuck
+    data.extend_from_slice(bytemuck::bytes_of(&state));
+    Account {
+        lamports: 100_000_000_000,
+        data,
+        owner: jito_steward::id(),
         ..Account::default()
     }
 }

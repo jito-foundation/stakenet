@@ -85,7 +85,9 @@ fn create_validator_history(
         _padding0: [0; 7],
         last_ip_timestamp: 0,
         last_version_timestamp: 0,
-        _padding1: [0; 232],
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
     }
 }
 

@@ -1,14 +1,14 @@
-use anchor_lang::Discriminator;
+use anchor_lang::{Discriminator, InstructionData, ToAccountMetas};
 use jito_steward::{StewardStateAccount, StewardStateAccountV2};
+use solana_program_test::*;
 use solana_sdk::signature::{Keypair, Signer};
-use solana_sdk::transaction::TransactionError;
 use tests::steward_fixtures::TestFixture;
 
 #[tokio::test]
 async fn test_migrate_state_to_v2() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    // Config is initialized as part of steward initialization
 
     // Initialize with V1 state
     fixture.initialize_steward_v1(None, None).await;
@@ -19,12 +19,8 @@ async fn test_migrate_state_to_v2() {
         .await;
 
     // Verify it has the V1 discriminator
-    let account_data_before = fixture
-        .ctx
-        .borrow_mut()
-        .get_account(&fixture.steward_state)
-        .unwrap()
-        .data;
+    let account_raw_before = fixture.get_account(&fixture.steward_state).await;
+    let account_data_before = account_raw_before.data;
     let discriminator_before = &account_data_before[0..8];
     assert_eq!(discriminator_before, StewardStateAccount::DISCRIMINATOR);
 
@@ -43,12 +39,8 @@ async fn test_migrate_state_to_v2() {
         .await;
 
     // Verify it has the V2 discriminator
-    let account_data_after = fixture
-        .ctx
-        .borrow_mut()
-        .get_account(&fixture.steward_state)
-        .unwrap()
-        .data;
+    let account_after_raw = fixture.get_account(&fixture.steward_state).await;
+    let account_data_after = account_after_raw.data;
     let discriminator_after = &account_data_after[0..8];
     assert_eq!(discriminator_after, StewardStateAccountV2::DISCRIMINATOR);
     assert_ne!(
@@ -85,7 +77,7 @@ async fn test_migrate_state_to_v2() {
 async fn test_migrate_state_to_v2_twice_fails() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    // Config is initialized as part of steward initialization
 
     // Initialize with V1 state
     fixture.initialize_steward_v1(None, None).await;
@@ -111,7 +103,7 @@ async fn test_migrate_state_to_v2_twice_fails() {
 async fn test_migrate_requires_admin() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
-    fixture.initialize_config().await;
+    // Config is initialized as part of steward initialization
     fixture.initialize_steward_v1(None, None).await;
 
     // Try to migrate with a different signer
@@ -144,6 +136,11 @@ async fn test_migrate_requires_admin() {
         fixture.ctx.borrow().last_blockhash,
     );
 
-    let result = fixture.submit_transaction(transaction).await;
+    let result = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .process_transaction(transaction)
+        .await;
     assert!(result.is_err());
 }

@@ -1,6 +1,6 @@
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
-    BitMask, Config, Delegation, Parameters, StewardStateV1, StewardStateEnum,
+    BitMask, Config, Delegation, Parameters, StewardStateV2, StewardStateEnum,
 };
 use solana_sdk::{
     clock::Clock, epoch_schedule::EpochSchedule, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey,
@@ -13,7 +13,7 @@ use validator_history::{
 use crate::steward_fixtures::{cluster_history_default, validator_history_default};
 
 /*
-StewardStateV1 is large enough that you may need to heap-allocate this struct or request a larger stack size.
+StewardStateV2 is large enough that you may need to heap-allocate this struct or request a larger stack size.
 */
 pub struct StateMachineFixtures {
     pub current_epoch: u64,
@@ -23,7 +23,7 @@ pub struct StateMachineFixtures {
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
-    pub state: StewardStateV1,
+    pub state: StewardStateV2,
 }
 
 impl Default for StateMachineFixtures {
@@ -152,14 +152,14 @@ impl Default for StateMachineFixtures {
         validator_lamport_balances[1] = LAMPORTS_PER_SOL * 1000;
         validator_lamport_balances[2] = LAMPORTS_PER_SOL * 1000;
 
-        // Setup StewardStateV1
-        let state = StewardStateV1 {
+        // Setup StewardStateV2
+        let state = StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
-            yield_scores: [0; MAX_VALIDATORS],
-            sorted_yield_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            raw_scores: [0; MAX_VALIDATORS],
+            sorted_raw_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
             start_computing_scores_slot: 20, // "Current" slot
             progress: BitMask::default(),
             current_epoch,
@@ -170,9 +170,11 @@ impl Default for StateMachineFixtures {
             stake_deposit_unstake_total: 0,
             delegations: [Delegation::default(); MAX_VALIDATORS],
             instant_unstake: BitMask::default(),
-            compute_delegations_completed: false.into(),
-            rebalance_completed: false.into(),
-            _padding0: [0; 6 + 8 * MAX_VALIDATORS],
+            validators_for_immediate_removal: BitMask::default(),
+            validators_to_remove: BitMask::default(),
+            status_flags: 0,
+            validators_added: 0,
+            _padding: [0; 1822],
         };
 
         StateMachineFixtures {

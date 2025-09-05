@@ -1461,7 +1461,7 @@ fn test_insert_sorted_index() {
 
 #[test]
 fn test_select_validators_to_delegate() {
-    let scores: [u32; 10] = [10, 0, 9, 0, 8, 0, 7, 0, 6, 0];
+    let scores: [u64; 10] = [10, 0, 9, 0, 8, 0, 7, 0, 6, 0];
     let sorted_score_indices = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9];
 
     let mut validators: Vec<u16> = select_validators_to_delegate(&scores, &sorted_score_indices, 4);
@@ -1474,7 +1474,7 @@ fn test_select_validators_to_delegate() {
     validators = select_validators_to_delegate(&scores, &sorted_score_indices, 0);
     assert!(validators.is_empty());
 
-    let scores = [0; 10];
+    let scores: [u64; 10] = [0; 10];
     validators = select_validators_to_delegate(&scores, &sorted_score_indices, 10);
     assert!(validators.is_empty());
 }
@@ -1733,12 +1733,12 @@ fn test_decrease_stake_calculation() {
     // Delegations: 0: 100%, 1: 0%, 2: 0%
 
     let mut state = default_fixture.state;
-    state.yield_scores[0] = 100;
-    state.yield_scores[1] = 0;
-    state.yield_scores[2] = 95;
-    state.sorted_yield_score_indices[0] = 0;
-    state.sorted_yield_score_indices[1] = 2;
-    state.sorted_yield_score_indices[2] = 1;
+    state.raw_scores[0] = 100;
+    state.raw_scores[1] = 0;
+    state.raw_scores[2] = 95;
+    state.sorted_raw_score_indices[0] = 0;
+    state.sorted_raw_score_indices[1] = 2;
+    state.sorted_raw_score_indices[2] = 1;
     state.delegations[0] = Delegation::new(1, 1);
     state.delegations[1] = Delegation::new(0, 1);
     state.delegations[2] = Delegation::new(0, 1);

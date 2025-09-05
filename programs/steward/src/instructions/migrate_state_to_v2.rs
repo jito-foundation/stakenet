@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 
 use crate::{
-    state::{Config, StewardStateAccount, StewardStateAccountV2, StewardStateV2},
+    state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::get_config_admin,
     STATE_PADDING_0_SIZE,
 };
@@ -44,66 +44,11 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let v1_bytes = &data[8..8 + v1_size];
     let v1_account: &StewardStateAccount = bytemuck::from_bytes(v1_bytes);
     let v1_state = v1_account.state;
+    let v1_is_initialized = v1_account.is_initialized;
+    let v1_bump = v1_account.bump;
+    let v1_padding = v1_account._padding;
 
-    // Create V2 state with converted values
-    let v2_state = StewardStateV2 {
-        // Preserve state machine position - no disruption
-        state_tag: v1_state.state_tag,
-
-        // Preserve validator tracking
-        validator_lamport_balances: v1_state.validator_lamport_balances,
-
-        // Convert scores from u32 to u64 (zero-extend)
-        scores: {
-            let mut scores = [0u64; crate::constants::MAX_VALIDATORS];
-            for i in 0..crate::constants::MAX_VALIDATORS {
-                scores[i] = v1_state.scores[i] as u64;
-            }
-            scores
-        },
-        sorted_score_indices: v1_state.sorted_score_indices,
-
-        // Convert raw scores (previously yield_scores) from u32 to u64
-        raw_scores: {
-            let mut raw_scores = [0u64; crate::constants::MAX_VALIDATORS];
-            for i in 0..crate::constants::MAX_VALIDATORS {
-                raw_scores[i] = v1_state.yield_scores[i] as u64;
-            }
-            raw_scores
-        },
-        sorted_raw_score_indices: v1_state.sorted_yield_score_indices,
-
-        // Preserve all operational state
-        delegations: v1_state.delegations,
-        instant_unstake: v1_state.instant_unstake,
-        progress: v1_state.progress,
-        validators_for_immediate_removal: v1_state.validators_for_immediate_removal,
-        validators_to_remove: v1_state.validators_to_remove,
-
-        // Preserve cycle metadata
-        start_computing_scores_slot: v1_state.start_computing_scores_slot,
-        current_epoch: v1_state.current_epoch,
-        next_cycle_epoch: v1_state.next_cycle_epoch,
-        num_pool_validators: v1_state.num_pool_validators,
-        scoring_unstake_total: v1_state.scoring_unstake_total,
-        instant_unstake_total: v1_state.instant_unstake_total,
-        stake_deposit_unstake_total: v1_state.stake_deposit_unstake_total,
-        status_flags: v1_state.status_flags,
-        validators_added: v1_state.validators_added,
-
-        // Reduced padding in V2
-        _padding0: [0u8; STATE_PADDING_0_SIZE],
-    };
-
-    // Create V2 account wrapper
-    let v2_account = StewardStateAccountV2 {
-        state: v2_state,
-        is_initialized: v1_account.is_initialized,
-        bump: v1_account.bump,
-        _padding: v1_account._padding,
-    };
-
-    // Write V2 back to account with new discriminator (same size, no realloc needed!)
+    // Write V2 directly to account data to avoid stack allocation
     drop(data); // Drop the borrow before we mutably borrow
     let mut data = ctx.accounts.state_account.data.borrow_mut();
 
@@ -111,14 +56,65 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let v2_discriminator = StewardStateAccountV2::DISCRIMINATOR;
     data[0..8].copy_from_slice(v2_discriminator);
 
-    // Write V2 account data after discriminator using bytemuck
-    let v2_bytes = bytemuck::bytes_of(&v2_account);
-    data[8..8 + v2_bytes.len()].copy_from_slice(v2_bytes);
+    // Write V2 account data directly, field by field to avoid stack allocation
+    let v2_bytes = &mut data[8..];
+    let mut offset = 0;
+
+    // Helper to write bytes and advance offset
+    let mut write_bytes = |bytes: &[u8]| {
+        v2_bytes[offset..offset + bytes.len()].copy_from_slice(bytes);
+        offset += bytes.len();
+    };
+
+    // Write StewardStateV2 fields in order
+    write_bytes(bytemuck::bytes_of(&v1_state.state_tag));
+    write_bytes(bytemuck::bytes_of(&v1_state.validator_lamport_balances));
+
+    // Convert and write scores (u32 to u64)
+    for i in 0..crate::constants::MAX_VALIDATORS {
+        let score_u64 = v1_state.scores[i] as u64;
+        write_bytes(&score_u64.to_le_bytes());
+    }
+
+    write_bytes(bytemuck::bytes_of(&v1_state.sorted_score_indices));
+
+    // Convert and write raw_scores (previously yield_scores, u32 to u64)
+    for i in 0..crate::constants::MAX_VALIDATORS {
+        let raw_score_u64 = v1_state.yield_scores[i] as u64;
+        write_bytes(&raw_score_u64.to_le_bytes());
+    }
+
+    write_bytes(bytemuck::bytes_of(&v1_state.sorted_yield_score_indices));
+    write_bytes(bytemuck::bytes_of(&v1_state.delegations));
+    write_bytes(bytemuck::bytes_of(&v1_state.instant_unstake));
+    write_bytes(bytemuck::bytes_of(&v1_state.progress));
+    write_bytes(bytemuck::bytes_of(
+        &v1_state.validators_for_immediate_removal,
+    ));
+    write_bytes(bytemuck::bytes_of(&v1_state.validators_to_remove));
+    write_bytes(bytemuck::bytes_of(&v1_state.start_computing_scores_slot));
+    write_bytes(bytemuck::bytes_of(&v1_state.current_epoch));
+    write_bytes(bytemuck::bytes_of(&v1_state.next_cycle_epoch));
+    write_bytes(bytemuck::bytes_of(&v1_state.num_pool_validators));
+    write_bytes(bytemuck::bytes_of(&v1_state.scoring_unstake_total));
+    write_bytes(bytemuck::bytes_of(&v1_state.instant_unstake_total));
+    write_bytes(bytemuck::bytes_of(&v1_state.stake_deposit_unstake_total));
+    write_bytes(bytemuck::bytes_of(&v1_state.status_flags));
+    write_bytes(bytemuck::bytes_of(&v1_state.validators_added));
+
+    // Write reduced padding for V2
+    let padding = [0u8; STATE_PADDING_0_SIZE];
+    write_bytes(&padding);
+
+    // Write StewardStateAccountV2 wrapper fields
+    write_bytes(bytemuck::bytes_of(&v1_is_initialized));
+    write_bytes(bytemuck::bytes_of(&v1_bump));
+    write_bytes(bytemuck::bytes_of(&v1_padding));
 
     msg!("Successfully migrated steward state from V1 to V2");
-    msg!("Preserved {} validators", v2_state.num_pool_validators);
-    msg!("Current state: {:?}", v2_state.state_tag);
-    msg!("Next cycle epoch: {}", v2_state.next_cycle_epoch);
+    msg!("Preserved {} validators", v1_state.num_pool_validators);
+    msg!("Current state: {:?}", v1_state.state_tag);
+    msg!("Next cycle epoch: {}", v1_state.next_cycle_epoch);
 
     Ok(())
 }

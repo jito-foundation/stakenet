@@ -25,7 +25,8 @@ use spl_stake_pool::{
 use tests::{
     stake_pool_utils::serialized_stake_pool_account,
     steward_fixtures::{
-        new_vote_account, serialized_stake_account, serialized_steward_state_account, TestFixture,
+        new_vote_account, serialized_stake_account, serialized_steward_state_account_v1,
+        TestFixture,
     },
 };
 
@@ -143,7 +144,7 @@ async fn _setup_test_steward_state(
 
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
-        &serialized_steward_state_account(steward_state_account).into(),
+        &serialized_steward_state_account_v1(steward_state_account).into(),
     );
 }
 

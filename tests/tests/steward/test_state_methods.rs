@@ -11,7 +11,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
-    Delegation, StewardStateEnum, StewardStateV1,
+    Delegation, StewardStateEnum, StewardStateV2,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use spl_stake_pool::big_vec::BigVec;
@@ -63,9 +63,9 @@ fn test_compute_scores() {
     assert!(state.scores[0..3] == [1_000_000_000, 0, 950_000_000]);
     assert!(state.sorted_score_indices[0..3] == [0, 2, 1]);
     assert!(state.sorted_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
-    assert!(state.yield_scores[0..3] == [1_000_000_000, 2_000_000, 950_000_000]);
-    assert!(state.sorted_yield_score_indices[0..3] == [0, 2, 1]);
-    assert!(state.sorted_yield_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
+    assert!(state.raw_scores[0..3] == [1_000_000_000, 2_000_000, 950_000_000]);
+    assert!(state.sorted_raw_score_indices[0..3] == [0, 2, 1]);
+    assert!(state.sorted_raw_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
     assert!(state.start_computing_scores_slot == clock.slot);
     assert!(state.next_cycle_epoch == current_epoch + parameters.num_epochs_between_scoring);
     assert!(state.current_epoch == current_epoch);
@@ -167,8 +167,8 @@ fn test_compute_scores() {
     // validator would not have a score of 0 if it was not blacklisted
     assert!(state.scores[validators[0].index as usize] == 0);
     assert!(state.sorted_score_indices[0] == 0);
-    assert!(state.yield_scores[0] == 1_000_000_000);
-    assert!(state.sorted_yield_score_indices[0] == 0);
+    assert!(state.raw_scores[0] == 1_000_000_000);
+    assert!(state.sorted_raw_score_indices[0] == 0);
 
     // Test reset scoring: 3 cases
 
@@ -244,7 +244,7 @@ fn test_compute_delegations() {
     // Regular run
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 1_000_000_000, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.state_tag = StewardStateEnum::ComputeDelegations;
     assert!(config.parameters.num_delegation_validators == 3);
     let res = state.compute_delegations(clock.epoch, config);
@@ -266,7 +266,7 @@ fn test_compute_delegations() {
     state.delegations = [Delegation::default(); MAX_VALIDATORS];
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
     let res = state.compute_delegations(clock.epoch, config);
     assert!(res.is_ok());
     assert!(
@@ -543,7 +543,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
 
@@ -617,7 +617,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
     state.validator_lamport_balances[1] = 1000 * LAMPORTS_PER_SOL;
@@ -675,7 +675,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.instant_unstake.reset();
     state.instant_unstake.set(0, true).unwrap();
 
@@ -711,7 +711,7 @@ fn test_rebalance() {
     state.delegations[0..3].copy_from_slice(&[Delegation::new(1, 3); 3]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 1_000_000_000, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.progress.reset();
     let res = state.rebalance(
         fixtures.current_epoch,
@@ -836,12 +836,12 @@ fn test_rebalance_default_lamports() {
     }
 }
 
-fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV1 {
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV2 {
     let mut state = fixtures.state;
     // Set values for all of the values that are gonna get shifted
     state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
     state.scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.raw_scores[0..3].copy_from_slice(&[0, 1, 2]);
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(0, 1),
         Delegation::new(1, 1),
@@ -867,7 +867,7 @@ fn test_remove_validator() {
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
-    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.raw_scores[1], 2);
     assert_eq!(state.scores[1], 2);
     assert!(state.delegations[1] == Delegation::new(2, 1));
 
@@ -879,7 +879,7 @@ fn test_remove_validator() {
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
-    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.raw_scores[1], 2);
     assert_eq!(state.scores[1], 2);
     assert!(state.delegations[1] == Delegation::new(2, 1));
 
@@ -944,7 +944,7 @@ fn test_rebalance_max_lamports() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
 
