@@ -122,4 +122,3 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
 
     Ok(())
 }
-

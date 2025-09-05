@@ -19,8 +19,8 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     instructions::AuthorityType,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, LargeBitMask, Parameters, StewardStateV2, StewardStateAccountV2,
-    StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
+    Config, Delegation, LargeBitMask, Parameters, StewardStateAccountV2, StewardStateEnum,
+    StewardStateV2, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 use solana_program_test::*;
 #[allow(deprecated)]
@@ -126,7 +126,10 @@ impl TestFixture {
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
         let steward_state = Pubkey::find_program_address(
-            &[StewardStateAccountV2::SEED, steward_config.pubkey().as_ref()],
+            &[
+                StewardStateAccountV2::SEED,
+                steward_config.pubkey().as_ref(),
+            ],
             &jito_steward::id(),
         )
         .0;
@@ -325,7 +328,8 @@ impl TestFixture {
         parameters: Option<UpdateParametersArgs>,
         priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
     ) {
-        self.initialize_steward_v1(parameters, priority_fee_parameters).await;
+        self.initialize_steward_v1(parameters, priority_fee_parameters)
+            .await;
         // Always migrate to V2 after initialization
         self.migrate_steward_state_to_v2().await;
     }
@@ -432,7 +436,7 @@ impl TestFixture {
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
         );
-        
+
         let ctx = self.ctx.borrow_mut();
         ctx.banks_client
             .process_transaction_with_preflight(transaction)
@@ -481,7 +485,8 @@ impl TestFixture {
 
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
-        let mut num_reallocs = (StewardStateAccountV2::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut num_reallocs =
+            (StewardStateAccountV2::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let mut ixs = vec![];
 
         while num_reallocs > 0 {

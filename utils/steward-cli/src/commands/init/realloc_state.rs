@@ -44,7 +44,8 @@ pub async fn command_realloc_state(
     let steward_state_account_raw = client.get_account(&steward_state).await?;
 
     if steward_state_account_raw.data.len() == StewardStateAccountV2::SIZE {
-        match StewardStateAccountV2::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
+        match StewardStateAccountV2::try_deserialize(&mut steward_state_account_raw.data.as_slice())
+        {
             Ok(steward_state_account) => {
                 if steward_state_account.is_initialized.into() {
                     println!("State account already exists");

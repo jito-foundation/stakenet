@@ -768,7 +768,7 @@ impl StewardStateV2 {
             // Note: validator age should already be updated by the validator history program
             let score_v2 = calculate_validator_score_v2(validator, current_epoch as u16)?;
             self.raw_scores[index] = score_v2;
-            
+
             // Apply binary filters from the old scoring system to get final score
             let score = validator_score(
                 validator,
@@ -777,9 +777,9 @@ impl StewardStateV2 {
                 current_epoch as u16,
                 TVC_ACTIVATION_EPOCH,
             )?;
-            
+
             // Apply binary filters (multiply raw score by 0 or 1 based on filters)
-            let binary_filter_multiplier = if score.blacklisted_score > 0.0 
+            let binary_filter_multiplier = if score.blacklisted_score > 0.0
                 && score.superminority_score > 0.0
                 && score.delinquency_score > 0.0
                 && score.commission_score > 0.0
@@ -788,12 +788,13 @@ impl StewardStateV2 {
                 && score.running_jito_score > 0.0
                 && score.merkle_root_upload_authority_score > 0.0
                 && score.priority_fee_commission_score > 0.0
-                && score.priority_fee_merkle_root_upload_authority_score > 0.0 {
-                score_v2  // All filters pass, use raw score
+                && score.priority_fee_merkle_root_upload_authority_score > 0.0
+            {
+                score_v2 // All filters pass, use raw score
             } else {
-                0  // One or more filters failed
+                0 // One or more filters failed
             };
-            
+
             self.scores[index] = binary_filter_multiplier;
 
             // Insertion sort scores into sorted_indices
