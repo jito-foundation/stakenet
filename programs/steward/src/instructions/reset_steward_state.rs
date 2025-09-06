@@ -2,7 +2,7 @@ use crate::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     stake_pool_utils::deserialize_stake_pool,
-    state::{Config, StewardStateAccountV2},
+    state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::{get_config_admin, get_stake_pool_address},
     BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
 };
@@ -13,7 +13,7 @@ use spl_stake_pool::state::ValidatorListHeader;
 pub struct ResetStewardState<'info> {
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

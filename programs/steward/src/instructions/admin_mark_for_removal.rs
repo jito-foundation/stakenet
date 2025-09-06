@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{utils::get_config_admin, Config, StewardStateAccountV2};
+use crate::{utils::get_config_admin, Config, StewardStateAccount, StewardStateAccountV2};
 
 #[derive(Accounts)]
 pub struct AdminMarkForRemoval<'info> {
@@ -9,7 +9,7 @@ pub struct AdminMarkForRemoval<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

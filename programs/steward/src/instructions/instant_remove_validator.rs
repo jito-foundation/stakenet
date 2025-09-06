@@ -4,7 +4,7 @@ use crate::{
     utils::{
         get_stake_pool_address, get_validator_list, get_validator_list_length, tally_stake_status,
     },
-    Config, StewardStateAccountV2,
+    Config, StewardStateAccount, StewardStateAccountV2,
 };
 use anchor_lang::prelude::*;
 
@@ -14,7 +14,7 @@ pub struct InstantRemoveValidator<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

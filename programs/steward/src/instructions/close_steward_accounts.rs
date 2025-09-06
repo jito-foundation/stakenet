@@ -1,5 +1,5 @@
 use crate::{
-    state::{Config, StewardStateAccountV2},
+    state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::get_config_admin,
 };
 use anchor_lang::prelude::*;
@@ -11,7 +11,7 @@ pub struct CloseStewardAccounts<'info> {
     #[account(
         mut,
         close = authority,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

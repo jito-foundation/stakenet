@@ -11,7 +11,7 @@ use crate::{
 pub struct MigrateStateToV2<'info> {
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump,
     )]
     /// CHECK: We're reading this as V1 and writing as V2
@@ -43,7 +43,8 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
 
     let v1_bytes = &data[8..8 + v1_size];
     let v1_account: &StewardStateAccount = bytemuck::from_bytes(v1_bytes);
-    let v1_state = v1_account.state;
+    // Borrow the inner state by reference to avoid copying a very large struct onto the stack
+    let v1_state = &v1_account.state;
     let v1_is_initialized = v1_account.is_initialized;
     let v1_bump = v1_account.bump;
     let v1_padding = v1_account._padding;

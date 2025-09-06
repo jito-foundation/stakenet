@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, solana_program::program::invoke};
 
 use crate::{
     constants::MAX_ALLOC_BYTES, stake_pool_utils::deserialize_stake_pool, Config,
-    StewardStateAccountV2, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
+    StewardStateAccount, StewardStateAccountV2, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 
 #[derive(Accounts)]
@@ -18,7 +18,7 @@ pub struct InitializeSteward<'info> {
         init,
         payer = current_staker,
         space = MAX_ALLOC_BYTES,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

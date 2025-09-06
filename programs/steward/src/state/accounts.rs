@@ -111,15 +111,16 @@ impl StewardStateAccount {
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
 }
 
+// Provide SIZE/SEED constants for V2 for clients that reference them.
 impl StewardStateAccountV2 {
     pub const SIZE: usize = 8 + size_of::<Self>();
+    // Uses the same PDA seed as V1; the state account PDA did not change.
     pub const SEED: &'static [u8] = b"steward_state";
-    pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
 }
 
 pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[StewardStateAccountV2::SEED, steward_config.as_ref()],
+        &[StewardStateAccount::SEED, steward_config.as_ref()],
         &crate::id(),
     )
 }

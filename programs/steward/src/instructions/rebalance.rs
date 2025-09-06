@@ -24,7 +24,7 @@ use crate::{
     maybe_transition,
     stake_pool_utils::deserialize_stake_pool,
     utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
-    Config, StewardStateAccountV2, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -34,7 +34,7 @@ pub struct Rebalance<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,
@@ -249,7 +249,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    StewardStateAccountV2::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
                     &[ctx.bumps.state_account],
                 ]],
@@ -287,7 +287,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                     ctx.accounts.stake_program.to_account_info(),
                 ],
                 &[&[
-                    StewardStateAccountV2::SEED,
+                    StewardStateAccount::SEED,
                     &ctx.accounts.config.key().to_bytes(),
                     &[ctx.bumps.state_account],
                 ]],

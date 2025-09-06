@@ -127,7 +127,7 @@ impl TestFixture {
         let steward_config = Keypair::new();
         let steward_state = Pubkey::find_program_address(
             &[
-                StewardStateAccountV2::SEED,
+                StewardStateAccount::SEED,
                 steward_config.pubkey().as_ref(),
             ],
             &jito_steward::id(),
@@ -197,7 +197,7 @@ impl TestFixture {
             stake_pool_meta: accounts_fixture.stake_pool_meta,
             steward_config: accounts_fixture.steward_config_keypair,
             steward_state: Pubkey::find_program_address(
-                &[StewardStateAccountV2::SEED, steward_config_address.as_ref()],
+                &[StewardStateAccount::SEED, steward_config_address.as_ref()],
                 &jito_steward::id(),
             )
             .0,
@@ -486,7 +486,7 @@ impl TestFixture {
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
         let mut num_reallocs =
-            (StewardStateAccountV2::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+            (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let mut ixs = vec![];
 
         while num_reallocs > 0 {
@@ -1358,7 +1358,7 @@ impl Default for FixtureDefaultAccounts {
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
             &[
-                StewardStateAccountV2::SEED,
+                StewardStateAccount::SEED,
                 steward_config_keypair.pubkey().as_ref(),
             ],
             &jito_steward::id(),
@@ -1467,7 +1467,7 @@ impl FixtureDefaultAccounts {
             Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
         let steward_state_address = Pubkey::find_program_address(
             &[
-                StewardStateAccountV2::SEED,
+                StewardStateAccount::SEED,
                 self.steward_config_keypair.pubkey().as_ref(),
             ],
             &jito_steward::id(),
@@ -1709,7 +1709,7 @@ pub fn serialized_validator_history_account(validator_history: ValidatorHistory)
 pub fn serialized_steward_state_account_v1(state: StewardStateAccount) -> Account {
     let mut data = Vec::with_capacity(StewardStateAccount::SIZE);
     // Add discriminator
-    data.extend_from_slice(&StewardStateAccount::DISCRIMINATOR);
+    data.extend_from_slice(StewardStateAccount::DISCRIMINATOR);
     // Add account data using bytemuck
     data.extend_from_slice(bytemuck::bytes_of(&state));
     Account {
@@ -1721,9 +1721,9 @@ pub fn serialized_steward_state_account_v1(state: StewardStateAccount) -> Accoun
 }
 
 pub fn serialized_steward_state_account(state: StewardStateAccountV2) -> Account {
-    let mut data = Vec::with_capacity(StewardStateAccountV2::SIZE);
+    let mut data = Vec::with_capacity(StewardStateAccount::SIZE);
     // Add discriminator
-    data.extend_from_slice(&StewardStateAccountV2::DISCRIMINATOR);
+    data.extend_from_slice(StewardStateAccountV2::DISCRIMINATOR);
     // Add account data using bytemuck
     data.extend_from_slice(bytemuck::bytes_of(&state));
     Account {

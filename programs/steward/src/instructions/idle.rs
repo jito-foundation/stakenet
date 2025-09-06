@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     maybe_transition,
     utils::{get_validator_list, state_checks},
-    Config, StewardStateAccountV2, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -12,7 +12,7 @@ pub struct Idle<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,

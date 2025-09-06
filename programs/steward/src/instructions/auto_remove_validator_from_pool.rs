@@ -4,7 +4,7 @@ use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
 use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
-use crate::StewardStateAccountV2;
+use crate::{StewardStateAccount, StewardStateAccountV2};
 use crate::{
     stake_pool_utils::deserialize_stake_pool,
     utils::{
@@ -37,7 +37,7 @@ pub struct AutoRemoveValidator<'info> {
 
     #[account(
         mut,
-        seeds = [StewardStateAccountV2::SEED, config.key().as_ref()],
+        seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
     pub state_account: AccountLoader<'info, StewardStateAccountV2>,
@@ -199,7 +199,7 @@ pub fn handler(ctx: Context<AutoRemoveValidator>, validator_list_index: usize) -
                 ctx.accounts.stake_program.to_account_info(),
             ],
             &[&[
-                StewardStateAccountV2::SEED,
+                StewardStateAccount::SEED,
                 &ctx.accounts.config.key().to_bytes(),
                 &[ctx.bumps.state_account],
             ]],
