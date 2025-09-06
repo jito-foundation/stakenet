@@ -112,7 +112,6 @@ async fn _epoch_maintenance_setup() -> (
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {

@@ -128,7 +128,6 @@ async fn test_auto_add_validator_to_pool() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     _auto_add_validator_to_pool(&fixture, &Pubkey::new_unique()).await;
 
@@ -141,7 +140,6 @@ async fn test_auto_remove() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -301,7 +299,6 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     fixture.advance_num_epochs(1, 10).await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
@@ -601,7 +598,6 @@ async fn test_instant_remove_validator() {
     let _ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 

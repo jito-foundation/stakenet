@@ -40,7 +40,6 @@ async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -179,7 +178,6 @@ async fn test_compute_scores() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
         vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -496,7 +494,6 @@ async fn test_compute_instant_unstake() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -727,7 +724,6 @@ async fn test_idle() {
     let ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -865,7 +861,6 @@ async fn test_rebalance_increase() {
         .await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1108,7 +1103,6 @@ async fn test_rebalance_decrease() {
         .await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1419,7 +1413,6 @@ async fn test_rebalance_other_cases() {
         .await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())

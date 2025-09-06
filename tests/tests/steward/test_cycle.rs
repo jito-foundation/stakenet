@@ -81,7 +81,6 @@ async fn test_cycle() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
 
@@ -277,7 +276,6 @@ async fn test_remove_validator_mid_epoch() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for vote_account in unit_test_fixtures
@@ -512,7 +510,6 @@ async fn test_add_validator_next_cycle() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
