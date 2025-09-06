@@ -396,19 +396,22 @@ impl TestFixture {
     }
 
     pub async fn migrate_steward_state_to_v2(&self) {
-        let instruction = Instruction {
-            program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::MigrateStateToV2 {
-                state_account: self.steward_state,
-                config: self.steward_config.pubkey(),
-                signer: self.keypair.pubkey(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::MigrateStateToV2 {}.data(),
-        };
+        let instructions = vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: jito_steward::accounts::MigrateStateToV2 {
+                    state_account: self.steward_state,
+                    config: self.steward_config.pubkey(),
+                    signer: self.keypair.pubkey(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::MigrateStateToV2 {}.data(),
+            },
+        ];
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction],
+            &instructions,
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
@@ -417,19 +420,22 @@ impl TestFixture {
     }
 
     pub async fn try_migrate_steward_state_to_v2(&self) -> Result<(), BanksClientError> {
-        let instruction = Instruction {
-            program_id: jito_steward::id(),
-            accounts: jito_steward::accounts::MigrateStateToV2 {
-                state_account: self.steward_state,
-                config: self.steward_config.pubkey(),
-                signer: self.keypair.pubkey(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::MigrateStateToV2 {}.data(),
-        };
+        let instructions = vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: jito_steward::accounts::MigrateStateToV2 {
+                    state_account: self.steward_state,
+                    config: self.steward_config.pubkey(),
+                    signer: self.keypair.pubkey(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::MigrateStateToV2 {}.data(),
+            },
+        ];
 
         let transaction = Transaction::new_signed_with_payer(
-            &[instruction],
+            &instructions,
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
             self.ctx.borrow().last_blockhash,
@@ -483,11 +489,19 @@ impl TestFixture {
 
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
-        let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
-        let mut ixs = vec![];
+        let num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
 
-        while num_reallocs > 0 {
-            ixs.extend(vec![
+        // Do one realloc per transaction to avoid exceeding compute budget
+        for _ in 0..num_reallocs {
+            let blockhash = self
+                .ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap();
+
+            let ixs = vec![
+                ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
                 Instruction {
                     program_id: jito_steward::id(),
                     accounts: jito_steward::accounts::ReallocState {
@@ -499,17 +513,9 @@ impl TestFixture {
                     }
                     .to_account_metas(None),
                     data: jito_steward::instruction::ReallocState {}.data(),
-                };
-                num_reallocs.min(10)
-            ]);
-            let blockhash = {
-                let mut banks_client = self.ctx.borrow_mut().banks_client.clone();
+                },
+            ];
 
-                banks_client
-                    .get_new_latest_blockhash(&Hash::default())
-                    .await
-                    .unwrap()
-            };
             let transaction = Transaction::new_signed_with_payer(
                 &ixs,
                 Some(&self.keypair.pubkey()),
@@ -517,8 +523,6 @@ impl TestFixture {
                 blockhash,
             );
             self.submit_transaction_assert_success(transaction).await;
-            num_reallocs -= num_reallocs.min(10);
-            ixs = vec![];
         }
     }
 
