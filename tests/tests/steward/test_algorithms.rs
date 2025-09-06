@@ -26,7 +26,7 @@ use validator_history::{
 
 #[test]
 fn test_compute_score() {
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     let current_epoch = default_fixture.current_epoch;
     let mut config = default_fixture.config;
@@ -1027,7 +1027,7 @@ fn test_compute_score() {
 
 #[test]
 fn test_instant_unstake() {
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     let epoch_schedule = default_fixture.epoch_schedule;
     let current_epoch = default_fixture.current_epoch;
@@ -1496,7 +1496,7 @@ fn test_increase_stake_calculation() {
 
     */
 
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     // Scores of fixture validators = [1.0, 0.0, 0.95]
 
@@ -1725,7 +1725,7 @@ fn test_decrease_stake_calculation() {
         [X] stake deposit not hit
         [X] errors
     */
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     // Yield scores of fixture validators = [1.0, 0.0, 0.95]
     // Active stake lamports: 1000 SOL on each
@@ -2143,7 +2143,7 @@ fn test_decrease_stake_calculation() {
 fn test_decrease_stake_default_lamports() {
     // Given internal lamport balance set to default, test that no changes happen when doing stake deposit unstake
 
-    let mut state = StateMachineFixtures::default().state;
+    let mut state = Box::<StateMachineFixtures>::default().state;
 
     state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
 

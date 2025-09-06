@@ -10,8 +10,9 @@ async fn test_migrate_state_to_v2() {
     fixture.initialize_stake_pool().await;
     // Config is initialized as part of steward initialization
 
-    // Initialize with V1 state
+    // Initialize with V1 state and realloc to full size
     fixture.initialize_steward_v1(None, None).await;
+    fixture.realloc_steward_state().await;
 
     // Get the account before migration
     let account_before = fixture
@@ -79,8 +80,9 @@ async fn test_migrate_state_to_v2_twice_fails() {
     fixture.initialize_stake_pool().await;
     // Config is initialized as part of steward initialization
 
-    // Initialize with V1 state
+    // Initialize with V1 state and realloc to full size
     fixture.initialize_steward_v1(None, None).await;
+    fixture.realloc_steward_state().await;
 
     // First migration should succeed
     fixture.migrate_steward_state_to_v2().await;
@@ -105,6 +107,7 @@ async fn test_migrate_requires_admin() {
     fixture.initialize_stake_pool().await;
     // Config is initialized as part of steward initialization
     fixture.initialize_steward_v1(None, None).await;
+    fixture.realloc_steward_state().await;
 
     // Try to migrate with a different signer
     let fake_admin = Keypair::new();

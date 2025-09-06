@@ -38,7 +38,7 @@ fn test_compute_scores() {
     let cluster_history = &mut fixtures.cluster_history;
     let config = &mut fixtures.config;
     let parameters = config.parameters;
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
 
     // Test normal run
     let cloned_validators = Box::new(validators.clone());
@@ -237,7 +237,7 @@ fn test_compute_delegations() {
     // - [ ]  InvalidState error
 
     let mut fixtures = Box::<StateMachineFixtures>::default();
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
     let clock = &mut fixtures.clock;
     let config = &fixtures.config;
 
@@ -300,7 +300,7 @@ fn test_compute_instant_unstake_errors() {
         - [X]  ClusterHistoryNotRecentEnough Error
     */
     let mut fixtures = Box::<StateMachineFixtures>::default();
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let current_epoch = &fixtures.current_epoch;
@@ -398,7 +398,7 @@ fn test_compute_instant_unstake_errors() {
 #[test]
 fn test_compute_instant_unstake_success() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let current_epoch = &fixtures.current_epoch;
@@ -495,7 +495,7 @@ fn test_rebalance() {
     fixtures.config.parameters.instant_unstake_cap_bps = 10000;
     fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
 
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
 
     // Increase stake
     // validator_list: all validators have 1000 SOL
@@ -753,8 +753,8 @@ fn test_rebalance() {
 
 #[test]
 fn test_rebalance_default_lamports() {
-    let fixtures = StateMachineFixtures::default();
-    let mut state = fixtures.state;
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = *fixtures.state;
     let mut validator_list = fixtures.validator_list.clone();
 
     // Case 1: Lamports default, has transient stake
@@ -795,7 +795,7 @@ fn test_rebalance_default_lamports() {
     assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
 
     // Case 2: Lamports not default, no transient stake
-    let mut state = fixtures.state;
+    let mut state = *fixtures.state;
     state.state_tag = StewardStateEnum::Rebalance;
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(1, 1),
@@ -836,8 +836,8 @@ fn test_rebalance_default_lamports() {
     }
 }
 
-fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV2 {
-    let mut state = fixtures.state;
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> Box<StewardStateV2> {
+    let mut state = fixtures.state.clone();
     // Set values for all of the values that are gonna get shifted
     state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
     state.scores[0..3].copy_from_slice(&[0, 1, 2]);
@@ -858,7 +858,7 @@ fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState
 fn test_remove_validator() {
     // Setup: create steward state based off StewardStateFixtures
     // mark index 1 to removal
-    let fixtures = StateMachineFixtures::default();
+    let fixtures = Box::<StateMachineFixtures>::default();
     let mut state = _test_remove_validator_setup(&fixtures);
 
     // test basic case - remove validator_to_remove
@@ -902,8 +902,8 @@ fn test_remove_validator() {
 
 #[test]
 fn test_remove_validator_fails() {
-    let fixtures = StateMachineFixtures::default();
-    let mut state = fixtures.state;
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = *fixtures.state;
 
     // Test fails if validator not marked to remove
     state.validators_for_immediate_removal.reset();
@@ -929,7 +929,7 @@ fn test_rebalance_max_lamports() {
     fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
 
     const MAX_SOLANA_LAMPORTS: u64 = 600_000_000 * LAMPORTS_PER_SOL;
-    let state = &mut fixtures.state;
+    let state = &mut *fixtures.state;
 
     state.state_tag = StewardStateEnum::Rebalance;
     let mut validator_list_bytes = borsh1::to_vec(&fixtures.validator_list).unwrap();

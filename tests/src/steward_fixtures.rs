@@ -325,9 +325,10 @@ impl TestFixture {
         parameters: Option<UpdateParametersArgs>,
         priority_fee_parameters: Option<UpdatePriorityFeeParametersArgs>,
     ) {
+        // Initialize V1 first, realloc to full size, then migrate to V2
         self.initialize_steward_v1(parameters, priority_fee_parameters)
             .await;
-        // Always migrate to V2 after initialization
+        self.realloc_steward_state().await;
         self.migrate_steward_state_to_v2().await;
     }
 
@@ -1319,7 +1320,7 @@ pub struct FixtureDefaultAccounts {
     pub steward_config_keypair: Keypair,
     pub steward_config: Config,
     pub steward_state_address: Pubkey,
-    pub steward_state: StewardStateAccountV2,
+    pub steward_state: Box<StewardStateAccountV2>,
     pub validator_history_config: validator_history::state::Config,
     pub cluster_history: ClusterHistory,
     pub validators: Vec<ValidatorEntry>,
@@ -1360,7 +1361,7 @@ impl Default for FixtureDefaultAccounts {
             &jito_steward::id(),
         );
 
-        let steward_state = StewardStateV2 {
+        let steward_state = Box::new(StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores,
             validator_lamport_balances: [0; MAX_VALIDATORS],
             scores: [0; MAX_VALIDATORS],
@@ -1382,13 +1383,13 @@ impl Default for FixtureDefaultAccounts {
             validators_added: 0,
             status_flags: 0,
             _padding0: [0; 2],
-        };
-        let steward_state_account = StewardStateAccountV2 {
-            state: steward_state,
+        });
+        let steward_state_account = Box::new(StewardStateAccountV2 {
+            state: *steward_state,
             is_initialized: true.into(),
             bump: steward_state_bump,
             _padding: [0; 6],
-        };
+        });
 
         let validator_history_config_bump = Pubkey::find_program_address(
             &[validator_history::state::Config::SEED],
@@ -1484,7 +1485,7 @@ impl FixtureDefaultAccounts {
             ),
             (
                 steward_state_address,
-                serialized_steward_state_account(self.steward_state),
+                serialized_steward_state_account(*self.steward_state),
             ),
             (
                 validator_history_config_address,
@@ -1828,7 +1829,7 @@ pub struct StateMachineFixtures {
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
-    pub state: StewardStateV2,
+    pub state: Box<StewardStateV2>,
 }
 
 impl Default for StateMachineFixtures {
@@ -1991,8 +1992,8 @@ impl Default for StateMachineFixtures {
         validator_lamport_balances[1] = LAMPORTS_PER_SOL * 1000;
         validator_lamport_balances[2] = LAMPORTS_PER_SOL * 1000;
 
-        // Setup StewardState
-        let state = StewardStateV2 {
+        // Setup StewardState - Box to avoid stack overflow
+        let state = Box::new(StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
@@ -2014,7 +2015,7 @@ impl Default for StateMachineFixtures {
             validators_to_remove: BitMask::default(),
             validators_for_immediate_removal: BitMask::default(),
             _padding0: [0; 2],
-        };
+        });
 
         StateMachineFixtures {
             current_epoch,

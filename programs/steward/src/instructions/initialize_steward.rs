@@ -2,8 +2,7 @@ use anchor_lang::{prelude::*, solana_program::program::invoke};
 
 use crate::{
     constants::MAX_ALLOC_BYTES, stake_pool_utils::deserialize_stake_pool, Config,
-    StewardStateAccount, StewardStateAccountV2, UpdateParametersArgs,
-    UpdatePriorityFeeParametersArgs,
+    StewardStateAccount, UpdateParametersArgs, UpdatePriorityFeeParametersArgs,
 };
 
 #[derive(Accounts)]
@@ -22,7 +21,7 @@ pub struct InitializeSteward<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
+    pub state_account: AccountLoader<'info, StewardStateAccount>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(mut)]

@@ -25,7 +25,7 @@ use validator_history::ValidatorHistory;
 async fn test_cycle() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     // Note that these parameters are overriden in initialize_steward, just included here for completeness
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
@@ -224,7 +224,7 @@ async fn test_remove_validator_mid_epoch() {
 
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
 
@@ -458,7 +458,7 @@ async fn test_add_validator_next_cycle() {
 
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
 

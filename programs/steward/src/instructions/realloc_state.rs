@@ -2,9 +2,9 @@ use crate::{
     bitmask::BitMask,
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_ALLOC_BYTES, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
-    state::{Config, StewardStateAccount, StewardStateAccountV2},
+    state::{Config, StewardStateAccount},
     utils::get_validator_list,
-    Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
+    Delegation, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::ValidatorListHeader;
@@ -40,7 +40,7 @@ pub struct ReallocState<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
+    pub state_account: AccountLoader<'info, StewardStateAccount>,
 
     pub config: AccountLoader<'info, Config>,
 
@@ -77,8 +77,8 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         state_account.state.validator_lamport_balances = [LAMPORT_BALANCE_DEFAULT; MAX_VALIDATORS];
         state_account.state.scores = [0; MAX_VALIDATORS];
         state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
-        state_account.state.raw_scores = [0; MAX_VALIDATORS];
-        state_account.state.sorted_raw_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
+        state_account.state.yield_scores = [0; MAX_VALIDATORS];
+        state_account.state.sorted_yield_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
         state_account.state.progress = BitMask::default();
         state_account.state.current_epoch = 0; // will be set by epoch_maintenance
         state_account.state.next_cycle_epoch = clock
@@ -91,8 +91,8 @@ pub fn handler(ctx: Context<ReallocState>) -> Result<()> {
         state_account.state.validators_to_remove = BitMask::default();
         state_account.state.validators_for_immediate_removal = BitMask::default();
         state_account.state.validators_added = 0;
-        state_account.state.clear_flags();
-        state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
+        state_account.state.status_flags = 0;
+        state_account.state._padding0 = [0; MAX_VALIDATORS * 8 + 2];
     }
 
     Ok(())

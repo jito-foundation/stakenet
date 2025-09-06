@@ -29,6 +29,11 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let mut data = ctx.accounts.state_account.data.borrow_mut();
 
     // Verify this is a V1 account by checking the discriminator
+    msg!("Found discriminator: {:?}", &data[0..8]);
+    msg!(
+        "Expected V1 discriminator: {:?}",
+        StewardStateAccount::DISCRIMINATOR
+    );
     if &data[0..8] != StewardStateAccount::DISCRIMINATOR {
         return Err(ProgramError::InvalidAccountData.into());
     }
