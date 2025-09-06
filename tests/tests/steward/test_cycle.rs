@@ -6,7 +6,10 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
-use jito_steward::{stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
+use jito_steward::{
+    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
+    UpdateParametersArgs,
+};
 use solana_program_test::*;
 #[allow(deprecated)]
 use solana_sdk::{
@@ -82,7 +85,8 @@ async fn test_cycle() {
         )
         .await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -192,7 +196,7 @@ async fn test_cycle() {
     .await;
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -359,7 +363,7 @@ async fn test_remove_validator_mid_epoch() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -393,7 +397,7 @@ async fn test_remove_validator_mid_epoch() {
     assert!(validator_list.validators.len() == 2);
 
     instant_remove_validator(&fixture, 2).await;
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -433,7 +437,7 @@ async fn test_remove_validator_mid_epoch() {
     assert!(validator_list.validators.len() == 2);
 
     crank_epoch_maintenance(&fixture, None).await;
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -558,7 +562,7 @@ async fn test_add_validator_next_cycle() {
     assert!(validator_list.validators.len() == 3);
 
     // Ensure that num_pool_validators isn't updated but validators_added is
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -591,7 +595,7 @@ async fn test_add_validator_next_cycle() {
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
 
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -614,7 +618,7 @@ async fn test_add_validator_next_cycle() {
     .await;
 
     // Ensure that num_pool_validators is updated and validators_added is reset
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 

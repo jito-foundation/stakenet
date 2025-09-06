@@ -346,8 +346,11 @@ async fn test_compute_scores() {
         steward_state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ));
-    assert_eq!(steward_state_account.state.scores[0], 1_000_000_000);
-    assert_eq!(steward_state_account.state.raw_scores[0], 1_000_000_000);
+    assert_eq!(steward_state_account.state.scores[0], 7249739868903849600);
+    assert_eq!(
+        steward_state_account.state.raw_scores[0],
+        7249739868903849600
+    );
     assert_eq!(steward_state_account.state.sorted_score_indices[0], 0);
     assert_eq!(steward_state_account.state.sorted_raw_score_indices[0], 0);
     assert!(steward_state_account.state.progress.get(0).unwrap());

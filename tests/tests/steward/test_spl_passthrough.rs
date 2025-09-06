@@ -8,7 +8,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS},
     derive_steward_state_address,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, StewardStateAccount, StewardStateEnum,
+    Config, Delegation, StewardStateAccountV2, StewardStateEnum,
 };
 use rand::prelude::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
@@ -25,8 +25,7 @@ use spl_stake_pool::{
 use tests::{
     stake_pool_utils::serialized_stake_pool_account,
     steward_fixtures::{
-        new_vote_account, serialized_stake_account, serialized_steward_state_account_v1,
-        TestFixture,
+        new_vote_account, serialized_stake_account, serialized_steward_state_account, TestFixture,
     },
 };
 
@@ -97,7 +96,7 @@ async fn _setup_test_steward_state(
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_config.parameters.scoring_unstake_cap_bps = 0;
     steward_config.parameters.instant_unstake_cap_bps = 0;
@@ -127,7 +126,7 @@ async fn _setup_test_steward_state(
 
     steward_state_account
         .state
-        .sorted_yield_score_indices
+        .sorted_raw_score_indices
         .copy_from_slice(&arr);
 
     for i in 0..validators_to_add {
@@ -144,7 +143,7 @@ async fn _setup_test_steward_state(
 
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
-        &serialized_steward_state_account_v1(steward_state_account).into(),
+        &serialized_steward_state_account(steward_state_account).into(),
     );
 }
 
@@ -302,7 +301,7 @@ async fn _increase_and_check_stake(
     let validator_history =
         fixture.initialize_validator_history_with_credits(vote_account, validator_list_index);
 
-    let state_account_before: StewardStateAccount =
+    let state_account_before: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _lamports_before_increase = *state_account_before
         .state
@@ -350,7 +349,7 @@ async fn _increase_and_check_stake(
     );
     fixture.submit_transaction_assert_success(transaction).await;
 
-    let state_account_after: StewardStateAccount =
+    let state_account_after: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let lamports_after_increase = *state_account_after
         .state
@@ -385,7 +384,7 @@ async fn _increase_and_check_additional_stake(
     let validator_history =
         fixture.initialize_validator_history_with_credits(vote_account, validator_list_index);
 
-    let state_account_before: StewardStateAccount =
+    let state_account_before: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _lamports_before_increase = *state_account_before
         .state
@@ -440,7 +439,7 @@ async fn _increase_and_check_additional_stake(
     );
     fixture.submit_transaction_assert_success(transaction).await;
 
-    let state_account_after: StewardStateAccount =
+    let state_account_after: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let lamports_after_increase = *state_account_after
         .state
