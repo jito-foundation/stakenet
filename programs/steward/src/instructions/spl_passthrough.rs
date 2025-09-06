@@ -7,7 +7,6 @@
 use crate::constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS};
 use crate::errors::StewardError;
 use crate::state::Config;
-use crate::{StewardStateAccount, StewardStateAccountV2};
 use crate::{
     stake_pool_utils::deserialize_stake_pool,
     utils::{
@@ -15,6 +14,7 @@ use crate::{
         stake_is_inactive_without_history, stake_is_usable_by_pool,
     },
 };
+use crate::{StewardStateAccount, StewardStateAccountV2};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     borsh1::try_from_slice_unchecked,

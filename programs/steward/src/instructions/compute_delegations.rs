@@ -1,5 +1,7 @@
 use crate::utils::{get_validator_list, state_checks};
-use crate::{maybe_transition, Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum};
+use crate::{
+    maybe_transition, Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
+};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]

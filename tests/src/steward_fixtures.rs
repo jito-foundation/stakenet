@@ -126,10 +126,7 @@ impl TestFixture {
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
         let steward_state = Pubkey::find_program_address(
-            &[
-                StewardStateAccount::SEED,
-                steward_config.pubkey().as_ref(),
-            ],
+            &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
         )
         .0;
@@ -485,8 +482,7 @@ impl TestFixture {
 
     pub async fn realloc_steward_state(&self) {
         // Realloc validator history account
-        let mut num_reallocs =
-            (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut num_reallocs = (StewardStateAccount::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let mut ixs = vec![];
 
         while num_reallocs > 0 {

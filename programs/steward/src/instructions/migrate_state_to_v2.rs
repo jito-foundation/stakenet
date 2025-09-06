@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
+use core::ptr;
 
 use crate::{
     state::{Config, StewardStateAccount, StewardStateAccountV2},
@@ -24,98 +25,188 @@ pub struct MigrateStateToV2<'info> {
 }
 
 pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
-    // Deserialize the account data as V1
-    let data = ctx.accounts.state_account.data.borrow();
+    // Borrow account data mutably; we will read/write in-place using raw pointers.
+    let mut data = ctx.accounts.state_account.data.borrow_mut();
 
     // Verify this is a V1 account by checking the discriminator
-    let v1_discriminator = StewardStateAccount::DISCRIMINATOR;
-    let account_discriminator = &data[0..8];
-    if account_discriminator != v1_discriminator {
+    if &data[0..8] != StewardStateAccount::DISCRIMINATOR {
         return Err(ProgramError::InvalidAccountData.into());
     }
 
-    // Skip the 8-byte discriminator and cast to V1 struct (zero-copy)
-    // Ensure we have enough bytes
-    let v1_size = std::mem::size_of::<StewardStateAccount>();
-    if data.len() < 8 + v1_size {
-        return Err(ProgramError::AccountDataTooSmall.into());
+    // Offsets within the account after the 8-byte discriminator
+    let base = 8usize;
+
+    // Sizes and shifts
+    let max = crate::constants::MAX_VALIDATORS;
+    let sz_u64_arr = core::mem::size_of::<u64>() * max; // 8 * MAX
+    let sz_u32_arr = core::mem::size_of::<u32>() * max; // 4 * MAX
+    let sz_u16_arr = core::mem::size_of::<u16>() * max; // 2 * MAX
+    let sz_deleg = core::mem::size_of::<crate::Delegation>() * max; // 8 * MAX
+    let sz_bitmask = core::mem::size_of::<crate::bitmask::BitMask>(); // 8 * ceil(MAX/64)
+
+    let shift_scores = sz_u64_arr - sz_u32_arr; // +4 * MAX
+    let shift_raw = sz_u64_arr - sz_u32_arr; // +4 * MAX
+    let _total_shift = shift_scores + shift_raw; // +8 * MAX
+
+    // V1 layout offsets (relative to base)
+    let off_v1_state_tag = 0usize;
+    let off_v1_balances = off_v1_state_tag + core::mem::size_of::<crate::StewardStateEnum>();
+    let off_v1_scores = off_v1_balances + sz_u64_arr;
+    let off_v1_sorted_score_indices = off_v1_scores + sz_u32_arr;
+    let off_v1_yield_scores = off_v1_sorted_score_indices + sz_u16_arr;
+    let off_v1_sorted_yield_score_indices = off_v1_yield_scores + sz_u32_arr;
+    let off_v1_delegations = off_v1_sorted_yield_score_indices + sz_u16_arr;
+    let off_v1_instant_unstake = off_v1_delegations + sz_deleg;
+    let off_v1_progress = off_v1_instant_unstake + sz_bitmask;
+    let off_v1_validators_for_immediate_removal = off_v1_progress + sz_bitmask;
+    let off_v1_validators_to_remove = off_v1_validators_for_immediate_removal + sz_bitmask;
+    let off_v1_start_slot = off_v1_validators_to_remove + sz_bitmask;
+    let off_v1_current_epoch = off_v1_start_slot + 8;
+    let off_v1_next_cycle_epoch = off_v1_current_epoch + 8;
+    let off_v1_num_pool_validators = off_v1_next_cycle_epoch + 8;
+    let off_v1_scoring_unstake_total = off_v1_num_pool_validators + 8;
+    let off_v1_instant_unstake_total = off_v1_scoring_unstake_total + 8;
+    let off_v1_stake_deposit_unstake_total = off_v1_instant_unstake_total + 8;
+    let off_v1_status_flags = off_v1_stake_deposit_unstake_total + 8;
+    let off_v1_validators_added = off_v1_status_flags + 4;
+    let _off_v1_padding0 = off_v1_validators_added + 2;
+
+    // V2 layout offsets (relative to base)
+    let off_v2_state_tag = off_v1_state_tag;
+    let off_v2_balances = off_v2_state_tag + core::mem::size_of::<crate::StewardStateEnum>();
+    let off_v2_scores = off_v2_balances + sz_u64_arr; // u64[MAX]
+    let off_v2_sorted_score_indices = off_v2_scores + sz_u64_arr; // after expanded scores
+    let off_v2_raw_scores = off_v2_sorted_score_indices + sz_u16_arr; // u64[MAX]
+    let off_v2_sorted_raw_score_indices = off_v2_raw_scores + sz_u64_arr;
+    let off_v2_delegations = off_v2_sorted_raw_score_indices + sz_u16_arr;
+    let off_v2_instant_unstake = off_v2_delegations + sz_deleg;
+    let off_v2_progress = off_v2_instant_unstake + sz_bitmask;
+    let off_v2_validators_for_immediate_removal = off_v2_progress + sz_bitmask;
+    let off_v2_validators_to_remove = off_v2_validators_for_immediate_removal + sz_bitmask;
+    let off_v2_start_slot = off_v2_validators_to_remove + sz_bitmask;
+    let off_v2_current_epoch = off_v2_start_slot + 8;
+    let off_v2_next_cycle_epoch = off_v2_current_epoch + 8;
+    let off_v2_num_pool_validators = off_v2_next_cycle_epoch + 8;
+    let off_v2_scoring_unstake_total = off_v2_num_pool_validators + 8;
+    let off_v2_instant_unstake_total = off_v2_scoring_unstake_total + 8;
+    let off_v2_stake_deposit_unstake_total = off_v2_instant_unstake_total + 8;
+    let off_v2_status_flags = off_v2_stake_deposit_unstake_total + 8;
+    let off_v2_validators_added = off_v2_status_flags + 4;
+    let off_v2_padding0 = off_v2_validators_added + 2;
+
+    // Raw pointer to the start of state bytes
+    let p = unsafe { data.as_mut_ptr().add(base) };
+
+    // Helper for memmove-like copy within the same buffer
+    unsafe fn copy_bytes(p: *mut u8, src_off: usize, dst_off: usize, len: usize) {
+        if len == 0 || src_off == dst_off {
+            return;
+        }
+        ptr::copy(p.add(src_off), p.add(dst_off), len);
     }
 
-    let v1_bytes = &data[8..8 + v1_size];
-    let v1_account: &StewardStateAccount = bytemuck::from_bytes(v1_bytes);
-    // Borrow the inner state by reference to avoid copying a very large struct onto the stack
-    let v1_state = &v1_account.state;
-    let v1_is_initialized = v1_account.is_initialized;
-    let v1_bump = v1_account.bump;
-    let v1_padding = v1_account._padding;
+    // Move trailing fields (those after yield_scores) forward by total_shift, from end to start
+    unsafe {
+        // validators_added (2)
+        copy_bytes(p, off_v1_validators_added, off_v2_validators_added, 2);
+        // status_flags (4)
+        copy_bytes(p, off_v1_status_flags, off_v2_status_flags, 4);
+        // stake/unstake totals and counters (8 each)
+        copy_bytes(
+            p,
+            off_v1_stake_deposit_unstake_total,
+            off_v2_stake_deposit_unstake_total,
+            8,
+        );
+        copy_bytes(
+            p,
+            off_v1_instant_unstake_total,
+            off_v2_instant_unstake_total,
+            8,
+        );
+        copy_bytes(
+            p,
+            off_v1_scoring_unstake_total,
+            off_v2_scoring_unstake_total,
+            8,
+        );
+        copy_bytes(p, off_v1_num_pool_validators, off_v2_num_pool_validators, 8);
+        copy_bytes(p, off_v1_next_cycle_epoch, off_v2_next_cycle_epoch, 8);
+        copy_bytes(p, off_v1_current_epoch, off_v2_current_epoch, 8);
+        copy_bytes(p, off_v1_start_slot, off_v2_start_slot, 8);
+        // Bitmasks
+        copy_bytes(
+            p,
+            off_v1_validators_to_remove,
+            off_v2_validators_to_remove,
+            sz_bitmask,
+        );
+        copy_bytes(
+            p,
+            off_v1_validators_for_immediate_removal,
+            off_v2_validators_for_immediate_removal,
+            sz_bitmask,
+        );
+        copy_bytes(p, off_v1_progress, off_v2_progress, sz_bitmask);
+        copy_bytes(
+            p,
+            off_v1_instant_unstake,
+            off_v2_instant_unstake,
+            sz_bitmask,
+        );
+        // Delegations
+        copy_bytes(p, off_v1_delegations, off_v2_delegations, sz_deleg);
+        // sorted_yield_score_indices -> sorted_raw_score_indices
+        copy_bytes(
+            p,
+            off_v1_sorted_yield_score_indices,
+            off_v2_sorted_raw_score_indices,
+            sz_u16_arr,
+        );
+    }
 
-    // Write V2 directly to account data to avoid stack allocation
-    drop(data); // Drop the borrow before we mutably borrow
-    let mut data = ctx.accounts.state_account.data.borrow_mut();
+    // Convert raw_scores: v1 yield_scores [u32; MAX] -> v2 raw_scores [u64; MAX]
+    for i in (0..max).rev() {
+        let src_off = off_v1_yield_scores + i * 4;
+        let dst_off = off_v2_raw_scores + i * 8;
+        // Read LE u32
+        let mut buf4 = [0u8; 4];
+        buf4.copy_from_slice(&data[base + src_off..base + src_off + 4]);
+        let val = u32::from_le_bytes(buf4) as u64;
+        let bytes = val.to_le_bytes();
+        data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
+    }
+
+    // Move sorted_score_indices forward by shift_scores
+    unsafe {
+        copy_bytes(
+            p,
+            off_v1_sorted_score_indices,
+            off_v2_sorted_score_indices,
+            sz_u16_arr,
+        );
+    }
+
+    // Convert scores: v1 scores [u32; MAX] -> v2 scores [u64; MAX]
+    for i in (0..max).rev() {
+        let src_off = off_v1_scores + i * 4;
+        let dst_off = off_v2_scores + i * 8;
+        let mut buf4 = [0u8; 4];
+        buf4.copy_from_slice(&data[base + src_off..base + src_off + 4]);
+        let val = u32::from_le_bytes(buf4) as u64;
+        let bytes = val.to_le_bytes();
+        data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
+    }
+
+    // Zero reduced padding for V2
+    for i in 0..STATE_PADDING_0_SIZE {
+        data[base + off_v2_padding0 + i] = 0u8;
+    }
 
     // Write the V2 discriminator
     let v2_discriminator = StewardStateAccountV2::DISCRIMINATOR;
     data[0..8].copy_from_slice(v2_discriminator);
 
-    // Write V2 account data directly, field by field to avoid stack allocation
-    let v2_bytes = &mut data[8..];
-    let mut offset = 0;
-
-    // Helper to write bytes and advance offset
-    let mut write_bytes = |bytes: &[u8]| {
-        v2_bytes[offset..offset + bytes.len()].copy_from_slice(bytes);
-        offset += bytes.len();
-    };
-
-    // Write StewardStateV2 fields in order
-    write_bytes(bytemuck::bytes_of(&v1_state.state_tag));
-    write_bytes(bytemuck::bytes_of(&v1_state.validator_lamport_balances));
-
-    // Convert and write scores (u32 to u64)
-    for i in 0..crate::constants::MAX_VALIDATORS {
-        let score_u64 = v1_state.scores[i] as u64;
-        write_bytes(&score_u64.to_le_bytes());
-    }
-
-    write_bytes(bytemuck::bytes_of(&v1_state.sorted_score_indices));
-
-    // Convert and write raw_scores (previously yield_scores, u32 to u64)
-    for i in 0..crate::constants::MAX_VALIDATORS {
-        let raw_score_u64 = v1_state.yield_scores[i] as u64;
-        write_bytes(&raw_score_u64.to_le_bytes());
-    }
-
-    write_bytes(bytemuck::bytes_of(&v1_state.sorted_yield_score_indices));
-    write_bytes(bytemuck::bytes_of(&v1_state.delegations));
-    write_bytes(bytemuck::bytes_of(&v1_state.instant_unstake));
-    write_bytes(bytemuck::bytes_of(&v1_state.progress));
-    write_bytes(bytemuck::bytes_of(
-        &v1_state.validators_for_immediate_removal,
-    ));
-    write_bytes(bytemuck::bytes_of(&v1_state.validators_to_remove));
-    write_bytes(bytemuck::bytes_of(&v1_state.start_computing_scores_slot));
-    write_bytes(bytemuck::bytes_of(&v1_state.current_epoch));
-    write_bytes(bytemuck::bytes_of(&v1_state.next_cycle_epoch));
-    write_bytes(bytemuck::bytes_of(&v1_state.num_pool_validators));
-    write_bytes(bytemuck::bytes_of(&v1_state.scoring_unstake_total));
-    write_bytes(bytemuck::bytes_of(&v1_state.instant_unstake_total));
-    write_bytes(bytemuck::bytes_of(&v1_state.stake_deposit_unstake_total));
-    write_bytes(bytemuck::bytes_of(&v1_state.status_flags));
-    write_bytes(bytemuck::bytes_of(&v1_state.validators_added));
-
-    // Write reduced padding for V2
-    let padding = [0u8; STATE_PADDING_0_SIZE];
-    write_bytes(&padding);
-
-    // Write StewardStateAccountV2 wrapper fields
-    write_bytes(bytemuck::bytes_of(&v1_is_initialized));
-    write_bytes(bytemuck::bytes_of(&v1_bump));
-    write_bytes(bytemuck::bytes_of(&v1_padding));
-
     msg!("Successfully migrated steward state from V1 to V2");
-    msg!("Preserved {} validators", v1_state.num_pool_validators);
-    msg!("Current state: {:?}", v1_state.state_tag);
-    msg!("Next cycle epoch: {}", v1_state.next_cycle_epoch);
-
     Ok(())
 }
