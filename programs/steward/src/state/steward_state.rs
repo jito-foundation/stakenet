@@ -766,7 +766,12 @@ impl StewardStateV2 {
 
             // Calculate the new v2 score (4-tier encoding)
             // Note: validator age should already be updated by the validator history program
-            let score_v2 = calculate_validator_score_v2(validator, current_epoch as u16)?;
+            let score_v2 = calculate_validator_score_v2(
+                validator,
+                current_epoch as u16,
+                config.parameters.commission_range,
+                config.parameters.mev_commission_range,
+            )?;
             self.raw_scores[index] = score_v2;
 
             // Apply binary filters from the old scoring system to get final score

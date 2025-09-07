@@ -37,35 +37,72 @@ pub fn encode_validator_score_v2(
     Ok(score)
 }
 
-/// Extract the most recent MEV commission from validator history
-pub fn get_mev_commission(validator: &ValidatorHistory, current_epoch: u16) -> u16 {
-    // Look for MEV commission from current or recent epochs
-    // Start with most recent and work backwards
-    for entry in validator.history.arr.iter().rev() {
-        if entry.epoch != u16::MAX
-            && entry.epoch <= current_epoch
-            && entry.mev_commission != u16::MAX
-        {
-            return entry.mev_commission;
+/// Calculate the average MEV commission over a window of epochs
+pub fn calculate_avg_mev_commission(
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+    window_size: u16,
+) -> u16 {
+    let start_epoch = current_epoch.saturating_sub(window_size);
+    let mev_commission_window = validator
+        .history
+        .mev_commission_range(start_epoch, current_epoch);
+
+    // Calculate sum and count without allocating a Vec
+    let mut sum: u64 = 0;
+    let mut count: u64 = 0;
+
+    for commission in mev_commission_window.iter() {
+        if let Some(c) = commission {
+            sum = sum.saturating_add(*c as u64);
+            count += 1;
         }
     }
 
-    // Default to max if no data
-    BASIS_POINTS_MAX
+    if count == 0 {
+        // Default to max if no data
+        return BASIS_POINTS_MAX;
+    }
+
+    // Calculate average
+    let avg = sum / count;
+
+    // Safely convert back to u16, capping at max
+    avg.min(BASIS_POINTS_MAX as u64) as u16
 }
 
-/// Extract the most recent commission from validator history
-pub fn get_commission(validator: &ValidatorHistory, current_epoch: u16) -> u8 {
-    // Look for commission from current or recent epochs
-    // Start with most recent and work backwards
-    for entry in validator.history.arr.iter().rev() {
-        if entry.epoch != u16::MAX && entry.epoch <= current_epoch && entry.commission != u8::MAX {
-            return entry.commission;
+/// Calculate the average inflation commission over a window of epochs
+pub fn calculate_avg_commission(
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+    window_size: u16,
+) -> u8 {
+    let start_epoch = current_epoch.saturating_sub(window_size);
+    let commission_window = validator
+        .history
+        .commission_range(start_epoch, current_epoch);
+
+    // Calculate sum and count without allocating a Vec
+    let mut sum: u32 = 0;
+    let mut count: u32 = 0;
+
+    for commission in commission_window.iter() {
+        if let Some(c) = commission {
+            sum = sum.saturating_add(*c as u32);
+            count += 1;
         }
     }
 
-    // Default to max if no data
-    100
+    if count == 0 {
+        // Default to max if no data
+        return 100;
+    }
+
+    // Calculate average
+    let avg = sum / count;
+
+    // Safely convert back to u8, capping at 100
+    avg.min(100) as u8
 }
 
 /// Get epoch credits for the previous epoch
@@ -89,10 +126,13 @@ pub fn get_epoch_credits(validator: &ValidatorHistory, current_epoch: u16) -> Re
 pub fn calculate_validator_score_v2(
     validator: &ValidatorHistory,
     current_epoch: u16,
+    commission_range: u16,
+    mev_commission_range: u16,
 ) -> Result<u64> {
-    // Get components
-    let commission = get_commission(validator, current_epoch);
-    let mev_commission = get_mev_commission(validator, current_epoch);
+    // Get components using averages for commissions
+    let commission = calculate_avg_commission(validator, current_epoch, commission_range);
+    let mev_commission =
+        calculate_avg_mev_commission(validator, current_epoch, mev_commission_range);
     let validator_age = validator.validator_age();
     let epoch_credits = get_epoch_credits(validator, current_epoch)?;
 

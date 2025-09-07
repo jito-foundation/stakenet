@@ -107,6 +107,7 @@ impl TestFixture {
             Ok(_) | Err(_) => {
                 let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
                 program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
+                program.set_compute_max_units(1_400_000);
                 program
             } // Err(_) => {
               //     let mut program = ProgramTest::new(
@@ -1017,6 +1018,8 @@ pub async fn crank_compute_score(
     let ctx = &fixture.ctx;
 
     for &i in indices {
+        let compute_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
+        let heap_ix = ComputeBudgetInstruction::request_heap_frame(256 * 1024);
         let ix = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::ComputeScore {
@@ -1034,7 +1037,7 @@ pub async fn crank_compute_score(
         };
         let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
         let tx = Transaction::new_signed_with_payer(
-            &[ix],
+            &[compute_ix, heap_ix, ix],
             Some(&fixture.keypair.pubkey()),
             &[&fixture.keypair],
             blockhash,

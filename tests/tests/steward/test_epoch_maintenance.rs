@@ -6,7 +6,8 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2, UpdateParametersArgs, EPOCH_MAINTENANCE,
+    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
+    UpdateParametersArgs, EPOCH_MAINTENANCE,
 };
 use solana_program_test::*;
 use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};

@@ -146,7 +146,7 @@ pub fn validator_score(
 
     /////// Component calculations ///////
     let (mev_commission_score, max_mev_commission, max_mev_commission_epoch, running_jito_score) =
-        calculate_mev_commission(
+        calculate_max_mev_commission(
             &mev_commission_window,
             current_epoch,
             params.mev_commission_bps_threshold,
@@ -160,7 +160,7 @@ pub fn validator_score(
             params.scoring_delinquency_threshold_ratio,
         )?;
 
-    let (commission_score, max_commission, max_commission_epoch) = calculate_commission(
+    let (commission_score, max_commission, max_commission_epoch) = calculate_max_commission(
         &commission_window,
         current_epoch,
         params.commission_threshold,
@@ -238,7 +238,7 @@ pub fn validator_score(
 
 /// Finds max MEV commission in the last `mev_commission_range` epochs and determines if it is above a threshold.
 /// Also determines if validator has had a MEV commission in the last 10 epochs to ensure they are running jito-solana
-pub fn calculate_mev_commission(
+pub fn calculate_max_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
@@ -335,7 +335,7 @@ pub fn calculate_epoch_credits(
 }
 
 /// Finds max commission in the last `commission_range` epochs
-pub fn calculate_commission(
+pub fn calculate_max_commission(
     commission_window: &[Option<u8>],
     current_epoch: u16,
     commission_threshold: u8,

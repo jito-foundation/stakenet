@@ -91,8 +91,8 @@ fn create_validator_history(
     }
 }
 
-mod test_calculate_mev_commission {
-    use jito_steward::score::calculate_mev_commission;
+mod test_calculate_max_mev_commission {
+    use jito_steward::score::calculate_max_mev_commission;
 
     #[test]
     fn test_normal() {
@@ -102,7 +102,7 @@ mod test_calculate_mev_commission {
         let threshold = 300;
 
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, current_epoch, threshold).unwrap();
+            calculate_max_mev_commission(&window, current_epoch, threshold).unwrap();
 
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 500);
@@ -112,7 +112,7 @@ mod test_calculate_mev_commission {
         // All commissions below threshold, and epoch is first instance of max commission
         let window = [Some(100), Some(200), Some(250), Some(250)];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 3, 300).unwrap();
+            calculate_max_mev_commission(&window, 3, 300).unwrap();
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 250);
         assert_eq!(max_epoch, 2);
@@ -121,7 +121,7 @@ mod test_calculate_mev_commission {
         // Window with Nones
         let window = [None, None, None];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 2, 300).unwrap();
+            calculate_max_mev_commission(&window, 2, 300).unwrap();
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 2);
@@ -133,7 +133,7 @@ mod test_calculate_mev_commission {
         // Empty window
         let window: [Option<u16>; 0] = [];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 0, 300).unwrap();
+            calculate_max_mev_commission(&window, 0, 300).unwrap();
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 0);
@@ -141,7 +141,7 @@ mod test_calculate_mev_commission {
 
         // Test Arithmetic error
         let window = [Some(0), Some(0), Some(0)];
-        let result = calculate_mev_commission(&window, 0, 300);
+        let result = calculate_max_mev_commission(&window, 0, 300);
         assert!(result.is_err());
     }
 }
@@ -231,7 +231,7 @@ mod test_calculate_epoch_credits {
     }
 }
 
-mod test_calculate_commission {
+mod test_calculate_max_commission {
     use super::*;
 
     #[test]
@@ -241,7 +241,7 @@ mod test_calculate_commission {
         let threshold = 8;
 
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, current_epoch, threshold).unwrap();
+            calculate_max_commission(&commission_window, current_epoch, threshold).unwrap();
 
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 7);
@@ -250,7 +250,7 @@ mod test_calculate_commission {
         // Commission above threshold
         let commission_window = [Some(5), Some(10), Some(6)];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 2, 8).unwrap();
+            calculate_max_commission(&commission_window, 2, 8).unwrap();
         assert_eq!(score, 0.0);
         assert_eq!(max_commission, 10);
         assert_eq!(max_epoch, 1);
@@ -261,7 +261,7 @@ mod test_calculate_commission {
         // Empty window
         let commission_window: [Option<u8>; 0] = [];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 0, 8).unwrap();
+            calculate_max_commission(&commission_window, 0, 8).unwrap();
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 0);
         assert_eq!(max_epoch, 0);
@@ -269,14 +269,14 @@ mod test_calculate_commission {
         // Window with None values
         let commission_window = [None, Some(5), None];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 2, 8).unwrap();
+            calculate_max_commission(&commission_window, 2, 8).unwrap();
         assert_eq!(score, 1.0);
         assert_eq!(max_commission, 5);
         assert_eq!(max_epoch, 1);
 
         // Test Arithmetic error
         let commission_window = [Some(0), Some(0), Some(0)];
-        let result = calculate_commission(&commission_window, 0, 8);
+        let result = calculate_max_commission(&commission_window, 0, 8);
         assert!(result.is_err());
     }
 }
