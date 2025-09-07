@@ -1722,7 +1722,7 @@ pub fn serialized_steward_state_account_v1(state: StewardStateAccount) -> Accoun
 }
 
 pub fn serialized_steward_state_account(state: StewardStateAccountV2) -> Account {
-    let mut data = Vec::with_capacity(StewardStateAccount::SIZE);
+    let mut data = Vec::with_capacity(StewardStateAccountV2::SIZE);
     // Add discriminator
     data.extend_from_slice(StewardStateAccountV2::DISCRIMINATOR);
     // Add account data using bytemuck

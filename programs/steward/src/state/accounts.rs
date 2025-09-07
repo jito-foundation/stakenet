@@ -87,7 +87,7 @@ impl Config {
     }
 }
 
-/// V1 State Account - for migration purposes
+/// V1 State Account
 #[account(zero_copy)]
 pub struct StewardStateAccount {
     pub state: StewardStateV1,
@@ -96,7 +96,7 @@ pub struct StewardStateAccount {
     pub _padding: [u8; 6],
 }
 
-/// V2 State Account - current version
+/// V2 State Account
 #[account(zero_copy)]
 pub struct StewardStateAccountV2 {
     pub state: StewardStateV2,
@@ -111,11 +111,8 @@ impl StewardStateAccount {
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
 }
 
-// Provide SIZE/SEED constants for V2 for clients that reference them.
 impl StewardStateAccountV2 {
     pub const SIZE: usize = 8 + size_of::<Self>();
-    // Uses the same PDA seed as V1; the state account PDA did not change.
-    pub const SEED: &'static [u8] = b"steward_state";
 }
 
 pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {

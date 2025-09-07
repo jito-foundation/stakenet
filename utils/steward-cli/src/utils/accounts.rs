@@ -1,6 +1,6 @@
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
-use jito_steward::{Config, StewardStateAccountV2};
+use jito_steward::{Config, StewardStateAccount, StewardStateAccountV2};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::find_withdraw_authority_program_address;
@@ -59,7 +59,7 @@ pub async fn get_steward_config_account(
 
 pub fn get_steward_state_address(program_id: &Pubkey, steward_config: &Pubkey) -> Pubkey {
     let (steward_state, _) = Pubkey::find_program_address(
-        &[StewardStateAccountV2::SEED, steward_config.as_ref()],
+        &[StewardStateAccount::SEED, steward_config.as_ref()],
         program_id,
     );
 

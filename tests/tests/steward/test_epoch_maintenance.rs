@@ -6,7 +6,7 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    stake_pool_utils::ValidatorList, StewardStateAccountV2, UpdateParametersArgs, EPOCH_MAINTENANCE,
+    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2, UpdateParametersArgs, EPOCH_MAINTENANCE,
 };
 use solana_program_test::*;
 use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};
@@ -78,7 +78,7 @@ async fn _epoch_maintenance_setup() -> (
     fixture.steward_config = Keypair::new();
     fixture.steward_state = Pubkey::find_program_address(
         &[
-            StewardStateAccountV2::SEED,
+            StewardStateAccount::SEED,
             fixture.steward_config.pubkey().as_ref(),
         ],
         &jito_steward::id(),
