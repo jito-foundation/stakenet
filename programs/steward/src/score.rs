@@ -178,8 +178,8 @@ pub fn calculate_validator_score(
 #[event]
 #[derive(Debug, PartialEq)]
 pub struct ScoreComponentsV4 {
-    /// Final score with binary filters applied to raw_score
-    pub score: f64,
+    /// Final score with binary filters applied to raw_score (0 if any filter fails, raw_score otherwise)
+    pub score: u64,
 
     /// The 4-tier encoded score (before binary filters)
     pub raw_score: u64,
@@ -196,29 +196,29 @@ pub struct ScoreComponentsV4 {
     /// Average vote credits over the window
     pub vote_credits_avg: u32,
 
-    /// If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0
-    pub mev_commission_score: f64,
+    /// If max mev commission in mev_commission_range epochs is less than threshold, score is 1, else 0
+    pub mev_commission_score: u8,
 
-    /// If validator is blacklisted, score is 0.0, else 1.0
-    pub blacklisted_score: f64,
+    /// If validator is blacklisted, score is 0, else 1
+    pub blacklisted_score: u8,
 
-    /// If validator is not in the superminority, score is 1.0, else 0.0
-    pub superminority_score: f64,
+    /// If validator is not in the superminority, score is 1, else 0
+    pub superminority_score: u8,
 
-    /// If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
-    pub delinquency_score: f64,
+    /// If delinquency is not > threshold in any epoch, score is 1, else 0
+    pub delinquency_score: u8,
 
-    /// If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
-    pub running_jito_score: f64,
+    /// If validator has a mev commission in the last 10 epochs, score is 1, else 0
+    pub running_jito_score: u8,
 
-    /// If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0
-    pub commission_score: f64,
+    /// If max commission in commission_range epochs is less than commission_threshold, score is 1, else 0
+    pub commission_score: u8,
 
-    /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0
-    pub historical_commission_score: f64,
+    /// If max commission in all validator history epochs is less than historical_commission_threshold, score is 1, else 0
+    pub historical_commission_score: u8,
 
-    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
-    pub merkle_root_upload_authority_score: f64,
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1, else 0
+    pub merkle_root_upload_authority_score: u8,
 
     pub vote_account: Pubkey,
 
@@ -229,10 +229,10 @@ pub struct ScoreComponentsV4 {
 
     /// If validator has realized priority fee commissions > config limits over a lookback range,
     /// score 0.
-    pub priority_fee_commission_score: f64,
+    pub priority_fee_commission_score: u8,
 
-    /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
-    pub priority_fee_merkle_root_upload_authority_score: f64,
+    /// If validator is using TipRouter authority, OR OldJito authority then score is 1, else 0
+    pub priority_fee_merkle_root_upload_authority_score: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
@@ -371,20 +371,18 @@ pub fn validator_score(
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
     /////// Apply binary filters to raw score ///////
-    // Normalize raw_score to f64 (0 to 1 range) then apply binary filters
-    let normalized_raw_score = raw_score as f64 / u64::MAX as f64;
-
-    let score = normalized_raw_score
-        * mev_commission_score
-        * commission_score
-        * historical_commission_score
-        * blacklisted_score
-        * superminority_score
-        * delinquency_score
-        * running_jito_score
-        * merkle_root_upload_authority_score
-        * priority_fee_commission_score
-        * priority_fee_merkle_root_upload_authority_score;
+    // Binary filters are 0 or 1, multiply them with the raw_score
+    let score = raw_score
+        * mev_commission_score as u64
+        * commission_score as u64
+        * historical_commission_score as u64
+        * blacklisted_score as u64
+        * superminority_score as u64
+        * delinquency_score as u64
+        * running_jito_score as u64
+        * merkle_root_upload_authority_score as u64
+        * priority_fee_commission_score as u64
+        * priority_fee_merkle_root_upload_authority_score as u64;
 
     Ok(ScoreComponentsV4 {
         score,
@@ -427,7 +425,7 @@ pub fn calculate_max_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
-) -> Result<(f64, u16, u16, f64)> {
+) -> Result<(u8, u16, u16, u8)> {
     let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
         .rev()
@@ -439,16 +437,16 @@ pub fn calculate_max_mev_commission(
     let max_mev_commission_epoch = max_mev_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let mev_commission_score = if max_mev_commission <= mev_commission_bps_threshold {
-        1.0
+        1
     } else {
-        0.0
+        0
     };
 
     /////// Running Jito ///////
     let running_jito_score = if mev_commission_window.iter().any(|i| i.is_some()) {
-        1.0
+        1
     } else {
-        0.0
+        0
     };
 
     Ok((
@@ -465,13 +463,13 @@ pub fn calculate_delinquency(
     total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
-) -> Result<(f64, f64, u16)> {
+) -> Result<(u8, f64, u16)> {
     if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
         return Err(StewardError::ArithmeticError.into());
     }
 
     // Delinquency heuristic - not actual delinquency
-    let mut delinquency_score = 1.0;
+    let mut delinquency_score = 1;
     let mut delinquency_ratio = 1.0;
     let mut delinquency_epoch = EPOCH_DEFAULT;
 
@@ -486,7 +484,7 @@ pub fn calculate_delinquency(
             let credits = maybe_credits.unwrap_or(0);
             let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
             if ratio < scoring_delinquency_threshold_ratio {
-                delinquency_score = 0.0;
+                delinquency_score = 0;
                 delinquency_ratio = ratio;
                 delinquency_epoch = epoch_credits_start
                     .checked_add(i as u16)
@@ -504,7 +502,7 @@ pub fn calculate_max_commission(
     commission_window: &[Option<u8>],
     current_epoch: u16,
     commission_threshold: u8,
-) -> Result<(f64, u8, u16)> {
+) -> Result<(u8, u8, u16)> {
     /////// Commission ///////
     let (max_commission, max_commission_epoch) = commission_window
         .iter()
@@ -517,9 +515,9 @@ pub fn calculate_max_commission(
     let max_commission_epoch = max_commission_epoch.ok_or(StewardError::ArithmeticError)?;
 
     let commission_score = if max_commission <= commission_threshold {
-        1.0
+        1
     } else {
-        0.0
+        0
     };
 
     Ok((commission_score, max_commission, max_commission_epoch))
@@ -530,7 +528,7 @@ pub fn calculate_historical_commission(
     validator: &ValidatorHistory,
     current_epoch: u16,
     historical_commission_threshold: u8,
-) -> Result<(f64, u8, u16)> {
+) -> Result<(u8, u8, u16)> {
     if validator.history.is_empty() {
         return Err(StewardError::ArithmeticError.into());
     }
@@ -550,9 +548,9 @@ pub fn calculate_historical_commission(
 
     let historical_commission_score =
         if max_historical_commission <= historical_commission_threshold {
-            1.0
+            1
         } else {
-            0.0
+            0
         };
 
     Ok((
@@ -567,7 +565,7 @@ pub fn calculate_superminority(
     validator: &ValidatorHistory,
     current_epoch: u16,
     commission_range: u16,
-) -> Result<(f64, u16)> {
+) -> Result<(u8, u16)> {
     /*
         If epoch credits exist, we expect the validator to have a superminority flag set. If not, scoring fails and we wait for
         the stake oracle to call UpdateStakeHistory.
@@ -577,9 +575,9 @@ pub fn calculate_superminority(
     if validator.history.epoch_credits_latest().is_some() {
         if let Some(superminority) = validator.history.superminority_latest() {
             if superminority == 1 {
-                Ok((0.0, current_epoch))
+                Ok((0, current_epoch))
             } else {
-                Ok((1.0, EPOCH_DEFAULT))
+                Ok((1, EPOCH_DEFAULT))
             }
         } else {
             Err(StewardError::StakeHistoryNotRecentEnough.into())
@@ -605,50 +603,50 @@ pub fn calculate_superminority(
         let epoch = epoch.ok_or(StewardError::ArithmeticError)?;
 
         if status == 1 {
-            Ok((0.0, epoch))
+            Ok((0, epoch))
         } else {
-            Ok((1.0, EPOCH_DEFAULT))
+            Ok((1, EPOCH_DEFAULT))
         }
     }
 }
 
 /// Checks if validator is blacklisted using the validator history index in the config's blacklist
-pub fn calculate_blacklist_score(config: &Config, validator_index: u32) -> Result<f64> {
+pub fn calculate_blacklist_score(config: &Config, validator_index: u32) -> Result<u8> {
     if config
         .validator_history_blacklist
         .get(validator_index as usize)?
     {
-        Ok(0.0)
+        Ok(0)
     } else {
-        Ok(1.0)
+        Ok(1)
     }
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
-pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Result<f64> {
+pub fn calculate_merkle_root_authority_score(validator: &ValidatorHistory) -> Result<u8> {
     // calculate_instant_unstake_merkle_root_upload_auth returns whether or not
     // instant unstake should be triggered, so we invert the result to get the score
     if calculate_instant_unstake_merkle_root_upload_auth(
         &validator.history.merkle_root_upload_authority_latest(),
     )? {
-        Ok(0.0)
+        Ok(0)
     } else {
-        Ok(1.0)
+        Ok(1)
     }
 }
 
 /// Checks if validator is using appropriate TDA MerkleRootUploadAuthority
 pub fn calculate_priority_fee_merkle_root_authority_score(
     validator: &ValidatorHistory,
-) -> Result<f64> {
+) -> Result<u8> {
     if calculate_instant_unstake_merkle_root_upload_auth(
         &validator
             .history
             .priority_fee_merkle_root_upload_authority_latest(),
     )? {
-        Ok(0.0)
+        Ok(0)
     } else {
-        Ok(1.0)
+        Ok(1)
     }
 }
 
@@ -679,7 +677,7 @@ pub fn calculate_priority_fee_commission(
     config: &Config,
     validator: &ValidatorHistory,
     current_epoch: u16,
-) -> Result<(f64, u16, u16)> {
+) -> Result<(u8, u16, u16)> {
     let (start_epoch, end_epoch) = config.priority_fee_epoch_range(current_epoch);
     let priority_fee_tips = validator
         .history
@@ -727,13 +725,13 @@ pub fn calculate_priority_fee_commission(
     // return score 1 when there's not enough history. We assume both fields being None means the
     // priority fee data is non-existent for this epoch.
     if priority_fee_tips[0].is_none() && total_priority_fees[0].is_none() {
-        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
+        return Ok((1, 0u16, max_priority_fee_commission_epoch));
     }
 
     // if there are no realized commissions due to Unset PFDA, return score 1, default
     // to not penalize the validator for not having a PFDA copied into their history
     if realized_commissions.is_empty() {
-        return Ok((1.0, 0u16, max_priority_fee_commission_epoch));
+        return Ok((1, 0u16, max_priority_fee_commission_epoch));
     }
 
     let num_epochs: u64 = realized_commissions.len() as u64;
@@ -752,12 +750,12 @@ pub fn calculate_priority_fee_commission(
     let max_commission = config.max_avg_commission();
     // We would still like to emit avg_commission before the go-live epoch
     if current_epoch < config.parameters.priority_fee_scoring_start_epoch {
-        return Ok((1.0, avg_commission, EPOCH_DEFAULT));
+        return Ok((1, avg_commission, EPOCH_DEFAULT));
     }
     if avg_commission <= max_commission {
-        Ok((1.0, avg_commission, max_priority_fee_commission_epoch))
+        Ok((1, avg_commission, max_priority_fee_commission_epoch))
     } else {
-        Ok((0.0, avg_commission, max_priority_fee_commission_epoch))
+        Ok((0, avg_commission, max_priority_fee_commission_epoch))
     }
 }
 

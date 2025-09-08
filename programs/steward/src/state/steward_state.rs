@@ -12,8 +12,7 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, StateTransition},
     score::{
-        calculate_validator_score, instant_unstake_validator, validator_score,
-        InstantUnstakeComponentsV3, ScoreComponentsV4,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV4,
     },
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
@@ -764,20 +763,8 @@ impl StewardStateV2 {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            // Calculate the 4-tier encoded score
-            // Note: validator age should already be updated by the validator history program
-            let raw_score = calculate_validator_score(
-                validator,
-                current_epoch as u16,
-                config.parameters.commission_range,
-                config.parameters.mev_commission_range,
-                config.parameters.epoch_credits_range,
-                TVC_ACTIVATION_EPOCH,
-            )?;
-            self.raw_scores[index] = raw_score;
-
-            // Apply binary filters from the old scoring system to get final score
-            let score = validator_score(
+            // Calculate score with binary filters applied
+            let score_components = validator_score(
                 validator,
                 cluster,
                 config,
@@ -785,24 +772,9 @@ impl StewardStateV2 {
                 TVC_ACTIVATION_EPOCH,
             )?;
 
-            // Apply binary filters (multiply raw score by 0 or 1 based on filters)
-            let binary_filter_multiplier = if score.blacklisted_score > 0.0
-                && score.superminority_score > 0.0
-                && score.delinquency_score > 0.0
-                && score.commission_score > 0.0
-                && score.historical_commission_score > 0.0
-                && score.mev_commission_score > 0.0
-                && score.running_jito_score > 0.0
-                && score.merkle_root_upload_authority_score > 0.0
-                && score.priority_fee_commission_score > 0.0
-                && score.priority_fee_merkle_root_upload_authority_score > 0.0
-            {
-                raw_score // All filters pass, use raw score
-            } else {
-                0 // One or more filters failed
-            };
-
-            self.scores[index] = binary_filter_multiplier;
+            // Store both raw score and final score
+            self.raw_scores[index] = score_components.raw_score;
+            self.scores[index] = score_components.score;
 
             // Insertion sort scores into sorted_indices
             let num_scores_calculated = self.progress.count();
@@ -822,7 +794,7 @@ impl StewardStateV2 {
             )?;
 
             self.progress.set(index, true)?;
-            return Ok(Some(score));
+            return Ok(Some(score_components));
         }
 
         Err(StewardError::InvalidState.into())
