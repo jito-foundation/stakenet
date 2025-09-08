@@ -16,14 +16,185 @@ use crate::{
     Config,
 };
 
+/// Encode a 4-tier validator score into a u64 with the following bit layout:
+/// Bits 56-63 (8 bits):  Inflation commission (inverted, 0-100%)
+/// Bits 42-55 (14 bits): MEV commission (inverted, 0-10000 bps)
+/// Bits 25-41 (17 bits): Validator age (direct, epochs)
+/// Bits 0-24 (25 bits):  Vote credits (direct value)
+///
+/// Higher scores are better in all cases.
+pub fn encode_validator_score(
+    inflation_commission: u8, // 0-100
+    mev_commission_bps: u16,  // 0-10000
+    validator_age: u32,       // epochs with non-zero vote credits
+    vote_credits: u32,        // average vote credits value
+) -> Result<u64> {
+    // Tier 1: Inflation commission (inverted so lower commission = higher score)
+    let inflation_score = 100u64.saturating_sub(inflation_commission.min(100) as u64);
+
+    // Tier 2: MEV commission (inverted so lower commission = higher score)
+    let mev_score =
+        (BASIS_POINTS_MAX as u64).saturating_sub(mev_commission_bps.min(BASIS_POINTS_MAX) as u64);
+
+    // Tier 3: Validator age (direct - older validators score higher)
+    // Cap at 17 bits max value (131,071 epochs = ~716 years)
+    let age_score = (validator_age as u64).min((1u64 << 17) - 1);
+
+    // Tier 4: Vote credits (direct value)
+    // Cap at 25 bits max value (33,554,431)
+    let credits_score = (vote_credits as u64).min((1u64 << 25) - 1);
+
+    // Combine into single u64
+    let score = (inflation_score << 56) | (mev_score << 42) | (age_score << 25) | credits_score;
+
+    Ok(score)
+}
+
+/// Calculate the average MEV commission over a window of epochs
+pub fn calculate_avg_mev_commission(
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+    window_size: u16,
+) -> u16 {
+    let start_epoch = current_epoch.saturating_sub(window_size);
+    let mev_commission_window = validator
+        .history
+        .mev_commission_range(start_epoch, current_epoch);
+
+    // Calculate sum and count without allocating a Vec
+    let mut sum: u64 = 0;
+    let mut count: u64 = 0;
+
+    for commission in mev_commission_window.iter() {
+        if let Some(c) = commission {
+            sum = sum.saturating_add(*c as u64);
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        // Default to max if no data
+        return BASIS_POINTS_MAX;
+    }
+
+    // Calculate average
+    let avg = sum / count;
+
+    // Safely convert back to u16, capping at max
+    avg.min(BASIS_POINTS_MAX as u64) as u16
+}
+
+/// Calculate the average inflation commission over a window of epochs
+pub fn calculate_avg_commission(
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+    window_size: u16,
+) -> u8 {
+    let start_epoch = current_epoch.saturating_sub(window_size);
+    let commission_window = validator
+        .history
+        .commission_range(start_epoch, current_epoch);
+
+    // Calculate sum and count without allocating a Vec
+    let mut sum: u32 = 0;
+    let mut count: u32 = 0;
+
+    for commission in commission_window.iter() {
+        if let Some(c) = commission {
+            sum = sum.saturating_add(*c as u32);
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        // Default to max if no data
+        return 100;
+    }
+
+    // Calculate average
+    let avg = sum / count;
+
+    // Safely convert back to u8, capping at 100
+    avg.min(100) as u8
+}
+
+/// Calculate the average vote credits over a window
+pub fn calculate_avg_vote_credits(epoch_credits_window: &[Option<u32>]) -> u32 {
+    if epoch_credits_window.is_empty() {
+        return 0;
+    }
+
+    let sum: u64 = epoch_credits_window
+        .iter()
+        .filter_map(|&c| c)
+        .map(|c| c as u64)
+        .sum();
+
+    let count = epoch_credits_window.iter().filter(|c| c.is_some()).count() as u64;
+
+    if count == 0 {
+        return 0;
+    }
+
+    // Return average, capped at u32::MAX
+    (sum / count).min(u32::MAX as u64) as u32
+}
+
+/// Calculate the new 4-tier validator score
+pub fn calculate_validator_score(
+    validator: &ValidatorHistory,
+    current_epoch: u16,
+    commission_range: u16,
+    mev_commission_range: u16,
+    epoch_credits_range: u16,
+    tvc_activation_epoch: u64,
+) -> Result<u64> {
+    // Get average commissions
+    let commission = calculate_avg_commission(validator, current_epoch, commission_range);
+    let mev_commission =
+        calculate_avg_mev_commission(validator, current_epoch, mev_commission_range);
+
+    // Get validator age
+    let validator_age = validator.validator_age();
+
+    // Get average vote credits
+    let epoch_credits_start = current_epoch
+        .checked_sub(epoch_credits_range)
+        .ok_or(ArithmeticError)?;
+    let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
+
+    let epoch_credits_window = validator.history.epoch_credits_range_normalized(
+        epoch_credits_start,
+        epoch_credits_end,
+        tvc_activation_epoch,
+    );
+
+    let avg_vote_credits = calculate_avg_vote_credits(&epoch_credits_window);
+
+    // Encode into u64
+    encode_validator_score(commission, mev_commission, validator_age, avg_vote_credits)
+}
+
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV3 {
-    /// Product of all scoring components
+pub struct ScoreComponentsV4 {
+    /// Final score with binary filters applied to raw_score
     pub score: f64,
 
-    /// vote_credits_ratio * (1 - commission)
-    pub yield_score: f64,
+    /// The 4-tier encoded score (before binary filters)
+    pub raw_score: u64,
+
+    /// Average inflation commission used in scoring (0-100)
+    pub commission_avg: u8,
+
+    /// Average MEV commission used in scoring (basis points)
+    pub mev_commission_avg: u16,
+
+    /// Validator age in epochs (number of epochs with non-zero vote credits)
+    pub validator_age: u32,
+
+    /// Average vote credits over the window
+    pub vote_credits_avg: u32,
 
     /// If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0
     pub mev_commission_score: f64,
@@ -48,10 +219,6 @@ pub struct ScoreComponentsV3 {
 
     /// If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0
     pub merkle_root_upload_authority_score: f64,
-
-    /// Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs
-    /// Excluding current epoch
-    pub vote_credits_ratio: f64,
 
     pub vote_account: Pubkey,
 
@@ -110,7 +277,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV3> {
+) -> Result<ScoreComponentsV4> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -144,7 +311,23 @@ pub fn validator_score(
         current_epoch,
     );
 
-    /////// Component calculations ///////
+    /////// Calculate 4-tier score components ///////
+    let commission_avg =
+        calculate_avg_commission(validator, current_epoch, params.commission_range);
+    let mev_commission_avg =
+        calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
+    let validator_age = validator.validator_age();
+    let vote_credits_avg = calculate_avg_vote_credits(&normalized_epoch_credits_window);
+
+    // Calculate raw 4-tier score
+    let raw_score = encode_validator_score(
+        commission_avg,
+        mev_commission_avg,
+        validator_age,
+        vote_credits_avg,
+    )?;
+
+    /////// Binary filter calculations ///////
     let (mev_commission_score, max_mev_commission, max_mev_commission_epoch, running_jito_score) =
         calculate_max_mev_commission(
             &mev_commission_window,
@@ -152,13 +335,12 @@ pub fn validator_score(
             params.mev_commission_bps_threshold,
         )?;
 
-    let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
-        calculate_epoch_credits(
-            &normalized_epoch_credits_window,
-            &total_blocks_window,
-            epoch_credits_start,
-            params.scoring_delinquency_threshold_ratio,
-        )?;
+    let (delinquency_score, delinquency_ratio, delinquency_epoch) = calculate_delinquency(
+        &normalized_epoch_credits_window,
+        &total_blocks_window,
+        epoch_credits_start,
+        params.scoring_delinquency_threshold_ratio,
+    )?;
 
     let (commission_score, max_commission, max_commission_epoch) = calculate_max_commission(
         &commission_window,
@@ -188,25 +370,29 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
-    /////// Formula ///////
+    /////// Apply binary filters to raw score ///////
+    // Normalize raw_score to f64 (0 to 1 range) then apply binary filters
+    let normalized_raw_score = raw_score as f64 / u64::MAX as f64;
 
-    let yield_score = vote_credits_ratio * (1. - max_commission as f64 / COMMISSION_MAX as f64);
-
-    let score = mev_commission_score
+    let score = normalized_raw_score
+        * mev_commission_score
         * commission_score
         * historical_commission_score
         * blacklisted_score
         * superminority_score
         * delinquency_score
         * running_jito_score
-        * yield_score
         * merkle_root_upload_authority_score
         * priority_fee_commission_score
         * priority_fee_merkle_root_upload_authority_score;
 
-    Ok(ScoreComponentsV3 {
+    Ok(ScoreComponentsV4 {
         score,
-        yield_score,
+        raw_score,
+        commission_avg,
+        mev_commission_avg,
+        validator_age,
+        vote_credits_avg,
         mev_commission_score,
         blacklisted_score,
         superminority_score,
@@ -215,7 +401,6 @@ pub fn validator_score(
         commission_score,
         historical_commission_score,
         merkle_root_upload_authority_score,
-        vote_credits_ratio,
         vote_account: validator.vote_account,
         epoch: current_epoch,
         details: ScoreDetails {
@@ -274,28 +459,16 @@ pub fn calculate_max_mev_commission(
     ))
 }
 
-/// Calculates the vote credits ratio and delinquency score for the validator
-pub fn calculate_epoch_credits(
+/// Calculates the delinquency score for the validator
+pub fn calculate_delinquency(
     epoch_credits_window: &[Option<u32>],
     total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
-) -> Result<(f64, f64, f64, u16)> {
+) -> Result<(f64, f64, u16)> {
     if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
         return Err(StewardError::ArithmeticError.into());
     }
-
-    let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
-        / epoch_credits_window.len() as f64;
-
-    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
-    if nonzero_blocks == 0 {
-        return Err(StewardError::ArithmeticError.into());
-    }
-
-    // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks =
-        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1.0;
@@ -323,15 +496,7 @@ pub fn calculate_epoch_credits(
         }
     }
 
-    let normalized_vote_credits_ratio =
-        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
-
-    Ok((
-        normalized_vote_credits_ratio,
-        delinquency_score,
-        delinquency_ratio,
-        delinquency_epoch,
-    ))
+    Ok((delinquency_score, delinquency_ratio, delinquency_epoch))
 }
 
 /// Finds max commission in the last `commission_range` epochs

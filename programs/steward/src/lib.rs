@@ -15,7 +15,6 @@ pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod score;
-pub mod score_v2;
 pub mod stake_pool_utils;
 pub mod state;
 pub mod utils;

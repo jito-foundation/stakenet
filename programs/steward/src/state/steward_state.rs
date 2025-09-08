@@ -12,9 +12,9 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, StateTransition},
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV3,
+        calculate_validator_score, instant_unstake_validator, validator_score,
+        InstantUnstakeComponentsV3, ScoreComponentsV4,
     },
-    score_v2::calculate_validator_score_v2,
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
 };
@@ -683,7 +683,7 @@ impl StewardStateV2 {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-    ) -> Result<Option<ScoreComponentsV3>> {
+    ) -> Result<Option<ScoreComponentsV4>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -764,15 +764,17 @@ impl StewardStateV2 {
                 return Err(StewardError::ClusterHistoryNotRecentEnough.into());
             }
 
-            // Calculate the new v2 score (4-tier encoding)
+            // Calculate the 4-tier encoded score
             // Note: validator age should already be updated by the validator history program
-            let score_v2 = calculate_validator_score_v2(
+            let raw_score = calculate_validator_score(
                 validator,
                 current_epoch as u16,
                 config.parameters.commission_range,
                 config.parameters.mev_commission_range,
+                config.parameters.epoch_credits_range,
+                TVC_ACTIVATION_EPOCH,
             )?;
-            self.raw_scores[index] = score_v2;
+            self.raw_scores[index] = raw_score;
 
             // Apply binary filters from the old scoring system to get final score
             let score = validator_score(
@@ -795,7 +797,7 @@ impl StewardStateV2 {
                 && score.priority_fee_commission_score > 0.0
                 && score.priority_fee_merkle_root_upload_authority_score > 0.0
             {
-                score_v2 // All filters pass, use raw score
+                raw_score // All filters pass, use raw score
             } else {
                 0 // One or more filters failed
             };
