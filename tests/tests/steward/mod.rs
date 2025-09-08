@@ -7,6 +7,7 @@ mod test_migrate_state_to_v2;
 mod test_parameters;
 mod test_priority_fee_parameters;
 mod test_scoring;
+mod test_scoring_v2;
 mod test_spl_passthrough;
 mod test_state_methods;
 mod test_state_transitions;
