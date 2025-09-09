@@ -1368,7 +1368,7 @@ impl Default for FixtureDefaultAccounts {
             &jito_steward::id(),
         );
 
-        let steward_state = Box::new(StewardStateV2 {
+        let steward_state = StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores,
             validator_lamport_balances: [0; MAX_VALIDATORS],
             scores: [0; MAX_VALIDATORS],
@@ -1390,9 +1390,9 @@ impl Default for FixtureDefaultAccounts {
             validators_added: 0,
             status_flags: 0,
             _padding0: [0; 2],
-        });
+        };
         let steward_state_account = Box::new(StewardStateAccountV2 {
-            state: *steward_state,
+            state: steward_state,
             _padding0: 0u8,
             bump: steward_state_bump,
             _padding1: [0; 6],
@@ -1836,7 +1836,7 @@ pub struct StateMachineFixtures {
     pub cluster_history: ClusterHistory,
     pub config: Config,
     pub validator_list: Vec<ValidatorStakeInfo>,
-    pub state: Box<StewardStateV2>,
+    pub state: StewardStateV2,
 }
 
 impl Default for StateMachineFixtures {
@@ -1999,8 +1999,8 @@ impl Default for StateMachineFixtures {
         validator_lamport_balances[1] = LAMPORTS_PER_SOL * 1000;
         validator_lamport_balances[2] = LAMPORTS_PER_SOL * 1000;
 
-        // Setup StewardState - Box to avoid stack overflow
-        let state = Box::new(StewardStateV2 {
+        // Setup StewardState
+        let state = StewardStateV2 {
             state_tag: StewardStateEnum::ComputeScores, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
@@ -2022,7 +2022,7 @@ impl Default for StateMachineFixtures {
             validators_to_remove: BitMask::default(),
             validators_for_immediate_removal: BitMask::default(),
             _padding0: [0; 2],
-        });
+        };
 
         StateMachineFixtures {
             current_epoch,

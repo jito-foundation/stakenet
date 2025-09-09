@@ -18,7 +18,7 @@ pub fn test_compute_scores_to_compute_delegations() {
     let cluster_history = &fixtures.cluster_history;
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     for validator in validators {
         state
@@ -60,7 +60,7 @@ pub fn test_compute_scores_to_new_compute_scores() {
     let cluster_history = &fixtures.cluster_history;
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     // Case 1: Make some progress but then progress halts until past next_compute_epoch
     state
@@ -95,7 +95,7 @@ pub fn test_compute_scores_noop() {
     let clock = &fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -111,7 +111,7 @@ pub fn test_compute_delegations_to_idle() {
     let epoch_schedule = &fixtures.epoch_schedule;
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
     state.state_tag = StewardStateEnum::ComputeDelegations;
@@ -129,7 +129,7 @@ pub fn test_compute_delegations_to_compute_scores() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeDelegations;
     clock.epoch += parameters.num_epochs_between_scoring;
@@ -147,7 +147,7 @@ pub fn test_compute_delegations_noop() {
     let clock = &fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeDelegations;
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -166,7 +166,7 @@ pub fn test_idle_to_compute_instant_unstake() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::Idle;
     clock.slot +=
@@ -188,7 +188,7 @@ pub fn test_idle_to_compute_scores() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     clock.epoch += parameters.num_epochs_between_scoring;
     clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
@@ -205,7 +205,7 @@ pub fn test_idle_noop() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     // Case 1: before we've hit instant_unstake_epoch_progress
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
@@ -232,7 +232,7 @@ pub fn test_compute_instant_unstake_to_rebalance() {
     let cluster_history = &fixtures.cluster_history;
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeInstantUnstake;
     for validator in validators {
@@ -279,7 +279,7 @@ pub fn test_compute_instant_unstake_to_idle() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeInstantUnstake;
     state.set_flag(RESET_TO_IDLE);
@@ -296,7 +296,7 @@ pub fn test_compute_instant_unstake_to_compute_scores() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeInstantUnstake;
     clock.epoch += parameters.num_epochs_between_scoring;
@@ -314,7 +314,7 @@ pub fn test_compute_instant_unstake_transition_noop() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::ComputeInstantUnstake;
     assert!(state.progress.is_empty());
@@ -334,7 +334,7 @@ pub fn test_rebalance_to_idle() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::Rebalance;
 
@@ -364,7 +364,7 @@ pub fn test_rebalance_to_compute_scores() {
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
-    let state = &mut *fixtures.state;
+    let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::Rebalance;
     clock.epoch += parameters.num_epochs_between_scoring;
