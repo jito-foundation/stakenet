@@ -4,7 +4,7 @@ use crate::{
     stake_pool_utils::deserialize_stake_pool,
     state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::{get_config_admin, get_stake_pool_address},
-    BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
+    BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE_V2,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::ValidatorListHeader;
@@ -65,6 +65,6 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     state_account.state.validators_for_immediate_removal = BitMask::default();
     state_account.state.validators_added = 0;
     state_account.state.clear_flags();
-    state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
+    state_account.state._padding0 = [0; STATE_PADDING_0_SIZE_V2];
     Ok(())
 }

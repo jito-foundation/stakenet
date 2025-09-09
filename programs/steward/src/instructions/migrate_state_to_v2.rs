@@ -5,7 +5,7 @@ use core::ptr;
 use crate::{
     state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::get_config_admin,
-    STATE_PADDING_0_SIZE,
+    STATE_PADDING_0_SIZE_V2,
 };
 
 #[derive(Accounts)]
@@ -204,7 +204,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     }
 
     // Zero reduced padding for V2
-    for i in 0..STATE_PADDING_0_SIZE {
+    for i in 0..STATE_PADDING_0_SIZE_V2 {
         data[base + off_v2_padding0 + i] = 0u8;
     }
 

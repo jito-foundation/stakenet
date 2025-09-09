@@ -119,7 +119,15 @@ pub struct StewardStateV1 {
     pub validators_added: u16,
 
     /// Future state and #[repr(C)] alignment
-    pub _padding0: [u8; MAX_VALIDATORS * 8 + 2],
+    pub _padding0: [u8; STATE_PADDING_0_SIZE_V1],
+}
+
+pub const STATE_PADDING_0_SIZE_V1: usize = MAX_VALIDATORS * 8 + 2;
+
+impl StewardStateV1 {
+    pub fn clear_flags(&mut self) {
+        self.status_flags = 0;
+    }
 }
 
 /// Tracks state of the stake pool.
@@ -194,11 +202,11 @@ pub struct StewardStateV2 {
     pub validators_added: u16,
 
     /// Future state and #[repr(C)] alignment
-    pub _padding0: [u8; STATE_PADDING_0_SIZE],
+    pub _padding0: [u8; STATE_PADDING_0_SIZE_V2],
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = 2;
+pub const STATE_PADDING_0_SIZE_V2: usize = 2;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
