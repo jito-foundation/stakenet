@@ -39,7 +39,6 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     let clock = Clock::get()?;
-    state_account.is_initialized = true.into();
     state_account.bump = ctx.bumps.state_account;
 
     let config = ctx.accounts.config.load()?;
