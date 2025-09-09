@@ -5,7 +5,6 @@ use core::ptr;
 use crate::{
     state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::get_config_admin,
-    STATE_PADDING_0_SIZE_V2,
 };
 
 #[derive(Accounts)]
@@ -74,7 +73,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let off_v1_stake_deposit_unstake_total = off_v1_instant_unstake_total + 8;
     let off_v1_status_flags = off_v1_stake_deposit_unstake_total + 8;
     let off_v1_validators_added = off_v1_status_flags + 4;
-    let _off_v1_padding0 = off_v1_validators_added + 2;
+    let off_v1_padding0 = off_v1_validators_added + 2;
 
     // V2 layout offsets (relative to base)
     let off_v2_state_tag = off_v1_state_tag;
@@ -97,7 +96,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let off_v2_stake_deposit_unstake_total = off_v2_instant_unstake_total + 8;
     let off_v2_status_flags = off_v2_stake_deposit_unstake_total + 8;
     let off_v2_validators_added = off_v2_status_flags + 4;
-    let off_v2_padding0 = off_v2_validators_added + 2;
+    let _off_v2_padding0 = off_v2_validators_added + 2;
 
     // Raw pointer to the start of state bytes
     let p = unsafe { data.as_mut_ptr().add(base) };
@@ -110,67 +109,37 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         ptr::copy(p.add(src_off), p.add(dst_off), len);
     }
 
-    // Move trailing fields (those after yield_scores) forward by total_shift, from end to start
+    // OPTIMIZATION: Move everything from delegations onward forward by 8000 bytes in one bulk operation
+    // Everything after sorted_yield_score_indices maintains the same layout, just shifted forward
+    let bulk_move_start = off_v1_delegations;
+    let bulk_move_end = off_v1_padding0 + 2; // Include padding
+    let bulk_move_size = bulk_move_end - bulk_move_start;
+
     unsafe {
-        // validators_added (2)
-        copy_bytes(p, off_v1_validators_added, off_v2_validators_added, 2);
-        // status_flags (4)
-        copy_bytes(p, off_v1_status_flags, off_v2_status_flags, 4);
-        // stake/unstake totals and counters (8 each)
-        copy_bytes(
-            p,
-            off_v1_stake_deposit_unstake_total,
-            off_v2_stake_deposit_unstake_total,
-            8,
-        );
-        copy_bytes(
-            p,
-            off_v1_instant_unstake_total,
-            off_v2_instant_unstake_total,
-            8,
-        );
-        copy_bytes(
-            p,
-            off_v1_scoring_unstake_total,
-            off_v2_scoring_unstake_total,
-            8,
-        );
-        copy_bytes(p, off_v1_num_pool_validators, off_v2_num_pool_validators, 8);
-        copy_bytes(p, off_v1_next_cycle_epoch, off_v2_next_cycle_epoch, 8);
-        copy_bytes(p, off_v1_current_epoch, off_v2_current_epoch, 8);
-        copy_bytes(p, off_v1_start_slot, off_v2_start_slot, 8);
-        // Bitmasks
-        copy_bytes(
-            p,
-            off_v1_validators_to_remove,
-            off_v2_validators_to_remove,
-            sz_bitmask,
-        );
-        copy_bytes(
-            p,
-            off_v1_validators_for_immediate_removal,
-            off_v2_validators_for_immediate_removal,
-            sz_bitmask,
-        );
-        copy_bytes(p, off_v1_progress, off_v2_progress, sz_bitmask);
-        copy_bytes(
-            p,
-            off_v1_instant_unstake,
-            off_v2_instant_unstake,
-            sz_bitmask,
-        );
-        // Delegations
-        copy_bytes(p, off_v1_delegations, off_v2_delegations, sz_deleg);
-        // sorted_yield_score_indices -> sorted_raw_score_indices
+        // Move the entire block forward by 8000 bytes (the total expansion)
+        // This moves: delegations, all bitmasks, all u64 fields, status_flags, validators_added, and padding
+        copy_bytes(p, bulk_move_start, off_v2_delegations, bulk_move_size);
+
+        // Now move the sorted indices that need individual handling
+        // sorted_yield_score_indices -> sorted_raw_score_indices (moves forward by 8000)
         copy_bytes(
             p,
             off_v1_sorted_yield_score_indices,
             off_v2_sorted_raw_score_indices,
             sz_u16_arr,
         );
+
+        // sorted_score_indices moves forward by 4000
+        copy_bytes(
+            p,
+            off_v1_sorted_score_indices,
+            off_v2_sorted_score_indices,
+            sz_u16_arr,
+        );
     }
 
     // Convert raw_scores: v1 yield_scores [u32; MAX] -> v2 raw_scores [u64; MAX]
+    // We expand in place from the end backwards to avoid overwriting
     for i in (0..max).rev() {
         let src_off = off_v1_yield_scores + i * 4;
         let dst_off = off_v2_raw_scores + i * 8;
@@ -182,17 +151,8 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
     }
 
-    // Move sorted_score_indices forward by shift_scores
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_sorted_score_indices,
-            off_v2_sorted_score_indices,
-            sz_u16_arr,
-        );
-    }
-
     // Convert scores: v1 scores [u32; MAX] -> v2 scores [u64; MAX]
+    // We expand in place from the end backwards to avoid overwriting
     for i in (0..max).rev() {
         let src_off = off_v1_scores + i * 4;
         let dst_off = off_v2_scores + i * 8;
@@ -203,10 +163,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
     }
 
-    // Zero reduced padding for V2
-    for i in 0..STATE_PADDING_0_SIZE_V2 {
-        data[base + off_v2_padding0 + i] = 0u8;
-    }
+    // Note: Padding was already moved with the bulk operation and should already be correct
 
     // Write the V2 discriminator
     let v2_discriminator = StewardStateAccountV2::DISCRIMINATOR;
