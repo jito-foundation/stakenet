@@ -229,7 +229,7 @@ pub enum StewardStateEnum {
     Rebalance,
 }
 
-#[derive(BorshSerialize, PartialEq, Eq)]
+#[derive(BorshSerialize, PartialEq, Eq, Debug)]
 #[zero_copy]
 pub struct Delegation {
     pub numerator: u32,
