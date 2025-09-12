@@ -195,6 +195,24 @@ async fn test_migrate_state_to_v2() {
         steward_state_v1.state.validators_added,
         steward_state_v2.state.validators_added
     );
+
+    // Verify V1 padding is all zeros
+    for (i, &byte) in steward_state_v1.state._padding0.iter().enumerate() {
+        assert_eq!(
+            byte, 0,
+            "V1 padding byte at index {} should be 0, but was {}",
+            i, byte
+        );
+    }
+
+    // Verify V2 padding is all zeros
+    for (i, &byte) in steward_state_v2.state._padding0.iter().enumerate() {
+        assert_eq!(
+            byte, 0,
+            "V2 padding byte at index {} should be 0, but was {}",
+            i, byte
+        );
+    }
 }
 
 #[tokio::test]
