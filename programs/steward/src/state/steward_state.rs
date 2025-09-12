@@ -206,7 +206,7 @@ pub struct StewardStateV2 {
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE_V2: usize = 4;
+pub const STATE_PADDING_0_SIZE_V2: usize = 2;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
