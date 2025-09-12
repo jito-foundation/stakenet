@@ -48,7 +48,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let sz_deleg = core::mem::size_of::<crate::Delegation>() * max; // 8 * MAX
     let sz_bitmask = core::mem::size_of::<crate::bitmask::BitMask>(); // 8 * ceil(MAX/64)
 
-    let shift_scores = sz_u64_arr - sz_u32_arr; // +4 * MAX (expansion from u32 to u64)
+    let _shift_scores = sz_u64_arr - sz_u32_arr; // +4 * MAX (expansion from u32 to u64)
 
     // V1 layout offsets (relative to base)
     let off_v1_state_tag = 0usize;
@@ -71,15 +71,17 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let off_v1_stake_deposit_unstake_total = off_v1_instant_unstake_total + 8;
     let off_v1_status_flags = off_v1_stake_deposit_unstake_total + 8;
     let off_v1_validators_added = off_v1_status_flags + 4;
-    let off_v1_padding0 = off_v1_validators_added + 2;
+    let _off_v1_padding0 = off_v1_validators_added + 2;
 
     // V2 layout offsets (relative to base)
-    // With the new layout, only scores and sorted_score_indices change position
-    // Everything from delegations onwards stays at the same offset as V1
+    // With the new layout, raw_scores comes right after scores
     let off_v2_state_tag = off_v1_state_tag;
     let off_v2_balances = off_v2_state_tag + core::mem::size_of::<crate::StewardStateEnum>();
     let off_v2_scores = off_v2_balances + sz_u64_arr; // u64[MAX] - same start as V1 but expanded size
-    let off_v2_sorted_score_indices = off_v2_scores + sz_u64_arr; // after expanded scores
+    let off_v2_raw_scores = off_v2_scores + sz_u64_arr; // raw_scores comes right after scores
+    let off_v2_sorted_score_indices = off_v2_raw_scores + sz_u64_arr; // after raw_scores
+    let off_v2_sorted_raw_score_indices = off_v2_sorted_score_indices + sz_u16_arr; // after sorted_score_indices
+    let off_v2_delegations = off_v2_sorted_raw_score_indices + sz_u16_arr; // delegations shifts forward
 
     // Raw pointer to the start of state bytes
     let p = unsafe { data.as_mut_ptr().add(base) };
@@ -93,15 +95,63 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     }
 
     // With the new V2 layout:
-    // - sorted_score_indices needs to move forward by sz_u16_arr (to make room for expanded scores)
-    // - sorted_yield_score_indices moves to where yield_scores was (becomes sorted_raw_score_indices)
-    // - yield_scores data gets copied to the end (where padding was) as raw_scores
-    // - scores gets expanded in place from u32 to u64
-    // - Everything else (delegations onwards) stays at the same offset!
+    // - scores expands from u32 to u64 in place
+    // - raw_scores (expanded from yield_scores) goes right after scores
+    // - sorted_score_indices moves forward to accommodate both expanded scores and raw_scores
+    // - sorted_raw_score_indices (from sorted_yield_score_indices) goes after sorted_score_indices
+    // - Everything from delegations onwards shifts forward by the total expansion
 
-    // Step 1: Copy yield_scores to the new raw_scores location at the end (after 6 bytes of padding)
-    let off_v2_raw_scores = off_v1_padding0 + 6; // raw_scores is at V1 padding location + 6 bytes for alignment
-    for i in 0..max {
+    // Calculate how much everything after sorted_raw_score_indices shifts forward
+    let _total_shift = (sz_u64_arr * 2) - (sz_u32_arr * 2); // Expansion of both scores and yield_scores from u32 to u64
+
+    // We need to work backwards to avoid overwriting data:
+    // 1. Move everything from delegations onwards forward by total_shift
+    // 2. Move sorted_yield_score_indices to its new position (sorted_raw_score_indices)
+    // 3. Move sorted_score_indices to its new position
+    // 4. Expand yield_scores to raw_scores in its new position
+    // 5. Finally expand scores in place
+
+    // Step 1: Move everything from delegations onwards forward by total_shift
+    // Calculate the size of data from delegations to the end (before padding)
+    let data_after_delegations_size = sz_deleg + // delegations
+        sz_bitmask * 4 + // 4 bitmasks
+        8 * 8 + // 8 u64 fields
+        4 + // status_flags (u32)
+        2; // validators_added (u16)
+
+    // Move from the end to avoid overwriting
+    unsafe {
+        copy_bytes(
+            p,
+            off_v1_delegations,
+            off_v2_delegations,
+            data_after_delegations_size,
+        );
+    }
+
+    // Step 2: Move sorted_yield_score_indices to become sorted_raw_score_indices at its new position
+    unsafe {
+        copy_bytes(
+            p,
+            off_v1_sorted_yield_score_indices,
+            off_v2_sorted_raw_score_indices,
+            sz_u16_arr,
+        );
+    }
+
+    // Step 3: Move sorted_score_indices to its new position (further forward to accommodate expanded arrays)
+    unsafe {
+        copy_bytes(
+            p,
+            off_v1_sorted_score_indices,
+            off_v2_sorted_score_indices,
+            sz_u16_arr,
+        );
+    }
+
+    // Step 4: Expand yield_scores to raw_scores in the new position (right after scores)
+    // Work backwards to avoid overwriting
+    for i in (0..max).rev() {
         let src_off = off_v1_yield_scores + i * 4;
         let dst_off = off_v2_raw_scores + i * 8;
         // Read LE u32
@@ -112,29 +162,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
     }
 
-    // Step 2: Move sorted_yield_score_indices to where yield_scores was (becomes sorted_raw_score_indices)
-    let off_v2_sorted_raw_score_indices = off_v1_yield_scores; // sorted_raw_score_indices takes yield_scores' spot
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_sorted_yield_score_indices,
-            off_v2_sorted_raw_score_indices,
-            sz_u16_arr,
-        );
-    }
-
-    // Step 3: Move sorted_score_indices forward to make room for expanded scores
-    let off_v2_sorted_score_indices = off_v1_sorted_score_indices + shift_scores; // Move forward by 4*MAX
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_sorted_score_indices,
-            off_v2_sorted_score_indices,
-            sz_u16_arr,
-        );
-    }
-
-    // Step 4: Expand scores in place from u32 to u64 (must be done last, after moving sorted_score_indices)
+    // Step 5: Expand scores in place from u32 to u64 (must be done last)
     for i in (0..max).rev() {
         let src_off = off_v1_scores + i * 4;
         let dst_off = off_v2_scores + i * 8;
@@ -144,8 +172,6 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         let bytes = val.to_le_bytes();
         data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
     }
-
-    // Note: delegations, bitmasks, and all other fields remain at their original offsets!
 
     // Write the V2 discriminator
     let v2_discriminator = StewardStateAccountV2::DISCRIMINATOR;

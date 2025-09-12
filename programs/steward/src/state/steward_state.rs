@@ -146,6 +146,9 @@ pub struct StewardStateV2 {
     /// Overall score of validator, used to determine delegates and order for delegation.
     pub scores: [u64; MAX_VALIDATORS],
 
+    /// Raw score without binary filters applied. Used as secondary priority, to determine order for unstaking.
+    pub raw_scores: [u64; MAX_VALIDATORS],
+
     /// Indices of validators, sorted by score descending
     pub sorted_score_indices: [u16; MAX_VALIDATORS],
 
@@ -197,9 +200,6 @@ pub struct StewardStateV2 {
 
     /// Number of validators added to the pool in the current cycle
     pub validators_added: u16,
-
-    /// Raw score without binary filters applied. Used as secondary priority, to determine order for unstaking.
-    pub raw_scores: [u64; MAX_VALIDATORS],
 
     /// Future state and #[repr(C)] alignment
     pub _padding0: [u8; STATE_PADDING_0_SIZE_V2],

@@ -23,29 +23,6 @@ async fn test_migrate_state_to_v2() {
     let discriminator_v1 = &steward_state_v1_account_data[0..8];
     assert_eq!(discriminator_v1, StewardStateAccount::DISCRIMINATOR);
 
-    // Record some values to verify they are preserved
-    // let state_tag_v1 = steward_state_v1.state.state_tag;
-    // let validator_lamport_balances_v1 = steward_state_v1.state.validator_lamport_balances;
-    // let scores_v1 = steward_state_v1.state.scores;
-    // let sorted_scores_indices_v1 = steward_state_v1.state.sorted_score_indices;
-    // let yield_scores_v1 = steward_state_v1.state.yield_scores;
-    // let sorted_yield_score_indices_v1 = steward_state_v1.state.sorted_yield_score_indices;
-    // let delegations_v1 = steward_state_v1.state.delegations;
-    // let instant_unstake_v1 = steward_state_v1.state.instant_unstake;
-    // let progress_v1 = steward_state_v1.state.progress;
-    // let validators_for_immediate_removal_v1 =
-    //     steward_state_v1.state.validators_for_immediate_removal;
-    // let validators_to_remove_v1 = steward_state_v1.state.validators_to_remove;
-    // let start_computing_scores_slot_v1 = steward_state_v1.state.start_computing_scores_slot;
-    // let current_epoch_v1 = steward_state_v1.state.current_epoch;
-    // let next_cycle_epoch_v1 = steward_state_v1.state.next_cycle_epoch;
-    // let num_pool_validators_v1 = steward_state_v1.state.num_pool_validators;
-    // let scoring_unstake_total_v1 = steward_state_v1.state.scoring_unstake_total;
-    // let instant_unstake_total_v1 = steward_state_v1.state.instant_unstake_total;
-    // let stake_deposit_unstake_total_v1 = steward_state_v1.state.stake_deposit_unstake_total;
-    // let status_flags_v1 = steward_state_v1.state.status_flags;
-    // let validators_added_v1 = steward_state_v1.state.validators_added;
-
     // Perform the migration
     fixture.migrate_steward_state_to_v2().await;
 
