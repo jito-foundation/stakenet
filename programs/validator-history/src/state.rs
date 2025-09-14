@@ -668,7 +668,7 @@ pub struct ValidatorHistory {
     pub validator_age: u32, // Total epochs with non-zero vote credits
     pub validator_age_last_updated_epoch: u16, // Last epoch when age was updated
 
-    pub _padding1: [u8; 226], // Reduced from 232 bytes to accommodate age fields
+    pub _padding1: [u8; 226],
 
     pub history: CircBuf,
 }
@@ -1176,27 +1176,22 @@ impl ValidatorHistory {
     /// Initialize validator age by counting epochs with non-zero vote credits in the circular buffer
     /// This is idempotent - safe to call multiple times
     pub fn initialize_validator_age(&mut self, _current_epoch: u16) {
-        // If never initialized, scan the buffer and count epochs with vote credits
-        if self.validator_age_last_updated_epoch == 0 {
-            let mut age_count = 0u32;
-            let mut latest_epoch_with_credits = 0u16;
+        let mut age_count = 0u32;
+        let mut latest_epoch_with_credits = 0u16;
 
-            // Scan through the circular buffer for epochs with non-zero vote credits
-            for entry in self.history.arr.iter() {
-                if entry.epoch != u16::MAX
-                    && entry.epoch_credits != u32::MAX
-                    && entry.epoch_credits > 0
-                {
-                    age_count = age_count.saturating_add(1);
-                    if entry.epoch > latest_epoch_with_credits {
-                        latest_epoch_with_credits = entry.epoch;
-                    }
+        // Scan through the circular buffer for epochs with non-zero vote credits
+        for entry in self.history.arr.iter() {
+            if entry.epoch != u16::MAX && entry.epoch_credits != u32::MAX && entry.epoch_credits > 0
+            {
+                age_count = age_count.saturating_add(1);
+                if entry.epoch > latest_epoch_with_credits {
+                    latest_epoch_with_credits = entry.epoch;
                 }
             }
-
-            self.validator_age = age_count;
-            self.validator_age_last_updated_epoch = latest_epoch_with_credits.max(1);
         }
+
+        self.validator_age = age_count;
+        self.validator_age_last_updated_epoch = latest_epoch_with_credits.max(1);
     }
 
     /// Update validator age for the current epoch based on epoch credits
@@ -1207,15 +1202,46 @@ impl ValidatorHistory {
             self.initialize_validator_age(epoch);
         }
 
-        // Check if this epoch has non-zero vote credits
-        let has_vote_credits = self.history.arr.iter().any(|entry| {
-            entry.epoch == epoch && entry.epoch_credits != u32::MAX && entry.epoch_credits > 0
-        });
+        // Count epochs with vote credits since last update
+        if epoch > self.validator_age_last_updated_epoch {
+            let mut epochs_with_credits = 0u32;
+            let mut latest_epoch_with_credits = self.validator_age_last_updated_epoch;
 
-        // Only update if this is a new epoch and validator had vote credits
-        if epoch > self.validator_age_last_updated_epoch && has_vote_credits {
-            self.validator_age = self.validator_age.saturating_add(1);
-            self.validator_age_last_updated_epoch = epoch;
+            // Start from most recent entry and work backwards
+            let start_idx = self.history.idx as usize;
+
+            for i in 0..MAX_ITEMS {
+                // Walk backwards through the circular buffer
+                let idx = (start_idx + MAX_ITEMS - i) % MAX_ITEMS;
+                let entry = &self.history.arr[idx];
+
+                // Skip invalid entries
+                if entry.epoch == u16::MAX {
+                    continue;
+                }
+
+                // Stop if we've gone too far back
+                if entry.epoch <= self.validator_age_last_updated_epoch {
+                    break;
+                }
+
+                // Count if in range and has credits
+                if entry.epoch <= epoch
+                    && entry.epoch_credits != u32::MAX
+                    && entry.epoch_credits > 0
+                {
+                    epochs_with_credits = epochs_with_credits.saturating_add(1);
+                    if entry.epoch > latest_epoch_with_credits {
+                        latest_epoch_with_credits = entry.epoch;
+                    }
+                }
+            }
+
+            // Update age and last updated epoch if any epochs had credits
+            if epochs_with_credits > 0 {
+                self.validator_age = self.validator_age.saturating_add(epochs_with_credits);
+                self.validator_age_last_updated_epoch = latest_epoch_with_credits;
+            }
         }
 
         Ok(())
