@@ -444,8 +444,8 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
-            commission_avg: 0,
+            raw_score: 7177682274865921664,
+            commission_avg: 1,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,

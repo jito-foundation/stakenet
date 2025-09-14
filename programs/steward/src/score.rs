@@ -62,23 +62,24 @@ pub fn calculate_avg_mev_commission(
         .mev_commission_range(start_epoch, current_epoch);
 
     // Calculate sum and count without allocating a Vec
-    let mut sum: u64 = 0;
-    let mut count: u64 = 0;
-
-    for commission in mev_commission_window.iter() {
-        if let Some(c) = commission {
-            sum = sum.saturating_add(*c as u64);
-            count += 1;
-        }
-    }
+    let (sum, count) = mev_commission_window
+        .iter()
+        .filter_map(|&c| c)
+        .fold((0u64, 0u64), |(sum, count), c| {
+            (sum.saturating_add(c as u64), count + 1)
+        });
 
     if count == 0 {
         // Default to max if no data
         return BASIS_POINTS_MAX;
     }
 
-    // Calculate average
-    let avg = sum / count;
+    // Calculate average with ceiling (round up to be more strict)
+    let avg = sum
+        .checked_add(count - 1)
+        .unwrap_or(sum)
+        .checked_div(count)
+        .unwrap_or(0);
 
     // Safely convert back to u16, capping at max
     avg.min(BASIS_POINTS_MAX as u64) as u16
@@ -96,23 +97,24 @@ pub fn calculate_avg_commission(
         .commission_range(start_epoch, current_epoch);
 
     // Calculate sum and count without allocating a Vec
-    let mut sum: u32 = 0;
-    let mut count: u32 = 0;
-
-    for commission in commission_window.iter() {
-        if let Some(c) = commission {
-            sum = sum.saturating_add(*c as u32);
-            count += 1;
-        }
-    }
+    let (sum, count) = commission_window
+        .iter()
+        .filter_map(|&c| c)
+        .fold((0u32, 0u32), |(sum, count), c| {
+            (sum.saturating_add(c as u32), count + 1)
+        });
 
     if count == 0 {
         // Default to max if no data
         return 100;
     }
 
-    // Calculate average
-    let avg = sum / count;
+    // Calculate average with ceiling (round up to be more strict)
+    let avg = sum
+        .checked_add(count - 1)
+        .unwrap_or(sum)
+        .checked_div(count)
+        .unwrap_or(0);
 
     // Safely convert back to u8, capping at 100
     avg.min(100) as u8

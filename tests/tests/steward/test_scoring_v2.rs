@@ -195,8 +195,9 @@ fn test_calculate_avg_commission() {
     }
     let avg = calculate_avg_commission(&validator, 20, 10);
     // Average of [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] % 20 = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 0]
-    // = (10+11+12+13+14+15+16+17+18+19+0) / 11 = 145 / 11 = 13
-    assert_eq!(avg, 13);
+    // = (10+11+12+13+14+15+16+17+18+19+0) / 11 = 145 / 11 = 13.18...
+    // With ceiling: (145 + 10) / 11 = 155 / 11 = 14
+    assert_eq!(avg, 14);
 
     // Test with all None - Clear history and add entries with no commission data
     let mut validator = create_validator_history();
@@ -236,8 +237,9 @@ fn test_calculate_avg_mev_commission() {
     });
     // Now check average for epochs 11-21 (window of 10 from epoch 21 means 21-10=11 to 21 inclusive)
     let avg = calculate_avg_mev_commission(&validator, 21, 10);
-    // Average of 10 * 1000 + 1 * 10000 = 20000 / 11 = 1818
-    assert_eq!(avg, 1818);
+    // Average of 10 * 1000 + 1 * 10000 = 20000 / 11 = 1818.18...
+    // With ceiling: (20000 + 10) / 11 = 20010 / 11 = 1819
+    assert_eq!(avg, 1819);
 
     // Test with high MEV commission value
     validator.history.push(ValidatorHistoryEntry {
@@ -246,9 +248,10 @@ fn test_calculate_avg_mev_commission() {
         ..ValidatorHistoryEntry::default()
     });
     let avg = calculate_avg_mev_commission(&validator, 22, 10);
-    // Average of epochs 12-22: 9*1000 + 1*10000 + 1*20000 = 39000 / 11 = 3545
+    // Average of epochs 12-22: 9*1000 + 1*10000 + 1*20000 = 39000 / 11 = 3545.45...
+    // With ceiling: (39000 + 10) / 11 = 39010 / 11 = 3546
     // The value is NOT capped when stored in ValidatorHistory
-    assert_eq!(avg, 3545);
+    assert_eq!(avg, 3546);
 }
 
 #[test]
