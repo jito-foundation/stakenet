@@ -338,8 +338,6 @@ async fn test_compute_scores() {
     // Then run compute scores with its own compute budget
     let tx = Transaction::new_signed_with_payer(
         &[
-            // Request maximum allowed heap frame
-            ComputeBudgetInstruction::request_heap_frame(256 * 1024),
             ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
             compute_scores_ix.clone(),
         ],
