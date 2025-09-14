@@ -75,11 +75,12 @@ pub fn calculate_avg_mev_commission(
     }
 
     // Calculate average with ceiling (round up to be more strict)
+    // Add (count - 1) to implement ceiling division: (sum + count - 1) / count
     let avg = sum
-        .checked_add(count - 1)
+        .checked_add(count.saturating_sub(1))
         .unwrap_or(sum)
         .checked_div(count)
-        .unwrap_or(0);
+        .unwrap_or(BASIS_POINTS_MAX as u64);
 
     // Safely convert back to u16, capping at max
     avg.min(BASIS_POINTS_MAX as u64) as u16
@@ -110,11 +111,12 @@ pub fn calculate_avg_commission(
     }
 
     // Calculate average with ceiling (round up to be more strict)
+    // Add (count - 1) to implement ceiling division: (sum + count - 1) / count
     let avg = sum
-        .checked_add(count - 1)
+        .checked_add(count.saturating_sub(1))
         .unwrap_or(sum)
         .checked_div(count)
-        .unwrap_or(0);
+        .unwrap_or(100);
 
     // Safely convert back to u8, capping at 100
     avg.min(100) as u8
