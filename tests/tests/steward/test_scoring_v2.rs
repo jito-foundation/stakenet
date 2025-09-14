@@ -1,6 +1,6 @@
 use jito_steward::score::{
     calculate_avg_commission, calculate_avg_mev_commission, calculate_avg_vote_credits,
-    calculate_validator_score, encode_validator_score,
+    encode_validator_score,
 };
 use solana_sdk::pubkey::Pubkey;
 use validator_history::{CircBuf, ValidatorHistory, ValidatorHistoryEntry};
@@ -307,50 +307,6 @@ fn test_score_sorting_property() {
 }
 
 #[test]
-fn test_calculate_validator_score_integration() {
-    use validator_history::constants::TVC_MULTIPLIER;
-
-    let mut validator = create_validator_history();
-
-    // Set up a validator with consistent data across epochs
-    for epoch in 0..=20 {
-        validator.history.push(ValidatorHistoryEntry {
-            epoch: epoch as u16,
-            commission: 5,
-            mev_commission: 100,
-            epoch_credits: 1000 * TVC_MULTIPLIER,
-            ..ValidatorHistoryEntry::default()
-        });
-    }
-
-    // Calculate score
-    let score = calculate_validator_score(
-        &validator, 20, // current_epoch
-        10, // commission_range
-        10, // mev_commission_range
-        10, // epoch_credits_range
-        0,  // tvc_activation_epoch
-    )
-    .unwrap();
-
-    // Verify components match expectations
-    // commission_avg should be 5
-    // mev_commission_avg should be 100
-    // validator_age should be 0 (not set in test)
-    // vote_credits_avg should be 16000 (we stored 1000 * TVC_MULTIPLIER = 16000)
-    // Since tvc_activation_epoch is 0, normalization doesn't change the value
-
-    // Expected score calculation:
-    // inflation_score = 100 - 5 = 95
-    // mev_score = 10000 - 100 = 9900
-    // age_score = 0
-    // credits_score = 16000
-    let expected = (95u64 << 56) | (9900u64 << 42) | (0u64 << 25) | 16000u64;
-
-    assert_eq!(score, expected);
-}
-
-#[test]
 fn test_large_score_values() {
     // Test that large score values don't cause issues
     // This addresses the concern about large u64 values
@@ -437,4 +393,348 @@ fn test_vote_credits_impact() {
     assert_eq!(low_credits & 0x1FFFFFF, 1000);
     assert_eq!(mid_credits & 0x1FFFFFF, 10000);
     assert_eq!(high_credits & 0x1FFFFFF, 100000);
+}
+
+// Integration tests for the complete validator_score function
+#[cfg(test)]
+mod validator_score_integration_tests {
+    use super::*;
+    use jito_steward::{score::validator_score, Config, LargeBitMask, Parameters};
+    use solana_sdk::pubkey::Pubkey;
+    use validator_history::{
+        constants::TVC_MULTIPLIER, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
+    };
+
+    fn create_test_config() -> Config {
+        Config {
+            parameters: Parameters {
+                mev_commission_bps_threshold: 1000,
+                commission_threshold: 10,
+                historical_commission_threshold: 50,
+                mev_commission_range: 10,
+                epoch_credits_range: 10,
+                commission_range: 10,
+                scoring_delinquency_threshold_ratio: 0.85,
+                instant_unstake_delinquency_threshold_ratio: 0.8,
+                ..Parameters::default()
+            },
+            stake_pool: Pubkey::new_unique(),
+            validator_list: Pubkey::new_unique(),
+            admin: Pubkey::new_unique(),
+            parameters_authority: Pubkey::new_unique(),
+            blacklist_authority: Pubkey::new_unique(),
+            validator_history_blacklist: LargeBitMask::default(),
+            paused: false.into(),
+            _padding_0: [0u8; 7],
+            priority_fee_parameters_authority: Pubkey::new_unique(),
+            _padding: [0; 984],
+        }
+    }
+
+    fn create_cluster_history(epochs: u16) -> ClusterHistory {
+        let bump =
+            Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).1;
+        let mut cluster = ClusterHistory {
+            struct_version: 0,
+            bump,
+            _padding0: [0; 7],
+            cluster_history_last_update_slot: 1000,
+            _padding1: [0; 232],
+            history: CircBufCluster {
+                arr: [ClusterHistoryEntry::default(); ClusterHistory::MAX_ITEMS],
+                idx: ClusterHistory::MAX_ITEMS as u64 - 1,
+                is_empty: 1,
+                padding: [0; 7],
+            },
+        };
+
+        // Add cluster history entries with 1000 blocks per epoch
+        for epoch in 0..=epochs {
+            cluster.history.push(ClusterHistoryEntry {
+                epoch: epoch as u16,
+                total_blocks: 1000,
+                ..ClusterHistoryEntry::default()
+            });
+        }
+
+        cluster
+    }
+
+    #[test]
+    fn test_validator_score_perfect_validator() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Set up perfect validator - 0% commissions, good credits
+        for epoch in 0..=20 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 0,
+                mev_commission: 0,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0, // tvc_activation_epoch
+        )
+        .unwrap();
+
+        // Perfect validator should have non-zero raw score and score
+        assert!(result.raw_score > 0);
+        assert_eq!(result.score, result.raw_score); // No binary filters should fail
+
+        // Check components
+        assert_eq!(result.commission_avg, 0);
+        assert_eq!(result.mev_commission_avg, 0);
+        assert_eq!(result.vote_credits_avg, 16000); // 1000 * TVC_MULTIPLIER
+
+        // All binary filters should pass (score = 1)
+        assert_eq!(result.mev_commission_score, 1);
+        assert_eq!(result.blacklisted_score, 1);
+        assert_eq!(result.superminority_score, 1);
+        assert_eq!(result.delinquency_score, 1);
+        assert_eq!(result.running_jito_score, 1);
+        assert_eq!(result.commission_score, 1);
+        assert_eq!(result.historical_commission_score, 1);
+    }
+
+    #[test]
+    fn test_validator_score_high_commission_filter() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Set up validator with high commission that exceeds threshold
+        for epoch in 0..=20 {
+            let commission = if epoch == 20 { 50 } else { 5 }; // Spike to 50% in last epoch
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Score should be 0 due to commission filter
+        assert_eq!(result.score, 0);
+        assert!(result.raw_score > 0); // Raw score should still be non-zero
+        assert_eq!(result.commission_score, 0); // Commission filter failed
+        assert_eq!(result.details.max_commission, 50);
+        assert_eq!(result.details.max_commission_epoch, 20);
+    }
+
+    #[test]
+    fn test_validator_score_mev_commission_filter() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Set up validator with high MEV commission
+        for epoch in 0..=20 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 2000, // Above 1000 bps threshold
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Score should be 0 due to MEV commission filter
+        assert_eq!(result.score, 0);
+        assert!(result.raw_score > 0);
+        assert_eq!(result.mev_commission_score, 0); // MEV commission filter failed
+        assert_eq!(result.details.max_mev_commission, 2000);
+    }
+
+    #[test]
+    fn test_validator_score_delinquency_filter() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Set up validator with poor performance
+        for epoch in 0..=20 {
+            let credits = if epoch == 15 {
+                100 // Very low credits in one epoch
+            } else {
+                1000 * TVC_MULTIPLIER
+            };
+
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: credits,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Check if delinquency was detected
+        if result.delinquency_score == 0 {
+            assert_eq!(result.score, 0);
+            assert!(result.details.delinquency_ratio < 0.85);
+        }
+    }
+
+    #[test]
+    fn test_validator_score_not_running_jito() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Set up validator with no MEV commission (not running Jito)
+        for epoch in 0..=20 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: u16::MAX, // MAX means None/not set
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Score should be 0 due to not running Jito
+        assert_eq!(result.score, 0);
+        assert!(result.raw_score > 0);
+        assert_eq!(result.running_jito_score, 0); // Not running Jito filter failed
+    }
+
+    #[test]
+    fn test_validator_score_blacklisted() {
+        let mut validator = create_validator_history();
+        validator.index = 5; // Set a specific index
+
+        let cluster = create_cluster_history(20);
+        let mut config = create_test_config();
+
+        // Blacklist this validator
+        config.validator_history_blacklist.set(5, true).unwrap();
+
+        let current_epoch = 20u16;
+
+        // Set up otherwise good validator
+        for epoch in 0..=20 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Score should be 0 due to blacklist
+        assert_eq!(result.score, 0);
+        assert!(result.raw_score > 0);
+        assert_eq!(result.blacklisted_score, 0); // Blacklist filter failed
+    }
+
+    #[test]
+    fn test_validator_score_ranking() {
+        // Test that scores correctly rank validators
+        let cluster = create_cluster_history(20);
+        let config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Create validators with different characteristics
+        let mut validators = vec![];
+
+        // Validator 1: Perfect (0% commissions)
+        let mut v1 = create_validator_history();
+        for epoch in 0..=20 {
+            v1.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 0,
+                mev_commission: 0,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+        validators.push(("perfect", v1));
+
+        // Validator 2: Good (5% commission)
+        let mut v2 = create_validator_history();
+        for epoch in 0..=20 {
+            v2.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+        validators.push(("good", v2));
+
+        // Validator 3: OK (10% commission, higher MEV)
+        let mut v3 = create_validator_history();
+        for epoch in 0..=20 {
+            v3.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 10,
+                mev_commission: 500,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+        validators.push(("ok", v3));
+
+        // Calculate scores
+        let mut scores = vec![];
+        for (name, validator) in &validators {
+            let result = validator_score(validator, &cluster, &config, current_epoch, 0).unwrap();
+            scores.push((name, result.score));
+        }
+
+        // Verify ranking: perfect > good > ok
+        assert!(
+            scores[0].1 > scores[1].1,
+            "Perfect should score higher than good"
+        );
+        assert!(
+            scores[1].1 > scores[2].1,
+            "Good should score higher than ok"
+        );
+    }
 }

@@ -140,41 +140,6 @@ pub fn calculate_avg_vote_credits(epoch_credits_window: &[Option<u32>]) -> u32 {
     (sum / count).min(u32::MAX as u64) as u32
 }
 
-/// Calculate the new 4-tier validator score
-pub fn calculate_validator_score(
-    validator: &ValidatorHistory,
-    current_epoch: u16,
-    commission_range: u16,
-    mev_commission_range: u16,
-    epoch_credits_range: u16,
-    tvc_activation_epoch: u64,
-) -> Result<u64> {
-    // Get average commissions
-    let commission = calculate_avg_commission(validator, current_epoch, commission_range);
-    let mev_commission =
-        calculate_avg_mev_commission(validator, current_epoch, mev_commission_range);
-
-    // Get validator age
-    let validator_age = validator.validator_age();
-
-    // Get average vote credits
-    let epoch_credits_start = current_epoch
-        .checked_sub(epoch_credits_range)
-        .ok_or(ArithmeticError)?;
-    let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
-
-    let epoch_credits_window = validator.history.epoch_credits_range_normalized(
-        epoch_credits_start,
-        epoch_credits_end,
-        tvc_activation_epoch,
-    );
-
-    let avg_vote_credits = calculate_avg_vote_credits(&epoch_credits_window);
-
-    // Encode into u64
-    encode_validator_score(commission, mev_commission, validator_age, avg_vote_credits)
-}
-
 #[event]
 #[derive(Debug, PartialEq)]
 pub struct ScoreComponentsV4 {
