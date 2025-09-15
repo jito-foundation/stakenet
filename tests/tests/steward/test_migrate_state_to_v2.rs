@@ -1,5 +1,6 @@
 use anchor_lang::Discriminator;
-use jito_steward::{StewardStateAccount, StewardStateAccountV2};
+use jito_steward::{constants::MAX_VALIDATORS, StewardStateAccount, StewardStateAccountV2};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use solana_program_test::*;
 use tests::steward_fixtures::TestFixture;
 
@@ -11,6 +12,59 @@ async fn test_migrate_state_to_v2() {
     // Initialize with V1 state and realloc to full size
     fixture.initialize_steward_v1(None, None).await;
     fixture.realloc_steward_state().await;
+
+    // Inject random test data into the V1 state fields that will be migrated
+    {
+        let mut rng = thread_rng();
+        let mut account = fixture.get_account(&fixture.steward_state).await;
+
+        // Calculate offsets (matching the migration logic)
+        let base = 8usize;
+        let size_state_enum = 1usize;
+        let size_u64_array = 8 * MAX_VALIDATORS;
+        let size_u32_array = 4 * MAX_VALIDATORS;
+        let size_u16_array = 2 * MAX_VALIDATORS;
+
+        let off_v1_balances = size_state_enum;
+        let off_v1_scores = off_v1_balances + size_u64_array;
+        let off_v1_sorted_score_indices = off_v1_scores + size_u32_array;
+        let off_v1_yield_scores = off_v1_sorted_score_indices + size_u16_array;
+        let off_v1_sorted_yield_score_indices = off_v1_yield_scores + size_u32_array;
+
+        // Generate and write random scores
+        for i in 0..MAX_VALIDATORS {
+            let score = rng.gen_range(0, 1_000_000u32);
+            let score_offset = base + off_v1_scores + i * 4;
+            account.data[score_offset..score_offset + 4].copy_from_slice(&score.to_le_bytes());
+
+            let yield_score = rng.gen_range(0, 500_000u32);
+            let yield_score_offset = base + off_v1_yield_scores + i * 4;
+            account.data[yield_score_offset..yield_score_offset + 4]
+                .copy_from_slice(&yield_score.to_le_bytes());
+        }
+
+        // Generate and write shuffled indices
+        let mut score_indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
+        let mut yield_indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
+        score_indices.shuffle(&mut rng);
+        yield_indices.shuffle(&mut rng);
+
+        for i in 0..MAX_VALIDATORS {
+            let sorted_score_offset = base + off_v1_sorted_score_indices + i * 2;
+            account.data[sorted_score_offset..sorted_score_offset + 2]
+                .copy_from_slice(&score_indices[i].to_le_bytes());
+
+            let sorted_yield_offset = base + off_v1_sorted_yield_score_indices + i * 2;
+            account.data[sorted_yield_offset..sorted_yield_offset + 2]
+                .copy_from_slice(&yield_indices[i].to_le_bytes());
+        }
+
+        // Update the account in the test context
+        fixture
+            .ctx
+            .borrow_mut()
+            .set_account(&fixture.steward_state, &account.into());
+    }
 
     // Get the account before migration
     let steward_state_v1 = fixture
