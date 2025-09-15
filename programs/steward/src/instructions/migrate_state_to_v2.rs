@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
-use core::ptr;
 
 use crate::constants::MAX_VALIDATORS;
 use crate::BitMask;
@@ -28,29 +27,24 @@ pub struct MigrateStateToV2<'info> {
 }
 
 pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
-    // Borrow account data mutably
-    // we will migrate the data in-place with raw pointers
     let mut data = ctx.accounts.state_account.data.borrow_mut();
 
-    // Verify this is a V1 account by checking the discriminator
+    // Verify this is a V1 account
     if &data[0..8] != StewardStateAccount::DISCRIMINATOR {
         return Err(ProgramError::InvalidAccountData.into());
     }
 
-    // Offsets within the account after the 8-byte discriminator
+    // Sizes
     let base = 8usize;
-
-    // Sizes and shifts
-    let size_u64_array = 8 * MAX_VALIDATORS;
     let size_u32_array = 4 * MAX_VALIDATORS;
     let size_u16_array = 2 * MAX_VALIDATORS;
+    let size_u64_array = 8 * MAX_VALIDATORS;
     let size_state_enum = core::mem::size_of::<StewardStateEnum>();
     let size_delegation = core::mem::size_of::<Delegation>() * MAX_VALIDATORS;
     let size_bitmask = core::mem::size_of::<BitMask>();
 
-    // V1 layout offsets (relative to base)
-    let off_v1_state_tag = 0usize;
-    let off_v1_balances = off_v1_state_tag + size_state_enum;
+    // V1 layout offsets
+    let off_v1_balances = size_state_enum;
     let off_v1_scores = off_v1_balances + size_u64_array;
     let off_v1_sorted_score_indices = off_v1_scores + size_u32_array;
     let off_v1_yield_scores = off_v1_sorted_score_indices + size_u16_array;
@@ -69,94 +63,51 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let off_v1_stake_deposit_unstake_total = off_v1_instant_unstake_total + 8;
     let off_v1_status_flags = off_v1_stake_deposit_unstake_total + 8;
     let off_v1_validators_added = off_v1_status_flags + 4;
-    let _off_v1_padding0 = off_v1_validators_added + 2;
+    let off_v1_padding = off_v1_validators_added + 2;
 
-    // V2 layout offsets (relative to base)
-    // With the new layout, raw_scores comes right after scores
-    let off_v2_state_tag = off_v1_state_tag;
-    let off_v2_balances = off_v2_state_tag + size_state_enum;
-    let off_v2_scores = off_v2_balances + size_u64_array;
-    let off_v2_raw_scores = off_v2_scores + size_u64_array;
-    let off_v2_sorted_score_indices = off_v2_raw_scores + size_u64_array;
-    let off_v2_sorted_raw_score_indices = off_v2_sorted_score_indices + size_u16_array;
-    let off_v2_delegations = off_v2_sorted_raw_score_indices + size_u16_array;
+    // Save sorted_score_indices before it gets overwritten
+    let mut sorted_score_indices_data = vec![0u8; size_u16_array];
+    sorted_score_indices_data.copy_from_slice(
+        &data[base + off_v1_sorted_score_indices
+            ..base + off_v1_sorted_score_indices + size_u16_array],
+    );
 
-    // Raw pointer to the start of state bytes
-    let p = unsafe { data.as_mut_ptr().add(base) };
+    // Save yield_scores to convert to raw_scores
+    let mut yield_scores_data = vec![0u8; size_u32_array];
+    yield_scores_data.copy_from_slice(
+        &data[base + off_v1_yield_scores..base + off_v1_yield_scores + size_u32_array],
+    );
 
-    // Helper for memmove-like copy within the same buffer
-    unsafe fn copy_bytes(p: *mut u8, src_off: usize, dst_off: usize, len: usize) {
-        if len == 0 || src_off == dst_off {
-            return;
-        }
-        ptr::copy(p.add(src_off), p.add(dst_off), len);
-    }
-
-    // Step 1: Move everything from delegations onwards forward
-    // Calculate the size of data from delegations to the end (before padding)
-    let data_after_delegations_size = size_delegation + // delegations
-        size_bitmask * 4 + // 4 bitmasks
-        8 * 8 + // 8 u64 fields
-        4 + // status_flags (u32)
-        2; // validators_added (u16)
-
-    // Move from the end to avoid overwriting
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_delegations,
-            off_v2_delegations,
-            data_after_delegations_size,
-        );
-    }
-
-    // Step 2: Move sorted_yield_score_indices to become sorted_raw_score_indices at its new position
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_sorted_yield_score_indices,
-            off_v2_sorted_raw_score_indices,
-            size_u16_array,
-        );
-    }
-
-    // Step 3: Move sorted_score_indices to its new position (further forward to accommodate expanded arrays)
-    unsafe {
-        copy_bytes(
-            p,
-            off_v1_sorted_score_indices,
-            off_v2_sorted_score_indices,
-            size_u16_array,
-        );
-    }
-
-    // Step 4: Expand yield_scores to raw_scores in the new position (right after scores)
-    // Work backwards to avoid overwriting
-    for i in (0..MAX_VALIDATORS).rev() {
-        let src_off = off_v1_yield_scores + i * 4;
-        let dst_off = off_v2_raw_scores + i * 8;
-        // Read LE u32
-        let mut buf4 = [0u8; 4];
-        buf4.copy_from_slice(&data[base + src_off..base + src_off + 4]);
-        let val = u32::from_le_bytes(buf4) as u64;
-        let bytes = val.to_le_bytes();
-        data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
-    }
-
-    // Step 5: Expand scores in place from u32 to u64 (must be done last)
+    // Expand scores from u32 to u64 in place (work backwards to avoid overwriting)
     for i in (0..MAX_VALIDATORS).rev() {
         let src_off = off_v1_scores + i * 4;
-        let dst_off = off_v2_scores + i * 8;
+        let dst_off = off_v1_scores + i * 8;
         let mut buf4 = [0u8; 4];
         buf4.copy_from_slice(&data[base + src_off..base + src_off + 4]);
         let val = u32::from_le_bytes(buf4) as u64;
         let bytes = val.to_le_bytes();
         data[base + dst_off..base + dst_off + 8].copy_from_slice(&bytes);
+    }
+
+    // Move sorted_score_indices to its new position after expanded scores
+    let off_v2_sorted_score_indices = off_v1_scores + size_u64_array;
+    data[base + off_v2_sorted_score_indices..base + off_v2_sorted_score_indices + size_u16_array]
+        .copy_from_slice(&sorted_score_indices_data);
+
+    // Write raw_scores at the end (old padding location + 2 bytes)
+    let off_v2_raw_scores = base + off_v1_padding + 2;
+    for i in 0..MAX_VALIDATORS {
+        let src_off = i * 4;
+        let dst_off = off_v2_raw_scores + i * 8;
+        let mut buf4 = [0u8; 4];
+        buf4.copy_from_slice(&yield_scores_data[src_off..src_off + 4]);
+        let val = u32::from_le_bytes(buf4) as u64;
+        let bytes = val.to_le_bytes();
+        data[dst_off..dst_off + 8].copy_from_slice(&bytes);
     }
 
     // Write the V2 discriminator
-    let v2_discriminator = StewardStateAccountV2::DISCRIMINATOR;
-    data[0..8].copy_from_slice(v2_discriminator);
+    data[0..8].copy_from_slice(StewardStateAccountV2::DISCRIMINATOR);
 
     Ok(())
 }
