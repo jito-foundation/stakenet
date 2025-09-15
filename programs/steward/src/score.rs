@@ -285,7 +285,7 @@ pub fn validator_score(
         calculate_avg_commission(validator, current_epoch, params.commission_range);
     let mev_commission_avg =
         calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
-    let validator_age = validator.validator_age();
+    let validator_age = validator.validator_age;
     let vote_credits_avg = calculate_avg_vote_credits(&normalized_epoch_credits_window);
 
     // Calculate raw 4-tier score

@@ -1174,8 +1174,7 @@ impl ValidatorHistory {
     }
 
     /// Initialize validator age by counting epochs with non-zero vote credits in the circular buffer
-    /// This is idempotent - safe to call multiple times
-    pub fn initialize_validator_age(&mut self, _current_epoch: u16) {
+    fn initialize_validator_age(&mut self, _current_epoch: u16) {
         let mut age_count = 0u32;
         let mut latest_epoch_with_credits = 0u16;
 
@@ -1245,11 +1244,6 @@ impl ValidatorHistory {
         }
 
         Ok(())
-    }
-
-    /// Get the validator age (total epochs with non-zero vote credits)
-    pub fn validator_age(&self) -> u32 {
-        self.validator_age
     }
 }
 
