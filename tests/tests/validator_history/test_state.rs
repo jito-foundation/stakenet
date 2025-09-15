@@ -244,8 +244,8 @@ fn test_validator_age_wraparound() {
 }
 
 #[test]
-fn test_validator_age_backwards_iteration() {
-    // Test that the backwards iteration optimization works correctly
+fn test_validator_age_current_epoch_pending() {
+    // Test that current epoch with 0 credits remains "pending" and can be counted later
     let mut validator_history = ValidatorHistory {
         struct_version: 0,
         vote_account: Pubkey::default(),
@@ -260,23 +260,144 @@ fn test_validator_age_backwards_iteration() {
         history: CircBuf::default(),
     };
 
-    // Add some epochs with credits
-    for epoch in [100, 101, 102, 105, 110].iter() {
+    // Add epochs 100, 101 with credits
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 100,
+        epoch_credits: 1000,
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 101,
+        epoch_credits: 1000,
+        ..ValidatorHistoryEntry::default()
+    });
+
+    // Initialize at epoch 101
+    validator_history.update_validator_age(101).unwrap();
+    assert_eq!(validator_history.validator_age, 2);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 101);
+
+    // Add epoch 102 with 0 credits initially (simulating early in the epoch)
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 102,
+        epoch_credits: 0,
+        ..ValidatorHistoryEntry::default()
+    });
+
+    // Update at epoch 102 with 0 credits - should not advance checkpoint to 102
+    validator_history.update_validator_age(102).unwrap();
+    assert_eq!(validator_history.validator_age, 2); // No new epochs counted
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 101); // Checkpoint stays at 101
+
+    // Simulate epoch 102 gaining credits later
+    // Find and update the epoch 102 entry
+    for entry in validator_history.history.arr.iter_mut() {
+        if entry.epoch == 102 {
+            entry.epoch_credits = 1500;
+            break;
+        }
+    }
+
+    // Update again at epoch 102 - now it should count
+    validator_history.update_validator_age(102).unwrap();
+    assert_eq!(validator_history.validator_age, 3); // Now epoch 102 is counted
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 102); // Checkpoint advances
+
+    // Verify idempotency - calling again shouldn't change anything
+    validator_history.update_validator_age(102).unwrap();
+    assert_eq!(validator_history.validator_age, 3);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 102);
+}
+
+#[test]
+fn test_validator_age_multiple_pending_epochs() {
+    // Test handling multiple epochs that start with 0 credits
+    let mut validator_history = ValidatorHistory {
+        struct_version: 0,
+        vote_account: Pubkey::default(),
+        index: 0,
+        bump: 0,
+        _padding0: [0; 7],
+        last_ip_timestamp: 0,
+        last_version_timestamp: 0,
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
+        history: CircBuf::default(),
+    };
+
+    // Add epoch 100 with credits
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 100,
+        epoch_credits: 1000,
+        ..ValidatorHistoryEntry::default()
+    });
+
+    // Initialize
+    validator_history.update_validator_age(100).unwrap();
+    assert_eq!(validator_history.validator_age, 1);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 100);
+
+    // Add epochs 101, 102, 103 all with 0 credits initially
+    for epoch in 101..=103 {
         validator_history.history.push(ValidatorHistoryEntry {
-            epoch: *epoch,
-            epoch_credits: 1000,
+            epoch,
+            epoch_credits: 0,
             ..ValidatorHistoryEntry::default()
         });
     }
 
-    // Initialize at epoch 102
-    validator_history.update_validator_age(102).unwrap();
-    // When initializing, it counts all epochs with credits in the buffer
-    // which includes epochs 100, 101, 102, 105, 110 (all 5 epochs)
-    assert_eq!(validator_history.validator_age, 5); // All 5 epochs in buffer
+    // Update at epoch 103 - no new epochs should be counted
+    // Checkpoint advances to 102 (epoch-1) to mark epochs 101-102 as processed
+    // Epoch 103 remains pending since it's the current epoch with 0 credits
+    validator_history.update_validator_age(103).unwrap();
+    assert_eq!(validator_history.validator_age, 1);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 102);
 
-    // Update at epoch 110 - should be no-op since 110 is already counted
-    validator_history.update_validator_age(110).unwrap();
-    assert_eq!(validator_history.validator_age, 5); // Still 5, no new epochs
-    assert_eq!(validator_history.validator_age_last_updated_epoch, 110);
+    // Epoch 101 gains credits (but this is after we've already processed it)
+    for entry in validator_history.history.arr.iter_mut() {
+        if entry.epoch == 101 {
+            entry.epoch_credits = 500;
+            break;
+        }
+    }
+
+    // Update - epoch 101 won't be counted because it's already been processed
+    // Checkpoint stays at 102
+    validator_history.update_validator_age(103).unwrap();
+    assert_eq!(validator_history.validator_age, 1); // Still 1, epoch 101 was already processed
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 102);
+
+    // Epoch 103 gains credits (skipping 102)
+    for entry in validator_history.history.arr.iter_mut() {
+        if entry.epoch == 103 {
+            entry.epoch_credits = 800;
+            break;
+        }
+    }
+
+    // Update - should count epoch 103 now (total: 100 and 103)
+    validator_history.update_validator_age(103).unwrap();
+    assert_eq!(validator_history.validator_age, 2); // epochs 100 and 103
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 103);
+
+    // Finally epoch 102 gains credits (but it's already been processed)
+    for entry in validator_history.history.arr.iter_mut() {
+        if entry.epoch == 102 {
+            entry.epoch_credits = 600;
+            break;
+        }
+    }
+
+    // Move to epoch 104 to finalize everything
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 104,
+        epoch_credits: 1000,
+        ..ValidatorHistoryEntry::default()
+    });
+
+    validator_history.update_validator_age(104).unwrap();
+    // Should have counted epochs 100, 103, 104 (epochs 101 and 102 were processed with 0 credits)
+    assert_eq!(validator_history.validator_age, 3);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 104);
 }

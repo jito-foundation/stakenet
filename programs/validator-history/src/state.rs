@@ -1174,7 +1174,7 @@ impl ValidatorHistory {
     }
 
     /// Initialize validator age by counting epochs with non-zero vote credits in the circular buffer
-    fn initialize_validator_age(&mut self, _current_epoch: u16) {
+    fn initialize_validator_age(&mut self) {
         let mut age_count = 0u32;
         let mut latest_epoch_with_credits = 0u16;
 
@@ -1193,55 +1193,68 @@ impl ValidatorHistory {
         self.validator_age_last_updated_epoch = latest_epoch_with_credits.max(1);
     }
 
+    /// Count epochs with non-zero vote credits from provided range
+    fn count_epochs_with_credits_from_range(&self, credits_range: &[Option<u32>]) -> u32 {
+        let mut total_epochs_with_credits = 0u32;
+        for credits in credits_range.iter().flatten() {
+            if *credits > 0 {
+                total_epochs_with_credits = total_epochs_with_credits.saturating_add(1);
+            }
+        }
+        total_epochs_with_credits
+    }
+
     /// Update validator age for the current epoch based on epoch credits
     /// This is idempotent - safe to call multiple times in the same epoch
     pub fn update_validator_age(&mut self, epoch: u16) -> Result<()> {
         // Initialize if needed
         if self.validator_age_last_updated_epoch == 0 {
-            self.initialize_validator_age(epoch);
+            self.initialize_validator_age();
+            return Ok(());
         }
 
-        // Count epochs with vote credits since last update
-        if epoch > self.validator_age_last_updated_epoch {
-            let mut epochs_with_credits = 0u32;
-            let mut latest_epoch_with_credits = self.validator_age_last_updated_epoch;
+        // Check if current epoch has credits
+        let current_epoch_credits = self
+            .history
+            .epoch_credits_range(epoch, epoch)
+            .first()
+            .and_then(|c| *c)
+            .unwrap_or(0);
 
-            // Start from most recent entry and work backwards
-            let start_idx = self.history.idx as usize;
+        // Determine the range to count based on current epoch credits
+        let end_epoch = if current_epoch_credits > 0 {
+            // Current epoch has credits, include it in the count
+            epoch
+        } else {
+            // Current epoch has 0 credits, keep it pending by excluding it
+            epoch.saturating_sub(1)
+        };
 
-            for i in 0..MAX_ITEMS {
-                // Walk backwards through the circular buffer
-                let idx = (start_idx + MAX_ITEMS - i) % MAX_ITEMS;
-                let entry = &self.history.arr[idx];
-
-                // Skip invalid entries
-                if entry.epoch == u16::MAX {
-                    continue;
-                }
-
-                // Stop if we've gone too far back
-                if entry.epoch <= self.validator_age_last_updated_epoch {
-                    break;
-                }
-
-                // Count if in range and has credits
-                if entry.epoch <= epoch
-                    && entry.epoch_credits != u32::MAX
-                    && entry.epoch_credits > 0
-                {
-                    epochs_with_credits = epochs_with_credits.saturating_add(1);
-                    if entry.epoch > latest_epoch_with_credits {
-                        latest_epoch_with_credits = entry.epoch;
-                    }
-                }
-            }
-
-            // Update age and last updated epoch if any epochs had credits
-            if epochs_with_credits > 0 {
-                self.validator_age = self.validator_age.saturating_add(epochs_with_credits);
-                self.validator_age_last_updated_epoch = latest_epoch_with_credits;
-            }
+        // If end_epoch is less than our last checkpoint, nothing to do
+        if end_epoch <= self.validator_age_last_updated_epoch {
+            return Ok(());
         }
+
+        // Get epoch credits range from last checkpoint + 1 to end
+        // We only count new epochs, not ones already processed
+        let start_epoch = self.validator_age_last_updated_epoch.saturating_add(1);
+
+        if start_epoch > end_epoch {
+            // No new epochs to process
+            return Ok(());
+        }
+
+        let credits_range = self.history.epoch_credits_range(start_epoch, end_epoch);
+
+        // Count epochs with credits using the helper
+        let new_epochs_with_credits = self.count_epochs_with_credits_from_range(&credits_range);
+
+        // Update validator age by adding new epochs with credits
+        self.validator_age = self.validator_age.saturating_add(new_epochs_with_credits);
+
+        // Always update checkpoint to end_epoch to mark all processed epochs
+        // This provides idempotency
+        self.validator_age_last_updated_epoch = end_epoch;
 
         Ok(())
     }
