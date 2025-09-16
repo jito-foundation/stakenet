@@ -1,5 +1,7 @@
 use anchor_lang::Discriminator;
-use jito_steward::{constants::MAX_VALIDATORS, StewardStateAccount, StewardStateAccountV2};
+use jito_steward::{
+    constants::MAX_VALIDATORS, utils::U8Bool, StewardStateAccount, StewardStateAccountV2,
+};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use solana_program_test::*;
 use tests::steward_fixtures::{serialized_steward_state_account_v1, TestFixture};
@@ -312,6 +314,28 @@ async fn test_migrate_state_to_v2() {
             byte, 0,
             "V2 padding byte at index {} should be 0, but was {}",
             i, byte
+        );
+    }
+
+    // Verify v1 is_initialized vs v2 _padding0
+    assert_eq!(steward_state_v1.is_initialized, U8Bool::from(true));
+    assert_eq!(
+        steward_state_v2._padding0, 0,
+        "V2 _padding0 should be zeroed out"
+    );
+
+    // Verify bump field is preserved
+    assert_eq!(
+        steward_state_v1.bump, steward_state_v2.bump,
+        "Bump should be preserved during migration"
+    );
+
+    // Verify v1 _padding vs v2 _padding1
+    for (i, &byte) in steward_state_v1._padding.iter().enumerate() {
+        assert_eq!(
+            byte, steward_state_v2._padding1[i],
+            "V1 _padding[{}] should equal V2 _padding1[{}]",
+            i, i
         );
     }
 }

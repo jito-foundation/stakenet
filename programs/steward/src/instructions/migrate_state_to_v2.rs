@@ -5,6 +5,7 @@ use crate::constants::MAX_VALIDATORS;
 use crate::BitMask;
 use crate::Delegation;
 use crate::StewardStateEnum;
+use crate::StewardStateV2;
 use crate::{
     state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::get_config_admin,
@@ -108,6 +109,20 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
 
     // Write the V2 discriminator
     data[0..8].copy_from_slice(StewardStateAccountV2::DISCRIMINATOR);
+
+    // Handle account-level fields after the state struct
+    // V1 layout after state: is_initialized (1 byte), bump (1 byte), _padding (6 bytes)
+    // V2 layout after state: _padding0 (1 byte), bump (1 byte), _padding1 (6 bytes)
+
+    // Calculate offset to account-level fields (after the state struct)
+    let state_v2_size = core::mem::size_of::<StewardStateV2>();
+    let account_fields_offset = base + state_v2_size;
+
+    // Zero out _padding0 (was is_initialized in V1, now repurposed as padding)
+    data[account_fields_offset] = 0;
+
+    // bump field stays at the same position (offset + 1), no change needed
+    // _padding1 stays at the same position as V1 _padding (offset + 2..offset + 8), no change needed
 
     Ok(())
 }
