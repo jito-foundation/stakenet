@@ -146,7 +146,9 @@ pub fn calculate_avg_vote_credits(epoch_credits_window: &[Option<u32>]) -> u32 {
     }
 
     // Return average, capped at u32::MAX
-    (sum / count).min(u32::MAX as u64) as u32
+    sum.checked_div(count)
+        .unwrap_or(u32::MAX as u64)
+        .min(u32::MAX as u64) as u32
 }
 
 #[event]
