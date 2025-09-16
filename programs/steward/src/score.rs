@@ -22,6 +22,11 @@ use crate::{
 /// Bits 25-41 (17 bits): Validator age (direct, epochs)
 /// Bits 0-24 (25 bits):  Vote credits (direct value)
 ///
+/// The tiers are in descending order of importance. The highest bits (56-63) contain
+/// the most important factor (inflation commission), so when comparing scores as u64 values,
+/// differences in higher-order bits will dominate lower-order bits. This creates a
+/// hierarchical comparison where inflation commission > MEV commission > age > credits.
+///
 /// Higher scores are better in all cases.
 pub fn encode_validator_score(
     inflation_commission: u8, // 0-100
