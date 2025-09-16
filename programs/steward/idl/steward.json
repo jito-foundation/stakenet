@@ -2812,11 +2812,25 @@
             "type": "u16"
           },
           {
+            "name": "directed_stake_unstake_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to be unstaked from directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "directed_stake_global_cap_bps",
+            "docs": [
+              "Maximum percentage of the pool to delegated via directed stake (in basis points)"
+            ],
+            "type": "u16"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
           },
