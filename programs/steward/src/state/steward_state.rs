@@ -137,6 +137,12 @@ pub enum StewardStateEnum {
     /// Once scores are computed, the number of lamports assigned to each validator determined in this step
     ComputeDelegations,
 
+    /// When delegations for undirected stake have been computed we move on to directed stake
+    ComputeDirectedStakeMeta,
+
+    /// DirectedStakeMeta is calculated off-chain and must be copied on-chain through multiple txns
+    CopyDirectedStakeMeta,
+
     /// Once delegations are computed, the pool is idle until the 90% mark of the epoch
     Idle,
 
@@ -145,7 +151,16 @@ pub enum StewardStateEnum {
 
     /// Stake rebalances computed and executed, adjusting delegations if instant_unstake validators are hit
     /// Transition back to Idle, or ComputeScores if new cycle
-    Rebalance,
+    RebalanceUndirectedStake,
+
+    /// At 0% of the scoring epoch progress we should lock the stake pool's reserve
+    LockReserve,
+
+    /// Directed stake rebalances when the stake pool's reserve is locked
+    RebalanceDirectedStake,
+
+    /// Unlock the stake pool's reserve when directed rebalances finish
+    UnlockReserve,
 }
 
 #[derive(BorshSerialize, PartialEq, Eq)]
@@ -193,7 +208,12 @@ impl Display for StewardStateEnum {
             Self::ComputeInstantUnstake => {
                 write!(f, "ComputeInstantUnstake")
             }
-            Self::Rebalance => write!(f, "Rebalance"),
+            Self::RebalanceUndirectedStake => write!(f, "RebalanceUndirectedStake"),
+            Self::ComputeDirectedStakeMeta => write!(f, "ComputeDirectedStakeMeta"),
+            Self::CopyDirectedStakeMeta => write!(f, "CopyDirectedStakeMeta"),
+            Self::LockReserve => write!(f, "LockReserve"),
+            Self::RebalanceDirectedStake => write!(f, "RebalanceDirectedStake"),
+            Self::UnlockReserve => write!(f, "UnlockReserve"),
         }
     }
 }
@@ -303,11 +323,12 @@ impl StewardState {
                 current_slot,
                 params.num_epochs_between_scoring,
             ),
-            StewardStateEnum::Rebalance => self.transition_rebalance(
+            StewardStateEnum::RebalanceUndirectedStake => self.transition_rebalance(
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
             ),
+            _ => Err(StewardError::InvalidState.into()),
         }
     }
 
@@ -405,7 +426,7 @@ impl StewardState {
             self.progress = BitMask::default();
             // NOTE: RESET_TO_IDLE is cleared in the Idle transition
         } else if self.progress.is_complete(self.num_pool_validators)? {
-            self.state_tag = StewardStateEnum::Rebalance;
+            self.state_tag = StewardStateEnum::RebalanceUndirectedStake;
             self.progress = BitMask::default();
             self.set_flag(COMPUTE_INSTANT_UNSTAKES);
         }
@@ -856,7 +877,7 @@ impl StewardState {
         stake_rent: u64,
         parameters: &Parameters,
     ) -> Result<RebalanceType> {
-        if matches!(self.state_tag, StewardStateEnum::Rebalance) {
+        if matches!(self.state_tag, StewardStateEnum::RebalanceUndirectedStake) {
             if current_epoch >= self.next_cycle_epoch {
                 return Err(StewardError::InvalidState.into());
             }

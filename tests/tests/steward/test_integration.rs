@@ -713,7 +713,7 @@ async fn test_compute_instant_unstake() {
     steward_state_account = fixture.load_and_deserialize(&fixture.steward_state).await;
     assert!(matches!(
         steward_state_account.state.state_tag,
-        StewardStateEnum::Rebalance
+        StewardStateEnum::RebalanceUndirectedStake
     ));
     assert!(steward_state_account.state.progress.is_empty());
     assert!(steward_state_account.state.instant_unstake.get(0).unwrap());
@@ -876,7 +876,7 @@ async fn test_rebalance_increase() {
     steward_config.parameters.instant_unstake_cap_bps = 0;
     steward_config.parameters.stake_deposit_unstake_cap_bps = 0;
     steward_config.parameters.minimum_voting_epochs = 1;
-    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+    steward_state_account.state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
@@ -1122,7 +1122,7 @@ async fn test_rebalance_decrease() {
     steward_config.parameters.stake_deposit_unstake_cap_bps = 250;
     steward_config.parameters.minimum_voting_epochs = 1;
 
-    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+    steward_state_account.state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
@@ -1461,7 +1461,7 @@ async fn test_rebalance_other_cases() {
 
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
-    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+    steward_state_account.state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
 
     ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -1621,7 +1621,7 @@ async fn test_rebalance_other_cases() {
     // Test transition to Idle when complete
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
-    steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
+    steward_state_account.state.state_tag = StewardStateEnum::RebalanceUndirectedStake;
     for i in 0..MAX_VALIDATORS {
         steward_state_account.state.sorted_score_indices[i] = i as u16;
         steward_state_account.state.sorted_yield_score_indices[i] = i as u16;
