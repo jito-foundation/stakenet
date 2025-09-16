@@ -53,7 +53,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -102,7 +102,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249339646671339136,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 91,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -149,7 +149,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249339646671339136,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 91,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -196,7 +196,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -247,7 +247,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -296,7 +296,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -346,7 +346,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -397,7 +397,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7205759403792809600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 10000,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -444,8 +444,8 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7177682274865921664,
-            commission_avg: 1,
+            raw_score: 6457106334486642304,
+            commission_max: 11,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -501,7 +501,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -547,7 +547,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -600,7 +600,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903847680,
             raw_score: 7249739868903847680,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 14080,
@@ -648,7 +648,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903848800,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 15200,
@@ -701,7 +701,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903848757,
             raw_score: 7249739868903848757,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 15157,
@@ -752,7 +752,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -840,7 +840,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -892,7 +892,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -944,7 +944,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -998,7 +998,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 7249739868903849600,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,
@@ -1052,7 +1052,7 @@ fn test_compute_score() {
         ScoreComponentsV4 {
             score: 0,
             raw_score: 7249739868903849600,
-            commission_avg: 0,
+            commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: 16000,

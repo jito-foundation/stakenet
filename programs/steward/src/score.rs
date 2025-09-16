@@ -91,42 +91,6 @@ pub fn calculate_avg_mev_commission(
     avg.min(BASIS_POINTS_MAX as u64) as u16
 }
 
-/// Calculate the average inflation commission over a window of epochs
-pub fn calculate_avg_commission(
-    validator: &ValidatorHistory,
-    current_epoch: u16,
-    window_size: u16,
-) -> u8 {
-    let start_epoch = current_epoch.saturating_sub(window_size);
-    let commission_window = validator
-        .history
-        .commission_range(start_epoch, current_epoch);
-
-    // Calculate sum and count without allocating a Vec
-    let (sum, count) = commission_window
-        .iter()
-        .filter_map(|&c| c)
-        .fold((0u32, 0u32), |(sum, count), c| {
-            (sum.saturating_add(c as u32), count + 1)
-        });
-
-    if count == 0 {
-        // Default to max if no data
-        return 100;
-    }
-
-    // Calculate average with ceiling (round up to be more strict)
-    // Add (count - 1) to implement ceiling division: (sum + count - 1) / count
-    let avg = sum
-        .checked_add(count.saturating_sub(1))
-        .unwrap_or(sum)
-        .checked_div(count)
-        .unwrap_or(100);
-
-    // Safely convert back to u8, capping at 100
-    avg.min(100) as u8
-}
-
 /// Calculate the average vote credits over a window
 pub fn calculate_avg_vote_credits(epoch_credits_window: &[Option<u32>]) -> u32 {
     if epoch_credits_window.is_empty() {
@@ -160,8 +124,8 @@ pub struct ScoreComponentsV4 {
     /// The 4-tier encoded score (before binary filters)
     pub raw_score: u64,
 
-    /// Average inflation commission used in scoring (0-100)
-    pub commission_avg: u8,
+    /// Maximum inflation commission used in scoring (0-100)
+    pub commission_max: u8,
 
     /// Average MEV commission used in scoring (basis points)
     pub mev_commission_avg: u16,
@@ -287,22 +251,6 @@ pub fn validator_score(
         current_epoch,
     );
 
-    /////// Calculate 4-tier score components ///////
-    let commission_avg =
-        calculate_avg_commission(validator, current_epoch, params.commission_range);
-    let mev_commission_avg =
-        calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
-    let validator_age = validator.validator_age;
-    let vote_credits_avg = calculate_avg_vote_credits(&normalized_epoch_credits_window);
-
-    // Calculate raw 4-tier score
-    let raw_score = encode_validator_score(
-        commission_avg,
-        mev_commission_avg,
-        validator_age,
-        vote_credits_avg,
-    )?;
-
     /////// Binary filter calculations ///////
     let (mev_commission_score, max_mev_commission, max_mev_commission_epoch, running_jito_score) =
         calculate_max_mev_commission(
@@ -322,6 +270,21 @@ pub fn validator_score(
         &commission_window,
         current_epoch,
         params.commission_threshold,
+    )?;
+
+    /////// Calculate 4-tier score components ///////
+    // Use max_commission from the binary filter calculation above
+    let mev_commission_avg =
+        calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
+    let validator_age = validator.validator_age;
+    let vote_credits_avg = calculate_avg_vote_credits(&normalized_epoch_credits_window);
+
+    // Calculate raw 4-tier score using max commission instead of average
+    let raw_score = encode_validator_score(
+        max_commission,
+        mev_commission_avg,
+        validator_age,
+        vote_credits_avg,
     )?;
 
     let (historical_commission_score, max_historical_commission, max_historical_commission_epoch) =
@@ -363,7 +326,7 @@ pub fn validator_score(
     Ok(ScoreComponentsV4 {
         score,
         raw_score,
-        commission_avg,
+        commission_max: max_commission,
         mev_commission_avg,
         validator_age,
         vote_credits_avg,

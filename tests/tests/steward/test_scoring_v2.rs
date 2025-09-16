@@ -1,6 +1,5 @@
 use jito_steward::score::{
-    calculate_avg_commission, calculate_avg_mev_commission, calculate_avg_vote_credits,
-    encode_validator_score,
+    calculate_avg_mev_commission, calculate_avg_vote_credits, encode_validator_score,
 };
 use solana_sdk::pubkey::Pubkey;
 use validator_history::{CircBuf, ValidatorHistory, ValidatorHistoryEntry};
@@ -160,56 +159,6 @@ fn test_encode_validator_score_caps() {
     assert_eq!(mev_bits, 0, "10000 - min(20000, 10000) = 0");
     assert_eq!(age_bits, 131071, "Capped at (1 << 17) - 1");
     assert_eq!(credit_bits, 33554431, "Capped at (1 << 25) - 1");
-}
-
-#[test]
-fn test_calculate_avg_commission() {
-    let mut validator = create_validator_history();
-
-    // Set up commission values for epochs 10-20
-    for epoch in 10..=20 {
-        validator.history.push(ValidatorHistoryEntry {
-            epoch: epoch as u16,
-            commission: 10,
-            ..ValidatorHistoryEntry::default()
-        });
-    }
-
-    // Average over 10 epochs (11-20)
-    let avg = calculate_avg_commission(&validator, 20, 10);
-    assert_eq!(avg, 10);
-
-    // Test with some missing data
-    validator.history.arr[15].commission = u8::MAX; // MAX means None
-    let avg = calculate_avg_commission(&validator, 20, 10);
-    assert_eq!(avg, 10, "Should still be 10 (ignores None values)");
-
-    // Test with varying commissions - need to clear and repopulate
-    let mut validator = create_validator_history();
-    for epoch in 10..=20 {
-        validator.history.push(ValidatorHistoryEntry {
-            epoch: epoch as u16,
-            commission: (epoch as u8) % 20,
-            ..ValidatorHistoryEntry::default()
-        });
-    }
-    let avg = calculate_avg_commission(&validator, 20, 10);
-    // Average of [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] % 20 = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 0]
-    // = (10+11+12+13+14+15+16+17+18+19+0) / 11 = 145 / 11 = 13.18...
-    // With ceiling: (145 + 10) / 11 = 155 / 11 = 14
-    assert_eq!(avg, 14);
-
-    // Test with all None - Clear history and add entries with no commission data
-    let mut validator = create_validator_history();
-    for epoch in 10..=20 {
-        validator.history.push(ValidatorHistoryEntry {
-            epoch: epoch as u16,
-            commission: u8::MAX, // MAX means None
-            ..ValidatorHistoryEntry::default()
-        });
-    }
-    let avg = calculate_avg_commission(&validator, 20, 10);
-    assert_eq!(avg, 100, "Should return 100 (max) when no data");
 }
 
 #[test]
@@ -497,7 +446,7 @@ mod validator_score_integration_tests {
         assert_eq!(result.score, result.raw_score); // No binary filters should fail
 
         // Check components
-        assert_eq!(result.commission_avg, 0);
+        assert_eq!(result.commission_max, 0);
         assert_eq!(result.mev_commission_avg, 0);
         assert_eq!(result.vote_credits_avg, 16000); // 1000 * TVC_MULTIPLIER
 
