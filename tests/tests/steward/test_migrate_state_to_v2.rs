@@ -2,7 +2,15 @@ use anchor_lang::Discriminator;
 use jito_steward::{constants::MAX_VALIDATORS, StewardStateAccount, StewardStateAccountV2};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use solana_program_test::*;
-use tests::steward_fixtures::TestFixture;
+use tests::steward_fixtures::{serialized_steward_state_account_v1, TestFixture};
+
+/// Holds the random test data we generate for migration testing
+struct RandomTestData {
+    scores: Vec<u32>,
+    yield_scores: Vec<u32>,
+    sorted_score_indices: Vec<u16>,
+    sorted_yield_score_indices: Vec<u16>,
+}
 
 #[tokio::test]
 async fn test_migrate_state_to_v2() {
@@ -13,63 +21,46 @@ async fn test_migrate_state_to_v2() {
     fixture.initialize_steward_v1(None, None).await;
     fixture.realloc_steward_state().await;
 
-    // Inject random test data into the V1 state fields that will be migrated
-    {
-        let mut rng = thread_rng();
-        let mut account = fixture.get_account(&fixture.steward_state).await;
+    // Generate random test data and store it
+    let mut rng = thread_rng();
+    let random_data = RandomTestData {
+        scores: (0..MAX_VALIDATORS)
+            .map(|_| rng.gen_range(1, 1_000_000u32))
+            .collect(),
+        yield_scores: (0..MAX_VALIDATORS)
+            .map(|_| rng.gen_range(1, 500_000u32))
+            .collect(),
+        sorted_score_indices: {
+            let mut indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
+            indices.shuffle(&mut rng);
+            indices
+        },
+        sorted_yield_score_indices: {
+            let mut indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
+            indices.shuffle(&mut rng);
+            indices
+        },
+    };
 
-        // Calculate offsets (matching the migration logic)
-        let base = 8usize;
-        let size_state_enum = 1usize;
-        let size_u64_array = 8 * MAX_VALIDATORS;
-        let size_u32_array = 4 * MAX_VALIDATORS;
-        let size_u16_array = 2 * MAX_VALIDATORS;
-
-        let off_v1_balances = size_state_enum;
-        let off_v1_scores = off_v1_balances + size_u64_array;
-        let off_v1_sorted_score_indices = off_v1_scores + size_u32_array;
-        let off_v1_yield_scores = off_v1_sorted_score_indices + size_u16_array;
-        let off_v1_sorted_yield_score_indices = off_v1_yield_scores + size_u32_array;
-
-        // Generate and write random scores
-        for i in 0..MAX_VALIDATORS {
-            let score = rng.gen_range(0, 1_000_000u32);
-            let score_offset = base + off_v1_scores + i * 4;
-            account.data[score_offset..score_offset + 4].copy_from_slice(&score.to_le_bytes());
-
-            let yield_score = rng.gen_range(0, 500_000u32);
-            let yield_score_offset = base + off_v1_yield_scores + i * 4;
-            account.data[yield_score_offset..yield_score_offset + 4]
-                .copy_from_slice(&yield_score.to_le_bytes());
-        }
-
-        // Generate and write shuffled indices
-        let mut score_indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
-        let mut yield_indices: Vec<u16> = (0..MAX_VALIDATORS as u16).collect();
-        score_indices.shuffle(&mut rng);
-        yield_indices.shuffle(&mut rng);
-
-        for i in 0..MAX_VALIDATORS {
-            let sorted_score_offset = base + off_v1_sorted_score_indices + i * 2;
-            account.data[sorted_score_offset..sorted_score_offset + 2]
-                .copy_from_slice(&score_indices[i].to_le_bytes());
-
-            let sorted_yield_offset = base + off_v1_sorted_yield_score_indices + i * 2;
-            account.data[sorted_yield_offset..sorted_yield_offset + 2]
-                .copy_from_slice(&yield_indices[i].to_le_bytes());
-        }
-
-        // Update the account in the test context
-        fixture
-            .ctx
-            .borrow_mut()
-            .set_account(&fixture.steward_state, &account.into());
-    }
-
-    // Get the account before migration
-    let steward_state_v1 = fixture
+    // Load the V1 state and update it with our random values
+    let mut steward_state_v1 = fixture
         .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
         .await;
+
+    // Update the V1 state with our random values
+    for i in 0..MAX_VALIDATORS {
+        steward_state_v1.state.scores[i] = random_data.scores[i];
+        steward_state_v1.state.yield_scores[i] = random_data.yield_scores[i];
+        steward_state_v1.state.sorted_score_indices[i] = random_data.sorted_score_indices[i];
+        steward_state_v1.state.sorted_yield_score_indices[i] =
+            random_data.sorted_yield_score_indices[i];
+    }
+
+    // Update the account in BanksClient
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account_v1(steward_state_v1).into(),
+    );
 
     // Verify it has the V1 discriminator
     let steward_state_v1_account = fixture.get_account(&fixture.steward_state).await;
@@ -109,31 +100,87 @@ async fn test_migrate_state_to_v2() {
     {
         assert_eq!(*el, steward_state_v2.state.validator_lamport_balances[ix]);
     }
-    // Scores
+    // Scores - compare against both V1 and random data
     for (ix, el) in steward_state_v1.state.scores.iter().enumerate() {
-        assert_eq!((*el) as u64, steward_state_v2.state.scores[ix])
+        // Compare V2 against V1
+        assert_eq!(
+            (*el) as u64,
+            steward_state_v2.state.scores[ix],
+            "Score mismatch at index {}: V1={}, V2={}",
+            ix,
+            el,
+            steward_state_v2.state.scores[ix]
+        );
+        // Additionally compare V2 against original random data
+        assert_eq!(
+            random_data.scores[ix] as u64, steward_state_v2.state.scores[ix],
+            "Score mismatch at index {}: random={}, V2={}",
+            ix, random_data.scores[ix], steward_state_v2.state.scores[ix]
+        );
     }
-    // Sorted score indices
+    // Sorted score indices - compare against both V1 and random data
     for (ix, el) in steward_state_v1
         .state
         .sorted_score_indices
         .iter()
         .enumerate()
     {
-        assert_eq!(*el, steward_state_v2.state.sorted_score_indices[ix]);
+        // Compare V2 against V1
+        assert_eq!(
+            *el, steward_state_v2.state.sorted_score_indices[ix],
+            "Sorted score index mismatch at {}: V1={}, V2={}",
+            ix, el, steward_state_v2.state.sorted_score_indices[ix]
+        );
+        // Additionally compare V2 against original random data
+        assert_eq!(
+            random_data.sorted_score_indices[ix],
+            steward_state_v2.state.sorted_score_indices[ix],
+            "Sorted score index mismatch at {}: random={}, V2={}",
+            ix,
+            random_data.sorted_score_indices[ix],
+            steward_state_v2.state.sorted_score_indices[ix]
+        );
     }
-    // Yield scores -> Raw scores (expanded from u32 to u64)
+    // Yield scores -> Raw scores (expanded from u32 to u64) - compare against both V1 and random data
     for (ix, el) in steward_state_v1.state.yield_scores.iter().enumerate() {
-        assert_eq!((*el) as u64, steward_state_v2.state.raw_scores[ix]);
+        // Compare V2 against V1
+        assert_eq!(
+            (*el) as u64,
+            steward_state_v2.state.raw_scores[ix],
+            "Raw score mismatch at index {}: V1_yield={}, V2_raw={}",
+            ix,
+            el,
+            steward_state_v2.state.raw_scores[ix]
+        );
+        // Additionally compare V2 against original random data
+        assert_eq!(
+            random_data.yield_scores[ix] as u64, steward_state_v2.state.raw_scores[ix],
+            "Raw score mismatch at index {}: random_yield={}, V2_raw={}",
+            ix, random_data.yield_scores[ix], steward_state_v2.state.raw_scores[ix]
+        );
     }
-    // Sorted yield score indices -> Sorted raw score indices
+    // Sorted yield score indices -> Sorted raw score indices - compare against both V1 and random data
     for (ix, el) in steward_state_v1
         .state
         .sorted_yield_score_indices
         .iter()
         .enumerate()
     {
-        assert_eq!(*el, steward_state_v2.state.sorted_raw_score_indices[ix]);
+        // Compare V2 against V1
+        assert_eq!(
+            *el, steward_state_v2.state.sorted_raw_score_indices[ix],
+            "Sorted raw score index mismatch at {}: V1_yield={}, V2_raw={}",
+            ix, el, steward_state_v2.state.sorted_raw_score_indices[ix]
+        );
+        // Additionally compare V2 against original random data
+        assert_eq!(
+            random_data.sorted_yield_score_indices[ix],
+            steward_state_v2.state.sorted_raw_score_indices[ix],
+            "Sorted raw score index mismatch at {}: random_yield={}, V2_raw={}",
+            ix,
+            random_data.sorted_yield_score_indices[ix],
+            steward_state_v2.state.sorted_raw_score_indices[ix]
+        );
     }
     // Delegations
     for (ix, el) in steward_state_v1.state.delegations.iter().enumerate() {
