@@ -2,7 +2,6 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 
 use crate::constants::MAX_VALIDATORS;
-use crate::StewardStateV1;
 use crate::StewardStateV2;
 use crate::{
     state::{Config, StewardStateAccount, StewardStateAccountV2},
@@ -66,42 +65,56 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         // After all the fields before _padding0 in V1:
         // state_tag + balances + scores + sorted_indices + yield_scores + sorted_yield_indices
         // + delegations + 4 bitmasks + 7 u64s + u32 + u16
-        let after_validators_added = base + 8 + size_u64_array + size_u32_array + size_u16_array
-            + size_u32_array + size_u16_array + (8 * MAX_VALIDATORS)
-            + (4 * core::mem::size_of::<crate::BitMask>()) + (7 * 8) + 4 + 2;
-        after_validators_added
+        base + 8
+            + size_u64_array
+            + size_u32_array
+            + size_u16_array
+            + size_u32_array
+            + size_u16_array
+            + (8 * MAX_VALIDATORS)
+            + (4 * core::mem::size_of::<crate::BitMask>())
+            + (7 * 8)
+            + 4
+            + 2
     };
     let off_v2_raw_scores = v1_padding_offset + 2; // Skip the 2-byte _padding0 in V2
 
     // ==========================================
-    // STEP 3: Save sorted_score_indices before it gets overwritten
+    // STEP 3: Save yield_scores before it gets overwritten
     // ==========================================
 
-    // Use a small buffer to copy in chunks to avoid stack overflow
-    let mut sorted_indices_buffer = vec![0u8; size_u16_array];
-    sorted_indices_buffer.copy_from_slice(
-        &data[off_v1_sorted_score_indices..off_v1_sorted_score_indices + size_u16_array]
+    // We need to save yield_scores before moving sorted_score_indices
+    // because sorted_score_indices' new location overlaps with yield_scores in V1
+    let yield_scores = {
+        let v1_account: &StewardStateAccount =
+            bytemuck::from_bytes(&data[8..8 + core::mem::size_of::<StewardStateAccount>()]);
+        v1_account.state.yield_scores.to_vec()
+    };
+
+    // ==========================================
+    // STEP 4: Move sorted_score_indices to new location
+    // ==========================================
+
+    // Now we can safely move sorted_score_indices
+    // Use copy_within since source and destination don't overlap
+    data.copy_within(
+        off_v1_sorted_score_indices..off_v1_sorted_score_indices + size_u16_array,
+        off_v2_sorted_score_indices,
     );
 
     // ==========================================
-    // STEP 4: Process yield_scores -> raw_scores
+    // STEP 5: Write yield_scores as raw_scores
     // ==========================================
 
-    // Read yield_scores from V1 and write as expanded raw_scores to V2 location
-    // Process one at a time to avoid borrow conflicts
-    for i in 0..MAX_VALIDATORS {
-        let val = {
-            let v1_account: &StewardStateAccount =
-                bytemuck::from_bytes(&data[8..8 + core::mem::size_of::<StewardStateAccount>()]);
-            v1_account.state.yield_scores[i] as u64
-        }; // Drop the reference here
-
+    // Write the saved yield_scores as expanded raw_scores to V2 location
+    for (i, &score) in yield_scores.iter().enumerate() {
+        let val = score as u64;
         let dst_off = off_v2_raw_scores + i * 8;
         data[dst_off..dst_off + 8].copy_from_slice(&val.to_le_bytes());
     }
 
     // ==========================================
-    // STEP 5: Expand scores from u32 to u64 in place
+    // STEP 6: Expand scores from u32 to u64 in place
     // ==========================================
 
     // Work backwards to avoid overwriting unread data
@@ -117,43 +130,17 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     }
 
     // ==========================================
-    // STEP 6: Write sorted_score_indices at new location
-    // ==========================================
-
-    // Move sorted_score_indices to its new position after expanded scores
-    data[off_v2_sorted_score_indices..off_v2_sorted_score_indices + size_u16_array]
-        .copy_from_slice(&sorted_indices_buffer);
-
-    // Note: sorted_yield_score_indices stays in place and becomes sorted_raw_score_indices
-
-    // ==========================================
     // STEP 7: Update discriminator and account-level fields
     // ==========================================
-
-    // Get the bump value before updating discriminator
-    let v1_bump = {
-        let v1_account: &StewardStateAccount =
-            bytemuck::from_bytes(&data[8..8 + core::mem::size_of::<StewardStateAccount>()]);
-        v1_account.bump
-    };
 
     // Update to V2 discriminator
     data[0..8].copy_from_slice(StewardStateAccountV2::DISCRIMINATOR);
 
     // Handle account-level fields after the state struct
-    // V1: is_initialized (1 byte), bump (1 byte), _padding (6 bytes)
-    // V2: _padding0 (1 byte), bump (1 byte), _padding1 (6 bytes)
-
+    // The v1 struct had an is_initialized field and we zero that out for the v2 struct as padding
     let state_v2_size = core::mem::size_of::<StewardStateV2>();
     let account_fields_offset = base + state_v2_size;
-
-    // Zero out _padding0 (was is_initialized in V1)
     data[account_fields_offset] = 0;
-
-    // Preserve bump at the same relative position
-    data[account_fields_offset + 1] = v1_bump;
-
-    // _padding1 remains unchanged at offset+2..offset+8
 
     Ok(())
 }
