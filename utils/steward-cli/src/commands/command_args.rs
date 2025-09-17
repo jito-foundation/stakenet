@@ -381,9 +381,14 @@ pub struct BacktestParameters {
     #[arg(long)]
     pub start_epoch: Option<u64>,
 
-    /// Number of epochs to look back from start epoch (defaults to 10)
+    /// Number of individual epochs to analyze going backwards from start epoch (defaults to 10)
     #[arg(long, default_value = "10")]
     pub lookback_epochs: u64,
+
+    /// Number of scoring cycles (rebalancing periods) to export. Each cycle is 10 epochs.
+    /// For example, 3 cycles with current epoch 850 would export epochs 849, 839, 829
+    #[arg(long, default_value = "3")]
+    pub scoring_cycles: u64,
 
     /// Output file for saving results in JSON format
     #[arg(long)]

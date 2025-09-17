@@ -43,10 +43,10 @@ pub struct ValidatorScoreResult {
     pub priority_fee_merkle_root_upload_authority_score: u8,
 
     // 4-tier score components
-    pub commission_max: u8,        // Max inflation commission (0-100)
-    pub mev_commission_avg: u16,   // Average MEV commission (basis points)
-    pub validator_age: u32,        // Epochs with non-zero vote credits
-    pub vote_credits_avg: u32,     // Normalized vote credits ratio scaled by 10M
+    pub commission_max: u8,      // Max inflation commission (0-100)
+    pub mev_commission_avg: u16, // Average MEV commission (basis points)
+    pub validator_age: u32,      // Epochs with non-zero vote credits
+    pub vote_credits_avg: u32,   // Normalized vote credits ratio scaled by 10M
 
     // Metadata
     pub metadata: ValidatorMetadata,
@@ -81,7 +81,8 @@ impl ValidatorScoreResult {
             historical_commission_score: components.historical_commission_score,
             merkle_root_upload_authority_score: components.merkle_root_upload_authority_score,
             priority_fee_commission_score: components.priority_fee_commission_score,
-            priority_fee_merkle_root_upload_authority_score: components.priority_fee_merkle_root_upload_authority_score,
+            priority_fee_merkle_root_upload_authority_score: components
+                .priority_fee_merkle_root_upload_authority_score,
             commission_max: components.commission_max,
             mev_commission_avg: components.mev_commission_avg,
             validator_age: components.validator_age,
@@ -223,18 +224,25 @@ async fn run_backtest_with_cached_data(
     Ok(results)
 }
 
-fn export_results_to_csv(results: &[BacktestResult], export_dir: &Path) -> Result<()> {
+fn export_results_to_csv(
+    results: &[BacktestResult],
+    export_dir: &Path,
+    scoring_epochs: &[u64],
+) -> Result<()> {
     // Create export directory if it doesn't exist
     fs::create_dir_all(export_dir)?;
 
-    for result in results {
+    // Only export CSVs for scoring cycle epochs
+    for result in results.iter().filter(|r| scoring_epochs.contains(&r.epoch)) {
         let csv_path = export_dir.join(format!("epoch_{}_validators.csv", result.epoch));
         let mut csv = String::new();
 
         // Header
         csv.push_str("Rank,Vote Account,Name,Score,Raw Score,Commission Max %,MEV Commission Avg (bps),Validator Age,Vote Credits Avg,");
         csv.push_str("MEV Commission Filter,Blacklisted Filter,Superminority Filter,Delinquency Filter,Running Jito Filter,");
-        csv.push_str("Commission Filter,Historical Commission Filter,Merkle Root Authority Filter,");
+        csv.push_str(
+            "Commission Filter,Historical Commission Filter,Merkle Root Authority Filter,",
+        );
         csv.push_str("Priority Fee Commission Filter,Priority Fee Merkle Authority Filter\n");
 
         // Data rows
@@ -243,7 +251,12 @@ fn export_results_to_csv(results: &[BacktestResult], export_dir: &Path) -> Resul
                 "{},\"{}\",\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                 validator.rank.unwrap_or(0),
                 validator.vote_account,
-                validator.metadata.name.as_ref().unwrap_or(&"Unknown".to_string()).replace("\"", "\"\""),
+                validator
+                    .metadata
+                    .name
+                    .as_ref()
+                    .unwrap_or(&"Unknown".to_string())
+                    .replace("\"", "\"\""),
                 validator.score,
                 validator.raw_score,
                 validator.commission_max,
@@ -297,17 +310,40 @@ pub async fn command_run_backtest(
     let start_epoch = if let Some(epoch) = args.start_epoch {
         epoch
     } else {
-        // Default to current epoch - 1
+        // Default to current epoch - 1 (since current epoch is not complete)
         cached_data.fetched_epoch.saturating_sub(1)
     };
 
-    // Calculate target epochs aligned with rebalancing schedule (every 10 epochs)
+    // Calculate scoring cycle epochs (rebalancing boundaries)
     let rebalancing_interval = 10u64;
-    let latest_rebalancing_epoch = (start_epoch / rebalancing_interval) * rebalancing_interval;
+    let mut scoring_epochs = Vec::new();
 
+    // Start from the most recent completed rebalancing epoch
+    let latest_scoring_epoch =
+        (start_epoch / rebalancing_interval) * rebalancing_interval + (rebalancing_interval - 1);
+
+    for i in 0..args.scoring_cycles {
+        if let Some(epoch) = latest_scoring_epoch.checked_sub(i * rebalancing_interval) {
+            scoring_epochs.push(epoch);
+        }
+    }
+    scoring_epochs.reverse(); // Order from oldest to newest
+
+    // We need to fetch enough epochs to cover the lookback windows (typically 30 epochs)
+    // Plus all the scoring epochs we want to analyze
+    let min_epoch = scoring_epochs.first().copied().unwrap_or(start_epoch);
+    let max_lookback_window = 30u64; // This should come from config but 30 is typical
+    let earliest_needed_epoch = min_epoch.saturating_sub(max_lookback_window);
+
+    // Build list of all epochs we need to fetch for analysis
     let mut target_epochs = Vec::new();
-    for i in 0..args.lookback_epochs {
-        if let Some(epoch) = latest_rebalancing_epoch.checked_sub(i * rebalancing_interval) {
+    let epochs_to_fetch = start_epoch.saturating_sub(earliest_needed_epoch) + 1;
+
+    // Make sure we have at least as many epochs as requested in lookback_epochs
+    let epochs_to_fetch = epochs_to_fetch.max(args.lookback_epochs);
+
+    for i in 0..epochs_to_fetch {
+        if let Some(epoch) = start_epoch.checked_sub(i) {
             target_epochs.push(epoch);
         }
     }
@@ -330,10 +366,13 @@ pub async fn command_run_backtest(
         args.output_file, json_len
     );
 
-    // Export to CSV if requested
+    // Export to CSV if requested (only for scoring cycle epochs)
     if args.export_csv {
-        info!("Exporting results to CSV format...");
-        export_results_to_csv(&results, &args.export_dir)?;
+        info!(
+            "Exporting results to CSV format for scoring epochs: {:?}",
+            scoring_epochs
+        );
+        export_results_to_csv(&results, &args.export_dir, &scoring_epochs)?;
         info!("CSV export complete: {}", args.export_dir.display());
     }
 

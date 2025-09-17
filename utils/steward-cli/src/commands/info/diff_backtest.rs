@@ -174,18 +174,20 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
                 "  {} validators dropped from top 400 due to failing 97% threshold",
                 dropped_due_to_99_threshold.len()
             );
-            
+
             // Show details for validators that were dropped
             println!("\n  Validators dropped due to 97% threshold:");
             for (i, validator) in dropped_due_to_99_threshold.iter().take(10).enumerate() {
                 let epoch_info = if let Some(epoch) = validator.proposed_delinquency_epoch {
-                    format!("Epoch {} (ratio: {:.4})", 
-                        epoch, 
-                        validator.proposed_delinquency_ratio.unwrap_or(0.0))
+                    format!(
+                        "Epoch {} (ratio: {:.4})",
+                        epoch,
+                        validator.proposed_delinquency_ratio.unwrap_or(0.0)
+                    )
                 } else {
                     "Unknown epoch".to_string()
                 };
-                
+
                 println!(
                     "    {}. {} [Prod rank: {}] - Failed at {}",
                     i + 1,
@@ -195,7 +197,10 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
                 );
             }
             if dropped_due_to_99_threshold.len() > 10 {
-                println!("    ... and {} more", dropped_due_to_99_threshold.len() - 10);
+                println!(
+                    "    ... and {} more",
+                    dropped_due_to_99_threshold.len() - 10
+                );
             }
         }
 
@@ -226,7 +231,6 @@ pub async fn command_diff_backtest(args: DiffBacktest) -> Result<()> {
             "  Top 400 Proposed Yield Deciles:   {:?}",
             format_deciles(&calculate_deciles(&top_400_proposed_yields))
         );
-
 
         println!();
     }

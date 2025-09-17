@@ -152,10 +152,11 @@ fn update_validator_ages(
         }
 
         // Deserialize the validator history (this reads past the discriminator)
-        let mut validator_history = match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
-            Ok(h) => h,
-            Err(_) => continue, // Skip if we can't deserialize
-        };
+        let mut validator_history =
+            match ValidatorHistory::try_deserialize(&mut account.data.as_slice()) {
+                Ok(h) => h,
+                Err(_) => continue, // Skip if we can't deserialize
+            };
 
         // Update validator age
         if let Err(e) = validator_history.update_validator_age(current_epoch) {
@@ -290,7 +291,10 @@ pub async fn fetch_and_cache_data(
     };
 
     // Save to cache file
-    info!("Serializing and saving data to cache file: {:?}", cache_file);
+    info!(
+        "Serializing and saving data to cache file: {:?}",
+        cache_file
+    );
     let json = serde_json::to_string_pretty(&cached_data)?;
     let json_len = json.len();
     fs::write(cache_file, json)?;
@@ -314,13 +318,8 @@ pub async fn command_create_backtest_cache(
 
     info!("Creating backtest cache with updated validator ages...");
 
-    let _cached_data = fetch_and_cache_data(
-        client,
-        &program_id,
-        &args.steward_config,
-        &args.cache_file,
-    )
-    .await?;
+    let _cached_data =
+        fetch_and_cache_data(client, &program_id, &args.steward_config, &args.cache_file).await?;
 
     info!("✅ Cache created successfully at {:?}", args.cache_file);
     info!("📊 Cache includes:");
