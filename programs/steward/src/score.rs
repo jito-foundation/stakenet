@@ -419,6 +419,12 @@ pub fn calculate_delinquency(
         return Err(StewardError::ArithmeticError.into());
     }
 
+    // Check if we have at least some cluster data to work with
+    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
+    if nonzero_blocks == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1;
     let mut delinquency_ratio = 1.0;

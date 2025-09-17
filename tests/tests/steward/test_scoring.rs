@@ -219,15 +219,11 @@ mod test_calculate_epoch_credits {
         let result = calculate_delinquency(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
 
-        // Test all blocks none - should not error, returns default values (no punishment)
+        // Test all blocks none - should error when no cluster data is available
         let epoch_credits = [Some(1), Some(1)];
         let total_blocks = [None, None];
         let result = calculate_delinquency(&epoch_credits, &total_blocks, u16::MAX, 0.9);
-        assert!(result.is_ok());
-        let (delinquency_score, delinquency_ratio, delinquency_epoch) = result.unwrap();
-        assert_eq!(delinquency_score, 1); // No punishment when blocks data is missing
-        assert_eq!(delinquency_ratio, 1.0);
-        assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
+        assert!(result.is_err());
     }
 }
 
