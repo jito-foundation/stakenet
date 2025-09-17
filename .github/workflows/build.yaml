@@ -4,14 +4,14 @@ on:
     branches:
       - master
       - steward-test-branch
-      - feat/add-priority-fee-support
+      - feat/directed-staking
     tags:
       - "v*"
   pull_request:
     branches:
       - master
       - steward-test-branch
-      - feat/add-priority-fee-support
+      - feat/directed-staking
 jobs:
   security_audit:
     name: security_audit
