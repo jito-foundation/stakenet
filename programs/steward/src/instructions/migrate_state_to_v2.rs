@@ -74,35 +74,35 @@ struct MigrationOffsets {
 
 impl MigrationOffsets {
     fn new() -> Self {
-        const DISCRIMINATOR_SIZE: usize = 8;
-        const STATE_TAG_SIZE: usize = 8;
-        const U16_ARRAY_SIZE: usize = 2 * MAX_VALIDATORS;
-        const U32_ARRAY_SIZE: usize = 4 * MAX_VALIDATORS;
-        const U64_ARRAY_SIZE: usize = 8 * MAX_VALIDATORS;
-        const DELEGATION_SIZE: usize = 8 * MAX_VALIDATORS;
-        const BITMASK_SIZE: usize = core::mem::size_of::<crate::BitMask>();
+        let discriminator_size: usize = 8;
+        let state_tag_size: usize = 8;
+        let u16_array_size: usize = 2 * MAX_VALIDATORS;
+        let u32_array_size: usize = 4 * MAX_VALIDATORS;
+        let u64_array_size: usize = 8 * MAX_VALIDATORS;
+        let delegation_size: usize = 8 * MAX_VALIDATORS;
+        let bitmask_size: usize = core::mem::size_of::<crate::BitMask>();
 
-        let base = DISCRIMINATOR_SIZE;
+        let base = discriminator_size;
 
         // Scores come after state_tag and balances array
-        let scores = base + STATE_TAG_SIZE + U64_ARRAY_SIZE;
+        let scores = base + state_tag_size + u64_array_size;
 
         // In V1, sorted_indices comes after u32 scores array
-        let v1_sorted_indices = scores + U32_ARRAY_SIZE;
+        let v1_sorted_indices = scores + u32_array_size;
 
         // In V2, sorted_indices comes after expanded u64 scores array
-        let v2_sorted_indices = scores + U64_ARRAY_SIZE;
+        let v2_sorted_indices = scores + u64_array_size;
 
         // Calculate where raw_scores goes in V2 (where V1 padding was)
         // This is after all V1 fields plus 2-byte _padding0
-        let v1_state_end = base + STATE_TAG_SIZE
-            + U64_ARRAY_SIZE      // balances
-            + U32_ARRAY_SIZE      // scores (u32 in V1)
-            + U16_ARRAY_SIZE      // sorted_score_indices
-            + U32_ARRAY_SIZE      // yield_scores
-            + U16_ARRAY_SIZE      // sorted_yield_score_indices
-            + DELEGATION_SIZE     // delegations
-            + (4 * BITMASK_SIZE)  // 4 bitmasks
+        let v1_state_end = base + state_tag_size
+            + u64_array_size      // balances
+            + u32_array_size      // scores (u32 in V1)
+            + u16_array_size      // sorted_score_indices
+            + u32_array_size      // yield_scores
+            + u16_array_size      // sorted_yield_score_indices
+            + delegation_size     // delegations
+            + (4 * bitmask_size)  // 4 bitmasks
             + (7 * 8)            // 7 u64 fields
             + 4                  // 1 u32 field
             + 2; // 1 u16 field
@@ -135,10 +135,9 @@ fn extract_v1_yield_scores(data: &[u8]) -> Vec<u32> {
 
 /// Move sorted_score_indices from V1 location to V2 location
 fn move_sorted_indices(data: &mut [u8], offsets: &MigrationOffsets) {
-    const U16_ARRAY_SIZE: usize = 2 * MAX_VALIDATORS;
-
+    let u16_array_size: usize = 2 * MAX_VALIDATORS;
     data.copy_within(
-        offsets.v1_sorted_indices..offsets.v1_sorted_indices + U16_ARRAY_SIZE,
+        offsets.v1_sorted_indices..offsets.v1_sorted_indices + u16_array_size,
         offsets.v2_sorted_indices,
     );
 }
@@ -175,8 +174,8 @@ fn finalize_migration(data: &mut [u8]) {
     data[0..8].copy_from_slice(StewardStateAccountV2::DISCRIMINATOR);
 
     // Clear the old is_initialized field (becomes padding in V2)
-    const DISCRIMINATOR_SIZE: usize = 8;
+    let discriminator_size: usize = 8;
     let state_v2_size = core::mem::size_of::<StewardStateV2>();
-    let account_fields_offset = DISCRIMINATOR_SIZE + state_v2_size;
+    let account_fields_offset = discriminator_size + state_v2_size;
     data[account_fields_offset] = 0;
 }
