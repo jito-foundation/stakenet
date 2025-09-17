@@ -85,7 +85,6 @@ async fn test_update_priority_fee_parameters() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let priority_fee_authority_keypair = fixture
         .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)
@@ -133,7 +132,6 @@ async fn test_bad_authority() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     fixture
         .set_new_authority(AuthorityType::SetPriorityFeeParameterAuthority)

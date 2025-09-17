@@ -643,6 +643,46 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "upload_validator_age",
+      "discriminator": [
+        52,
+        37,
+        147,
+        127,
+        255,
+        138,
+        32,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "oracle_authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "validator_age",
+          "type": "u32"
+        },
+        {
+          "name": "validator_age_last_updated_epoch",
+          "type": "u16"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1089,11 +1129,19 @@
             "type": "u64"
           },
           {
+            "name": "validator_age",
+            "type": "u32"
+          },
+          {
+            "name": "validator_age_last_updated_epoch",
+            "type": "u16"
+          },
+          {
             "name": "_padding1",
             "type": {
               "array": [
                 "u8",
-                232
+                226
               ]
             }
           },

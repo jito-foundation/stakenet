@@ -1,4 +1,17 @@
 // Unit tests for scoring, instant unstake, and delegation methods
+//
+// Note on score values: The maximum scores in these tests start with 7 (e.g., 7249739868913833600).
+// This is because of the 4-tier bit encoding in encode_validator_score():
+// - Tier 1 (bits 56-63): Inflation commission (inverted, 0% commission → score of 100)
+// - Tier 2 (bits 42-55): MEV commission (inverted, 0% commission → score of 10000)
+// - Tier 3 (bits 25-41): Validator age
+// - Tier 4 (bits 0-24): Vote credits ratio
+//
+// When a validator has perfect metrics (0% commissions), the inflation commission score of 100
+// is placed in bits 56-63. In binary: 100 = 0b01100100
+// When shifted left by 56 bits, this creates a large number starting with 7 in decimal.
+// Specifically: 100 << 56 = 7,205,759,403,792,793,600 (starts with 7.2...)
+// Adding the other perfect tier scores increases this to ~7.24... × 10^18
 use crate::steward::serialize_validator_list;
 use jito_steward::{
     constants::{
@@ -12,7 +25,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
-        InstantUnstakeDetails, ScoreComponentsV3, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV4, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -26,7 +39,7 @@ use validator_history::{
 
 #[test]
 fn test_compute_score() {
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     let current_epoch = default_fixture.current_epoch;
     let mut config = default_fixture.config;
@@ -50,22 +63,25 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: good_validator.vote_account,
             epoch: current_epoch as u16,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
+            priority_fee_merkle_root_upload_authority_score: 1,
             details: ScoreDetails {
                 max_mev_commission: 0,
                 max_mev_commission_epoch: 10,
@@ -96,20 +112,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 0.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249339646681323136,
+            commission_max: 0,
+            mev_commission_avg: 91,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 0,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -140,20 +159,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 0.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249339646681323136,
+            commission_max: 0,
+            mev_commission_avg: 91,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 0,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -184,20 +206,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -232,20 +257,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 0.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 0,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -278,20 +306,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 0.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 0,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -325,20 +356,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -373,20 +407,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 0.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 0.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7205759403802793600,
+            commission_max: 0,
+            mev_commission_avg: 10000,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 0,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 0,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -418,20 +455,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 0.89,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 0.0,
-            historical_commission_score: 0.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 6457106334496626304,
+            commission_max: 11,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 0,
+            historical_commission_score: 0,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -471,20 +511,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -514,20 +557,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 0.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 0,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -564,20 +610,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.88,
-            yield_score: 0.88,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 0.88,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868912633600,
+            raw_score: 7249739868912633600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 8800000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -609,20 +658,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 0.95,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 0.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 0.95,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913333600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 9500000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 0,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -659,20 +711,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.9,
-            yield_score: 0.9,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 0.9,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868912833600,
+            raw_score: 7249739868912833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 9000000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -707,20 +762,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -760,7 +818,7 @@ fn test_compute_score() {
         TVC_ACTIVATION_EPOCH,
     )
     .unwrap();
-    assert!(components.superminority_score == 0.0);
+    assert!(components.superminority_score == 0);
 
     // Test error: superminority should exist if epoch credits exist
     let mut validator = good_validator;
@@ -792,20 +850,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 0.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 0,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -841,20 +902,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -890,20 +954,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -941,20 +1008,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 1.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 1.0,
+        ScoreComponentsV4 {
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 1,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -992,20 +1062,23 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV3 {
-            score: 0.0,
-            yield_score: 1.0,
-            mev_commission_score: 1.0,
-            blacklisted_score: 1.0,
-            superminority_score: 1.0,
-            delinquency_score: 1.0,
-            running_jito_score: 1.0,
-            vote_credits_ratio: 1.0,
-            commission_score: 1.0,
-            historical_commission_score: 1.0,
-            merkle_root_upload_authority_score: 1.0,
-            priority_fee_merkle_root_upload_authority_score: 1.0,
-            priority_fee_commission_score: 0.0,
+        ScoreComponentsV4 {
+            score: 0,
+            raw_score: 7249739868913833600,
+            commission_max: 0,
+            mev_commission_avg: 0,
+            validator_age: 0,
+            vote_credits_avg: 10_000_000,
+            mev_commission_score: 1,
+            blacklisted_score: 1,
+            superminority_score: 1,
+            delinquency_score: 1,
+            running_jito_score: 1,
+            commission_score: 1,
+            historical_commission_score: 1,
+            merkle_root_upload_authority_score: 1,
+            priority_fee_merkle_root_upload_authority_score: 1,
+            priority_fee_commission_score: 0,
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
@@ -1027,7 +1100,7 @@ fn test_compute_score() {
 
 #[test]
 fn test_instant_unstake() {
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     let epoch_schedule = default_fixture.epoch_schedule;
     let current_epoch = default_fixture.current_epoch;
@@ -1461,7 +1534,7 @@ fn test_insert_sorted_index() {
 
 #[test]
 fn test_select_validators_to_delegate() {
-    let scores: [u32; 10] = [10, 0, 9, 0, 8, 0, 7, 0, 6, 0];
+    let scores: [u64; 10] = [10, 0, 9, 0, 8, 0, 7, 0, 6, 0];
     let sorted_score_indices = [0, 2, 4, 6, 8, 1, 3, 5, 7, 9];
 
     let mut validators: Vec<u16> = select_validators_to_delegate(&scores, &sorted_score_indices, 4);
@@ -1474,7 +1547,7 @@ fn test_select_validators_to_delegate() {
     validators = select_validators_to_delegate(&scores, &sorted_score_indices, 0);
     assert!(validators.is_empty());
 
-    let scores = [0; 10];
+    let scores: [u64; 10] = [0; 10];
     validators = select_validators_to_delegate(&scores, &sorted_score_indices, 10);
     assert!(validators.is_empty());
 }
@@ -1496,7 +1569,7 @@ fn test_increase_stake_calculation() {
 
     */
 
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     // Scores of fixture validators = [1.0, 0.0, 0.95]
 
@@ -1725,7 +1798,7 @@ fn test_decrease_stake_calculation() {
         [X] stake deposit not hit
         [X] errors
     */
-    let default_fixture = StateMachineFixtures::default();
+    let default_fixture = Box::<StateMachineFixtures>::default();
 
     // Yield scores of fixture validators = [1.0, 0.0, 0.95]
     // Active stake lamports: 1000 SOL on each
@@ -1733,12 +1806,12 @@ fn test_decrease_stake_calculation() {
     // Delegations: 0: 100%, 1: 0%, 2: 0%
 
     let mut state = default_fixture.state;
-    state.yield_scores[0] = 100;
-    state.yield_scores[1] = 0;
-    state.yield_scores[2] = 95;
-    state.sorted_yield_score_indices[0] = 0;
-    state.sorted_yield_score_indices[1] = 2;
-    state.sorted_yield_score_indices[2] = 1;
+    state.raw_scores[0] = 100;
+    state.raw_scores[1] = 0;
+    state.raw_scores[2] = 95;
+    state.sorted_raw_score_indices[0] = 0;
+    state.sorted_raw_score_indices[1] = 2;
+    state.sorted_raw_score_indices[2] = 1;
     state.delegations[0] = Delegation::new(1, 1);
     state.delegations[1] = Delegation::new(0, 1);
     state.delegations[2] = Delegation::new(0, 1);
@@ -2143,7 +2216,7 @@ fn test_decrease_stake_calculation() {
 fn test_decrease_stake_default_lamports() {
     // Given internal lamport balance set to default, test that no changes happen when doing stake deposit unstake
 
-    let mut state = StateMachineFixtures::default().state;
+    let mut state = Box::<StateMachineFixtures>::default().state;
 
     state.validator_lamport_balances[0] = LAMPORT_BALANCE_DEFAULT;
 

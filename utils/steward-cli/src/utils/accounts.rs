@@ -1,6 +1,6 @@
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
-use jito_steward::{Config, StewardStateAccount};
+use jito_steward::{Config, StewardStateAccount, StewardStateAccountV2};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::find_withdraw_authority_program_address;
@@ -9,7 +9,7 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 
 pub struct UsefulStewardAccounts {
     pub config_account: Config,
-    pub state_account: StewardStateAccount,
+    pub state_account: StewardStateAccountV2,
     pub state_address: Pubkey,
     pub stake_pool_account: StakePool,
     pub stake_pool_address: Pubkey,
@@ -70,12 +70,12 @@ pub async fn get_steward_state_account(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<(StewardStateAccount, Pubkey)> {
+) -> Result<(StewardStateAccountV2, Pubkey)> {
     let steward_state = get_steward_state_address(program_id, steward_config);
 
     let state_raw_account = client.get_account(&steward_state).await?;
     Ok((
-        StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())?,
+        StewardStateAccountV2::try_deserialize(&mut state_raw_account.data.as_slice())?,
         steward_state,
     ))
 }
