@@ -30,9 +30,10 @@ use commands::{
         rebalance::command_crank_rebalance, steward::command_crank_steward,
     },
     info::{
+        create_backtest_cache::command_create_backtest_cache,
         diff_backtest::command_diff_backtest,
         export_backtest::command_export_backtest,
-        view_backtest::command_view_backtest,
+        run_backtest::command_run_backtest,
         view_config::command_view_config,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
@@ -68,8 +69,11 @@ async fn main() -> Result<()> {
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
-        Commands::ViewBacktest(args) => {
-            command_view_backtest(&client, program_id, args.backtest_parameters).await
+        Commands::CreateBacktestCache(args) => {
+            command_create_backtest_cache(&client, program_id, args).await
+        }
+        Commands::RunBacktest(args) => {
+            command_run_backtest(&client, program_id, args.backtest_parameters).await
         }
         Commands::DiffBacktest(args) => {
             command_diff_backtest(args).await

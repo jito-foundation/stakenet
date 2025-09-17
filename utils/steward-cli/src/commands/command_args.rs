@@ -242,7 +242,9 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
-    ViewBacktest(ViewBacktest),
+    // Backtest commands
+    CreateBacktestCache(CreateBacktestCache),
+    RunBacktest(RunBacktest),
     DiffBacktest(DiffBacktest),
     ExportBacktest(ExportBacktest),
 
@@ -323,8 +325,28 @@ pub struct ViewNextIndexToRemove {
 }
 
 #[derive(Parser)]
-#[command(about = "Run backtests on past epochs with current or modified scoring parameters")]
-pub struct ViewBacktest {
+#[command(about = "Create a cache file with validator data for backtest analysis")]
+pub struct CreateBacktestCache {
+    /// Steward config account
+    #[arg(
+        long,
+        env,
+        default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
+    )]
+    pub steward_config: Pubkey,
+
+    /// Path to cache file for storing fetched data
+    #[arg(long, default_value = "backtest_cache.json")]
+    pub cache_file: PathBuf,
+
+    /// Force fetching fresh data even if cache exists
+    #[arg(long)]
+    pub force_fetch: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Run backtests on past epochs using cached data")]
+pub struct RunBacktest {
     #[command(flatten)]
     pub backtest_parameters: BacktestParameters,
 }
@@ -351,15 +373,11 @@ pub struct ExportBacktest {
 
 #[derive(Parser)]
 pub struct BacktestParameters {
-    /// Steward config account
-    #[arg(
-        long,
-        env,
-        default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
-    )]
-    pub steward_config: Pubkey,
+    /// Path to cache file for loading fetched data (must exist)
+    #[arg(long, default_value = "backtest_cache.json")]
+    pub cache_file: PathBuf,
 
-    /// Start epoch for backtest (defaults to current epoch - 1)
+    /// Start epoch for backtest (defaults to current epoch - 1 from cache)
     #[arg(long)]
     pub start_epoch: Option<u64>,
 
@@ -367,17 +385,17 @@ pub struct BacktestParameters {
     #[arg(long, default_value = "10")]
     pub lookback_epochs: u64,
 
-    /// Path to cache file for storing/loading fetched data
-    #[arg(long, default_value = "backtest_cache.json")]
-    pub cache_file: Option<PathBuf>,
-
-    /// Force fetching fresh data even if cache exists
-    #[arg(long, default_value = "false")]
-    pub force_fetch: bool,
-
-    /// Output file for saving results in JSON format (required)
+    /// Output file for saving results in JSON format
     #[arg(long)]
     pub output_file: PathBuf,
+
+    /// Export results to CSV format
+    #[arg(long)]
+    pub export_csv: bool,
+
+    /// Directory for CSV export files
+    #[arg(long, default_value = "backtest_results/exports")]
+    pub export_dir: PathBuf,
 }
 
 // ---------- ACTIONS ------------

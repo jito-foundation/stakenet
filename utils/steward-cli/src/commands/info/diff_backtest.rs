@@ -1,5 +1,5 @@
 use crate::commands::command_args::DiffBacktest;
-use crate::commands::info::view_backtest::ValidatorMetadata;
+use crate::commands::info::create_backtest_cache::ValidatorMetadata;
 use anyhow::Result;
 use serde::{Deserialize, Deserializer};
 use solana_sdk::pubkey::Pubkey;

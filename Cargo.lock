@@ -10787,6 +10787,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "borsh 1.5.7",
+ "bytemuck",
  "clap 4.5.45",
  "dotenvy",
  "env_logger 0.10.2",
