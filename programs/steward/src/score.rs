@@ -32,7 +32,7 @@ pub fn encode_validator_score(
     inflation_commission: u8, // 0-100
     mev_commission_bps: u16,  // 0-10000
     validator_age: u32,       // epochs with non-zero vote credits
-    vote_credits: u32,        // average vote credits value
+    vote_credits: u32,        // normalized vote credits ratio scaled by 10,000,000
 ) -> Result<u64> {
     // Tier 1: Inflation commission (inverted so lower commission = higher score)
     let inflation_score = 100u64.saturating_sub(inflation_commission.min(100) as u64);
@@ -45,7 +45,7 @@ pub fn encode_validator_score(
     // Cap at 17 bits max value (131,071 epochs = ~716 years)
     let age_score = (validator_age as u64).min((1u64 << 17) - 1);
 
-    // Tier 4: Vote credits (direct value)
+    // Tier 4: Vote credits ratio (normalized performance, scaled by 10M for precision)
     // Cap at 25 bits max value (33,554,431)
     let credits_score = (vote_credits as u64).min((1u64 << 25) - 1);
 
@@ -91,28 +91,39 @@ pub fn calculate_avg_mev_commission(
     avg.min(BASIS_POINTS_MAX as u64) as u16
 }
 
-/// Calculate the average vote credits over a window
-pub fn calculate_avg_vote_credits(epoch_credits_window: &[Option<u32>]) -> u32 {
-    if epoch_credits_window.is_empty() {
+/// Calculate the normalized average vote credits ratio over a window
+/// Returns the ratio scaled by 10,000,000 for precision in 25-bit encoding
+pub fn calculate_avg_vote_credits(
+    epoch_credits_window: &[Option<u32>],
+    total_blocks_window: &[Option<u32>],
+) -> u32 {
+    if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
         return 0;
     }
 
-    let sum: u64 = epoch_credits_window
-        .iter()
-        .filter_map(|&c| c)
-        .map(|c| c as u64)
-        .sum();
+    // Calculate average vote credits
+    let credits_sum: u32 = epoch_credits_window.iter().filter_map(|&i| i).sum();
+    let average_vote_credits = credits_sum as f64 / epoch_credits_window.len() as f64;
 
-    let count = epoch_credits_window.iter().filter(|c| c.is_some()).count() as u64;
-
-    if count == 0 {
+    // Calculate average blocks (only from non-None values)
+    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
+    if nonzero_blocks == 0 {
         return 0;
     }
 
-    // Return average, capped at u32::MAX
-    sum.checked_div(count)
-        .unwrap_or(u32::MAX as u64)
-        .min(u32::MAX as u64) as u32
+    let blocks_sum: u32 = total_blocks_window.iter().filter_map(|&i| i).sum();
+    let average_blocks = blocks_sum as f64 / nonzero_blocks as f64;
+
+    // Calculate normalized ratio
+    let normalized_vote_credits_ratio =
+        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
+
+    // Scale by 10,000,000 for precision and cap at 25 bits max
+    const SCALE_FACTOR: f64 = 10_000_000.0;
+    let scaled_ratio = (normalized_vote_credits_ratio * SCALE_FACTOR) as u64;
+
+    // Cap at 25 bits max value (33,554,431)
+    scaled_ratio.min((1u64 << 25) - 1) as u32
 }
 
 #[event]
@@ -277,7 +288,8 @@ pub fn validator_score(
     let mev_commission_avg =
         calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
     let validator_age = validator.validator_age;
-    let vote_credits_avg = calculate_avg_vote_credits(&normalized_epoch_credits_window);
+    let vote_credits_avg =
+        calculate_avg_vote_credits(&normalized_epoch_credits_window, &total_blocks_window);
 
     // Calculate raw 4-tier score using max commission instead of average
     let raw_score = encode_validator_score(

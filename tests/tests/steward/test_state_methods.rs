@@ -62,11 +62,11 @@ fn test_compute_scores() {
         .unwrap());
     // Updated assertions for new bit-packed scoring system
     // The scores are now u64 values with bit-packed fields
-    assert!(state.scores[0..3] == [7249739868903849600, 0, 6887252875458657920]);
+    assert!(state.scores[0..3] == [7249739868913833600, 0, 6887252875468641920]);
     assert!(state.sorted_score_indices[0..3] == [0, 2, 1]);
     assert!(state.sorted_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
     assert!(
-        state.raw_scores[0..3] == [7249739868903849600, 72057594037931136, 6887252875458657920]
+        state.raw_scores[0..3] == [7249739868913833600, 72057594039927936, 6887252875468641920]
     );
     assert!(state.sorted_raw_score_indices[0..3] == [0, 2, 1]);
     assert!(state.sorted_raw_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
@@ -171,7 +171,7 @@ fn test_compute_scores() {
     // validator would not have a score of 0 if it was not blacklisted
     assert!(state.scores[validators[0].index as usize] == 0);
     assert!(state.sorted_score_indices[0] == 0);
-    assert!(state.raw_scores[0] == 7249739868903849600); // Updated for new scoring system
+    assert!(state.raw_scores[0] == 7249739868913833600); // Updated for new scoring system
     assert!(state.sorted_raw_score_indices[0] == 0);
 
     // Test reset scoring: 3 cases

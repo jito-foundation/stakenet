@@ -205,30 +205,56 @@ fn test_calculate_avg_mev_commission() {
 
 #[test]
 fn test_calculate_avg_vote_credits() {
-    // Test with all values present
-    let window = vec![Some(1000), Some(2000), Some(3000)];
-    let avg = calculate_avg_vote_credits(&window);
-    assert_eq!(avg, 2000, "(1000 + 2000 + 3000) / 3 = 2000");
+    use validator_history::constants::TVC_MULTIPLIER;
 
-    // Test with some None values
-    let window = vec![Some(1000), None, Some(3000)];
-    let avg = calculate_avg_vote_credits(&window);
-    assert_eq!(avg, 2000, "(1000 + 3000) / 2 = 2000");
+    // Test with perfect performance (all credits match blocks)
+    let credits_window = vec![
+        Some(1000 * TVC_MULTIPLIER),
+        Some(2000 * TVC_MULTIPLIER),
+        Some(3000 * TVC_MULTIPLIER),
+    ];
+    let blocks_window = vec![Some(1000), Some(2000), Some(3000)];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
+    // Perfect ratio of 1.0, scaled by 10,000,000
+    assert_eq!(
+        avg, 10_000_000,
+        "Perfect performance should yield 10,000,000"
+    );
 
-    // Test with all None
-    let window = vec![None, None, None];
-    let avg = calculate_avg_vote_credits(&window);
+    // Test with 90% performance
+    let credits_window = vec![Some(900 * TVC_MULTIPLIER), Some(1800 * TVC_MULTIPLIER)];
+    let blocks_window = vec![Some(1000), Some(2000)];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
+    // 0.9 ratio scaled by 10,000,000
+    assert_eq!(avg, 9_000_000, "90% performance should yield 9,000,000");
+
+    // Test with missing blocks data (should use only non-None values)
+    let credits_window = vec![Some(1000 * TVC_MULTIPLIER), Some(2000 * TVC_MULTIPLIER)];
+    let blocks_window = vec![Some(1000), None];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
+    // avg_credits = (16000 + 32000) / 2 = 24000
+    // avg_blocks = 1000 / 1 = 1000
+    // ratio = 24000 / (1000 * 16) = 1.5
+    // scaled = 1.5 * 10,000,000 = 15,000,000
+    assert_eq!(avg, 15_000_000);
+
+    // Test with all None credits
+    let credits_window = vec![None, None, None];
+    let blocks_window = vec![Some(1000), Some(2000), Some(3000)];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
     assert_eq!(avg, 0);
 
-    // Test empty window
-    let window = vec![];
-    let avg = calculate_avg_vote_credits(&window);
+    // Test empty windows
+    let credits_window = vec![];
+    let blocks_window = vec![];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
     assert_eq!(avg, 0);
 
-    // Test single value
-    let window = vec![Some(5000)];
-    let avg = calculate_avg_vote_credits(&window);
-    assert_eq!(avg, 5000);
+    // Test with all None blocks
+    let credits_window = vec![Some(1000 * TVC_MULTIPLIER)];
+    let blocks_window = vec![None];
+    let avg = calculate_avg_vote_credits(&credits_window, &blocks_window);
+    assert_eq!(avg, 0, "Should return 0 when no valid blocks data");
 }
 
 #[test]
@@ -448,7 +474,7 @@ mod validator_score_integration_tests {
         // Check components
         assert_eq!(result.commission_max, 0);
         assert_eq!(result.mev_commission_avg, 0);
-        assert_eq!(result.vote_credits_avg, 16000); // 1000 * TVC_MULTIPLIER
+        assert_eq!(result.vote_credits_avg, 10_000_000); // Perfect ratio of 1.0, scaled by 10M
 
         // All binary filters should pass (score = 1)
         assert_eq!(result.mev_commission_score, 1);

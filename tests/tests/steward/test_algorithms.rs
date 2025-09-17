@@ -1,4 +1,17 @@
 // Unit tests for scoring, instant unstake, and delegation methods
+//
+// Note on score values: The maximum scores in these tests start with 7 (e.g., 7249739868913833600).
+// This is because of the 4-tier bit encoding in encode_validator_score():
+// - Tier 1 (bits 56-63): Inflation commission (inverted, 0% commission → score of 100)
+// - Tier 2 (bits 42-55): MEV commission (inverted, 0% commission → score of 10000)
+// - Tier 3 (bits 25-41): Validator age
+// - Tier 4 (bits 0-24): Vote credits ratio
+//
+// When a validator has perfect metrics (0% commissions), the inflation commission score of 100
+// is placed in bits 56-63. In binary: 100 = 0b01100100
+// When shifted left by 56 bits, this creates a large number starting with 7 in decimal.
+// Specifically: 100 << 56 = 7,205,759,403,792,793,600 (starts with 7.2...)
+// Adding the other perfect tier scores increases this to ~7.24... × 10^18
 use crate::steward::serialize_validator_list;
 use jito_steward::{
     constants::{
@@ -51,12 +64,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -101,11 +114,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249339646671339136,
+            raw_score: 7249339646681323136,
             commission_max: 0,
             mev_commission_avg: 91,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 0,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -148,11 +161,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249339646671339136,
+            raw_score: 7249339646681323136,
             commission_max: 0,
             mev_commission_avg: 91,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 0,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -194,12 +207,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -246,11 +259,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 0,
             superminority_score: 1,
@@ -295,11 +308,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 0,
@@ -344,12 +357,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -396,11 +409,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7205759403792809600,
+            raw_score: 7205759403802793600,
             commission_max: 0,
             mev_commission_avg: 10000,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 0,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -444,11 +457,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 6457106334486642304,
+            raw_score: 6457106334496626304,
             commission_max: 11,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -499,12 +512,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -546,11 +559,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -598,12 +611,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903847680,
-            raw_score: 7249739868903847680,
+            score: 7249739868912633600,
+            raw_score: 7249739868912633600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 14080,
+            vote_credits_avg: 8800000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -647,11 +660,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903848800,
+            raw_score: 7249739868913333600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 15200,
+            vote_credits_avg: 9500000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -699,12 +712,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903848757,
-            raw_score: 7249739868903848757,
+            score: 7249739868912833600,
+            raw_score: 7249739868912833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 15157,
+            vote_credits_avg: 9000000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -750,12 +763,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -839,11 +852,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -890,12 +903,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -942,12 +955,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -996,12 +1009,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV4 {
-            score: 7249739868903849600,
-            raw_score: 7249739868903849600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
@@ -1051,11 +1064,11 @@ fn test_compute_score() {
         components,
         ScoreComponentsV4 {
             score: 0,
-            raw_score: 7249739868903849600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 16000,
+            vote_credits_avg: 10_000_000,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
