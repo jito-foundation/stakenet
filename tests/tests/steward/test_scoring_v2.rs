@@ -408,7 +408,7 @@ mod validator_score_integration_tests {
         // Add cluster history entries with 1000 blocks per epoch
         for epoch in 0..=epochs {
             cluster.history.push(ClusterHistoryEntry {
-                epoch: epoch as u16,
+                epoch,
                 total_blocks: 1000,
                 ..ClusterHistoryEntry::default()
             });
