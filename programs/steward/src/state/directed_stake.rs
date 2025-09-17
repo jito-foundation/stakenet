@@ -15,7 +15,8 @@ pub const MAX_PREFERENCES_PER_TICKET: usize = 8;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
 pub enum DirectedStakeRecordType {
     Validator,
-    Staker,
+    User,
+    Protocol,
 }
 
 #[derive(BorshSerialize)]
@@ -140,23 +141,36 @@ impl DirectedStakeTicket {
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct DirectedStakeWhitelist {
-    pub permissioned_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
+    pub permissioned_user_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
+    pub permissioned_protocol_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
     pub permissioned_validators: [Pubkey; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    pub total_permissioned_stakers: u16,
+    pub total_permissioned_user_stakers: u16,
+    pub total_permissioned_protocol_stakers: u16,
     pub total_permissioned_validators: u16,
-    // 256 bytes reserved for future use
-    pub _padding0: [u8; 256],
+    // 250 bytes reserved for future use
+    pub _padding0: [u8; 250],
 }
 
 impl DirectedStakeWhitelist {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"whitelist";
 
-    pub fn is_staker_permissioned(&self, staker: &Pubkey) -> bool {
-        self.permissioned_stakers
+    pub fn is_user_staker_permissioned(&self, staker: &Pubkey) -> bool {
+        self.permissioned_user_stakers
             .iter()
-            .take(self.total_permissioned_stakers as usize)
+            .take(self.total_permissioned_user_stakers as usize)
             .any(|pk| pk == staker)
+    }
+
+    pub fn is_protocol_staker_permissioned(&self, staker: &Pubkey) -> bool {
+        self.permissioned_protocol_stakers
+            .iter()
+            .take(self.total_permissioned_protocol_stakers as usize)
+            .any(|pk| pk == staker)
+    }
+
+    pub fn is_staker_permissioned(&self, staker: &Pubkey) -> bool {
+        self.is_user_staker_permissioned(staker) || self.is_protocol_staker_permissioned(staker)
     }
 
     pub fn is_validator_permissioned(&self, validator: &Pubkey) -> bool {
@@ -166,24 +180,50 @@ impl DirectedStakeWhitelist {
             .any(|pk| pk == validator)
     }
 
+    pub fn can_add_user_staker(&self) -> bool {
+        (self.total_permissioned_user_stakers as usize) < MAX_PERMISSIONED_DIRECTED_STAKERS
+    }
+
+    pub fn can_add_protocol_staker(&self) -> bool {
+        (self.total_permissioned_protocol_stakers as usize) < MAX_PERMISSIONED_DIRECTED_STAKERS
+    }
+
     pub fn can_add_staker(&self) -> bool {
-        (self.total_permissioned_stakers as usize) < MAX_PERMISSIONED_DIRECTED_STAKERS
+        self.can_add_user_staker() || self.can_add_protocol_staker()
     }
 
     pub fn can_add_validator(&self) -> bool {
         (self.total_permissioned_validators as usize) < MAX_PERMISSIONED_DIRECTED_VALIDATORS
     }
 
-    pub fn add_staker(&mut self, staker: Pubkey) -> Result<()> {
-        if !self.can_add_staker() {
+    pub fn add_user_staker(&mut self, staker: Pubkey) -> Result<()> {
+        if !self.can_add_user_staker() {
             return Err(error!(DirectedStakeStakerListFull));
         }
         if self.is_staker_permissioned(&staker) {
             return Err(error!(AlreadyPermissioned));
         }
-        self.permissioned_stakers[self.total_permissioned_stakers as usize] = staker;
-        self.total_permissioned_stakers += 1;
+        self.permissioned_user_stakers[self.total_permissioned_user_stakers as usize] = staker;
+        self.total_permissioned_user_stakers += 1;
         Ok(())
+    }
+
+    pub fn add_protocol_staker(&mut self, staker: Pubkey) -> Result<()> {
+        if !self.can_add_protocol_staker() {
+            return Err(error!(DirectedStakeStakerListFull));
+        }
+        if self.is_staker_permissioned(&staker) {
+            return Err(error!(AlreadyPermissioned));
+        }
+        self.permissioned_protocol_stakers[self.total_permissioned_protocol_stakers as usize] =
+            staker;
+        self.total_permissioned_protocol_stakers += 1;
+        Ok(())
+    }
+
+    pub fn add_staker(&mut self, staker: Pubkey) -> Result<()> {
+        // Default to adding as user staker for backward compatibility
+        self.add_user_staker(staker)
     }
 
     pub fn add_validator(&mut self, validator: Pubkey) -> Result<()> {
@@ -198,14 +238,14 @@ impl DirectedStakeWhitelist {
         Ok(())
     }
 
-    pub fn remove_staker(&mut self, staker: &Pubkey) -> Result<()> {
-        if self.total_permissioned_stakers == 0 {
+    pub fn remove_user_staker(&mut self, staker: &Pubkey) -> Result<()> {
+        if self.total_permissioned_user_stakers == 0 {
             return Err(error!(StakerNotInWhitelist));
         }
 
         let mut found_index = None;
-        for i in 0..self.total_permissioned_stakers as usize {
-            if self.permissioned_stakers[i] == *staker {
+        for i in 0..self.total_permissioned_user_stakers as usize {
+            if self.permissioned_user_stakers[i] == *staker {
                 found_index = Some(i);
                 break;
             }
@@ -213,14 +253,53 @@ impl DirectedStakeWhitelist {
 
         if let Some(index) = found_index {
             // Shift remaining elements to the left
-            for i in index..(self.total_permissioned_stakers as usize - 1) {
-                self.permissioned_stakers[i] = self.permissioned_stakers[i + 1];
+            for i in index..(self.total_permissioned_user_stakers as usize - 1) {
+                self.permissioned_user_stakers[i] = self.permissioned_user_stakers[i + 1];
             }
             // Clear the last element
-            self.permissioned_stakers[self.total_permissioned_stakers as usize - 1] =
+            self.permissioned_user_stakers[self.total_permissioned_user_stakers as usize - 1] =
                 Pubkey::default();
-            self.total_permissioned_stakers -= 1;
+            self.total_permissioned_user_stakers -= 1;
             Ok(())
+        } else {
+            Err(error!(StakerNotInWhitelist))
+        }
+    }
+
+    pub fn remove_protocol_staker(&mut self, staker: &Pubkey) -> Result<()> {
+        if self.total_permissioned_protocol_stakers == 0 {
+            return Err(error!(StakerNotInWhitelist));
+        }
+
+        let mut found_index = None;
+        for i in 0..self.total_permissioned_protocol_stakers as usize {
+            if self.permissioned_protocol_stakers[i] == *staker {
+                found_index = Some(i);
+                break;
+            }
+        }
+
+        if let Some(index) = found_index {
+            // Shift remaining elements to the left
+            for i in index..(self.total_permissioned_protocol_stakers as usize - 1) {
+                self.permissioned_protocol_stakers[i] = self.permissioned_protocol_stakers[i + 1];
+            }
+            // Clear the last element
+            self.permissioned_protocol_stakers
+                [self.total_permissioned_protocol_stakers as usize - 1] = Pubkey::default();
+            self.total_permissioned_protocol_stakers -= 1;
+            Ok(())
+        } else {
+            Err(error!(StakerNotInWhitelist))
+        }
+    }
+
+    pub fn remove_staker(&mut self, staker: &Pubkey) -> Result<()> {
+        // Try to remove from user stakers first, then protocol stakers
+        if self.is_user_staker_permissioned(staker) {
+            self.remove_user_staker(staker)
+        } else if self.is_protocol_staker_permissioned(staker) {
+            self.remove_protocol_staker(staker)
         } else {
             Err(error!(StakerNotInWhitelist))
         }

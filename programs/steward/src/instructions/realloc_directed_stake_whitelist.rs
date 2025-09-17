@@ -52,11 +52,14 @@ pub fn handler(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
     let account_size = ctx.accounts.directed_stake_whitelist.as_ref().data_len();
     if account_size >= DirectedStakeWhitelist::SIZE {
         let mut whitelist = ctx.accounts.directed_stake_whitelist.load_mut()?;
-        whitelist.permissioned_stakers =
+        whitelist.permissioned_user_stakers =
+            [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
+        whitelist.permissioned_protocol_stakers =
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
         whitelist.permissioned_validators =
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_VALIDATORS];
-        whitelist.total_permissioned_stakers = 0;
+        whitelist.total_permissioned_user_stakers = 0;
+        whitelist.total_permissioned_protocol_stakers = 0;
         whitelist.total_permissioned_validators = 0;
     }
     Ok(())

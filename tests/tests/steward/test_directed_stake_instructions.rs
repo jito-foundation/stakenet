@@ -9,11 +9,15 @@ use solana_sdk::pubkey::Pubkey;
 #[test]
 fn test_directed_stake_record_type_serialization() {
     let validator_type = DirectedStakeRecordType::Validator;
-    let staker_type = DirectedStakeRecordType::Staker;
+    let user_type = DirectedStakeRecordType::User;
+    let protocol_type = DirectedStakeRecordType::Protocol;
 
     assert_eq!(validator_type, DirectedStakeRecordType::Validator);
-    assert_eq!(staker_type, DirectedStakeRecordType::Staker);
-    assert_ne!(validator_type, staker_type);
+    assert_eq!(user_type, DirectedStakeRecordType::User);
+    assert_eq!(protocol_type, DirectedStakeRecordType::Protocol);
+    assert_ne!(validator_type, user_type);
+    assert_ne!(validator_type, protocol_type);
+    assert_ne!(user_type, protocol_type);
 }
 
 #[test]
@@ -111,14 +115,17 @@ fn test_directed_stake_ticket_invalid_preferences() {
 #[test]
 fn test_directed_stake_whitelist_initialization() {
     let whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
-    assert_eq!(whitelist.total_permissioned_stakers, 0);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 0);
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 0);
     assert_eq!(whitelist.total_permissioned_validators, 0);
     assert!(whitelist.can_add_staker());
     assert!(whitelist.can_add_validator());
@@ -127,27 +134,40 @@ fn test_directed_stake_whitelist_initialization() {
 #[test]
 fn test_directed_stake_whitelist_add_operations() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
-    let staker = Pubkey::new_unique();
+    let user_staker = Pubkey::new_unique();
+    let protocol_staker = Pubkey::new_unique();
     let validator = Pubkey::new_unique();
 
-    let result = whitelist.add_staker(staker);
+    let result = whitelist.add_user_staker(user_staker);
     assert!(result.is_ok());
-    assert_eq!(whitelist.total_permissioned_stakers, 1);
-    assert!(whitelist.is_staker_permissioned(&staker));
+    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
+    assert!(whitelist.is_user_staker_permissioned(&user_staker));
+    assert!(whitelist.is_staker_permissioned(&user_staker));
+
+    let result = whitelist.add_protocol_staker(protocol_staker);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 1);
+    assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker));
+    assert!(whitelist.is_staker_permissioned(&protocol_staker));
 
     let result = whitelist.add_validator(validator);
     assert!(result.is_ok());
     assert_eq!(whitelist.total_permissioned_validators, 1);
     assert!(whitelist.is_validator_permissioned(&validator));
 
-    let result = whitelist.add_staker(staker);
+    let result = whitelist.add_user_staker(user_staker);
+    assert!(result.is_err());
+
+    let result = whitelist.add_protocol_staker(protocol_staker);
     assert!(result.is_err());
 
     let result = whitelist.add_validator(validator);
@@ -157,30 +177,44 @@ fn test_directed_stake_whitelist_add_operations() {
 #[test]
 fn test_directed_stake_whitelist_remove_operations() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
-    let staker = Pubkey::new_unique();
+    let user_staker = Pubkey::new_unique();
+    let protocol_staker = Pubkey::new_unique();
     let validator = Pubkey::new_unique();
 
-    whitelist.add_staker(staker).unwrap();
+    whitelist.add_user_staker(user_staker).unwrap();
+    whitelist.add_protocol_staker(protocol_staker).unwrap();
     whitelist.add_validator(validator).unwrap();
 
-    let result = whitelist.remove_staker(&staker);
+    let result = whitelist.remove_user_staker(&user_staker);
     assert!(result.is_ok());
-    assert_eq!(whitelist.total_permissioned_stakers, 0);
-    assert!(!whitelist.is_staker_permissioned(&staker));
+    assert_eq!(whitelist.total_permissioned_user_stakers, 0);
+    assert!(!whitelist.is_user_staker_permissioned(&user_staker));
+    assert!(!whitelist.is_staker_permissioned(&user_staker));
+
+    let result = whitelist.remove_protocol_staker(&protocol_staker);
+    assert!(result.is_ok());
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 0);
+    assert!(!whitelist.is_protocol_staker_permissioned(&protocol_staker));
+    assert!(!whitelist.is_staker_permissioned(&protocol_staker));
 
     let result = whitelist.remove_validator(&validator);
     assert!(result.is_ok());
     assert_eq!(whitelist.total_permissioned_validators, 0);
     assert!(!whitelist.is_validator_permissioned(&validator));
 
-    let result = whitelist.remove_staker(&staker);
+    let result = whitelist.remove_user_staker(&user_staker);
+    assert!(result.is_err());
+
+    let result = whitelist.remove_protocol_staker(&protocol_staker);
     assert!(result.is_err());
 
     let result = whitelist.remove_validator(&validator);
@@ -190,11 +224,13 @@ fn test_directed_stake_whitelist_remove_operations() {
 #[test]
 fn test_directed_stake_whitelist_edge_cases() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let non_existent = Pubkey::new_unique();
@@ -249,11 +285,13 @@ fn test_directed_stake_ticket_edge_cases() {
 #[test]
 fn test_directed_stake_whitelist_validation_logic() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let staker = Pubkey::new_unique();
@@ -318,11 +356,13 @@ fn test_directed_stake_whitelist_validation_logic() {
 #[test]
 fn test_permissioned_stakers_validation() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let staker1 = Pubkey::new_unique();
@@ -335,10 +375,10 @@ fn test_permissioned_stakers_validation() {
     assert!(!whitelist.is_staker_permissioned(&staker2));
     assert!(!whitelist.is_staker_permissioned(&non_permissioned_staker));
 
-    // Add stakers to whitelist
-    assert!(whitelist.add_staker(staker1).is_ok());
-    assert!(whitelist.add_staker(staker2).is_ok());
-    assert!(whitelist.add_staker(staker3).is_ok());
+    // Add stakers to whitelist (as user stakers)
+    assert!(whitelist.add_user_staker(staker1).is_ok());
+    assert!(whitelist.add_user_staker(staker2).is_ok());
+    assert!(whitelist.add_user_staker(staker3).is_ok());
 
     // Verify stakers are now permissioned
     assert!(whitelist.is_staker_permissioned(&staker1));
@@ -348,32 +388,36 @@ fn test_permissioned_stakers_validation() {
 
     // Test can_add_staker method
     assert!(whitelist.can_add_staker());
-    assert_eq!(whitelist.total_permissioned_stakers, 3);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 3);
 
     // Test duplicate addition should fail
-    assert!(whitelist.add_staker(staker1).is_err());
-    assert_eq!(whitelist.total_permissioned_stakers, 3); // Should remain unchanged
+    assert!(whitelist.add_user_staker(staker1).is_err());
+    assert_eq!(whitelist.total_permissioned_user_stakers, 3); // Should remain unchanged
 
     // Test removing a staker
-    assert!(whitelist.remove_staker(&staker2).is_ok());
+    assert!(whitelist.remove_user_staker(&staker2).is_ok());
     assert!(!whitelist.is_staker_permissioned(&staker2));
     assert!(whitelist.is_staker_permissioned(&staker1));
     assert!(whitelist.is_staker_permissioned(&staker3));
-    assert_eq!(whitelist.total_permissioned_stakers, 2);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 2);
 
     // Test removing non-existent staker should fail
-    assert!(whitelist.remove_staker(&non_permissioned_staker).is_err());
-    assert_eq!(whitelist.total_permissioned_stakers, 2); // Should remain unchanged
+    assert!(whitelist
+        .remove_user_staker(&non_permissioned_staker)
+        .is_err());
+    assert_eq!(whitelist.total_permissioned_user_stakers, 2); // Should remain unchanged
 }
 
 #[test]
 fn test_permissioned_validators_validation() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let validator1 = Pubkey::new_unique();
@@ -422,11 +466,13 @@ fn test_permissioned_validators_validation() {
 #[test]
 fn test_ticket_authorization_scenarios() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let permissioned_staker = Pubkey::new_unique();
@@ -486,18 +532,20 @@ fn test_ticket_authorization_scenarios() {
 #[test]
 fn test_whitelist_capacity_limits() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
-    // Test that we can add up to the maximum number of stakers
+    // Test that we can add up to the maximum number of user stakers
     for i in 0..MAX_PERMISSIONED_DIRECTED_STAKERS {
         let staker = Pubkey::new_unique();
-        assert!(whitelist.add_staker(staker).is_ok());
-        assert_eq!(whitelist.total_permissioned_stakers, (i + 1) as u16);
+        assert!(whitelist.add_user_staker(staker).is_ok());
+        assert_eq!(whitelist.total_permissioned_user_stakers, (i + 1) as u16);
     }
 
     // Test that we can add up to the maximum number of validators
@@ -507,11 +555,11 @@ fn test_whitelist_capacity_limits() {
         assert_eq!(whitelist.total_permissioned_validators, (i + 1) as u16);
     }
 
-    // Test that we can't add more stakers beyond the limit
+    // Test that we can't add more user stakers beyond the limit
     let extra_staker = Pubkey::new_unique();
-    assert!(whitelist.add_staker(extra_staker).is_err());
+    assert!(whitelist.add_user_staker(extra_staker).is_err());
     assert_eq!(
-        whitelist.total_permissioned_stakers,
+        whitelist.total_permissioned_user_stakers,
         MAX_PERMISSIONED_DIRECTED_STAKERS as u16
     );
 
@@ -524,59 +572,66 @@ fn test_whitelist_capacity_limits() {
     );
 
     // Test can_add methods return false when at capacity
-    assert!(!whitelist.can_add_staker());
+    assert!(!whitelist.can_add_user_staker());
     assert!(!whitelist.can_add_validator());
+    // Note: can_add_staker() returns true if either user or protocol stakers can be added
+    // Since we only filled user stakers, protocol stakers can still be added
+    assert!(whitelist.can_add_staker());
 }
 
 #[test]
 fn test_whitelist_removal_and_readdition() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let staker = Pubkey::new_unique();
     let validator = Pubkey::new_unique();
 
     // Add staker and validator
-    whitelist.add_staker(staker).unwrap();
+    whitelist.add_user_staker(staker).unwrap();
     whitelist.add_validator(validator).unwrap();
 
     assert!(whitelist.is_staker_permissioned(&staker));
     assert!(whitelist.is_validator_permissioned(&validator));
-    assert_eq!(whitelist.total_permissioned_stakers, 1);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
     assert_eq!(whitelist.total_permissioned_validators, 1);
 
     // Remove them
-    whitelist.remove_staker(&staker).unwrap();
+    whitelist.remove_user_staker(&staker).unwrap();
     whitelist.remove_validator(&validator).unwrap();
 
     assert!(!whitelist.is_staker_permissioned(&staker));
     assert!(!whitelist.is_validator_permissioned(&validator));
-    assert_eq!(whitelist.total_permissioned_stakers, 0);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 0);
     assert_eq!(whitelist.total_permissioned_validators, 0);
 
     // Add them back
-    whitelist.add_staker(staker).unwrap();
+    whitelist.add_user_staker(staker).unwrap();
     whitelist.add_validator(validator).unwrap();
 
     assert!(whitelist.is_staker_permissioned(&staker));
     assert!(whitelist.is_validator_permissioned(&validator));
-    assert_eq!(whitelist.total_permissioned_stakers, 1);
+    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
     assert_eq!(whitelist.total_permissioned_validators, 1);
 }
 
 #[test]
 fn test_preferences_validation_edge_cases() {
     let mut whitelist = DirectedStakeWhitelist {
-        permissioned_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_stakers: 0,
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 256],
+        _padding0: [0; 250],
     };
 
     let validator1 = Pubkey::new_unique();
@@ -637,4 +692,163 @@ fn test_preferences_validation_edge_cases() {
         .iter()
         .all(|pref| whitelist.is_validator_permissioned(&pref.vote_pubkey));
     assert!(all_valid);
+}
+
+#[test]
+fn test_user_and_protocol_staker_separation() {
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 250],
+    };
+
+    let user_staker1 = Pubkey::new_unique();
+    let user_staker2 = Pubkey::new_unique();
+    let protocol_staker1 = Pubkey::new_unique();
+    let protocol_staker2 = Pubkey::new_unique();
+
+    // Add user stakers
+    whitelist.add_user_staker(user_staker1).unwrap();
+    whitelist.add_user_staker(user_staker2).unwrap();
+
+    // Add protocol stakers
+    whitelist.add_protocol_staker(protocol_staker1).unwrap();
+    whitelist.add_protocol_staker(protocol_staker2).unwrap();
+
+    // Verify counts
+    assert_eq!(whitelist.total_permissioned_user_stakers, 2);
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 2);
+
+    // Verify user staker permissions
+    assert!(whitelist.is_user_staker_permissioned(&user_staker1));
+    assert!(whitelist.is_user_staker_permissioned(&user_staker2));
+    assert!(!whitelist.is_user_staker_permissioned(&protocol_staker1));
+    assert!(!whitelist.is_user_staker_permissioned(&protocol_staker2));
+
+    // Verify protocol staker permissions
+    assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker1));
+    assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker2));
+    assert!(!whitelist.is_protocol_staker_permissioned(&user_staker1));
+    assert!(!whitelist.is_protocol_staker_permissioned(&user_staker2));
+
+    // Verify general staker permissions (should work for both types)
+    assert!(whitelist.is_staker_permissioned(&user_staker1));
+    assert!(whitelist.is_staker_permissioned(&user_staker2));
+    assert!(whitelist.is_staker_permissioned(&protocol_staker1));
+    assert!(whitelist.is_staker_permissioned(&protocol_staker2));
+
+    // Test removal
+    whitelist.remove_user_staker(&user_staker1).unwrap();
+    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
+    assert!(!whitelist.is_user_staker_permissioned(&user_staker1));
+    assert!(!whitelist.is_staker_permissioned(&user_staker1));
+
+    whitelist.remove_protocol_staker(&protocol_staker1).unwrap();
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 1);
+    assert!(!whitelist.is_protocol_staker_permissioned(&protocol_staker1));
+    assert!(!whitelist.is_staker_permissioned(&protocol_staker1));
+
+    // Verify remaining stakers still work
+    assert!(whitelist.is_user_staker_permissioned(&user_staker2));
+    assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker2));
+    assert!(whitelist.is_staker_permissioned(&user_staker2));
+    assert!(whitelist.is_staker_permissioned(&protocol_staker2));
+}
+
+#[test]
+fn test_user_and_protocol_staker_capacity_limits() {
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 250],
+    };
+
+    // Fill up user stakers
+    for i in 0..MAX_PERMISSIONED_DIRECTED_STAKERS {
+        let staker = Pubkey::new_unique();
+        assert!(whitelist.add_user_staker(staker).is_ok());
+        assert_eq!(whitelist.total_permissioned_user_stakers, (i + 1) as u16);
+    }
+
+    // Fill up protocol stakers
+    for i in 0..MAX_PERMISSIONED_DIRECTED_STAKERS {
+        let staker = Pubkey::new_unique();
+        assert!(whitelist.add_protocol_staker(staker).is_ok());
+        assert_eq!(
+            whitelist.total_permissioned_protocol_stakers,
+            (i + 1) as u16
+        );
+    }
+
+    // Test that we can't add more user stakers
+    let extra_user_staker = Pubkey::new_unique();
+    assert!(whitelist.add_user_staker(extra_user_staker).is_err());
+    assert_eq!(
+        whitelist.total_permissioned_user_stakers,
+        MAX_PERMISSIONED_DIRECTED_STAKERS as u16
+    );
+
+    // Test that we can't add more protocol stakers
+    let extra_protocol_staker = Pubkey::new_unique();
+    assert!(whitelist
+        .add_protocol_staker(extra_protocol_staker)
+        .is_err());
+    assert_eq!(
+        whitelist.total_permissioned_protocol_stakers,
+        MAX_PERMISSIONED_DIRECTED_STAKERS as u16
+    );
+
+    // Test can_add methods return false when at capacity
+    assert!(!whitelist.can_add_user_staker());
+    assert!(!whitelist.can_add_protocol_staker());
+    assert!(!whitelist.can_add_staker());
+}
+
+#[test]
+fn test_cross_category_staker_operations() {
+    let mut whitelist = DirectedStakeWhitelist {
+        permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
+        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        total_permissioned_user_stakers: 0,
+        total_permissioned_protocol_stakers: 0,
+        total_permissioned_validators: 0,
+        _padding0: [0; 250],
+    };
+
+    let staker = Pubkey::new_unique();
+
+    // Add as user staker
+    whitelist.add_user_staker(staker).unwrap();
+    assert!(whitelist.is_user_staker_permissioned(&staker));
+    assert!(whitelist.is_staker_permissioned(&staker));
+
+    // Try to add same staker as protocol staker (should fail)
+    assert!(whitelist.add_protocol_staker(staker).is_err());
+
+    // Remove from user stakers
+    whitelist.remove_user_staker(&staker).unwrap();
+    assert!(!whitelist.is_user_staker_permissioned(&staker));
+    assert!(!whitelist.is_staker_permissioned(&staker));
+
+    // Now add as protocol staker
+    whitelist.add_protocol_staker(staker).unwrap();
+    assert!(whitelist.is_protocol_staker_permissioned(&staker));
+    assert!(whitelist.is_staker_permissioned(&staker));
+
+    // Try to add same staker as user staker (should fail)
+    assert!(whitelist.add_user_staker(staker).is_err());
+
+    // Test generic remove_staker method
+    whitelist.remove_staker(&staker).unwrap();
+    assert!(!whitelist.is_protocol_staker_permissioned(&staker));
+    assert!(!whitelist.is_staker_permissioned(&staker));
 }

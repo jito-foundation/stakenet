@@ -39,8 +39,11 @@ pub fn handler(
         DirectedStakeRecordType::Validator => {
             whitelist.add_validator(record)?;
         }
-        DirectedStakeRecordType::Staker => {
-            whitelist.add_staker(record)?;
+        DirectedStakeRecordType::User => {
+            whitelist.add_user_staker(record)?;
+        }
+        DirectedStakeRecordType::Protocol => {
+            whitelist.add_protocol_staker(record)?;
         }
     }
     Ok(())

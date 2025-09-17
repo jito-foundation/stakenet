@@ -39,8 +39,11 @@ pub fn handler(
         DirectedStakeRecordType::Validator => {
             whitelist.remove_validator(&record)?;
         }
-        DirectedStakeRecordType::Staker => {
-            whitelist.remove_staker(&record)?;
+        DirectedStakeRecordType::User => {
+            whitelist.remove_user_staker(&record)?;
+        }
+        DirectedStakeRecordType::Protocol => {
+            whitelist.remove_protocol_staker(&record)?;
         }
     }
 
