@@ -1,8 +1,8 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    Config, DirectedStakeWhitelist, errors::StewardError,
-    state::directed_stake::DirectedStakeRecordType,
+    errors::StewardError, state::directed_stake::DirectedStakeRecordType, Config,
+    DirectedStakeWhitelist,
 };
 
 #[derive(Accounts)]
@@ -44,7 +44,7 @@ pub fn handler(
     let config = ctx.accounts.config.load_init()?;
     RemoveFromDirectedStakeWhitelist::auth(&config, ctx.accounts.authority.key)?;
     let mut whitelist = ctx.accounts.directed_stake_whitelist.load_init()?;
-    
+
     match record_type {
         DirectedStakeRecordType::Validator => {
             whitelist.remove_validator(&record)?;
@@ -53,6 +53,6 @@ pub fn handler(
             whitelist.remove_staker(&record)?;
         }
     }
-    
+
     Ok(())
 }

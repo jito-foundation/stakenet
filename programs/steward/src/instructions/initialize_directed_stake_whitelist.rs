@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    constants::MAX_ALLOC_BYTES, Config, DirectedStakeWhitelist, errors::StewardError,
-};
+use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config, DirectedStakeWhitelist};
 
 #[derive(Accounts)]
 pub struct InitializeDirectedStakeWhitelist<'info> {
@@ -16,8 +14,8 @@ pub struct InitializeDirectedStakeWhitelist<'info> {
         seeds = [DirectedStakeWhitelist::SEED, config.key().as_ref()],
         bump
     )]
-    pub directed_stake_whitelist: AccountLoader<'info, DirectedStakeWhitelist>,    
-    
+    pub directed_stake_whitelist: AccountLoader<'info, DirectedStakeWhitelist>,
+
     pub system_program: Program<'info, System>,
 
     #[account(mut)]
@@ -40,9 +38,7 @@ impl InitializeDirectedStakeWhitelist<'_> {
     }
 }
 
-pub fn handler(
-    ctx: Context<InitializeDirectedStakeWhitelist>,
-) -> Result<()> {
+pub fn handler(ctx: Context<InitializeDirectedStakeWhitelist>) -> Result<()> {
     let config = ctx.accounts.config.load_init()?;
     InitializeDirectedStakeWhitelist::auth(&config, ctx.accounts.authority.key)?;
     let _ = ctx.accounts.directed_stake_whitelist.load_init()?;

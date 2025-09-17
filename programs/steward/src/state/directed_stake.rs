@@ -76,7 +76,6 @@ pub struct DirectedStakePreference {
     pub _padding0: [u8; 94],
 }
 
-
 impl DirectedStakePreference {
     pub fn empty() -> Self {
         Self {

@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    Config, DirectedStakeWhitelist, errors::StewardError,
-};
+use crate::{errors::StewardError, Config, DirectedStakeWhitelist};
 
 #[derive(Accounts)]
 pub struct CloseDirectedStakeWhitelist<'info> {
@@ -37,9 +35,7 @@ impl CloseDirectedStakeWhitelist<'_> {
     }
 }
 
-pub fn handler(
-    ctx: Context<CloseDirectedStakeWhitelist>,
-) -> Result<()> {
+pub fn handler(ctx: Context<CloseDirectedStakeWhitelist>) -> Result<()> {
     let config = ctx.accounts.config.load_init()?;
     CloseDirectedStakeWhitelist::auth(&config, ctx.accounts.authority.key)?;
     Ok(())
