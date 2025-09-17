@@ -1,11 +1,9 @@
 use std::mem::size_of;
 
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
 use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
-
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
-
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
 assert!(EXPECTED_SIZE == CONFIG_SIZE);*/
@@ -55,8 +53,17 @@ pub struct Config {
     /// The authority that can update the priority fee configs
     pub priority_fee_parameters_authority: Pubkey,
 
+    /// The authority that can update the DirectedStakeMeta for an epoch
+    pub directed_stake_meta_upload_authority: Pubkey,
+
+    /// The authority that can invoke lock_reserve and unlock_reserve instructions
+    pub reserve_lock_authority: Pubkey,
+
+    /// The authority that can update the directed stake whitelist
+    pub directed_stake_whitelist_authority: Pubkey,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 984],
+    pub _padding: [u8; 888],
 }
 
 impl Config {
