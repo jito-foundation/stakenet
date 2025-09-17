@@ -1920,6 +1920,11 @@
       "code": 6036,
       "name": "ValidatorNotInWhitelist",
       "msg": "Validator not found in whitelist"
+    },
+    {
+      "code": 6037,
+      "name": "WhitelistAuthorityUnset",
+      "msg": "Whitelist not initialized"
     }
   ],
   "types": [

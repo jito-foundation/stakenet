@@ -4,6 +4,7 @@ use crate::{
     errors::StewardError, state::directed_stake::DirectedStakePreference, utils::U8Bool, Config,
     DirectedStakeTicket, DirectedStakeWhitelist,
 };
+use std::mem::size_of;
 
 #[derive(Accounts)]
 pub struct InitializeDirectedStakeTicket<'info> {

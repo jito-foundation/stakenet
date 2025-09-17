@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{errors::StewardError, Config, DirectedStakeWhitelist};
+use std::mem::size_of;
 
 #[derive(Accounts)]
 pub struct CloseDirectedStakeWhitelist<'info> {

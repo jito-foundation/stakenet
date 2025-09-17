@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{errors::StewardError, Config, DirectedStakeTicket};
+use std::mem::size_of;
 
 #[derive(Accounts)]
 pub struct CloseDirectedStakeTicket<'info> {
