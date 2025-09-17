@@ -41,7 +41,6 @@ impl UpdateDirectedStakeTicket<'_> {
             return Err(error!(StewardError::Unauthorized));
         }
         
-        // Validate that all validators in preferences are on the whitelist
         for preference in preferences {
             if !whitelist.is_validator_permissioned(&preference.vote_pubkey) {
                 msg!("Error: Validator {} is not on the directed stake whitelist", preference.vote_pubkey);
@@ -60,7 +59,6 @@ pub fn handler(
     let whitelist = ctx.accounts.whitelist_account.load()?;
     let mut ticket = ctx.accounts.ticket_account.load_mut()?;
     
-    // Validate authorization and whitelist requirements
     UpdateDirectedStakeTicket::auth(&ticket, &whitelist, ctx.accounts.signer.key, &preferences)?;
     
     if preferences.len() > crate::MAX_PREFERENCES_PER_TICKET {
