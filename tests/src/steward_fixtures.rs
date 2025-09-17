@@ -404,7 +404,6 @@ impl TestFixture {
                 accounts: jito_steward::accounts::MigrateStateToV2 {
                     state_account: self.steward_state,
                     config: self.steward_config.pubkey(),
-                    signer: self.keypair.pubkey(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::MigrateStateToV2 {}.data(),
@@ -428,7 +427,6 @@ impl TestFixture {
                 accounts: jito_steward::accounts::MigrateStateToV2 {
                     state_account: self.steward_state,
                     config: self.steward_config.pubkey(),
-                    signer: self.keypair.pubkey(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::MigrateStateToV2 {}.data(),

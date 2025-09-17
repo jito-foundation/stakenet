@@ -2,11 +2,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 
 use crate::constants::MAX_VALIDATORS;
+use crate::state::{Config, StewardStateAccount, StewardStateAccountV2};
 use crate::StewardStateV2;
-use crate::{
-    state::{Config, StewardStateAccount, StewardStateAccountV2},
-    utils::get_config_admin,
-};
 
 #[derive(Accounts)]
 pub struct MigrateStateToV2<'info> {
@@ -19,9 +16,6 @@ pub struct MigrateStateToV2<'info> {
     pub state_account: AccountInfo<'info>,
 
     pub config: AccountLoader<'info, Config>,
-
-    #[account(address = get_config_admin(&config)?)]
-    pub signer: Signer<'info>,
 }
 
 pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
@@ -43,7 +37,7 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     // The migration only changes a few things:
     // 1. scores: expand from u32 to u64 (in place)
     // 2. sorted_score_indices: moves after expanded scores
-    // 3. sorted_yield_score_indices: becomes sorted_raw_score_indices (stays in place!)
+    // 3. sorted_yield_score_indices: becomes sorted_raw_score_indices (stays in place)
     // 4. yield_scores: becomes raw_scores at the end (expanded to u64)
 
     let base = 8usize; // Skip discriminator
