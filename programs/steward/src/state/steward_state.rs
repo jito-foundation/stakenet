@@ -124,12 +124,6 @@ pub struct StewardStateV1 {
 
 pub const STATE_PADDING_0_SIZE_V1: usize = MAX_VALIDATORS * 8 + 2;
 
-impl StewardStateV1 {
-    pub fn clear_flags(&mut self) {
-        self.status_flags = 0;
-    }
-}
-
 /// Tracks state of the stake pool.
 /// Follow state transitions here:
 /// https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png
