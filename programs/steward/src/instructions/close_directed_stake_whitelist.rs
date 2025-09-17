@@ -16,28 +16,17 @@ pub struct CloseDirectedStakeWhitelist<'info> {
     )]
     pub whitelist_account: AccountLoader<'info, DirectedStakeWhitelist>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
+    )]
     pub authority: Signer<'info>,
 }
 
 impl CloseDirectedStakeWhitelist<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
-
-    pub fn auth(config: &Config, authority_pubkey: &Pubkey) -> Result<()> {
-        if config.directed_stake_whitelist_authority == Pubkey::default() {
-            msg!("Error: Whitelist authority not initialized in Steward Config");
-            return Err(error!(StewardError::WhitelistAuthorityUnset));
-        }
-        if authority_pubkey != &config.directed_stake_whitelist_authority {
-            msg!("Error: Only the directed_stake_whitelist_authority can close the whitelist");
-            return Err(error!(StewardError::Unauthorized));
-        }
-        Ok(())
-    }
 }
 
-pub fn handler(ctx: Context<CloseDirectedStakeWhitelist>) -> Result<()> {
-    let config = ctx.accounts.config.load_init()?;
-    CloseDirectedStakeWhitelist::auth(&config, ctx.accounts.authority.key)?;
+pub fn handler(_ctx: Context<CloseDirectedStakeWhitelist>) -> Result<()> {
     Ok(())
 }

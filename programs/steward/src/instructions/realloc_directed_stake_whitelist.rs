@@ -41,7 +41,10 @@ pub struct ReallocDirectedStakeWhitelist<'info> {
 
     pub system_program: Program<'info, System>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
+    )]
     pub signer: Signer<'info>,
 }
 
