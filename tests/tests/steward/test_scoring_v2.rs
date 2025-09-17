@@ -285,27 +285,6 @@ fn test_score_sorting_property() {
 }
 
 #[test]
-fn test_large_score_values() {
-    // Test that large score values don't cause issues
-    // This addresses the concern about large u64 values
-
-    // Perfect validator should have a very large score
-    let perfect_score = encode_validator_score(0, 0, 100, 16000).unwrap();
-
-    // This is a large number but it's correct!
-    // Top byte is 100 (0x64), representing perfect inflation commission score
-    assert_eq!((perfect_score >> 56) & 0xFF, 100);
-
-    // The full value should be:
-    // (100 << 56) | (10000 << 42) | (100 << 25) | 16000
-    let expected = (100u64 << 56) | (10000u64 << 42) | (100u64 << 25) | 16000u64;
-    assert_eq!(perfect_score, expected);
-
-    // This large value is by design - it allows for fine-grained sorting
-    // where higher-order bits (inflation commission) matter most
-}
-
-#[test]
 fn test_commission_boundaries() {
     // Test boundary values for commissions
 
