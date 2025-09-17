@@ -329,27 +329,13 @@ pub async fn command_run_backtest(
     }
     scoring_epochs.reverse(); // Order from oldest to newest
 
-    // We need to fetch enough epochs to cover the lookback windows (typically 30 epochs)
-    // Plus all the scoring epochs we want to analyze
-    let min_epoch = scoring_epochs.first().copied().unwrap_or(start_epoch);
-    let max_lookback_window = 30u64; // This should come from config but 30 is typical
-    let earliest_needed_epoch = min_epoch.saturating_sub(max_lookback_window);
+    info!("Scoring cycles will be evaluated at epochs: {:?}", scoring_epochs);
 
-    // Build list of all epochs we need to fetch for analysis
-    let mut target_epochs = Vec::new();
-    let epochs_to_fetch = start_epoch.saturating_sub(earliest_needed_epoch) + 1;
+    // We only need to score at the rebalancing epochs, not every epoch
+    // The scoring function will look back from each scoring epoch
+    let target_epochs = scoring_epochs.clone();
 
-    // Make sure we have at least as many epochs as requested in lookback_epochs
-    let epochs_to_fetch = epochs_to_fetch.max(args.lookback_epochs);
-
-    for i in 0..epochs_to_fetch {
-        if let Some(epoch) = start_epoch.checked_sub(i) {
-            target_epochs.push(epoch);
-        }
-    }
-    target_epochs.reverse(); // Order from oldest to newest
-
-    info!("Running backtest for epochs: {:?}", target_epochs);
+    info!("Running backtest for {} scoring epochs", target_epochs.len());
 
     // Run backtest with cached data
     let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
