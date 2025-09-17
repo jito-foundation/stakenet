@@ -23,7 +23,7 @@ async fn test_migrate_state_to_v2() {
     fixture.initialize_steward_v1(None, None).await;
     fixture.realloc_steward_state().await;
 
-    // Generate random test data and store it
+    // Generate random test data
     let mut rng = thread_rng();
     let random_data = RandomTestData {
         scores: (0..MAX_VALIDATORS)
@@ -58,7 +58,7 @@ async fn test_migrate_state_to_v2() {
             random_data.sorted_yield_score_indices[i];
     }
 
-    // Update the account in BanksClient
+    // Update the account
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
         &serialized_steward_state_account_v1(steward_state_v1).into(),

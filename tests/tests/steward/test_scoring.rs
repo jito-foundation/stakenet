@@ -165,7 +165,6 @@ mod test_calculate_epoch_credits {
         let (delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_delinquency(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
 
-        // Note: vote_credits_ratio calculation was removed, delinquency check only
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.8);
         assert_eq!(delinquency_epoch, 0);
@@ -191,7 +190,6 @@ mod test_calculate_epoch_credits {
         let total_blocks = [Some(1000), None, Some(1000)];
         let (delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
-        // Note: vote_credits_ratio calculation was removed
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.0);
         assert_eq!(delinquency_epoch, 0);
@@ -205,7 +203,6 @@ mod test_calculate_epoch_credits {
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
         let (delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
-        // Note: vote_credits_ratio calculation was removed
         assert_eq!(delinquency_score, 1);
         assert_eq!(delinquency_ratio, 1.0);
         assert_eq!(delinquency_epoch, EPOCH_DEFAULT);

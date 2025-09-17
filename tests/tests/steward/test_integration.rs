@@ -232,8 +232,6 @@ async fn test_compute_scores() {
 
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.num_epochs_between_scoring = 10;
-    // Use a reasonable window size that works for both binary filters and averaging
-    // In production this is typically 30 epochs
     steward_config.parameters.epoch_credits_range = 30;
     steward_config.parameters.mev_commission_range = 30;
     steward_config.parameters.commission_range = 30;
@@ -354,10 +352,11 @@ async fn test_compute_scores() {
         steward_state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ));
-    // Score values will be different with average commission calculation
-    // Just check that a non-zero score was computed
-    assert!(steward_state_account.state.scores[0] > 0);
-    assert!(steward_state_account.state.raw_scores[0] > 0);
+    assert_eq!(steward_state_account.state.scores[0], 7249739868913833600);
+    assert_eq!(
+        steward_state_account.state.raw_scores[0],
+        7249739868913833600
+    );
     assert_eq!(steward_state_account.state.sorted_score_indices[0], 0);
     assert_eq!(steward_state_account.state.sorted_raw_score_indices[0], 0);
     assert!(steward_state_account.state.progress.get(0).unwrap());
@@ -559,8 +558,6 @@ async fn test_compute_instant_unstake() {
 
     steward_config.parameters.num_delegation_validators = 2;
     steward_config.parameters.num_epochs_between_scoring = 10;
-    // Use a reasonable window size that works for both binary filters and averaging
-    // In production this is typically 30 epochs
     steward_config.parameters.epoch_credits_range = 30;
     steward_config.parameters.mev_commission_range = 30;
     steward_config.parameters.commission_range = 30;
