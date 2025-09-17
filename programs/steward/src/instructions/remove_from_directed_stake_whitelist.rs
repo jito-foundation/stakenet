@@ -4,6 +4,7 @@ use crate::{
     errors::StewardError, state::directed_stake::DirectedStakeRecordType, Config,
     DirectedStakeWhitelist,
 };
+use std::mem::size_of;
 
 #[derive(Accounts)]
 pub struct RemoveFromDirectedStakeWhitelist<'info> {
