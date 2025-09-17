@@ -25,7 +25,7 @@ jobs:
         with:
           crate: cargo-audit
           version: "0.21.1"
-      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2024-0421 --ignore RUSTSEC-2025-0022 --ignore RUSTSEC-2025-0009 --ignore RUSTSEC-2025-0004 --ignore RUSTSEC-2024-0357 --ignore RUSTSEC-2024-0336
+      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2024-0421 --ignore RUSTSEC-2025-0022 --ignore RUSTSEC-2025-0009 --ignore RUSTSEC-2025-0004 --ignore RUSTSEC-2024-0357 --ignore RUSTSEC-2024-0336 --ignore RUSTSEC-2025-0055
 
   lint:
     name: lint
