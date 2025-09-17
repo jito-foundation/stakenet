@@ -234,7 +234,7 @@ fn test_directed_stake_whitelist_edge_cases() {
     };
 
     let non_existent = Pubkey::new_unique();
-    let result = whitelist.remove_staker(&non_existent);
+    let result = whitelist.remove_user_staker(&non_existent);
     assert!(result.is_err());
 
     let result = whitelist.remove_validator(&non_existent);
@@ -300,7 +300,7 @@ fn test_directed_stake_whitelist_validation_logic() {
     let non_whitelisted_validator = Pubkey::new_unique();
 
     // Add staker and validators to whitelist
-    whitelist.add_staker(staker).unwrap();
+    whitelist.add_user_staker(staker).unwrap();
     whitelist.add_validator(validator1).unwrap();
     whitelist.add_validator(validator2).unwrap();
 
@@ -483,7 +483,7 @@ fn test_ticket_authorization_scenarios() {
     let close_authority = Pubkey::new_unique();
 
     // Setup whitelist
-    whitelist.add_staker(permissioned_staker).unwrap();
+    whitelist.add_user_staker(permissioned_staker).unwrap();
     whitelist.add_validator(permissioned_validator).unwrap();
 
     // Test ticket initialization authorization

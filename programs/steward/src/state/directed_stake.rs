@@ -221,11 +221,6 @@ impl DirectedStakeWhitelist {
         Ok(())
     }
 
-    pub fn add_staker(&mut self, staker: Pubkey) -> Result<()> {
-        // Default to adding as user staker for backward compatibility
-        self.add_user_staker(staker)
-    }
-
     pub fn add_validator(&mut self, validator: Pubkey) -> Result<()> {
         if !self.can_add_validator() {
             return Err(error!(DirectedStakeValidatorListFull));
@@ -294,17 +289,6 @@ impl DirectedStakeWhitelist {
         }
     }
 
-    pub fn remove_staker(&mut self, staker: &Pubkey) -> Result<()> {
-        // Try to remove from user stakers first, then protocol stakers
-        if self.is_user_staker_permissioned(staker) {
-            self.remove_user_staker(staker)
-        } else if self.is_protocol_staker_permissioned(staker) {
-            self.remove_protocol_staker(staker)
-        } else {
-            Err(error!(StakerNotInWhitelist))
-        }
-    }
-
     pub fn remove_validator(&mut self, validator: &Pubkey) -> Result<()> {
         if self.total_permissioned_validators == 0 {
             return Err(error!(ValidatorNotInWhitelist));
@@ -330,6 +314,17 @@ impl DirectedStakeWhitelist {
             Ok(())
         } else {
             Err(error!(ValidatorNotInWhitelist))
+        }
+    }
+
+    pub fn remove_staker(&mut self, staker: &Pubkey) -> Result<()> {
+        // Try to remove from user stakers first, then protocol stakers
+        if self.is_user_staker_permissioned(staker) {
+            self.remove_user_staker(staker)
+        } else if self.is_protocol_staker_permissioned(staker) {
+            self.remove_protocol_staker(staker)
+        } else {
+            Err(error!(StakerNotInWhitelist))
         }
     }
 }
