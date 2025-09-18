@@ -3,7 +3,10 @@ use anchor_lang::Discriminator;
 
 use crate::constants::MAX_VALIDATORS;
 use crate::state::{Config, StewardStateAccount, StewardStateAccountV2};
-use crate::StewardStateV2;
+
+// V1 and V2 have the same size, so we can use the same range for both
+const ACCOUNT_SIZE: usize = core::mem::size_of::<StewardStateAccount>();
+const ACCOUNT_RANGE: core::ops::Range<usize> = 8..8 + ACCOUNT_SIZE;
 
 #[derive(Accounts)]
 pub struct MigrateStateToV2<'info> {
@@ -31,22 +34,24 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     // ==========================================
     data[0..8].copy_from_slice(StewardStateAccountV2::DISCRIMINATOR);
 
-    // V1 and V2 have the same size, so we can use the same range for both
-    const ACCOUNT_SIZE: usize = core::mem::size_of::<StewardStateAccount>();
-    const ACCOUNT_RANGE: core::ops::Range<usize> = 8..8 + ACCOUNT_SIZE;
-
     // ==========================================
-    // STEP 3: Extract and preserve yield_scores before they get overwritten
+    // STEP 3: Copy yield_scores to raw_scores location (safe - no overlap)
     // ==========================================
-    let yield_scores = {
-        let v1_account: &StewardStateAccount = bytemuck::from_bytes(&data[ACCOUNT_RANGE]);
-        v1_account.state.yield_scores.to_vec()
-    };
+    for i in 0..MAX_VALIDATORS {
+        // Grab value from v1 location
+        let yield_score = {
+            let v1_account: &StewardStateAccount = bytemuck::from_bytes(&data[ACCOUNT_RANGE]);
+            v1_account.state.yield_scores[i]
+        };
+        // Write to v2 location
+        let v2_account: &mut StewardStateAccountV2 =
+            bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
+        v2_account.state.raw_scores[i] = yield_score as u64;
+    }
 
     // ==========================================
     // STEP 4: Copy sorted_score_indices to new V2 location
     // ==========================================
-    // sorted_score_indices needs to move from after u32 scores to after u64 scores
     for i in 0..MAX_VALIDATORS {
         // Grab value from v1 location
         let val = {
@@ -57,15 +62,6 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         let v2_account: &mut StewardStateAccountV2 =
             bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
         v2_account.state.sorted_score_indices[i] = val;
-    }
-
-    // ==========================================
-    // STEP 5: Write preserved yield_scores as raw_scores
-    // ==========================================
-    for i in 0..MAX_VALIDATORS {
-        let v2_account: &mut StewardStateAccountV2 =
-            bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
-        v2_account.state.raw_scores[i] = yield_scores[i] as u64;
     }
 
     // ==========================================
@@ -84,8 +80,8 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     }
 
     // Clear the old is_initialized field (now padding)
-    let account_fields_offset = 8 + core::mem::size_of::<StewardStateV2>();
-    data[account_fields_offset] = 0;
+    let v2_account: &mut StewardStateAccountV2 = bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
+    v2_account._padding0 = 0;
 
     Ok(())
 }
