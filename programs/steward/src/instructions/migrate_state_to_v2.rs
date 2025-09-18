@@ -54,14 +54,14 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     // ==========================================
     for i in 0..MAX_VALIDATORS {
         // Grab value from v1 location
-        let val = {
+        let sorted_score_index = {
             let v1_account: &StewardStateAccount = bytemuck::from_bytes(&data[ACCOUNT_RANGE]);
             v1_account.state.sorted_score_indices[i]
         };
         // Write to v2 location
         let v2_account: &mut StewardStateAccountV2 =
             bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
-        v2_account.state.sorted_score_indices[i] = val;
+        v2_account.state.sorted_score_indices[i] = sorted_score_index;
     }
 
     // ==========================================
