@@ -398,6 +398,10 @@ pub struct BacktestParameters {
     /// Directory for CSV export files
     #[arg(long, default_value = "backtest_results/exports")]
     pub export_dir: PathBuf,
+
+    /// Override MEV commission range for testing (default: use config value from chain)
+    #[arg(long)]
+    pub override_mev_commission_range: Option<u16>,
 }
 
 // ---------- ACTIONS ------------

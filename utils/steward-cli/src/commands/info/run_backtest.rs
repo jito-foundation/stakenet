@@ -104,15 +104,22 @@ fn load_cached_data(cache_file: &std::path::Path) -> Result<CachedBacktestData> 
 async fn run_backtest_with_cached_data(
     cached_data: &CachedBacktestData,
     target_epochs: Vec<u64>,
+    override_mev_commission_range: Option<u16>,
 ) -> Result<Vec<BacktestResult>> {
     use anchor_lang::AccountDeserialize;
     use jito_steward::Config;
     use validator_history::{ClusterHistory, ValidatorHistory};
 
     // Deserialize accounts from cached data
-    let config: Config =
+    let mut config: Config =
         Config::try_deserialize(&mut cached_data.config_account.data.as_slice())
             .map_err(|e| anyhow::anyhow!("Failed to deserialize steward config: {}", e))?;
+
+    // Apply MEV commission range override if provided
+    if let Some(mev_range) = override_mev_commission_range {
+        info!("Overriding MEV commission range from {} to {}", config.parameters.mev_commission_range, mev_range);
+        config.parameters.mev_commission_range = mev_range;
+    }
 
     let cluster_history: ClusterHistory =
         ClusterHistory::try_deserialize(&mut cached_data.cluster_history_account.data.as_slice())
@@ -338,7 +345,7 @@ pub async fn command_run_backtest(
     info!("Running backtest for {} scoring epochs", target_epochs.len());
 
     // Run backtest with cached data
-    let results = run_backtest_with_cached_data(&cached_data, target_epochs).await?;
+    let results = run_backtest_with_cached_data(&cached_data, target_epochs, args.override_mev_commission_range).await?;
 
     info!("Backtest analysis complete for {} epochs", results.len());
 
