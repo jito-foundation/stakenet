@@ -92,66 +92,6 @@ pub fn calculate_avg_mev_commission(
     avg.min(BASIS_POINTS_MAX as u64) as u16
 }
 
-/// Calculates the vote credits ratio and delinquency score for the validator
-pub fn calculate_epoch_credits(
-    epoch_credits_window: &[Option<u32>],
-    total_blocks_window: &[Option<u32>],
-    epoch_credits_start: u16,
-    scoring_delinquency_threshold_ratio: f64,
-) -> Result<(f64, u8, f64, u16)> {
-    if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
-        return Err(StewardError::ArithmeticError.into());
-    }
-
-    let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
-        / epoch_credits_window.len() as f64;
-
-    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
-    if nonzero_blocks == 0 {
-        return Err(StewardError::ArithmeticError.into());
-    }
-
-    // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks =
-        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
-
-    // Delinquency heuristic - not actual delinquency
-    let mut delinquency_score = 1u8;
-    let mut delinquency_ratio = 1.0;
-    let mut delinquency_epoch = EPOCH_DEFAULT;
-
-    for (i, (maybe_credits, maybe_blocks)) in epoch_credits_window
-        .iter()
-        .zip(total_blocks_window.iter())
-        .enumerate()
-    {
-        if let Some(blocks) = maybe_blocks {
-            // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
-            // If total blocks are None, then keepers missed an upload and validator should not be punished.
-            let credits = maybe_credits.unwrap_or(0);
-            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
-            if ratio < scoring_delinquency_threshold_ratio {
-                delinquency_score = 0;
-                delinquency_ratio = ratio;
-                delinquency_epoch = epoch_credits_start
-                    .checked_add(i as u16)
-                    .ok_or(StewardError::ArithmeticError)?;
-                break;
-            }
-        }
-    }
-
-    let normalized_vote_credits_ratio =
-        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
-
-    Ok((
-        normalized_vote_credits_ratio,
-        delinquency_score,
-        delinquency_ratio,
-        delinquency_epoch,
-    ))
-}
-
 #[event]
 #[derive(Debug, PartialEq)]
 pub struct ScoreComponentsV4 {
@@ -434,6 +374,66 @@ pub fn calculate_max_mev_commission(
         max_mev_commission,
         max_mev_commission_epoch,
         running_jito_score,
+    ))
+}
+
+/// Calculates the vote credits ratio and delinquency score for the validator
+pub fn calculate_epoch_credits(
+    epoch_credits_window: &[Option<u32>],
+    total_blocks_window: &[Option<u32>],
+    epoch_credits_start: u16,
+    scoring_delinquency_threshold_ratio: f64,
+) -> Result<(f64, u8, f64, u16)> {
+    if epoch_credits_window.is_empty() || total_blocks_window.is_empty() {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
+    let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
+        / epoch_credits_window.len() as f64;
+
+    let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
+    if nonzero_blocks == 0 {
+        return Err(StewardError::ArithmeticError.into());
+    }
+
+    // Get average of total blocks in window, ignoring values where upload was missed
+    let average_blocks =
+        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
+
+    // Delinquency heuristic - not actual delinquency
+    let mut delinquency_score = 1u8;
+    let mut delinquency_ratio = 1.0;
+    let mut delinquency_epoch = EPOCH_DEFAULT;
+
+    for (i, (maybe_credits, maybe_blocks)) in epoch_credits_window
+        .iter()
+        .zip(total_blocks_window.iter())
+        .enumerate()
+    {
+        if let Some(blocks) = maybe_blocks {
+            // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
+            // If total blocks are None, then keepers missed an upload and validator should not be punished.
+            let credits = maybe_credits.unwrap_or(0);
+            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
+            if ratio < scoring_delinquency_threshold_ratio {
+                delinquency_score = 0;
+                delinquency_ratio = ratio;
+                delinquency_epoch = epoch_credits_start
+                    .checked_add(i as u16)
+                    .ok_or(StewardError::ArithmeticError)?;
+                break;
+            }
+        }
+    }
+
+    let normalized_vote_credits_ratio =
+        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
+
+    Ok((
+        normalized_vote_credits_ratio,
+        delinquency_score,
+        delinquency_ratio,
+        delinquency_epoch,
     ))
 }
 
