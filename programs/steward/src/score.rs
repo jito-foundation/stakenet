@@ -36,7 +36,7 @@ pub fn encode_validator_score(
     vote_credits: u32,        // normalized vote credits ratio scaled by VOTE_CREDITS_RATIO_MAX
 ) -> Result<u64> {
     // Tier 1: Inflation commission (inverted so lower commission = higher score)
-    let inflation_score = 100u64.saturating_sub(inflation_commission.min(100) as u64);
+    let inflation_score = 100u64.saturating_sub(inflation_commission.min(COMMISSION_MAX) as u64);
 
     // Tier 2: MEV commission (inverted so lower commission = higher score)
     let mev_score =

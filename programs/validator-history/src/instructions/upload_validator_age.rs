@@ -29,7 +29,6 @@ pub struct UploadValidatorAge<'info> {
 }
 
 /// Allows the oracle authority to manually set the validator_age field.
-/// This serves as a backdoor for uploading validator age data when needed.
 pub fn handle_upload_validator_age(
     ctx: Context<UploadValidatorAge>,
     validator_age: u32,

@@ -1180,7 +1180,9 @@ impl ValidatorHistory {
 
         // Scan through the circular buffer for epochs with non-zero vote credits
         for entry in self.history.arr.iter() {
-            if entry.epoch != u16::MAX && entry.epoch_credits != u32::MAX && entry.epoch_credits > 0
+            if entry.epoch != ValidatorHistoryEntry::default().epoch
+                && entry.epoch_credits != ValidatorHistoryEntry::default().epoch_credits
+                && entry.epoch_credits > 0
             {
                 age_count = age_count.saturating_add(1);
                 if entry.epoch > latest_epoch_with_credits {
