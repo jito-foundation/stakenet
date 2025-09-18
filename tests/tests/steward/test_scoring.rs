@@ -1,4 +1,4 @@
-use jito_steward::{score::*, Config, LargeBitMask, Parameters};
+use jito_steward::{constants::VOTE_CREDITS_RATIO_MAX, score::*, Config, LargeBitMask, Parameters};
 use solana_sdk::pubkey::Pubkey;
 use validator_history::{CircBuf, MerkleRootUploadAuthority, ValidatorHistory};
 
@@ -148,7 +148,7 @@ mod test_calculate_max_mev_commission {
 
 mod test_calculate_epoch_credits {
     use jito_steward::constants::EPOCH_DEFAULT;
-    use jito_steward::score::calculate_delinquency;
+    use jito_steward::score::calculate_epoch_credits;
     use validator_history::constants::TVC_MULTIPLIER;
 
     #[test]
@@ -162,9 +162,10 @@ mod test_calculate_epoch_credits {
         let epoch_start = 0;
         let threshold = 0.9;
 
-        let (delinquency_score, delinquency_ratio, delinquency_epoch) =
-            calculate_delinquency(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
 
+        assert_eq!(vote_credits_ratio, 0.8);
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.8);
         assert_eq!(delinquency_epoch, 0);
@@ -179,8 +180,8 @@ mod test_calculate_epoch_credits {
             Some(850 * TVC_MULTIPLIER),
         ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
-        let (delinquency_score, delinquency_ratio, delinquency_epoch) =
-            calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
+        let (_vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.7);
         assert_eq!(delinquency_epoch, 0);
@@ -188,8 +189,9 @@ mod test_calculate_epoch_credits {
         // Missing data
         let epoch_credits = [None, Some(800 * TVC_MULTIPLIER), Some(900 * TVC_MULTIPLIER)];
         let total_blocks = [Some(1000), None, Some(1000)];
-        let (delinquency_score, delinquency_ratio, delinquency_epoch) =
-            calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
+        assert_eq!(vote_credits_ratio, 1700. / 3000.);
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.0);
         assert_eq!(delinquency_epoch, 0);
@@ -201,8 +203,9 @@ mod test_calculate_epoch_credits {
             Some(1000 * TVC_MULTIPLIER),
         ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
-        let (delinquency_score, delinquency_ratio, delinquency_epoch) =
-            calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
+        assert_eq!(vote_credits_ratio, 0.9);
         assert_eq!(delinquency_score, 1);
         assert_eq!(delinquency_ratio, 1.0);
         assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
@@ -210,19 +213,19 @@ mod test_calculate_epoch_credits {
         // Empty windows
         let epoch_credits: [Option<u32>; 0] = [];
         let total_blocks: [Option<u32>; 0] = [];
-        let result = calculate_delinquency(&epoch_credits, &total_blocks, 0, 0.9);
+        let result = calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9);
         assert!(result.is_err());
 
         // Test Arithmetic error
         let epoch_credits = [Some(TVC_MULTIPLIER), Some(0)];
         let total_blocks = [Some(1), Some(1)];
-        let result = calculate_delinquency(&epoch_credits, &total_blocks, u16::MAX, 0.9);
+        let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
 
         // Test all blocks none - should error when no cluster data is available
         let epoch_credits = [Some(1), Some(1)];
         let total_blocks = [None, None];
-        let result = calculate_delinquency(&epoch_credits, &total_blocks, u16::MAX, 0.9);
+        let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
     }
 }
