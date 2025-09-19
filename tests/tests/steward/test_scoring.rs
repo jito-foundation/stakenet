@@ -1,4 +1,4 @@
-use jito_steward::{constants::VOTE_CREDITS_RATIO_MAX, score::*, Config, LargeBitMask, Parameters};
+use jito_steward::{score::*, Config, LargeBitMask, Parameters};
 use solana_sdk::pubkey::Pubkey;
 use validator_history::{CircBuf, MerkleRootUploadAuthority, ValidatorHistory};
 
