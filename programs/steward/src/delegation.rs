@@ -6,7 +6,7 @@ use crate::events::DecreaseComponents;
 use crate::{
     errors::StewardError,
     utils::{get_target_lamports, stake_lamports_at_validator_list_index},
-    StewardState,
+    StewardStateV2,
 };
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ pub enum RebalanceType {
 /// and this ensures that unstaking is done fairly at the time of the rebalance. In addition, these instructions can run in any order.
 #[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
-    state: &StewardState,
+    state: &StewardStateV2,
     target_index: usize,
     mut unstake_state: UnstakeState,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
@@ -42,7 +42,7 @@ pub fn decrease_stake_calculation(
         .checked_add(stake_rent)
         .ok_or(StewardError::ArithmeticError)?;
 
-    for idx in state.sorted_yield_score_indices[..state.num_pool_validators as usize]
+    for idx in state.sorted_raw_score_indices[..state.num_pool_validators as usize]
         .iter()
         .rev()
     {
@@ -105,7 +105,7 @@ pub fn decrease_stake_calculation(
 /// This allows for a fair staking distribution based on the current state of the pool, and these instructions can run in any order.
 #[allow(clippy::too_many_arguments)]
 pub fn increase_stake_calculation(
-    state: &StewardState,
+    state: &StewardStateV2,
     target_index: usize,
     current_lamports: u64,
     stake_pool_lamports: u64,
@@ -204,7 +204,7 @@ impl UnstakeState {
     /// Note: modifies unstake_totals
     pub fn simulate_unstake(
         &mut self,
-        state: &StewardState,
+        state: &StewardStateV2,
         index: usize,
         mut current_lamports: u64,
         target_lamports: u64,
@@ -243,7 +243,7 @@ impl UnstakeState {
 
     pub fn stake_deposit_unstake(
         &self,
-        state: &StewardState,
+        state: &StewardStateV2,
         index: usize,
         current_lamports: u64,
         target_lamports: u64,
@@ -278,7 +278,7 @@ impl UnstakeState {
 
     pub fn instant_unstake(
         &self,
-        state: &StewardState,
+        state: &StewardStateV2,
         index: usize,
         current_lamports: u64,
         target_lamports: u64,

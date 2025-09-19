@@ -48,6 +48,7 @@ enum Commands {
     StakeByCountry(StakeByCountry),
     GetConfig,
     UpdateOracleAuthority(UpdateOracleAuthority),
+    UploadValidatorAge(UploadValidatorAge),
 }
 
 #[derive(Parser)]
@@ -163,6 +164,26 @@ struct UpdateOracleAuthority {
     /// New oracle authority (Pubkey as base58 string)
     #[arg(long, env)]
     oracle_authority: Pubkey,
+}
+
+#[derive(Parser)]
+#[command(about = "Upload validator age for a specific vote account")]
+struct UploadValidatorAge {
+    /// Path to oracle authority keypair
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+
+    /// Vote account pubkey to update
+    #[arg(short, long, env)]
+    vote_account: Pubkey,
+
+    /// Validator age value to set
+    #[arg(short, long, env)]
+    age: u32,
+
+    /// Epoch when validator age was last updated (defaults to current epoch)
+    #[arg(short, long, env)]
+    epoch: Option<u16>,
 }
 
 #[derive(Parser)]
@@ -1091,6 +1112,62 @@ fn command_get_config(client: RpcClient) {
     }
 }
 
+fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
+    // Upload validator age for a specific vote account
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+
+    // Get current epoch if not specified
+    let epoch = args.epoch.unwrap_or_else(|| {
+        let epoch_info = client.get_epoch_info().expect("Failed to get epoch info");
+        epoch_info.epoch as u16
+    });
+
+    // Get validator history account address
+    let (validator_history_pda, _) = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, args.vote_account.as_ref()],
+        &validator_history::ID,
+    );
+
+    // Get config account address
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let instruction = Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::UploadValidatorAge {
+            validator_history_account: validator_history_pda,
+            vote_account: args.vote_account,
+            config: config_pda,
+            oracle_authority: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::UploadValidatorAge {
+            validator_age: args.age,
+            validator_age_last_updated_epoch: epoch,
+        }
+        .data(),
+    };
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+
+    println!("Successfully uploaded validator age:");
+    println!("  Vote Account: {}", args.vote_account);
+    println!("  Validator Age: {}", args.age);
+    println!("  Last Updated Epoch: {}", epoch);
+    println!("  Signature: {}", signature);
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -1107,5 +1184,6 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
+        Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
     };
 }

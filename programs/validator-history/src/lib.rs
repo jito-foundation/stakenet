@@ -108,6 +108,14 @@ pub mod validator_history {
         handle_update_stake_history(ctx, epoch, lamports, rank, is_superminority)
     }
 
+    pub fn upload_validator_age(
+        ctx: Context<UploadValidatorAge>,
+        validator_age: u32,
+        validator_age_last_updated_epoch: u16,
+    ) -> Result<()> {
+        handle_upload_validator_age(ctx, validator_age, validator_age_last_updated_epoch)
+    }
+
     pub fn copy_gossip_contact_info(ctx: Context<CopyGossipContactInfo>) -> Result<()> {
         handle_copy_gossip_contact_info(ctx)
     }

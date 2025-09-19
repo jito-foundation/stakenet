@@ -8,7 +8,7 @@ use anchor_lang::{
 use jito_steward::{
     instructions::AuthorityType,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, StewardStateAccount,
+    Config, StewardStateAccountV2,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -128,7 +128,6 @@ async fn test_auto_add_validator_to_pool() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     _auto_add_validator_to_pool(&fixture, &Pubkey::new_unique()).await;
 
@@ -141,7 +140,6 @@ async fn test_auto_remove() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -204,7 +202,7 @@ async fn test_auto_remove() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(
@@ -301,7 +299,6 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     fixture.advance_num_epochs(1, 10).await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
@@ -389,7 +386,7 @@ async fn test_auto_remove_validator_states() {
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
@@ -466,7 +463,7 @@ async fn test_auto_remove_validator_states() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
@@ -550,7 +547,7 @@ async fn test_auto_remove_validator_states() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingAll.into());
@@ -601,7 +598,6 @@ async fn test_instant_remove_validator() {
     let _ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -651,7 +647,7 @@ async fn test_instant_remove_validator() {
     fixture.submit_transaction_assert_success(tx).await;
 
     // Check that validator is removed
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     assert!(
         steward_state_account

@@ -2,7 +2,7 @@ use crate::{
     errors::StewardError,
     maybe_transition,
     utils::{get_validator_list, get_validator_stake_info_at_index, state_checks},
-    Config, StewardStateAccount, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -16,7 +16,7 @@ pub struct ComputeInstantUnstake<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     /// CHECK: We check it is the correct vote account in the handler
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
