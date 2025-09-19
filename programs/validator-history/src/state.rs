@@ -1177,6 +1177,14 @@ impl ValidatorHistory {
     /// Only counts completed epochs (up to current_epoch - 1)
     fn initialize_validator_age(&mut self, current_epoch: u16) {
         let mut age_count = 0u32;
+
+        // Special case: at epoch 0, there are no completed epochs yet
+        if current_epoch == 0 {
+            self.validator_age = 0;
+            self.validator_age_last_updated_epoch = 0;
+            return;
+        }
+
         let end_epoch = current_epoch.saturating_sub(1);
 
         // Scan through the circular buffer for epochs with non-zero vote credits

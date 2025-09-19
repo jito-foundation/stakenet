@@ -69,6 +69,16 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[0].epoch_credits == 10);
     assert!(account.history.arr[0].commission == 9);
 
+    // Check validator_age - at epoch 0, no completed epochs yet, so age should be 0
+    assert_eq!(
+        account.validator_age, 0,
+        "Validator age should be 0 at epoch 0"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 0,
+        "Last updated epoch should be 0"
+    );
+
     // Skips epoch
     fixture.advance_num_epochs(2).await;
     let epoch_credits = vec![(0, 22, 10), (1, 35, 22), (2, 49, 35)];
@@ -120,6 +130,17 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[2].epoch_credits == 14);
     assert!(account.history.arr[1].epoch_credits == 13);
     assert!(account.history.arr[0].epoch_credits == 12);
+
+    // Check validator_age - at epoch 2, we should count epochs 0 and 1 (not 2, as it's current)
+    // Both epochs 0 and 1 have non-zero credits (12 and 13 respectively)
+    assert_eq!(
+        account.validator_age, 2,
+        "Validator age should be 2 at epoch 2 (counting epochs 0 and 1)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 1,
+        "Last updated epoch should be 1 (epoch 2 - 1)"
+    );
 }
 
 #[tokio::test]
@@ -260,6 +281,19 @@ async fn test_insert_missing_entries_compute() {
     assert!(account.history.arr[end_idx].epoch == 1000);
     assert!(account.history.arr[end_idx].epoch_credits == 10);
     assert!(account.history.arr[end_idx].commission == 9);
+
+    // Check validator_age - at epoch 1000, validator age was already calculated during the second
+    // transaction when we only had epochs 0 and 1000. At that time, only epoch 0 was counted
+    // (epoch 1000 is current and not counted). The third transaction adds historical data but
+    // doesn't recalculate age since we're still at epoch 1000 and it's idempotent.
+    assert_eq!(
+        account.validator_age, 1,
+        "Validator age should be 1 (only epoch 0 was present when age was calculated)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 999,
+        "Last updated epoch should be 999 (epoch 1000 - 1)"
+    );
     for i in end_idx + 1..ValidatorHistory::MAX_ITEMS {
         assert!(account.history.arr[i].epoch == ValidatorHistoryEntry::default().epoch);
         assert!(
@@ -375,6 +409,19 @@ async fn test_insert_missing_entries_wraparound() {
             assert_eq!(account.history.arr[index].epoch_credits, 10);
         }
     }
+
+    // Check validator_age - at epoch 610, count all epochs with credits up to 609
+    // We have epochs 99-609 in the buffer (512 entries total due to wraparound)
+    // All of them have non-zero credits (10 or 11)
+    // So validator_age should be the count of epochs from 99 to 609 = 511 epochs
+    assert_eq!(
+        account.validator_age, 511,
+        "Validator age should be 511 (epochs 99-609 with credits)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 609,
+        "Last updated epoch should be 609 (epoch 610 - 1)"
+    );
 
     drop(fixture);
 }
