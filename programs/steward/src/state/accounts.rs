@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use borsh::BorshSerialize;
 use type_layout::TypeLayout;
 
-use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardState};
+use crate::{parameters::Parameters, utils::U8Bool, LargeBitMask, StewardStateV1, StewardStateV2};
 
 /* TODO: const CONFIG_SIZE: usize = size_of::<Config>();
 const EXPECTED_SIZE: usize = 4040;
@@ -87,19 +87,33 @@ impl Config {
     }
 }
 
-#[derive(BorshSerialize)]
+/// V1 State Account
 #[account(zero_copy)]
 pub struct StewardStateAccount {
-    pub state: StewardState,
+    pub state: StewardStateV1,
     pub is_initialized: U8Bool,
     pub bump: u8,
     pub _padding: [u8; 6],
+}
+
+/// V2 State Account
+#[account(zero_copy)]
+pub struct StewardStateAccountV2 {
+    pub state: StewardStateV2,
+    pub bump: u8,
+    /// is_initialized byte repurposed as padding, as the v2 struct has a new discriminator and
+    /// cannot be passed into the init or realloc instructions.
+    pub _padding0: [u8; 7],
 }
 
 impl StewardStateAccount {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"steward_state";
     pub const IS_INITIALIZED_BYTE_POSITION: usize = Self::SIZE - 8;
+}
+
+impl StewardStateAccountV2 {
+    pub const SIZE: usize = 8 + size_of::<Self>();
 }
 
 pub fn derive_steward_state_address(steward_config: &Pubkey) -> (Pubkey, u8) {

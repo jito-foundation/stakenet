@@ -7,6 +7,7 @@ pub const STAKE_POOL_TRANSIENT_SEED: &[u8] = b"transient";
 pub const MAX_VALIDATORS: usize = 5_000;
 pub const BASIS_POINTS_MAX: u16 = 10_000;
 pub const COMMISSION_MAX: u8 = 100;
+pub const VOTE_CREDITS_RATIO_MAX: u32 = 10_000_000;
 pub const SORTED_INDEX_DEFAULT: u16 = u16::MAX;
 pub const LAMPORT_BALANCE_DEFAULT: u64 = u64::MAX;
 pub const EPOCH_DEFAULT: u16 = u16::MAX;

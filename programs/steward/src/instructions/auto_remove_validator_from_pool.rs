@@ -4,7 +4,6 @@ use crate::constants::STAKE_POOL_WITHDRAW_SEED;
 use crate::errors::StewardError;
 use crate::events::AutoRemoveValidatorEvent;
 use crate::state::Config;
-use crate::StewardStateAccount;
 use crate::{
     stake_pool_utils::deserialize_stake_pool,
     utils::{
@@ -12,6 +11,7 @@ use crate::{
         stake_is_inactive_without_history, stake_is_usable_by_pool,
     },
 };
+use crate::{StewardStateAccount, StewardStateAccountV2};
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
     borsh1::try_from_slice_unchecked,
@@ -40,7 +40,7 @@ pub struct AutoRemoveValidator<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(

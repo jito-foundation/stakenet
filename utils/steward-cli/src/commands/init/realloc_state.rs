@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount};
+use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount, StewardStateAccountV2};
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_program::instruction::Instruction;
@@ -56,7 +56,7 @@ pub async fn command_realloc_state(
     }
 
     let data_length = steward_state_account_raw.data.len();
-    let whats_left = StewardStateAccount::SIZE - data_length.min(StewardStateAccount::SIZE);
+    let whats_left = StewardStateAccountV2::SIZE - data_length.min(StewardStateAccountV2::SIZE);
 
     let mut reallocs_left_to_run =
         (whats_left.max(MAX_ALLOC_BYTES) - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;

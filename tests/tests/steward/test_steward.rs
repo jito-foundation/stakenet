@@ -8,7 +8,7 @@ use anchor_lang::{
 use jito_steward::{
     instructions::AuthorityType,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, StewardStateAccount,
+    Config, StewardStateAccountV2,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -128,7 +128,6 @@ async fn test_auto_add_validator_to_pool() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     _auto_add_validator_to_pool(&fixture, &Pubkey::new_unique()).await;
 
@@ -141,7 +140,6 @@ async fn test_auto_remove() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -204,7 +202,7 @@ async fn test_auto_remove() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(
@@ -301,7 +299,6 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     fixture.advance_num_epochs(1, 10).await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
@@ -389,7 +386,7 @@ async fn test_auto_remove_validator_states() {
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
@@ -466,7 +463,7 @@ async fn test_auto_remove_validator_states() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
@@ -550,7 +547,7 @@ async fn test_auto_remove_validator_states() {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingAll.into());
@@ -601,7 +598,6 @@ async fn test_instant_remove_validator() {
     let _ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -651,7 +647,7 @@ async fn test_instant_remove_validator() {
     fixture.submit_transaction_assert_success(tx).await;
 
     // Check that validator is removed
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     assert!(
         steward_state_account
@@ -857,6 +853,23 @@ async fn test_blacklist_edge_cases() {
     assert!(config.validator_history_blacklist.is_empty());
 
     drop(fixture);
+}
+
+#[tokio::test]
+async fn test_steward_state_account_sizes() {
+    use jito_steward::{StewardStateAccount, StewardStateAccountV2};
+    use std::mem::size_of;
+
+    let v1_size = size_of::<StewardStateAccount>();
+    let v2_size = size_of::<StewardStateAccountV2>();
+
+    assert_eq!(
+        v1_size,
+        v2_size,
+        "StewardStateAccount ({} bytes) and StewardStateAccountV2 ({} bytes) must have the same size",
+        v1_size,
+        v2_size
+    );
 }
 
 #[tokio::test]

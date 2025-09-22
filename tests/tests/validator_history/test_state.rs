@@ -1,5 +1,6 @@
+use anchor_lang::prelude::*;
 use validator_history::constants::TVC_MULTIPLIER;
-use validator_history::state::CircBuf;
+use validator_history::state::{CircBuf, ValidatorHistory};
 use validator_history::ValidatorHistoryEntry;
 
 const MAX_ITEMS: usize = 512;
@@ -70,4 +71,181 @@ fn test_epoch_credits_range_normalized() {
             Some(1000)
         ]
     );
+}
+
+#[test]
+fn test_validator_age_tracking_with_gaps() {
+    // Test that validator age correctly counts multiple epochs when there's a gap between updates
+    let mut validator_history = ValidatorHistory {
+        struct_version: 0,
+        vote_account: Pubkey::default(),
+        index: 0,
+        bump: 0,
+        _padding0: [0; 7],
+        last_ip_timestamp: 0,
+        last_version_timestamp: 0,
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
+        history: CircBuf::default(),
+    };
+
+    // Add epochs 100, 101, 102 with credits
+    for epoch in 100..=102 {
+        validator_history.history.push(ValidatorHistoryEntry {
+            epoch,
+            epoch_credits: 1000,
+            ..ValidatorHistoryEntry::default()
+        });
+    }
+
+    // Initialize validator age at epoch 102
+    validator_history.update_validator_age(102).unwrap();
+    assert_eq!(validator_history.validator_age, 2); // Counts epochs 100, 101 (not 102 as it's current)
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 101); // Only counts up to epoch 101
+
+    // Add epochs 105, 106, 107 with credits (gap of 2 epochs)
+    for epoch in 105..=107 {
+        validator_history.history.push(ValidatorHistoryEntry {
+            epoch,
+            epoch_credits: 1000,
+            ..ValidatorHistoryEntry::default()
+        });
+    }
+
+    // Update at epoch 107 - should count epochs 102, 105, 106 (not 107 as it's current)
+    validator_history.update_validator_age(107).unwrap();
+    assert_eq!(validator_history.validator_age, 5); // 2 + 3 new epochs (102, 105, 106)
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 106); // Only up to epoch 106
+}
+
+#[test]
+fn test_validator_age_mixed_credits() {
+    // Test with some epochs having credits and some not
+    let mut validator_history = ValidatorHistory {
+        struct_version: 0,
+        vote_account: Pubkey::default(),
+        index: 0,
+        bump: 0,
+        _padding0: [0; 7],
+        last_ip_timestamp: 0,
+        last_version_timestamp: 0,
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
+        history: CircBuf::default(),
+    };
+
+    // Add epochs with varying credits
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 100,
+        epoch_credits: 1000, // Has credits
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 101,
+        epoch_credits: 0, // No credits
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 102,
+        epoch_credits: 500, // Has credits
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 103,
+        epoch_credits: u32::MAX, // Invalid credits (not set)
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 104,
+        epoch_credits: 2000, // Has credits
+        ..ValidatorHistoryEntry::default()
+    });
+
+    // Update at epoch 104
+    validator_history.update_validator_age(104).unwrap();
+    // Should count epochs 100, 102 (not 104 as it's current)
+    assert_eq!(validator_history.validator_age, 2);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 103); // Only up to epoch 103
+}
+
+#[test]
+fn test_validator_age_idempotent() {
+    // Test that calling update multiple times in same epoch is idempotent
+    let mut validator_history = ValidatorHistory {
+        struct_version: 0,
+        vote_account: Pubkey::default(),
+        index: 0,
+        bump: 0,
+        _padding0: [0; 7],
+        last_ip_timestamp: 0,
+        last_version_timestamp: 0,
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
+        history: CircBuf::default(),
+    };
+
+    // Add epoch 100 with credits
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 100,
+        epoch_credits: 1000,
+        ..ValidatorHistoryEntry::default()
+    });
+
+    // First update at epoch 100 (epoch 100 is current, not counted)
+    validator_history.update_validator_age(100).unwrap();
+    assert_eq!(validator_history.validator_age, 0); // No epochs counted (100 is current)
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 99);
+
+    // Second update at same epoch - should be no-op
+    validator_history.update_validator_age(100).unwrap();
+    assert_eq!(validator_history.validator_age, 0);
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 99);
+
+    // Move to epoch 101 to count epoch 100
+    validator_history.history.push(ValidatorHistoryEntry {
+        epoch: 101,
+        epoch_credits: 500,
+        ..ValidatorHistoryEntry::default()
+    });
+    validator_history.update_validator_age(101).unwrap();
+    assert_eq!(validator_history.validator_age, 1); // Now epoch 100 is counted
+    assert_eq!(validator_history.validator_age_last_updated_epoch, 100);
+}
+
+#[test]
+fn test_validator_age_wraparound() {
+    // Test with circular buffer wraparound
+    let mut validator_history = ValidatorHistory {
+        struct_version: 0,
+        vote_account: Pubkey::default(),
+        index: 0,
+        bump: 0,
+        _padding0: [0; 7],
+        last_ip_timestamp: 0,
+        last_version_timestamp: 0,
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
+        history: CircBuf::default(),
+    };
+
+    // Fill buffer to cause wraparound
+    for epoch in 0..600u16 {
+        validator_history.history.push(ValidatorHistoryEntry {
+            epoch,
+            epoch_credits: if epoch % 2 == 0 { 1000 } else { 0 },
+            ..ValidatorHistoryEntry::default()
+        });
+    }
+
+    // Update at epoch 599
+    validator_history.update_validator_age(599).unwrap();
+    // Should count all even epochs from 0 to 598 (300 epochs)
+    // But buffer only holds 512 entries, so it wraps around
+    // Epochs 88-599 are in buffer, even epochs from 88-598 = 256 epochs
+    let even_epochs_in_range = (88..=598).filter(|e| e % 2 == 0).count();
+    assert_eq!(validator_history.validator_age, even_epochs_in_range as u32);
 }

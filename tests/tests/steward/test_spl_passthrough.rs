@@ -8,7 +8,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS},
     derive_steward_state_address,
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, StewardStateAccount, StewardStateEnum,
+    Config, Delegation, StewardStateAccountV2, StewardStateEnum,
 };
 use rand::prelude::SliceRandom;
 use rand::{rngs::StdRng, SeedableRng};
@@ -96,7 +96,7 @@ async fn _setup_test_steward_state(
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_config.parameters.scoring_unstake_cap_bps = 0;
     steward_config.parameters.instant_unstake_cap_bps = 0;
@@ -126,7 +126,7 @@ async fn _setup_test_steward_state(
 
     steward_state_account
         .state
-        .sorted_yield_score_indices
+        .sorted_raw_score_indices
         .copy_from_slice(&arr);
 
     for i in 0..validators_to_add {
@@ -301,7 +301,7 @@ async fn _increase_and_check_stake(
     let validator_history =
         fixture.initialize_validator_history_with_credits(vote_account, validator_list_index);
 
-    let state_account_before: StewardStateAccount =
+    let state_account_before: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _lamports_before_increase = *state_account_before
         .state
@@ -349,7 +349,7 @@ async fn _increase_and_check_stake(
     );
     fixture.submit_transaction_assert_success(transaction).await;
 
-    let state_account_after: StewardStateAccount =
+    let state_account_after: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let lamports_after_increase = *state_account_after
         .state
@@ -384,7 +384,7 @@ async fn _increase_and_check_additional_stake(
     let validator_history =
         fixture.initialize_validator_history_with_credits(vote_account, validator_list_index);
 
-    let state_account_before: StewardStateAccount =
+    let state_account_before: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _lamports_before_increase = *state_account_before
         .state
@@ -439,7 +439,7 @@ async fn _increase_and_check_additional_stake(
     );
     fixture.submit_transaction_assert_success(transaction).await;
 
-    let state_account_after: StewardStateAccount =
+    let state_account_after: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let lamports_after_increase = *state_account_after
         .state
@@ -490,7 +490,6 @@ async fn test_add_validator_to_pool() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     {
         // Test add 1 validator
@@ -513,7 +512,6 @@ async fn test_remove_validator_from_pool() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     // Setup the steward state
     // _setup_test_steward_state(&fixture, MAX_VALIDATORS, 1_000_000_000).await;
@@ -607,7 +605,6 @@ async fn test_set_preferred_validator() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -665,7 +662,6 @@ async fn test_increase_validator_stake() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -687,7 +683,6 @@ async fn test_decrease_validator_stake() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
 
@@ -766,7 +761,6 @@ async fn test_increase_additional_validator_stake() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     // Assert the validator was added to the validator list
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
@@ -789,7 +783,6 @@ async fn test_decrease_additional_validator_stake() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     _add_test_validator(&fixture, Pubkey::new_unique()).await;
 
@@ -883,7 +876,6 @@ async fn test_set_staker() {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
 
     let new_staker = Keypair::new();
 

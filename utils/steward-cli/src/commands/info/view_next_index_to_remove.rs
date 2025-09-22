@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use jito_steward::StewardStateAccount;
+use jito_steward::StewardStateAccountV2;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::pubkey::Pubkey;
@@ -23,7 +23,7 @@ pub async fn command_view_next_index_to_remove(
     Ok(())
 }
 
-fn _print_next_index_to_remove(state_account: &StewardStateAccount) {
+fn _print_next_index_to_remove(state_account: &StewardStateAccountV2) {
     for i in 0..state_account.state.num_pool_validators {
         let value = state_account
             .state
