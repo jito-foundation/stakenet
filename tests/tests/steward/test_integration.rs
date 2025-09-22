@@ -232,9 +232,11 @@ async fn test_compute_scores() {
 
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.num_epochs_between_scoring = 10;
-    steward_config.parameters.epoch_credits_range = 30;
-    steward_config.parameters.mev_commission_range = 30;
-    steward_config.parameters.commission_range = 30;
+    // Limit on window sizes before the program heap is exhausted
+    // empirically tested
+    steward_config.parameters.epoch_credits_range = 390;
+    steward_config.parameters.mev_commission_range = 390;
+    steward_config.parameters.commission_range = 390;
     steward_config
         .parameters
         .scoring_delinquency_threshold_ratio = 0.1;
