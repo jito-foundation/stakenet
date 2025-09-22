@@ -1391,9 +1391,8 @@ impl Default for FixtureDefaultAccounts {
         };
         let steward_state_account = Box::new(StewardStateAccountV2 {
             state: steward_state,
-            _padding0: 0u8,
             bump: steward_state_bump,
-            _padding1: [0; 6],
+            _padding0: [0; 7],
         });
 
         let validator_history_config_bump = Pubkey::find_program_address(

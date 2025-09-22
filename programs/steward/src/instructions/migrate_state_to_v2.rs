@@ -79,9 +79,17 @@ pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
         v2_account.state.scores[i] = score_u32 as u64;
     }
 
-    // Clear the old is_initialized field (now padding)
+    // ==========================================
+    // STEP 6: Finalize account level fields
+    // ==========================================
+
+    // Copy over bump from v1 offset
+    let v1_account: &StewardStateAccount = bytemuck::from_bytes(&data[ACCOUNT_RANGE]);
+    let v1_bump = v1_account.bump;
     let v2_account: &mut StewardStateAccountV2 = bytemuck::from_bytes_mut(&mut data[ACCOUNT_RANGE]);
-    v2_account._padding0 = 0;
+    v2_account.bump = v1_bump;
+    // Clear the old is_initialized field (now padding)
+    v2_account._padding0 = [0u8; 7];
 
     Ok(())
 }

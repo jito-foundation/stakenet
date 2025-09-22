@@ -100,11 +100,10 @@ pub struct StewardStateAccount {
 #[account(zero_copy)]
 pub struct StewardStateAccountV2 {
     pub state: StewardStateV2,
+    pub bump: u8,
     /// is_initialized byte repurposed as padding, as the v2 struct has a new discriminator and
     /// cannot be passed into the init or realloc instructions.
-    pub _padding0: u8,
-    pub bump: u8,
-    pub _padding1: [u8; 6],
+    pub _padding0: [u8; 7],
 }
 
 impl StewardStateAccount {

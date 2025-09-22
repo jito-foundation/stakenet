@@ -320,7 +320,7 @@ async fn test_migrate_state_to_v2() {
     // Verify v1 is_initialized vs v2 _padding0
     assert_eq!(steward_state_v1.is_initialized, U8Bool::from(true));
     assert_eq!(
-        steward_state_v2._padding0, 0,
+        steward_state_v2._padding0, [0u8; 7],
         "V2 _padding0 should be zeroed out"
     );
 
@@ -329,15 +329,6 @@ async fn test_migrate_state_to_v2() {
         steward_state_v1.bump, steward_state_v2.bump,
         "Bump should be preserved during migration"
     );
-
-    // Verify v1 _padding vs v2 _padding1
-    for (i, &byte) in steward_state_v1._padding.iter().enumerate() {
-        assert_eq!(
-            byte, steward_state_v2._padding1[i],
-            "V1 _padding[{}] should equal V2 _padding1[{}]",
-            i, i
-        );
-    }
 }
 
 #[tokio::test]
