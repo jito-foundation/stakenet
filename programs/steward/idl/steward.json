@@ -3313,23 +3313,19 @@
             }
           },
           {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "_padding0",
             "docs": [
               "is_initialized byte repurposed as padding, as the v2 struct has a new discriminator and",
               "cannot be passed into the init or realloc instructions."
             ],
-            "type": "u8"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "_padding1",
             "type": {
               "array": [
                 "u8",
-                6
+                7
               ]
             }
           }
