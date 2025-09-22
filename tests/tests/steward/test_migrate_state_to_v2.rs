@@ -1,6 +1,7 @@
 use anchor_lang::Discriminator;
 use jito_steward::{
     constants::MAX_VALIDATORS, utils::U8Bool, StewardStateAccount, StewardStateAccountV2,
+    StewardStateEnum,
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use solana_program_test::*;
@@ -57,6 +58,9 @@ async fn test_migrate_state_to_v2() {
         steward_state_v1.state.sorted_yield_score_indices[i] =
             random_data.sorted_yield_score_indices[i];
     }
+
+    // Set state to idle
+    steward_state_v1.state.state_tag = StewardStateEnum::Idle;
 
     // Update the account
     fixture.ctx.borrow_mut().set_account(
@@ -340,6 +344,18 @@ async fn test_migrate_state_to_v2_twice_fails() {
     // Initialize with V1 state and realloc to full size
     fixture.initialize_steward_v1(None, None).await;
     fixture.realloc_steward_state().await;
+
+    // Set state to idle
+    let mut steward_state_v1 = fixture
+        .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
+        .await;
+    steward_state_v1.state.state_tag = StewardStateEnum::Idle;
+
+    // Save the modified state back to the account
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account_v1(steward_state_v1).into(),
+    );
 
     // First migration should succeed
     fixture.migrate_steward_state_to_v2().await;

@@ -330,7 +330,33 @@ impl TestFixture {
         self.initialize_steward_v1(parameters, priority_fee_parameters)
             .await;
         self.realloc_steward_state().await;
+
+        // Set state to Idle before migration to avoid InvalidState error
+        // We need to directly modify the account data to avoid excessive I/O
+        const DISCRIMINATOR_LEN: usize = 8;
+        const STATE_TAG_OFFSET: usize = DISCRIMINATOR_LEN;
+        {
+            let mut account = self.get_account(&self.steward_state).await;
+            // Set state_tag to Idle (which is 2)
+            account.data[STATE_TAG_OFFSET] = 2;
+
+            self.ctx
+                .borrow_mut()
+                .set_account(&self.steward_state, &account.into());
+        }
+
+        // Migrate
         self.migrate_steward_state_to_v2().await;
+
+        // Set state back to ComputeScores after migration
+        {
+            let mut account = self.get_account(&self.steward_state).await;
+            // Set state_tag to ComputeScores (which is 0)
+            account.data[STATE_TAG_OFFSET] = 0;
+            self.ctx
+                .borrow_mut()
+                .set_account(&self.steward_state, &account.into());
+        }
     }
 
     pub async fn initialize_steward_v1(

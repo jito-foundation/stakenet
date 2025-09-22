@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 
 use crate::constants::MAX_VALIDATORS;
+use crate::errors::StewardError;
 use crate::state::{Config, StewardStateAccount, StewardStateAccountV2};
 
 // V1 and V2 have the same size, so we can use the same range for both
@@ -23,6 +24,14 @@ pub struct MigrateStateToV2<'info> {
 
 pub fn handler(ctx: Context<MigrateStateToV2>) -> Result<()> {
     let mut data = ctx.accounts.state_account.data.borrow_mut();
+
+    // ==========================================
+    // STEP 0: Exit if currently in scoring state
+    // ==========================================
+    let v1_account: &StewardStateAccount = bytemuck::from_bytes(&data[ACCOUNT_RANGE]);
+    if let crate::StewardStateEnum::ComputeScores = v1_account.state.state_tag {
+        return Err(StewardError::InvalidState.into());
+    }
 
     // ==========================================
     // STEP 1: Verify this is a V1 account
