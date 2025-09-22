@@ -2,9 +2,9 @@ use crate::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     errors::StewardError,
     stake_pool_utils::deserialize_stake_pool,
-    state::{Config, StewardStateAccount},
+    state::{Config, StewardStateAccount, StewardStateAccountV2},
     utils::{get_config_admin, get_stake_pool_address},
-    BitMask, Delegation, StewardStateEnum, STATE_PADDING_0_SIZE,
+    BitMask, Delegation, StewardStateEnum,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::ValidatorListHeader;
@@ -16,7 +16,7 @@ pub struct ResetStewardState<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     pub config: AccountLoader<'info, Config>,
 
@@ -39,7 +39,6 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     let clock = Clock::get()?;
-    state_account.is_initialized = true.into();
     state_account.bump = ctx.bumps.state_account;
 
     let config = ctx.accounts.config.load()?;
@@ -51,8 +50,8 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     state_account.state.validator_lamport_balances = [LAMPORT_BALANCE_DEFAULT; MAX_VALIDATORS];
     state_account.state.scores = [0; MAX_VALIDATORS];
     state_account.state.sorted_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
-    state_account.state.yield_scores = [0; MAX_VALIDATORS];
-    state_account.state.sorted_yield_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
+    state_account.state.raw_scores = [0; MAX_VALIDATORS];
+    state_account.state.sorted_raw_score_indices = [SORTED_INDEX_DEFAULT; MAX_VALIDATORS];
     state_account.state.progress = BitMask::default();
     state_account.state.current_epoch = clock.epoch;
     state_account.state.next_cycle_epoch = clock
@@ -64,8 +63,8 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     state_account.state.start_computing_scores_slot = clock.slot;
     state_account.state.validators_to_remove = BitMask::default();
     state_account.state.validators_for_immediate_removal = BitMask::default();
+    state_account.state._padding0 = [0; 2];
     state_account.state.validators_added = 0;
     state_account.state.clear_flags();
-    state_account.state._padding0 = [0; STATE_PADDING_0_SIZE];
     Ok(())
 }
