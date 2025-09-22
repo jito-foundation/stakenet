@@ -856,6 +856,23 @@ async fn test_blacklist_edge_cases() {
 }
 
 #[tokio::test]
+async fn test_steward_state_account_sizes() {
+    use jito_steward::{StewardStateAccount, StewardStateAccountV2};
+    use std::mem::size_of;
+
+    let v1_size = size_of::<StewardStateAccount>();
+    let v2_size = size_of::<StewardStateAccountV2>();
+
+    assert_eq!(
+        v1_size,
+        v2_size,
+        "StewardStateAccount ({} bytes) and StewardStateAccountV2 ({} bytes) must have the same size",
+        v1_size,
+        v2_size
+    );
+}
+
+#[tokio::test]
 async fn test_set_new_authority() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
