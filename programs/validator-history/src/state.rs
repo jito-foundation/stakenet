@@ -4,6 +4,8 @@ use anchor_lang::idl::{
     IdlBuild,
 };
 
+use crate::constants::VALIDATOR_AGE_EPOCH_DEFAULT;
+
 use {
     crate::{
         constants::TVC_MULTIPLIER,
@@ -1219,7 +1221,7 @@ impl ValidatorHistory {
     /// Only counts completed epochs (up to current_epoch - 1) to avoid partial data
     pub fn update_validator_age(&mut self, current_epoch: u16) -> Result<()> {
         // Initialize if needed
-        if self.validator_age_last_updated_epoch == 0 {
+        if self.validator_age_last_updated_epoch == VALIDATOR_AGE_EPOCH_DEFAULT {
             self.initialize_validator_age(current_epoch);
             return Ok(());
         }
