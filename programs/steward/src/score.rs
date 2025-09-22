@@ -256,11 +256,11 @@ pub fn validator_score(
         calculate_avg_mev_commission(validator, current_epoch, params.mev_commission_range);
     let validator_age = validator.validator_age;
 
-    // Scale the normalized_vote_credits_ratio by VOTE_CREDITS_RATIO_MAX for precision and cap at 25 bits
+    // Scale the normalized vote credits ratio for precision and cap at 25 bits
     let scaled_ratio = (vote_credits_ratio * VOTE_CREDITS_RATIO_MAX as f64) as u64;
     let vote_credits_avg = scaled_ratio.min((1u64 << 25) - 1) as u32;
 
-    // Calculate raw 4-tier score using max commission instead of average
+    // Calculate raw 4-tier score
     let raw_score = encode_validator_score(
         max_commission,
         mev_commission_avg,
