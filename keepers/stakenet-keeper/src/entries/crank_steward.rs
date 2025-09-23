@@ -274,7 +274,7 @@ async fn _handle_instant_removal_validators(
 
     while validators_to_remove.count() != 0 {
         let mut validator_index_to_remove = None;
-        for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
+        for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
                     "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
