@@ -96,6 +96,18 @@ async fn main() -> Result<()> {
         Commands::InstantRemoveValidator(args) => {
             command_instant_remove_validator(args, &client, program_id).await
         }
+        Commands::ProcessImmediateRemovals(args) => {
+            let payer_path = args.payer_keypair_path.to_string_lossy().to_string();
+            commands::actions::process_immediate_removals::command_process_immediate_removals(
+                payer_path,
+                args.steward_config,
+                &client,
+                program_id,
+                args.dry_run,
+                args.batch_size,
+            )
+            .await
+        }
         Commands::AutoRemoveValidatorFromPool(args) => {
             command_auto_remove_validator_from_pool(args, &client, program_id).await
         }

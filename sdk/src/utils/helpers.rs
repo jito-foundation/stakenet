@@ -39,6 +39,7 @@ pub fn get_unprogressed_validators(
     all_steward_accounts: &AllStewardAccounts,
     validator_history_program_id: &Pubkey,
 ) -> Vec<ProgressionInfo> {
+    let validator_list_len = all_steward_accounts.validator_list_account.validators.len();
     (0..all_steward_accounts.state_account.state.num_pool_validators)
         .filter_map(|validator_index| {
             let has_progressed = all_steward_accounts
@@ -50,6 +51,12 @@ pub fn get_unprogressed_validators(
             if has_progressed {
                 None
             } else {
+                // Check if validator_index is within bounds of the validator list
+                if (validator_index as usize) >= validator_list_len {
+                    // Skip validators that are beyond the actual validator list length
+                    return None;
+                }
+
                 let vote_account = all_steward_accounts.validator_list_account.validators
                     [validator_index as usize]
                     .vote_account_address;

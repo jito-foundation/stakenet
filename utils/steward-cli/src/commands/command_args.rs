@@ -270,6 +270,7 @@ pub enum Commands {
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
     InstantRemoveValidator(InstantRemoveValidator),
+    ProcessImmediateRemovals(ProcessImmediateRemovals),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
 
     // Cranks
@@ -540,6 +541,26 @@ pub struct InstantRemoveValidator {
     /// Validator index of validator list to remove
     #[arg(long, env)]
     pub validator_index_to_remove: u64,
+}
+
+#[derive(Parser)]
+#[command(about = "Process all validators marked for immediate removal in batches")]
+pub struct ProcessImmediateRemovals {
+    /// Path to keypair used to pay for the transactions
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub payer_keypair_path: PathBuf,
+
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Number of validators to remove in each transaction
+    #[arg(long, default_value = "5")]
+    pub batch_size: usize,
+
+    /// Dry run - only show what would be done without executing
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Parser)]
