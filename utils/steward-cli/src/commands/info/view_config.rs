@@ -50,6 +50,11 @@ fn _print_default_config(
     formatted_string += &format!("Staker:      {}\n", staker);
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
+    formatted_string += &format!("Validator List:  {}\n", config_account.validator_list);
+    formatted_string += &format!(
+        "Priority Fee Parameters Authority:   {}\n",
+        config_account.priority_fee_parameters_authority
+    );
     formatted_string += "\n↺ State ↺\n";
     formatted_string += &format!("Is Paused:   {:?}\n", config_account.paused);
     formatted_string += &format!(
@@ -134,6 +139,27 @@ fn _print_default_config(
     formatted_string += &format!(
         "Minimum Voting Epochs:  {:?}\n",
         config_account.parameters.minimum_voting_epochs
+    );
+    formatted_string += "\n⚙️ Priority Fee Parameters ⚙️\n";
+    formatted_string += &format!(
+        "Priority Fee Lookback Epochs:  {:?}\n",
+        config_account.parameters.priority_fee_lookback_epochs
+    );
+    formatted_string += &format!(
+        "Priority Fee Lookback Offset:  {:?}\n",
+        config_account.parameters.priority_fee_lookback_offset
+    );
+    formatted_string += &format!(
+        "Priority Fee Max Commission BPS:  {:?}\n",
+        config_account.parameters.priority_fee_max_commission_bps
+    );
+    formatted_string += &format!(
+        "Priority Fee Error Margin BPS:  {:?}\n",
+        config_account.parameters.priority_fee_error_margin_bps
+    );
+    formatted_string += &format!(
+        "Priority Fee Scoring Start Epoch:  {:?}\n",
+        config_account.parameters.priority_fee_scoring_start_epoch
     );
     formatted_string += "---------------------";
 
