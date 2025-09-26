@@ -14,8 +14,8 @@ RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
 
 #########
 
-FROM ubuntu:22.04 as validator-history
-RUN apt-get update && apt-get install -y ca-certificates
+FROM ubuntu:22.04 as stakenet-keeper
+RUN apt-get update && apt-get install -y ca-certificates procps
 ENV APP="stakenet-keeper"
 
 COPY --from=builder /usr/src/app/target/release/$APP ./$APP
