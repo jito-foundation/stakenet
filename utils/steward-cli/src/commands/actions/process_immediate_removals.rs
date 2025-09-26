@@ -58,10 +58,10 @@ pub async fn command_process_immediate_removals(
             break;
         }
 
-        // Find up to 2 validators marked for removal
+        // Find up to 3 validators marked for removal
         let mut validators_to_remove = Vec::new();
         let validator_list_len = steward_accounts.validator_list_account.validators.len();
-        let batch_size = 2; // Hardcoded batch size
+        let batch_size = 3; // Hardcoded batch size
 
         for i in 0..validator_list_len {
             if steward_accounts
@@ -86,22 +86,36 @@ pub async fn command_process_immediate_removals(
         if validators_to_remove.len() == 1 {
             println!("Removing validator at index {}...", validators_to_remove[0]);
         } else {
-            println!("Removing {} validators at indices: {:?}...",
-                     validators_to_remove.len(), validators_to_remove);
+            println!(
+                "Removing {} validators at indices: {:?}...",
+                validators_to_remove.len(),
+                validators_to_remove
+            );
         }
 
         if dry_run {
-            println!("Dry run mode - would remove validators at indices: {:?}", validators_to_remove);
+            println!(
+                "Dry run mode - would remove validators at indices: {:?}",
+                validators_to_remove
+            );
             total_removed += validators_to_remove.len();
-            println!("Would have removed {} validators total so far", total_removed);
+            println!(
+                "Would have removed {} validators total so far",
+                total_removed
+            );
 
             // In dry run, show estimated iterations
             let remaining_after_batch = validators_to_remove_count - validators_to_remove.len();
             let estimated_iterations = (remaining_after_batch + 1) / 2; // Ceiling division for batch size 2
-            println!("Would need approximately {} more iterations to remove all {} remaining validators",
-                     estimated_iterations, remaining_after_batch);
+            println!(
+                "Would need approximately {} more iterations to remove all {} remaining validators",
+                estimated_iterations, remaining_after_batch
+            );
 
-            println!("\nDry run complete. First batch would remove indices: {:?}.", validators_to_remove);
+            println!(
+                "\nDry run complete. First batch would remove indices: {:?}.",
+                validators_to_remove
+            );
             break;
         }
 
@@ -116,24 +130,23 @@ pub async fn command_process_immediate_removals(
         instructions.push(compute_budget_ix);
 
         let priority_fee_ix =
-            solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(
-                10_000,
-            );
+            solana_sdk::compute_budget::ComputeBudgetInstruction::set_compute_unit_price(10_000);
         instructions.push(priority_fee_ix);
 
         // Add removal instructions for each validator in the batch
         for (batch_index, validator_index) in validators_to_remove.iter().enumerate() {
-            // For the second instruction, we need to adjust the index
-            // because removing the first validator shifts all subsequent indices down by 1
-            // Since we iterate through indices in ascending order, the second index
-            // will always be higher than the first, so we always decrement by 1
-            let adjusted_index = if batch_index == 0 {
-                *validator_index
-            } else {
-                // The second validator's index needs to be decremented by 1
-                // because the first removal shifts everything down
-                validator_index - 1
-            };
+            // // For the second instruction, we need to adjust the index
+            // // because removing the first validator shifts all subsequent indices down by 1
+            // // Since we iterate through indices in ascending order, the second index
+            // // will always be higher than the first, so we always decrement by 1
+            // let adjusted_index = if batch_index == 0 {
+            //     *validator_index
+            // } else {
+            //     // The second validator's index needs to be decremented by 1
+            //     // because the first removal shifts everything down
+            //     validator_index - 1
+            // };
+            let adjusted_index = validator_index - batch_index;
 
             let ix = Instruction {
                 program_id,
@@ -172,10 +185,16 @@ pub async fn command_process_immediate_removals(
         {
             Ok(signature) => {
                 if validators_to_remove.len() == 1 {
-                    println!("✓ Successfully removed validator at index {}", validators_to_remove[0]);
+                    println!(
+                        "✓ Successfully removed validator at index {}",
+                        validators_to_remove[0]
+                    );
                 } else {
-                    println!("✓ Successfully removed {} validators at indices: {:?}",
-                             validators_to_remove.len(), validators_to_remove);
+                    println!(
+                        "✓ Successfully removed {} validators at indices: {:?}",
+                        validators_to_remove.len(),
+                        validators_to_remove
+                    );
                 }
                 println!("  Transaction signature: {}", signature);
                 total_removed += validators_to_remove.len();
@@ -184,8 +203,10 @@ pub async fn command_process_immediate_removals(
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             }
             Err(e) => {
-                println!("✗ Failed to remove validators at indices {:?}: {}",
-                         validators_to_remove, e);
+                println!(
+                    "✗ Failed to remove validators at indices {:?}: {}",
+                    validators_to_remove, e
+                );
 
                 // Wait longer on error
                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -231,3 +252,4 @@ pub async fn command_process_immediate_removals(
 
     Ok(())
 }
+

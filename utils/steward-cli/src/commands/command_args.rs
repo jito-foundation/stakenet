@@ -281,6 +281,7 @@ pub enum Commands {
     CrankIdle(CrankIdle),
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
+    UpdateClusterHistory(UpdateClusterHistory),
 }
 
 // ---------- VIEWS ------------
@@ -657,6 +658,13 @@ pub struct CrankComputeInstantUnstake {
 #[derive(Parser)]
 #[command(about = "Crank `rebalance` state")]
 pub struct CrankRebalance {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Update cluster history from validator history program")]
+pub struct UpdateClusterHistory {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
 }

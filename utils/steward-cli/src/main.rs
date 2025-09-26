@@ -38,6 +38,7 @@ use commands::{
 };
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::signature::read_keypair_file;
 
 pub mod commands;
 pub mod utils;
@@ -141,6 +142,15 @@ async fn main() -> Result<()> {
             command_crank_compute_instant_unstake(args, &client, program_id).await
         }
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
+        Commands::UpdateClusterHistory(args) => {
+            let payer = read_keypair_file(args.permissionless_parameters.payer_keypair_path)
+                .expect("Failed to read keypair file");
+            commands::update_cluster_history::update_cluster_history(
+                &client.url(),
+                &payer,
+            )
+            .await
+        }
     };
 
     if let Err(e) = result {
