@@ -12,7 +12,7 @@ pub struct ResetValidatorLamportBalances<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub steward_state: AccountLoader<'info, StewardStateAccount>,
+    pub steward_state: AccountLoader<'info, StewardStateAccountV2>,
 
     pub config: AccountLoader<'info, Config>,
 
