@@ -211,6 +211,10 @@ pub struct PermissionedParameters {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
 
+    /// Optional authority pubkey to use when printing transactions (no keypair required)
+    #[arg(long, env)]
+    pub authority_pubkey: Option<Pubkey>,
+
     // Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,
