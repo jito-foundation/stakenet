@@ -19,5 +19,6 @@ solana-native-token = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
 spl-stake-pool = { workspace = true }
+stakenet-sdk = { path = "../../sdk" }
 tokio = { workspace = true }
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
