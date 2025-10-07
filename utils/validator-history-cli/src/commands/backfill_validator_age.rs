@@ -213,7 +213,6 @@ fn compute_validator_ages(
         .iter()
         .map(|history| (history.vote_account, history))
         .collect();
-
     // Group oracle data by vote account
     let mut oracle_data_by_validator: HashMap<Pubkey, Vec<&SourceData>> = HashMap::new();
     for data in oracle {
