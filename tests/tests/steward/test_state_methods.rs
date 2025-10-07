@@ -924,6 +924,85 @@ fn test_remove_validator_fails() {
 }
 
 #[test]
+fn test_remove_validator_at_max_validators() {
+    // Test case where num_pool_validators == MAX_VALIDATORS
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = fixtures.state;
+    state.num_pool_validators = MAX_VALIDATORS as u64;
+    state.validators_added = 0;
+
+    // Remove second-to-last validator
+    let index = MAX_VALIDATORS - 2;
+    state.validators_to_remove.set(index, true).unwrap();
+
+    // Set test values
+    state.validator_lamport_balances[index] = 998;
+    state.validator_lamport_balances[index + 1] = 999;
+    state.scores[index] = 998;
+    state.scores[index + 1] = 999;
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+
+    // Verify shifting occurred - value at index should now be what was at index+1
+    assert_eq!(state.validator_lamport_balances[index], 999);
+    assert_eq!(state.scores[index], 999);
+
+    // Verify the last position was cleared after shifting
+    assert_eq!(
+        state.validator_lamport_balances[index + 1],
+        LAMPORT_BALANCE_DEFAULT
+    );
+    assert_eq!(state.scores[index + 1], 0);
+}
+
+#[test]
+fn test_remove_validator_at_sum_equals_max() {
+    // Test case where num_pool_validators + validators_added == MAX_VALIDATORS
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = fixtures.state;
+
+    // Set up state where sum equals MAX_VALIDATORS
+    state.num_pool_validators = (MAX_VALIDATORS - 10) as u64;
+    state.validators_added = 10;
+
+    // Test removing from existing pool
+    let index = MAX_VALIDATORS - 100;
+    state.validators_to_remove.set(index, true).unwrap();
+
+    // Set values to verify shifting
+    state.validator_lamport_balances[index] = 100;
+    state.validator_lamport_balances[index + 1] = 101;
+    state.scores[index] = 100;
+    state.scores[index + 1] = 101;
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 11) as u64);
+    assert_eq!(state.validators_added, 10); // unchanged
+
+    // Verify shifting occurred
+    assert_eq!(state.validator_lamport_balances[index], 101);
+    assert_eq!(state.scores[index], 101);
+
+    // Test removing from added pool
+    let mut state = fixtures.state;
+    state.num_pool_validators = (MAX_VALIDATORS - 10) as u64;
+    state.validators_added = 10;
+
+    let index = MAX_VALIDATORS - 5;
+    state
+        .validators_for_immediate_removal
+        .set(index, true)
+        .unwrap();
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 10) as u64); // unchanged
+    assert_eq!(state.validators_added, 9); // decremented
+}
+
+#[test]
 fn test_rebalance_max_lamports() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
     fixtures.config.parameters.scoring_unstake_cap_bps = 10000;
