@@ -568,6 +568,10 @@ impl StewardStateV2 {
                 .ok_or(StewardError::ArithmeticError)?;
         }
 
+        // Refresh range bounds after decrement
+        let num_pool_validators = self.num_pool_validators as usize;
+        let num_pool_validators_plus_added = num_pool_validators + self.validators_added as usize;
+
         // Shift all validator state to the left
         for i in index..num_pool_validators {
             let next_i = i.checked_add(1).ok_or(StewardError::ArithmeticError)?;
