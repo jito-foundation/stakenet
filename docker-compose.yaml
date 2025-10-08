@@ -3,7 +3,7 @@ services:
   stakenet-keeper:
     build:
       context: .
-      target: validator-history
+      target: stakenet-keeper
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -41,7 +41,8 @@ services:
   metrics-only:
     build:
       context: .
-      target: validator-history
+      target: stakenet-keeper
+    container_name: metrics-only
     environment:
       - RUST_LOG=${RUST_LOG:-info}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}
@@ -73,7 +74,8 @@ services:
   priority-fees:
     build:
       context: .
-      target: validator-history
+      target: stakenet-keeper
+    container_name: priority-fees
     environment:
       - RUST_LOG=${RUST_LOG}
       - SOLANA_METRICS_CONFIG=${SOLANA_METRICS_CONFIG}

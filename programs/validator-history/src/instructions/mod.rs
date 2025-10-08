@@ -17,6 +17,7 @@ pub mod set_new_priority_fee_oracle_authority;
 pub mod set_new_tip_distribution_program;
 pub mod update_priority_fee_history;
 pub mod update_stake_history;
+pub mod upload_validator_age;
 
 pub use backfill_total_blocks::*;
 pub use copy_cluster_info::*;
@@ -37,3 +38,4 @@ pub use set_new_priority_fee_oracle_authority::*;
 pub use set_new_tip_distribution_program::*;
 pub use update_priority_fee_history::*;
 pub use update_stake_history::*;
+pub use upload_validator_age::*;
