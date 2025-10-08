@@ -206,7 +206,7 @@ fn compute_validator_ages(
     validator_histories: &[ValidatorHistory],
 ) -> Vec<(Pubkey, u32)> {
     // Hash validator histories by vote pubkey
-    let history_map: HashMap<Pubkey, &ValidatorHistory> = validator_histories
+    let history_map: Vec<(Pubkey, &ValidatorHistory)> = validator_histories
         .iter()
         .map(|history| (history.vote_account, history))
         .collect();
