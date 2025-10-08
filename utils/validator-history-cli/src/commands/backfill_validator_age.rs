@@ -46,30 +46,24 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
     println!("/////////////////////////////////////////////////");
     // Parse oracle keypair
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
-
     // Build async client
     let client = RpcClient::new_with_timeout(rpc_url, Duration::from_secs(60));
-
     // Read oracle source data
     println!("\nReading oracle data ...");
     let oracle = read_oracle_data(args.oracle_source);
-
     // Get current epoch
     let epoch_info = client
         .get_epoch_info()
         .await
         .expect("Failed to get epoch info");
     let current_epoch = epoch_info.epoch;
-
     // Get all validator history accounts
     println!("Fetching onchain history accounts ...");
     let accounts = get_all_validator_history_accounts(&client, validator_history::ID)
         .await
         .expect("Failed to fetch all validator history accounts");
-
     // Compute oracle validator ages using both oracle data and onchain data
     let validator_ages = compute_validator_ages(&oracle, &accounts);
-
     // Build and submit instructions
     for chunk in validator_ages.chunks(10) {
         let instructions = chunk
