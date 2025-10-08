@@ -205,11 +205,6 @@ fn compute_validator_ages(
     oracle: &[SourceData],
     validator_histories: &[ValidatorHistory],
 ) -> Vec<(Pubkey, u32)> {
-    // Hash validator histories by vote pubkey
-    let history_map: Vec<(Pubkey, &ValidatorHistory)> = validator_histories
-        .iter()
-        .map(|history| (history.vote_account, history))
-        .collect();
     // Group oracle data by vote account
     let mut oracle_data_by_validator: HashMap<Pubkey, Vec<&SourceData>> = HashMap::new();
     for data in oracle {
@@ -220,14 +215,14 @@ fn compute_validator_ages(
     }
     // Process each validator
     let mut validator_ages: Vec<(Pubkey, u32)> = Vec::new();
-    for (vote_account, history) in history_map.iter() {
+    for history in validator_histories.iter() {
         // Find first epoch onchain with credits
         let first_onchain_epoch = find_first_epoch_with_credits(history);
         // Count epochs
         let mut total_epochs = 0u32;
         if let Some(first_epoch) = first_onchain_epoch {
             // Count oracle epochs
-            if let Some(oracle_data) = oracle_data_by_validator.get(vote_account) {
+            if let Some(oracle_data) = oracle_data_by_validator.get(&history.vote_account) {
                 for data in oracle_data {
                     if data.credits > 0 && data.epoch < first_epoch {
                         total_epochs += 1;
@@ -239,7 +234,7 @@ fn compute_validator_ages(
             total_epochs += onchain_epochs;
         } else {
             // No onchain data, use all oracle data
-            if let Some(oracle_data) = oracle_data_by_validator.get(vote_account) {
+            if let Some(oracle_data) = oracle_data_by_validator.get(&history.vote_account) {
                 for data in oracle_data {
                     if data.credits > 0 {
                         total_epochs += 1;
@@ -248,7 +243,7 @@ fn compute_validator_ages(
             }
         }
         if total_epochs > 0 {
-            validator_ages.push((*vote_account, total_epochs));
+            validator_ages.push((history.vote_account, total_epochs));
         }
     }
     validator_ages
