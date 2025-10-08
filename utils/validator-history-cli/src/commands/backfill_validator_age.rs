@@ -154,14 +154,11 @@ fn build_instruction(validator_age: (Pubkey, u32), signer: Pubkey, epoch: u16) -
     }
 }
 
-/// Finds the earliest epoch with non-zero vote credits in the validator history
+/// Find the earliest epoch with non-zero vote credits in the validator history
 fn find_first_epoch_with_credits(validator_history: &ValidatorHistory) -> Option<u16> {
     let history = &validator_history.history;
-    if history.is_empty() {
-        return None;
-    }
-    let mut first_epoch_with_credits = None;
     let default = ValidatorHistoryEntry::default();
+    let mut first_epoch_with_credits = None;
     for entry in history.arr.iter() {
         if entry.epoch == default.epoch {
             continue;
@@ -183,12 +180,12 @@ fn find_first_epoch_with_credits(validator_history: &ValidatorHistory) -> Option
     first_epoch_with_credits
 }
 
-/// Counts the number of epochs with non-zero vote credits in the validator history
+/// Count the number of epochs with non-zero vote credits in the validator history
 /// starting from a given epoch
 fn count_onchain_epochs_with_credits(validator_history: &ValidatorHistory) -> u32 {
-    let mut count = 0;
     let history = &validator_history.history;
     let default = ValidatorHistoryEntry::default();
+    let mut count = 0;
     for entry in history.arr.iter() {
         if entry.epoch == default.epoch {
             continue;
@@ -200,9 +197,9 @@ fn count_onchain_epochs_with_credits(validator_history: &ValidatorHistory) -> u3
     count
 }
 
-/// Computes validator ages by combining oracle data and onchain data
+/// Compute validator ages by combining oracle data and onchain data
 ///
-/// Counts oracle data up to the first onchain epoch
+/// Count oracle data up to the first onchain epoch
 /// and then onchain data from the first onchain epoch onwards
 fn compute_validator_ages(
     oracle: &[SourceData],
