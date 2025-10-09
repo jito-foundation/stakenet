@@ -62,6 +62,8 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
     let accounts = get_all_validator_history_accounts(&client, validator_history::ID)
         .await
         .expect("Failed to fetch all validator history accounts");
+    // Filter for valid vote accounts
+    let accounts = validate_validator_history_accounts(&client, accounts.as_slice()).await;
     // Compute oracle validator ages using both oracle data and onchain data
     let validator_ages = compute_validator_ages(&oracle, &accounts);
     // Build and submit instructions
@@ -122,6 +124,42 @@ async fn build_and_submit_transaction(
     client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .await
+}
+
+/// Asserts that vote accounts exist and belong to the vote program
+async fn validate_validator_history_accounts(
+    client: &RpcClient,
+    accounts: &[ValidatorHistory],
+) -> Vec<ValidatorHistory> {
+    let mut num_valid = 0;
+    let mut num_closed = 0;
+    let mut num_open_but_invalid = 0;
+    let mut validated = vec![];
+    for account in accounts {
+        let vote_account = client.get_account(&account.vote_account).await;
+        if let Ok(vote_account) = vote_account {
+            if vote_account.owner == solana_sdk::vote::program::ID {
+                validated.push(*account);
+                num_valid += 1;
+            } else {
+                println!(
+                    "Vote account exist but does not belong to the vote program: {:?}",
+                    account.vote_account
+                );
+                num_open_but_invalid += 1;
+            }
+        } else {
+            println!("Vote account does not exist: {:?}", account.vote_account);
+            num_closed += 1;
+        }
+    }
+    println!("\nNumber of valid vote accounts: {}", num_valid);
+    println!(
+        "Number of open but invalid vote accounts: {}",
+        num_open_but_invalid
+    );
+    println!("Number of closed vote accounts: {}", num_closed);
+    validated
 }
 
 fn build_instruction(validator_age: (Pubkey, u32), signer: Pubkey, epoch: u16) -> Instruction {
