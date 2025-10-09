@@ -14,7 +14,7 @@ use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::{path::PathBuf, time::Duration};
 use tokio::time;
-use validator_history::{Config, ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 #[derive(Parser)]
 #[command(about = "Backfill validator ages onchain from historic oracle data")]
