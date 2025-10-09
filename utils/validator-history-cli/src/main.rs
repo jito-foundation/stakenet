@@ -17,7 +17,9 @@ use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
 };
-use validator_history_cli::validator_history_entry_output::ValidatorHistoryEntryOutput;
+use validator_history_cli::{
+    commands, validator_history_entry_output::ValidatorHistoryEntryOutput,
+};
 
 #[derive(Parser)]
 #[command(about = "CLI for validator history program", version)]
@@ -45,6 +47,7 @@ enum Commands {
     ViewConfig,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    BackfillValidatorAge(commands::backfill_validator_age::BackfillValidatorAge),
     StakeByCountry(StakeByCountry),
     GetConfig,
     UpdateOracleAuthority(UpdateOracleAuthority),
@@ -1185,5 +1188,8 @@ async fn main() {
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
+        Commands::BackfillValidatorAge(command_args) => {
+            commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
     };
 }
