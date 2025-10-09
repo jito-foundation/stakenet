@@ -1,18 +1,50 @@
-use std::{collections::HashMap, str::FromStr};
-
 use anchor_lang::prelude::EpochSchedule;
 use log::{error, info};
+use rand::Rng;
+use reqwest;
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use solana_client::rpc_response::RpcLeaderSchedule;
 use solana_sdk::pubkey::Pubkey;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::entries::priority_fee_and_block_metadata_entry::PriorityFeeAndBlockMetadataEntry;
 
 use super::errors::BlockMetadataKeeperError;
 
+// -------------------------- DUNE SCHEMA ----------------------------
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneApiResponse {
+    result: DuneResult,
+    next_uri: Option<String>,
+    next_offset: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneResult {
+    rows: Vec<DuneRow>,
+    metadata: DuneMetadata,
+}
+
+#[derive(Debug, Deserialize)]
+struct DuneRow {
+    leader: String,
+    slot: u64,
+    epoch: u64,
+    priority_fees_lamports: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct DuneMetadata {
+    total_row_count: u64,
+}
+
 // -------------------------- NEW SCHEMA -----------------------------
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DBSlotInfoState {
     Created = 0x10,
     Done = 0x11,
@@ -42,10 +74,9 @@ impl DBSlotInfoState {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct DBSlotInfo {
-    pub identity_key: String,
+    pub identity_key: String, // As of mainnet epoch `LEADER_SCHEDULE_VOTE_KEY_EPOCH`, this is also the vote key
     pub vote_key: Option<String>,
     pub epoch: u64,
     pub absolute_slot: u64,
@@ -76,7 +107,7 @@ impl DBSlotInfo {
     // -------------------- STAGES -----------------------------
 
     // 1. Updates the leader schedule such that we know we have every entry for a given epoch
-    pub fn upsert_leader_schedule(
+    pub fn insert_leader_schedule(
         connection: &mut Connection,
         epoch: u64,
         epoch_schedule: &EpochSchedule,
@@ -111,6 +142,11 @@ impl DBSlotInfo {
             let identity_key = leader.0;
             let relative_slots = leader.1;
 
+            //TODO Get leader schedule from new RPC call
+            // let vote_key: String = (epoch >= LEADER_SCHEDULE_VOTE_KEY_EPOCH)
+            //     .then_some(leader.0.to_string())
+            //     .unwrap_or_default();
+
             // Process each slot individually
             for relative_slots in relative_slots.chunks(chunk_size) {
                 for relative_slot in relative_slots {
@@ -127,7 +163,7 @@ impl DBSlotInfo {
                             absolute_slot,
                             relative_slot,
                             epoch,
-                            "", // vote_key is empty at this point, will be updated later
+                            "", // vote_key default to empty
                             identity_key,
                             0,                              // priority_fees default to 0
                             DBSlotInfoState::Created as u8, // Set initial state to Created
@@ -148,19 +184,18 @@ impl DBSlotInfo {
     // 2. Update the Vote Identity Mapping only for the current epoch.
     pub fn upsert_vote_identity_mapping(
         connection: &mut Connection,
-        epoch: u64,
         mapping: &HashMap<String, String>, // identity, vote
         chunk_size: Option<usize>,
     ) -> Result<u64, BlockMetadataKeeperError> {
-        let chunk_size = chunk_size.unwrap_or(100);
-        let unmapped = match Self::get_unmapped_identity_accounts(connection, epoch) {
+        let chunk_size = chunk_size.unwrap_or(3000);
+        let unmapped = match Self::get_unmapped_identity_accounts(connection) {
             Ok(list) => list,
             Err(_) => mapping.keys().cloned().collect(),
         };
 
         let sql = "UPDATE slot_info
          SET vote_key = ?
-         WHERE epoch = ? AND identity_key = ? AND vote_key = ''";
+         WHERE identity_key = ? AND vote_key = ''";
 
         let mut write_counter = 0;
         let mut transaction = connection.transaction()?;
@@ -178,7 +213,7 @@ impl DBSlotInfo {
                 let vote_key = entry.1.to_string();
 
                 write_counter += 1;
-                transaction.execute(sql, params![vote_key, epoch, identity_key])?;
+                transaction.execute(sql, params![vote_key, identity_key])?;
             }
             transaction.commit()?;
             transaction = connection.transaction()?;
@@ -265,20 +300,42 @@ impl DBSlotInfo {
         Ok(())
     }
 
-    pub fn get_unmapped_identity_accounts(
+    pub fn check_random_slot_exists_in_epoch(
         connection: &Connection,
         epoch: u64,
+        epoch_schedule: &EpochSchedule,
+    ) -> Result<bool, BlockMetadataKeeperError> {
+        // Get the slot range for this epoch
+        let first_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
+        let slots_in_epoch = epoch_schedule.get_slots_in_epoch(epoch);
+        let last_slot = first_slot + slots_in_epoch - 1;
+
+        // Generate a random slot within the epoch range
+        let mut rng = rand::thread_rng();
+        let random_slot = rng.gen_range(first_slot..=last_slot);
+
+        // Check if this slot exists in the database
+        let mut statement =
+            connection.prepare("SELECT COUNT(*) FROM slot_info WHERE absolute_slot = ?")?;
+
+        let count: i64 = statement.query_row(params![random_slot], |row| row.get(0))?;
+
+        Ok(count > 0)
+    }
+
+    pub fn get_unmapped_identity_accounts(
+        connection: &Connection,
     ) -> Result<Vec<String>, BlockMetadataKeeperError> {
         // Prepare query to find all distinct identity_keys where vote_key is empty
         let mut statement = connection.prepare(
             "SELECT DISTINCT identity_key
              FROM slot_info
-             WHERE vote_key = '' AND epoch = ?
+             WHERE vote_key = ''
              ORDER BY identity_key ASC",
         )?;
 
         // Execute query and map the results to a Vec<String>
-        let unmapped_results = statement.query_map(params![epoch], |row| {
+        let unmapped_results = statement.query_map(params![], |row| {
             let identity_key: String = row.get(0)?;
             Ok(identity_key)
         })?;
@@ -302,7 +359,8 @@ impl DBSlotInfo {
             "SELECT absolute_slot
              FROM slot_info
              WHERE state = ? AND absolute_slot < ?
-             ORDER BY absolute_slot ASC",
+             ORDER BY absolute_slot ASC
+             LIMIT 100000",
         )?;
 
         // Execute query with parameters
@@ -380,7 +438,6 @@ impl DBSlotInfo {
     // To Entry
     pub fn get_priority_fee_and_block_metadata_entries(
         connection: &Connection,
-        epoch_schedule: &EpochSchedule,
         epoch: u64,
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
@@ -397,13 +454,12 @@ impl DBSlotInfo {
                 state,
                 error_string
             FROM slot_info
-            WHERE epoch = ? AND state = ? AND vote_key != ''
+            WHERE epoch = ? AND vote_key != ''
             ORDER BY absolute_slot ASC",
         )?;
-        let slot_infos = statement
-            .query_map(params![epoch, DBSlotInfoState::Done as u8], |row| {
-                Ok(Self::from_db_row(row))
-            })?;
+        let slot_infos = statement.query_map(params![epoch], |row| Ok(Self::from_db_row(row)))?;
+
+        let highest_global_done_slot = get_highest_done_slot(connection)?.unwrap_or(0);
 
         let mut map = HashMap::<String, PriorityFeeAndBlockMetadataEntry>::new();
         for slot_info in slot_infos {
@@ -451,16 +507,189 @@ impl DBSlotInfo {
                 }
             }
 
-            entry.highest_slot = slot_info.absolute_slot.max(entry.highest_slot);
-            entry.update_slot = if entry.blocks_left > 0 {
-                entry.highest_slot
-            } else {
-                epoch_schedule.get_first_slot_in_epoch(entry.epoch + 1)
-            };
+            if slot_info.state as u8 == DBSlotInfoState::Done as u8 {
+                entry.highest_done_slot = slot_info.absolute_slot.max(entry.highest_done_slot);
+            }
+
+            entry.highest_global_done_slot = highest_global_done_slot;
         }
 
         Ok(map)
     }
+
+    /// Fetches data from Dune API and inserts into the database
+    ///
+    /// # Arguments
+    /// * `connection` - Database connection
+    /// * `api_key` - Dune API key
+    /// * `query_id` - Dune query ID
+    /// * `epoch_schedule` - Solana epoch schedule for calculating relative slots
+    /// * `batch_size` - Number of records to fetch per API call (default: 1000)
+    /// * `chunk_size` - Number of records to insert per database transaction (default: 100)
+    pub fn fetch_and_insert_from_dune(
+        connection: &mut Connection,
+        api_key: &str,
+        query_id: &str,
+        epoch_schedule: &EpochSchedule,
+        batch_size: usize,
+        chunk_size: usize,
+        starting_offset: usize,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let client = reqwest::blocking::Client::new();
+        let base_url = format!("https://api.dune.com/api/v1/query/{}/results", query_id);
+
+        let mut total_written = 0u64;
+        let mut offset = starting_offset;
+        let mut has_more = true;
+
+        info!("Starting Dune API fetch for query {}", query_id);
+
+        while has_more {
+            // Build URL with pagination
+            let url = format!("{}?limit={}&offset={}", base_url, batch_size, offset);
+
+            info!("Fetching batch from Dune API, offset: {}", offset);
+
+            // Make API request
+            let response = client
+                .get(&url)
+                .header("X-Dune-API-Key", api_key)
+                .send()
+                .map_err(|e| {
+                    BlockMetadataKeeperError::OtherError(format!("API request failed: {}", e))
+                })?;
+
+            if !response.status().is_success() {
+                return Err(BlockMetadataKeeperError::OtherError(format!(
+                    "API returned error status: {}",
+                    response.status()
+                )));
+            }
+
+            let api_response: DuneApiResponse = response.json().map_err(|e| {
+                BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {}", e))
+            })?;
+
+            let rows = api_response.result.rows;
+            if rows.is_empty() {
+                has_more = false;
+                continue;
+            }
+
+            // Convert Dune rows to DBSlotInfo entries
+            let mut entries_to_insert = Vec::new();
+
+            let rows_length = rows.len();
+            for row in rows {
+                // Calculate relative slot
+                let first_slot_in_epoch = epoch_schedule.get_first_slot_in_epoch(row.epoch);
+                let relative_slot = row.slot - first_slot_in_epoch;
+
+                entries_to_insert.push(DBSlotInfo {
+                    identity_key: row.leader,
+                    vote_key: None,
+                    epoch: row.epoch,
+                    absolute_slot: row.slot,
+                    relative_slot,
+                    priority_fees: row.priority_fees_lamports,
+                    state: DBSlotInfoState::Done,
+                    error_string: None,
+                });
+            }
+
+            if !entries_to_insert.is_empty() {
+                // Insert in chunks
+                let slots_start = entries_to_insert.first().unwrap().absolute_slot;
+                let slots_end = entries_to_insert.last().unwrap().absolute_slot;
+
+                let written =
+                    Self::insert_dune_entries(connection, &entries_to_insert, chunk_size)?;
+                total_written += written;
+
+                info!(
+                    "Wrote {} entries for slots {}-{} (epoch {})",
+                    written,
+                    slots_start,
+                    slots_end,
+                    entries_to_insert.first().unwrap().epoch
+                );
+            }
+
+            // Check if there are more results
+            offset += rows_length;
+            has_more = api_response.next_uri.is_some();
+
+            // Optional: Add a small delay to avoid rate limiting
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        info!(
+            "Completed Dune API fetch. Total entries written: {}",
+            total_written
+        );
+        Ok(total_written)
+    }
+
+    /// Helper function to insert Dune entries into the database
+    fn insert_dune_entries(
+        connection: &mut Connection,
+        entries: &[DBSlotInfo],
+        chunk_size: usize,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let sql = "INSERT OR IGNORE INTO slot_info (
+            absolute_slot,
+            relative_slot,
+            epoch,
+            vote_key,
+            identity_key,
+            priority_fees,
+            state,
+            error_string
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+        let mut write_counter = 0;
+        let mut transaction = connection.transaction()?;
+
+        for chunk in entries.chunks(chunk_size) {
+            for entry in chunk {
+                write_counter += 1;
+                transaction.execute(
+                    sql,
+                    params![
+                        entry.absolute_slot,
+                        entry.relative_slot,
+                        entry.epoch,
+                        entry.vote_key.as_deref().unwrap_or(""),
+                        entry.identity_key,
+                        entry.priority_fees,
+                        entry.state.clone() as u8,
+                        entry.error_string.as_deref().unwrap_or("")
+                    ],
+                )?;
+            }
+
+            transaction.commit()?;
+            transaction = connection.transaction()?;
+        }
+
+        Ok(write_counter)
+    }
+}
+
+pub fn get_highest_done_slot(
+    connection: &Connection,
+) -> Result<Option<u64>, BlockMetadataKeeperError> {
+    let mut statement = connection.prepare(
+        "SELECT MAX(absolute_slot)
+         FROM slot_info
+         WHERE state = ?",
+    )?;
+
+    let result = statement.query_row(params![DBSlotInfoState::Done as u8], |row| {
+        row.get::<_, Option<u64>>(0)
+    })?;
+
+    Ok(result)
 }
 
 /// Create all necessary tables and indexes. Uses IF NOT EXISTS to be safe

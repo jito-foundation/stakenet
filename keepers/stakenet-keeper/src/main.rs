@@ -102,9 +102,9 @@ async fn random_cooldown(range: u8) {
 async fn run_keeper(keeper_config: KeeperConfig) {
     // Intervals
     let metrics_interval = keeper_config.metrics_interval;
-    let validator_history_interval = 60;
+    let validator_history_interval = keeper_config.validator_history_interval;
     let steward_interval = keeper_config.steward_interval;
-    let block_metadata_interval = 60;
+    let block_metadata_interval = keeper_config.block_metadata_interval;
 
     let intervals = vec![
         validator_history_interval,
@@ -129,7 +129,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...");
+            info!("Pre-fetching data for update...({})", tick);
             match pre_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -146,7 +146,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...");
+                info!("Creating missing accounts...({})", tick);
                 match create_missing_accounts(&keeper_config, &keeper_state).await {
                     Ok(new_accounts_created) => {
                         keeper_state.increment_update_run_for_epoch(
@@ -182,7 +182,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Post-fetching data for update...");
+            info!("Post-fetching data for update...({})", tick);
             match post_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
@@ -324,25 +324,32 @@ fn main() {
 
     info!("{}\n\n", args);
 
-    let gossip_entrypoints = args
-        .gossip_entrypoints
-        .map(|gossip_entrypoints| {
-            gossip_entrypoints
-                .iter()
-                .enumerate()
-                .map(|(index, gossip_entrypoint)| {
-                    solana_net_utils::parse_host_port(gossip_entrypoint).unwrap_or_else(|err| {
-                        panic!(
-                            "Failed to parse gossip entrypoint #{} '{}': {}",
-                            index + 1,
-                            gossip_entrypoint,
-                            err
-                        )
+    let gossip_entrypoints =
+        args.gossip_entrypoints
+            .map(|gossip_entrypoints| {
+                gossip_entrypoints
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, gossip_entrypoint)| {
+                        if gossip_entrypoint.is_empty() {
+                            None
+                        } else {
+                            Some(
+                                solana_net_utils::parse_host_port(gossip_entrypoint)
+                                    .unwrap_or_else(|err| {
+                                        panic!(
+                                            "Failed to parse gossip entrypoint #{} '{}': {}",
+                                            index + 1,
+                                            gossip_entrypoint,
+                                            err
+                                        )
+                                    }),
+                            )
+                        }
                     })
-                })
-                .collect()
-        })
-        .expect("Failed to create socket addresses from gossip entrypoints");
+                    .collect()
+            })
+            .expect("Failed to create socket addresses from gossip entrypoints");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
@@ -419,6 +426,8 @@ fn main() {
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
+            lookback_epochs: args.lookback_epochs,
+            lookback_start_offset_epochs: args.lookback_start_offset_epochs,
             validator_history_min_stake: args.validator_history_min_stake,
         };
 
