@@ -164,9 +164,10 @@ async fn validate_validator_history_accounts(
 
 fn build_instruction(validator_age: (Pubkey, u32), signer: Pubkey, epoch: u16) -> Instruction {
     let (vote_pubkey, age) = validator_age;
-    let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
-    let (validator_history_pda, _) = Pubkey::find_program_address(
-        &[ValidatorHistory::SEED, vote_pubkey.as_ref()],
+    let config =
+        stakenet_sdk::utils::accounts::get_validator_history_config_address(&validator_history::ID);
+    let validator_history_pda = stakenet_sdk::utils::accounts::get_validator_history_address(
+        &vote_pubkey,
         &validator_history::ID,
     );
     let accounts = validator_history::accounts::UploadValidatorAge {
