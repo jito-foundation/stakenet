@@ -43,43 +43,74 @@ The state machine represents the progress throughout a cycle (10-epoch period fo
 
 ### Compute Scores
 
-At the start of a 10 epoch cycle (“the cycle”), all validators are scored. We save the overall score, which combines yield performance as well as binary criteria for eligibility, and we also save the yield-only score.
+At the start of a 10 epoch cycle ("the cycle"), all validators are scored. We save both the overall `score` (which includes binary eligibility filters) and the `raw_score` (the 4-tier hierarchical score before filters).
 
-The `score` is for determining eligibility to be staked in the pool, the `yield_score` determines the unstaking order (who gets unstaked first, lowest to highest).
+The `score` determines eligibility to be staked in the pool (must be non-zero). The `raw_score` determines the unstaking order (lower raw_score validators are unstaked first).
 
-The following metrics are used to calculate the `score` and `yield_score`:
+The scoring system uses a **4-tier hierarchical encoding** combined with **binary eligibility filters**.
 
-- `mev_commission_score`: If max mev commission in `mev_commission_range` epochs is less than threshold, score is 1.0, else 0
-- `commission_score`: If any commission within the individual's validator history exceeds the historical_commission_threshold, score it 0.0, else 1.0. This effectively bans validators who have performed commission manipulation.
-- `blacklisted_score`: If validator is blacklisted, score is 0.0, else 1.0
-- `superminority_score`: If validator is not in the superminority, score is 1.0, else 0.0
-- `delinquency_score`: If delinquency is not > threshold in any epoch, score is 1.0, else 0.0
-- `running_jito_score`: If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0
-- `merkle_root_upload_authority_score`: If validator is using TipRouter or OldJito Tip Distribution merkle root upload authority then score is 1.0, else 0.0
-- `priority_fee_commission_score`: If validator's realized priority fee commission is < configured threshold over configured epoch range then score is 1.0, else 0.0
+### 4-Tier Score Components
+
+The `raw_score` is a u64 value encoding four tiers in descending order of importance:
+
+1. **Tier 1 (bits 56-63)**: Inflation commission (inverted, 0-100%) - Lower commission = higher score
+2. **Tier 2 (bits 42-55)**: MEV commission average (inverted, 0-10000 bps) - Lower commission = higher score
+3. **Tier 3 (bits 25-41)**: Validator age (direct, epochs with non-zero vote credits) - Older = higher score
+4. **Tier 4 (bits 0-24)**: Vote credits ratio (normalized, scaled) - Higher performance = higher score
+
+This hierarchical structure ensures that differences in higher-order tiers (e.g., inflation commission) dominate lower-order tiers when comparing validators.
+
+### Binary Eligibility Filters
+
+The following binary filters (0 or 1) are applied to the `raw_score`:
+
+- `mev_commission_score`: If max MEV commission in `mev_commission_range` epochs is ≤ threshold, score is 1, else 0
+- `commission_score`: If max commission in `commission_range` epochs is ≤ threshold, score is 1, else 0
+- `historical_commission_score`: If max commission in all history is ≤ threshold, score is 1, else 0
+- `blacklisted_score`: If validator is NOT blacklisted, score is 1, else 0
+- `superminority_score`: If validator is NOT in the superminority, score is 1, else 0
+- `delinquency_score`: If delinquency ratio is acceptable in all epochs, score is 1, else 0
+- `running_jito_score`: If validator has any MEV commission in the last `mev_commission_range` epochs, score is 1, else 0
+- `merkle_root_upload_authority_score`: If validator is using TipRouter or OldJito Tip Distribution merkle root upload authority, score is 1, else 0
+- `priority_fee_merkle_root_upload_authority_score`: If validator is using acceptable priority fee merkle root upload authority, score is 1, else 0
+- `priority_fee_commission_score`: If validator's realized priority fee commission is ≤ configured threshold over configured epoch range, score is 1, else 0
 
 > Note: All data comes from the `ValidatorHistory` account for each validator.
 
-To formula to calculate the `score` and `yield_score`:
+### Score Formula
 
 ```rust
-let yield_score = (average_vote_credits / average_blocks)
-    * (1. - commission);
+// Calculate 4-tier raw score
+let raw_score = encode_validator_score(
+    max_commission,           // Tier 1: 0-100 (inverted)
+    mev_commission_avg,       // Tier 2: 0-10000 bps (inverted)
+    validator_age,            // Tier 3: epochs with non-zero vote credits
+    vote_credits_avg          // Tier 4: scaled normalized vote credits ratio
+);
 
-let score = mev_commission_score
+// Apply binary filters
+let score = raw_score
+    * mev_commission_score
     * commission_score
+    * historical_commission_score
     * blacklisted_score
     * superminority_score
     * delinquency_score
     * running_jito_score
-    * yield_score
     * merkle_root_upload_authority_score
     * priority_fee_commission_score
+    * priority_fee_merkle_root_upload_authority_score;
 ```
 
-As a validator, in order to receive a high score for JitoSOL, you must meet these binary eligibility criteria, and return a high rate of rewards to your stakers. The eligibility criteria ensure that we're delegating to validators that meet some important properties for decentralization, Solana network health, operator quality, and MEV sharing. The yield score is an objective way to compare validators' relative yield and ensure we're returning a competitive APY to JitoSOL holders, which in turn attracts more stake to delegate to validators.
+As a validator, to receive a high score for JitoSOL, you must meet all binary eligibility criteria (binary filters) AND optimize the 4-tier score components. The eligibility criteria ensure delegation to validators meeting important properties for decentralization, Solana network health, operator quality, and MEV sharing.
 
-In this version 0 of the score formula, there is no weighting of any factor above any other, because it is a product of all factors. But because all factors besides `yield_score` will only be `1.0` or `0.0`, yield is the main factor for determining validator ranking assuming all eligibility criteria is met. Even if one of the eligibility factors is not met, or the score is not high enough to be selected for the pool delegation, it is still advantageous to have a high `yield_score` as it is used for ranking which validators to unstake first.
+The 4-tier hierarchical system creates a clear priority order:
+1. **Inflation commission** (most important) - Validators with lower commissions are always preferred
+2. **MEV commission** - Among validators with equal inflation commission, lower MEV commission is preferred
+3. **Validator age** - Among validators equal on commissions, older validators are preferred
+4. **Vote credits** - Among validators equal on all above, higher performance is preferred
+
+If any binary filter fails (equals 0), the final score becomes 0 regardless of the raw_score. The `raw_score` is also used for ranking validators during unstaking operations (lower raw_score validators are unstaked first).
 
 For a breakdown of the formulas used for each score, see the Appendix.
 
@@ -89,7 +120,7 @@ Take a look at the implementation in [score.rs](./src/score.rs#L180)
 
 Once all the validators are scored, we need to calculate the stake distribution we will be aiming for during this cycle.
 
-The top 200 of these validators by overall score will become our validator set, with each receiving 1/200th of the share of the pool. If there are fewer than 200 validators eligible (having a non-zero score), the “ideal” validators are all of the eligible validators.
+The top N validators by overall score will become our validator set (where N = `num_delegation_validators`, currently 400), with each receiving 1/N of the pool's stake. If there are fewer than N validators eligible (having a non-zero score), the "ideal" validators are all of the eligible validators.
 
 At the end of this step, we have a list of target delegations, representing proportions of the share of the pool, not fixed lamport amounts.
 
@@ -106,14 +137,16 @@ The following criteria are used to determine if a validator should be instantly 
 - `delinquency_check`: Checks if validator has missed > `instant_unstake_delinquency_threshold_ratio` of votes this epoch
 - `commission_check`: Checks if validator has increased commission > `commission_threshold`
 - `mev_commission_check`: Checks if validator has increased MEV commission > `mev_commission_bps_threshold`
-- `is_blacklisted`: Checks if validator was added to blacklist blacklisted
+- `is_blacklisted`: Checks if validator was added to blacklist
 - `is_bad_merkle_root_upload_authority`: Checks if validator has an unacceptable Tip Distribution merkle root upload authority
+- `is_bad_priority_fee_merkle_root_upload_authority`: Checks if validator has an unacceptable Priority Fee merkle root upload authority
 
 If any of these criteria are true, we mark the validator for instant unstaking:
 
 ```rust
 let instant_unstake =
-    delinquency_check || commission_check || mev_commission_check || is_blacklisted || is_bad_merkle_root_upload_authority;
+    delinquency_check || commission_check || mev_commission_check || is_blacklisted
+    || is_bad_merkle_root_upload_authority || is_bad_priority_fee_merkle_root_upload_authority;
 ```
 
 Take a look at the implementation in [score.rs](./src/score.rs#L554)
@@ -203,25 +236,32 @@ Administrators can:
 | Parameter                                     | Value                        | Description                                                                                                                                                                                             |
 | --------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Scoring Parameters**                        |                              |                                                                                                                                                                                                         |
-| `mev_commission_range`                        | 10                           | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                                                                                   |
+| `mev_commission_range`                        | 30                           | Number of recent epochs used to evaluate MEV commissions and running Jito for scoring                                                                                                                   |
 | `epoch_credits_range`                         | 30                           | Number of recent epochs used to evaluate yield                                                                                                                                                          |
 | `commission_range`                            | 30                           | Number of recent epochs used to evaluate commissions for scoring                                                                                                                                        |
 | `mev_commission_bps_threshold`                | 1000                         | Maximum allowable MEV commission in mev_commission_range (stored in basis points)                                                                                                                       |
 | `commission_threshold`                        | 5                            | Maximum allowable validator commission in commission_range (stored in percent)                                                                                                                          |
 | `historical_commission_threshold`             | 50                           | Maximum allowable validator commission in all history (stored in percent)                                                                                                                               |
-| `scoring_delinquency_threshold_ratio`         | 0.85                         | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
+| `scoring_delinquency_threshold_ratio`         | 0.97                         | Minimum ratio of slots voted on for each epoch for a validator to be eligible for stake. Used as proxy for validator reliability/restart timeliness. Ratio is number of epoch_credits / blocks_produced |
+|                                               |                              |                                                                                                                                                                                                         |
+| **Priority Fee Scoring Parameters**           |                              |                                                                                                                                                                                                         |
+| `priority_fee_lookback_epochs`                | 10                           | Number of epochs to look back for priority fee commission evaluation                                                                                                                                    |
+| `priority_fee_lookback_offset`                | 2                            | Epoch offset for priority fee evaluation (look at epochs from current_epoch - offset - lookback to current_epoch - offset)                                                                             |
+| `priority_fee_max_commission_bps`             | 10000                        | Maximum allowable average realized priority fee commission (in basis points). Validators exceeding this fail priority_fee_commission_score                                                              |
+| `priority_fee_error_margin_bps`               | 500                          | Error margin for priority fee commission calculations (in basis points)                                                                                                                                 |
+| `priority_fee_scoring_start_epoch`            | 65535                        | Epoch when priority fee scoring begins (scores default to 1 for all prior epochs)                                                                                                                       |
 |                                               |                              |                                                                                                                                                                                                         |
 | **Delegation Parameters**                     |                              |                                                                                                                                                                                                         |
 | `instant_unstake_delinquency_threshold_ratio` | 0.70                         | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
-| `num_delegation_validators`                   | 200                          | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
+| `num_delegation_validators`                   | 400                          | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
 | `scoring_unstake_cap_bps`                     | 750                          | Percent of total pool lamports that can be unstaked due to new delegation set (in basis points)                                                                                                         |
 | `instant_unstake_cap_bps`                     | 1000                         | Percent of total pool lamports that can be unstaked due to instant unstaking (in basis points)                                                                                                          |
 | `stake_deposit_unstake_cap_bps`               | 1000                         | Percent of total pool lamports that can be unstaked due to stake deposits above target lamports (in basis points)                                                                                       |
 |                                               |                              |                                                                                                                                                                                                         |
 | **State Machine Operation Parameters**        |                              |                                                                                                                                                                                                         |
-| `compute_score_slot_range`                    | 1000                         | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                                                                            |
+| `compute_score_slot_range`                    | 10000                        | Scoring window such that the validators are all scored within a similar timeframe (in slots)                                                                                                            |
 | `instant_unstake_epoch_progress`              | 0.90                         | Point in epoch progress before instant unstake can be computed                                                                                                                                          |
-| `instant_unstake_inputs_epoch_progress`       | 0.50                         | Inputs to “Compute Instant Unstake” need to be updated past this point in epoch progress                                                                                                                |
+| `instant_unstake_inputs_epoch_progress`       | 0.50                         | Inputs to "Compute Instant Unstake" need to be updated past this point in epoch progress                                                                                                                |
 | `num_epochs_between_scoring`                  | 10                           | Cycle length - Number of epochs to run the Monitor->Rebalance loop                                                                                                                                      |
 | `minimum_stake_lamports`                      | 5,000,000,000,000 (5000 SOL) | Minimum number of stake lamports for a validator to be considered for the pool                                                                                                                          |
 | `minimum_voting_epochs`                       | 5                            | Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool                                                                                                   |
@@ -320,9 +360,21 @@ $`
 
 $`
 \displaylines{
-\text{merkle\_root\_upload\_authority\_score} = 
-\begin{cases} 
+\text{merkle\_root\_upload\_authority\_score} =
+\begin{cases}
 1.0 & \text{if Tip Distribution merkle root upload authority is acceptable in current epoch} \\
+0.0 & \text{otherwise}
+\end{cases}
+}
+`$
+
+---
+
+$`
+\displaylines{
+\text{priority\_fee\_merkle\_root\_upload\_authority\_score} =
+\begin{cases}
+1.0 & \text{if Priority Fee merkle root upload authority is acceptable in current epoch} \\
 0.0 & \text{otherwise}
 \end{cases}
 }
@@ -356,18 +408,41 @@ Note: total_blocks is the field in ClusterHistory that tracks how many blocks we
 
 $`
 \displaylines{
-\text{yield\_score} = \text{vote\_credits\_ratio} \times (1 - max(\text{commission}_{t_1, t_2})) \\
-\text{where } t_1 = \text{current\_epoch} - \text{commission\_range} \\
-\text{and } t_2 = \text{current\_epoch}
+\text{avg\_mev\_commission} = \lceil \frac{\sum_{t=t_1}^{t_2} \text{mev\_commission}_t}{\text{count}(\text{mev\_commission}_t)} \rceil \\
+\text{where } t_1 = \text{current\_epoch} - \text{mev\_commission\_range} \\
+\text{and } t_2 = \text{current\_epoch} \\
+\text{(ceiling division to be more strict)}
 }
 `$
 
-Note: Yield score is a relative measure of the yield returned to stakers by the validator, not an exact measure of its APY.
+Note: If no MEV commission data exists, defaults to BASIS_POINTS_MAX (10000).
+
+---
+
+### 4-Tier Encoding Formula
+
+The raw score is encoded as a u64 with the following bit layout:
+
+$`
+\displaylines{
+\text{raw\_score} = (\text{inflation\_tier} \ll 56) \mid (\text{mev\_tier} \ll 42) \mid (\text{age\_tier} \ll 25) \mid \text{credits\_tier} \\\\
+\text{where:} \\
+\text{inflation\_tier} = 100 - \min(\text{max\_commission}, 100) \text{ (8 bits)} \\
+\text{mev\_tier} = 10000 - \min(\text{avg\_mev\_commission}, 10000) \text{ (14 bits)} \\
+\text{age\_tier} = \min(\text{validator\_age}, 2^{17}-1) \text{ (17 bits)} \\
+\text{credits\_tier} = \min(\text{vote\_credits\_ratio} \times 10^7, 2^{25}-1) \text{ (25 bits)}
+}
+`$
+
+Note: Higher raw_score values indicate better validators due to inversion of commission values and direct encoding of age and credits.
 
 ---
 
 $`
 \displaylines{
-\text{final\_score} = \text{mev\_commission\_score} \times \text{commission\_score} \times \text{historical\_commission\_score} \times \text{blacklisted\_score} \times \text{merkle\_root\_upload\_authority\_score} \times \text{superminority\_score} \times \text{delinquency\_score} \times \text{running\_jito\_score} \times \text{yield\_score}
+\text{final\_score} = \text{raw\_score} \times \text{mev\_commission\_score} \times \text{commission\_score} \times \text{historical\_commission\_score} \\
+\times \text{blacklisted\_score} \times \text{merkle\_root\_upload\_authority\_score} \times \text{superminority\_score} \\
+\times \text{delinquency\_score} \times \text{running\_jito\_score} \times \text{priority\_fee\_commission\_score} \\
+\times \text{priority\_fee\_merkle\_root\_upload\_authority\_score}
 }
 `$
