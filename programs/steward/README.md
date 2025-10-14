@@ -255,8 +255,6 @@ Administrators can:
 | `priority_fee_error_margin_bps`               | 500                          | Error margin for priority fee commission calculations (in basis points)                                                                                                                                 |
 | `priority_fee_scoring_start_epoch`            | 65535                        | Epoch when priority fee scoring begins (scores default to 1 for all prior epochs)                                                                                                                       |
 |                                               |                              |                                                                                                                                                                                                         |
-| **Note:** Priority fee scoring is effectively disabled via conservative parameter settings (`priority_fee_max_commission_bps` = 10000 and `priority_fee_scoring_start_epoch` = 65535). These features could be activated in a future governance proposal. |                              |                                                                                                                                                                                                         |
-|                                               |                              |                                                                                                                                                                                                         |
 | **Delegation Parameters**                     |                              |                                                                                                                                                                                                         |
 | `instant_unstake_delinquency_threshold_ratio` | 0.70                         | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
 | `num_delegation_validators`                   | 400                          | Number of validators who are eligible for stake (validator set size)                                                                                                                                    |
@@ -386,8 +384,6 @@ $`
 }
 `$
 
-> Note: Priority fee scoring is effectively disabled via conservative parameter settings (`priority_fee_max_commission_bps` = 10000 and `priority_fee_scoring_start_epoch` = 65535). These features could be activated in a future governance proposal.
-
 ---
 
 $`
@@ -454,5 +450,3 @@ $`
 \times \text{priority\_fee\_merkle\_root\_upload\_authority\_score}
 }
 `$
-
-> Note: Priority fee scoring components (`priority_fee_commission_score` and `priority_fee_merkle_root_upload_authority_score`) are effectively disabled via conservative parameter settings and could be activated in a future governance proposal.
