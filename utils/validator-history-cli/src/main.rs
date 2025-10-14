@@ -387,11 +387,26 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
             "Activated Stake Lamports: {}",
             format_option(entry_output.activated_stake_lamports)
         ));
-        field_descriptions.push(format!("MEV Commission: {}", format_option(entry_output.mev_commission)));
-        field_descriptions.push(format!("Epoch Credits: {}", format_option(entry_output.epoch_credits)));
-        field_descriptions.push(format!("Commission: {}", format_option(entry_output.commission)));
-        field_descriptions.push(format!("Client Type: {}", format_option(entry_output.client_type)));
-        field_descriptions.push(format!("Client Version: {}", format_option(entry_output.version)));
+        field_descriptions.push(format!(
+            "MEV Commission: {}",
+            format_option(entry_output.mev_commission)
+        ));
+        field_descriptions.push(format!(
+            "Epoch Credits: {}",
+            format_option(entry_output.epoch_credits)
+        ));
+        field_descriptions.push(format!(
+            "Commission: {}",
+            format_option(entry_output.commission)
+        ));
+        field_descriptions.push(format!(
+            "Client Type: {}",
+            format_option(entry_output.client_type)
+        ));
+        field_descriptions.push(format!(
+            "Client Version: {}",
+            format_option(entry_output.version)
+        ));
         field_descriptions.push(format!("IP: {}", format_option(entry_output.ip)));
         field_descriptions.push(format!(
             "Merkle Root Upload Authority: {}",
@@ -406,7 +421,10 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
             "Last Update: {}",
             format_option(entry_output.vote_account_last_update_slot)
         ));
-        field_descriptions.push(format!("MEV Earned: {}", format_option(entry_output.mev_earned)));
+        field_descriptions.push(format!(
+            "MEV Earned: {}",
+            format_option(entry_output.mev_earned)
+        ));
         field_descriptions.push(format!(
             "Priority Fee Commission: {}",
             format_option(entry_output.priority_fee_commission)
@@ -706,8 +724,7 @@ fn command_history(args: History, client: RpcClient) {
         );
         println!(
             "Validator Age: {} | Validator Age Last Updated Epoch: {}",
-            validator_history.validator_age,
-            validator_history.validator_age_last_updated_epoch
+            validator_history.validator_age, validator_history.validator_age_last_updated_epoch
         );
 
         for epoch in start_epoch..=current_epoch {
