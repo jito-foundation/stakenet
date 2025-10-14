@@ -104,8 +104,6 @@ let score = raw_score
     * priority_fee_merkle_root_upload_authority_score;  // Currently disabled
 ```
 
-> Note: Priority fee scoring components (`priority_fee_commission_score` and `priority_fee_merkle_root_upload_authority_score`) are effectively disabled via conservative parameter settings and could be activated in a future governance proposal.
-
 As a validator, to receive a high score for JitoSOL, you must meet all binary eligibility criteria (binary filters) AND optimize the 4-tier score components. The eligibility criteria ensure delegation to validators meeting important properties for decentralization, Solana network health, operator quality, and MEV sharing.
 
 The 4-tier hierarchical system creates a clear priority order:
