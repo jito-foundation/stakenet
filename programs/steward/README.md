@@ -72,10 +72,12 @@ The following binary filters (0 or 1) are applied to the `raw_score`:
 - `delinquency_score`: If delinquency ratio is acceptable in all epochs, score is 1, else 0
 - `running_jito_score`: If validator has any MEV commission in the last `mev_commission_range` epochs, score is 1, else 0
 - `merkle_root_upload_authority_score`: If validator is using TipRouter or OldJito Tip Distribution merkle root upload authority, score is 1, else 0
-- `priority_fee_merkle_root_upload_authority_score`: If validator is using acceptable priority fee merkle root upload authority, score is 1, else 0
-- `priority_fee_commission_score`: If validator's realized priority fee commission is ≤ configured threshold over configured epoch range, score is 1, else 0
+- `priority_fee_merkle_root_upload_authority_score`: If validator is using acceptable priority fee merkle root upload authority, score is 1, else 0 (currently disabled via parameter settings)
+- `priority_fee_commission_score`: If validator's realized priority fee commission is ≤ configured threshold over configured epoch range, score is 1, else 0 (currently disabled via parameter settings)
 
 > Note: All data comes from the `ValidatorHistory` account for each validator.
+>
+> Note: Priority fee scoring is effectively disabled via conservative parameter settings (`priority_fee_max_commission_bps` = 10000 and `priority_fee_scoring_start_epoch` = 65535). These features could be activated in a future governance proposal.
 
 ### Score Formula
 
@@ -98,9 +100,11 @@ let score = raw_score
     * delinquency_score
     * running_jito_score
     * merkle_root_upload_authority_score
-    * priority_fee_commission_score
-    * priority_fee_merkle_root_upload_authority_score;
+    * priority_fee_commission_score  // Currently disabled
+    * priority_fee_merkle_root_upload_authority_score;  // Currently disabled
 ```
+
+> Note: Priority fee scoring components (`priority_fee_commission_score` and `priority_fee_merkle_root_upload_authority_score`) are effectively disabled via conservative parameter settings and could be activated in a future governance proposal.
 
 As a validator, to receive a high score for JitoSOL, you must meet all binary eligibility criteria (binary filters) AND optimize the 4-tier score components. The eligibility criteria ensure delegation to validators meeting important properties for decentralization, Solana network health, operator quality, and MEV sharing.
 
@@ -139,7 +143,7 @@ The following criteria are used to determine if a validator should be instantly 
 - `mev_commission_check`: Checks if validator has increased MEV commission > `mev_commission_bps_threshold`
 - `is_blacklisted`: Checks if validator was added to blacklist
 - `is_bad_merkle_root_upload_authority`: Checks if validator has an unacceptable Tip Distribution merkle root upload authority
-- `is_bad_priority_fee_merkle_root_upload_authority`: Checks if validator has an unacceptable Priority Fee merkle root upload authority
+- `is_bad_priority_fee_merkle_root_upload_authority`: Checks if validator has an unacceptable Priority Fee merkle root upload authority (currently disabled via parameter settings)
 
 If any of these criteria are true, we mark the validator for instant unstaking:
 
@@ -250,6 +254,8 @@ Administrators can:
 | `priority_fee_max_commission_bps`             | 10000                        | Maximum allowable average realized priority fee commission (in basis points). Validators exceeding this fail priority_fee_commission_score                                                              |
 | `priority_fee_error_margin_bps`               | 500                          | Error margin for priority fee commission calculations (in basis points)                                                                                                                                 |
 | `priority_fee_scoring_start_epoch`            | 65535                        | Epoch when priority fee scoring begins (scores default to 1 for all prior epochs)                                                                                                                       |
+|                                               |                              |                                                                                                                                                                                                         |
+| **Note:** Priority fee scoring is effectively disabled via conservative parameter settings (`priority_fee_max_commission_bps` = 10000 and `priority_fee_scoring_start_epoch` = 65535). These features could be activated in a future governance proposal. |                              |                                                                                                                                                                                                         |
 |                                               |                              |                                                                                                                                                                                                         |
 | **Delegation Parameters**                     |                              |                                                                                                                                                                                                         |
 | `instant_unstake_delinquency_threshold_ratio` | 0.70                         | Same as scoring_delinquency_threshold_ratio but evaluated every epoch                                                                                                                                   |
@@ -380,6 +386,8 @@ $`
 }
 `$
 
+> Note: Priority fee scoring is effectively disabled via conservative parameter settings (`priority_fee_max_commission_bps` = 10000 and `priority_fee_scoring_start_epoch` = 65535). These features could be activated in a future governance proposal.
+
 ---
 
 $`
@@ -446,3 +454,5 @@ $`
 \times \text{priority\_fee\_merkle\_root\_upload\_authority\_score}
 }
 `$
+
+> Note: Priority fee scoring components (`priority_fee_commission_score` and `priority_fee_merkle_root_upload_authority_score`) are effectively disabled via conservative parameter settings and could be activated in a future governance proposal.
