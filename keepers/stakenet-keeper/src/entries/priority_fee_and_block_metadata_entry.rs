@@ -16,12 +16,12 @@ pub struct PriorityFeeAndBlockMetadataEntry {
     pub total_priority_fees: u64,
     pub total_leader_slots: u32,
     pub blocks_produced: u32,
-    pub update_slot: u64,
+    pub highest_global_done_slot: u64, // Highest Done slot globally
+    pub highest_done_slot: u64,        // Highest Done slot within an epoch
     // Aux Data
     pub blocks_left: u32,
     pub blocks_error: u32,
     pub blocks_missed: u32,
-    pub highest_slot: u64,
 }
 
 impl PriorityFeeAndBlockMetadataEntry {
@@ -44,11 +44,11 @@ impl PriorityFeeAndBlockMetadataEntry {
             total_priority_fees: 0,
             total_leader_slots: 0,
             blocks_produced: 0,
-            update_slot: 0,
+            highest_global_done_slot: 0,
             blocks_left: 0,
             blocks_error: 0,
             blocks_missed: 0,
-            highest_slot: 0,
+            highest_done_slot: 0,
         }
     }
 }
@@ -75,7 +75,7 @@ impl UpdateInstruction for PriorityFeeAndBlockMetadataEntry {
                 total_priority_fees: self.total_priority_fees,
                 total_leader_slots: self.total_leader_slots,
                 blocks_produced: self.blocks_produced,
-                highest_oracle_recorded_slot: self.update_slot,
+                highest_oracle_recorded_slot: self.highest_global_done_slot,
             }
             .data(),
         }

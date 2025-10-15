@@ -131,6 +131,7 @@ pub async fn post_create_update(
     let client = &keeper_config.client;
     let validator_history_program_id = &keeper_config.validator_history_program_id;
     let tip_distribution_program_id = &keeper_config.tip_distribution_program_id;
+    let current_epoch = keeper_state.epoch_info.epoch;
 
     // Update Validator History Accounts
     keeper_state.validator_history_map =
@@ -145,7 +146,7 @@ pub async fn post_create_update(
         client,
         tip_distribution_program_id,
         keeper_state,
-        keeper_state.epoch_info.epoch.saturating_sub(1),
+        current_epoch.saturating_sub(1),
     )
     .await?;
 
@@ -154,7 +155,7 @@ pub async fn post_create_update(
         client,
         tip_distribution_program_id,
         keeper_state,
-        keeper_state.epoch_info.epoch,
+        current_epoch,
     )
     .await?;
 
