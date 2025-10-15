@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
-
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
+use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
+use rusqlite::Connection;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -13,6 +13,8 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
+use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
+use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -51,6 +53,7 @@ enum Commands {
     StakeByCountry(StakeByCountry),
     GetConfig,
     UpdateOracleAuthority(UpdateOracleAuthority),
+    DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
 }
 
@@ -167,6 +170,30 @@ struct UpdateOracleAuthority {
     /// New oracle authority (Pubkey as base58 string)
     #[arg(long, env)]
     oracle_authority: Pubkey,
+}
+
+#[derive(Parser)]
+#[command(about = "Backfills the Priority Fee DB from Dune from the last 99 epochs")]
+struct DunePriorityFeeBackfill {
+    /// Path to the local SQLite file
+    #[arg(long, env, default_value = "../../keepers/block_keeper.db3")]
+    pub sqlite_path: PathBuf,
+
+    /// Dune API key
+    #[arg(long, env)]
+    dune_api_key: String,
+
+    #[arg(long, env, default_value = "5598354")]
+    query_id: String,
+
+    #[arg(long, env, default_value_t = 32000)]
+    batch_size: usize,
+
+    #[arg(long, env, default_value_t = 32000)]
+    chunk_size: usize,
+
+    #[arg(long, env, default_value_t = 0)]
+    starting_offset: usize,
 }
 
 #[derive(Parser)]
@@ -1141,6 +1168,32 @@ fn command_get_config(client: RpcClient) {
     }
 }
 
+async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
+    let epoch_schedule = client
+        .get_epoch_schedule()
+        .expect("Could not get epoch schedule");
+
+    // Move the blocking operations into spawn_blocking
+    let entries_written = tokio::task::spawn_blocking(move || {
+        let mut connection = Connection::open(args.sqlite_path).expect("Failed to open database");
+
+        DBSlotInfo::fetch_and_insert_from_dune(
+            &mut connection,
+            &args.dune_api_key,
+            &args.query_id,
+            &epoch_schedule,
+            args.chunk_size,
+            args.batch_size,
+            args.starting_offset,
+        )
+    })
+    .await
+    .expect("Task panicked")
+    .expect("Error running backfill");
+
+    println!("Total entries written: {}", entries_written);
+}
+
 fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
     // Upload validator age for a specific vote account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
@@ -1199,6 +1252,8 @@ fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    env_logger::init();
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
@@ -1213,6 +1268,9 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
+        Commands::DunePriorityFeeBackfill(args) => {
+            command_dune_priority_fee_backfill(args, client).await
+        }
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
