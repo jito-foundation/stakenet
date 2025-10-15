@@ -11798,6 +11798,7 @@ dependencies = [
  "solana-sdk",
  "spl-stake-pool",
  "stakenet-keeper",
+ "stakenet-sdk",
  "tokio",
  "validator-history",
 ]

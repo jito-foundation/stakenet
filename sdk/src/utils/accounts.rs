@@ -10,7 +10,7 @@ use solana_client::{
 use solana_sdk::pubkey::Pubkey;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use validator_history::{ClusterHistory, ValidatorHistory};
+use validator_history::{ClusterHistory, Config as ValidatorHistoryConfig, ValidatorHistory};
 
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
@@ -428,8 +428,9 @@ pub fn get_validator_history_address(
 }
 
 pub fn get_validator_history_config_address(validator_history_program_id: &Pubkey) -> Pubkey {
-    let (address, _) =
-        Pubkey::find_program_address(&[StewardConfig::SEED], validator_history_program_id);
-
+    let (address, _) = Pubkey::find_program_address(
+        &[ValidatorHistoryConfig::SEED],
+        validator_history_program_id,
+    );
     address
 }
