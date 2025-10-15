@@ -371,6 +371,10 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
+fn format_option(opt: Option<String>) -> String {
+    opt.unwrap_or_else(|| "None".to_string())
+}
+
 fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
     let entry_output = ValidatorHistoryEntryOutput::from(entry);
 
@@ -380,56 +384,74 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
         let mut field_descriptions = Vec::new();
 
         field_descriptions.push(format!(
-            "Activated Stake Lamports: {:?}",
-            entry_output.activated_stake_lamports
-        ));
-        field_descriptions.push(format!("MEV Commission: {:?}", entry_output.mev_commission));
-        field_descriptions.push(format!("Epoch Credits: {:?}", entry_output.epoch_credits));
-        field_descriptions.push(format!("Commission: {:?}", entry_output.commission));
-        field_descriptions.push(format!("Client Type: {:?}", entry_output.client_type));
-        field_descriptions.push(format!("Client Version: {:?}", entry_output.version));
-        field_descriptions.push(format!("IP: {:?}", entry_output.ip));
-        field_descriptions.push(format!(
-            "Merkle Root Upload Authority: {:?}",
-            entry_output.merkle_root_upload_authority
+            "Activated Stake Lamports: {}",
+            format_option(entry_output.activated_stake_lamports)
         ));
         field_descriptions.push(format!(
-            "Superminority: {:?}",
-            entry_output.is_superminority
-        ));
-        field_descriptions.push(format!("Rank: {:?}", entry_output.rank));
-        field_descriptions.push(format!(
-            "Last Update: {:?}",
-            entry_output.vote_account_last_update_slot
-        ));
-        field_descriptions.push(format!("MEV Earned: {:?}", entry_output.mev_earned));
-        field_descriptions.push(format!(
-            "Priority Fee Commission: {:?}",
-            entry_output.priority_fee_commission
+            "MEV Commission: {}",
+            format_option(entry_output.mev_commission)
         ));
         field_descriptions.push(format!(
-            "Priority Fee Tips: {:?}",
-            entry_output.priority_fee_tips
+            "Epoch Credits: {}",
+            format_option(entry_output.epoch_credits)
         ));
         field_descriptions.push(format!(
-            "Total Priority Fees: {:?}",
-            entry_output.total_priority_fees
+            "Commission: {}",
+            format_option(entry_output.commission)
         ));
         field_descriptions.push(format!(
-            "Total Leader Slots: {:?}",
-            entry_output.total_leader_slots
+            "Client Type: {}",
+            format_option(entry_output.client_type)
         ));
         field_descriptions.push(format!(
-            "Blocks Produced: {:?}",
-            entry_output.blocks_produced
+            "Client Version: {}",
+            format_option(entry_output.version)
+        ));
+        field_descriptions.push(format!("IP: {}", format_option(entry_output.ip)));
+        field_descriptions.push(format!(
+            "Merkle Root Upload Authority: {}",
+            format_option(entry_output.merkle_root_upload_authority)
         ));
         field_descriptions.push(format!(
-            "Block Data Updated At Slot: {:?}",
-            entry_output.block_data_updated_at_slot
+            "Superminority: {}",
+            format_option(entry_output.is_superminority)
+        ));
+        field_descriptions.push(format!("Rank: {}", format_option(entry_output.rank)));
+        field_descriptions.push(format!(
+            "Last Update: {}",
+            format_option(entry_output.vote_account_last_update_slot)
         ));
         field_descriptions.push(format!(
-            "Priority Fee Merkle Root Upload Authority: {:?}",
-            entry_output.priority_fee_merkle_root_upload_authority
+            "MEV Earned: {}",
+            format_option(entry_output.mev_earned)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Commission: {}",
+            format_option(entry_output.priority_fee_commission)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Tips: {}",
+            format_option(entry_output.priority_fee_tips)
+        ));
+        field_descriptions.push(format!(
+            "Total Priority Fees: {}",
+            format_option(entry_output.total_priority_fees)
+        ));
+        field_descriptions.push(format!(
+            "Total Leader Slots: {}",
+            format_option(entry_output.total_leader_slots)
+        ));
+        field_descriptions.push(format!(
+            "Blocks Produced: {}",
+            format_option(entry_output.blocks_produced)
+        ));
+        field_descriptions.push(format!(
+            "Block Data Updated At Slot: {}",
+            format_option(entry_output.block_data_updated_at_slot)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Merkle Root Upload Authority: {}",
+            format_option(entry_output.priority_fee_merkle_root_upload_authority)
         ));
 
         field_descriptions.join(" | ")
@@ -699,6 +721,10 @@ fn command_history(args: History, client: RpcClient) {
         println!(
             "History for validator {} | Validator History Account {}",
             args.validator, validator_history_pda
+        );
+        println!(
+            "Validator Age: {} | Validator Age Last Updated Epoch: {}",
+            validator_history.validator_age, validator_history.validator_age_last_updated_epoch
         );
 
         for epoch in start_epoch..=current_epoch {
