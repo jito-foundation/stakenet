@@ -830,46 +830,6 @@ async fn _handle_rebalance(
     let validators_to_run =
         get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
-    // let mut validator_list_data = client
-    //     .get_account_data(&all_steward_accounts.validator_list_address)
-    //     .await?;
-    // let (_, validator_list) =
-    //     ValidatorListHeader::deserialize_vec(&mut validator_list_data).unwrap();
-
-    // let stake_pool_data = client
-    //     .get_account_data(&all_steward_accounts.stake_pool_address)
-    //     .await?;
-    // let stake_pool: StakePool =
-    //     StakePool::try_deserialize(&mut stake_pool_data.as_slice()).unwrap();
-
-    // for validator_info in validators_to_run.iter() {
-    //     let vote_account = &validator_info.vote_account;
-    //     let epoch_info = client.get_epoch_info().await?;
-    //     let current_epoch = epoch_info.epoch;
-
-    //     let stake_address =
-    //         get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
-    //     let stake_acc_data = client.get_account_data(&stake_address).await?;
-    //     let stake_state: StakeStateV2 =
-    //         try_from_slice_unchecked(&mut stake_acc_data.as_slice()).unwrap();
-    //     let stake_account_active_lamports = match stake_state {
-    //         StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
-    //         _ => continue,
-    //     };
-
-    //     let state_account = all_steward_accounts.state_account.state.rebalance(
-    //         current_epoch,
-    //         validator_info.index,
-    //         &validator_list,
-    //         stake_pool.total_lamports,
-    //         reserve_stake_acc.lamports,
-    //         stake_account_active_lamports,
-    //         minimum_delegation,
-    //         stake_rent,
-    //         &all_steward_accounts.config_account.parameters,
-    //     );
-    // }
-
     let mut ixs_to_run = validators_to_run
         .iter()
         .map(|validator_info| {
