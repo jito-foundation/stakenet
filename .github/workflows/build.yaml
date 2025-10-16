@@ -83,9 +83,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: 1.84.1
+      # - uses: actions-rust-lang/setup-rust-toolchain@v1
+      #   with:
+      #     toolchain: 1.84.1
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -156,9 +156,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: 1.86.0
+      # - uses: actions-rust-lang/setup-rust-toolchain@v1
+      #   with:
+      #     toolchain: 1.86.0
       - uses: actions/download-artifact@v4
         with:
           name: validator_history.so
