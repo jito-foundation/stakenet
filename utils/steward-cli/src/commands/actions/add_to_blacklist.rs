@@ -4,10 +4,18 @@ use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+use squads_multisig::pda::{get_transaction_pda, get_proposal_pda, get_vault_pda};
+use squads_multisig::client::{
+    vault_transaction_create, proposal_create, get_multisig,
+    VaultTransactionCreateAccounts, ProposalCreateAccounts, ProposalCreateArgs,
+};
+use squads_multisig::vault_transaction::VaultTransactionMessageExt;
+use squads_multisig::state::TransactionMessage;
 
 use crate::utils::transactions::{configure_instruction, maybe_print_tx};
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    system_program,
 };
 
 use crate::commands::command_args::AddToBlacklist;
@@ -59,7 +67,7 @@ pub async fn command_add_to_blacklist(
         }
     }
 
-    let ix = Instruction {
+    let blacklist_ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::AddValidatorsToBlacklist {
             config: args.permissioned_parameters.steward_config,
@@ -72,36 +80,120 @@ pub async fn command_add_to_blacklist(
         .data(),
     };
 
-    let blockhash = client.get_latest_blockhash().await?;
+    // If Squads multisig is provided, create a Squads proposal
+    if let Some(multisig) = args.squads_multisig {
+        let squads_program_id = args.squads_program_id.unwrap_or(squads_multisig::squads_multisig_program::ID);
 
-    let configured_ix = configure_instruction(
-        &[ix],
-        args.permissioned_parameters
-            .transaction_parameters
-            .priority_fee,
-        args.permissioned_parameters
-            .transaction_parameters
-            .compute_limit,
-        args.permissioned_parameters
-            .transaction_parameters
-            .heap_size,
-    );
+        // Fetch the multisig account to get the transaction index
+        let multisig_account = get_multisig(client, &multisig).await?;
+        let transaction_index = multisig_account.transaction_index + 1;
 
-    if !maybe_print_tx(
-        &configured_ix,
-        &args.permissioned_parameters.transaction_parameters,
-    ) {
-        let transaction = Transaction::new_signed_with_payer(
-            &configured_ix,
-            Some(&authority.pubkey()),
-            &[&authority],
-            blockhash,
+        // Derive PDAs
+        let vault_pda = get_vault_pda(&multisig, args.squads_vault_index, Some(&squads_program_id)).0;
+        let transaction_pda = get_transaction_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
+        let proposal_pda = get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
+
+        // Create the transaction message for the vault transaction
+        let message = TransactionMessage::try_compile(
+            &vault_pda,
+            &[blacklist_ix],
+            &[]
+        )?;
+
+        // Create vault transaction instruction
+        let vault_tx_ix = vault_transaction_create(
+            VaultTransactionCreateAccounts {
+                multisig,
+                transaction: transaction_pda,
+                creator: authority.pubkey(),
+                rent_payer: authority.pubkey(),
+                system_program: system_program::id(),
+            },
+            args.squads_vault_index,
+            0, // num_ephemeral_signers
+            &message,
+            Some(format!("Add validators to blacklist: {:?}", args.validator_history_indices_to_blacklist)),
+            Some(squads_program_id),
         );
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
 
-        println!("Signature: {}", signature);
+        // Create proposal instruction
+        let proposal_ix = proposal_create(
+            ProposalCreateAccounts {
+                multisig,
+                creator: authority.pubkey(),
+                proposal: proposal_pda,
+                rent_payer: authority.pubkey(),
+                system_program: system_program::id(),
+            },
+            ProposalCreateArgs {
+                transaction_index,
+                draft: false,
+            },
+            Some(squads_program_id),
+        );
+
+        let blockhash = client.get_latest_blockhash().await?;
+
+        let configured_ixs = configure_instruction(
+            &[vault_tx_ix, proposal_ix],
+            args.permissioned_parameters.transaction_parameters.priority_fee,
+            args.permissioned_parameters.transaction_parameters.compute_limit,
+            args.permissioned_parameters.transaction_parameters.heap_size,
+        );
+
+        if !maybe_print_tx(
+            &configured_ixs,
+            &args.permissioned_parameters.transaction_parameters,
+        ) {
+            let transaction = Transaction::new_signed_with_payer(
+                &configured_ixs,
+                Some(&authority.pubkey()),
+                &[&authority],
+                blockhash,
+            );
+            let signature = client
+                .send_and_confirm_transaction_with_spinner(&transaction)
+                .await?;
+
+            println!("Squads proposal created!");
+            println!("Transaction Index: {}", transaction_index);
+            println!("Proposal: {}", proposal_pda);
+            println!("Transaction: {}", transaction_pda);
+            println!("Signature: {}", signature);
+        }
+    } else {
+        // Direct execution (original behavior)
+        let blockhash = client.get_latest_blockhash().await?;
+
+        let configured_ix = configure_instruction(
+            &[blacklist_ix],
+            args.permissioned_parameters
+                .transaction_parameters
+                .priority_fee,
+            args.permissioned_parameters
+                .transaction_parameters
+                .compute_limit,
+            args.permissioned_parameters
+                .transaction_parameters
+                .heap_size,
+        );
+
+        if !maybe_print_tx(
+            &configured_ix,
+            &args.permissioned_parameters.transaction_parameters,
+        ) {
+            let transaction = Transaction::new_signed_with_payer(
+                &configured_ix,
+                Some(&authority.pubkey()),
+                &[&authority],
+                blockhash,
+            );
+            let signature = client
+                .send_and_confirm_transaction_with_spinner(&transaction)
+                .await?;
+
+            println!("Signature: {}", signature);
+        }
     }
 
     Ok(())

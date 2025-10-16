@@ -446,6 +446,18 @@ pub struct AddToBlacklist {
     /// Vote accounts of validators to blacklist (comma separated)
     #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
     pub vote_accounts_to_blacklist: Vec<Pubkey>,
+
+    /// Squads multisig address - if provided, creates a Squads proposal instead of direct execution
+    #[arg(long, env)]
+    pub squads_multisig: Option<Pubkey>,
+
+    /// Vault index for the Squads multisig (default: 0)
+    #[arg(long, env, default_value = "0")]
+    pub squads_vault_index: u8,
+
+    /// Squads program ID (defaults to mainnet Squads v4 program)
+    #[arg(long, env)]
+    pub squads_program_id: Option<Pubkey>,
 }
 
 fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {

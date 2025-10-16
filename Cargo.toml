@@ -40,6 +40,7 @@ spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
+squads-multisig = { git = "https://github.com/jito-foundation/squads-v4", rev = "dec7df064ed5766330535ef1e759fd40e86f20c6" }
 thiserror = "1.0.37"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = { version = "0.4.13", features = ["limit", "buffer", "timeout", "load-shed"] }
