@@ -447,8 +447,10 @@ pub struct AddToBlacklist {
     #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
     pub vote_accounts_to_blacklist: Vec<Pubkey>,
 
-    /// Squads multisig address - if provided, creates a Squads proposal instead of direct execution
-    #[arg(long, env)]
+    /// Squads multisig account address. When provided, creates a Squads proposal instead of direct execution.
+    /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
+    /// multisig address and will act as the signing authority for the blacklist operation.
+    #[arg(long, env, default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c")]
     pub squads_multisig: Option<Pubkey>,
 
     /// Vault index for the Squads multisig (default: 0)
