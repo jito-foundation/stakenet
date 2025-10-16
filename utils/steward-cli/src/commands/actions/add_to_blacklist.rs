@@ -183,7 +183,7 @@ pub async fn command_add_to_blacklist(
             println!("Signature: {}", signature);
         }
     } else {
-        // Direct execution (original behavior)
+        // Direct execution
         let blockhash = client.get_latest_blockhash().await?;
 
         let configured_ix = configure_instruction(
