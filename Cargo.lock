@@ -1025,7 +1025,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115e54d64eb62cdebad391c19efc9dce4981c690c85a33a12199d99bb9546fee"
 dependencies = [
  "borsh-derive 0.10.4",
- "hashbrown 0.13.2",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -10937,7 +10937,7 @@ dependencies = [
 [[package]]
 name = "squads-multisig"
 version = "2.1.0"
-source = "git+https://github.com/jito-foundation/squads-v4?rev=dec7df064ed5766330535ef1e759fd40e86f20c6#dec7df064ed5766330535ef1e759fd40e86f20c6"
+source = "git+https://github.com/jito-foundation/squads-v4?rev=1b8635491d98f1d474315bd89fa939ccbd4fbacc#1b8635491d98f1d474315bd89fa939ccbd4fbacc"
 dependencies = [
  "futures",
  "solana-account-decoder 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -10949,7 +10949,7 @@ dependencies = [
 [[package]]
 name = "squads-multisig-program"
 version = "2.1.0"
-source = "git+https://github.com/jito-foundation/squads-v4?rev=dec7df064ed5766330535ef1e759fd40e86f20c6#dec7df064ed5766330535ef1e759fd40e86f20c6"
+source = "git+https://github.com/jito-foundation/squads-v4?rev=1b8635491d98f1d474315bd89fa939ccbd4fbacc#1b8635491d98f1d474315bd89fa939ccbd4fbacc"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -12338,7 +12338,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

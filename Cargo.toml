@@ -39,7 +39,7 @@ spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"]
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
-squads-multisig = { git = "https://github.com/jito-foundation/squads-v4", rev = "dec7df064ed5766330535ef1e759fd40e86f20c6" }
+squads-multisig = { git = "https://github.com/jito-foundation/squads-v4", rev = "1b8635491d98f1d474315bd89fa939ccbd4fbacc" }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.47.1", features = ["full"] }
