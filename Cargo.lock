@@ -10937,7 +10937,7 @@ dependencies = [
 [[package]]
 name = "squads-multisig"
 version = "2.1.0"
-source = "git+https://github.com/jito-foundation/squads-v4?rev=1b8635491d98f1d474315bd89fa939ccbd4fbacc#1b8635491d98f1d474315bd89fa939ccbd4fbacc"
+source = "git+https://github.com/jito-foundation/squads-v4?rev=15105957c1ae11ffaf21f4219ff96c56a4c31655#15105957c1ae11ffaf21f4219ff96c56a4c31655"
 dependencies = [
  "futures",
  "solana-account-decoder 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -10949,7 +10949,7 @@ dependencies = [
 [[package]]
 name = "squads-multisig-program"
 version = "2.1.0"
-source = "git+https://github.com/jito-foundation/squads-v4?rev=1b8635491d98f1d474315bd89fa939ccbd4fbacc#1b8635491d98f1d474315bd89fa939ccbd4fbacc"
+source = "git+https://github.com/jito-foundation/squads-v4?rev=15105957c1ae11ffaf21f4219ff96c56a4c31655#15105957c1ae11ffaf21f4219ff96c56a4c31655"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
