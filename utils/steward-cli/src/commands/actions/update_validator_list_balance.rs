@@ -38,7 +38,7 @@ pub async fn command_update_validator_list_balance(
         &stake_pool,
         &all_steward_accounts.stake_pool_withdraw_authority,
         &validator_list,
-        &all_steward_accounts.reserve_stake_address,
+        &all_steward_accounts.stake_pool_account.reserve_stake,
         &all_steward_accounts.validator_list_account,
         &[target_vote_account],
         args.validator_list_index,

@@ -17,7 +17,7 @@ pub struct AllStewardAccounts {
     pub stake_pool_withdraw_authority: Pubkey,
     pub validator_list_account: Box<ValidatorList>,
     pub validator_list_address: Pubkey,
-    pub reserve_stake_address: Pubkey,
+    // pub reserve_stake_address: Pubkey,
     pub reserve_stake_account: Account,
 }
 

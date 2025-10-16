@@ -1,5 +1,7 @@
-use std::ops::{Mul, Sub};
-use std::sync::Arc;
+use std::{
+    ops::{Mul, Sub},
+    sync::Arc,
+};
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
 use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
@@ -891,12 +893,12 @@ async fn _handle_rebalance(
         .collect::<Vec<Instruction>>();
 
     let reserve_stake_acc = client
-        .get_account(&all_steward_accounts.reserve_stake_address)
+        .get_account(&all_steward_accounts.stake_pool_account.reserve_stake)
         .await?;
 
-    let stake_rent = Rent::get()
-        .unwrap()
-        .minimum_balance(StakeStateV2::size_of());
+    let stake_rent = client
+        .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
+        .await?;
 
     if reserve_stake_acc
         .lamports
@@ -907,7 +909,7 @@ async fn _handle_rebalance(
             .sub(reserve_stake_acc.lamports);
         let instruction = transfer(
             &payer.pubkey(),
-            &all_steward_accounts.reserve_stake_address,
+            &all_steward_accounts.stake_pool_account.reserve_stake,
             amount,
         );
 

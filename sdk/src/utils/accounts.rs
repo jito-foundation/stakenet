@@ -261,7 +261,6 @@ pub async fn get_all_steward_accounts(
         config_account,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
-        reserve_stake_address,
         reserve_stake_account,
     }))
 }
