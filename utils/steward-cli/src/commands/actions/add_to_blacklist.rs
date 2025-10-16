@@ -127,10 +127,7 @@ pub async fn command_add_to_blacklist(
             args.squads_vault_index,
             0, // num_ephemeral_signers
             &message,
-            Some(format!(
-                "Add validators to blacklist: {:?}",
-                args.validator_history_indices_to_blacklist
-            )),
+            Some("Add validators to blacklist".to_string()),
             Some(squads_program_id),
         );
 
