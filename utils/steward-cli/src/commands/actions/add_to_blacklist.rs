@@ -84,14 +84,27 @@ pub async fn command_add_to_blacklist(
     if let Some(multisig) = args.squads_multisig {
         let squads_program_id = args.squads_program_id.unwrap_or(squads_multisig::squads_multisig_program::ID);
 
+        println!("🔍 Debug Info:");
+        println!("  Multisig Address: {}", multisig);
+        println!("  Squads Program ID: {}", squads_program_id);
+
         // Fetch the multisig account to get the transaction index
-        let multisig_account = get_multisig(client, &multisig).await?;
+        println!("  Fetching multisig account...");
+        let multisig_account = get_multisig(client, &multisig).await.map_err(|e| {
+            eprintln!("❌ Failed to fetch multisig account: {}", e);
+            e
+        })?;
         let transaction_index = multisig_account.transaction_index + 1;
+        println!("  Next transaction index: {}", transaction_index);
 
         // Derive PDAs
         let vault_pda = get_vault_pda(&multisig, args.squads_vault_index, Some(&squads_program_id)).0;
         let transaction_pda = get_transaction_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
         let proposal_pda = get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
+
+        println!("  Vault PDA: {}", vault_pda);
+        println!("  Transaction PDA: {}", transaction_pda);
+        println!("  Proposal PDA: {}", proposal_pda);
 
         // Create the transaction message for the vault transaction
         let message = TransactionMessage::try_compile(
@@ -156,9 +169,6 @@ pub async fn command_add_to_blacklist(
                 .await?;
 
             println!("Squads proposal created!");
-            println!("Transaction Index: {}", transaction_index);
-            println!("Proposal: {}", proposal_pda);
-            println!("Transaction: {}", transaction_pda);
             println!("Signature: {}", signature);
         }
     } else {
