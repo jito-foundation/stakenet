@@ -7,22 +7,26 @@ use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAcco
 use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
 
+use log::{error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
 use solana_sdk::signer::Signer;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
-use solana_sdk::system_instruction::transfer;
 use solana_sdk::vote::state::VoteState;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
+use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
 use spl_stake_pool::instruction::{
     cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
 };
-use spl_stake_pool::state::{StakeStatus, ValidatorStakeInfo};
 use spl_stake_pool::{find_withdraw_authority_program_address, MAX_VALIDATORS_TO_UPDATE};
+use spl_stake_pool::{
+    instruction::deposit_sol,
+    state::{StakeStatus, ValidatorStakeInfo},
+};
 use stakenet_sdk::models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts};
 use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
 use stakenet_sdk::models::submit_stats::SubmitStats;
@@ -137,7 +141,7 @@ pub fn _get_update_stake_pool_ixs(
                     .expect("Could not deserialize vote account");
 
                 if vote_account.epoch_credits.iter().last().is_none() {
-                    println!(
+                    error!(
                         "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{:?}\nVote Account\n{:?}\n",
                         stake_account,
                         vote_account
@@ -155,7 +159,7 @@ pub fn _get_update_stake_pool_ixs(
                             }
                         }
                         _ => {
-                            println!("🔶 Error: Stake account is not StakeStateV2::Stake");
+                            error!("🔶 Error: Stake account is not StakeStateV2::Stake");
                             false
                         }
                     }
@@ -222,7 +226,7 @@ async fn _update_pool(
         epoch,
     );
 
-    println!("Updating Pool");
+    info!("Updating Pool");
     let update_txs_to_run =
         package_instructions(&update_ixs, 1, priority_fee, Some(1_400_000), None);
     let update_stats =
@@ -231,7 +235,7 @@ async fn _update_pool(
     stats.combine(&update_stats);
 
     // TODO fix
-    println!("Deactivating Delinquent");
+    info!("Deactivating Delinquent");
     // for ix in deactivate_delinquent_ixs {
     //     let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer]);
     //     let tx = client
@@ -251,7 +255,7 @@ async fn _update_pool(
 
     stats.combine(&update_stats);
 
-    println!("Cleaning Pool");
+    info!("Cleaning Pool");
     let cleanup_txs_to_run =
         package_instructions(&cleanup_ixs, 1, priority_fee, Some(1_400_000), None);
     let cleanup_stats =
@@ -291,7 +295,7 @@ async fn _handle_instant_removal_validators(
             }
         }
 
-        println!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
 
         let ix = Instruction {
             program_id: *program_id,
@@ -310,7 +314,7 @@ async fn _handle_instant_removal_validators(
 
         let configured_ix = configure_instruction(&[ix], priority_fee, Some(1_400_000), None);
 
-        println!("Submitting Instant Removal");
+        info!("Submitting Instant Removal");
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
@@ -439,7 +443,7 @@ async fn _handle_adding_validators(
                                 return None;
                             }
                         } else {
-                            println!("Validator {} below liveness minimum", vote_address);
+                            info!("Validator {} below liveness minimum", vote_address);
                             return None;
                         }
                     }
@@ -492,8 +496,8 @@ async fn _handle_adding_validators(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
@@ -588,8 +592,8 @@ async fn _handle_delinquent_validators(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
@@ -629,7 +633,7 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        println!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
 
         let ix = Instruction {
             program_id: *program_id,
@@ -649,7 +653,7 @@ async fn _handle_epoch_maintenance(
         let cu = validator_index_to_remove.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
 
-        println!("Submitting Epoch Maintenance");
+        info!("Submitting Epoch Maintenance");
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
@@ -673,7 +677,7 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        println!(
+        info!(
             "State Epoch: {} | Current Epoch: {}",
             state_epoch, current_epoch
         );
@@ -716,8 +720,8 @@ async fn _handle_compute_score(
 
     let txs_to_run = package_instructions(&ixs_to_run, 5, priority_fee, Some(1_400_000), None);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
@@ -810,8 +814,8 @@ async fn _handle_compute_instant_unstake(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
@@ -829,7 +833,7 @@ async fn _handle_compute_instant_unstake(
 /// ## Reserve Stake Pre-funding
 ///
 /// Before submitting rebalance instructions, this function checks if the reserve stake
-/// account has sufficient lamports to cover rent for all validators being
+/// account has sufficient lamports (N * transient stake account + ephemeral_stake account) to cover rent for all validators being
 /// processed.
 async fn _handle_rebalance(
     payer: &Arc<Keypair>,
@@ -905,9 +909,23 @@ async fn _handle_rebalance(
         let amount: u64 = stake_rent
             .mul(validators_to_run.len() as u64)
             .sub(reserve_stake_acc.lamports);
-        let instruction = transfer(
+
+        let acc_token_address = get_associated_token_address(
             &payer.pubkey(),
+            &all_steward_accounts.stake_pool_account.pool_mint,
+        );
+
+        let instruction = deposit_sol(
+            &spl_stake_pool::id(),
+            &all_steward_accounts.stake_pool_address,
+            &all_steward_accounts.stake_pool_withdraw_authority,
             &all_steward_accounts.stake_pool_account.reserve_stake,
+            &payer.pubkey(),
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.manager_fee_account,
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.pool_mint,
+            &spl_token::id(),
             amount,
         );
 
@@ -916,8 +934,8 @@ async fn _handle_rebalance(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    log::info!("Submitting {} instructions", ixs_to_run.len());
-    log::info!("Submitting {} transactions", txs_to_run.len());
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
 
@@ -942,7 +960,7 @@ pub async fn crank_steward(
 
     {
         // --------- UPDATE STAKE POOL -----------
-        println!("Update Stake Pool");
+        info!("Update Stake Pool");
 
         let stats = _update_pool(
             payer,
@@ -961,7 +979,7 @@ pub async fn crank_steward(
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
         if should_run_epoch_maintenance {
-            println!("Cranking Epoch Maintenance...");
+            info!("Cranking Epoch Maintenance...");
 
             let stats = _handle_epoch_maintenance(
                 payer,
@@ -979,7 +997,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK AND HANDLE INSTANT REMOVAL -----------
-        println!("Checking and Handling Instant Removal...");
+        info!("Checking and Handling Instant Removal...");
 
         let stats = _handle_instant_removal_validators(
             payer,
@@ -995,7 +1013,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK VALIDATORS TO REMOVE -----------
-        println!("Finding and Removing Bad Validators...");
+        info!("Finding and Removing Bad Validators...");
 
         let stats = _handle_delinquent_validators(
             payer,
@@ -1017,7 +1035,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK VALIDATORS TO ADD -----------
-        println!("Adding good validators...");
+        info!("Adding good validators...");
         // Any validator that has new history account
         // Anything that would pass the benchmark
         // Find any validators that that are not in pool
@@ -1041,7 +1059,7 @@ pub async fn crank_steward(
         if should_crank_state {
             let stats = match all_steward_accounts.state_account.state.state_tag {
                 StewardStateEnum::ComputeScores => {
-                    println!("Cranking Compute Score...");
+                    info!("Cranking Compute Score...");
 
                     _handle_compute_score(
                         payer,
@@ -1053,7 +1071,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::ComputeDelegations => {
-                    println!("Cranking Compute Delegations...");
+                    info!("Cranking Compute Delegations...");
 
                     _handle_compute_delegations(
                         payer,
@@ -1065,7 +1083,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::Idle => {
-                    println!("Cranking Idle...");
+                    info!("Cranking Idle...");
 
                     _handle_idle(
                         payer,
@@ -1077,7 +1095,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::ComputeInstantUnstake => {
-                    println!("Cranking Compute Instant Unstake...");
+                    info!("Cranking Compute Instant Unstake...");
 
                     _handle_compute_instant_unstake(
                         payer,
@@ -1089,7 +1107,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::Rebalance => {
-                    println!("Cranking Rebalance...");
+                    info!("Cranking Rebalance...");
 
                     _handle_rebalance(
                         payer,
@@ -1114,18 +1132,18 @@ pub async fn crank_steward(
                 match error {
                     JitoSendTransactionError::ExceededRetries => {
                         // Continue
-                        println!("Exceeded Retries: {:?}", error);
+                        error!("Exceeded Retries: {:?}", error);
                     }
                     JitoSendTransactionError::TransactionError(e) => {
                         // Flag
-                        println!("Transaction: {:?}", e);
+                        error!("Transaction: {:?}", e);
                     }
                     JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
                         // Recover
-                        println!("\n\nERROR: ");
+                        error!("\n\nERROR: ");
                         e.logs.iter().for_each(|log| {
                             log.iter().enumerate().for_each(|(i, log)| {
-                                println!("{}: {:?}", i, log);
+                                error!("{}: {:?}", i, log);
                             });
                         });
                     }

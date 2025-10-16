@@ -33,7 +33,9 @@ solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
 solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
+spl-associated-token-account = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
+spl-token = { workspace = true }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
