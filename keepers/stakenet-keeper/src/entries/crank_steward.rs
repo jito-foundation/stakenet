@@ -818,6 +818,19 @@ async fn _handle_compute_instant_unstake(
     Ok(stats)
 }
 
+/// Handles the rebalancing of validator stakes in a stake pool.
+///
+/// This function is responsible for redistributing stake across validators in a stake pool
+/// according to the steward's rebalancing algorithm. It identifies validators that need
+/// rebalancing, constructs the necessary instructions, and submits them as transactions.
+///
+/// # Note
+///
+/// ## Reserve Stake Pre-funding
+///
+/// Before submitting rebalance instructions, this function checks if the reserve stake
+/// account has sufficient lamports to cover rent for all validators being
+/// processed.
 async fn _handle_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
