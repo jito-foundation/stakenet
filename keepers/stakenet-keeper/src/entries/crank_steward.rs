@@ -1,3 +1,4 @@
+use std::ops::{Mul, Sub};
 use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
@@ -7,8 +8,12 @@ use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
+use solana_sdk::rent::Rent;
+use solana_sdk::signer::Signer;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
+use solana_sdk::system_instruction::transfer;
+use solana_sdk::sysvar::Sysvar;
 use solana_sdk::vote::state::VoteState;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
@@ -825,7 +830,47 @@ async fn _handle_rebalance(
     let validators_to_run =
         get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
-    let ixs_to_run = validators_to_run
+    // let mut validator_list_data = client
+    //     .get_account_data(&all_steward_accounts.validator_list_address)
+    //     .await?;
+    // let (_, validator_list) =
+    //     ValidatorListHeader::deserialize_vec(&mut validator_list_data).unwrap();
+
+    // let stake_pool_data = client
+    //     .get_account_data(&all_steward_accounts.stake_pool_address)
+    //     .await?;
+    // let stake_pool: StakePool =
+    //     StakePool::try_deserialize(&mut stake_pool_data.as_slice()).unwrap();
+
+    // for validator_info in validators_to_run.iter() {
+    //     let vote_account = &validator_info.vote_account;
+    //     let epoch_info = client.get_epoch_info().await?;
+    //     let current_epoch = epoch_info.epoch;
+
+    //     let stake_address =
+    //         get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+    //     let stake_acc_data = client.get_account_data(&stake_address).await?;
+    //     let stake_state: StakeStateV2 =
+    //         try_from_slice_unchecked(&mut stake_acc_data.as_slice()).unwrap();
+    //     let stake_account_active_lamports = match stake_state {
+    //         StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
+    //         _ => continue,
+    //     };
+
+    //     let state_account = all_steward_accounts.state_account.state.rebalance(
+    //         current_epoch,
+    //         validator_info.index,
+    //         &validator_list,
+    //         stake_pool.total_lamports,
+    //         reserve_stake_acc.lamports,
+    //         stake_account_active_lamports,
+    //         minimum_delegation,
+    //         stake_rent,
+    //         &all_steward_accounts.config_account.parameters,
+    //     );
+    // }
+
+    let mut ixs_to_run = validators_to_run
         .iter()
         .map(|validator_info| {
             let validator_index = validator_info.index;
@@ -872,10 +917,34 @@ async fn _handle_rebalance(
         })
         .collect::<Vec<Instruction>>();
 
+    let reserve_stake_acc = client
+        .get_account(&all_steward_accounts.reserve_stake_address)
+        .await?;
+
+    let stake_rent = Rent::get()
+        .unwrap()
+        .minimum_balance(StakeStateV2::size_of());
+
+    if reserve_stake_acc
+        .lamports
+        .lt(&stake_rent.mul(validators_to_run.len() as u64))
+    {
+        let amount: u64 = stake_rent
+            .mul(validators_to_run.len() as u64)
+            .sub(reserve_stake_acc.lamports);
+        let instruction = transfer(
+            &payer.pubkey(),
+            &all_steward_accounts.reserve_stake_address,
+            amount,
+        );
+
+        ixs_to_run.insert(0, instruction);
+    }
+
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    println!("Submitting {} instructions", ixs_to_run.len());
-    println!("Submitting {} transactions", txs_to_run.len());
+    log::info!("Submitting {} instructions", ixs_to_run.len());
+    log::info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
 
