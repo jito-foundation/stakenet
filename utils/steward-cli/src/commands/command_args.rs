@@ -454,7 +454,11 @@ pub struct AddToBlacklist {
     /// Squads multisig account address.
     /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
     /// multisig address and will act as the signing authority for the blacklist operation.
-    #[arg(long, env, default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c")]
+    #[arg(
+        long,
+        env,
+        default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c"
+    )]
     pub squads_multisig: Pubkey,
 
     /// Vault index for the Squads multisig (default: 0)
