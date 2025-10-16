@@ -847,53 +847,6 @@ async fn _handle_rebalance(
     let validators_to_run =
         get_unprogressed_validators(all_steward_accounts, &validator_history_program_id);
 
-    let mut ixs_to_run = validators_to_run
-        .iter()
-        .map(|validator_info| {
-            let validator_index = validator_info.index;
-            let vote_account = &validator_info.vote_account;
-            let history_account = validator_info.history_account;
-
-            let stake_address =
-                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
-
-            let transient_stake_address = get_transient_stake_address(
-                vote_account,
-                &all_steward_accounts.stake_pool_address,
-                &all_steward_accounts.validator_list_account,
-                validator_index,
-            );
-
-            Instruction {
-                program_id: *program_id,
-                accounts: jito_steward::accounts::Rebalance {
-                    config: all_steward_accounts.config_address,
-                    state_account: all_steward_accounts.state_address,
-                    validator_history: history_account,
-                    stake_pool_program: spl_stake_pool::id(),
-                    stake_pool: all_steward_accounts.stake_pool_address,
-                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
-                    validator_list: all_steward_accounts.validator_list_address,
-                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
-                    stake_account: stake_address,
-                    transient_stake_account: transient_stake_address,
-                    vote_account: *vote_account,
-                    system_program: system_program::id(),
-                    stake_program: stake::program::id(),
-                    rent: solana_sdk::sysvar::rent::id(),
-                    clock: solana_sdk::sysvar::clock::id(),
-                    stake_history: solana_sdk::sysvar::stake_history::id(),
-                    stake_config: stake::config::ID,
-                }
-                .to_account_metas(None),
-                data: jito_steward::instruction::Rebalance {
-                    validator_list_index: validator_index as u64,
-                }
-                .data(),
-            }
-        })
-        .collect::<Vec<Instruction>>();
-
     let reserve_stake_acc = client
         .get_account(&all_steward_accounts.stake_pool_account.reserve_stake)
         .await?;
@@ -902,6 +855,7 @@ async fn _handle_rebalance(
         .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
         .await?;
 
+    let mut ixs_to_run = Vec::new();
     if reserve_stake_acc
         .lamports
         .lt(&stake_rent.mul(validators_to_run.len() as u64))
@@ -929,8 +883,52 @@ async fn _handle_rebalance(
             amount,
         );
 
-        ixs_to_run.insert(0, instruction);
+        ixs_to_run.push(instruction);
     }
+
+    ixs_to_run.extend(validators_to_run.iter().map(|validator_info| {
+        let validator_index = validator_info.index;
+        let vote_account = &validator_info.vote_account;
+        let history_account = validator_info.history_account;
+
+        let stake_address =
+            get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+        let transient_stake_address = get_transient_stake_address(
+            vote_account,
+            &all_steward_accounts.stake_pool_address,
+            &all_steward_accounts.validator_list_account,
+            validator_index,
+        );
+
+        Instruction {
+            program_id: *program_id,
+            accounts: jito_steward::accounts::Rebalance {
+                config: all_steward_accounts.config_address,
+                state_account: all_steward_accounts.state_address,
+                validator_history: history_account,
+                stake_pool_program: spl_stake_pool::id(),
+                stake_pool: all_steward_accounts.stake_pool_address,
+                withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                validator_list: all_steward_accounts.validator_list_address,
+                reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                stake_account: stake_address,
+                transient_stake_account: transient_stake_address,
+                vote_account: *vote_account,
+                system_program: system_program::id(),
+                stake_program: stake::program::id(),
+                rent: solana_sdk::sysvar::rent::id(),
+                clock: solana_sdk::sysvar::clock::id(),
+                stake_history: solana_sdk::sysvar::stake_history::id(),
+                stake_config: stake::config::ID,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::Rebalance {
+                validator_list_index: validator_index as u64,
+            }
+            .data(),
+        }
+    }));
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
