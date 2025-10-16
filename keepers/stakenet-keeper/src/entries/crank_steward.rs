@@ -10,12 +10,10 @@ use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 
-use solana_sdk::rent::Rent;
 use solana_sdk::signer::Signer;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
 use solana_sdk::system_instruction::transfer;
-use solana_sdk::sysvar::Sysvar;
 use solana_sdk::vote::state::VoteState;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
