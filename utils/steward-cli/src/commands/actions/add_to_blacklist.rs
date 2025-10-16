@@ -4,18 +4,18 @@ use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use squads_multisig::pda::{get_transaction_pda, get_proposal_pda, get_vault_pda};
 use squads_multisig::client::{
-    vault_transaction_create, proposal_create, get_multisig,
-    VaultTransactionCreateAccounts, ProposalCreateAccounts, ProposalCreateArgs,
+    get_multisig, proposal_create, vault_transaction_create, ProposalCreateAccounts,
+    ProposalCreateArgs, VaultTransactionCreateAccounts,
 };
-use squads_multisig::vault_transaction::VaultTransactionMessageExt;
+use squads_multisig::pda::{get_proposal_pda, get_transaction_pda, get_vault_pda};
 use squads_multisig::state::TransactionMessage;
+use squads_multisig::vault_transaction::VaultTransactionMessageExt;
 
 use crate::utils::transactions::{configure_instruction, maybe_print_tx};
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
-    system_program,
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, system_program,
+    transaction::Transaction,
 };
 
 use crate::commands::command_args::AddToBlacklist;
@@ -80,9 +80,12 @@ pub async fn command_add_to_blacklist(
         .data(),
     };
 
-    // If Squads multisig is provided, create a Squads proposal
-    if let Some(multisig) = args.squads_multisig {
-        let squads_program_id = args.squads_program_id.unwrap_or(squads_multisig::squads_multisig_program::ID);
+    // If Squads proposal flag is set, create a Squads proposal
+    if args.squads_proposal {
+        let multisig = args.squads_multisig;
+        let squads_program_id = args
+            .squads_program_id
+            .unwrap_or(squads_multisig::squads_multisig_program::ID);
 
         println!("🔍 Debug Info:");
         println!("  Multisig Address: {}", multisig);
@@ -98,20 +101,19 @@ pub async fn command_add_to_blacklist(
         println!("  Next transaction index: {}", transaction_index);
 
         // Derive PDAs
-        let vault_pda = get_vault_pda(&multisig, args.squads_vault_index, Some(&squads_program_id)).0;
-        let transaction_pda = get_transaction_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
-        let proposal_pda = get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
+        let vault_pda =
+            get_vault_pda(&multisig, args.squads_vault_index, Some(&squads_program_id)).0;
+        let transaction_pda =
+            get_transaction_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
+        let proposal_pda =
+            get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
 
         println!("  Vault PDA: {}", vault_pda);
         println!("  Transaction PDA: {}", transaction_pda);
         println!("  Proposal PDA: {}", proposal_pda);
 
         // Create the transaction message for the vault transaction
-        let message = TransactionMessage::try_compile(
-            &vault_pda,
-            &[blacklist_ix],
-            &[]
-        )?;
+        let message = TransactionMessage::try_compile(&vault_pda, &[blacklist_ix], &[])?;
 
         // Create vault transaction instruction
         let vault_tx_ix = vault_transaction_create(
@@ -125,7 +127,10 @@ pub async fn command_add_to_blacklist(
             args.squads_vault_index,
             0, // num_ephemeral_signers
             &message,
-            Some(format!("Add validators to blacklist: {:?}", args.validator_history_indices_to_blacklist)),
+            Some(format!(
+                "Add validators to blacklist: {:?}",
+                args.validator_history_indices_to_blacklist
+            )),
             Some(squads_program_id),
         );
 
@@ -149,9 +154,15 @@ pub async fn command_add_to_blacklist(
 
         let configured_ixs = configure_instruction(
             &[vault_tx_ix, proposal_ix],
-            args.permissioned_parameters.transaction_parameters.priority_fee,
-            args.permissioned_parameters.transaction_parameters.compute_limit,
-            args.permissioned_parameters.transaction_parameters.heap_size,
+            args.permissioned_parameters
+                .transaction_parameters
+                .priority_fee,
+            args.permissioned_parameters
+                .transaction_parameters
+                .compute_limit,
+            args.permissioned_parameters
+                .transaction_parameters
+                .heap_size,
         );
 
         if !maybe_print_tx(
