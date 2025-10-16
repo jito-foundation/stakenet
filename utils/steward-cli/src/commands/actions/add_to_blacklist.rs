@@ -88,7 +88,6 @@ pub async fn command_add_to_blacklist(
             .squads_program_id
             .unwrap_or(squads_multisig::squads_multisig_program::ID);
 
-        println!("🔍 Debug Info:");
         println!("  Multisig Address: {}", multisig);
         println!("  Squads Program ID: {}", squads_program_id);
 
