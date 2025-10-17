@@ -246,6 +246,7 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewEligibleValidators(ViewConfig),
 
     // Actions
     InitSteward(InitSteward),

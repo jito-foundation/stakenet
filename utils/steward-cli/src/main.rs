@@ -39,6 +39,8 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
+use crate::commands::info::view_eligible_validator::command_view_eligible_validators;
+
 pub mod commands;
 pub mod utils;
 
@@ -61,6 +63,10 @@ async fn main() -> Result<()> {
         Commands::ViewState(args) => command_view_state(args, &client, program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
+        }
+        Commands::ViewEligibleValidators(args) => {
+            command_view_eligible_validators(args, &client, program_id, validator_history::id())
+                .await
         }
 
         // --- Helpers ---
