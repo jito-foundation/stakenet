@@ -23,7 +23,6 @@ solana-metrics = { workspace = true }
 solana-program = { workspace = true }
 solana-remote-wallet = { workspace = true }
 solana-sdk = { workspace = true }
-uriparse = "0.6.4"
 spl-pod = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 squads-multisig = { workspace = true }
@@ -31,4 +30,5 @@ stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
+uriparse = "0.6.4"
 validator-history = { features = ["no-entrypoint"], path = "../../programs/validator-history" }
