@@ -25,18 +25,9 @@ pub async fn command_add_to_blacklist(
     args: AddToBlacklist,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
-    global_signer: Option<&str>,
+    cli_signer: &CliSigner,
 ) -> Result<()> {
-    // Use global signer - required for this command
-    let signer_path = global_signer.expect("--signer flag is required for this command");
-
-    // Create the appropriate signer based on the path
-    let authority = if signer_path == "ledger" {
-        CliSigner::new_ledger()
-    } else {
-        CliSigner::new_keypair_from_path(signer_path)?
-    };
-
+    let authority = cli_signer;
     let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx
         || args
             .permissioned_parameters
