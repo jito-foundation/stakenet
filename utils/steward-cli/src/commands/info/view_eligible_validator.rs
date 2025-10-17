@@ -21,6 +21,7 @@ pub async fn command_view_eligible_validators(
     let all_steward_accounts =
         get_all_steward_accounts(client, &steward_program_id, &steward_config).await?;
 
+    let mut eligible_validators: u16 = 0;
     let mut solana_labs: u16 = 0;
     let mut jito_labs: u16 = 0;
     let mut firedancers: u16 = 0;
@@ -51,9 +52,16 @@ pub async fn command_view_eligible_validators(
                     _ => others = others.add(1),
                 }
             }
+
+            eligible_validators = eligible_validators.add(1);
         }
     }
 
+    println!(
+        "Number of validators: {}",
+        all_steward_accounts.state_account.state.num_pool_validators
+    );
+    println!("Eligible Validators: {eligible_validators}");
     println!("Solana Lab: {solana_labs}");
     println!("Jito Lab: {jito_labs}");
     println!("Firedancer: {firedancers}");
