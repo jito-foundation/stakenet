@@ -73,6 +73,10 @@ pub enum RebalanceTypeTag {
 
 #[cfg(feature = "idl-build")]
 impl IdlBuild for RebalanceTypeTag {
+    fn get_full_path() -> String {
+        "RebalanceTypeTag".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "RebalanceTypeTag".to_string(),
@@ -98,6 +102,8 @@ impl IdlBuild for RebalanceTypeTag {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 /// Deprecated: This struct is no longer emitted but is kept to allow parsing of old events.

@@ -23,6 +23,10 @@ pub struct Args {
     )]
     pub program_id: Pubkey,
 
+    /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
+    #[arg(long, global = true, env)]
+    pub signer: Option<String>,
+
     #[command(subcommand)]
     pub commands: Commands,
 }
@@ -446,6 +450,28 @@ pub struct AddToBlacklist {
     /// Vote accounts of validators to blacklist (comma separated)
     #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
     pub vote_accounts_to_blacklist: Vec<Pubkey>,
+
+    /// Create a Squads multisig proposal instead of direct execution
+    #[arg(long, env, default_value = "false")]
+    pub squads_proposal: bool,
+
+    /// Squads multisig account address.
+    /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
+    /// multisig address and will act as the signing authority for the blacklist operation.
+    #[arg(
+        long,
+        env,
+        default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c"
+    )]
+    pub squads_multisig: Pubkey,
+
+    /// Vault index for the Squads multisig (default: 0)
+    #[arg(long, env, default_value = "0")]
+    pub squads_vault_index: u8,
+
+    /// Squads program ID (defaults to mainnet Squads v4 program)
+    #[arg(long, env)]
+    pub squads_program_id: Option<Pubkey>,
 }
 
 fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
