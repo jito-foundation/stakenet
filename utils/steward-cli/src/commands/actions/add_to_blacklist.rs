@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::cli_signer::CliSigner;
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -27,9 +28,17 @@ pub async fn command_add_to_blacklist(
     args: AddToBlacklist,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
+    global_signer: Option<&str>,
 ) -> Result<()> {
-    let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
-        .expect("Failed reading keypair file ( Authority )");
+    // Use global signer - required for this command
+    let signer_path = global_signer.expect("--signer flag is required for this command");
+
+    // Create the appropriate signer based on the path (USB for Ledger, file path for keypair)
+    let authority = if signer_path.starts_with("usb://") {
+        CliSigner::new_ledger(signer_path)
+    } else {
+        CliSigner::new_keypair_from_path(signer_path)?
+    };
 
     let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx
         || args

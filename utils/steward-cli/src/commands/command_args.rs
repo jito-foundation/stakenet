@@ -23,6 +23,10 @@ pub struct Args {
     )]
     pub program_id: Pubkey,
 
+    /// Filepath or URL to a keypair (supports usb:// for Ledger)
+    #[arg(long, global = true, env)]
+    pub signer: Option<String>,
+
     #[command(subcommand)]
     pub commands: Commands,
 }

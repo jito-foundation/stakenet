@@ -39,6 +39,7 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
+pub mod cli_signer;
 pub mod commands;
 pub mod utils;
 
@@ -52,6 +53,7 @@ async fn main() -> Result<()> {
     ));
 
     let program_id = args.program_id;
+    let global_signer = args.signer.as_deref();
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
@@ -105,7 +107,9 @@ async fn main() -> Result<()> {
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, program_id).await
         }
-        Commands::AddToBlacklist(args) => command_add_to_blacklist(args, &client, program_id).await,
+        Commands::AddToBlacklist(args) => {
+            command_add_to_blacklist(args, &client, program_id, global_signer).await
+        }
         Commands::RemoveFromBlacklist(args) => {
             command_remove_from_blacklist(args, &client, program_id).await
         }

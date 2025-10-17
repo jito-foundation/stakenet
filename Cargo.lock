@@ -5946,7 +5946,7 @@ dependencies = [
  "solana-native-token",
  "solana-presigner",
  "solana-pubkey",
- "solana-remote-wallet",
+ "solana-remote-wallet 2.3.3 (git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.3.3)",
  "solana-seed-phrase",
  "solana-signature",
  "solana-signer",
@@ -7782,6 +7782,30 @@ version = "2.3.3"
 source = "git+https://github.com/gzalz/agave?branch=gzalz%2Fv2.3.3#62b1bde87c45a3aab017dd15b6b7df5f0f85e27c"
 dependencies = [
  "num_cpus",
+]
+
+[[package]]
+name = "solana-remote-wallet"
+version = "2.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e096ab7b2fabdf773d1946463da19035fd333faf83500c0c2eb21abf555fc5c"
+dependencies = [
+ "console",
+ "dialoguer",
+ "hidapi",
+ "log",
+ "num-derive",
+ "num-traits",
+ "parking_lot 0.12.4",
+ "qstring",
+ "semver",
+ "solana-derivation-path",
+ "solana-offchain-message",
+ "solana-pubkey",
+ "solana-signature",
+ "solana-signer",
+ "thiserror 2.0.14",
+ "uriparse",
 ]
 
 [[package]]
@@ -11057,6 +11081,7 @@ dependencies = [
  "solana-client 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-metrics 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-program",
+ "solana-remote-wallet 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-sdk",
  "spl-pod",
  "spl-stake-pool",
@@ -11065,6 +11090,7 @@ dependencies = [
  "stakenet-sdk",
  "thiserror 1.0.69",
  "tokio",
+ "uriparse",
  "validator-history",
 ]
 
