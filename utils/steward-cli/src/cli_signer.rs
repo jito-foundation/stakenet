@@ -39,12 +39,13 @@ impl CliSigner {
         }
     }
 
-    // Will only work with Ledger devices
-    pub fn new_ledger(path: &str) -> Self {
+    /// Will only work with Ledger devices
+    /// Uses hardcoded derivation path
+    pub fn new_ledger() -> Self {
         println!("\nConnecting to Ledger Device");
         println!("- This will only work with Ledger devices.");
-        println!("- It will use the first account on the first connected Ledger.");
-        println!("- The Ledger must be unlocked and the Solana app open.\n");
+        println!("- The Ledger must be unlocked and the Solana app open.");
+        println!("- Verify the public key shown on your Ledger screen.\n");
 
         println!("Searching for wallets...");
         let wallet_manager =
@@ -58,24 +59,27 @@ impl CliSigner {
         let device = devices.first().expect("No devices found");
         let ledger = get_ledger_from_info(device.clone(), "Signer", &wallet_manager)
             .expect("This CLI only supports Ledger devices");
+
+        // Hardcode to first account
+        let ledger_uri = "usb://ledger?key=0";
         let derivation_path = DerivationPath::from_uri_key_query(
-            &uriparse::URIReference::try_from(path).expect("Could not create URIReference"),
+            &uriparse::URIReference::try_from(ledger_uri).expect("Could not create URIReference"),
         )
         .expect("Could not create derivation path from str")
         .expect("Could not create derivation path from str");
 
-        let path = format!("{}{}", ledger.pretty_path, derivation_path.get_query());
+        let display_path = format!("usb://ledger{}", derivation_path.get_query());
         let confirm_key = true;
         let remote_keypair = RemoteKeypair::new(
             RemoteWalletType::Ledger(ledger),
             derivation_path,
             confirm_key,
-            path.clone(),
+            display_path.clone(),
         )
         .expect("Could not create remote keypair");
         println!(
-            "\nConnected to Ledger wallet specified by path and pubkey\n- {}\n- {}\n",
-            path, remote_keypair.pubkey
+            "\n✓ Connected to Ledger:\n  Path: {}\n  Pubkey: {}\n",
+            display_path, remote_keypair.pubkey
         );
 
         Self::new(None, Some(remote_keypair))

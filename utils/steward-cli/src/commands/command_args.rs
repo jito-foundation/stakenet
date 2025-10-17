@@ -23,7 +23,7 @@ pub struct Args {
     )]
     pub program_id: Pubkey,
 
-    /// Filepath or URL to a keypair (supports usb:// for Ledger)
+    /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
     #[arg(long, global = true, env)]
     pub signer: Option<String>,
 

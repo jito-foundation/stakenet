@@ -30,9 +30,9 @@ pub async fn command_add_to_blacklist(
     // Use global signer - required for this command
     let signer_path = global_signer.expect("--signer flag is required for this command");
 
-    // Create the appropriate signer based on the path (USB for Ledger, file path for keypair)
-    let authority = if signer_path.starts_with("usb://") {
-        CliSigner::new_ledger(signer_path)
+    // Create the appropriate signer based on the path
+    let authority = if signer_path == "ledger" {
+        CliSigner::new_ledger()
     } else {
         CliSigner::new_keypair_from_path(signer_path)?
     };
