@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
+#[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 
 use anchor_lang::{
@@ -37,6 +39,7 @@ impl From<spl_stake_pool::instruction::PreferredValidatorType> for PreferredVali
     }
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for PreferredValidatorType {
     fn get_full_path() -> String {
         "PreferredValidatorType".to_string()

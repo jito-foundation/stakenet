@@ -1,5 +1,6 @@
 use std::mem::size_of;
 
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::{types::*, *};
 use anchor_lang::{prelude::Result, zero_copy};
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -38,6 +39,7 @@ pub struct UpdateParametersArgs {
     pub minimum_voting_epochs: Option<u64>,
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for UpdateParametersArgs {
     fn get_full_path() -> String {
         "UpdateParametersArgs".to_string()
@@ -498,6 +500,7 @@ pub struct UpdatePriorityFeeParametersArgs {
     pub priority_fee_scoring_start_epoch: Option<u16>,
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for UpdatePriorityFeeParametersArgs {
     fn get_full_path() -> String {
         "UpdatePriorityFeeParametersArgs".to_string()

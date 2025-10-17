@@ -1,3 +1,4 @@
+#[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
     IdlBuild,
@@ -105,6 +106,7 @@ impl MerkleRootUploadAuthority {
     }
 }
 
+#[cfg(feature = "idl-build")]
 impl IdlBuild for MerkleRootUploadAuthority {
     fn get_full_path() -> String {
         "MerkleRootUploadAuthority".to_string()
