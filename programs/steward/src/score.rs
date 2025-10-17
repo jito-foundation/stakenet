@@ -1,4 +1,3 @@
-#[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,

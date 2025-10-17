@@ -18,10 +18,8 @@ use crate::{
     Config, Parameters,
 };
 
-#[cfg(feature = "idl-build")]
 use anchor_lang::idl::types::*;
 use anchor_lang::prelude::*;
-#[cfg(feature = "idl-build")]
 use anchor_lang::IdlBuild;
 
 use bytemuck::{Pod, Zeroable};
@@ -269,8 +267,11 @@ impl Display for StewardStateEnum {
     }
 }
 
-#[cfg(feature = "idl-build")]
 impl IdlBuild for StewardStateEnum {
+    fn get_full_path() -> String {
+        "StewardStateEnum".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "StewardStateEnum".to_string(),
@@ -304,6 +305,8 @@ impl IdlBuild for StewardStateEnum {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 // BITS 0-7 COMPLETED PROGRESS FLAGS
