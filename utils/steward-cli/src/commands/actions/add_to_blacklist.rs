@@ -15,10 +15,7 @@ use squads_multisig::vault_transaction::VaultTransactionMessageExt;
 
 use crate::utils::transactions::{configure_instruction, maybe_print_tx};
 #[allow(deprecated)]
-use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, system_program,
-    transaction::Transaction,
-};
+use solana_sdk::{pubkey::Pubkey, signer::Signer, system_program, transaction::Transaction};
 
 use crate::commands::command_args::AddToBlacklist;
 use stakenet_sdk::utils::accounts::get_validator_history_address;
