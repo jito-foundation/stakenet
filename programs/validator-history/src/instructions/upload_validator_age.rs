@@ -2,7 +2,8 @@ use crate::{
     errors::ValidatorHistoryError,
     state::{Config, ValidatorHistory},
 };
-use anchor_lang::{prelude::*, solana_program::vote};
+use anchor_lang::{prelude::*, system_program};
+use solana_program::vote;
 
 #[derive(Accounts)]
 pub struct UploadValidatorAge<'info> {
@@ -13,8 +14,10 @@ pub struct UploadValidatorAge<'info> {
     )]
     pub validator_history_account: AccountLoader<'info, ValidatorHistory>,
 
-    /// CHECK: fine since we are not deserializing account
-    #[account(owner = vote::program::ID.key())]
+    /// CHECK: This account may be closed or active. Owner must be vote program or system program.
+    #[account(
+        constraint = vote_account.owner == &vote::program::ID || vote_account.owner == &system_program::ID
+    )]
     pub vote_account: AccountInfo<'info>,
 
     #[account(
