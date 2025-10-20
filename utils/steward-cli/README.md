@@ -282,8 +282,35 @@ cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 reset-stat
 
 ### Add To Blacklist
 
+**Direct execution:**
+
 ```bash
-cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-blacklist 2168
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ../../credentials/stakenet_test.json \
+  --validator-history-indices-to-blacklist 2168
+```
+
+**Creating a Squads multisig proposal with Ledger:**
+
+```bash
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ledger \
+  --validator-history-indices-to-blacklist 2168 \
+  --squads-proposal \
+  --squads-multisig 87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c \
+  --squads-vault-index 0
+```
+
+Note: `--squads-multisig` defaults to the blacklist authority multisig and `--squads-vault-index` defaults to the main vault, so they can be omitted:
+
+```bash
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ledger \
+  --validator-history-indices-to-blacklist 2168 \
+  --squads-proposal
 ```
 
 ### Remove From Blacklist
