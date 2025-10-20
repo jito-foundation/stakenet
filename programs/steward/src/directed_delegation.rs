@@ -100,7 +100,7 @@ pub fn increase_stake_calculation(
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
-    // Is this reasonable with the dynamic nature of the stake meta?
+    // Is this reasonable with the dynamic nature of the stake whitelist?
     let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
     let target_lamports = directed_stake_meta
         .get_target_lamports(&vote_pubkey)
@@ -163,89 +163,4 @@ pub struct UnstakeState {
     pub scoring_unstake_cap: u64,
     pub directed_unstake_total: u64,
     pub directed_unstake_cap: u64,
-}
-
-impl UnstakeState {
-
-    pub fn stake_deposit_unstake(
-        &self,
-        directed_stake_meta: &DirectedStakeMeta,
-        index: usize,
-        current_lamports: u64,
-        target_lamports: u64,
-    ) -> Result<u64> {
-        // Check if the validator has gotten a stake deposit, and if so, destake those additional lamports
-        // either to the target or to the previous balance before the deposit, whichever is lower in terms of total lamports unstaked
-        let vote_pubkey = directed_stake_meta.targets[index].vote_pubkey;
-        let staked_lamport_balance = directed_stake_meta.get_total_staked_lamports(&vote_pubkey).ok_or(StewardError::ValidatorIndexOutOfBounds)?;
-        if current_lamports > staked_lamport_balance
-            && self.stake_deposit_unstake_total < self.stake_deposit_unstake_cap
-            && staked_lamport_balance != LAMPORT_BALANCE_DEFAULT
-        {
-            let lamports_above_target = current_lamports
-                .checked_sub(target_lamports)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let lamports_above_balance = current_lamports
-                .checked_sub(staked_lamport_balance)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let cap_limit = self
-                .stake_deposit_unstake_cap
-                .checked_sub(self.stake_deposit_unstake_total)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let stake_deposit_unstake_lamports = lamports_above_target
-                .min(lamports_above_balance)
-                .min(cap_limit);
-
-            return Ok(stake_deposit_unstake_lamports);
-        }
-        Ok(0)
-    }
-
-    pub fn instant_unstake(
-        &self,
-        state: &StewardState,
-        index: usize,
-        current_lamports: u64,
-        target_lamports: u64,
-    ) -> Result<u64> {
-        // If this validator is marked for instant unstake, destake to the target
-        /*if state.instant_unstake.get_unsafe(index)
-            && self.instant_unstake_total < self.instant_unstake_cap
-        {
-            let lamports_above_target = current_lamports
-                .checked_sub(target_lamports)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let cap_limit = self
-                .instant_unstake_cap
-                .checked_sub(self.instant_unstake_total)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let instant_unstake_lamports = lamports_above_target.min(cap_limit);
-
-            return Ok(instant_unstake_lamports);
-        }*/
-        Ok(0)
-    }
-
-    pub fn scoring_unstake(&self, current_lamports: u64, target_lamports: u64) -> Result<u64> {
-        // If there are additional lamports to unstake on this validator and the total unstaked lamports is below the cap, destake to the target
-        /*if self.scoring_unstake_total < self.scoring_unstake_cap {
-            let lamports_above_target = current_lamports
-                .checked_sub(target_lamports)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let cap_limit = self
-                .scoring_unstake_cap
-                .checked_sub(self.scoring_unstake_total)
-                .ok_or(StewardError::ArithmeticError)?;
-
-            let scoring_unstake_lamports = lamports_above_target.min(cap_limit);
-            return Ok(scoring_unstake_lamports);
-        }*/
-        Ok(0)
-    }
 }

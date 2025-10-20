@@ -3,7 +3,7 @@ use crate::{maybe_transition, Config, StewardStateAccount, StewardStateEnum};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-pub struct ComputeDelegations<'info> {
+pub struct ComputeDirectedDelegations<'info> {
     pub config: AccountLoader<'info, Config>,
 
     #[account(
@@ -22,7 +22,7 @@ pub struct ComputeDelegations<'info> {
 `compute_delegations` takes in the results from scoring and any other accounts that may affect a validator's delegation
 It computes a share of the pool for each validator.
 */
-pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
+pub fn handler(ctx: Context<ComputeDirectedDelegations>) -> Result<()> {
     let config = ctx.accounts.config.load()?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
     let clock = Clock::get()?;
@@ -38,7 +38,7 @@ pub fn handler(ctx: Context<ComputeDelegations>) -> Result<()> {
 
     state_account
         .state
-        .compute_delegations(clock.epoch, &config)?;
+        .compute_directed_delegations(clock.epoch, &config)?;
 
     if let Some(event) = maybe_transition(
         &mut state_account.state,

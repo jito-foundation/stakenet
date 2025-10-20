@@ -31,10 +31,16 @@ pub fn handler(
     ctx: Context<CopyDirectedStakeTargets>,
     vote_pubkey: Pubkey,
     target_lamports: u64,
+    override_entry: bool,
 ) -> Result<()> {
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
+    let config = ctx.accounts.config.load()?;
 
-    if stake_meta.uploaded_stake_targets >= stake_meta.total_stake_targets {
+    if ctx.accounts.authority.key() != config.directed_stake_meta_upload_authority {
+        return Err(error!(StewardError::Unauthorized));
+    }
+
+    if stake_meta.uploaded_stake_targets >= stake_meta.total_stake_targets && !override_entry {
         return Err(error!(StewardError::InvalidParameterValue));
     }
 
@@ -53,6 +59,8 @@ pub fn handler(
 
     stake_meta.targets[target_index] = new_target;
 
-    stake_meta.uploaded_stake_targets += 1;
+    if !override_entry {
+        stake_meta.uploaded_stake_targets += 1;
+    }
     Ok(())
 }

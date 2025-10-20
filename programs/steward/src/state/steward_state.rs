@@ -133,12 +133,21 @@ pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2)-8;
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u64)]
 pub enum StewardStateEnum {
+    /// Once the directed stake meta is computed, the pool will transition into the CopyDirectedStakeMeta state
+    ComputeDirectedStakeMeta,
+
+    /// Once directed stake delegations are computed, the pool will transition to the RebalanceDirected state
+    ComputeDirectedDelegations,
+
     /// Start state
     /// Every `num_cycle_epochs` epochs, scores are computed and the top `num_delegation_validators` validators are selected.
     ComputeScores,
 
     /// Once scores are computed, the number of lamports assigned to each validator determined in this step
     ComputeDelegations,
+
+    /// Once the directed stake meta is copied, the pool will transition into the Idle state
+    CopyDirectedStakeMeta,
 
     /// Once delegations are computed, the pool is idle until the 90% mark of the epoch
     Idle,
@@ -201,6 +210,9 @@ impl Display for StewardStateEnum {
             }
             Self::Rebalance => write!(f, "Rebalance"),
             Self::RebalanceDirected => write!(f, "RebalanceDirected"),
+            Self::ComputeDirectedStakeMeta => write!(f, "ComputeDirectedStakeMeta"),
+            Self::ComputeDirectedDelegations => write!(f, "ComputeDirectedDelegations"),
+            Self::CopyDirectedStakeMeta => write!(f, "CopyDirectedStakeMeta"),
         }
     }
 }
@@ -236,6 +248,18 @@ impl IdlBuild for StewardStateEnum {
                         name: "RebalanceDirected".to_string(),
                         fields: None,
                     },
+                    IdlEnumVariant {
+                        name: "ComputeDirectedStakeMeta".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "ComputeDirectedDelegations".to_string(),
+                        fields: None,
+                    },
+                    IdlEnumVariant {
+                        name: "CopyDirectedStakeMeta".to_string(),
+                        fields: None,
+                    },
                 ],
             },
             docs: Default::default(),
@@ -256,6 +280,8 @@ pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
 pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
 pub const REBALANCE_DIRECTED: u32 = 1 << 7;
+pub const COMPUTE_DIRECTED_DELEGATIONS: u32 = 1 << 8;
+pub const COPY_DIRECTED_STAKE_META: u32 = 1 << 9;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
@@ -321,6 +347,21 @@ impl StewardState {
                 params.num_epochs_between_scoring,
             ),
             StewardStateEnum::RebalanceDirected => self.transition_rebalance_directed(
+                current_epoch,
+                current_slot,
+                params.num_epochs_between_scoring,
+            ),
+            StewardStateEnum::ComputeDirectedStakeMeta => self.transition_compute_directed_stake_meta(
+                current_epoch,
+                current_slot,
+                params.num_epochs_between_scoring,
+            ),
+            StewardStateEnum::ComputeDirectedDelegations => self.transition_compute_directed_delegations(
+                current_epoch,
+                current_slot,
+                params.num_epochs_between_scoring,
+            ),
+            StewardStateEnum::CopyDirectedStakeMeta => self.transition_copy_directed_stake_meta(
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
@@ -461,7 +502,45 @@ impl StewardState {
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
         // TODO: Implement directed rebalance transition
+        self.state_tag = StewardStateEnum::RebalanceDirected;
         self.set_flag(REBALANCE_DIRECTED);
+        Ok(())
+    }
+
+    #[inline]
+    fn transition_compute_directed_stake_meta(
+        &mut self,
+        current_epoch: u64,
+        current_slot: u64,
+        num_epochs_between_scoring: u64,
+    ) -> Result<()> {
+        // TODO: Implement directed stake meta computation transition
+        self.state_tag = StewardStateEnum::ComputeDirectedDelegations;
+        self.set_flag(COMPUTE_DIRECTED_DELEGATIONS);
+        Ok(())
+    }
+
+    #[inline]
+    fn transition_copy_directed_stake_meta(
+        &mut self,
+        current_epoch: u64,
+        current_slot: u64,
+        num_epochs_between_scoring: u64,
+    ) -> Result<()> {
+        // TODO: Implement directed stake meta copying transition
+        self.state_tag = StewardStateEnum::Idle;
+        self.set_flag(COPY_DIRECTED_STAKE_META);
+        Ok(())
+    }
+
+    #[inline]
+    fn transition_compute_directed_delegations(
+        &mut self,
+        current_epoch: u64,
+        current_slot: u64,
+        num_epochs_between_scoring: u64,
+    ) -> Result<()> {
+        // TODO: Implement directed stake delegations computation transition
         Ok(())
     }
 
@@ -792,7 +871,7 @@ impl StewardState {
     ///
     /// Mutates: delegations, compute_delegations_completed
     pub fn compute_directed_delegations(&mut self, current_epoch: u64, config: &Config) -> Result<()> {
-        if matches!(self.state_tag, StewardStateEnum::ComputeDelegations) {
+        if matches!(self.state_tag, StewardStateEnum::ComputeDirectedDelegations) {
             if current_epoch >= self.next_cycle_epoch {
                 return Err(StewardError::InvalidState.into());
             }
@@ -813,7 +892,7 @@ impl StewardState {
                 };
             }
 
-            self.set_flag(COMPUTE_DELEGATIONS);
+            self.set_flag(COMPUTE_DIRECTED_DELEGATIONS);
 
             return Ok(());
         }

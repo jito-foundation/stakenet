@@ -37,6 +37,10 @@ impl UpdateDirectedStakeTicket<'_> {
         authority_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
     ) -> Result<()> {
+        if whitelist.is_user_staker_permissioned(authority_pubkey) || whitelist.is_protocol_staker_permissioned(authority_pubkey) {
+            return Err(error!(StewardError::Unauthorized));
+        }
+
         if authority_pubkey != &ticket.ticket_update_authority {
             msg!("Error: Only the ticket update authority can update ticket preferences");
             return Err(error!(StewardError::Unauthorized));
@@ -76,7 +80,7 @@ pub fn handler(
         .sum();
 
     if total_bps > 10_000 {
-        msg!("Error: Total stake share basis points cannot exceed 10,000");
+        msg!("Error: Total stake share basis points cannot exceed 10_000");
         return Err(error!(StewardError::InvalidParameterValue));
     }
 

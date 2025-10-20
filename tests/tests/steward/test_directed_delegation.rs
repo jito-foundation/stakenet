@@ -325,31 +325,6 @@ fn test_decrease_stake_calculation_zero_cap() {
 }
 
 #[test]
-fn test_unstake_state_stake_deposit_unstake_cap_reached() {
-    let validator1 = Pubkey::new_unique();
-    let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 800_000),
-    ]);
-
-    let unstake_state = UnstakeState {
-        stake_deposit_unstake_total: 500_000, // Already at cap
-        stake_deposit_unstake_cap: 500_000,
-        ..Default::default()
-    };
-
-    let result = unstake_state.stake_deposit_unstake(
-        &directed_stake_meta,
-        0,
-        1_200_000,
-        1_000_000,
-    );
-
-    assert!(result.is_ok());
-    let unstake_amount = result.unwrap();
-    assert_eq!(unstake_amount, 0); // Should be 0 when cap is reached
-}
-
-#[test]
 fn test_increase_stake_calculation_proportional_distribution() {
     let state = create_mock_steward_state(3);
     let validator1 = Pubkey::new_unique();

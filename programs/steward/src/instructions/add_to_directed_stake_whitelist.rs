@@ -34,6 +34,11 @@ pub fn handler(
     record: Pubkey,
 ) -> Result<()> {
     let mut whitelist = ctx.accounts.directed_stake_whitelist.load_mut()?;
+    let config = ctx.accounts.config.load()?;
+    
+    if ctx.accounts.authority.key() != config.directed_stake_whitelist_authority {
+        return Err(error!(StewardError::Unauthorized));
+    }
 
     match record_type {
         DirectedStakeRecordType::Validator => {
