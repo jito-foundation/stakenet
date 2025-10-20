@@ -51,6 +51,7 @@ pub async fn build_copy_target_transaction(
         data: jito_steward::instruction::CopyDirectedStakeTargets {
             vote_pubkey,
             total_target_lamports: target_lamports,
+            override_entry: false,
         }
         .data(),
     };

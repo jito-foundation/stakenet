@@ -1066,6 +1066,30 @@ pub async fn crank_steward(
                         results: vec![],
                     }
                 }
+                StewardStateEnum::ComputeDirectedStakeMeta => {
+                    println!("[Unimplemented] Cranking Compute Directed Stake Meta...");
+                    SubmitStats {
+                        successes: 0,
+                        errors: 0,
+                        results: vec![],
+                    }
+                }
+                StewardStateEnum::ComputeDirectedDelegations => {
+                    println!("[Unimplemented] Cranking Compute Directed Delegations...");
+                    SubmitStats {
+                        successes: 0,
+                        errors: 0,
+                        results: vec![],
+                    }
+                }
+                StewardStateEnum::CopyDirectedStakeMeta => {
+                    println!("[Unimplemented] Cranking Copy Directed Stake Meta...");
+                    SubmitStats {
+                        successes: 0,
+                        errors: 0,
+                        results: vec![],
+                    }
+                }
             };
 
             return_stats.combine(&stats);

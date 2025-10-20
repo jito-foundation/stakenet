@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-
+use borsh::{BorshSerialize, BorshDeserialize};
 use crate::state::directed_stake::DirectedStakeMeta;
 use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config};
 use std::mem::size_of;
@@ -33,14 +33,27 @@ impl InitializeDirectedStakeMeta<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
 }
 
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct DirectedStakeMetaHeader {
+    discriminator: [u8; 8],
+    epoch: u64,
+    total_stake_targets: u16,
+    uploaded_stake_targets: u16,
+}
+
 pub fn handler(ctx: Context<InitializeDirectedStakeMeta>, total_stake_targets: u16) -> Result<()> {
     let epoch = ctx.accounts.clock.epoch;
     let total_stake_targets = total_stake_targets as u16;
-    let epoch_bytes = epoch.to_le_bytes();
-    let total_stake_targets_bytes = total_stake_targets.to_le_bytes();
     let mut stake_meta_data = ctx.accounts.directed_stake_meta.as_ref().try_borrow_mut_data()?;
-    // Normal serialization will fail due to required reallocs, so we copy to offsets which will remain unchanged
-    stake_meta_data[8..16].copy_from_slice(&epoch_bytes);
-    stake_meta_data[16..18].copy_from_slice(&total_stake_targets_bytes);
+    let discriminator_bytes: [u8; 8] = DirectedStakeMeta::DISCRIMINATOR.try_into().map_err(|_| error!(StewardError::InvalidParameterValue))?;
+    // At the time of initialization we can serialize the header, but not the full account 
+    // because the targets array is not fully allocated.
+    let header = DirectedStakeMetaHeader {
+        discriminator: discriminator_bytes,
+        epoch,
+        total_stake_targets,
+        uploaded_stake_targets: 0,
+    };
+    header.serialize(&mut *stake_meta_data)?;
     Ok(())
 }
