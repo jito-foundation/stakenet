@@ -19,8 +19,8 @@ use solana_program_test::*;
 use spl_stake_pool::{
     find_transient_stake_program_address,
 };
-
-use tests::steward_fixtures::TestFixture;
+use anchor_lang::Discriminator;
+use tests::steward_fixtures::{TestFixture, system_account};
 
 /// Helper function to set the directed stake whitelist authority
 async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
@@ -169,6 +169,31 @@ async fn setup_directed_stake_fixture() -> TestFixture {
 }
 
 
+/// Helper function to create a stake account with proper owner
+async fn create_stake_account(fixture: &TestFixture, vote_pubkey: Pubkey) {
+    let (stake_account_address, _, _) = fixture.stake_accounts_for_validator(vote_pubkey).await;
+    
+    // Create a stake account with proper owner (Stake Program)
+    let stake_account = solana_sdk::account::Account {
+        lamports: 1_000_000_000, // 1 SOL
+        data: vec![0; 200], // Minimal stake account data
+        owner: solana_program::stake::program::id(),
+        executable: false,
+        rent_epoch: 0,
+    };
+    
+    fixture.ctx.borrow_mut().set_account(&stake_account_address, &stake_account.into());
+}
+
+/// Helper function to add a validator to the stake pool
+async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
+    // Create the stake account first
+    create_stake_account(fixture, vote_pubkey).await;
+    
+    // No need for validator history account in directed rebalance tests
+    // We just need the stake account to exist with the proper owner
+}
+
 /// Helper function to reallocate directed stake meta to proper size
 async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     let directed_stake_meta = Pubkey::find_program_address(
@@ -295,37 +320,47 @@ async fn populate_directed_stake_meta_after_init(
         &jito_steward::id(),
     ).0;
 
-    // Read the existing account to preserve the discriminator
-    let ctx = fixture.ctx.borrow();
-    let mut existing_account = ctx.banks_client
-        .get_account(directed_stake_meta_pubkey)
-        .await
-        .unwrap()
-        .unwrap();
-    
-    // The account should already have the discriminator set by initialize_directed_stake_meta
-    // We just need to update the targets portion
-    // Layout: discriminator (8) + epoch (8) + total_stake_targets (2) + uploaded_stake_targets (2) + _padding0 (132) = 152 bytes header
-    
-    let header_size = 8 + 8 + 2 + 2 + 132; // 152 bytes
-    
-    // Create a single target
-    let target = DirectedStakeTarget {
-        vote_pubkey,
-        total_target_lamports: target_lamports,
-        total_staked_lamports: staked_lamports,
-        _padding0: [0; 64],
+    // Create the full DirectedStakeMeta with proper discriminator
+    let mut meta = DirectedStakeMeta {
+        epoch: 0, // Will be set by the program
+        total_stake_targets: 1,
+        uploaded_stake_targets: 1,
+        _padding0: [0; 132],
+        targets: {
+            let mut targets = [DirectedStakeTarget {
+                vote_pubkey: Pubkey::default(),
+                total_target_lamports: 0,
+                total_staked_lamports: 0,
+                _padding0: [0; 64],
+            }; 2048];
+            
+            // Set the first target
+            targets[0] = DirectedStakeTarget {
+                vote_pubkey,
+                total_target_lamports: target_lamports,
+                total_staked_lamports: staked_lamports,
+                _padding0: [0; 64],
+            };
+            
+            targets
+        },
+    };
+
+    // Serialize with discriminator
+    let mut account_data = Vec::new();
+    account_data.extend_from_slice(&DirectedStakeMeta::DISCRIMINATOR);
+    account_data.extend_from_slice(&borsh::to_vec(&meta).unwrap());
+
+    // Create account with proper data
+    let account = solana_sdk::account::Account {
+        lamports: 1_000_000_000,
+        data: account_data,
+        owner: jito_steward::id(),
+        executable: false,
+        rent_epoch: 0,
     };
     
-    // Serialize the target and write it to the correct position
-    let target_bytes = borsh::to_vec(&target).unwrap();
-    existing_account.data[header_size..header_size + target_bytes.len()].copy_from_slice(&target_bytes);
-    
-    // Update uploaded_stake_targets to 1 (at offset 8 + 8 + 2 = 18)
-    existing_account.data[18..20].copy_from_slice(&1u16.to_le_bytes());
-    
-    drop(ctx);
-    fixture.ctx.borrow_mut().set_account(&directed_stake_meta_pubkey, &existing_account.into());
+    fixture.ctx.borrow_mut().set_account(&directed_stake_meta_pubkey, &account.into());
 }
 
 /// Helper function to create a simple directed stake meta for testing
@@ -367,6 +402,9 @@ async fn test_simple_directed_rebalance_increase() {
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();
     
+    // Add validator to the stake pool first
+    add_validator_to_pool(&fixture, vote_pubkey).await;
+    
     // Set up directed stake meta with target > staked
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 500_000_000;   // 0.5 SOL currently staked
@@ -390,7 +428,7 @@ async fn test_simple_directed_rebalance_increase() {
             withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
+            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_pubkey,
@@ -440,6 +478,9 @@ async fn test_simple_directed_rebalance_decrease() {
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();
     
+    // Add validator to the stake pool first
+    add_validator_to_pool(&fixture, vote_pubkey).await;
+    
     // Set up directed stake meta with staked > target
     let target_lamports = 500_000_000;   // 0.5 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (excess)
@@ -462,7 +503,7 @@ async fn test_simple_directed_rebalance_decrease() {
             withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
+            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_pubkey,
@@ -512,6 +553,9 @@ async fn test_simple_directed_rebalance_no_action_needed() {
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();
     
+    // Add validator to the stake pool first
+    add_validator_to_pool(&fixture, vote_pubkey).await;
+    
     // Set up directed stake meta with target = staked (no action needed)
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (at target)
@@ -536,7 +580,7 @@ async fn test_simple_directed_rebalance_no_action_needed() {
             withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
+            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_pubkey,
@@ -586,6 +630,9 @@ async fn test_directed_rebalance_wrong_state() {
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();
     
+    // Add validator to the stake pool first
+    add_validator_to_pool(&fixture, vote_pubkey).await;
+    
     // Set up directed stake meta
     let directed_stake_meta = create_simple_directed_stake_meta(
         vote_pubkey,
@@ -608,7 +655,7 @@ async fn test_directed_rebalance_wrong_state() {
             withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
+            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_pubkey,
