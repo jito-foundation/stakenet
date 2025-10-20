@@ -136,9 +136,6 @@ pub enum StewardStateEnum {
     /// Once the directed stake meta is computed, the pool will transition into the CopyDirectedStakeMeta state
     ComputeDirectedStakeMeta,
 
-    /// Once directed stake delegations are computed, the pool will transition to the RebalanceDirected state
-    ComputeDirectedDelegations,
-
     /// Start state
     /// Every `num_cycle_epochs` epochs, scores are computed and the top `num_delegation_validators` validators are selected.
     ComputeScores,
@@ -211,7 +208,6 @@ impl Display for StewardStateEnum {
             Self::Rebalance => write!(f, "Rebalance"),
             Self::RebalanceDirected => write!(f, "RebalanceDirected"),
             Self::ComputeDirectedStakeMeta => write!(f, "ComputeDirectedStakeMeta"),
-            Self::ComputeDirectedDelegations => write!(f, "ComputeDirectedDelegations"),
             Self::CopyDirectedStakeMeta => write!(f, "CopyDirectedStakeMeta"),
         }
     }
@@ -282,7 +278,8 @@ pub const POST_LOOP_IDLE: u32 = 1 << 6;
 pub const REBALANCE_DIRECTED: u32 = 1 << 7;
 pub const COMPUTE_DIRECTED_DELEGATIONS: u32 = 1 << 8;
 pub const COPY_DIRECTED_STAKE_META: u32 = 1 << 9;
-// BITS 8-15 RESERVED FOR FUTURE USE
+pub const COMPUTE_DIRECTED_STAKE_META: u32 = 1 << 10;
+// BITS 10-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
 /// state transition layer that it needs to be reset to the IDLE state
@@ -335,6 +332,8 @@ impl StewardState {
                 params.num_epochs_between_scoring,
                 epoch_progress,
                 params.instant_unstake_epoch_progress,
+                params.max_epoch_progress_for_directed_rebalance,
+                params.min_epoch_progress_for_compute_directed_stake_meta,
             ),
             StewardStateEnum::ComputeInstantUnstake => self.transition_compute_instant_unstake(
                 current_epoch,
@@ -350,16 +349,15 @@ impl StewardState {
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
+                epoch_progress,
+                params.max_epoch_progress_for_directed_rebalance,
             ),
             StewardStateEnum::ComputeDirectedStakeMeta => self.transition_compute_directed_stake_meta(
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
-            ),
-            StewardStateEnum::ComputeDirectedDelegations => self.transition_compute_directed_delegations(
-                current_epoch,
-                current_slot,
-                params.num_epochs_between_scoring,
+                epoch_progress,
+                params.min_epoch_progress_for_compute_directed_stake_meta,
             ),
             StewardStateEnum::CopyDirectedStakeMeta => self.transition_copy_directed_stake_meta(
                 current_epoch,
@@ -418,8 +416,12 @@ impl StewardState {
         num_epochs_between_scoring: u64,
         epoch_progress: f64,
         min_epoch_progress_for_instant_unstake: f64,
+        max_epoch_progress_for_directed_rebalance: f64,
+        min_epoch_progress_for_compute_directed_stake_meta: f64,
     ) -> Result<()> {
         let completed_loop = self.has_flag(REBALANCE);
+        let completed_directed_rebalance = self.has_flag(REBALANCE_DIRECTED);
+        let completed_directed_stake_meta = self.has_flag(COPY_DIRECTED_STAKE_META);
 
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
@@ -427,6 +429,10 @@ impl StewardState {
                 current_slot,
                 num_epochs_between_scoring,
             )?;
+        } else if !completed_directed_rebalance && epoch_progress <= max_epoch_progress_for_directed_rebalance {
+            self.state_tag = StewardStateEnum::RebalanceDirected;
+        } else if !completed_directed_stake_meta && completed_directed_rebalance && !completed_loop && epoch_progress >= min_epoch_progress_for_compute_directed_stake_meta {
+            self.state_tag = StewardStateEnum::ComputeDirectedStakeMeta;
         } else if !completed_loop {
             self.unset_flag(RESET_TO_IDLE);
 
@@ -500,10 +506,19 @@ impl StewardState {
         current_epoch: u64,
         current_slot: u64,
         num_epochs_between_scoring: u64,
+        epoch_progress: f64,
+        max_epoch_progress_for_directed_rebalance: f64,
     ) -> Result<()> {
-        // TODO: Implement directed rebalance transition
-        self.state_tag = StewardStateEnum::RebalanceDirected;
-        self.set_flag(REBALANCE_DIRECTED);
+        if current_epoch >= self.next_cycle_epoch {
+            self.reset_state_for_new_cycle(
+                current_epoch,
+                current_slot,
+                num_epochs_between_scoring,
+            )?;
+        } else if epoch_progress >= max_epoch_progress_for_directed_rebalance {
+            self.state_tag = StewardStateEnum::Idle;
+            self.set_flag(REBALANCE_DIRECTED);
+        }
         Ok(())
     }
 
@@ -513,10 +528,21 @@ impl StewardState {
         current_epoch: u64,
         current_slot: u64,
         num_epochs_between_scoring: u64,
+        epoch_progress: f64,
+        min_epoch_progress_for_compute_directed_stake_meta: f64,
     ) -> Result<()> {
-        // TODO: Implement directed stake meta computation transition
-        self.state_tag = StewardStateEnum::ComputeDirectedDelegations;
-        self.set_flag(COMPUTE_DIRECTED_DELEGATIONS);
+        if current_epoch >= self.next_cycle_epoch {
+            self.reset_state_for_new_cycle(
+                current_epoch,
+                current_slot,
+                num_epochs_between_scoring,
+            )?;
+        } else if epoch_progress >= min_epoch_progress_for_compute_directed_stake_meta {
+            self.state_tag = StewardStateEnum::CopyDirectedStakeMeta;
+            self.set_flag(COMPUTE_DIRECTED_STAKE_META);
+        } else {
+            self.state_tag = StewardStateEnum::Idle;
+        }
         Ok(())
     }
 
@@ -527,22 +553,38 @@ impl StewardState {
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        // TODO: Implement directed stake meta copying transition
-        self.state_tag = StewardStateEnum::Idle;
-        self.set_flag(COPY_DIRECTED_STAKE_META);
+        if current_epoch >= self.next_cycle_epoch {
+            self.reset_state_for_new_cycle(
+                current_epoch,
+                current_slot,
+                num_epochs_between_scoring,
+            )?;
+        } else if self.has_flag(COMPUTE_DIRECTED_STAKE_META) {
+            self.state_tag = StewardStateEnum::Idle;
+            self.set_flag(COPY_DIRECTED_STAKE_META);
+        }
         Ok(())
     }
 
-    #[inline]
+    /*#[inline]
     fn transition_compute_directed_delegations(
         &mut self,
         current_epoch: u64,
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        // TODO: Implement directed stake delegations computation transition
+        if current_epoch >= self.next_cycle_epoch {
+            self.reset_state_for_new_cycle(
+                current_epoch,
+                current_slot,
+                num_epochs_between_scoring,
+            )?;
+        } else {
+            self.state_tag = StewardStateEnum::CopyDirectedStakeMeta;
+            self.set_flag(COMPUTE_DIRECTED_STAKE_META);
+        }
         Ok(())
-    }
+    }*/
 
     /// Update internal state when transitioning to a new cycle, and ComputeScores restarts
     fn reset_state_for_new_cycle(
@@ -870,7 +912,7 @@ impl StewardState {
     /// to each validator, represented as a fraction of total stake
     ///
     /// Mutates: delegations, compute_delegations_completed
-    pub fn compute_directed_delegations(&mut self, current_epoch: u64, config: &Config) -> Result<()> {
+    /*pub fn compute_directed_delegations(&mut self, current_epoch: u64, config: &Config) -> Result<()> {
         if matches!(self.state_tag, StewardStateEnum::ComputeDirectedDelegations) {
             if current_epoch >= self.next_cycle_epoch {
                 return Err(StewardError::InvalidState.into());
@@ -897,7 +939,7 @@ impl StewardState {
             return Ok(());
         }
         Err(StewardError::InvalidState.into())
-    }
+    }*/
 
     /// One instruction per validator.
     /// Check a set of criteria that determine whether a validator should be kicked from the pool

@@ -214,6 +214,12 @@ pub struct Parameters {
     /// Validator history copy_vote_account and Cluster History must be updated past this epoch progress before calculating instant unstake
     pub instant_unstake_inputs_epoch_progress: f64,
 
+    /// The minimum epoch progress for computing directed stake meta
+    pub min_epoch_progress_for_compute_directed_stake_meta: f64,
+
+    /// The maximum epoch progress for directed rebalance
+    pub max_epoch_progress_for_directed_rebalance: f64,
+
     /// Number of epochs a given validator set will be delegated to before recomputing scores
     pub num_epochs_between_scoring: u64,
 
@@ -234,7 +240,7 @@ pub struct Parameters {
 
     pub _padding_0: [u8; 2],
 
-    pub _padding_1: [u64; 31],
+    pub _padding_1: [u64; 29],
 }
 
 impl Parameters {

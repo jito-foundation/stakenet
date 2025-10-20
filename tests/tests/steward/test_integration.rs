@@ -732,7 +732,7 @@ async fn test_idle() {
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
     fixture
-        .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 0)
+        .advance_num_epochs(epoch_schedule.first_normal_epoch - clock.epoch, 100_000) // ~ 25% epoch progress
         .await;
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())

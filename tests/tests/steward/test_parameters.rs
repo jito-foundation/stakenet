@@ -253,8 +253,10 @@ fn _test_parameter(
         priority_fee_scoring_start_epoch: 0,
         directed_stake_unstake_cap_bps: 750,
         directed_stake_global_cap_bps: 3_000,
+        min_epoch_progress_for_compute_directed_stake_meta: 0.5,
+        max_epoch_progress_for_directed_rebalance: 0.1,
         _padding_0: [0; 2],
-        _padding_1: [0; 31],
+        _padding_1: [0; 29],
     });
 
     // First Valid Epoch
