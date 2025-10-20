@@ -387,7 +387,7 @@ async fn test_simple_directed_rebalance_increase() {
             ).0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_pool_meta.reserve, // Use reserve as withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
@@ -459,7 +459,7 @@ async fn test_simple_directed_rebalance_decrease() {
             ).0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_pool_meta.reserve, // Use reserve as withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
@@ -533,7 +533,7 @@ async fn test_simple_directed_rebalance_no_action_needed() {
             ).0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_pool_meta.reserve, // Use reserve as withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
@@ -605,7 +605,7 @@ async fn test_directed_rebalance_wrong_state() {
             ).0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_pool_meta.reserve, // Use reserve as withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
             stake_account: fixture.stake_pool_meta.reserve, // Use reserve as stake account for simplicity
