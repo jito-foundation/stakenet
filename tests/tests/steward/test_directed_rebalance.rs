@@ -2,6 +2,7 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{
     instructions::AuthorityType,
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
+    DirectedStakeWhitelist,
 };
 use solana_program::{
     instruction::Instruction,
@@ -20,33 +21,6 @@ use spl_stake_pool::{
 };
 
 use tests::steward_fixtures::TestFixture;
-
-/// Helper function to create a test fixture with directed stake setup
-async fn setup_directed_stake_fixture() -> TestFixture {
-    let fixture = TestFixture::new().await;
-    
-    fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None, None).await;
-    println!("Steward initialized");
-    fixture.realloc_steward_state().await;
-    println!("Steward state reallocated");
-    println!("Fixture initialized");
-    
-    // Set the directed stake whitelist authority to the fixture's keypair
-    set_directed_stake_whitelist_authority(&fixture).await;
-    
-    println!("Directed stake whitelist authority set");
-    // Initialize the directed stake whitelist first
-    initialize_directed_stake_whitelist(&fixture).await;
-    
-    println!("Directed stake whitelist initialized");
-
-    // Initialize the directed stake meta account
-    initialize_directed_stake_meta(&fixture, 1).await;
-    println!("Directed stake meta initialized");
-
-    fixture
-}
 
 /// Helper function to set the directed stake whitelist authority
 async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
@@ -77,7 +51,7 @@ async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
 /// Helper function to initialize directed stake whitelist
 async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
     let directed_stake_whitelist = Pubkey::find_program_address(
-        &[jito_steward::DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
         &jito_steward::id(),
     ).0;
 
@@ -162,11 +136,38 @@ async fn initialize_directed_stake_meta(
 
     fixture.submit_transaction_assert_success(tx).await;
     
-    // Reallocate the account to its proper size
-    realloc_directed_stake_meta(fixture).await;
-    
     directed_stake_meta
 }
+
+/// Helper function to create a test fixture with directed stake setup
+async fn setup_directed_stake_fixture() -> TestFixture {
+    let fixture = TestFixture::new().await;
+    
+    fixture.initialize_stake_pool().await;
+    fixture.initialize_steward(None, None).await;
+    println!("Steward initialized");
+    fixture.realloc_steward_state().await;
+    println!("Steward state reallocated");
+    println!("Fixture initialized");
+    
+    // Set the directed stake whitelist authority to the fixture's keypair
+    set_directed_stake_whitelist_authority(&fixture).await;
+    
+    println!("Directed stake whitelist authority set");
+    // Initialize the directed stake whitelist first
+    initialize_directed_stake_whitelist(&fixture).await;
+    
+    println!("Directed stake whitelist initialized");
+
+    // Initialize the directed stake meta account
+    initialize_directed_stake_meta(&fixture, 1).await;
+    println!("Directed stake meta initialized");
+    realloc_directed_stake_meta(&fixture).await;
+    println!("Directed stake meta reallocated");
+
+    fixture
+}
+
 
 /// Helper function to reallocate directed stake meta to proper size
 async fn realloc_directed_stake_meta(fixture: &TestFixture) {
@@ -262,15 +263,69 @@ async fn populate_directed_stake_meta(
 
     // Write the data to the account using the context
     let mut ctx = fixture.ctx.borrow_mut();
-    let account_data = borsh::to_vec(&meta).unwrap();
+    let mut account_data = borsh::to_vec(&meta).unwrap();
+    
+    // Add the Anchor discriminator at the beginning
+    // The discriminator is the first 8 bytes of SHA256("account:DirectedStakeMeta")
+    let discriminator = [0x8a, 0x5a, 0x5c, 0x5c, 0x5c, 0x5c, 0x5c, 0x5c]; // This is a placeholder - we need the actual discriminator
+    let mut full_data = Vec::new();
+    full_data.extend_from_slice(&discriminator);
+    full_data.extend_from_slice(&account_data);
+    
     let account = solana_sdk::account::Account {
         lamports: 1_000_000_000, // 1 SOL for rent
-        data: account_data,
+        data: full_data,
         owner: jito_steward::id(),
         executable: false,
         rent_epoch: 0,
     };
     ctx.set_account(&directed_stake_meta, &account.into());
+}
+
+/// Helper function to populate directed stake meta after initialization
+async fn populate_directed_stake_meta_after_init(
+    fixture: &TestFixture,
+    vote_pubkey: Pubkey,
+    target_lamports: u64,
+    staked_lamports: u64,
+) {
+    println!("Populating directed stake meta after initialization");
+    let directed_stake_meta_pubkey = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Read the existing account to preserve the discriminator
+    let ctx = fixture.ctx.borrow();
+    let mut existing_account = ctx.banks_client
+        .get_account(directed_stake_meta_pubkey)
+        .await
+        .unwrap()
+        .unwrap();
+    
+    // The account should already have the discriminator set by initialize_directed_stake_meta
+    // We just need to update the targets portion
+    // Layout: discriminator (8) + epoch (8) + total_stake_targets (2) + uploaded_stake_targets (2) + _padding0 (132) = 152 bytes header
+    
+    let header_size = 8 + 8 + 2 + 2 + 132; // 152 bytes
+    
+    // Create a single target
+    let target = DirectedStakeTarget {
+        vote_pubkey,
+        total_target_lamports: target_lamports,
+        total_staked_lamports: staked_lamports,
+        _padding0: [0; 64],
+    };
+    
+    // Serialize the target and write it to the correct position
+    let target_bytes = borsh::to_vec(&target).unwrap();
+    existing_account.data[header_size..header_size + target_bytes.len()].copy_from_slice(&target_bytes);
+    
+    // Update uploaded_stake_targets to 1 (at offset 8 + 8 + 2 = 18)
+    existing_account.data[18..20].copy_from_slice(&1u16.to_le_bytes());
+    
+    drop(ctx);
+    fixture.ctx.borrow_mut().set_account(&directed_stake_meta_pubkey, &existing_account.into());
 }
 
 /// Helper function to create a simple directed stake meta for testing
@@ -315,8 +370,11 @@ async fn test_simple_directed_rebalance_increase() {
     // Set up directed stake meta with target > staked
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 500_000_000;   // 0.5 SOL currently staked
-    populate_directed_stake_meta(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
     
+    // Populate the account data manually (after initialization sets discriminator)
+    populate_directed_stake_meta_after_init(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
+
+    println!("Directed stake meta populated... rebalancing");
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
@@ -385,11 +443,9 @@ async fn test_simple_directed_rebalance_decrease() {
     // Set up directed stake meta with staked > target
     let target_lamports = 500_000_000;   // 0.5 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (excess)
-    let directed_stake_meta = create_simple_directed_stake_meta(
-        vote_pubkey,
-        target_lamports,
-        staked_lamports,
-    );
+    
+    // Populate the account data manually (after initialization sets discriminator)
+    populate_directed_stake_meta_after_init(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
     
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
