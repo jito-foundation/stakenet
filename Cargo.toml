@@ -29,6 +29,7 @@ solana-packet = "=2.2.1"
 solana-program = "=2.3.0"
 solana-program-test = "=2.3.3"
 solana-pubkey = "=2.4.0"
+solana-remote-wallet = "=2.3.3"
 solana-rpc-client = "=2.3.3"
 solana-rpc-client-api = "=2.3.3"
 solana-sdk = "=2.3.1"
@@ -39,6 +40,7 @@ spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"]
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
+squads-multisig = { git = "https://github.com/jito-foundation/squads-v4", rev = "8deba5de275904e2336c46188ab3039faecd0537" }
 stakenet-sdk = { path = "sdk", version = "0.1.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.47.1", features = ["full"] }

@@ -39,6 +39,9 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
+use crate::cli_signer::CliSigner;
+
+pub mod cli_signer;
 pub mod commands;
 pub mod utils;
 
@@ -52,6 +55,7 @@ async fn main() -> Result<()> {
     ));
 
     let program_id = args.program_id;
+    let global_signer = args.signer.as_deref();
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
@@ -105,7 +109,17 @@ async fn main() -> Result<()> {
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, program_id).await
         }
-        Commands::AddToBlacklist(args) => command_add_to_blacklist(args, &client, program_id).await,
+        Commands::AddToBlacklist(args) => {
+            // Use global signer - required for this command
+            let signer_path = global_signer.expect("--signer flag is required for this command");
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_add_to_blacklist(args, &client, program_id, &cli_signer).await
+        }
         Commands::RemoveFromBlacklist(args) => {
             command_remove_from_blacklist(args, &client, program_id).await
         }

@@ -108,6 +108,10 @@ impl MerkleRootUploadAuthority {
 
 #[cfg(feature = "idl-build")]
 impl IdlBuild for MerkleRootUploadAuthority {
+    fn get_full_path() -> String {
+        "MerkleRootUploadAuthority".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "MerkleRootUploadAuthority".to_string(),
@@ -141,6 +145,8 @@ impl IdlBuild for MerkleRootUploadAuthority {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 #[derive(BorshSerialize, TypeLayout)]

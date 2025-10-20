@@ -25,6 +25,10 @@ impl AuthorityType {
 // Implement IdlBuild for AuthorityType
 #[cfg(feature = "idl-build")]
 impl IdlBuild for AuthorityType {
+    fn get_full_path() -> String {
+        "AuthorityType".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "AuthorityType".to_string(),
@@ -70,6 +74,8 @@ impl IdlBuild for AuthorityType {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 #[derive(Accounts)]
