@@ -24,7 +24,7 @@ use solana_sdk::{
     signer::Signer,
     transaction::Transaction,
 };
-use tests::steward_fixtures::TestFixture;
+use tests::steward_fixtures::{TestFixture, system_account};
 
 /// Helper function to create a test fixture with directed stake setup
 async fn setup_directed_stake_fixture() -> TestFixture {
@@ -49,6 +49,20 @@ async fn setup_directed_stake_fixture() -> TestFixture {
     //println!("Directed stake meta initialized");
 
     fixture
+}
+
+/// Helper function to create and fund a staker account
+async fn create_funded_staker(fixture: &TestFixture) -> Keypair {
+    let staker = Keypair::new();
+    
+    // Add the staker account to the test context with lamports
+    let mut ctx = fixture.ctx.borrow_mut();
+    ctx.set_account(
+        &staker.pubkey(),
+        &system_account(100_000_000_000).into(), // 100 SOL
+    );
+    
+    staker
 }
 
 /// Helper function to set the directed stake whitelist authority
@@ -506,8 +520,8 @@ async fn test_add_stakers_to_whitelist() {
 async fn test_initialize_directed_stake_ticket() {
     let fixture = setup_directed_stake_fixture().await;
     println!("Fixture initialized");
-    // Create a test staker and add to whitelist
-    let staker = Keypair::new();
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
     println!("Staker added to whitelist");
     // Initialize a directed stake ticket
@@ -538,8 +552,8 @@ async fn test_initialize_directed_stake_ticket() {
 async fn test_update_directed_stake_ticket() {
     let fixture = setup_directed_stake_fixture().await;
     
-    // Create a test staker and add to whitelist
-    let staker = Keypair::new();
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
     
     // Initialize a directed stake ticket
@@ -605,8 +619,8 @@ async fn test_initialize_directed_stake_meta() {
 async fn test_directed_stake_ticket_validation() {
     let fixture = setup_directed_stake_fixture().await;
     
-    // Create a test staker and add to whitelist
-    let staker = Keypair::new();
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
     
     // Initialize a directed stake ticket
@@ -690,7 +704,7 @@ async fn test_directed_stake_ticket_unauthorized() {
     let fixture = setup_directed_stake_fixture().await;
     
     // Try to initialize a ticket without being on the whitelist
-    let unauthorized_staker = Keypair::new();
+    let unauthorized_staker = create_funded_staker(&fixture).await;
     
     let ticket_account = Pubkey::find_program_address(
         &[DirectedStakeTicket::SEED, unauthorized_staker.pubkey().as_ref()],
@@ -749,10 +763,10 @@ async fn test_directed_stake_ticket_unauthorized() {
 async fn test_multiple_directed_stake_tickets() {
     let fixture = setup_directed_stake_fixture().await;
     
-    // Create multiple stakers and add them to whitelist
-    let staker1 = Keypair::new();
-    let staker2 = Keypair::new();
-    let protocol_staker = Keypair::new();
+    // Create multiple funded stakers and add them to whitelist
+    let staker1 = create_funded_staker(&fixture).await;
+    let staker2 = create_funded_staker(&fixture).await;
+    let protocol_staker = create_funded_staker(&fixture).await;
     
     add_staker_to_whitelist(&fixture, &staker1.pubkey(), DirectedStakeRecordType::User).await;
     add_staker_to_whitelist(&fixture, &staker2.pubkey(), DirectedStakeRecordType::User).await;
@@ -845,8 +859,8 @@ async fn test_multiple_directed_stake_tickets() {
 async fn test_directed_stake_ticket_allocation_calculation() {
     let fixture = setup_directed_stake_fixture().await;
     
-    // Create a test staker and add to whitelist
-    let staker = Keypair::new();
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
     
     // Create test validators

@@ -41,6 +41,10 @@ async fn setup_directed_stake_fixture() -> TestFixture {
     
     println!("Directed stake whitelist initialized");
 
+    // Initialize the directed stake meta account
+    initialize_directed_stake_meta(&fixture, 1).await;
+    println!("Directed stake meta initialized");
+
     fixture
 }
 
@@ -110,6 +114,165 @@ async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+/// Helper function to initialize directed stake meta
+async fn initialize_directed_stake_meta(
+    fixture: &TestFixture,
+    total_stake_targets: u16,
+) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                directed_stake_meta,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {
+            total_stake_targets,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    
+    // Reallocate the account to its proper size
+    realloc_directed_stake_meta(fixture).await;
+    
+    directed_stake_meta
+}
+
+/// Helper function to reallocate directed stake meta to proper size
+async fn realloc_directed_stake_meta(fixture: &TestFixture) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture.load_and_deserialize(&fixture.steward_config.pubkey()).await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocations we need
+    let mut num_reallocs = (DirectedStakeMeta::SIZE - jito_steward::constants::MAX_ALLOC_BYTES) / jito_steward::constants::MAX_ALLOC_BYTES + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_meta,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to populate directed stake meta with target data
+async fn populate_directed_stake_meta(
+    fixture: &TestFixture,
+    vote_pubkey: Pubkey,
+    target_lamports: u64,
+    staked_lamports: u64,
+) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Create the target data
+    let mut meta = DirectedStakeMeta {
+        epoch: 0,
+        total_stake_targets: 1,
+        uploaded_stake_targets: 1,
+        _padding0: [0; 132],
+        targets: [DirectedStakeTarget {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: 0,
+            total_staked_lamports: 0,
+            _padding0: [0; 64],
+        }; 2048],
+    };
+
+    // Set the first target
+    meta.targets[0] = DirectedStakeTarget {
+        vote_pubkey,
+        total_target_lamports: target_lamports,
+        total_staked_lamports: staked_lamports,
+        _padding0: [0; 64],
+    };
+
+    // Write the data to the account using the context
+    let mut ctx = fixture.ctx.borrow_mut();
+    let account_data = borsh::to_vec(&meta).unwrap();
+    let account = solana_sdk::account::Account {
+        lamports: 1_000_000_000, // 1 SOL for rent
+        data: account_data,
+        owner: jito_steward::id(),
+        executable: false,
+        rent_epoch: 0,
+    };
+    ctx.set_account(&directed_stake_meta, &account.into());
+}
+
 /// Helper function to create a simple directed stake meta for testing
 fn create_simple_directed_stake_meta(
     vote_pubkey: Pubkey,
@@ -152,11 +315,7 @@ async fn test_simple_directed_rebalance_increase() {
     // Set up directed stake meta with target > staked
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 500_000_000;   // 0.5 SOL currently staked
-    let directed_stake_meta = create_simple_directed_stake_meta(
-        vote_pubkey,
-        target_lamports,
-        staked_lamports,
-    );
+    populate_directed_stake_meta(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
     
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
@@ -430,6 +589,5 @@ async fn test_directed_rebalance_wrong_state() {
     // The transaction should fail with a state error
     fixture.submit_transaction_assert_error(tx, "StateMachineInvalidState").await;
     
-    // If we get here, the test passed - the transaction failed as expected
     println!("Expected failure (wrong state) - test passed");
 }
