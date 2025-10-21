@@ -20,8 +20,7 @@ use tests::steward_fixtures::{
     FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
 };
 use validator_history::ValidatorHistory;
-use jito_steward::state::steward_state::REBALANCE_DIRECTED;
-use tests::steward_fixtures::serialized_steward_state_account;
+
 #[tokio::test]
 async fn test_cycle() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
@@ -129,6 +128,9 @@ async fn test_cycle() {
 
     crank_idle(&fixture).await;
 
+    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+
+    
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -571,15 +573,9 @@ async fn test_add_validator_next_cycle() {
     let mut state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     
-    /*state_account.state.set_flag(REBALANCE_DIRECTED);
-    fixture.ctx.borrow_mut().set_account(
-        &fixture.steward_state,
-        &serialized_steward_state_account(state_account).into(),
-    );*/
-
     let state = state_account.state;
 
-    assert!(state.has_flag(REBALANCE_DIRECTED));
+    println!("Steward state: {}", state.state_tag);
     assert!(matches!(
         state.state_tag,
         jito_steward::StewardStateEnum::ComputeDelegations

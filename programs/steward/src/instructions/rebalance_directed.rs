@@ -150,15 +150,10 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     let transient_seed: u64 = 0;
     {
 
-        // Transitions to Idle before doing rebalance if RESET_TO_IDLE is set
-        if let Some(event) = maybe_transition(
-            &mut state_account.state,
-            &clock,
-            &config.parameters,
-            &epoch_schedule,
-        )? {
-            emit!(event);
-            return Ok(());
+        // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED
+        // This will cause the state to transition to Idle
+        if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+            state_account.state.set_flag(REBALANCE_DIRECTED);
         }
 
         state_checks(
@@ -168,6 +163,16 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             &ctx.accounts.validator_list,
             Some(StewardStateEnum::RebalanceDirected),
         )?;
+
+        if let Some(event) = maybe_transition(
+            &mut state_account.state,
+            &clock,
+            &config.parameters,
+            &epoch_schedule,
+        )? {
+            emit!(event);
+            return Ok(());
+        }
 
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
         let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;

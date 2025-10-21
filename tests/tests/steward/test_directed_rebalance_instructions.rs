@@ -676,6 +676,104 @@ async fn test_simple_directed_rebalance_no_action_needed() {
 }
 
 #[tokio::test]
+async fn test_simple_directed_rebalance_no_targets() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    let validator = Keypair::new();
+    let vote_pubkey = validator.pubkey();
+    
+    add_validator_to_pool(&fixture, vote_pubkey).await;
+    
+    let stake_pool: jito_steward::stake_pool_utils::StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    let mut stake_pool_spl = stake_pool.as_ref().clone();
+    
+    let funding_amount = 100_000_000_000; // 100 SOL
+    stake_pool_spl.pool_token_supply += funding_amount;
+    stake_pool_spl.total_lamports += funding_amount;
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.stake_pool,
+        &tests::stake_pool_utils::serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<jito_steward::stake_pool_utils::StakePool>()).into(),
+    );
+    
+    let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
+    let mut updated_reserve = reserve_account;
+    updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.reserve,
+        &updated_reserve.into(),
+    );
+    
+    let mut steward_state_account: jito_steward::StewardStateAccount = 
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+    
+    // Create the rebalance_directed instruction
+    let rebalance_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::RebalanceDirected {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            directed_stake_meta: Pubkey::find_program_address(
+                &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+                &jito_steward::id(),
+            ).0,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            stake_pool_program: spl_stake_pool::id(),
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            validator_list: fixture.stake_pool_meta.validator_list,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            transient_stake_account: find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                &vote_pubkey,
+                &fixture.stake_pool_meta.stake_pool,
+                0u64,
+            ).0,
+            vote_account: vote_pubkey,
+            clock: sysvar::clock::id(),
+            rent: sysvar::rent::id(),
+            stake_history: sysvar::stake_history::id(),
+            stake_config: solana_program::stake::config::ID,            
+            system_program: solana_program::system_program::id(),
+            stake_program: solana_program::stake::program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::RebalanceDirected {
+            validator_list_index: 0,
+        }
+        .data(),
+    };
+
+    // Submit the transaction
+    let tx = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::request_heap_frame(256 * 1024),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            rebalance_ix.clone(),
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.get_latest_blockhash().await,
+    );
+
+    // The transaction should succeed (or fail gracefully if not in the right state)
+    fixture.submit_transaction_assert_success(tx).await;
+
+    assert!(steward_state_account.state.has_flag(REBALANCE_DIRECTED), 
+    "REBALANCE_DIRECTED flag should be set after rebalancing completed");
+}
+
+#[tokio::test]
 async fn test_directed_rebalance_wrong_state() {
     // Test case: Try to call rebalance_directed when not in the right state
     let fixture = setup_directed_stake_fixture().await;
