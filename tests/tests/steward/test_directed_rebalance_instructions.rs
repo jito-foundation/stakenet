@@ -3,6 +3,7 @@ use jito_steward::{
     instructions::AuthorityType,
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
     DirectedStakeWhitelist,
+    REBALANCE_DIRECTED,
 };
 use solana_program::{
     instruction::Instruction,
@@ -20,7 +21,7 @@ use spl_stake_pool::{
     find_transient_stake_program_address,
 };
 use anchor_lang::Discriminator;
-use tests::steward_fixtures::{TestFixture, system_account};
+use tests::steward_fixtures::{TestFixture, serialized_steward_state_account};
 
 /// Helper function to set the directed stake whitelist authority
 async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
@@ -169,29 +170,63 @@ async fn setup_directed_stake_fixture() -> TestFixture {
 }
 
 
-/// Helper function to create a stake account with proper owner
-async fn create_stake_account(fixture: &TestFixture, vote_pubkey: Pubkey) {
-    let (stake_account_address, _, _) = fixture.stake_accounts_for_validator(vote_pubkey).await;
+/// Helper function to add a validator to the stake pool using AutoAddValidator
+async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
+    // Initialize validator history account first (required for AutoAddValidator)
+    let validator_history_address = fixture.initialize_validator_history_with_credits(vote_pubkey, 0);
     
-    // Create a stake account with proper owner (Stake Program)
-    let stake_account = solana_sdk::account::Account {
-        lamports: 1_000_000_000, // 1 SOL
-        data: vec![0; 200], // Minimal stake account data
-        owner: solana_program::stake::program::id(),
-        executable: false,
-        rent_epoch: 0,
+    // Get the stake account addresses
+    let (stake_account_address, _transient_stake_account_address, withdraw_authority) = 
+        fixture.stake_accounts_for_validator(vote_pubkey).await;
+    
+    // Use AutoAddValidator instruction to properly add validator to the pool
+    let add_validator_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
+            validator_history_account: validator_history_address,
+            config: fixture.steward_config.pubkey(),
+            stake_pool_program: spl_stake_pool::id(),
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            withdraw_authority,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_account: stake_account_address,
+            vote_account: vote_pubkey,
+            rent: sysvar::rent::id(),
+            clock: sysvar::clock::id(),
+            stake_history: sysvar::stake_history::id(),
+            stake_config: solana_program::stake::config::ID,
+            stake_program: solana_program::stake::program::id(),
+            system_program: solana_program::system_program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
     };
     
-    fixture.ctx.borrow_mut().set_account(&stake_account_address, &stake_account.into());
-}
-
-/// Helper function to add a validator to the stake pool
-async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
-    // Create the stake account first
-    create_stake_account(fixture, vote_pubkey).await;
+    let tx = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::request_heap_frame(256 * 1024),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            add_validator_ix,
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.get_latest_blockhash().await,
+    );
     
-    // No need for validator history account in directed rebalance tests
-    // We just need the stake account to exist with the proper owner
+    fixture.submit_transaction_assert_success(tx).await;
+    
+    // Update steward state to reflect the added validator
+    let mut steward_state_account: jito_steward::StewardStateAccount = 
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    steward_state_account.state.num_pool_validators += 1;
+    steward_state_account.state.validators_added -= 1;
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
 }
 
 /// Helper function to reallocate directed stake meta to proper size
@@ -252,62 +287,6 @@ async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
-/// Helper function to populate directed stake meta with target data
-async fn populate_directed_stake_meta(
-    fixture: &TestFixture,
-    vote_pubkey: Pubkey,
-    target_lamports: u64,
-    staked_lamports: u64,
-) {
-    let directed_stake_meta = Pubkey::find_program_address(
-        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
-        &jito_steward::id(),
-    ).0;
-
-    // Create the target data
-    let mut meta = DirectedStakeMeta {
-        total_stake_targets: 0,
-        padding0: [0; 64],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
-        }; 2048],
-    };
-
-    // Set the first target
-    meta.targets[0] = DirectedStakeTarget {
-        vote_pubkey,
-        total_target_lamports: target_lamports,
-        total_staked_lamports: staked_lamports,
-        target_last_updated_epoch: 0,
-        staked_last_updated_epoch: 0,
-        _padding0: [0; 64],
-    };
-
-    // Write the data to the account using the context
-    let mut ctx = fixture.ctx.borrow_mut();
-    let mut account_data = borsh::to_vec(&meta).unwrap();
-    
-    // Add the Anchor discriminator at the beginning
-    // The discriminator is the first 8 bytes of SHA256("account:DirectedStakeMeta")
-    let discriminator = [0x8a, 0x5a, 0x5c, 0x5c, 0x5c, 0x5c, 0x5c, 0x5c]; // This is a placeholder - we need the actual discriminator
-    let mut full_data = Vec::new();
-    full_data.extend_from_slice(&discriminator);
-    full_data.extend_from_slice(&account_data);
-    
-    let account = solana_sdk::account::Account {
-        lamports: 1_000_000_000, // 1 SOL for rent
-        data: full_data,
-        owner: jito_steward::id(),
-        executable: false,
-        rent_epoch: 0,
-    };
-    ctx.set_account(&directed_stake_meta, &account.into());
-}
 
 /// Helper function to populate directed stake meta after initialization
 async fn populate_directed_stake_meta_after_init(
@@ -323,7 +302,7 @@ async fn populate_directed_stake_meta_after_init(
     ).0;
 
     // Create the full DirectedStakeMeta with proper discriminator
-    let mut meta = DirectedStakeMeta {
+    let meta = DirectedStakeMeta {
         total_stake_targets: 0,
         padding0: [0; 64],
         targets: {
@@ -367,37 +346,6 @@ async fn populate_directed_stake_meta_after_init(
     fixture.ctx.borrow_mut().set_account(&directed_stake_meta_pubkey, &account.into());
 }
 
-/// Helper function to create a simple directed stake meta for testing
-fn create_simple_directed_stake_meta(
-    vote_pubkey: Pubkey,
-    target_lamports: u64,
-    staked_lamports: u64,
-) -> DirectedStakeMeta {
-    let mut meta = DirectedStakeMeta {
-        total_stake_targets: 0,
-        padding0: [0; 64],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
-        }; 2048],
-    };
-
-    // Set the first target
-    meta.targets[0] = DirectedStakeTarget {
-        vote_pubkey,
-        total_target_lamports: target_lamports,
-        total_staked_lamports: staked_lamports,
-        target_last_updated_epoch: 0,
-        staked_last_updated_epoch: 0,
-        _padding0: [0; 64],
-    };
-
-    meta
-}
 
 #[tokio::test]
 async fn test_simple_directed_rebalance_increase() {
@@ -410,6 +358,43 @@ async fn test_simple_directed_rebalance_increase() {
     
     // Add validator to the stake pool first
     add_validator_to_pool(&fixture, vote_pubkey).await;
+    
+    // Fund the stake pool with sufficient lamports for rebalance operations
+    let stake_pool: jito_steward::stake_pool_utils::StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    let mut stake_pool_spl = stake_pool.as_ref().clone();
+    
+    // Add substantial funding to the stake pool (100 SOL)
+    let funding_amount = 100_000_000_000; // 100 SOL
+    stake_pool_spl.pool_token_supply += funding_amount;
+    stake_pool_spl.total_lamports += funding_amount;
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.stake_pool,
+        &tests::stake_pool_utils::serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<jito_steward::stake_pool_utils::StakePool>()).into(),
+    );
+    
+    // Fund the reserve stake account with actual lamports
+    let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
+    let mut updated_reserve = reserve_account;
+    updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.reserve,
+        &updated_reserve.into(),
+    );
+    
+    // Set steward state to RebalanceDirected state
+    let mut steward_state_account: jito_steward::StewardStateAccount = 
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
     
     // Set up directed stake meta with target > staked
     let target_lamports = 1_000_000_000; // 1 SOL target
@@ -487,6 +472,43 @@ async fn test_simple_directed_rebalance_decrease() {
     // Add validator to the stake pool first
     add_validator_to_pool(&fixture, vote_pubkey).await;
     
+    // Fund the stake pool with sufficient lamports for rebalance operations
+    let stake_pool: jito_steward::stake_pool_utils::StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    let mut stake_pool_spl = stake_pool.as_ref().clone();
+    
+    // Add substantial funding to the stake pool (100 SOL)
+    let funding_amount = 100_000_000_000; // 100 SOL
+    stake_pool_spl.pool_token_supply += funding_amount;
+    stake_pool_spl.total_lamports += funding_amount;
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.stake_pool,
+        &tests::stake_pool_utils::serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<jito_steward::stake_pool_utils::StakePool>()).into(),
+    );
+    
+    // Fund the reserve stake account with actual lamports
+    let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
+    let mut updated_reserve = reserve_account;
+    updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.reserve,
+        &updated_reserve.into(),
+    );
+    
+    // Set steward state to RebalanceDirected state
+    let mut steward_state_account: jito_steward::StewardStateAccount = 
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+    
     // Set up directed stake meta with staked > target
     let target_lamports = 500_000_000;   // 0.5 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (excess)
@@ -562,14 +584,49 @@ async fn test_simple_directed_rebalance_no_action_needed() {
     // Add validator to the stake pool first
     add_validator_to_pool(&fixture, vote_pubkey).await;
     
+    // Fund the stake pool with sufficient lamports for rebalance operations
+    let stake_pool: jito_steward::stake_pool_utils::StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    let mut stake_pool_spl = stake_pool.as_ref().clone();
+    
+    // Add substantial funding to the stake pool (100 SOL)
+    let funding_amount = 100_000_000_000; // 100 SOL
+    stake_pool_spl.pool_token_supply += funding_amount;
+    stake_pool_spl.total_lamports += funding_amount;
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.stake_pool,
+        &tests::stake_pool_utils::serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<jito_steward::stake_pool_utils::StakePool>()).into(),
+    );
+    
+    // Fund the reserve stake account with actual lamports
+    let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
+    let mut updated_reserve = reserve_account;
+    updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.stake_pool_meta.reserve,
+        &updated_reserve.into(),
+    );
+    
+    // Set steward state to RebalanceDirected state
+    let mut steward_state_account: jito_steward::StewardStateAccount = 
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+    
     // Set up directed stake meta with target = staked (no action needed)
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (at target)
-    let directed_stake_meta = create_simple_directed_stake_meta(
-        vote_pubkey,
-        target_lamports,
-        staked_lamports,
-    );
+    
+    // Populate the account data manually (after initialization sets discriminator)
+    populate_directed_stake_meta_after_init(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
     
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
@@ -639,12 +696,15 @@ async fn test_directed_rebalance_wrong_state() {
     // Add validator to the stake pool first
     add_validator_to_pool(&fixture, vote_pubkey).await;
     
-    // Set up directed stake meta
-    let directed_stake_meta = create_simple_directed_stake_meta(
-        vote_pubkey,
-        1_000_000_000,
-        500_000_000,
-    );
+    // Set up directed stake meta with target > staked
+    let target_lamports = 1_000_000_000; // 1 SOL target
+    let staked_lamports = 500_000_000;   // 0.5 SOL currently staked
+    
+    // Populate the account data manually (after initialization sets discriminator)
+    populate_directed_stake_meta_after_init(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
+    
+    // NOTE: We intentionally do NOT set the steward state to RebalanceDirected
+    // This should cause the transaction to fail with StateMachineInvalidState
     
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {

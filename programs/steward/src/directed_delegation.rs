@@ -119,6 +119,10 @@ pub fn increase_stake_calculation(
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
     }
 
+    if total_delta_lamports == 0 {
+        return Ok(RebalanceType::None);
+    }
+
     let delta_proportion_bps: u128 =
         (delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
 
