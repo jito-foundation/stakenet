@@ -6,6 +6,7 @@ use solana_sdk::pubkey::Pubkey;
 
 #[test]
 fn test_get_target_index() {
+    let epoch = 1;
     let mut meta = DirectedStakeMeta {
         total_stake_targets: 0,
         padding0: [0; 64],
@@ -73,9 +74,9 @@ fn test_get_target_index() {
     assert_eq!(meta.get_total_staked_lamports(&validator3), Some(0));
 
     // Test adding to the total staked lamports
-    meta.add_to_total_staked_lamports(&validator1, 100);
-    meta.add_to_total_staked_lamports(&validator2, 200);
-    meta.add_to_total_staked_lamports(&validator3, 300);
+    meta.add_to_total_staked_lamports(&validator1, 100, epoch);
+    meta.add_to_total_staked_lamports(&validator2, 200, epoch);
+    meta.add_to_total_staked_lamports(&validator3, 300, epoch);
 
     // Test getting the total staked lamports
     assert_eq!(meta.get_total_staked_lamports(&validator1), Some(100));
@@ -83,12 +84,15 @@ fn test_get_target_index() {
     assert_eq!(meta.get_total_staked_lamports(&validator3), Some(300));
 
     // Test subtracting from the total staked lamports
-    meta.subtract_from_total_staked_lamports(&validator1, 50);
-    meta.subtract_from_total_staked_lamports(&validator2, 100);
-    meta.subtract_from_total_staked_lamports(&validator3, 150);
+    meta.subtract_from_total_staked_lamports(&validator1, 50, epoch);
+    meta.subtract_from_total_staked_lamports(&validator2, 100, epoch);
+    meta.subtract_from_total_staked_lamports(&validator3, 150, epoch);
 
     // Test getting the total staked lamports
     assert_eq!(meta.get_total_staked_lamports(&validator1), Some(50));
     assert_eq!(meta.get_total_staked_lamports(&validator2), Some(100));
     assert_eq!(meta.get_total_staked_lamports(&validator3), Some(150));
+
+    // Test all targets rebalanced for epoch
+    assert!(meta.all_targets_rebalanced_for_epoch(epoch));
 }

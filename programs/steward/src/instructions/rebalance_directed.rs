@@ -25,9 +25,8 @@ use crate::{
     stake_pool_utils::deserialize_stake_pool,
     state::directed_stake::DirectedStakeMeta,
     utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
-    Config, StewardStateAccount, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED,
 };
-
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
 pub struct RebalanceDirected<'info> {
@@ -139,7 +138,7 @@ pub struct RebalanceDirected<'info> {
 }
 
 pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> Result<()> {
-    let directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
+    let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
@@ -262,6 +261,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                     &[ctx.bumps.state_account],
                 ]],
             )?;
+            directed_stake_meta.subtract_from_total_staked_lamports(&ctx.accounts.vote_account.key(), decrease_components.total_unstake_lamports, clock.epoch);
         }
         RebalanceType::Increase(lamports) => {
             invoke_signed(
@@ -300,12 +300,17 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                     &[ctx.bumps.state_account],
                 ]],
             )?;
+            directed_stake_meta.add_to_total_staked_lamports(&ctx.accounts.vote_account.key(), lamports, clock.epoch);
         }
         RebalanceType::None => {}
     }
 
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+        if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+            state_account.state.set_flag(REBALANCE_DIRECTED);
+        }
 
         emit!(rebalance_to_event(
             ctx.accounts.vote_account.key(),

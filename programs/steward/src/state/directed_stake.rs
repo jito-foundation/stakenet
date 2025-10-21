@@ -53,17 +53,31 @@ impl DirectedStakeMeta {
     }
 
     /// Add to the total staked lamports for a particular validator
-    pub fn add_to_total_staked_lamports(&mut self, vote_pubkey: &Pubkey, lamports: u64) {
+    pub fn add_to_total_staked_lamports(&mut self, vote_pubkey: &Pubkey, lamports: u64, epoch: u64) {
         if let Some(index) = self.get_target_index(vote_pubkey) {
             self.targets[index].total_staked_lamports += lamports;
+            self.targets[index].staked_last_updated_epoch = epoch;
         }
     }
 
     /// Subtract from the total staked lamports for a particular validator
-    pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey: &Pubkey, lamports: u64) {
+    pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey: &Pubkey, lamports: u64, epoch: u64) {
         if let Some(index) = self.get_target_index(vote_pubkey) {
             self.targets[index].total_staked_lamports -= lamports;
+            self.targets[index].staked_last_updated_epoch = epoch;
         }
+    }
+
+    pub fn all_targets_rebalanced_for_epoch(&self, epoch: u64) -> bool {
+        for target in self.targets.iter() {
+            if target.staked_last_updated_epoch == 0 {
+                continue;
+            }
+            if target.staked_last_updated_epoch != epoch {
+                return false;
+            }
+        }
+        true
     }
 }
 
