@@ -756,7 +756,7 @@ async fn test_directed_rebalance_wrong_state() {
     );
 
     // The transaction should fail with a state error
-    fixture.submit_transaction_assert_error(tx, "StateMachineInvalidState").await;
+    fixture.submit_transaction_assert_error(tx, "InvalidState").await;
     
     println!("Expected failure (wrong state) - test passed");
 }
