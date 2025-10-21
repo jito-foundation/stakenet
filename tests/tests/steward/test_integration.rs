@@ -746,6 +746,7 @@ async fn test_idle() {
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.instant_unstake_epoch_progress = 0.9;
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
