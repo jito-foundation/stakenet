@@ -359,9 +359,8 @@ pub mod steward {
         ctx: Context<CopyDirectedStakeTargets>,
         vote_pubkey: Pubkey,
         total_target_lamports: u64,
-        override_entry: bool,
     ) -> Result<()> {
-        instructions::copy_directed_stake_targets::handler(ctx, vote_pubkey, total_target_lamports, override_entry)
+        instructions::copy_directed_stake_targets::handler(ctx, vote_pubkey, total_target_lamports)
     }
 
     /// Initialize DirectedStakeWhitelist account

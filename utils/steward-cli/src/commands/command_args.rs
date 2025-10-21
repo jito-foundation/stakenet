@@ -101,6 +101,14 @@ pub struct ConfigParameters {
     /// Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool
     #[arg(long, env)]
     pub minimum_voting_epochs: Option<u64>,
+
+    /// Minimum epoch progress for computing directed stake meta
+    #[arg(long, env)]
+    pub min_epoch_progress_for_compute_directed_stake_meta: Option<f64>,
+
+    /// Maximum epoch progress for directed rebalance
+    #[arg(long, env)]
+    pub max_epoch_progress_for_directed_rebalance: Option<f64>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -125,6 +133,8 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             num_epochs_between_scoring: config.num_epochs_between_scoring,
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
+            min_epoch_progress_for_compute_directed_stake_meta: config.min_epoch_progress_for_compute_directed_stake_meta,
+            max_epoch_progress_for_directed_rebalance: config.max_epoch_progress_for_directed_rebalance,
         }
     }
 }

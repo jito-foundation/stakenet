@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
-use crate::{errors::StewardError, Config};
+use crate::{errors::StewardError, Config, StewardStateAccount, maybe_transition};
 use std::mem::size_of;
 
 #[derive(Accounts)]
@@ -15,6 +15,8 @@ pub struct CopyDirectedStakeTargets<'info> {
         bump
     )]
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
+
+    pub clock: Sysvar<'info, Clock>,
 
     #[account(
         mut,
@@ -31,7 +33,6 @@ pub fn handler(
     ctx: Context<CopyDirectedStakeTargets>,
     vote_pubkey: Pubkey,
     target_lamports: u64,
-    override_entry: bool,
 ) -> Result<()> {
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let config = ctx.accounts.config.load()?;
@@ -40,27 +41,26 @@ pub fn handler(
         return Err(error!(StewardError::Unauthorized));
     }
 
-    if stake_meta.uploaded_stake_targets >= stake_meta.total_stake_targets && !override_entry {
-        return Err(error!(StewardError::InvalidParameterValue));
+    let maybe_target_index = stake_meta.get_target_index(&vote_pubkey);
+    if maybe_target_index.is_none() {
+        let new_target = DirectedStakeTarget {
+            vote_pubkey,
+            total_target_lamports: target_lamports,
+            total_staked_lamports: 0,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 64],
+        };
+        let target_index = stake_meta.total_stake_targets as usize;
+        stake_meta.targets[target_index] = new_target;
+        stake_meta.total_stake_targets += 1;
     }
 
-    if stake_meta.get_target_index(&vote_pubkey).is_some() {
-        return Err(error!(StewardError::InvalidParameterValue));
+    if let Some(target_index) = maybe_target_index {
+        let clock = Clock::get()?;
+        stake_meta.targets[target_index].total_target_lamports = target_lamports;
+        stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
     }
 
-    let target_index = stake_meta.uploaded_stake_targets as usize;
-
-    let new_target = DirectedStakeTarget {
-        vote_pubkey,
-        total_target_lamports: target_lamports,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    stake_meta.targets[target_index] = new_target;
-
-    if !override_entry {
-        stake_meta.uploaded_stake_targets += 1;
-    }
     Ok(())
 }

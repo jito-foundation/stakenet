@@ -492,6 +492,8 @@ async fn test_compute_instant_unstake() {
                 num_epochs_between_scoring: Some(10),
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+                max_epoch_progress_for_directed_rebalance: Some(0.1),
             }),
             None,
         )
@@ -776,7 +778,10 @@ async fn test_idle() {
         fixture.get_latest_blockhash().await,
     );
 
+    println!("Submitting Idle tx: {:?}", tx);
     fixture.submit_transaction_assert_success(tx).await;
+
+    println!("steward_state_account.state.state_tag: {}", steward_state_account.state.state_tag);
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;

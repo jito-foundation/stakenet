@@ -37,6 +37,8 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
+    pub min_epoch_progress_for_compute_directed_stake_meta: Option<f64>,
+    pub max_epoch_progress_for_directed_rebalance: Option<f64>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -271,6 +273,8 @@ impl Parameters {
             num_epochs_between_scoring,
             minimum_stake_lamports,
             minimum_voting_epochs,
+            min_epoch_progress_for_compute_directed_stake_meta,
+            max_epoch_progress_for_directed_rebalance,
         } = *args;
 
         let mut new_parameters = self;
@@ -350,6 +354,14 @@ impl Parameters {
 
         if let Some(minimum_voting_epochs) = minimum_voting_epochs {
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
+        }
+
+        if let Some(min_epoch_progress_for_compute_directed_stake_meta) = min_epoch_progress_for_compute_directed_stake_meta {
+            new_parameters.min_epoch_progress_for_compute_directed_stake_meta = min_epoch_progress_for_compute_directed_stake_meta;
+        }
+
+        if let Some(max_epoch_progress_for_directed_rebalance) = max_epoch_progress_for_directed_rebalance {
+            new_parameters.max_epoch_progress_for_directed_rebalance = max_epoch_progress_for_directed_rebalance;
         }
 
         // Validation will throw an error if any of the parameters are invalid

@@ -43,14 +43,14 @@ fn create_mock_directed_stake_meta(
     targets: Vec<(Pubkey, u64, u64)>, // (vote_pubkey, target_lamports, staked_lamports)
 ) -> DirectedStakeMeta {
     let mut meta = DirectedStakeMeta {
-        epoch: 0,
         total_stake_targets: 0,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
+        padding0: [0; 64],
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),
             total_target_lamports: 0,
             total_staked_lamports: 0,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
             _padding0: [0; 64],
         }; 2048],
     };
@@ -61,6 +61,8 @@ fn create_mock_directed_stake_meta(
                 vote_pubkey: *vote_pubkey,
                 total_target_lamports: *target_lamports,
                 total_staked_lamports: *staked_lamports,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
                 _padding0: [0; 64],
             };
         }

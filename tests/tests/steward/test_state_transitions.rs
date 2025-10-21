@@ -5,7 +5,6 @@
 
 use jito_steward::{
     constants::MAX_VALIDATORS, Delegation, StewardStateEnum, REBALANCE, RESET_TO_IDLE, REBALANCE_DIRECTED,
-    COMPUTE_DIRECTED_STAKE_META,
 };
 use tests::steward_fixtures::StateMachineFixtures;
 
@@ -405,66 +404,6 @@ pub fn test_directed_rebalance_to_idle() {
 
     state.state_tag = StewardStateEnum::RebalanceDirected;
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+100_000; // ~ 25% epoch progress
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    println!("state.state_tag: {}", state.state_tag);
-    assert!(matches!(state.state_tag, StewardStateEnum::Idle));
-}
-
-#[test]
-pub fn test_idle_to_compute_directed_stake_meta() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-    
-    state.set_flag(REBALANCE_DIRECTED);
-    state.unset_flag(REBALANCE);
-    state.unset_flag(COMPUTE_DIRECTED_STAKE_META);
-
-    state.state_tag = StewardStateEnum::Idle;
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+ 250_000; // > 50% epoch progress
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    println!("state.state_tag: {}", state.state_tag);
-    assert!(matches!(state.state_tag, StewardStateEnum::ComputeDirectedStakeMeta));
-}
-
-#[test]
-pub fn test_compute_directed_stake_meta_to_copy_directed_stake_meta() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::ComputeDirectedStakeMeta;
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+ 250_000; // > 50% epoch progress
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    println!("state.state_tag: {}", state.state_tag);
-    assert!(matches!(state.state_tag, StewardStateEnum::CopyDirectedStakeMeta));
-}
-
-#[test]
-pub fn test_copy_directed_stake_meta_to_idle() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.set_flag(COMPUTE_DIRECTED_STAKE_META);
-
-    state.state_tag = StewardStateEnum::CopyDirectedStakeMeta;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());

@@ -22,17 +22,9 @@ pub enum DirectedStakeRecordType {
 #[derive(BorshSerialize)]
 #[account(zero_copy)]
 pub struct DirectedStakeMeta {
-    /// Epoch for which the target calculations were made for
-    pub epoch: u64,
-    /// Total number of stake target calculations to be uploaded
-    pub total_stake_targets: u16,
-    /// Number of stake target calculations uploaded so far
-    pub uploaded_stake_targets: u16,
-    // 4 bytes required for alignment
-    // + 128 bytes reserved for future use
-    pub _padding0: [u8; 132],
-    /// Source of truth for directed stake targets for the epoch when
-    /// total_stake_targets == uploaded_stake_targets
+    // u64 for alignment, max permissioned validators is much smaller
+    pub total_stake_targets: u64,
+    pub padding0: [u8; 64],
     pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
 }
 
@@ -40,11 +32,6 @@ pub struct DirectedStakeMeta {
 impl DirectedStakeMeta {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"meta";
-
-    /// Returns true if all stake targets have been copied to on-chain accounts
-    pub fn is_copy_complete(&self) -> bool {
-        self.total_stake_targets == self.uploaded_stake_targets
-    }
 
     /// Get the index of a particular validator in the targets array
     pub fn get_target_index(&self, vote_pubkey: &Pubkey) -> Option<usize> {
@@ -89,6 +76,10 @@ pub struct DirectedStakeTarget {
     pub total_target_lamports: u64,
     /// Total directed stake already applied to this validator
     pub total_staked_lamports: u64,
+    /// Last updated epoch for target lamports
+    pub target_last_updated_epoch: u64,
+    /// Last updated epoch for staked lamports
+    pub staked_last_updated_epoch: u64,
     // Alignment compliant reserve space for future use
     pub _padding0: [u8; 64],
 }
@@ -133,9 +124,9 @@ pub struct DirectedStakeTicket {
     pub num_preferences: u16,
     /// The sum of staker preferences must be less than or equal to 10_000 bps
     pub staker_preferences: [DirectedStakePreference; MAX_PREFERENCES_PER_TICKET],
-    /// Authority that can update the ticket preferences
+    /// Authority that can update the ticket preferences, for now this is the staker itself
     pub ticket_update_authority: Pubkey,
-    /// Authority that can close the ticket and withdraw remaining lamports
+    /// Override authority that can close the ticket in the event of whitelist removal due to abuse
     pub ticket_close_authority: Pubkey,
     /// Is the ticket holder a protocol vs. an individual pubkey
     pub ticket_holder_is_protocol: U8Bool,

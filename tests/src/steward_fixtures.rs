@@ -345,6 +345,8 @@ impl TestFixture {
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+            max_epoch_progress_for_directed_rebalance: Some(0.1),
         });
 
         let update_priority_fee_parameters_args =
@@ -1108,6 +1110,33 @@ pub async fn crank_rebalance(
         );
         fixture.submit_transaction_assert_success(tx).await;
     }
+}
+
+pub async fn crank_rebalance_directed(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+}
+
+pub async fn crank_compute_directed_stake_meta(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+}
+
+pub async fn crank_copy_directed_stake_meta(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
 }
 
 pub async fn copy_vote_account(

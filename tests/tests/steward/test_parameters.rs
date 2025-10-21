@@ -213,6 +213,8 @@ async fn test_update_parameters() {
             num_epochs_between_scoring: Some(8),
             minimum_stake_lamports: Some(1),
             minimum_voting_epochs: Some(1),
+            min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+            max_epoch_progress_for_directed_rebalance: Some(0.1),
         },
         &fixture.keypair,
     )

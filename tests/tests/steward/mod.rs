@@ -1,11 +1,11 @@
 #![allow(unexpected_cfgs)]
 mod test_algorithms;
 mod test_cycle;
-mod test_directed_delegation;
-mod test_directed_rebalance;
+mod test_directed_increase_decrease;
+mod test_directed_rebalance_instructions;
 mod test_directed_stake_instructions;
-mod test_directed_stake_meta;
 mod test_directed_stake_meta_instructions;
+mod test_directed_stake_meta;
 mod test_epoch_maintenance;
 mod test_integration;
 mod test_parameters;

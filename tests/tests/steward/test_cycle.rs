@@ -77,6 +77,8 @@ async fn test_cycle() {
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+                max_epoch_progress_for_directed_rebalance: Some(0.1),
             }),
             None,
         )
@@ -273,6 +275,8 @@ async fn test_remove_validator_mid_epoch() {
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+                max_epoch_progress_for_directed_rebalance: Some(0.1),
             }),
             None,
         )
@@ -508,6 +512,8 @@ async fn test_add_validator_next_cycle() {
                 num_epochs_between_scoring: Some(1), // 1 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
+                max_epoch_progress_for_directed_rebalance: Some(0.1),
             }),
             None,
         )

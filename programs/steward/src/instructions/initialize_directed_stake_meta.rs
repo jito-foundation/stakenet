@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use borsh::{BorshSerialize, BorshDeserialize};
 use crate::state::directed_stake::DirectedStakeMeta;
-use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config};
+use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config, StewardStateAccount};
 use std::mem::size_of;
 
 #[derive(Accounts)]

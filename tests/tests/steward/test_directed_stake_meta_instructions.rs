@@ -1,415 +1,907 @@
-use jito_steward::{
-    state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
-    DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+#![allow(clippy::await_holding_refcell_ref)]
+/// Tests for directed stake tickets and directed stake metas
+/// 
+/// NOTE: This test file currently has placeholder instruction data (empty vectors) 
+/// because the directed stake instruction data structures are not exported from the Anchor program.
+/// To make these tests functional, you'll need to either:
+/// 1. Export the instruction data structures from the Anchor program
+/// 2. Use the generated IDL to construct instruction data
+/// 3. Manually construct the instruction data using Borsh serialization
+use anchor_lang::{
+    solana_program::{instruction::Instruction, pubkey::Pubkey, sysvar},
+    InstructionData, ToAccountMetas,
 };
-use solana_sdk::pubkey::Pubkey;
+use jito_steward::{
+    constants::MAX_ALLOC_BYTES,
+    instructions::AuthorityType,
+    state::directed_stake::{DirectedStakePreference, DirectedStakeRecordType},
+    DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
+};
+use solana_program_test::*;
+use solana_sdk::{
+    clock::Clock,
+    signature::Keypair,
+    signer::Signer,
+    transaction::Transaction,
+};
+use tests::steward_fixtures::{TestFixture, system_account};
 
-#[test]
-fn test_initialize_directed_stake_meta_validation() {
-    // Test the initialization logic that would be in the instruction handler
-    let epoch = 12345;
-    let total_stake_targets = 5;
+/// Helper function to create a test fixture with directed stake setup
+async fn setup_directed_stake_fixture() -> TestFixture {
+    let fixture = TestFixture::new().await;
+    
+    fixture.initialize_stake_pool().await;
+    fixture.initialize_steward(None, None).await;
+    println!("Steward initialized");
+    fixture.realloc_steward_state().await;
+    println!("Steward state reallocated");
+    println!("Fixture initialized");
+    // Set the directed stake whitelist authority to the fixture's keypair
+    set_directed_stake_whitelist_authority(&fixture).await;
+    
+    println!("Directed stake whitelist authority set");
+    // Initialize the directed stake whitelist first
+    initialize_directed_stake_whitelist(&fixture).await;
+    
+    println!("Directed stake whitelist initialized");
 
-    let meta = DirectedStakeMeta {
-        epoch,
-        total_stake_targets,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
+    //initialize_directed_stake_meta(&fixture, 10).await;
+    //println!("Directed stake meta initialized");
 
-    // Verify initial state
-    assert_eq!(meta.epoch, epoch);
-    assert_eq!(meta.total_stake_targets, total_stake_targets);
-    assert_eq!(meta.uploaded_stake_targets, 0);
-    assert!(!meta.is_copy_complete());
+    fixture
 }
 
-#[test]
-fn test_copy_directed_stake_targets_validation() {
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 3,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+/// Helper function to create and fund a staker account
+async fn create_funded_staker(fixture: &TestFixture) -> Keypair {
+    let staker = Keypair::new();
+    
+    // Add the staker account to the test context with lamports
+    let mut ctx = fixture.ctx.borrow_mut();
+    ctx.set_account(
+        &staker.pubkey(),
+        &system_account(100_000_000_000).into(), // 100 SOL
+    );
+    
+    staker
+}
+
+/// Helper function to set the directed stake whitelist authority
+async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
     };
 
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to reallocate the directed stake whitelist to its proper size
+async fn realloc_directed_stake_whitelist(fixture: &TestFixture) {
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture.load_and_deserialize(&fixture.steward_config.pubkey()).await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocations we need (similar to realloc_steward_state)
+    let mut num_reallocs = (DirectedStakeWhitelist::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_whitelist,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions in batches
+        let tx = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            fixture.ctx.borrow().last_blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+        println!("Directed stake whitelist reallocated");
+}
+
+/// Helper function to initialize directed stake whitelist
+async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeWhitelist {}.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    
+    // Reallocate the account to its proper size
+    realloc_directed_stake_whitelist(fixture).await;
+}
+
+/// Helper function to reallocate directed stake meta to proper size
+async fn realloc_directed_stake_meta(fixture: &TestFixture) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture.load_and_deserialize(&fixture.steward_config.pubkey()).await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocations we need
+    let mut num_reallocs = (DirectedStakeMeta::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_meta,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to add a staker to the directed stake whitelist
+async fn add_staker_to_whitelist(
+    fixture: &TestFixture,
+    staker: &Pubkey,
+    record_type: DirectedStakeRecordType,
+) {
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::AddToDirectedStakeWhitelist {
+            record_type: record_type.clone(),
+            record: *staker,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to add a validator to the directed stake whitelist
+async fn add_validator_to_whitelist(fixture: &TestFixture, validator: &Pubkey) {
+    add_staker_to_whitelist(fixture, validator, DirectedStakeRecordType::Validator).await;
+}
+
+/// Helper function to initialize a directed stake ticket
+async fn initialize_directed_stake_ticket(
+    fixture: &TestFixture,
+    signer: &Keypair,
+    ticket_update_authority: Pubkey,
+    ticket_close_authority: Pubkey,
+    ticket_holder_is_protocol: bool,
+) -> Pubkey {
+    let ticket_account = Pubkey::find_program_address(
+        &[DirectedStakeTicket::SEED, signer.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                ticket_account,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                signer.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeTicket {
+            ticket_update_authority,
+            ticket_close_authority,
+            ticket_holder_is_protocol,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&signer.pubkey()),
+        &[signer],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    ticket_account
+}
+
+/// Helper function to update a directed stake ticket with preferences
+async fn update_directed_stake_ticket(
+    fixture: &TestFixture,
+    ticket_account: &Pubkey,
+    signer: &Keypair,
+    preferences: Vec<DirectedStakePreference>,
+) {
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                *ticket_account,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                signer.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::UpdateDirectedStakeTicket {
+            preferences: preferences.clone(),
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&signer.pubkey()),
+        &[signer],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to initialize directed stake meta
+async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                directed_stake_meta,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {
+            total_stake_targets: 0,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    
+    // Reallocate the account to its proper size
+    realloc_directed_stake_meta(fixture).await;
+    
+    directed_stake_meta
+}
+
+#[tokio::test]
+async fn test_initialize_directed_stake_whitelist() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Verify the whitelist was created
+    let whitelist_account = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+    
+    let whitelist: DirectedStakeWhitelist = fixture
+        .load_and_deserialize(&whitelist_account)
+        .await;
+    
+    assert_eq!(whitelist.total_permissioned_user_stakers, 0);
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 0);
+    assert_eq!(whitelist.total_permissioned_validators, 0);
+}
+
+#[tokio::test]
+async fn test_add_stakers_to_whitelist() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Create test stakers
+    let user_staker = Keypair::new();
+    let protocol_staker = Keypair::new();
+    let validator = Pubkey::new_unique();
+    
+    // Add user staker
+    add_staker_to_whitelist(&fixture, &user_staker.pubkey(), DirectedStakeRecordType::User).await;
+    
+    // Add protocol staker
+    add_staker_to_whitelist(&fixture, &protocol_staker.pubkey(), DirectedStakeRecordType::Protocol).await;
+    
+    // Add validator
+    add_validator_to_whitelist(&fixture, &validator).await;
+    
+    // Verify the whitelist was updated
+    let whitelist_account = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+    
+    let whitelist: DirectedStakeWhitelist = fixture
+        .load_and_deserialize(&whitelist_account)
+        .await;
+    
+    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
+    assert_eq!(whitelist.total_permissioned_protocol_stakers, 1);
+    assert_eq!(whitelist.total_permissioned_validators, 1);
+    
+    assert!(whitelist.is_user_staker_permissioned(&user_staker.pubkey()));
+    assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker.pubkey()));
+    assert!(whitelist.is_validator_permissioned(&validator));
+}
+
+#[tokio::test]
+async fn test_initialize_directed_stake_ticket() {
+    let fixture = setup_directed_stake_fixture().await;
+    println!("Fixture initialized");
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
+    add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
+    println!("Staker added to whitelist");
+    // Initialize a directed stake ticket
+    let ticket_update_authority = Pubkey::new_unique();
+    let ticket_close_authority = Pubkey::new_unique();
+    let ticket_holder_is_protocol = false;
+    
+    let ticket_account = initialize_directed_stake_ticket(
+        &fixture,
+        &staker,
+        ticket_update_authority,
+        ticket_close_authority,
+        ticket_holder_is_protocol,
+    ).await;
+    println!("Ticket account: {}", ticket_account);
+    // Verify the ticket was created
+    let ticket: DirectedStakeTicket = fixture
+        .load_and_deserialize(&ticket_account)
+        .await;
+    
+    assert_eq!(ticket.num_preferences, 0);
+    assert_eq!(ticket.ticket_update_authority, ticket_update_authority);
+    assert_eq!(ticket.ticket_close_authority, ticket_close_authority);
+    assert_eq!(bool::from(ticket.ticket_holder_is_protocol), ticket_holder_is_protocol);
+}
+
+#[tokio::test]
+async fn test_update_directed_stake_ticket() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
+    add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
+    
+    // Initialize a directed stake ticket
+    let ticket_account = initialize_directed_stake_ticket(
+        &fixture,
+        &staker,
+        staker.pubkey(), // ticket_update_authority
+        staker.pubkey(), // ticket_close_authority
+        false, // ticket_holder_is_protocol
+    ).await;
+    
+    // Create some test validators and add them to whitelist
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    add_validator_to_whitelist(&fixture, &validator1).await;
+    add_validator_to_whitelist(&fixture, &validator2).await;
+    
+    // Create preferences
+    let preferences = vec![
+        DirectedStakePreference::new(validator1, 6000), // 60%
+        DirectedStakePreference::new(validator2, 4000), // 40%
+    ];
+    
+    // Update the ticket with preferences
+    update_directed_stake_ticket(&fixture, &ticket_account, &staker, preferences).await;
+    
+    // Verify the ticket was updated
+    let ticket: DirectedStakeTicket = fixture
+        .load_and_deserialize(&ticket_account)
+        .await;
+    
+    assert_eq!(ticket.num_preferences, 2);
+    assert_eq!(ticket.staker_preferences[0].vote_pubkey, validator1);
+    assert_eq!(ticket.staker_preferences[0].stake_share_bps, 6000);
+    assert_eq!(ticket.staker_preferences[1].vote_pubkey, validator2);
+    assert_eq!(ticket.staker_preferences[1].stake_share_bps, 4000);
+    
+    // Test that preferences are valid (total <= 10000 bps)
+    assert!(ticket.preferences_valid());
+}
+
+#[tokio::test]
+async fn test_initialize_directed_stake_meta() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Initialize directed stake meta
+    let directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    
+    // Verify the meta was created
+    let meta: DirectedStakeMeta = fixture
+        .load_and_deserialize(&directed_stake_meta)
+        .await;
+}
+
+#[tokio::test]
+async fn test_directed_stake_ticket_validation() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
+    add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
+    
+    // Initialize a directed stake ticket
+    let ticket_account = initialize_directed_stake_ticket(
+        &fixture,
+        &staker,
+        staker.pubkey(),
+        staker.pubkey(),
+        false,
+    ).await;
+    
+    // Create test validators and add them to whitelist
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    add_validator_to_whitelist(&fixture, &validator1).await;
+    add_validator_to_whitelist(&fixture, &validator2).await;
+    
+    // Test valid preferences (total = 10000 bps)
+    let valid_preferences = vec![
+        DirectedStakePreference::new(validator1, 6000),
+        DirectedStakePreference::new(validator2, 4000),
+    ];
+    
+    update_directed_stake_ticket(&fixture, &ticket_account, &staker, valid_preferences).await;
+    
+    let ticket: DirectedStakeTicket = fixture
+        .load_and_deserialize(&ticket_account)
+        .await;
+    assert!(ticket.preferences_valid());
+    
+    // Test invalid preferences (total > 10000 bps)
+    let _invalid_preferences = vec![
+        DirectedStakePreference::new(validator1, 6000),
+        DirectedStakePreference::new(validator2, 5000), // Total = 11000 bps
+    ];
+    
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                ticket_account,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                staker.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::UpdateDirectedStakeTicket {
+            preferences: _invalid_preferences.clone(),
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&staker.pubkey()),
+        &[&staker],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(tx, "InvalidParameterValue")
+        .await;
+}
+
+#[tokio::test]
+async fn test_directed_stake_ticket_unauthorized() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Try to initialize a ticket without being on the whitelist
+    let unauthorized_staker = create_funded_staker(&fixture).await;
+    
+    let ticket_account = Pubkey::find_program_address(
+        &[DirectedStakeTicket::SEED, unauthorized_staker.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                directed_stake_whitelist,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                ticket_account,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                unauthorized_staker.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeTicket {
+            ticket_update_authority: unauthorized_staker.pubkey(),
+            ticket_close_authority: unauthorized_staker.pubkey(),
+            ticket_holder_is_protocol: false,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&unauthorized_staker.pubkey()),
+        &[&unauthorized_staker],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture
+        .submit_transaction_assert_error(tx, "Unauthorized")
+        .await;
+}
+
+#[tokio::test]
+async fn test_multiple_directed_stake_tickets() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Create multiple funded stakers and add them to whitelist
+    let staker1 = create_funded_staker(&fixture).await;
+    let staker2 = create_funded_staker(&fixture).await;
+    let protocol_staker = create_funded_staker(&fixture).await;
+    
+    add_staker_to_whitelist(&fixture, &staker1.pubkey(), DirectedStakeRecordType::User).await;
+    add_staker_to_whitelist(&fixture, &staker2.pubkey(), DirectedStakeRecordType::User).await;
+    add_staker_to_whitelist(&fixture, &protocol_staker.pubkey(), DirectedStakeRecordType::Protocol).await;
+    
+    // Create test validators
     let validator1 = Pubkey::new_unique();
     let validator2 = Pubkey::new_unique();
     let validator3 = Pubkey::new_unique();
 
-    // Test copying targets one by one
-    let target1 = DirectedStakeTarget {
-        vote_pubkey: validator1,
-        total_target_lamports: 1000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    // Simulate the copy logic
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target1;
-    meta.uploaded_stake_targets += 1;
-
-    assert_eq!(meta.uploaded_stake_targets, 1);
-    assert_eq!(meta.get_target_index(&validator1), Some(0));
-    assert!(!meta.is_copy_complete());
-
-    // Copy second target
-    let target2 = DirectedStakeTarget {
-        vote_pubkey: validator2,
-        total_target_lamports: 2000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target2;
-    meta.uploaded_stake_targets += 1;
-
-    assert_eq!(meta.uploaded_stake_targets, 2);
-    assert_eq!(meta.get_target_index(&validator2), Some(1));
-    assert!(!meta.is_copy_complete());
-
-    // Copy third target
-    let target3 = DirectedStakeTarget {
-        vote_pubkey: validator3,
-        total_target_lamports: 3000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target3;
-    meta.uploaded_stake_targets += 1;
-
-    assert_eq!(meta.uploaded_stake_targets, 3);
-    assert_eq!(meta.get_target_index(&validator3), Some(2));
-    assert!(meta.is_copy_complete());
+    add_validator_to_whitelist(&fixture, &validator1).await;
+    add_validator_to_whitelist(&fixture, &validator2).await;
+    add_validator_to_whitelist(&fixture, &validator3).await;
+    
+    // Initialize tickets for all stakers
+    let ticket1 = initialize_directed_stake_ticket(
+        &fixture,
+        &staker1,
+        staker1.pubkey(),
+        staker1.pubkey(),
+        false,
+    ).await;
+    
+    let ticket2 = initialize_directed_stake_ticket(
+        &fixture,
+        &staker2,
+        staker2.pubkey(),
+        staker2.pubkey(),
+        false,
+    ).await;
+    
+    let ticket3 = initialize_directed_stake_ticket(
+        &fixture,
+        &protocol_staker,
+        protocol_staker.pubkey(),
+        protocol_staker.pubkey(),
+        true,
+    ).await;
+    
+    // Update each ticket with different preferences
+    update_directed_stake_ticket(
+        &fixture,
+        &ticket1,
+        &staker1,
+        vec![DirectedStakePreference::new(validator1, 10000)],
+    ).await;
+    
+    update_directed_stake_ticket(
+        &fixture,
+        &ticket2,
+        &staker2,
+        vec![
+            DirectedStakePreference::new(validator2, 5000),
+            DirectedStakePreference::new(validator3, 5000),
+        ],
+    ).await;
+    
+    update_directed_stake_ticket(
+        &fixture,
+        &ticket3,
+        &protocol_staker,
+        vec![
+            DirectedStakePreference::new(validator1, 3000),
+            DirectedStakePreference::new(validator2, 3000),
+            DirectedStakePreference::new(validator3, 4000),
+        ],
+    ).await;
+    
+    // Verify all tickets were created and updated correctly
+    let ticket1_data: DirectedStakeTicket = fixture.load_and_deserialize(&ticket1).await;
+    let ticket2_data: DirectedStakeTicket = fixture.load_and_deserialize(&ticket2).await;
+    let ticket3_data: DirectedStakeTicket = fixture.load_and_deserialize(&ticket3).await;
+    
+    assert_eq!(ticket1_data.num_preferences, 1);
+    assert_eq!(ticket1_data.staker_preferences[0].vote_pubkey, validator1);
+    assert_eq!(ticket1_data.staker_preferences[0].stake_share_bps, 10000);
+    
+    assert_eq!(ticket2_data.num_preferences, 2);
+    assert_eq!(ticket2_data.staker_preferences[0].vote_pubkey, validator2);
+    assert_eq!(ticket2_data.staker_preferences[0].stake_share_bps, 5000);
+    assert_eq!(ticket2_data.staker_preferences[1].vote_pubkey, validator3);
+    assert_eq!(ticket2_data.staker_preferences[1].stake_share_bps, 5000);
+    
+    assert_eq!(ticket3_data.num_preferences, 3);
+    assert!(bool::from(ticket3_data.ticket_holder_is_protocol));
+    assert!(ticket3_data.preferences_valid());
 }
 
-#[test]
-fn test_copy_directed_stake_targets_duplicate_validation() {
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 2,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    let validator = Pubkey::new_unique();
-
-    // Add first target
-    let target1 = DirectedStakeTarget {
-        vote_pubkey: validator,
-        total_target_lamports: 1000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target1;
-    meta.uploaded_stake_targets += 1;
-
-    // Test that duplicate validator is detected
-    assert!(meta.get_target_index(&validator).is_some());
-
-    // This would be prevented by the instruction logic
-    // The instruction should check if the validator already exists before adding
-}
-
-#[test]
-fn test_copy_directed_stake_targets_capacity_validation() {
-    let meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 2,
-        uploaded_stake_targets: 2, // Already at capacity
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    // Test that we can't add more targets when at capacity
-    assert!(meta.uploaded_stake_targets >= meta.total_stake_targets);
-    assert!(meta.is_copy_complete());
-}
-
-#[test]
-fn test_directed_stake_meta_instruction_flow() {
-    // Test the complete flow from initialization to completion
-    let epoch = 12345;
-    let total_stake_targets = 3;
-
-    // Step 1: Initialize meta
-    let mut meta = DirectedStakeMeta {
-        epoch,
-        total_stake_targets,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    assert_eq!(meta.epoch, epoch);
-    assert_eq!(meta.total_stake_targets, total_stake_targets);
-    assert_eq!(meta.uploaded_stake_targets, 0);
-    assert!(!meta.is_copy_complete());
-
-    // Step 2: Copy targets one by one
-    let validators = [
-        (Pubkey::new_unique(), 1000),
-        (Pubkey::new_unique(), 2000),
-        (Pubkey::new_unique(), 3000),
-    ];
-
-    for (i, (validator, target_lamports)) in validators.iter().enumerate() {
-        let target = DirectedStakeTarget {
-            vote_pubkey: *validator,
-            total_target_lamports: *target_lamports,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        };
-
-        let target_index = meta.uploaded_stake_targets as usize;
-        meta.targets[target_index] = target;
-        meta.uploaded_stake_targets += 1;
-
-        assert_eq!(meta.uploaded_stake_targets, (i + 1) as u16);
-        assert_eq!(meta.get_target_index(validator), Some(i));
-        assert_eq!(meta.targets[i].total_target_lamports, *target_lamports);
-    }
-
-    // Step 3: Verify completion
-    assert!(meta.is_copy_complete());
-    assert_eq!(meta.uploaded_stake_targets, total_stake_targets);
-}
-
-#[test]
-fn test_directed_stake_meta_error_conditions() {
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 2,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    let validator = Pubkey::new_unique();
-
-    // Test error condition: trying to add more targets than allowed
-    meta.uploaded_stake_targets = meta.total_stake_targets;
-    assert!(meta.uploaded_stake_targets >= meta.total_stake_targets);
-
-    // Test error condition: trying to add duplicate validator
-    meta.uploaded_stake_targets = 1;
-    meta.targets[0] = DirectedStakeTarget {
-        vote_pubkey: validator,
-        total_target_lamports: 1000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    // This would be caught by the instruction logic
-    assert!(meta.get_target_index(&validator).is_some());
-}
-
-#[test]
-fn test_directed_stake_meta_large_scale_operations() {
-    // Test with a larger number of targets
-    let total_stake_targets = 10;
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    let validators: Vec<Pubkey> = (0..total_stake_targets as usize)
-        .map(|_| Pubkey::new_unique())
-        .collect();
-
-    // Add all targets
-    for (i, validator) in validators.iter().enumerate() {
-        let target = DirectedStakeTarget {
-            vote_pubkey: *validator,
-            total_target_lamports: (i + 1) as u64 * 1000,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        };
-
-        let target_index = meta.uploaded_stake_targets as usize;
-        meta.targets[target_index] = target;
-        meta.uploaded_stake_targets += 1;
-
-        assert_eq!(meta.uploaded_stake_targets, (i + 1) as u16);
-        assert_eq!(meta.get_target_index(validator), Some(i));
-    }
-
-    assert!(meta.is_copy_complete());
-    assert_eq!(meta.uploaded_stake_targets, total_stake_targets);
-
-    // Verify all validators can be found
-    for (i, validator) in validators.iter().enumerate() {
-        assert_eq!(meta.get_target_index(validator), Some(i));
-    }
-}
-
-#[test]
-fn test_directed_stake_meta_whitelist_integration_validation() {
-    // Test that targets are properly validated against whitelist
-    let mut whitelist = DirectedStakeWhitelist {
-        permissioned_user_stakers: [Pubkey::default(); 2048],
-        permissioned_protocol_stakers: [Pubkey::default(); 2048],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        total_permissioned_user_stakers: 0,
-        total_permissioned_protocol_stakers: 0,
-        total_permissioned_validators: 0,
-        _padding0: [0; 250],
-    };
-
-    let whitelisted_validator = Pubkey::new_unique();
-    let non_whitelisted_validator = Pubkey::new_unique();
-
-    // Add validator to whitelist
-    whitelist.add_validator(whitelisted_validator).unwrap();
-
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 1,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    // Test adding whitelisted validator (should succeed)
-    let target = DirectedStakeTarget {
-        vote_pubkey: whitelisted_validator,
-        total_target_lamports: 1000,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target;
-    meta.uploaded_stake_targets += 1;
-
-    assert!(whitelist.is_validator_permissioned(&whitelisted_validator));
-    assert_eq!(meta.get_target_index(&whitelisted_validator), Some(0));
-
-    // Test that non-whitelisted validator would be rejected
-    assert!(!whitelist.is_validator_permissioned(&non_whitelisted_validator));
-    assert_eq!(meta.get_target_index(&non_whitelisted_validator), None);
-}
-
-#[test]
-fn test_directed_stake_meta_edge_case_epochs() {
-    // Test with different epoch values
-    let epochs = [0, 1, 100, 1000, u64::MAX];
-
-    for epoch in epochs {
-        let meta = DirectedStakeMeta {
-            epoch,
-            total_stake_targets: 1,
-            uploaded_stake_targets: 0,
-            _padding0: [0; 132],
-            targets: [DirectedStakeTarget {
-                vote_pubkey: Pubkey::default(),
-                total_target_lamports: 0,
-                total_staked_lamports: 0,
-                _padding0: [0; 64],
-            }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-        };
-
-        assert_eq!(meta.epoch, epoch);
-    }
-}
-
-#[test]
-fn test_directed_stake_meta_target_lamport_edge_cases() {
-    let mut meta = DirectedStakeMeta {
-        epoch: 12345,
-        total_stake_targets: 3,
-        uploaded_stake_targets: 0,
-        _padding0: [0; 132],
-        targets: [DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            _padding0: [0; 64],
-        }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
-    };
-
-    let validator = Pubkey::new_unique();
-
-    // Test with zero lamports
-    let target1 = DirectedStakeTarget {
-        vote_pubkey: validator,
-        total_target_lamports: 0,
-        total_staked_lamports: 0,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target1;
-    meta.uploaded_stake_targets += 1;
-
-    assert_eq!(meta.targets[0].total_target_lamports, 0);
-    assert_eq!(meta.targets[0].total_staked_lamports, 0);
-
-    // Test with maximum lamports
+#[tokio::test]
+async fn test_directed_stake_ticket_allocation_calculation() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Create a funded test staker and add to whitelist
+    let staker = create_funded_staker(&fixture).await;
+    add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
+    
+    // Create test validators
+    let validator1 = Pubkey::new_unique();
     let validator2 = Pubkey::new_unique();
-    let target2 = DirectedStakeTarget {
-        vote_pubkey: validator2,
-        total_target_lamports: u64::MAX,
-        total_staked_lamports: u64::MAX / 2,
-        _padding0: [0; 64],
-    };
-
-    let target_index = meta.uploaded_stake_targets as usize;
-    meta.targets[target_index] = target2;
-    meta.uploaded_stake_targets += 1;
-
-    assert_eq!(meta.targets[1].total_target_lamports, u64::MAX);
-    assert_eq!(meta.targets[1].total_staked_lamports, u64::MAX / 2);
+    add_validator_to_whitelist(&fixture, &validator1).await;
+    add_validator_to_whitelist(&fixture, &validator2).await;
+    
+    // Initialize a directed stake ticket
+    let ticket_account = initialize_directed_stake_ticket(
+        &fixture,
+        &staker,
+        staker.pubkey(),
+        staker.pubkey(),
+        false,
+    ).await;
+    
+    // Create preferences with specific percentages
+    let preferences = vec![
+        DirectedStakePreference::new(validator1, 3000), // 30%
+        DirectedStakePreference::new(validator2, 7000), // 70%
+    ];
+    
+    update_directed_stake_ticket(&fixture, &ticket_account, &staker, preferences).await;
+    
+    // Test allocation calculations
+    let ticket: DirectedStakeTicket = fixture
+        .load_and_deserialize(&ticket_account)
+        .await;
+    
+    let total_lamports = 1_000_000_000; // 1 SOL
+    
+    let allocations = ticket.get_allocations(total_lamports);
+    assert_eq!(allocations.len(), 2);
+    
+    // Check that allocations match the expected percentages
+    let validator1_allocation = allocations.iter()
+        .find(|(pubkey, _)| *pubkey == validator1)
+        .map(|(_, amount)| *amount)
+        .unwrap();
+    let validator2_allocation = allocations.iter()
+        .find(|(pubkey, _)| *pubkey == validator2)
+        .map(|(_, amount)| *amount)
+        .unwrap();
+    
+    // 30% of 1 SOL = 300,000,000 lamports
+    assert_eq!(validator1_allocation, 300_000_000);
+    // 70% of 1 SOL = 700,000,000 lamports
+    assert_eq!(validator2_allocation, 700_000_000);
+    
+    // Verify total allocation equals input
+    let total_allocation: u128 = allocations.iter().map(|(_, amount)| amount).sum();
+    assert_eq!(total_allocation, total_lamports as u128);
 }
