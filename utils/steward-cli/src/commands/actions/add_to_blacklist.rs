@@ -27,21 +27,12 @@ pub async fn command_add_to_blacklist(
     program_id: Pubkey,
     cli_signer: &CliSigner,
 ) -> Result<()> {
-    let authority = cli_signer;
-    let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx
-        || args
-            .permissioned_parameters
-            .transaction_parameters
-            .print_gov_tx
-    {
-        let config_account = client
-            .get_account(&args.permissioned_parameters.steward_config)
-            .await?;
-        let config = jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
-        config.blacklist_authority
-    } else {
-        authority.pubkey()
-    };
+    // Fetch config account for blacklist authority
+    let config_account = client
+        .get_account(&args.permissioned_parameters.steward_config)
+        .await?;
+    let config = jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
+    let blacklist_authority = config.blacklist_authority;
 
     // Build list of indices, starting with those passed directly
     let mut indices = args.validator_history_indices_to_blacklist.clone();
@@ -69,7 +60,7 @@ pub async fn command_add_to_blacklist(
         program_id,
         accounts: jito_steward::accounts::AddValidatorsToBlacklist {
             config: args.permissioned_parameters.steward_config,
-            authority: authority_pubkey,
+            authority: blacklist_authority,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddValidatorsToBlacklist {
@@ -105,6 +96,15 @@ pub async fn command_add_to_blacklist(
         let proposal_pda =
             get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
 
+        // Assert vault PDA is blacklist authority
+        if vault_pda != blacklist_authority {
+            return Err(anyhow::anyhow!(
+                "Vault PDA {} does not match configured blacklist authority {}",
+                vault_pda,
+                blacklist_authority
+            ));
+        }
+
         println!("  Vault PDA: {}", vault_pda);
         println!("  Transaction PDA: {}", transaction_pda);
         println!("  Proposal PDA: {}", proposal_pda);
@@ -117,8 +117,8 @@ pub async fn command_add_to_blacklist(
             VaultTransactionCreateAccounts {
                 multisig,
                 transaction: transaction_pda,
-                creator: authority.pubkey(),
-                rent_payer: authority.pubkey(),
+                creator: cli_signer.pubkey(),
+                rent_payer: cli_signer.pubkey(),
                 system_program: system_program::id(),
             },
             args.squads_vault_index,
@@ -132,9 +132,9 @@ pub async fn command_add_to_blacklist(
         let proposal_ix = proposal_create(
             ProposalCreateAccounts {
                 multisig,
-                creator: authority.pubkey(),
+                creator: cli_signer.pubkey(),
                 proposal: proposal_pda,
-                rent_payer: authority.pubkey(),
+                rent_payer: cli_signer.pubkey(),
                 system_program: system_program::id(),
             },
             ProposalCreateArgs {
@@ -165,8 +165,8 @@ pub async fn command_add_to_blacklist(
         ) {
             let transaction = Transaction::new_signed_with_payer(
                 &configured_ixs,
-                Some(&authority.pubkey()),
-                &[&authority],
+                Some(&cli_signer.pubkey()),
+                &[&cli_signer],
                 blockhash,
             );
             let signature = client
@@ -199,8 +199,8 @@ pub async fn command_add_to_blacklist(
         ) {
             let transaction = Transaction::new_signed_with_payer(
                 &configured_ix,
-                Some(&authority.pubkey()),
-                &[&authority],
+                Some(&cli_signer.pubkey()),
+                &[&cli_signer],
                 blockhash,
             );
             let signature = client
