@@ -111,12 +111,16 @@ pub fn increase_stake_calculation(
     }
 
     let mut total_delta_lamports: u64 = 0u64;
+    let mut target_delta_lamports: u64 = 0u64;
 
     for target in directed_stake_meta.targets.iter() {
         let target_lamports = directed_stake_meta.get_target_lamports(&target.vote_pubkey).ok_or(StewardError::ValidatorIndexOutOfBounds)?;
         let staked_lamports = directed_stake_meta.get_total_staked_lamports(&target.vote_pubkey).ok_or(StewardError::ValidatorIndexOutOfBounds)?;
         let delta_lamports = target_lamports.saturating_sub(staked_lamports);
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
+        if target.vote_pubkey == vote_pubkey {
+            target_delta_lamports = delta_lamports;
+        }
     }
 
     if total_delta_lamports == 0 {
@@ -124,15 +128,17 @@ pub fn increase_stake_calculation(
     }
 
     let delta_proportion_bps: u128 =
-        (delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
+        (target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
 
     let proportional_increase_lamports: u64 =
         ((reserve_lamports as u128).saturating_mul(delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
+    let adjusted_proportional_increase_lamports = proportional_increase_lamports.min(target_delta_lamports);
+
     if current_lamports < target_lamports {
-        return Ok(RebalanceType::Increase(proportional_increase_lamports));
+        return Ok(RebalanceType::Increase(adjusted_proportional_increase_lamports));
     }
     Err(StewardError::ValidatorIndexOutOfBounds.into())
 }

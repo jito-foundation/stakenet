@@ -491,7 +491,7 @@ async fn test_simple_directed_rebalance_decrease() {
     // Fund the reserve stake account with actual lamports
     let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
     let mut updated_reserve = reserve_account;
-    updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
+    updated_reserve.lamports += funding_amount; // Add 10 SOL to the reserve
     
     fixture.ctx.borrow_mut().set_account(
         &fixture.stake_pool_meta.reserve,
@@ -574,23 +574,18 @@ async fn test_simple_directed_rebalance_decrease() {
 
 #[tokio::test]
 async fn test_simple_directed_rebalance_no_action_needed() {
-    // Test case: Validator is already at target, no rebalance needed
     let fixture = setup_directed_stake_fixture().await;
     
-    // Create a validator
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();
     
-    // Add validator to the stake pool first
     add_validator_to_pool(&fixture, vote_pubkey).await;
     
-    // Fund the stake pool with sufficient lamports for rebalance operations
     let stake_pool: jito_steward::stake_pool_utils::StakePool = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
         .await;
     let mut stake_pool_spl = stake_pool.as_ref().clone();
     
-    // Add substantial funding to the stake pool (100 SOL)
     let funding_amount = 100_000_000_000; // 100 SOL
     stake_pool_spl.pool_token_supply += funding_amount;
     stake_pool_spl.total_lamports += funding_amount;
@@ -600,7 +595,6 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         &tests::stake_pool_utils::serialized_stake_pool_account(stake_pool_spl, std::mem::size_of::<jito_steward::stake_pool_utils::StakePool>()).into(),
     );
     
-    // Fund the reserve stake account with actual lamports
     let reserve_account = fixture.get_account(&fixture.stake_pool_meta.reserve).await;
     let mut updated_reserve = reserve_account;
     updated_reserve.lamports += funding_amount; // Add 100 SOL to the reserve
@@ -610,7 +604,6 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         &updated_reserve.into(),
     );
     
-    // Set steward state to RebalanceDirected state
     let mut steward_state_account: jito_steward::StewardStateAccount = 
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
@@ -621,11 +614,9 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         &serialized_steward_state_account(steward_state_account).into(),
     );
     
-    // Set up directed stake meta with target = staked (no action needed)
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (at target)
     
-    // Populate the account data manually (after initialization sets discriminator)
     populate_directed_stake_meta_after_init(&fixture, vote_pubkey, target_lamports, staked_lamports).await;
     
     // Create the rebalance_directed instruction
