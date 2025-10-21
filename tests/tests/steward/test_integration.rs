@@ -34,6 +34,7 @@ use validator_history::{
     Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
     ValidatorHistoryEntry,
 };
+use jito_steward::state::steward_state::REBALANCE_DIRECTED;
 
 #[tokio::test]
 async fn test_compute_delegations() {
@@ -1464,6 +1465,7 @@ async fn test_rebalance_other_cases() {
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let clock: Clock = fixture.get_sysvar().await;
 
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;

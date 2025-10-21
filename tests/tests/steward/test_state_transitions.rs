@@ -169,6 +169,7 @@ pub fn test_idle_to_compute_instant_unstake() {
     let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::Idle;
+    state.set_flag(REBALANCE_DIRECTED);
     clock.slot +=
         (epoch_schedule.slots_per_epoch as f64 * parameters.instant_unstake_epoch_progress) as u64;
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -210,6 +211,7 @@ pub fn test_idle_noop() {
     // Case 1: before we've hit instant_unstake_epoch_progress
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch) + 100_000; // ~ 25% epoch progress
     state.state_tag = StewardStateEnum::Idle;
+    state.set_flag(REBALANCE_DIRECTED);
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
@@ -403,6 +405,7 @@ pub fn test_directed_rebalance_to_idle() {
     let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::RebalanceDirected;
+    state.set_flag(REBALANCE_DIRECTED);
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+100_000; // ~ 25% epoch progress
 
     let res = state.transition(clock, parameters, epoch_schedule);

@@ -405,7 +405,7 @@ impl StewardState {
                 current_slot,
                 num_epochs_between_scoring,
             )?;
-        } else if !completed_directed_rebalance && epoch_progress <= max_epoch_progress_for_directed_rebalance {
+        } else if !completed_directed_rebalance && epoch_progress >= 0.0 {
             self.state_tag = StewardStateEnum::RebalanceDirected;
         } else if !completed_loop {
             self.unset_flag(RESET_TO_IDLE);

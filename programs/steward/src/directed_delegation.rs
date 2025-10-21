@@ -40,7 +40,6 @@ pub fn decrease_stake_calculation(
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
-    // Is this reasonable with the dynamic nature of the stake meta?
     let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
     let target_lamports = directed_stake_meta
         .get_target_lamports(&vote_pubkey)
@@ -100,7 +99,6 @@ pub fn increase_stake_calculation(
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
-    // Is this reasonable with the dynamic nature of the stake whitelist?
     let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
     let target_lamports = directed_stake_meta
         .get_target_lamports(&vote_pubkey)
