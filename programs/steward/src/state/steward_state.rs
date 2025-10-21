@@ -483,16 +483,16 @@ impl StewardState {
         epoch_progress: f64,
         max_epoch_progress_for_directed_rebalance: f64,
     ) -> Result<()> {
+        let directed_rebalance_complete = self.has_flag(REBALANCE_DIRECTED);
+
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
                 current_epoch,
                 current_slot,
                 num_epochs_between_scoring,
             )?;
-        } else if epoch_progress >= max_epoch_progress_for_directed_rebalance {
-            // Note: change this. We want to use a flag as the trigger for this transition.
+        } else if directed_rebalance_complete {
             self.state_tag = StewardStateEnum::Idle;
-            self.set_flag(REBALANCE_DIRECTED);
         }
         Ok(())
     }

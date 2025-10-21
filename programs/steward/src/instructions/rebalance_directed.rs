@@ -139,6 +139,8 @@ pub struct RebalanceDirected<'info> {
 
 pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
+    let mut state_account = ctx.accounts.state_account.load_mut()?;
+
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
@@ -146,9 +148,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     let rebalance_type: RebalanceType;
     // TODO: is this needed? Do we need to get from the directed stake meta?
     let transient_seed: u64 = 0;
-
     {
-        let mut state_account = ctx.accounts.state_account.load_mut()?;
 
         // Transitions to Idle before doing rebalance if RESET_TO_IDLE is set
         if let Some(event) = maybe_transition(
@@ -226,6 +226,8 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
         };
     }
 
+    msg!("rebalance_type: {:?}", rebalance_type);
+
     match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
             invoke_signed(
@@ -261,7 +263,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                     &[ctx.bumps.state_account],
                 ]],
             )?;
+            msg!("decrease_validator_stake_with_reserve successful");
             directed_stake_meta.subtract_from_total_staked_lamports(&ctx.accounts.vote_account.key(), decrease_components.total_unstake_lamports, clock.epoch);
+            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+                state_account.state.set_flag(REBALANCE_DIRECTED);
+            }
         }
         RebalanceType::Increase(lamports) => {
             invoke_signed(
@@ -300,32 +306,27 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                     &[ctx.bumps.state_account],
                 ]],
             )?;
+            msg!("increase_validator_stake successful");
             directed_stake_meta.add_to_total_staked_lamports(&ctx.accounts.vote_account.key(), lamports, clock.epoch);
+            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+                state_account.state.set_flag(REBALANCE_DIRECTED);
+            }
         }
-        RebalanceType::None => {}
+        RebalanceType::None => {
+            msg!("RebalanceType::None");
+            directed_stake_meta.update_staked_last_updated_epoch(&ctx.accounts.vote_account.key(), clock.epoch);
+            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+                state_account.state.set_flag(REBALANCE_DIRECTED);
+            }
+        }
     }
 
     {
-        let mut state_account = ctx.accounts.state_account.load_mut()?;
-
-        if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-            state_account.state.set_flag(REBALANCE_DIRECTED);
-        }
-
         emit!(rebalance_to_event(
             ctx.accounts.vote_account.key(),
             clock.epoch as u16,
             rebalance_type
         ));
-
-        if let Some(event) = maybe_transition(
-            &mut state_account.state,
-            &clock,
-            &config.parameters,
-            &epoch_schedule,
-        )? {
-            emit!(event);
-        }
     }
 
     Ok(())

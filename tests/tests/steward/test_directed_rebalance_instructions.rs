@@ -455,9 +455,9 @@ async fn test_simple_directed_rebalance_increase() {
 
     // The transaction should succeed (or fail gracefully if not in the right state)
     fixture.submit_transaction_assert_success(tx).await;
-    
-    // If we get here, the rebalance was executed successfully
-    println!("Rebalance executed successfully");
+
+    assert!(steward_state_account.state.has_flag(REBALANCE_DIRECTED), 
+    "REBALANCE_DIRECTED flag should be set after rebalance");
 }
 
 #[tokio::test]
@@ -567,9 +567,9 @@ async fn test_simple_directed_rebalance_decrease() {
 
     // The transaction should succeed (or fail gracefully if not in the right state)
     fixture.submit_transaction_assert_success(tx).await;
-    
-    // If we get here, the rebalance was executed successfully
-    println!("Decrease rebalance executed successfully");
+
+    assert!(steward_state_account.state.has_flag(REBALANCE_DIRECTED), 
+    "REBALANCE_DIRECTED flag should be set after rebalance");
 }
 
 #[tokio::test]
@@ -670,9 +670,9 @@ async fn test_simple_directed_rebalance_no_action_needed() {
 
     // The transaction should succeed (or fail gracefully if not in the right state)
     fixture.submit_transaction_assert_success(tx).await;
-    
-    // If we get here, the rebalance was executed successfully
-    println!("No action needed rebalance completed successfully");
+
+    assert!(steward_state_account.state.has_flag(REBALANCE_DIRECTED), 
+    "REBALANCE_DIRECTED flag should be set after rebalancing completed");
 }
 
 #[tokio::test]

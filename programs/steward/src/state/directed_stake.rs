@@ -68,9 +68,15 @@ impl DirectedStakeMeta {
         }
     }
 
+    pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey: &Pubkey, epoch: u64) {
+        if let Some(index) = self.get_target_index(vote_pubkey) {
+            self.targets[index].staked_last_updated_epoch = epoch;
+        }
+    }
+
     pub fn all_targets_rebalanced_for_epoch(&self, epoch: u64) -> bool {
         for target in self.targets.iter() {
-            if target.staked_last_updated_epoch == 0 {
+            if target.vote_pubkey == Pubkey::default() {
                 continue;
             }
             if target.staked_last_updated_epoch != epoch {
