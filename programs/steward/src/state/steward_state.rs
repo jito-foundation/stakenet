@@ -134,6 +134,9 @@ pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2)-8;
 #[repr(u64)]
 pub enum StewardStateEnum {
     /// Start state
+    /// Rebalance directed stake
+    RebalanceDirected,
+
     /// Every `num_cycle_epochs` epochs, scores are computed and the top `num_delegation_validators` validators are selected.
     ComputeScores,
 
@@ -150,8 +153,6 @@ pub enum StewardStateEnum {
     /// Transition back to Idle, or ComputeScores if new cycle
     Rebalance,
 
-    /// Rebalance directed stake
-    RebalanceDirected,
 }
 
 #[derive(BorshSerialize, PartialEq, Eq)]
@@ -504,7 +505,7 @@ impl StewardState {
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        self.state_tag = StewardStateEnum::ComputeScores;
+        self.state_tag = StewardStateEnum::RebalanceDirected;
         self.scores = [0; MAX_VALIDATORS];
         self.yield_scores = [0; MAX_VALIDATORS];
         self.progress = BitMask::default();

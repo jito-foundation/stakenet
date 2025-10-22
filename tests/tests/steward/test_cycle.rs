@@ -691,6 +691,16 @@ async fn test_add_validator_next_cycle() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
+    
+
+    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+
+    crank_idle(&fixture).await;
+    let state_account: StewardStateAccount =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
+    let state = state_account.state;
+    println!("Pre-compute score State: {}", state.state_tag);
+
     crank_compute_score(
         &fixture,
         &unit_test_fixtures,
@@ -717,7 +727,6 @@ async fn test_add_validator_next_cycle() {
     
     let state = state_account.state;
 
-    println!("Steward state: {}", state.state_tag);
     assert!(matches!(
         state.state_tag,
         jito_steward::StewardStateEnum::ComputeDelegations
@@ -727,7 +736,6 @@ async fn test_add_validator_next_cycle() {
 
     crank_compute_delegations(&fixture).await;
     crank_idle(&fixture).await;
-    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -735,6 +743,7 @@ async fn test_add_validator_next_cycle() {
         &[0, 1],
     )
     .await;
+    println!("Pre-rebalance state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
     crank_rebalance(
         &fixture,
         &unit_test_fixtures,
@@ -761,6 +770,9 @@ async fn test_add_validator_next_cycle() {
 
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
+    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+    crank_idle(&fixture).await;
+    println!("Pre-compute score State: {}", state.state_tag);
     // Ensure we're in the next cycle
     crank_compute_score(
         &fixture,
