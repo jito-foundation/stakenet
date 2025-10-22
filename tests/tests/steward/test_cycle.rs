@@ -6,7 +6,10 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
+use jito_steward::instructions::AuthorityType;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
+use solana_program::sysvar;
 use solana_program_test::*;
 #[allow(deprecated)]
 use solana_sdk::{
@@ -15,27 +18,33 @@ use solana_sdk::{
 };
 use tests::steward_fixtures::{
     auto_add_validator, crank_compute_delegations, crank_compute_instant_unstake,
-    crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance, crank_rebalance_directed, crank_stake_pool,
-    crank_validator_history_accounts, instant_remove_validator, ExtraValidatorAccounts,
-    FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
+    crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance,
+    crank_rebalance_directed, crank_stake_pool, crank_validator_history_accounts,
+    instant_remove_validator, ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures,
+    TestFixture, ValidatorEntry,
 };
-use jito_steward::instructions::AuthorityType;
 use validator_history::ValidatorHistory;
-use jito_steward::state::directed_stake::DirectedStakeMeta;
-use solana_program::sysvar;
 
 async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     let directed_stake_meta = Pubkey::find_program_address(
-        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
         &jito_steward::id(),
-    ).0;
+    )
+    .0;
 
     // Get the validator list address from the config
-    let config: jito_steward::Config = fixture.load_and_deserialize(&fixture.steward_config.pubkey()).await;
+    let config: jito_steward::Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
     let validator_list = config.validator_list;
 
     // Calculate how many reallocations we need
-    let mut num_reallocs = (DirectedStakeMeta::SIZE - jito_steward::constants::MAX_ALLOC_BYTES) / jito_steward::constants::MAX_ALLOC_BYTES + 1;
+    let mut num_reallocs = (DirectedStakeMeta::SIZE - jito_steward::constants::MAX_ALLOC_BYTES)
+        / jito_steward::constants::MAX_ALLOC_BYTES
+        + 1;
     let mut ixs = vec![];
 
     while num_reallocs > 0 {
@@ -82,14 +91,15 @@ async fn realloc_directed_stake_meta(fixture: &TestFixture) {
 }
 
 /// Helper function to initialize directed stake meta
-async fn initialize_directed_stake_meta(
-    fixture: &TestFixture,
-    total_stake_targets: u16,
-) -> Pubkey {
+async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targets: u16) -> Pubkey {
     let directed_stake_meta = Pubkey::find_program_address(
-        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
         &jito_steward::id(),
-    ).0;
+    )
+    .0;
 
     let set_auth_ix = Instruction {
         program_id: jito_steward::id(),
@@ -112,10 +122,7 @@ async fn initialize_directed_stake_meta(
                 fixture.steward_config.pubkey(),
                 false,
             ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(
-                directed_stake_meta,
-                false,
-            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(directed_stake_meta, false),
             anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
                 sysvar::clock::id(),
                 false,
@@ -131,7 +138,8 @@ async fn initialize_directed_stake_meta(
         ],
         data: jito_steward::instruction::InitializeDirectedStakeMeta {
             total_stake_targets,
-        }.data(),
+        }
+        .data(),
     };
 
     let tx = Transaction::new_signed_with_payer(
@@ -142,7 +150,7 @@ async fn initialize_directed_stake_meta(
     );
 
     fixture.submit_transaction_assert_success(tx).await;
-    
+
     directed_stake_meta
 }
 
@@ -235,10 +243,31 @@ async fn test_cycle() {
     }
 
     crank_epoch_maintenance(&fixture, None).await;
+
     // Auto add validator - adds to validator list
     for extra_accounts in extra_validator_accounts.iter() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
+
+    {
+        // Assert size of validators list
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        assert_eq!(validator_list.validators.len(), 3);
+        println!("Validator List Length: {}", validator_list.validators.len());
+    }
+
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
 
     crank_compute_score(
         &fixture,
@@ -253,16 +282,33 @@ async fn test_cycle() {
     let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
 
-
     crank_idle(&fixture).await;
 
-    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+    println!(
+        "Steward state: {}",
+        fixture
+            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
+            .await
+            .state
+            .state_tag
+    );
 
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
 
-    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
-
-
-    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+    println!(
+        "Steward state: {}",
+        fixture
+            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
+            .await
+            .state
+            .state_tag
+    );
 
     crank_compute_instant_unstake(
         &fixture,
@@ -272,7 +318,14 @@ async fn test_cycle() {
     )
     .await;
 
-    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+    println!(
+        "Steward state: {}",
+        fixture
+            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
+            .await
+            .state
+            .state_tag
+    );
 
     crank_rebalance(
         &fixture,
@@ -466,7 +519,13 @@ async fn test_remove_validator_mid_epoch() {
 
     crank_idle(&fixture).await;
 
-    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -691,9 +750,13 @@ async fn test_add_validator_next_cycle() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
-    
-
-    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
 
     crank_idle(&fixture).await;
     let state_account: StewardStateAccount =
@@ -724,7 +787,7 @@ async fn test_add_validator_next_cycle() {
     // Ensure that num_pool_validators isn't updated but validators_added is
     let mut state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
-    
+
     let state = state_account.state;
 
     assert!(matches!(
@@ -743,7 +806,14 @@ async fn test_add_validator_next_cycle() {
         &[0, 1],
     )
     .await;
-    println!("Pre-rebalance state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+    println!(
+        "Pre-rebalance state: {}",
+        fixture
+            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
+            .await
+            .state
+            .state_tag
+    );
     crank_rebalance(
         &fixture,
         &unit_test_fixtures,
@@ -770,7 +840,13 @@ async fn test_add_validator_next_cycle() {
 
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
     crank_idle(&fixture).await;
     println!("Pre-compute score State: {}", state.state_tag);
     // Ensure we're in the next cycle

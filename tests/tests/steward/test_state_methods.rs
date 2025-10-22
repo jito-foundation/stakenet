@@ -40,6 +40,7 @@ fn test_compute_scores() {
     let config = &mut fixtures.config;
     let parameters = config.parameters;
     let state = &mut fixtures.state;
+    state.state_tag = StewardStateEnum::ComputeScores;
 
     // Test normal run
     let cloned_validators = Box::new(validators.clone());

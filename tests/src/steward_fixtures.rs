@@ -14,6 +14,7 @@ use anchor_lang::{
     },
     AccountSerialize, AnchorSerialize, Discriminator, InstructionData, ToAccountMetas,
 };
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
@@ -22,7 +23,6 @@ use jito_steward::{
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
     StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
-use jito_steward::state::directed_stake::DirectedStakeMeta;
 use solana_program_test::*;
 #[allow(deprecated)]
 use solana_sdk::{
@@ -661,6 +661,22 @@ impl TestFixture {
             .expect("Failed warping to future epoch");
     }
 
+    pub async fn advance_num_slots(&self, additional_slots: u64) {
+        let clock: Clock = {
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
+            banks_client
+                .get_sysvar()
+                .await
+                .expect("Failed getting clock")
+        };
+        let target_slot = clock.slot + additional_slots;
+
+        self.ctx
+            .borrow_mut()
+            .warp_to_slot(target_slot)
+            .expect("Failed warping to future slot");
+    }
+
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
         let process_transaction_result = {
             let banks_client = self.ctx.borrow_mut().banks_client.clone();
@@ -765,9 +781,13 @@ pub async fn crank_rebalance_directed(
                 config: fixture.steward_config.pubkey(),
                 state_account: fixture.steward_state,
                 directed_stake_meta: Pubkey::find_program_address(
-                    &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+                    &[
+                        DirectedStakeMeta::SEED,
+                        fixture.steward_config.pubkey().as_ref(),
+                    ],
                     &jito_steward::id(),
-                ).0,
+                )
+                .0,
                 stake_pool: fixture.stake_pool_meta.stake_pool,
                 stake_pool_program: spl_stake_pool::id(),
                 withdraw_authority: extra_accounts.withdraw_authority,
@@ -779,7 +799,8 @@ pub async fn crank_rebalance_directed(
                     &extra_accounts.vote_account,
                     &fixture.stake_pool_meta.stake_pool,
                     0u64,
-                ).0,
+                )
+                .0,
                 vote_account: extra_accounts.vote_account,
                 clock: solana_sdk::sysvar::clock::id(),
                 rent: solana_sdk::sysvar::rent::id(),

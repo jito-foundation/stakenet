@@ -128,7 +128,7 @@ pub struct StewardState {
     // TODO ADD MORE PADDING
 }
 
-pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2)-8;
+pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2) - 8;
 
 #[derive(Clone, Copy, PartialEq)]
 #[repr(u64)]
@@ -152,7 +152,6 @@ pub enum StewardStateEnum {
     /// Stake rebalances computed and executed, adjusting delegations if instant_unstake validators are hit
     /// Transition back to Idle, or ComputeScores if new cycle
     Rebalance,
-
 }
 
 #[derive(BorshSerialize, PartialEq, Eq)]
@@ -261,14 +260,14 @@ impl IdlBuild for StewardStateEnum {
 
 // BITS 0-7 COMPLETED PROGRESS FLAGS
 // Used to mark the completion of a particular state
-pub const COMPUTE_SCORE: u32 = 1 << 0;
+pub const COMPUTE_SCORE: u32 = 1 << 7;
 pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
 pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
 pub const PRE_LOOP_IDLE: u32 = 1 << 3;
 pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
 pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
-pub const REBALANCE_DIRECTED: u32 = 1 << 7;
+pub const REBALANCE_DIRECTED: u32 = 1 << 0;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
@@ -399,6 +398,7 @@ impl StewardState {
     ) -> Result<()> {
         let completed_loop = self.has_flag(REBALANCE);
         let completed_directed_rebalance = self.has_flag(REBALANCE_DIRECTED);
+        let completed_compute_delegations = self.has_flag(COMPUTE_DELEGATIONS);
 
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
@@ -408,6 +408,8 @@ impl StewardState {
             )?;
         } else if !completed_directed_rebalance {
             self.state_tag = StewardStateEnum::RebalanceDirected;
+        } else if completed_directed_rebalance && !completed_compute_delegations {
+            self.state_tag = StewardStateEnum::ComputeScores;
         } else if !completed_loop {
             self.unset_flag(RESET_TO_IDLE);
 
@@ -493,13 +495,14 @@ impl StewardState {
                 num_epochs_between_scoring,
             )?;
         } else if directed_rebalance_complete {
+            self.progress = BitMask::default();
             self.state_tag = StewardStateEnum::Idle;
         }
         Ok(())
     }
 
     /// Update internal state when transitioning to a new cycle, and ComputeScores restarts
-    fn reset_state_for_new_cycle(
+    pub fn reset_state_for_new_cycle(
         &mut self,
         current_epoch: u64,
         current_slot: u64,
@@ -681,7 +684,7 @@ impl StewardState {
                 - it's been more than `compute_score_slot_range` slots since compute scores started
                 - computation started last epoch and it's a new epoch
             */
-            let slots_since_scoring_started = current_slot
+            /*let slots_since_scoring_started = current_slot
                 .checked_sub(self.start_computing_scores_slot)
                 .ok_or(StewardError::ArithmeticError)?;
             if self.progress.is_empty()
@@ -701,10 +704,11 @@ impl StewardState {
                 );
                 self.num_pool_validators = num_pool_validators;
                 self.validators_added = 0;
-            }
+            }*/
 
             // Skip scoring if already processed
             if self.progress.get(index)? {
+                msg!("Validator at index {} already scored", index);
                 return Ok(None);
             }
 
@@ -784,6 +788,7 @@ impl StewardState {
             return Ok(Some(score));
         }
 
+        msg!("Steward state invalid for compute_score");
         Err(StewardError::InvalidState.into())
     }
 

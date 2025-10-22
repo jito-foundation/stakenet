@@ -24,7 +24,10 @@ use crate::{
     maybe_transition,
     stake_pool_utils::deserialize_stake_pool,
     state::directed_stake::DirectedStakeMeta,
-    utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
+    utils::{
+        get_stake_pool_address, get_validator_list_length, get_validator_stake_info_at_index,
+        state_checks,
+    },
     Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED,
 };
 #[derive(Accounts)]
@@ -140,7 +143,7 @@ pub struct RebalanceDirected<'info> {
 pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
-
+    let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
@@ -149,7 +152,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     // TODO: is this needed? Do we need to get from the directed stake meta?
     let transient_seed: u64 = 0;
     {
-
         // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED
         // This will cause the state to transition to Idle
         if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
@@ -174,6 +176,25 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             return Ok(());
         }
 
+        let current_epoch = clock.epoch;
+        if current_epoch > state_account.state.current_epoch {
+            state_account.state.reset_state_for_new_cycle(
+                clock.epoch,
+                clock.slot,
+                config.parameters.num_epochs_between_scoring,
+            )?;
+
+            let num_pool_validators = get_validator_list_length(validator_list)?;
+            require!(
+                num_pool_validators as usize
+                    == state_account.state.num_pool_validators as usize
+                        + state_account.state.validators_added as usize,
+                StewardError::ListStateMismatch
+            );
+            state_account.state.num_pool_validators = num_pool_validators as u64;
+            state_account.state.validators_added = 0;
+        }
+
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
         let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
         let stake_account_active_lamports = match stake_state {
@@ -190,8 +211,10 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
             // Use directed delegation logic instead of regular rebalance
-            use crate::directed_delegation::{decrease_stake_calculation, increase_stake_calculation};
-            
+            use crate::directed_delegation::{
+                decrease_stake_calculation, increase_stake_calculation,
+            };
+
             let unstake_state = UnstakeState {
                 stake_deposit_unstake_total: 0,
                 instant_unstake_total: 0,
@@ -269,7 +292,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                 ]],
             )?;
             msg!("decrease_validator_stake_with_reserve successful");
-            directed_stake_meta.subtract_from_total_staked_lamports(&ctx.accounts.vote_account.key(), decrease_components.total_unstake_lamports, clock.epoch);
+            directed_stake_meta.subtract_from_total_staked_lamports(
+                &ctx.accounts.vote_account.key(),
+                decrease_components.total_unstake_lamports,
+                clock.epoch,
+            );
             if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
                 state_account.state.set_flag(REBALANCE_DIRECTED);
             }
@@ -312,14 +339,19 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                 ]],
             )?;
             msg!("increase_validator_stake successful");
-            directed_stake_meta.add_to_total_staked_lamports(&ctx.accounts.vote_account.key(), lamports, clock.epoch);
+            directed_stake_meta.add_to_total_staked_lamports(
+                &ctx.accounts.vote_account.key(),
+                lamports,
+                clock.epoch,
+            );
             if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
                 state_account.state.set_flag(REBALANCE_DIRECTED);
             }
         }
         RebalanceType::None => {
             msg!("RebalanceType::None");
-            directed_stake_meta.update_staked_last_updated_epoch(&ctx.accounts.vote_account.key(), clock.epoch);
+            directed_stake_meta
+                .update_staked_last_updated_epoch(&ctx.accounts.vote_account.key(), clock.epoch);
             if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
                 state_account.state.set_flag(REBALANCE_DIRECTED);
             }

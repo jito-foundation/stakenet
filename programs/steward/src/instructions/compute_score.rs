@@ -61,6 +61,10 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ) {
+        msg!(
+            "Attempting state transition to ComputeScores from {}",
+            state_account.state.state_tag
+        );
         if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
@@ -90,8 +94,22 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         &config,
         num_pool_validators as u64,
     )? {
+        msg!(
+            "Scored validator at index {} / {}",
+            validator_list_index,
+            num_pool_validators
+        );
         emit!(score);
     }
+
+    // msg! the state progress
+    msg!(
+        "Scoring progress is complete: {:?}",
+        state_account
+            .state
+            .progress
+            .is_complete(num_pool_validators as u64)
+    );
 
     if let Some(event) = maybe_transition(
         &mut state_account.state,
