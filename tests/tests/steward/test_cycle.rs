@@ -15,11 +15,136 @@ use solana_sdk::{
 };
 use tests::steward_fixtures::{
     auto_add_validator, crank_compute_delegations, crank_compute_instant_unstake,
-    crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance, crank_stake_pool,
+    crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance, crank_rebalance_directed, crank_stake_pool,
     crank_validator_history_accounts, instant_remove_validator, ExtraValidatorAccounts,
     FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
 };
+use jito_steward::instructions::AuthorityType;
 use validator_history::ValidatorHistory;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
+use solana_program::sysvar;
+
+async fn realloc_directed_stake_meta(fixture: &TestFixture) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture.load_and_deserialize(&fixture.steward_config.pubkey()).await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocations we need
+    let mut num_reallocs = (DirectedStakeMeta::SIZE - jito_steward::constants::MAX_ALLOC_BYTES) / jito_steward::constants::MAX_ALLOC_BYTES + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_meta,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to initialize directed stake meta
+async fn initialize_directed_stake_meta(
+    fixture: &TestFixture,
+    total_stake_targets: u16,
+) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+        &jito_steward::id(),
+    ).0;
+
+    let set_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                directed_stake_meta,
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {
+            total_stake_targets,
+        }.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_auth_ix, ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    
+    directed_stake_meta
+}
 
 #[tokio::test]
 async fn test_cycle() {
@@ -86,6 +211,8 @@ async fn test_cycle() {
     fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -126,11 +253,17 @@ async fn test_cycle() {
     let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
 
+
     crank_idle(&fixture).await;
 
     println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
 
-    
+
+    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
+
+
+    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
+
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -138,6 +271,8 @@ async fn test_cycle() {
         &[0, 1, 2],
     )
     .await;
+
+    println!("Steward state: {}", fixture.load_and_deserialize::<StewardStateAccount>(&fixture.steward_state).await.state.state_tag);
 
     crank_rebalance(
         &fixture,

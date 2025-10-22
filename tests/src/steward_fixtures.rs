@@ -22,6 +22,7 @@ use jito_steward::{
     Config, Delegation, LargeBitMask, Parameters, StewardState, StewardStateAccount,
     StewardStateEnum, UpdateParametersArgs, UpdatePriorityFeeParametersArgs, STATE_PADDING_0_SIZE,
 };
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use solana_program_test::*;
 #[allow(deprecated)]
 use solana_sdk::{
@@ -747,6 +748,63 @@ pub async fn crank_stake_pool(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+pub async fn crank_rebalance_directed(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+
+    for &i in indices {
+        let extra_accounts = &extra_validator_accounts[i];
+
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::RebalanceDirected {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                directed_stake_meta: Pubkey::find_program_address(
+                    &[DirectedStakeMeta::SEED, fixture.steward_config.pubkey().as_ref()],
+                    &jito_steward::id(),
+                ).0,
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+                stake_pool_program: spl_stake_pool::id(),
+                withdraw_authority: extra_accounts.withdraw_authority,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                reserve_stake: fixture.stake_pool_meta.reserve,
+                stake_account: extra_accounts.stake_account_address,
+                transient_stake_account: find_transient_stake_program_address(
+                    &spl_stake_pool::id(),
+                    &extra_accounts.vote_account,
+                    &fixture.stake_pool_meta.stake_pool,
+                    0u64,
+                ).0,
+                vote_account: extra_accounts.vote_account,
+                clock: solana_sdk::sysvar::clock::id(),
+                rent: solana_sdk::sysvar::rent::id(),
+                stake_history: solana_sdk::sysvar::stake_history::id(),
+                stake_config: solana_sdk::stake::config::ID,
+                system_program: system_program::id(),
+                stake_program: solana_sdk::stake::program::id(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::RebalanceDirected {
+                validator_list_index: i as u64,
+            }
+            .data(),
+        };
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+}
+
 pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Option<&[usize]>) {
     let ctx = &fixture.ctx;
     // Epoch Maintenence
@@ -1110,33 +1168,6 @@ pub async fn crank_rebalance(
         );
         fixture.submit_transaction_assert_success(tx).await;
     }
-}
-
-pub async fn crank_rebalance_directed(
-    fixture: &TestFixture,
-    _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &[ExtraValidatorAccounts],
-    indices: &[usize],
-) {
-    let ctx = &fixture.ctx;
-}
-
-pub async fn crank_compute_directed_stake_meta(
-    fixture: &TestFixture,
-    _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &[ExtraValidatorAccounts],
-    indices: &[usize],
-) {
-    let ctx = &fixture.ctx;
-}
-
-pub async fn crank_copy_directed_stake_meta(
-    fixture: &TestFixture,
-    _unit_test_fixtures: &StateMachineFixtures,
-    extra_validator_accounts: &[ExtraValidatorAccounts],
-    indices: &[usize],
-) {
-    let ctx = &fixture.ctx;
 }
 
 pub async fn copy_vote_account(
