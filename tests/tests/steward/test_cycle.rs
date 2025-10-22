@@ -421,6 +421,9 @@ async fn test_remove_validator_mid_epoch() {
         .await;
     fixture.realloc_steward_state().await;
 
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
+    realloc_directed_stake_meta(&fixture).await;
+
     let mut extra_validator_accounts = vec![];
     for vote_account in unit_test_fixtures
         .validator_list
@@ -462,6 +465,8 @@ async fn test_remove_validator_mid_epoch() {
     crank_compute_delegations(&fixture).await;
 
     crank_idle(&fixture).await;
+
+    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -657,6 +662,8 @@ async fn test_add_validator_next_cycle() {
         )
         .await;
     fixture.realloc_steward_state().await;
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -720,6 +727,7 @@ async fn test_add_validator_next_cycle() {
 
     crank_compute_delegations(&fixture).await;
     crank_idle(&fixture).await;
+    crank_rebalance_directed(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0]).await;
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
