@@ -3,7 +3,7 @@ use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 /// Basic integration test
 #[allow(deprecated)]
 use anchor_lang::{
-    solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
+    solana_program::{instruction::Instruction, pubkey::Pubkey, stake, system_program, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
 use jito_steward::state::steward_state::REBALANCE_DIRECTED;
@@ -18,7 +18,7 @@ use solana_sdk::{
     signer::Signer, stake::state::StakeStateV2, transaction::Transaction,
 };
 use spl_stake_pool::{
-    minimum_delegation,
+    find_transient_stake_program_address, minimum_delegation,
     state::{AccountType, ValidatorListHeader, ValidatorStakeInfo},
 };
 use tests::{
@@ -310,6 +310,53 @@ async fn test_compute_scores() {
         .data(),
     };
 
+    let rebalance_directed_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::RebalanceDirected {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            directed_stake_meta: Pubkey::find_program_address(
+                &[
+                    jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            stake_pool_program: spl_stake_pool::id(),
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(validator_history.vote_account)
+                .await
+                .2,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            stake_account: fixture
+                .stake_accounts_for_validator(validator_history.vote_account)
+                .await
+                .0,
+            transient_stake_account: find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                &validator_history.vote_account,
+                &fixture.stake_pool_meta.stake_pool,
+                0u64,
+            )
+            .0,
+            vote_account: validator_history.vote_account,
+            clock: solana_sdk::sysvar::clock::id(),
+            rent: solana_sdk::sysvar::rent::id(),
+            stake_history: solana_sdk::sysvar::stake_history::id(),
+            stake_config: solana_sdk::stake::config::ID,
+            system_program: system_program::id(),
+            stake_program: solana_sdk::stake::program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::RebalanceDirected {
+            validator_list_index: validator_history.index as u64,
+        }
+        .data(),
+    };
+
     // Basic test - test score computation that requires most compute
     let compute_scores_ix = Instruction {
         program_id: jito_steward::id(),
@@ -330,9 +377,10 @@ async fn test_compute_scores() {
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(800_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             epoch_maintenance_ix.clone(),
+            rebalance_directed_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
