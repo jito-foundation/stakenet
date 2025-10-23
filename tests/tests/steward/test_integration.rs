@@ -6,6 +6,7 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
+use jito_steward::state::steward_state::REBALANCE_DIRECTED;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     stake_pool_utils::{StakePool, ValidatorList},
@@ -34,7 +35,6 @@ use validator_history::{
     Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
     ValidatorHistoryEntry,
 };
-use jito_steward::state::steward_state::REBALANCE_DIRECTED;
 
 #[tokio::test]
 async fn test_compute_delegations() {
@@ -783,7 +783,10 @@ async fn test_idle() {
     println!("Submitting Idle tx: {:?}", tx);
     fixture.submit_transaction_assert_success(tx).await;
 
-    println!("steward_state_account.state.state_tag: {}", steward_state_account.state.state_tag);
+    println!(
+        "steward_state_account.state.state_tag: {}",
+        steward_state_account.state.state_tag
+    );
 
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
