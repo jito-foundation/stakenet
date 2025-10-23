@@ -120,6 +120,7 @@ pub fn handler(ctx: Context<UpdatePreferredWithdrawValidator>) -> Result<()> {
     let current_preferred = stake_pool.preferred_withdraw_validator_vote_address;
 
     // Only update if the optimal validator is different from current
+    // TODO: More explicit about the option types here
     if optimal_validator != current_preferred {
         msg!(
             "Updating preferred withdraw validator from {:?} to {:?}",
