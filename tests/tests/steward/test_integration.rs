@@ -1,6 +1,137 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
 /// Basic integration test
+
+async fn realloc_directed_stake_meta(fixture: &TestFixture) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocations we need
+    let mut num_reallocs = (jito_steward::state::directed_stake::DirectedStakeMeta::SIZE
+        - jito_steward::constants::MAX_ALLOC_BYTES)
+        / jito_steward::constants::MAX_ALLOC_BYTES
+        + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_meta,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+/// Helper function to initialize directed stake meta
+async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targets: u16) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    let set_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(directed_stake_meta, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                anchor_lang::solana_program::system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {
+            total_stake_targets,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_auth_ix, ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    directed_stake_meta
+}
 #[allow(deprecated)]
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, system_program, sysvar},
@@ -182,6 +313,10 @@ async fn test_compute_scores() {
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
 
+    // Initialize directed stake meta
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
+    realloc_directed_stake_meta(&fixture).await;
+
     let epoch_credits: Vec<(u64, u64, u64)> =
         vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -192,7 +327,7 @@ async fn test_compute_scores() {
     .0;
 
     let clock: Clock = fixture.get_sysvar().await;
-    fixture.advance_num_epochs(512 - clock.epoch, 0).await;
+    fixture.advance_num_epochs(512 - clock.epoch, 250_000).await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
     fixture.ctx.borrow_mut().set_account(
         &vote_account,
@@ -310,6 +445,35 @@ async fn test_compute_scores() {
         .data(),
     };
 
+    // First add the validator to the stake pool to create the stake account
+    let (stake_account_address, _transient_stake_account_address, withdraw_authority) = fixture
+        .stake_accounts_for_validator(validator_history.vote_account)
+        .await;
+
+    let add_validator_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AutoAddValidator {
+            steward_state: fixture.steward_state,
+            validator_history_account: validator_history_account,
+            config: fixture.steward_config.pubkey(),
+            stake_pool_program: spl_stake_pool::id(),
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            withdraw_authority,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            stake_account: stake_account_address,
+            vote_account: validator_history.vote_account,
+            rent: solana_sdk::sysvar::rent::id(),
+            clock: solana_sdk::sysvar::clock::id(),
+            stake_history: solana_sdk::sysvar::stake_history::id(),
+            stake_config: solana_sdk::stake::config::ID,
+            system_program: system_program::id(),
+            stake_program: solana_sdk::stake::program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
+    };
+
     let rebalance_directed_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::RebalanceDirected {
@@ -325,16 +489,10 @@ async fn test_compute_scores() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture
-                .stake_accounts_for_validator(validator_history.vote_account)
-                .await
-                .2,
+            withdraw_authority,
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture
-                .stake_accounts_for_validator(validator_history.vote_account)
-                .await
-                .0,
+            stake_account: stake_account_address,
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &validator_history.vote_account,
