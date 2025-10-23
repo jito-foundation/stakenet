@@ -360,13 +360,16 @@ async fn test_cycle() {
     )
     .await;
 
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+
     // In new cycle
     crank_compute_score(
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0, 1, 2, 0], // TODO: an extra 0 seems to force a state transition, let's have that
-                       // happen inside 2
+        &[0, 1, 2], // TODO: an extra 0 seems to force a state transition, let's have that
+                    // happen inside 2
     )
     .await;
 
