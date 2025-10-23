@@ -303,7 +303,12 @@ impl StewardState {
         let current_epoch = clock.epoch;
         let current_slot = clock.slot;
         let epoch_progress = epoch_progress(clock, epoch_schedule)?;
-
+        msg!(
+            "Epoch progress: {:.4}\nState: {} RebalanceDirected={}",
+            epoch_progress,
+            self.state_tag,
+            self.has_flag(REBALANCE_DIRECTED)
+        );
         match self.state_tag {
             StewardStateEnum::ComputeScores => self.transition_compute_scores(
                 current_epoch,
@@ -404,13 +409,12 @@ impl StewardState {
         let completed_compute_delegations = self.has_flag(COMPUTE_DELEGATIONS);
 
         if current_epoch >= self.next_cycle_epoch {
+            msg!("Resetting state for new cycle from Idle");
             self.reset_state_for_new_cycle(
                 current_epoch,
                 current_slot,
                 num_epochs_between_scoring,
             )?;
-        } else if !completed_directed_rebalance {
-            self.state_tag = StewardStateEnum::RebalanceDirected;
         } else if completed_directed_rebalance
             && !completed_compute_delegations
             && epoch_progress >= min_epoch_progress_for_compute_scores

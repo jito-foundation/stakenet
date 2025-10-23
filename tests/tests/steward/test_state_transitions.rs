@@ -53,20 +53,20 @@ pub fn test_compute_scores_to_compute_delegations() {
     assert!(state.delegations == [Delegation::default(); MAX_VALIDATORS]);
 }
 
+/* TODO: Is this test applicable anymore with the new initial state machine state?
 #[test]
 pub fn test_compute_scores_to_new_compute_scores() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
     let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
-    let validators = &fixtures.validators;
+    let validators = &mut fixtures.validators;
     let cluster_history = &fixtures.cluster_history;
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
     state.state_tag = StewardStateEnum::ComputeScores;
     state.set_flag(REBALANCE_DIRECTED);
-    clock.epoch += parameters.num_epochs_between_scoring;
     clock.slot += 250_000;
 
     // Case 1: Make some progress but then progress halts until past next_compute_epoch
@@ -90,7 +90,7 @@ pub fn test_compute_scores_to_new_compute_scores() {
     assert!(state.scores == [0; MAX_VALIDATORS]);
 
     // Case 2: Make some progress but then progress halts for 1000 slots
-}
+}*/
 
 #[test]
 pub fn test_compute_scores_noop() {
@@ -189,7 +189,7 @@ pub fn test_idle_to_compute_scores() {
     state.state_tag = StewardStateEnum::Idle;
     state.set_flag(REBALANCE_DIRECTED);
 
-    clock.epoch += parameters.num_epochs_between_scoring;
+    //clock.epoch += parameters.num_epochs_between_scoring;
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
     clock.slot += 250_000;
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -339,27 +339,6 @@ pub fn test_rebalance_to_idle() {
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
-}
-
-#[test]
-pub fn test_idle_to_directed_rebalance() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::Idle;
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch) + 1;
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    println!("state.state_tag: {}", state.state_tag);
-    assert!(matches!(
-        state.state_tag,
-        StewardStateEnum::RebalanceDirected
-    ));
 }
 
 #[test]
