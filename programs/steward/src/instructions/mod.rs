@@ -22,6 +22,7 @@ pub mod resume_steward;
 pub mod set_new_authority;
 pub mod spl_passthrough;
 pub mod update_parameters;
+pub mod update_preferred_withdraw_validator;
 pub mod update_priority_fee_parameters;
 
 pub use add_validators_to_blacklist::*;
@@ -47,4 +48,5 @@ pub use resume_steward::*;
 pub use set_new_authority::*;
 pub use spl_passthrough::*;
 pub use update_parameters::*;
+pub use update_preferred_withdraw_validator::*;
 pub use update_priority_fee_parameters::*;

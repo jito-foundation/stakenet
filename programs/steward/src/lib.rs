@@ -331,6 +331,14 @@ pub mod steward {
         )
     }
 
+    /// Updates the preferred withdraw validator to the validator with the lowest score
+    /// that has sufficient available lamports (permissionless)
+    pub fn update_preferred_withdraw_validator(
+        ctx: Context<UpdatePreferredWithdrawValidator>,
+    ) -> Result<()> {
+        instructions::update_preferred_withdraw_validator::handler(ctx)
+    }
+
     /// For priority fee parameters that are present in args, the instruction checks that they
     /// are within sensible bounds and saves them to config struct
     pub fn update_priority_fee_parameters(
