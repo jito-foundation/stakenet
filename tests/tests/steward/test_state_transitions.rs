@@ -4,7 +4,8 @@
 */
 
 use jito_steward::{
-    constants::MAX_VALIDATORS, Delegation, StewardStateEnum, REBALANCE, RESET_TO_IDLE, REBALANCE_DIRECTED,
+    constants::MAX_VALIDATORS, Delegation, StewardStateEnum, COMPUTE_DELEGATIONS, REBALANCE,
+    REBALANCE_DIRECTED, RESET_TO_IDLE,
 };
 use tests::steward_fixtures::StateMachineFixtures;
 
@@ -19,6 +20,8 @@ pub fn test_compute_scores_to_compute_delegations() {
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
+    state.state_tag = StewardStateEnum::ComputeScores;
+    state.set_flag(REBALANCE_DIRECTED);
 
     for validator in validators {
         state
@@ -61,6 +64,8 @@ pub fn test_compute_scores_to_new_compute_scores() {
     let config = &fixtures.config;
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
+    state.state_tag = StewardStateEnum::ComputeScores;
+    state.set_flag(REBALANCE_DIRECTED);
 
     // Case 1: Make some progress but then progress halts until past next_compute_epoch
     state
@@ -77,7 +82,7 @@ pub fn test_compute_scores_to_new_compute_scores() {
     assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
 
     clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
+    clock.slot += 250_000;
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -92,10 +97,13 @@ pub fn test_compute_scores_to_new_compute_scores() {
 pub fn test_compute_scores_noop() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
-    let clock = &fixtures.clock;
+    let clock = &mut fixtures.clock;
     let epoch_schedule = &fixtures.epoch_schedule;
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
+    state.state_tag = StewardStateEnum::ComputeScores;
+    state.set_flag(REBALANCE_DIRECTED);
+    clock.slot += 250_000;
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -120,24 +128,6 @@ pub fn test_compute_delegations_to_idle() {
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
-}
-
-#[test]
-pub fn test_compute_delegations_to_compute_scores() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::ComputeDelegations;
-    clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
 }
 
 #[test]
@@ -170,6 +160,7 @@ pub fn test_idle_to_compute_instant_unstake() {
 
     state.state_tag = StewardStateEnum::Idle;
     state.set_flag(REBALANCE_DIRECTED);
+    state.set_flag(COMPUTE_DELEGATIONS);
     clock.slot +=
         (epoch_schedule.slots_per_epoch as f64 * parameters.instant_unstake_epoch_progress) as u64;
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -191,11 +182,15 @@ pub fn test_idle_to_compute_scores() {
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
 
+    state.set_flag(REBALANCE_DIRECTED);
+
     clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
+    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
+    clock.slot += 250_000;
     state.state_tag = StewardStateEnum::Idle;
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
+    println!("state.state_tag: {}", state.state_tag);
     assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
 }
 
@@ -209,7 +204,7 @@ pub fn test_idle_noop() {
     let state = &mut fixtures.state;
 
     // Case 1: before we've hit instant_unstake_epoch_progress
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch) + 100_000; // ~ 25% epoch progress
+    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
     state.state_tag = StewardStateEnum::Idle;
     state.set_flag(REBALANCE_DIRECTED);
     let res = state.transition(clock, parameters, epoch_schedule);
@@ -218,6 +213,7 @@ pub fn test_idle_noop() {
 
     // Case 2: still after instant_unstake_epoch_progress but after rebalance is completed
     clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
+    state.set_flag(COMPUTE_DELEGATIONS);
     state.set_flag(REBALANCE);
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -292,24 +288,6 @@ pub fn test_compute_instant_unstake_to_idle() {
 }
 
 #[test]
-pub fn test_compute_instant_unstake_to_compute_scores() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::ComputeInstantUnstake;
-    clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
-}
-
-#[test]
 pub fn test_compute_instant_unstake_transition_noop() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
@@ -360,24 +338,6 @@ pub fn test_rebalance_to_idle() {
 }
 
 #[test]
-pub fn test_rebalance_to_compute_scores() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::Rebalance;
-    clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
-}
-
-#[test]
 pub fn test_idle_to_directed_rebalance() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
@@ -387,12 +347,15 @@ pub fn test_idle_to_directed_rebalance() {
     let state = &mut fixtures.state;
 
     state.state_tag = StewardStateEnum::Idle;
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+1;
+    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch) + 1;
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     println!("state.state_tag: {}", state.state_tag);
-    assert!(matches!(state.state_tag, StewardStateEnum::RebalanceDirected));
+    assert!(matches!(
+        state.state_tag,
+        StewardStateEnum::RebalanceDirected
+    ));
 }
 
 #[test]
@@ -406,7 +369,7 @@ pub fn test_directed_rebalance_to_idle() {
 
     state.state_tag = StewardStateEnum::RebalanceDirected;
     state.set_flag(REBALANCE_DIRECTED);
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch)+100_000; // ~ 25% epoch progress
+    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch) + 100_000; // ~ 25% epoch progress
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());

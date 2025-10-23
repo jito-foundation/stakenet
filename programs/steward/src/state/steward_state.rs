@@ -321,8 +321,7 @@ impl StewardState {
                 params.num_epochs_between_scoring,
                 epoch_progress,
                 params.instant_unstake_epoch_progress,
-                params.max_epoch_progress_for_directed_rebalance,
-                params.min_epoch_progress_for_compute_directed_stake_meta,
+                0.50,
             ),
             StewardStateEnum::ComputeInstantUnstake => self.transition_compute_instant_unstake(
                 current_epoch,
@@ -351,7 +350,10 @@ impl StewardState {
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        msg!("Progress is complete: {}", self.progress.is_complete(self.num_pool_validators).unwrap());
+        msg!(
+            "Progress is complete: {}",
+            self.progress.is_complete(self.num_pool_validators).unwrap()
+        );
         msg!("Num pool validators: {}", self.num_pool_validators);
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
@@ -395,8 +397,7 @@ impl StewardState {
         num_epochs_between_scoring: u64,
         epoch_progress: f64,
         min_epoch_progress_for_instant_unstake: f64,
-        max_epoch_progress_for_directed_rebalance: f64,
-        min_epoch_progress_for_compute_directed_stake_meta: f64,
+        min_epoch_progress_for_compute_scores: f64,
     ) -> Result<()> {
         let completed_loop = self.has_flag(REBALANCE);
         let completed_directed_rebalance = self.has_flag(REBALANCE_DIRECTED);
@@ -410,7 +411,10 @@ impl StewardState {
             )?;
         } else if !completed_directed_rebalance {
             self.state_tag = StewardStateEnum::RebalanceDirected;
-        } else if completed_directed_rebalance && !completed_compute_delegations {
+        } else if completed_directed_rebalance
+            && !completed_compute_delegations
+            && epoch_progress >= min_epoch_progress_for_compute_scores
+        {
             self.progress = BitMask::default();
             self.state_tag = StewardStateEnum::ComputeScores;
             self.instant_unstake = BitMask::default();

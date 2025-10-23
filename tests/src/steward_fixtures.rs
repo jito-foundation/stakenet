@@ -1389,7 +1389,7 @@ impl Default for FixtureDefaultAccounts {
         );
 
         let steward_state = StewardState {
-            state_tag: StewardStateEnum::ComputeScores,
+            state_tag: StewardStateEnum::RebalanceDirected,
             validator_lamport_balances: [0; MAX_VALIDATORS],
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
@@ -2013,7 +2013,7 @@ impl Default for StateMachineFixtures {
 
         // Setup StewardState
         let state = StewardState {
-            state_tag: StewardStateEnum::ComputeScores, // Initial state
+            state_tag: StewardStateEnum::RebalanceDirected, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
