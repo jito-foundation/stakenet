@@ -284,32 +284,6 @@ async fn test_cycle() {
 
     crank_idle(&fixture).await;
 
-    println!(
-        "Steward state: {}",
-        fixture
-            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
-            .await
-            .state
-            .state_tag
-    );
-
-    crank_rebalance_directed(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0],
-    )
-    .await;
-
-    println!(
-        "Steward state: {}",
-        fixture
-            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
-            .await
-            .state
-            .state_tag
-    );
-
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -317,15 +291,6 @@ async fn test_cycle() {
         &[0, 1, 2],
     )
     .await;
-
-    println!(
-        "Steward state: {}",
-        fixture
-            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
-            .await
-            .state
-            .state_tag
-    );
 
     crank_rebalance(
         &fixture,
@@ -335,15 +300,22 @@ async fn test_cycle() {
     )
     .await;
 
+    println!("Advancing epoch from {}", clock.epoch);
+
     fixture.advance_num_epochs(1, 10).await;
 
     crank_stake_pool(&fixture).await;
 
     crank_epoch_maintenance(&fixture, None).await;
 
-    crank_idle(&fixture).await;
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
 
-    // Advance to instant_unstake_inputs_epoch_progress
     fixture
         .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch) / 2 + 1)
         .await;
@@ -369,6 +341,8 @@ async fn test_cycle() {
 
     fixture.advance_num_epochs(1, 10).await;
 
+    println!("Advancing epoch from {}", clock.epoch);
+
     crank_stake_pool(&fixture).await;
 
     crank_epoch_maintenance(&fixture, None).await;
@@ -376,12 +350,23 @@ async fn test_cycle() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
+    crank_idle(&fixture).await;
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
+
     // In new cycle
     crank_compute_score(
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0, 1, 2],
+        &[0, 1, 2, 0], // TODO: an extra 0 seems to force a state transition, let's have that
+                       // happen inside 2
     )
     .await;
 
@@ -507,6 +492,17 @@ async fn test_remove_validator_mid_epoch() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
+
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+
     crank_compute_score(
         &fixture,
         &unit_test_fixtures,
@@ -516,16 +512,6 @@ async fn test_remove_validator_mid_epoch() {
     .await;
 
     crank_compute_delegations(&fixture).await;
-
-    crank_idle(&fixture).await;
-
-    crank_rebalance_directed(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0],
-    )
-    .await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -757,12 +743,13 @@ async fn test_add_validator_next_cycle() {
         &[0],
     )
     .await;
+    println!("Rebalance directed 1");
 
     crank_idle(&fixture).await;
+
     let state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
-    println!("Pre-compute score State: {}", state.state_tag);
 
     crank_compute_score(
         &fixture,
@@ -806,14 +793,6 @@ async fn test_add_validator_next_cycle() {
         &[0, 1],
     )
     .await;
-    println!(
-        "Pre-rebalance state: {}",
-        fixture
-            .load_and_deserialize::<StewardStateAccount>(&fixture.steward_state)
-            .await
-            .state
-            .state_tag
-    );
     crank_rebalance(
         &fixture,
         &unit_test_fixtures,
@@ -844,11 +823,11 @@ async fn test_add_validator_next_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1], // Once again, why the extra call?
     )
     .await;
+    println!("Rebalance directed 2");
     crank_idle(&fixture).await;
-    println!("Pre-compute score State: {}", state.state_tag);
     // Ensure we're in the next cycle
     crank_compute_score(
         &fixture,

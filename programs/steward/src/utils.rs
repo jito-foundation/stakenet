@@ -29,6 +29,11 @@ pub fn state_checks(
     }
 
     if let Some(expected_state) = expected_state {
+        msg!(
+            "Expected state: {}, Current state: {}",
+            expected_state,
+            state_account.state.state_tag
+        );
         require!(
             state_account.state.state_tag == expected_state,
             StewardError::InvalidState
@@ -214,8 +219,7 @@ pub fn vote_pubkey_at_validator_list_index(
     let pubkey_start_index = VEC_SIZE_BYTES
         .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
         .saturating_add(VOTE_ADDRESS_OFFSET);
-    let pubkey_end_index = pubkey_start_index
-        .saturating_add(PUBKEY_SIZE);
+    let pubkey_end_index = pubkey_start_index.saturating_add(PUBKEY_SIZE);
     let slice: [u8; PUBKEY_SIZE] = validator_list.data[pubkey_start_index..pubkey_end_index]
         .try_into()
         .map_err(|_| StewardError::ArithmeticError)?;

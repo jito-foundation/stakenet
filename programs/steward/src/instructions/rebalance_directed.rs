@@ -152,32 +152,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     // TODO: is this needed? Do we need to get from the directed stake meta?
     let transient_seed: u64 = 0;
     {
-        // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED
-        // This will cause the state to transition to Idle
-        if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-            state_account.state.set_flag(REBALANCE_DIRECTED);
-        }
-
-        state_checks(
-            &clock,
-            &config,
-            &state_account,
-            &ctx.accounts.validator_list,
-            Some(StewardStateEnum::RebalanceDirected),
-        )?;
-
-        if let Some(event) = maybe_transition(
-            &mut state_account.state,
-            &clock,
-            &config.parameters,
-            &epoch_schedule,
-        )? {
-            emit!(event);
-            return Ok(());
-        }
-
         let current_epoch = clock.epoch;
-        if current_epoch > state_account.state.current_epoch {
+        if (current_epoch > state_account.state.current_epoch
+            || state_account.state.num_pool_validators == 0)
+            && !state_account.state.has_flag(REBALANCE_DIRECTED)
+        {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
                 clock.slot,
@@ -193,7 +172,32 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             );
             state_account.state.num_pool_validators = num_pool_validators as u64;
             state_account.state.validators_added = 0;
+            msg!("Setting num pool validators: {}", num_pool_validators);
         }
+
+        // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED
+        // This will cause the state to transition to Idle
+        if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+            state_account.state.set_flag(REBALANCE_DIRECTED);
+        }
+
+        if let Some(event) = maybe_transition(
+            &mut state_account.state,
+            &clock,
+            &config.parameters,
+            &epoch_schedule,
+        )? {
+            emit!(event);
+            return Ok(());
+        }
+
+        state_checks(
+            &clock,
+            &config,
+            &state_account,
+            &ctx.accounts.validator_list,
+            Some(StewardStateEnum::RebalanceDirected),
+        )?;
 
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
         let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
@@ -297,9 +301,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                 decrease_components.total_unstake_lamports,
                 clock.epoch,
             );
-            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-                state_account.state.set_flag(REBALANCE_DIRECTED);
-            }
         }
         RebalanceType::Increase(lamports) => {
             invoke_signed(
@@ -344,17 +345,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                 lamports,
                 clock.epoch,
             );
-            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-                state_account.state.set_flag(REBALANCE_DIRECTED);
-            }
         }
         RebalanceType::None => {
             msg!("RebalanceType::None");
             directed_stake_meta
                 .update_staked_last_updated_epoch(&ctx.accounts.vote_account.key(), clock.epoch);
-            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-                state_account.state.set_flag(REBALANCE_DIRECTED);
-            }
         }
     }
 
@@ -364,6 +359,19 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             clock.epoch as u16,
             rebalance_type
         ));
+    }
+
+    if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+        state_account.state.set_flag(REBALANCE_DIRECTED);
+    }
+    if let Some(event) = maybe_transition(
+        &mut state_account.state,
+        &clock,
+        &config.parameters,
+        &epoch_schedule,
+    )? {
+        emit!(event);
+        return Ok(());
     }
 
     Ok(())

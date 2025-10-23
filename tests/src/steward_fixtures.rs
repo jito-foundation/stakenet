@@ -775,6 +775,7 @@ pub async fn crank_rebalance_directed(
     for &i in indices {
         let extra_accounts = &extra_validator_accounts[i];
 
+        let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
         let ix = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::RebalanceDirected {
@@ -817,7 +818,7 @@ pub async fn crank_rebalance_directed(
         };
         let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
         let tx = Transaction::new_signed_with_payer(
-            &[ix],
+            &[compute_budget_ix, ix],
             Some(&fixture.keypair.pubkey()),
             &[&fixture.keypair],
             blockhash,

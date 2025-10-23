@@ -351,6 +351,8 @@ impl StewardState {
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
+        msg!("Progress is complete: {}", self.progress.is_complete(self.num_pool_validators).unwrap());
+        msg!("Num pool validators: {}", self.num_pool_validators);
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
                 current_epoch,
@@ -409,7 +411,9 @@ impl StewardState {
         } else if !completed_directed_rebalance {
             self.state_tag = StewardStateEnum::RebalanceDirected;
         } else if completed_directed_rebalance && !completed_compute_delegations {
+            self.progress = BitMask::default();
             self.state_tag = StewardStateEnum::ComputeScores;
+            self.instant_unstake = BitMask::default();
         } else if !completed_loop {
             self.unset_flag(RESET_TO_IDLE);
 

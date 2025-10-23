@@ -72,6 +72,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
             &epoch_schedule,
         )? {
             emit!(event);
+            return Ok(());
         }
     }
 
