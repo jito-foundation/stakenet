@@ -1,5 +1,5 @@
 [workspace]
-members = ["api", "keepers/*", "programs/*", "sdk", "tests", "utils/*"]
+members = ["keepers/*", "programs/*", "sdk", "tests", "utils/*"]
 
 resolver = "2"
 

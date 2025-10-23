@@ -17,3 +17,4 @@ test-ledger
 /scripts
 /data
 notes.md
+block_keeper.db3
