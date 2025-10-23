@@ -66,6 +66,8 @@ pub fn test_compute_scores_to_new_compute_scores() {
     let state = &mut fixtures.state;
     state.state_tag = StewardStateEnum::ComputeScores;
     state.set_flag(REBALANCE_DIRECTED);
+    clock.epoch += parameters.num_epochs_between_scoring;
+    clock.slot += 250_000;
 
     // Case 1: Make some progress but then progress halts until past next_compute_epoch
     state
@@ -80,9 +82,6 @@ pub fn test_compute_scores_to_new_compute_scores() {
         )
         .unwrap();
     assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
-
-    clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot += 250_000;
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
@@ -182,12 +181,17 @@ pub fn test_idle_to_compute_scores() {
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
 
+    assert!(matches!(
+        state.state_tag,
+        StewardStateEnum::RebalanceDirected
+    ));
+
+    state.state_tag = StewardStateEnum::Idle;
     state.set_flag(REBALANCE_DIRECTED);
 
     clock.epoch += parameters.num_epochs_between_scoring;
     clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
     clock.slot += 250_000;
-    state.state_tag = StewardStateEnum::Idle;
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());
     println!("state.state_tag: {}", state.state_tag);
