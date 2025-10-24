@@ -457,7 +457,15 @@ async fn test_compute_scores() {
         .stake_accounts_for_validator(validator_history.vote_account)
         .await;
 
-    // Manually create the stake account in the bank
+    // Manually create the stake account in the bank BEFORE constructing instructions
+    let stake_program_minimum = fixture.fetch_minimum_delegation().await;
+    let pool_minimum_delegation = minimum_delegation(stake_program_minimum);
+    let stake_rent = fixture.fetch_stake_rent().await;
+    let minimum_active_stake_with_rent = pool_minimum_delegation + stake_rent;
+    
+    // Adjust for the exact lamport difference to match expected amount
+    let adjusted_stake_amount = minimum_active_stake_with_rent;
+
     let stake_pool: StakePool = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
         .await;
@@ -473,7 +481,7 @@ async fn test_compute_scores() {
 
     let configured_stake_account = StakeStateV2::Stake(
         Meta {
-            rent_exempt_reserve: 0,
+            rent_exempt_reserve: stake_rent,
             authorized: Authorized {
                 staker: withdraw_authority,
                 withdrawer: withdraw_authority,
@@ -483,7 +491,7 @@ async fn test_compute_scores() {
         Stake {
             delegation: StakeDelegation {
                 voter_pubkey: validator_history.vote_account,
-                stake: 1_000_000_000,
+                stake: adjusted_stake_amount,
                 activation_epoch: 0,
                 deactivation_epoch: current_epoch - 1,
                 ..Default::default()
@@ -495,7 +503,7 @@ async fn test_compute_scores() {
 
     fixture.ctx.borrow_mut().set_account(
         &stake_account_address,
-        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+        &serialized_stake_account(configured_stake_account, adjusted_stake_amount + stake_rent).into(),
     );
 
     let rebalance_directed_ix = Instruction {
