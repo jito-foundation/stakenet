@@ -920,14 +920,6 @@ fn _print_verbose_state(
                 formatted_string += &validator_score_components.to_string();
             }
 
-            formatted_string += &format!(
-                "Commission Score: {}\n",
-                steward_state_account
-                    .state
-                    .raw_scores
-                    .get(index)
-                    .unwrap_or(&0)
-            );
             formatted_string +=
                 &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
 
