@@ -89,11 +89,10 @@ pub struct StateInfo {
     /// Used for efficient ranking and delegation decisions
     sorted_score_indices_count: usize,
 
-    /// Count of computed raw component scores
-    /// Used as secondary priority for unstaking order decisions
+    /// Count of computed raw scores
     raw_scores_count: usize,
 
-    /// Count of validator indices sorted by raw score
+    /// Count of validator indices sorted by raw score (descending)
     sorted_raw_score_indices_count: usize,
 
     /// Count of delegation entries (target stake allocations)
@@ -297,10 +296,10 @@ pub struct ValidatorDetails {
     /// Overall rank among all validators (1-based, None if unranked)
     pub overall_rank: Option<usize>,
 
-    /// Performance score assigned by the steward (0 = failing, >0 = passing)
+    /// Validator's final score (0 if any eligibility criteria failed, otherwise equals raw_score)
     pub score: u64,
 
-    /// Raw score
+    /// Validator's 4-tier hierarchical score before binary filters applied
     pub raw_score: u64,
 
     /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
