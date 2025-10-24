@@ -137,6 +137,7 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, system_program, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::state::steward_state::REBALANCE_DIRECTED;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
@@ -173,7 +174,6 @@ use validator_history::{
     Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
     ValidatorHistoryEntry,
 };
-
 #[tokio::test]
 async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
@@ -319,9 +319,7 @@ async fn test_compute_scores() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-
-    // Initialize directed stake meta
-    let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
     realloc_directed_stake_meta(&fixture).await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
@@ -452,68 +450,14 @@ async fn test_compute_scores() {
         .data(),
     };
 
-    // Get stake account addresses
-    let (stake_account_address, _transient_stake_account_address, withdraw_authority) = fixture
-        .stake_accounts_for_validator(validator_history.vote_account)
-        .await;
-
-    // Manually create the stake account in the bank BEFORE constructing instructions
-    let stake_program_minimum = fixture.fetch_minimum_delegation().await;
-    let pool_minimum_delegation = minimum_delegation(stake_program_minimum);
-    let stake_rent = fixture.fetch_stake_rent().await;
-    let minimum_active_stake_with_rent = pool_minimum_delegation + stake_rent;
-    
-    // Adjust for the exact lamport difference to match expected amount
-    let adjusted_stake_amount = minimum_active_stake_with_rent;
-
-    let stake_pool: StakePool = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
-        .await;
-
-    let current_epoch = fixture
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap()
-        .epoch;
-
-    let configured_stake_account = StakeStateV2::Stake(
-        Meta {
-            rent_exempt_reserve: stake_rent,
-            authorized: Authorized {
-                staker: withdraw_authority,
-                withdrawer: withdraw_authority,
-            },
-            lockup: stake_pool.as_ref().lockup,
-        },
-        Stake {
-            delegation: StakeDelegation {
-                voter_pubkey: validator_history.vote_account,
-                stake: adjusted_stake_amount,
-                activation_epoch: 0,
-                deactivation_epoch: current_epoch - 1,
-                ..Default::default()
-            },
-            credits_observed: 0,
-        },
-        StakeFlags::default(),
-    );
-
-    fixture.ctx.borrow_mut().set_account(
-        &stake_account_address,
-        &serialized_stake_account(configured_stake_account, adjusted_stake_amount + stake_rent).into(),
-    );
-
-    let rebalance_directed_ix = Instruction {
+    let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::RebalanceDirected {
             config: fixture.steward_config.pubkey(),
             state_account: fixture.steward_state,
             directed_stake_meta: Pubkey::find_program_address(
                 &[
-                    jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+                    DirectedStakeMeta::SEED,
                     fixture.steward_config.pubkey().as_ref(),
                 ],
                 &jito_steward::id(),
@@ -521,18 +465,18 @@ async fn test_compute_scores() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority,
+            withdraw_authority: Pubkey::new_unique(),
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: stake_account_address,
+            stake_account: Pubkey::new_unique(),
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &validator_history.vote_account,
+                &Pubkey::new_unique(),
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: validator_history.vote_account,
+            vote_account: Pubkey::new_unique(),
             clock: solana_sdk::sysvar::clock::id(),
             rent: solana_sdk::sysvar::rent::id(),
             stake_history: solana_sdk::sysvar::stake_history::id(),
@@ -542,20 +486,9 @@ async fn test_compute_scores() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
-            validator_list_index: validator_history.index as u64,
+            validator_list_index: 0u64,
         }
         .data(),
-    };
-
-    let idle_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::Idle {
-            config: fixture.steward_config.pubkey(),
-            state_account: fixture.steward_state,
-            validator_list: fixture.stake_pool_meta.validator_list,
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::Idle {}.data(),
     };
 
     // Basic test - test score computation that requires most compute
@@ -578,24 +511,10 @@ async fn test_compute_scores() {
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(800_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             epoch_maintenance_ix.clone(),
-            rebalance_directed_ix.clone(),
-        ],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.get_latest_blockhash().await,
-    );
-
-    fixture.submit_transaction_assert_success(tx).await;
-    fixture.advance_num_slots(250_000).await;
-
-    let tx = Transaction::new_signed_with_payer(
-        &[
-            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
-            ComputeBudgetInstruction::request_heap_frame(128 * 1024),
-            idle_ix.clone(),
+            rebalance_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
@@ -608,6 +527,7 @@ async fn test_compute_scores() {
     let mut steward_state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
+    println!("State {}", steward_state_account.state.state_tag);
     assert!(matches!(
         steward_state_account.state.state_tag,
         StewardStateEnum::ComputeScores
