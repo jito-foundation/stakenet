@@ -334,7 +334,7 @@ async fn test_compute_scores() {
     .0;
 
     let clock: Clock = fixture.get_sysvar().await;
-    fixture.advance_num_epochs(512 - clock.epoch, 250_000).await;
+    fixture.advance_num_epochs(512 - clock.epoch, 0).await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
     fixture.ctx.borrow_mut().set_account(
         &vote_account,
@@ -539,6 +539,17 @@ async fn test_compute_scores() {
         .data(),
     };
 
+    let idle_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::Idle {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::Idle {}.data(),
+    };
+
     // Basic test - test score computation that requires most compute
     let compute_scores_ix = Instruction {
         program_id: jito_steward::id(),
@@ -563,6 +574,20 @@ async fn test_compute_scores() {
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             epoch_maintenance_ix.clone(),
             rebalance_directed_ix.clone(),
+        ],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.get_latest_blockhash().await,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+    fixture.advance_num_slots(250_000).await;
+
+    let tx = Transaction::new_signed_with_payer(
+        &[
+            ComputeBudgetInstruction::set_compute_unit_limit(600_000),
+            ComputeBudgetInstruction::request_heap_frame(128 * 1024),
+            idle_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),
