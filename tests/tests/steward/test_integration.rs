@@ -142,6 +142,7 @@ use jito_steward::state::steward_state::PRE_LOOP_IDLE;
 use jito_steward::state::steward_state::REBALANCE;
 use jito_steward::state::steward_state::REBALANCE_DIRECTED_COMPLETE;
 use jito_steward::state::steward_state::RESET_TO_IDLE;
+use jito_steward::DirectedStakeMeta;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     stake_pool_utils::{StakePool, ValidatorList},
@@ -165,11 +166,14 @@ use tests::{
         validator_history_default, TestFixture,
     },
 };
+
+use spl_stake_pool::find_transient_stake_program_address;
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
     Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
     ValidatorHistoryEntry,
 };
+
 #[tokio::test]
 async fn test_compute_delegations() {
     let fixture = TestFixture::new().await;
@@ -447,7 +451,7 @@ async fn test_compute_scores() {
 
     fixture.simulate_stake_pool_update().await;
 
-    let _epoch_maintenance_ix = Instruction {
+    let epoch_maintenance_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::EpochMaintenance {
             config: fixture.steward_config.pubkey(),
@@ -458,6 +462,48 @@ async fn test_compute_scores() {
         .to_account_metas(None),
         data: jito_steward::instruction::EpochMaintenance {
             validator_index_to_remove: None,
+        }
+        .data(),
+    };
+
+    let rebalance_directed_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::RebalanceDirected {
+            config: fixture.steward_config.pubkey(),
+            state_account: fixture.steward_state,
+            validator_list: fixture.stake_pool_meta.validator_list,
+            directed_stake_meta: Pubkey::find_program_address(
+                &[
+                    DirectedStakeMeta::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            stake_pool_program: spl_stake_pool::id(),
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account).await.2,
+            reserve_stake: fixture.stake_pool_meta.reserve,
+            stake_account: fixture.stake_accounts_for_validator(vote_account).await.0,
+            transient_stake_account: find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                &vote_account,
+                &fixture.stake_pool_meta.stake_pool,
+                0u64,
+            )
+            .0,
+            vote_account: vote_account,
+            clock: sysvar::clock::id(),
+            rent: sysvar::rent::id(),
+            stake_history: sysvar::stake_history::id(),
+            stake_config: solana_program::stake::config::ID,
+            system_program: solana_program::system_program::id(),
+            stake_program: solana_program::stake::program::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
+            validator_list_index: 0,
         }
         .data(),
     };
@@ -484,8 +530,8 @@ async fn test_compute_scores() {
             // Only high because we are averaging 512 epochs
             ComputeBudgetInstruction::set_compute_unit_limit(800_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
-            //epoch_maintenance_ix.clone(),
-            //rebalance_ix.clone(),
+            epoch_maintenance_ix.clone(),
+            rebalance_directed_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),

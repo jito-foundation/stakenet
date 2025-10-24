@@ -137,7 +137,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targe
             ),
         ],
         data: jito_steward::instruction::InitializeDirectedStakeMeta {
-            total_stake_targets,
+            total_stake_targets: 0,
         }
         .data(),
     };

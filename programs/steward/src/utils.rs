@@ -10,7 +10,10 @@ use spl_stake_pool::{
 };
 
 use crate::{
-    constants::{PUBKEY_SIZE, STAKE_STATUS_OFFSET, U64_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET},
+    constants::{
+        PUBKEY_SIZE, STAKE_STATUS_OFFSET, TRANSIENT_STAKE_SEED_LENGTH, TRANSIENT_STAKE_SEED_OFFSET,
+        U64_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET,
+    },
     errors::StewardError,
     Config, Delegation, StewardStateAccount, StewardStateEnum,
 };
@@ -245,6 +248,25 @@ pub fn get_validator_stake_info_at_index(
         .ok_or(StewardError::ValidatorNotInList)?;
 
     Ok(validator_stake_info)
+}
+
+/// Utility to efficiently extract transient seed from a validator list.
+pub fn get_transient_stake_seed_at_index(
+    validator_list_account_info: &AccountInfo,
+    index: usize,
+) -> Result<u64> {
+    let transient_seed_index = VEC_SIZE_BYTES
+        .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+        .saturating_add(TRANSIENT_STAKE_SEED_OFFSET);
+    let transient_seed_end_index = transient_seed_index
+        .checked_add(TRANSIENT_STAKE_SEED_LENGTH)
+        .ok_or(StewardError::ArithmeticError)?;
+    let slice: [u8; TRANSIENT_STAKE_SEED_LENGTH] = validator_list_account_info.try_borrow_data()?
+        [transient_seed_index..transient_seed_end_index]
+        .try_into()
+        .map_err(|_| StewardError::ArithmeticError)?;
+    let transient_seed = u64::from_le_bytes(slice);
+    Ok(transient_seed)
 }
 
 pub struct StakeStatusTally {

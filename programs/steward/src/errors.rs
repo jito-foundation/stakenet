@@ -81,4 +81,8 @@ pub enum StewardError {
     ValidatorNotInWhitelist,
     #[msg("Whitelist not initialized")]
     WhitelistAuthorityUnset,
+    #[msg(
+        "Vote pubkey referenced in directed stake meta index and validator list index do not match"
+    )]
+    DirectedStakeVoteAccountMismatch,
 }

@@ -155,9 +155,14 @@ pub mod steward {
     /// Increases or decreases stake for a validator at `validator_list_index` using directed stake targets
     pub fn rebalance_directed(
         ctx: Context<RebalanceDirected>,
+        directed_stake_meta_index: u64,
         validator_list_index: u64,
     ) -> Result<()> {
-        instructions::rebalance_directed::handler(ctx, validator_list_index as usize)
+        instructions::rebalance_directed::handler(
+            ctx,
+            directed_stake_meta_index as usize,
+            validator_list_index as usize,
+        )
     }
 
     /* Admin instructions */

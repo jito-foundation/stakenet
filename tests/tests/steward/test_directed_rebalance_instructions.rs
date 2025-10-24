@@ -137,29 +137,13 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targe
 /// Helper function to create a test fixture with directed stake setup
 async fn setup_directed_stake_fixture() -> TestFixture {
     let fixture = TestFixture::new().await;
-
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    println!("Steward initialized");
     fixture.realloc_steward_state().await;
-    println!("Steward state reallocated");
-    println!("Fixture initialized");
-
-    // Set the directed stake whitelist authority to the fixture's keypair
     set_directed_stake_whitelist_authority(&fixture).await;
-
-    println!("Directed stake whitelist authority set");
-    // Initialize the directed stake whitelist first
     initialize_directed_stake_whitelist(&fixture).await;
-
-    println!("Directed stake whitelist initialized");
-
-    // Initialize the directed stake meta account
     initialize_directed_stake_meta(&fixture, 1).await;
-    println!("Directed stake meta initialized");
     realloc_directed_stake_meta(&fixture).await;
-    println!("Directed stake meta reallocated");
-
     fixture
 }
 
@@ -460,6 +444,7 @@ async fn test_simple_directed_rebalance_increase() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
             validator_list_index: 0,
         }
         .data(),
@@ -593,6 +578,7 @@ async fn test_simple_directed_rebalance_decrease() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
             validator_list_index: 0,
         }
         .data(),
@@ -717,6 +703,7 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
             validator_list_index: 0,
         }
         .data(),
@@ -830,6 +817,7 @@ async fn test_simple_directed_rebalance_no_targets() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
             validator_list_index: 0,
         }
         .data(),
@@ -923,6 +911,7 @@ async fn test_directed_rebalance_wrong_state() {
         }
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
+            directed_stake_meta_index: 0,
             validator_list_index: 0,
         }
         .data(),

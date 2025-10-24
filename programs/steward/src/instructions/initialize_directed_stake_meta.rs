@@ -30,32 +30,6 @@ impl InitializeDirectedStakeMeta<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct DirectedStakeMetaHeader {
-    discriminator: [u8; 8],
-    epoch: u64,
-    total_stake_targets: u16,
-    uploaded_stake_targets: u16,
-}
-
 pub fn handler(ctx: Context<InitializeDirectedStakeMeta>, total_stake_targets: u16) -> Result<()> {
-    let epoch = ctx.accounts.clock.epoch;
-    let mut stake_meta_data = ctx
-        .accounts
-        .directed_stake_meta
-        .as_ref()
-        .try_borrow_mut_data()?;
-    let discriminator_bytes: [u8; 8] = DirectedStakeMeta::DISCRIMINATOR
-        .try_into()
-        .map_err(|_| error!(StewardError::InvalidParameterValue))?;
-    // At the time of initialization we can serialize the header, but not the full account
-    // because the targets array is not fully allocated.
-    let header = DirectedStakeMetaHeader {
-        discriminator: discriminator_bytes,
-        epoch,
-        total_stake_targets,
-        uploaded_stake_targets: 0,
-    };
-    header.serialize(&mut *stake_meta_data)?;
     Ok(())
 }

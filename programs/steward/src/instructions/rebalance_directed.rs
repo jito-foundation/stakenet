@@ -23,8 +23,8 @@ use crate::{
     stake_pool_utils::deserialize_stake_pool,
     state::directed_stake::DirectedStakeMeta,
     utils::{
-        get_stake_pool_address, get_validator_list_length, get_validator_stake_info_at_index,
-        state_checks,
+        get_stake_pool_address, get_transient_stake_seed_at_index, get_validator_list_length,
+        get_validator_stake_info_at_index, state_checks,
     },
     Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED_COMPLETE,
 };
@@ -138,7 +138,11 @@ pub struct RebalanceDirected<'info> {
     pub stake_program: AccountInfo<'info>,
 }
 
-pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> Result<()> {
+pub fn handler(
+    ctx: Context<RebalanceDirected>,
+    directed_stake_meta_index: usize,
+    validator_list_index: usize,
+) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
     let validator_list = &ctx.accounts.validator_list;
@@ -146,9 +150,33 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
 
+    // Vote pubkeys from directed stake meta entry and validator list must match
+    // if the directed stake meta has valid entries
+    let vote_pubkey_from_directed_stake_meta =
+        directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey;
+    let vote_pubkey_from_validator_list =
+        get_validator_stake_info_at_index(validator_list, validator_list_index as usize)?;
+
+    // An empty meta means there are no directed stake targets, automatically transition to Idle
+    if directed_stake_meta.total_stake_targets > 0 {
+        msg!(
+            "vote_pubkey_from_directed_stake_meta: {}",
+            vote_pubkey_from_directed_stake_meta
+        );
+        msg!(
+            "vote_pubkey_from_validator_list: {}",
+            vote_pubkey_from_validator_list.vote_account_address
+        );
+        require!(
+            vote_pubkey_from_directed_stake_meta
+                == vote_pubkey_from_validator_list.vote_account_address,
+            StewardError::DirectedStakeVoteAccountMismatch
+        );
+    }
+
     let rebalance_type: RebalanceType;
-    // TODO: is this needed? Do we need to get from the directed stake meta?
-    let transient_seed: u64 = 0;
+    let transient_seed: u64 =
+        get_transient_stake_seed_at_index(&validator_list, validator_list_index as usize)?;
     {
         let current_epoch = clock.epoch;
         if (current_epoch > state_account.state.current_epoch
@@ -232,7 +260,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             let decrease_result = decrease_stake_calculation(
                 &state_account.state,
                 &directed_stake_meta,
-                validator_list_index,
+                directed_stake_meta_index,
                 unstake_state,
                 stake_account_active_lamports,
                 stake_pool_lamports_with_fixed_cost,
@@ -245,7 +273,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
                 _ => increase_stake_calculation(
                     &state_account.state,
                     &directed_stake_meta,
-                    validator_list_index,
+                    directed_stake_meta_index,
                     stake_account_active_lamports,
                     stake_pool_lamports_with_fixed_cost,
                     reserve_lamports_with_rent,
