@@ -60,6 +60,9 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_priority_fee_commission {
         run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
+    if args.run_preferred_withdraw {
+        run_flags = set_flag(run_flags, KeeperOperations::PreferredWithdraw);
+    }
 
     run_flags
 }
@@ -244,6 +247,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            );
+
+            info!("Updating preferred withdraw validator...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::preferred_withdraw::fire(&keeper_config, &keeper_state).await,
             );
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {

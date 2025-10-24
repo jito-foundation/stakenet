@@ -227,6 +227,10 @@ pub struct Args {
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
 
+    /// Run Preferred Withdraw Validator Update
+    #[arg(long, env, default_value = "false")]
+    pub run_preferred_withdraw: bool,
+
     /// Number of epochs to look back for block metadata
     #[arg(long, env, default_value = "3")]
     pub lookback_epochs: u64,

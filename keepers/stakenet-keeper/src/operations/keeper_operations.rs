@@ -41,6 +41,7 @@ pub enum KeeperOperations {
     EmitMetrics,
     BlockMetadataKeeper,
     PriorityFeeCommission,
+    PreferredWithdraw,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -56,7 +57,7 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 13;
+    pub const LEN: usize = 14;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
@@ -264,6 +265,22 @@ impl KeeperOperations {
             (
                 "num-stewpf-commissionard-txs",
                 txs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            // PREFERRED WITHDRAW
+            (
+                "num-preferred-withdraw-runs",
+                runs_for_epoch[KeeperOperations::PreferredWithdraw as usize],
+                i64
+            ),
+            (
+                "num-preferred-withdraw-errors",
+                errors_for_epoch[KeeperOperations::PreferredWithdraw as usize],
+                i64
+            ),
+            (
+                "num-preferred-withdraw-txs",
+                txs_for_epoch[KeeperOperations::PreferredWithdraw as usize],
                 i64
             ),
             "cluster" => cluster,
