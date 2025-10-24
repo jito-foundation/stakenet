@@ -38,10 +38,7 @@ pub struct ReallocDirectedStakeMeta<'info> {
 
     pub system_program: Program<'info, System>,
 
-    #[account(
-        mut,
-        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
-    )]
+    #[account(mut)]
     pub signer: Signer<'info>,
 }
 
@@ -56,7 +53,7 @@ pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
             total_staked_lamports: 0,
             target_last_updated_epoch: 0,
             staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
+            _padding0: [0; 32],
         };
         stake_meta.targets = [default_target; crate::MAX_PERMISSIONED_DIRECTED_VALIDATORS];
     }

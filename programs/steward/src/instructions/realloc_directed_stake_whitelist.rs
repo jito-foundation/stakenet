@@ -1,9 +1,6 @@
 use crate::DirectedStakeWhitelist;
 use crate::{
-    constants::MAX_ALLOC_BYTES,
-    errors::StewardError,
-    state::{Config, StewardStateAccount},
-    utils::get_validator_list,
+    constants::MAX_ALLOC_BYTES, errors::StewardError, state::Config, utils::get_validator_list,
 };
 use anchor_lang::prelude::*;
 
@@ -41,10 +38,7 @@ pub struct ReallocDirectedStakeWhitelist<'info> {
 
     pub system_program: Program<'info, System>,
 
-    #[account(
-        mut,
-        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
-    )]
+    #[account(mut)]
     pub signer: Signer<'info>,
 }
 

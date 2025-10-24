@@ -46,12 +46,12 @@ pub async fn build_copy_target_transaction(
             config: program_id,
             directed_stake_meta: directed_stake_meta_pda,
             authority: authority_pubkey,
+            clock: solana_sdk::sysvar::clock::id(),
         }
         .to_account_metas(None),
         data: jito_steward::instruction::CopyDirectedStakeTargets {
             vote_pubkey,
             total_target_lamports: target_lamports,
-            override_entry: false,
         }
         .data(),
     };
@@ -181,7 +181,7 @@ pub async fn command_compute_directed_stake_meta(
     println!("DirectedStakeTickets:");
 
     for (pubkey, account) in &accounts {
-        let ticket = DirectedStakeTicket::try_from_slice(&mut account.data.as_slice()).unwrap();
+        let ticket = DirectedStakeTicket::try_from_slice(account.data.as_slice()).unwrap();
         let (jitosol_balance, _jitosol_ui_amount) = match client
             .get_token_account_balance(&ticket.ticket_update_authority)
             .await
@@ -251,7 +251,6 @@ pub async fn command_compute_directed_stake_meta(
         let tx_progress_weight = 60 / validator_target_delegations.len();
         let mut progress = 0;
         let start_time = std::time::Instant::now();
-        let mut total_duration = 0;
         let mut error_log: String = String::new();
         let mut success_log: String = String::new();
         println!("\nSending transactions...");
@@ -275,7 +274,7 @@ pub async fn command_compute_directed_stake_meta(
             )
             .await?;
             let maybe_signature = send_copy_target_transaction(client, tx.clone()).await;
-            total_duration = start_time.elapsed().as_secs();
+            let total_duration = start_time.elapsed().as_secs();
             progress = if (progress + tx_progress_weight) > 60 {
                 60
             } else {
@@ -284,7 +283,7 @@ pub async fn command_compute_directed_stake_meta(
             if args.progress_bar {
                 progress_bar = "\x1b[32m".to_string()
                     + &"━".repeat(progress)
-                    + &"\x1b[0m"
+                    + "\x1b[0m"
                     + &" ".repeat(60_usize.saturating_sub(progress));
                 print!(
                     "\r[{}] {}s elapsed ({}/{}) sent",

@@ -56,14 +56,11 @@ pub struct Config {
     /// The authority that can update the DirectedStakeMeta for an epoch
     pub directed_stake_meta_upload_authority: Pubkey,
 
-    /// The authority that can invoke lock_reserve and unlock_reserve instructions
-    pub reserve_lock_authority: Pubkey,
-
     /// The authority that can update the directed stake whitelist
     pub directed_stake_whitelist_authority: Pubkey,
 
     /// Padding for future governance parameters
-    pub _padding: [u8; 888],
+    pub _padding: [u8; 920],
 }
 
 impl Config {

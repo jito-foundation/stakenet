@@ -202,8 +202,9 @@ fn test_priority_parameter_validation() {
         directed_stake_global_cap_bps: 3_000,
         min_epoch_progress_for_compute_directed_stake_meta: 0.5,
         max_epoch_progress_for_directed_rebalance: 0.1,
+        compute_score_epoch_progress: 0.5,
         _padding_0: [0; 2],
-        _padding_1: [0; 29],
+        _padding_1: [0; 28],
     };
 
     // First Valid Epoch

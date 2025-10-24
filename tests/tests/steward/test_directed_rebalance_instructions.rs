@@ -3,7 +3,7 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{
     instructions::AuthorityType,
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
-    DirectedStakeWhitelist, REBALANCE_DIRECTED,
+    DirectedStakeWhitelist, REBALANCE_DIRECTED_COMPLETE,
 };
 use solana_program::{instruction::Instruction, sysvar};
 use solana_program_test::*;
@@ -317,7 +317,7 @@ async fn populate_directed_stake_meta_after_init(
                 total_staked_lamports: 0,
                 target_last_updated_epoch: 0,
                 staked_last_updated_epoch: 0,
-                _padding0: [0; 64],
+                _padding0: [0; 32],
             }; 2048];
 
             // Set the first target
@@ -327,7 +327,7 @@ async fn populate_directed_stake_meta_after_init(
                 total_staked_lamports: staked_lamports,
                 target_last_updated_epoch: 0,
                 staked_last_updated_epoch: 0,
-                _padding0: [0; 64],
+                _padding0: [0; 32],
             };
 
             targets
@@ -336,7 +336,7 @@ async fn populate_directed_stake_meta_after_init(
 
     // Serialize with discriminator
     let mut account_data = Vec::new();
-    account_data.extend_from_slice(&DirectedStakeMeta::DISCRIMINATOR);
+    account_data.extend_from_slice(DirectedStakeMeta::DISCRIMINATOR);
     account_data.extend_from_slice(&borsh::to_vec(&meta).unwrap());
 
     // Create account with proper data
@@ -400,7 +400,9 @@ async fn test_simple_directed_rebalance_increase() {
     let mut steward_state_account: jito_steward::StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
 
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -479,8 +481,10 @@ async fn test_simple_directed_rebalance_increase() {
     fixture.submit_transaction_assert_success(tx).await;
 
     assert!(
-        steward_state_account.state.has_flag(REBALANCE_DIRECTED),
-        "REBALANCE_DIRECTED flag should be set after rebalance"
+        steward_state_account
+            .state
+            .has_flag(REBALANCE_DIRECTED_COMPLETE),
+        "REBALANCE_DIRECTED_COMPLETE flag should be set after rebalance"
     );
 }
 
@@ -530,7 +534,9 @@ async fn test_simple_directed_rebalance_decrease() {
     let mut steward_state_account: jito_steward::StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
 
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -608,8 +614,10 @@ async fn test_simple_directed_rebalance_decrease() {
     fixture.submit_transaction_assert_success(tx).await;
 
     assert!(
-        steward_state_account.state.has_flag(REBALANCE_DIRECTED),
-        "REBALANCE_DIRECTED flag should be set after rebalance"
+        steward_state_account
+            .state
+            .has_flag(REBALANCE_DIRECTED_COMPLETE),
+        "REBALANCE_DIRECTED_COMPLETE flag should be set after rebalance"
     );
 }
 
@@ -652,7 +660,9 @@ async fn test_simple_directed_rebalance_no_action_needed() {
     let mut steward_state_account: jito_steward::StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
 
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -728,8 +738,10 @@ async fn test_simple_directed_rebalance_no_action_needed() {
     fixture.submit_transaction_assert_success(tx).await;
 
     assert!(
-        steward_state_account.state.has_flag(REBALANCE_DIRECTED),
-        "REBALANCE_DIRECTED flag should be set after rebalancing completed"
+        steward_state_account
+            .state
+            .has_flag(REBALANCE_DIRECTED_COMPLETE),
+        "REBALANCE_DIRECTED_COMPLETE flag should be set after rebalancing completed"
     );
 }
 
@@ -772,7 +784,9 @@ async fn test_simple_directed_rebalance_no_targets() {
     let mut steward_state_account: jito_steward::StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
 
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
@@ -837,8 +851,10 @@ async fn test_simple_directed_rebalance_no_targets() {
     fixture.submit_transaction_assert_success(tx).await;
 
     assert!(
-        steward_state_account.state.has_flag(REBALANCE_DIRECTED),
-        "REBALANCE_DIRECTED flag should be set after rebalancing completed"
+        steward_state_account
+            .state
+            .has_flag(REBALANCE_DIRECTED_COMPLETE),
+        "REBALANCE_DIRECTED_COMPLETE flag should be set after rebalancing completed"
     );
 }
 

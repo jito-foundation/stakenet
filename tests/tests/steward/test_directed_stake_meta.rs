@@ -1,6 +1,6 @@
 use jito_steward::{
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
-    DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+    MAX_PERMISSIONED_DIRECTED_VALIDATORS,
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -16,7 +16,7 @@ fn test_get_target_index() {
             total_staked_lamports: 0,
             target_last_updated_epoch: 0,
             staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
+            _padding0: [0; 32],
         }; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
     };
 
@@ -31,7 +31,7 @@ fn test_get_target_index() {
         total_staked_lamports: 0,
         target_last_updated_epoch: 0,
         staked_last_updated_epoch: 0,
-        _padding0: [0; 64],
+        _padding0: [0; 32],
     };
 
     meta.targets[0] = target1;
@@ -42,7 +42,7 @@ fn test_get_target_index() {
         total_staked_lamports: 0,
         target_last_updated_epoch: 0,
         staked_last_updated_epoch: 0,
-        _padding0: [0; 64],
+        _padding0: [0; 32],
     };
 
     meta.targets[1] = target2;
@@ -53,7 +53,7 @@ fn test_get_target_index() {
         total_staked_lamports: 0,
         target_last_updated_epoch: 0,
         staked_last_updated_epoch: 0,
-        _padding0: [0; 64],
+        _padding0: [0; 32],
     };
 
     meta.targets[2] = target3;

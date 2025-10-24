@@ -24,64 +24,25 @@ pub async fn command_view_directed_stake_meta(
     let stake_meta = from_bytes::<DirectedStakeMeta>(&account.data);
 
     println!("\n📊 DirectedStakeMeta Information:");
-    println!("  Epoch: {}", stake_meta.epoch);
-    println!(
-        "  Progress: {}/{} targets uploaded",
-        stake_meta.uploaded_stake_targets, stake_meta.total_stake_targets
-    );
-
-    let progress_percentage = if stake_meta.total_stake_targets > 0 {
-        (stake_meta.uploaded_stake_targets as f64 / stake_meta.total_stake_targets as f64) * 100.0
-    } else {
-        0.0
-    };
-    println!("  Progress: {:.1}%", progress_percentage);
-
-    if stake_meta.is_copy_complete() {
-        println!("  Status: ✅ Copy Complete");
-    } else {
-        println!("  Status: 🔄 Copy In Progress");
-    }
 
     println!("\n🎯 Stake Targets:");
-    if stake_meta.uploaded_stake_targets == 0 {
-        println!("  No targets uploaded yet.");
-    } else {
-        for i in 0..stake_meta.uploaded_stake_targets as usize {
-            let target = &stake_meta.targets[i];
-            if target.vote_pubkey != Pubkey::default() {
-                println!("  Target {}:", i + 1);
-                println!("    Vote Pubkey: {}", target.vote_pubkey);
-                println!("    Target Lamports: {}", target.total_target_lamports);
-                println!("    Staked Lamports: {}", target.total_staked_lamports);
-                println!();
-            }
+    for i in 0..stake_meta.total_stake_targets as usize {
+        let validator = &stake_meta.targets[i];
+        if validator.vote_pubkey != Pubkey::default() {
+            println!("  Target {}:", i + 1);
+            println!("    Vote Pubkey: {}", validator.vote_pubkey);
+            println!("    Target Lamports: {}", validator.total_target_lamports);
+            println!(
+                "    Target Last Updated Epoch: {}",
+                validator.target_last_updated_epoch
+            );
+            println!("    Staked Lamports: {}", validator.total_staked_lamports);
+            println!(
+                "    Staked Last Updated Epoch: {}",
+                validator.staked_last_updated_epoch
+            );
+            println!();
         }
-    }
-
-    if args.print_json {
-        println!("\n📄 JSON Output:");
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&serde_json::json!({
-                "epoch": stake_meta.epoch,
-                "total_stake_targets": stake_meta.total_stake_targets,
-                "uploaded_stake_targets": stake_meta.uploaded_stake_targets,
-                "is_copy_complete": stake_meta.is_copy_complete(),
-                "progress_percentage": progress_percentage,
-                "targets": stake_meta.targets.iter()
-                    .take(stake_meta.uploaded_stake_targets as usize)
-                    .filter(|target| target.vote_pubkey != Pubkey::default())
-                    .map(|target| {
-                        serde_json::json!({
-                            "vote_pubkey": target.vote_pubkey.to_string(),
-                            "total_target_lamports": target.total_target_lamports,
-                            "total_staked_lamports": target.total_staked_lamports
-                        })
-                    })
-                    .collect::<Vec<_>>()
-            }))?
-        );
     }
 
     Ok(())

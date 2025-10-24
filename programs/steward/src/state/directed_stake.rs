@@ -111,7 +111,7 @@ pub struct DirectedStakeTarget {
     /// Last updated epoch for staked lamports
     pub staked_last_updated_epoch: u64,
     // Alignment compliant reserve space for future use
-    pub _padding0: [u8; 64],
+    pub _padding0: [u8; 32],
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
-use crate::{errors::StewardError, maybe_transition, Config, StewardStateAccount};
+use crate::{errors::StewardError, Config};
 use std::mem::size_of;
 
 #[derive(Accounts)]
@@ -41,25 +41,25 @@ pub fn handler(
         return Err(error!(StewardError::Unauthorized));
     }
 
-    let maybe_target_index = stake_meta.get_target_index(&vote_pubkey);
-    if maybe_target_index.is_none() {
-        let new_target = DirectedStakeTarget {
-            vote_pubkey,
-            total_target_lamports: target_lamports,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
-        };
-        let target_index = stake_meta.total_stake_targets as usize;
-        stake_meta.targets[target_index] = new_target;
-        stake_meta.total_stake_targets += 1;
-    }
-
-    if let Some(target_index) = maybe_target_index {
-        let clock = Clock::get()?;
-        stake_meta.targets[target_index].total_target_lamports = target_lamports;
-        stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
+    match stake_meta.get_target_index(&vote_pubkey) {
+        Some(target_index) => {
+            let clock = Clock::get()?;
+            stake_meta.targets[target_index].total_target_lamports = target_lamports;
+            stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
+        }
+        None => {
+            let new_target = DirectedStakeTarget {
+                vote_pubkey,
+                total_target_lamports: target_lamports,
+                total_staked_lamports: 0,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            };
+            let target_index = stake_meta.total_stake_targets as usize;
+            stake_meta.targets[target_index] = new_target;
+            stake_meta.total_stake_targets += 1;
+        }
     }
 
     Ok(())

@@ -210,8 +210,7 @@ async fn test_cycle() {
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-                max_epoch_progress_for_directed_rebalance: Some(0.1),
+                compute_score_epoch_progress: Some(0.50),
             }),
             None,
         )
@@ -454,8 +453,7 @@ async fn test_remove_validator_mid_epoch() {
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-                max_epoch_progress_for_directed_rebalance: Some(0.1),
+                compute_score_epoch_progress: Some(0.50),
             }),
             None,
         )
@@ -721,8 +719,7 @@ async fn test_add_validator_next_cycle() {
                 num_epochs_between_scoring: Some(1), // 1 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-                max_epoch_progress_for_directed_rebalance: Some(0.1),
+                compute_score_epoch_progress: Some(0.50),
             }),
             None,
         )
@@ -769,10 +766,6 @@ async fn test_add_validator_next_cycle() {
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
 
-    let state_account: StewardStateAccount =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-    let state = state_account.state;
-
     crank_compute_score(
         &fixture,
         &unit_test_fixtures,
@@ -794,7 +787,7 @@ async fn test_add_validator_next_cycle() {
     assert!(validator_list.validators.len() == 3);
 
     // Ensure that num_pool_validators isn't updated but validators_added is
-    let mut state_account: StewardStateAccount =
+    let state_account: StewardStateAccount =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let state = state_account.state;

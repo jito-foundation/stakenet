@@ -1,10 +1,8 @@
 use anchor_lang::prelude::*;
-use spl_stake_pool::big_vec::BigVec;
 
-use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
 use crate::state::directed_stake::DirectedStakeMeta;
-use crate::{errors::StewardError, utils::vote_pubkey_at_validator_list_index, StewardState};
+use crate::{errors::StewardError, StewardState};
 #[derive(Debug, Clone)]
 pub enum RebalanceType {
     Increase(u64),
@@ -24,7 +22,7 @@ pub fn decrease_stake_calculation(
     state: &StewardState,
     directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
-    mut unstake_state: UnstakeState,
+    unstake_state: UnstakeState,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
     _stake_pool_lamports: u64,
     _minimum_delegation: u64,
@@ -94,7 +92,7 @@ pub fn increase_stake_calculation(
     target_index: usize,
     current_lamports: u64,
     _stake_pool_lamports: u64,
-    mut reserve_lamports: u64,
+    reserve_lamports: u64,
     _minimum_delegation: u64,
     _stake_rent: u64,
 ) -> Result<RebalanceType> {

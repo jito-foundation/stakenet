@@ -1,5 +1,5 @@
 use crate::state::directed_stake::DirectedStakeMeta;
-use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config, StewardStateAccount};
+use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config};
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 use std::mem::size_of;
@@ -22,10 +22,7 @@ pub struct InitializeDirectedStakeMeta<'info> {
 
     pub system_program: Program<'info, System>,
 
-    #[account(
-        mut,
-        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
-    )]
+    #[account(mut)]
     pub authority: Signer<'info>,
 }
 
@@ -43,7 +40,6 @@ pub struct DirectedStakeMetaHeader {
 
 pub fn handler(ctx: Context<InitializeDirectedStakeMeta>, total_stake_targets: u16) -> Result<()> {
     let epoch = ctx.accounts.clock.epoch;
-    let total_stake_targets = total_stake_targets as u16;
     let mut stake_meta_data = ctx
         .accounts
         .directed_stake_meta

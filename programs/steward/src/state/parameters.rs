@@ -37,8 +37,7 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
-    pub min_epoch_progress_for_compute_directed_stake_meta: Option<f64>,
-    pub max_epoch_progress_for_directed_rebalance: Option<f64>,
+    pub compute_score_epoch_progress: Option<f64>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -138,6 +137,11 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
+                    IdlField {
+                        name: "compute_score_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
                 ])),
             },
             docs: Default::default(),
@@ -231,6 +235,9 @@ pub struct Parameters {
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
 
+    /// The minimum epoch progress for computing scores
+    pub compute_score_epoch_progress: f64,
+
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
@@ -241,8 +248,7 @@ pub struct Parameters {
     pub directed_stake_global_cap_bps: u16,
 
     pub _padding_0: [u8; 2],
-
-    pub _padding_1: [u64; 29],
+    pub _padding_1: [u64; 28],
 }
 
 impl Parameters {
@@ -273,8 +279,7 @@ impl Parameters {
             num_epochs_between_scoring,
             minimum_stake_lamports,
             minimum_voting_epochs,
-            min_epoch_progress_for_compute_directed_stake_meta,
-            max_epoch_progress_for_directed_rebalance,
+            compute_score_epoch_progress,
         } = *args;
 
         let mut new_parameters = self;
@@ -356,18 +361,8 @@ impl Parameters {
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
         }
 
-        if let Some(min_epoch_progress_for_compute_directed_stake_meta) =
-            min_epoch_progress_for_compute_directed_stake_meta
-        {
-            new_parameters.min_epoch_progress_for_compute_directed_stake_meta =
-                min_epoch_progress_for_compute_directed_stake_meta;
-        }
-
-        if let Some(max_epoch_progress_for_directed_rebalance) =
-            max_epoch_progress_for_directed_rebalance
-        {
-            new_parameters.max_epoch_progress_for_directed_rebalance =
-                max_epoch_progress_for_directed_rebalance;
+        if let Some(compute_score_epoch_progress) = compute_score_epoch_progress {
+            new_parameters.compute_score_epoch_progress = compute_score_epoch_progress;
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -507,6 +502,10 @@ impl Parameters {
         }
 
         if self.priority_fee_error_margin_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.compute_score_epoch_progress < 0.0 || self.compute_score_epoch_progress >= 1.0 {
             return Err(StewardError::InvalidParameterValue.into());
         }
 

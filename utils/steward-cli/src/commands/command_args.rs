@@ -109,6 +109,10 @@ pub struct ConfigParameters {
     /// Maximum epoch progress for directed rebalance
     #[arg(long, env)]
     pub max_epoch_progress_for_directed_rebalance: Option<f64>,
+
+    /// Epoch progress for computing score
+    #[arg(long, env)]
+    pub compute_score_epoch_progress: Option<f64>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -133,10 +137,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             num_epochs_between_scoring: config.num_epochs_between_scoring,
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
-            min_epoch_progress_for_compute_directed_stake_meta: config
-                .min_epoch_progress_for_compute_directed_stake_meta,
-            max_epoch_progress_for_directed_rebalance: config
-                .max_epoch_progress_for_directed_rebalance,
+            compute_score_epoch_progress: config.compute_score_epoch_progress,
         }
     }
 }

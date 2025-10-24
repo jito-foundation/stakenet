@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config, DirectedStakeWhitelist};
+use crate::{constants::MAX_ALLOC_BYTES, Config, DirectedStakeWhitelist};
 use std::mem::size_of;
 
 #[derive(Accounts)]
@@ -19,10 +19,7 @@ pub struct InitializeDirectedStakeWhitelist<'info> {
 
     pub system_program: Program<'info, System>,
 
-    #[account(
-        mut,
-        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
-    )]
+    #[account(mut)]
     pub authority: Signer<'info>,
 }
 

@@ -6,15 +6,13 @@ use anchor_lang::{
         borsh1::try_from_slice_unchecked,
         program::invoke_signed,
         stake::{self, state::StakeStateV2, tools::get_minimum_delegation},
-        system_program, sysvar, vote,
+        system_program, sysvar,
     },
 };
 use borsh::BorshDeserialize;
 use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
-    state::ValidatorListHeader,
 };
-use validator_history::ValidatorHistory;
 
 use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
@@ -28,7 +26,7 @@ use crate::{
         get_stake_pool_address, get_validator_list_length, get_validator_stake_info_at_index,
         state_checks,
     },
-    Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED,
+    Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED_COMPLETE,
 };
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
@@ -155,7 +153,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
         let current_epoch = clock.epoch;
         if (current_epoch > state_account.state.current_epoch
             || state_account.state.num_pool_validators == 0)
-            && !state_account.state.has_flag(REBALANCE_DIRECTED)
+            && !state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE)
         {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
@@ -175,10 +173,10 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
             msg!("Setting num pool validators: {}", num_pool_validators);
         }
 
-        // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED
+        // If there are no more targets to rebalance, set the flag to REBALANCE_DIRECTED_COMPLETE
         // This will cause the state to transition to Idle
         if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-            state_account.state.set_flag(REBALANCE_DIRECTED);
+            state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
         }
 
         if let Some(event) = maybe_transition(
@@ -362,7 +360,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, validator_list_index: usize) -> 
     }
 
     if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-        state_account.state.set_flag(REBALANCE_DIRECTED);
+        state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
     }
     if let Some(event) = maybe_transition(
         &mut state_account.state,

@@ -50,7 +50,7 @@ fn create_mock_directed_stake_meta(
             total_staked_lamports: 0,
             target_last_updated_epoch: 0,
             staked_last_updated_epoch: 0,
-            _padding0: [0; 64],
+            _padding0: [0; 32],
         }; 2048],
     };
 
@@ -62,7 +62,7 @@ fn create_mock_directed_stake_meta(
                 total_staked_lamports: *staked_lamports,
                 target_last_updated_epoch: 0,
                 staked_last_updated_epoch: 0,
-                _padding0: [0; 64],
+                _padding0: [0; 32],
             };
         }
     }

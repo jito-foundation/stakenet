@@ -108,8 +108,7 @@ async fn _epoch_maintenance_setup() -> (
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-                max_epoch_progress_for_directed_rebalance: Some(0.1),
+                compute_score_epoch_progress: Some(0.50),
             }),
             None,
         )

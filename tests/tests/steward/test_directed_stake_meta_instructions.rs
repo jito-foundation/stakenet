@@ -18,7 +18,7 @@ use jito_steward::{
     DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
 };
 use solana_program_test::*;
-use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};
+use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
 use tests::steward_fixtures::{system_account, TestFixture};
 
 /// Helper function to create a test fixture with directed stake setup
@@ -294,7 +294,7 @@ async fn add_staker_to_whitelist(
             ),
         ],
         data: jito_steward::instruction::AddToDirectedStakeWhitelist {
-            record_type: record_type.clone(),
+            record_type,
             record: *staker,
         }
         .data(),
@@ -627,12 +627,8 @@ async fn test_update_directed_stake_ticket() {
 #[tokio::test]
 async fn test_initialize_directed_stake_meta() {
     let fixture = setup_directed_stake_fixture().await;
-
-    // Initialize directed stake meta
     let directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-
-    // Verify the meta was created
-    let meta: DirectedStakeMeta = fixture.load_and_deserialize(&directed_stake_meta).await;
+    let _: DirectedStakeMeta = fixture.load_and_deserialize(&directed_stake_meta).await;
 }
 
 #[tokio::test]

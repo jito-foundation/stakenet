@@ -1,7 +1,5 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
-/// Basic integration test
-
 async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     let directed_stake_meta = Pubkey::find_program_address(
         &[
@@ -134,16 +132,15 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targe
 }
 #[allow(deprecated)]
 use anchor_lang::{
-    solana_program::{instruction::Instruction, pubkey::Pubkey, stake, system_program, sysvar},
+    solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
-use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::state::steward_state::COMPUTE_INSTANT_UNSTAKES;
 use jito_steward::state::steward_state::EPOCH_MAINTENANCE;
 use jito_steward::state::steward_state::POST_LOOP_IDLE;
 use jito_steward::state::steward_state::PRE_LOOP_IDLE;
 use jito_steward::state::steward_state::REBALANCE;
-use jito_steward::state::steward_state::REBALANCE_DIRECTED;
+use jito_steward::state::steward_state::REBALANCE_DIRECTED_COMPLETE;
 use jito_steward::state::steward_state::RESET_TO_IDLE;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
@@ -152,18 +149,11 @@ use jito_steward::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock,
-    compute_budget::ComputeBudgetInstruction,
-    epoch_schedule::EpochSchedule,
-    signer::Signer,
-    stake::{
-        stake_flags::StakeFlags,
-        state::{Authorized, Delegation as StakeDelegation, Meta, Stake, StakeStateV2},
-    },
-    transaction::Transaction,
+    clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
+    signer::Signer, stake::state::StakeStateV2, transaction::Transaction,
 };
 use spl_stake_pool::{
-    find_transient_stake_program_address, minimum_delegation,
+    minimum_delegation,
     state::{AccountType, ValidatorListHeader, ValidatorStakeInfo},
 };
 use tests::{
@@ -400,12 +390,18 @@ async fn test_compute_scores() {
         .state
         .set_flag(jito_steward::EPOCH_MAINTENANCE);
     steward_state_account.state.unset_flag(
-        PRE_LOOP_IDLE | COMPUTE_INSTANT_UNSTAKES | REBALANCE | POST_LOOP_IDLE | REBALANCE_DIRECTED,
+        PRE_LOOP_IDLE
+            | COMPUTE_INSTANT_UNSTAKES
+            | REBALANCE
+            | POST_LOOP_IDLE
+            | REBALANCE_DIRECTED_COMPLETE,
     );
     steward_state_account
         .state
         .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.next_cycle_epoch =
         clock.epoch + steward_config.parameters.num_epochs_between_scoring;
@@ -451,7 +447,7 @@ async fn test_compute_scores() {
 
     fixture.simulate_stake_pool_update().await;
 
-    let epoch_maintenance_ix = Instruction {
+    let _epoch_maintenance_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::EpochMaintenance {
             config: fixture.steward_config.pubkey(),
@@ -651,8 +647,7 @@ async fn test_compute_instant_unstake() {
                 num_epochs_between_scoring: Some(10),
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-                min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-                max_epoch_progress_for_directed_rebalance: Some(0.1),
+                compute_score_epoch_progress: Some(0.50),
             }),
             None,
         )
@@ -904,7 +899,9 @@ async fn test_idle() {
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.instant_unstake_epoch_progress = 0.9;
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;
     steward_state_account.state.current_epoch = epoch_schedule.first_normal_epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
@@ -1627,7 +1624,9 @@ async fn test_rebalance_other_cases() {
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let clock: Clock = fixture.get_sysvar().await;
 
-    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
+    steward_state_account
+        .state
+        .set_flag(REBALANCE_DIRECTED_COMPLETE);
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;

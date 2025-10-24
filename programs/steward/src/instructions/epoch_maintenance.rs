@@ -7,7 +7,7 @@ use crate::{
         get_validator_list, get_validator_list_length,
     },
     Config, StewardStateAccount, COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE,
-    PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED, RESET_TO_IDLE,
+    PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE, RESET_TO_IDLE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -107,7 +107,7 @@ pub fn handler(
                     | COMPUTE_INSTANT_UNSTAKES
                     | REBALANCE
                     | POST_LOOP_IDLE
-                    | REBALANCE_DIRECTED,
+                    | REBALANCE_DIRECTED_COMPLETE,
             );
             state_account
                 .state

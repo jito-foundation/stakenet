@@ -1,7 +1,7 @@
 pub const MAX_ALLOC_BYTES: usize = 10_240;
 pub const VEC_SIZE_BYTES: usize = 4;
-pub const PUBKEY_SIZE: usize = 32;
 pub const U64_SIZE: usize = 8;
+pub const PUBKEY_SIZE: usize = 32;
 pub const STAKE_STATUS_OFFSET: usize = 40;
 pub const VOTE_ADDRESS_OFFSET: usize = 41;
 pub const STAKE_POOL_WITHDRAW_SEED: &[u8] = b"withdraw";

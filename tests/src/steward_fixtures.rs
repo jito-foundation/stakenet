@@ -346,8 +346,7 @@ impl TestFixture {
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
-            min_epoch_progress_for_compute_directed_stake_meta: Some(0.50),
-            max_epoch_progress_for_directed_rebalance: Some(0.1),
+            compute_score_epoch_progress: Some(0.50),
         });
 
         let update_priority_fee_parameters_args =
@@ -1375,9 +1374,8 @@ impl Default for FixtureDefaultAccounts {
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
-            reserve_lock_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 888],
+            _padding: [0; 920],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1877,8 +1875,9 @@ impl Default for StateMachineFixtures {
             directed_stake_global_cap_bps: 3_000,
             min_epoch_progress_for_compute_directed_stake_meta: 0.50,
             max_epoch_progress_for_directed_rebalance: 0.1,
+            compute_score_epoch_progress: 0.5,
             _padding_0: [0; 2],
-            _padding_1: [0; 29],
+            _padding_1: [0; 28],
         };
 
         // Setup Config
@@ -1894,9 +1893,8 @@ impl Default for StateMachineFixtures {
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
-            reserve_lock_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 888],
+            _padding: [0; 920],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
