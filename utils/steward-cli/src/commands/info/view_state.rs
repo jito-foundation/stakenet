@@ -3,8 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::LAMPORT_BALANCE_DEFAULT, stake_pool_utils::ValidatorList, Config, Delegation,
-    StewardStateAccountV2,
+    constants::LAMPORT_BALANCE_DEFAULT, score::ValidatorScoreComponents,
+    stake_pool_utils::ValidatorList, Config, Delegation, StewardStateAccountV2,
 };
 use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -915,8 +915,13 @@ fn _print_verbose_state(
 
             formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
             formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
+            if let Some(raw_score) = steward_state_account.state.raw_scores.get(index) {
+                let validator_score_components = ValidatorScoreComponents::decode(*raw_score);
+                formatted_string += &validator_score_components.to_string();
+            }
+
             formatted_string += &format!(
-                "Raw Score: {}\n",
+                "Commission Score: {}\n",
                 steward_state_account
                     .state
                     .raw_scores
