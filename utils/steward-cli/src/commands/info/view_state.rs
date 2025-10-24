@@ -89,12 +89,11 @@ pub struct StateInfo {
     /// Used for efficient ranking and delegation decisions
     sorted_score_indices_count: usize,
 
-    /// Count of computed yield component scores
+    /// Count of computed raw component scores
     /// Used as secondary priority for unstaking order decisions
     raw_scores_count: usize,
 
-    /// Count of validator indices sorted by yield score (descending)
-    /// Used for efficient yield-based ranking
+    /// Count of validator indices sorted by raw score
     sorted_raw_score_indices_count: usize,
 
     /// Count of delegation entries (target stake allocations)
@@ -127,7 +126,7 @@ pub struct StateInfo {
     scoring_unstake_total: u64,
 
     /// Total lamports scheduled for instant unstaking
-    /// Accumulated during the current cycle  
+    /// Accumulated during the current cycle
     instant_unstake_total: u64,
 
     /// Total lamports from stake deposits scheduled for unstaking
@@ -296,13 +295,12 @@ pub struct ValidatorDetails {
     pub steward_list_index: usize,
 
     /// Overall rank among all validators (1-based, None if unranked)
-    /// Ranking is based on score (primary) and yield score (secondary)
     pub overall_rank: Option<usize>,
 
     /// Performance score assigned by the steward (0 = failing, >0 = passing)
     pub score: u64,
 
-    /// Yield score based on staking rewards performance
+    /// Raw score
     pub raw_score: u64,
 
     /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
@@ -576,9 +574,9 @@ fn _print_default_state(
             "Sorted Score Indices Count: {}\n",
             output.state.sorted_score_indices_count
         );
-        formatted_string += &format!("Yield Scores Count: {}\n", output.state.raw_scores_count);
+        formatted_string += &format!("Raw Scores Count: {}\n", output.state.raw_scores_count);
         formatted_string += &format!(
-            "Sorted Yield Score Indices Count: {}\n",
+            "Sorted Raw Score Indices Count: {}\n",
             output.state.sorted_raw_score_indices_count
         );
         formatted_string += &format!("Delegations Count: {}\n", output.state.delegations_count);
@@ -919,7 +917,7 @@ fn _print_verbose_state(
             formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
             formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
             formatted_string += &format!(
-                "Yield Score: {}\n",
+                "Raw Score: {}\n",
                 steward_state_account
                     .state
                     .raw_scores
