@@ -299,8 +299,8 @@ pub struct ValidatorDetails {
     /// Validator's final score (0 if any eligibility criteria failed, otherwise equals raw_score)
     pub score: u64,
 
-    /// Validator's 4-tier hierarchical score before binary filters applied
-    pub raw_score: u64,
+    /// Validator score componets
+    pub validator_score: ValidatorScoreComponents,
 
     /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
     pub passing_eligibility_criteria: String,
@@ -780,7 +780,7 @@ fn build_verbose_state_output(
             steward_list_index: index,
             overall_rank,
             score: *score,
-            raw_score: *raw_score,
+            validator_score: ValidatorScoreComponents::decode(*raw_score),
             passing_eligibility_criteria: eligibility_criteria,
             target_delegation_percent,
             is_instant_unstake: steward_state_account

@@ -4,6 +4,7 @@ use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,
     Discriminator, Result,
 };
+use serde::{Deserialize, Serialize};
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
 };
@@ -31,7 +32,7 @@ use crate::{
 /// - Bits 0-24 (25 bits):  Tier 4 - Vote credits ratio (direct)
 ///
 /// Higher raw scores are always better, as commission values are inverted during encoding.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ValidatorScoreComponents {
     /// Inflation Commission (0-100%)
     ///
