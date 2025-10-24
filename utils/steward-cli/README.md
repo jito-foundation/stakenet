@@ -57,7 +57,6 @@ Inflation Commission: 4
 MEV commission BPS: 800
 Validator Age: 544
 Vote Credits: 9967609
-Commission Score: 6957991073806817273
 Passing Eligibility Criteria: Yes
 Target Delegation Percent: 0.0%
 
