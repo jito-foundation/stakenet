@@ -133,8 +133,10 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             num_epochs_between_scoring: config.num_epochs_between_scoring,
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
-            min_epoch_progress_for_compute_directed_stake_meta: config.min_epoch_progress_for_compute_directed_stake_meta,
-            max_epoch_progress_for_directed_rebalance: config.max_epoch_progress_for_directed_rebalance,
+            min_epoch_progress_for_compute_directed_stake_meta: config
+                .min_epoch_progress_for_compute_directed_stake_meta,
+            max_epoch_progress_for_directed_rebalance: config
+                .max_epoch_progress_for_directed_rebalance,
         }
     }
 }

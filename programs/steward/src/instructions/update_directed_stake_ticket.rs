@@ -37,7 +37,9 @@ impl UpdateDirectedStakeTicket<'_> {
         authority_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
     ) -> Result<()> {
-        if !whitelist.is_user_staker_permissioned(authority_pubkey) && !whitelist.is_protocol_staker_permissioned(authority_pubkey) {
+        if !whitelist.is_user_staker_permissioned(authority_pubkey)
+            && !whitelist.is_protocol_staker_permissioned(authority_pubkey)
+        {
             return Err(error!(StewardError::Unauthorized));
         }
 

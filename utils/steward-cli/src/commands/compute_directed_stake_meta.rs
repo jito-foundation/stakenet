@@ -104,7 +104,7 @@ pub async fn command_compute_directed_stake_meta(
         )
         .await?;
 
-    // TODO: If it exists, we need the previous epoch's directed stake meta to get the 
+    // TODO: If it exists, we need the previous epoch's directed stake meta to get the
     // total_stake_lamports for each validator
 
     // Mock data

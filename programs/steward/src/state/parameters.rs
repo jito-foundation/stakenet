@@ -356,12 +356,18 @@ impl Parameters {
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
         }
 
-        if let Some(min_epoch_progress_for_compute_directed_stake_meta) = min_epoch_progress_for_compute_directed_stake_meta {
-            new_parameters.min_epoch_progress_for_compute_directed_stake_meta = min_epoch_progress_for_compute_directed_stake_meta;
+        if let Some(min_epoch_progress_for_compute_directed_stake_meta) =
+            min_epoch_progress_for_compute_directed_stake_meta
+        {
+            new_parameters.min_epoch_progress_for_compute_directed_stake_meta =
+                min_epoch_progress_for_compute_directed_stake_meta;
         }
 
-        if let Some(max_epoch_progress_for_directed_rebalance) = max_epoch_progress_for_directed_rebalance {
-            new_parameters.max_epoch_progress_for_directed_rebalance = max_epoch_progress_for_directed_rebalance;
+        if let Some(max_epoch_progress_for_directed_rebalance) =
+            max_epoch_progress_for_directed_rebalance
+        {
+            new_parameters.max_epoch_progress_for_directed_rebalance =
+                max_epoch_progress_for_directed_rebalance;
         }
 
         // Validation will throw an error if any of the parameters are invalid

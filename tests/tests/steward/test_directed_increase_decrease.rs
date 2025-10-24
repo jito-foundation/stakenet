@@ -2,8 +2,7 @@ use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     directed_delegation::{
-        decrease_stake_calculation, increase_stake_calculation, RebalanceType,
-        UnstakeState,
+        decrease_stake_calculation, increase_stake_calculation, RebalanceType, UnstakeState,
     },
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
     Delegation, StewardState, StewardStateEnum, STATE_PADDING_0_SIZE,
@@ -79,7 +78,7 @@ fn test_increase_stake_calculation_basic() {
     let validator3 = Pubkey::new_unique();
 
     let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 500_000), // Needs 500k more
+        (validator1, 1_000_000, 500_000),   // Needs 500k more
         (validator2, 2_000_000, 1_000_000), // Needs 1M more
         (validator3, 1_500_000, 1_500_000), // Already at target
     ]);
@@ -88,7 +87,7 @@ fn test_increase_stake_calculation_basic() {
     let result = increase_stake_calculation(
         &state,
         &directed_stake_meta,
-        0, 
+        0,
         500_000,
         2_000_000,
         1_200_000,
@@ -121,11 +120,11 @@ fn test_increase_stake_calculation_no_increase_needed() {
     let result = increase_stake_calculation(
         &state,
         &directed_stake_meta,
-        0, // validator1 index
+        0,         // validator1 index
         1_000_000, // current_lamports (already at target)
         5_000_000, // stake_pool_lamports
         1_000_000, // reserve_lamports
-        1_000, // minimum_delegation
+        1_000,     // minimum_delegation
         2_000_000, // stake_rent
     );
 
@@ -143,9 +142,8 @@ fn test_increase_stake_calculation_index_out_of_bounds() {
     let state = create_mock_steward_state(2);
     let validator1 = Pubkey::new_unique();
 
-    let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 500_000),
-    ]);
+    let directed_stake_meta =
+        create_mock_directed_stake_meta(vec![(validator1, 1_000_000, 500_000)]);
 
     let result = increase_stake_calculation(
         &state,
@@ -198,7 +196,7 @@ fn test_decrease_stake_calculation_basic() {
     let validator3 = Pubkey::new_unique();
 
     let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 500_000, 1_000_000), // Has 500k more than target
+        (validator1, 500_000, 1_000_000),   // Has 500k more than target
         (validator2, 1_000_000, 2_000_000), // Has 1M more than target
         (validator3, 1_500_000, 1_500_000), // At target
     ]);
@@ -269,9 +267,8 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
     let state = create_mock_steward_state(2);
     let validator1 = Pubkey::new_unique();
 
-    let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 1_500_000),
-    ]);
+    let directed_stake_meta =
+        create_mock_directed_stake_meta(vec![(validator1, 1_000_000, 1_500_000)]);
 
     let unstake_state = UnstakeState {
         directed_unstake_cap: 1_000_000,
@@ -461,16 +458,7 @@ fn test_edge_case_zero_values() {
     ]);
 
     // Test increase with zero values
-    let result = increase_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-    );
+    let result = increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {

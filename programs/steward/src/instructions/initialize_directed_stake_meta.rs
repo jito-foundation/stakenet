@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*;
-use borsh::{BorshSerialize, BorshDeserialize};
 use crate::state::directed_stake::DirectedStakeMeta;
 use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config, StewardStateAccount};
+use anchor_lang::prelude::*;
+use borsh::{BorshDeserialize, BorshSerialize};
 use std::mem::size_of;
 
 #[derive(Accounts)]
@@ -44,9 +44,15 @@ pub struct DirectedStakeMetaHeader {
 pub fn handler(ctx: Context<InitializeDirectedStakeMeta>, total_stake_targets: u16) -> Result<()> {
     let epoch = ctx.accounts.clock.epoch;
     let total_stake_targets = total_stake_targets as u16;
-    let mut stake_meta_data = ctx.accounts.directed_stake_meta.as_ref().try_borrow_mut_data()?;
-    let discriminator_bytes: [u8; 8] = DirectedStakeMeta::DISCRIMINATOR.try_into().map_err(|_| error!(StewardError::InvalidParameterValue))?;
-    // At the time of initialization we can serialize the header, but not the full account 
+    let mut stake_meta_data = ctx
+        .accounts
+        .directed_stake_meta
+        .as_ref()
+        .try_borrow_mut_data()?;
+    let discriminator_bytes: [u8; 8] = DirectedStakeMeta::DISCRIMINATOR
+        .try_into()
+        .map_err(|_| error!(StewardError::InvalidParameterValue))?;
+    // At the time of initialization we can serialize the header, but not the full account
     // because the targets array is not fully allocated.
     let header = DirectedStakeMetaHeader {
         discriminator: discriminator_bytes,

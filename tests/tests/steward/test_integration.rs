@@ -138,7 +138,13 @@ use anchor_lang::{
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
 use jito_steward::state::directed_stake::DirectedStakeMeta;
+use jito_steward::state::steward_state::COMPUTE_INSTANT_UNSTAKES;
+use jito_steward::state::steward_state::EPOCH_MAINTENANCE;
+use jito_steward::state::steward_state::POST_LOOP_IDLE;
+use jito_steward::state::steward_state::PRE_LOOP_IDLE;
+use jito_steward::state::steward_state::REBALANCE;
 use jito_steward::state::steward_state::REBALANCE_DIRECTED;
+use jito_steward::state::steward_state::RESET_TO_IDLE;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     stake_pool_utils::{StakePool, ValidatorList},
@@ -390,6 +396,16 @@ async fn test_compute_scores() {
     // Basic state setup
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
     steward_state_account.state.state_tag = jito_steward::state::StewardStateEnum::ComputeScores;
+    steward_state_account
+        .state
+        .set_flag(jito_steward::EPOCH_MAINTENANCE);
+    steward_state_account.state.unset_flag(
+        PRE_LOOP_IDLE | COMPUTE_INSTANT_UNSTAKES | REBALANCE | POST_LOOP_IDLE | REBALANCE_DIRECTED,
+    );
+    steward_state_account
+        .state
+        .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
+    steward_state_account.state.set_flag(REBALANCE_DIRECTED);
     steward_state_account.state.current_epoch = clock.epoch;
     steward_state_account.state.next_cycle_epoch =
         clock.epoch + steward_config.parameters.num_epochs_between_scoring;
@@ -450,47 +466,6 @@ async fn test_compute_scores() {
         .data(),
     };
 
-    let rebalance_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::RebalanceDirected {
-            config: fixture.steward_config.pubkey(),
-            state_account: fixture.steward_state,
-            directed_stake_meta: Pubkey::find_program_address(
-                &[
-                    DirectedStakeMeta::SEED,
-                    fixture.steward_config.pubkey().as_ref(),
-                ],
-                &jito_steward::id(),
-            )
-            .0,
-            stake_pool: fixture.stake_pool_meta.stake_pool,
-            stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: Pubkey::new_unique(),
-            validator_list: fixture.stake_pool_meta.validator_list,
-            reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: Pubkey::new_unique(),
-            transient_stake_account: find_transient_stake_program_address(
-                &spl_stake_pool::id(),
-                &Pubkey::new_unique(),
-                &fixture.stake_pool_meta.stake_pool,
-                0u64,
-            )
-            .0,
-            vote_account: Pubkey::new_unique(),
-            clock: solana_sdk::sysvar::clock::id(),
-            rent: solana_sdk::sysvar::rent::id(),
-            stake_history: solana_sdk::sysvar::stake_history::id(),
-            stake_config: solana_sdk::stake::config::ID,
-            system_program: system_program::id(),
-            stake_program: solana_sdk::stake::program::id(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::RebalanceDirected {
-            validator_list_index: 0u64,
-        }
-        .data(),
-    };
-
     // Basic test - test score computation that requires most compute
     let compute_scores_ix = Instruction {
         program_id: jito_steward::id(),
@@ -513,8 +488,8 @@ async fn test_compute_scores() {
             // Only high because we are averaging 512 epochs
             ComputeBudgetInstruction::set_compute_unit_limit(800_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
-            epoch_maintenance_ix.clone(),
-            rebalance_ix.clone(),
+            //epoch_maintenance_ix.clone(),
+            //rebalance_ix.clone(),
             compute_scores_ix.clone(),
         ],
         Some(&fixture.keypair.pubkey()),

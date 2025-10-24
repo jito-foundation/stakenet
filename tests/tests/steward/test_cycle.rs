@@ -17,11 +17,11 @@ use solana_sdk::{
     system_program, transaction::Transaction,
 };
 use tests::steward_fixtures::{
-    auto_add_validator, cluster_history_default, crank_compute_delegations, crank_compute_instant_unstake,
-    crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance,
-    crank_rebalance_directed, crank_stake_pool, crank_validator_history_accounts,
-    instant_remove_validator, serialized_cluster_history_account, ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures,
-    TestFixture, ValidatorEntry,
+    auto_add_validator, cluster_history_default, crank_compute_delegations,
+    crank_compute_instant_unstake, crank_compute_score, crank_epoch_maintenance, crank_idle,
+    crank_rebalance, crank_rebalance_directed, crank_stake_pool, crank_validator_history_accounts,
+    instant_remove_validator, serialized_cluster_history_account, ExtraValidatorAccounts,
+    FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -603,26 +603,20 @@ async fn test_remove_validator_mid_epoch() {
 
     // Ensure validator history account for validator 0 is properly initialized
     // before calling ComputeInstantUnstake
-    let _validator_history_address = fixture.initialize_validator_history_with_credits(
-        extra_validator_accounts[0].vote_account,
-        0,
-    );
-
-
+    let _validator_history_address = fixture
+        .initialize_validator_history_with_credits(extra_validator_accounts[0].vote_account, 0);
 
     // Ensure cluster history account is properly initialized
-    let cluster_history_account = Pubkey::find_program_address(
-        &[ClusterHistory::SEED],
-        &validator_history::id(),
-    ).0;
+    let cluster_history_account =
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::id()).0;
     let cluster_history = cluster_history_default();
     fixture.ctx.borrow_mut().set_account(
         &cluster_history_account,
         &serialized_cluster_history_account(cluster_history).into(),
     );
 
-        // Update validator history accounts with current epoch data
-        crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1]).await;
+    // Update validator history accounts with current epoch data
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1]).await;
 
     // Compute instant unstake transitions to Rebalance
     // Use validator 0 since validator 2 has been removed from the list

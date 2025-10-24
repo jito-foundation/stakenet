@@ -1,9 +1,6 @@
 use crate::DirectedStakeMeta;
 use crate::{
-    constants::MAX_ALLOC_BYTES,
-    errors::StewardError,
-    state::Config,
-    utils::get_validator_list,
+    constants::MAX_ALLOC_BYTES, errors::StewardError, state::Config, utils::get_validator_list,
 };
 use anchor_lang::prelude::*;
 

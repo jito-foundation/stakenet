@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
-use crate::{errors::StewardError, Config, StewardStateAccount, maybe_transition};
+use crate::{errors::StewardError, maybe_transition, Config, StewardStateAccount};
 use std::mem::size_of;
 
 #[derive(Accounts)]

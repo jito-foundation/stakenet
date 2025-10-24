@@ -153,7 +153,10 @@ pub mod steward {
     }
 
     /// Increases or decreases stake for a validator at `validator_list_index` using directed stake targets
-    pub fn rebalance_directed(ctx: Context<RebalanceDirected>, validator_list_index: u64) -> Result<()> {
+    pub fn rebalance_directed(
+        ctx: Context<RebalanceDirected>,
+        validator_list_index: u64,
+    ) -> Result<()> {
         instructions::rebalance_directed::handler(ctx, validator_list_index as usize)
     }
 
@@ -391,7 +394,9 @@ pub mod steward {
     }
 
     /// Reallocate DirectedStakeWhitelist account to proper size
-    pub fn realloc_directed_stake_whitelist(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
+    pub fn realloc_directed_stake_whitelist(
+        ctx: Context<ReallocDirectedStakeWhitelist>,
+    ) -> Result<()> {
         instructions::realloc_directed_stake_whitelist::handler(ctx)
     }
 
