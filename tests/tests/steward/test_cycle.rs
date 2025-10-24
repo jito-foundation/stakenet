@@ -608,6 +608,8 @@ async fn test_remove_validator_mid_epoch() {
         0,
     );
 
+
+
     // Ensure cluster history account is properly initialized
     let cluster_history_account = Pubkey::find_program_address(
         &[ClusterHistory::SEED],
@@ -618,6 +620,9 @@ async fn test_remove_validator_mid_epoch() {
         &cluster_history_account,
         &serialized_cluster_history_account(cluster_history).into(),
     );
+
+        // Update validator history accounts with current epoch data
+        crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1]).await;
 
     // Compute instant unstake transitions to Rebalance
     // Use validator 0 since validator 2 has been removed from the list
