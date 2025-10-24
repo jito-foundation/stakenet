@@ -26,8 +26,9 @@ async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     let mut ixs = vec![];
 
     while num_reallocs > 0 {
-        ixs.extend(vec![
-            Instruction {
+        let instructions_to_add = num_reallocs.min(10);
+        for _ in 0..instructions_to_add {
+            ixs.push(Instruction {
                 program_id: jito_steward::id(),
                 accounts: vec![
                     anchor_lang::solana_program::instruction::AccountMeta::new(
@@ -52,9 +53,8 @@ async fn realloc_directed_stake_meta(fixture: &TestFixture) {
                     ),
                 ],
                 data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
-            };
-            num_reallocs.min(10)
-        ]);
+            });
+        }
         num_reallocs = num_reallocs.saturating_sub(10);
     }
 
@@ -145,8 +145,15 @@ use jito_steward::{
 };
 use solana_program_test::*;
 use solana_sdk::{
-    clock::Clock, compute_budget::ComputeBudgetInstruction, epoch_schedule::EpochSchedule,
-    signer::Signer, stake::state::StakeStateV2, transaction::Transaction,
+    clock::Clock,
+    compute_budget::ComputeBudgetInstruction,
+    epoch_schedule::EpochSchedule,
+    signer::Signer,
+    stake::{
+        stake_flags::StakeFlags,
+        state::{Authorized, Delegation as StakeDelegation, Meta, Stake, StakeStateV2},
+    },
+    transaction::Transaction,
 };
 use spl_stake_pool::{
     find_transient_stake_program_address, minimum_delegation,
@@ -445,34 +452,51 @@ async fn test_compute_scores() {
         .data(),
     };
 
-    // First add the validator to the stake pool to create the stake account
+    // Get stake account addresses
     let (stake_account_address, _transient_stake_account_address, withdraw_authority) = fixture
         .stake_accounts_for_validator(validator_history.vote_account)
         .await;
 
-    let add_validator_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::AutoAddValidator {
-            steward_state: fixture.steward_state,
-            validator_history_account: validator_history_account,
-            config: fixture.steward_config.pubkey(),
-            stake_pool_program: spl_stake_pool::id(),
-            stake_pool: fixture.stake_pool_meta.stake_pool,
-            reserve_stake: fixture.stake_pool_meta.reserve,
-            withdraw_authority,
-            validator_list: fixture.stake_pool_meta.validator_list,
-            stake_account: stake_account_address,
-            vote_account: validator_history.vote_account,
-            rent: solana_sdk::sysvar::rent::id(),
-            clock: solana_sdk::sysvar::clock::id(),
-            stake_history: solana_sdk::sysvar::stake_history::id(),
-            stake_config: solana_sdk::stake::config::ID,
-            system_program: system_program::id(),
-            stake_program: solana_sdk::stake::program::id(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
-    };
+    // Manually create the stake account in the bank
+    let stake_pool: StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+
+    let current_epoch = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar::<Clock>()
+        .await
+        .unwrap()
+        .epoch;
+
+    let configured_stake_account = StakeStateV2::Stake(
+        Meta {
+            rent_exempt_reserve: 0,
+            authorized: Authorized {
+                staker: withdraw_authority,
+                withdrawer: withdraw_authority,
+            },
+            lockup: stake_pool.as_ref().lockup,
+        },
+        Stake {
+            delegation: StakeDelegation {
+                voter_pubkey: validator_history.vote_account,
+                stake: 1_000_000_000,
+                activation_epoch: 0,
+                deactivation_epoch: current_epoch - 1,
+                ..Default::default()
+            },
+            credits_observed: 0,
+        },
+        StakeFlags::default(),
+    );
+
+    fixture.ctx.borrow_mut().set_account(
+        &stake_account_address,
+        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+    );
 
     let rebalance_directed_ix = Instruction {
         program_id: jito_steward::id(),
