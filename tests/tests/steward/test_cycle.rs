@@ -17,13 +17,13 @@ use solana_sdk::{
     system_program, transaction::Transaction,
 };
 use tests::steward_fixtures::{
-    auto_add_validator, crank_compute_delegations, crank_compute_instant_unstake,
+    auto_add_validator, cluster_history_default, crank_compute_delegations, crank_compute_instant_unstake,
     crank_compute_score, crank_epoch_maintenance, crank_idle, crank_rebalance,
     crank_rebalance_directed, crank_stake_pool, crank_validator_history_accounts,
-    instant_remove_validator, ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures,
+    instant_remove_validator, serialized_cluster_history_account, ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures,
     TestFixture, ValidatorEntry,
 };
-use validator_history::ValidatorHistory;
+use validator_history::{ClusterHistory, ValidatorHistory};
 
 async fn realloc_directed_stake_meta(fixture: &TestFixture) {
     let directed_stake_meta = Pubkey::find_program_address(
@@ -601,12 +601,31 @@ async fn test_remove_validator_mid_epoch() {
     assert_eq!(state.validators_for_immediate_removal.count(), 0);
     assert_eq!(state.num_pool_validators, 2);
 
+    // Ensure validator history account for validator 0 is properly initialized
+    // before calling ComputeInstantUnstake
+    let _validator_history_address = fixture.initialize_validator_history_with_credits(
+        extra_validator_accounts[0].vote_account,
+        0,
+    );
+
+    // Ensure cluster history account is properly initialized
+    let cluster_history_account = Pubkey::find_program_address(
+        &[ClusterHistory::SEED],
+        &validator_history::id(),
+    ).0;
+    let cluster_history = cluster_history_default();
+    fixture.ctx.borrow_mut().set_account(
+        &cluster_history_account,
+        &serialized_cluster_history_account(cluster_history).into(),
+    );
+
     // Compute instant unstake transitions to Rebalance
+    // Use validator 0 since validator 2 has been removed from the list
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[2],
+        &[0],
     )
     .await;
 
