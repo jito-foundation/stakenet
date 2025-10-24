@@ -4,6 +4,7 @@ use anchor_lang::{
     prelude::event, solana_program::pubkey::Pubkey, AnchorDeserialize, AnchorSerialize,
     Discriminator, Result,
 };
+use serde::{Deserialize, Serialize};
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
 };
@@ -16,6 +17,113 @@ use crate::{
     errors::StewardError::{self, ArithmeticError},
     Config,
 };
+
+/// Components of a validator score, organized by priority tiers.
+///
+/// Validator scores are encoded as a single u64 value with a hierarchical structure
+/// where higher-order bits represent more important factors. When comparing scores,
+/// differences in Tier 1 (inflation commission) always dominate lower tiers, creating
+/// a strict priority ordering.
+///
+/// The encoding uses 64 bits distributed across 4 tiers:
+/// - Bits 56-63 (8 bits):  Tier 1 - Inflation commission (inverted)
+/// - Bits 42-55 (14 bits): Tier 2 - MEV commission (inverted)
+/// - Bits 25-41 (17 bits): Tier 3 - Validator age (direct)
+/// - Bits 0-24 (25 bits):  Tier 4 - Vote credits ratio (direct)
+///
+/// Higher raw scores are always better, as commission values are inverted during encoding.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorScoreComponents {
+    /// Inflation Commission (0-100%)
+    ///
+    /// **Tier 1 - Highest Priority** (bits 56-63)
+    ///
+    /// Lower validator commission is always preferred. This tier uses the maximum
+    /// commission observed in the commission_range, inverted so lower commission
+    /// yields a higher score. A validator with 5% commission will always rank above
+    /// a validator with 10% commission, regardless of other factors.
+    pub inflation_commission: u8,
+
+    /// MEV Commission (0-10000 basis points, where 10000 = 100%)
+    ///
+    /// **Tier 2** (bits 42-55)
+    ///
+    /// Among validators with equal inflation commission, lower MEV commission is
+    /// preferred. This tier uses the average MEV commission over mev_commission_range
+    /// epochs, inverted so lower commission yields a higher score.
+    pub mev_commission_bps: u16,
+
+    /// Validator Age (epochs with non-zero vote credits)
+    ///
+    /// **Tier 3** (bits 25-41)
+    ///
+    /// Among validators equal on both commission tiers, older validators are preferred.
+    /// Age is measured in epochs where the validator produced non-zero vote credits,
+    /// rewarding longevity and reliability. Maximum representable age is 131,071 epochs
+    /// (approximately 716 years at ~2 days per epoch).
+    pub validator_age: u32,
+
+    /// Vote Credits Ratio (normalized performance score)
+    ///
+    /// **Tier 4 - Lowest Priority** (bits 0-24)
+    ///
+    /// Among validators equal on all above tiers, higher performance is preferred.
+    /// This represents vote credits relative to total possible credits, scaled by
+    /// VOTE_CREDITS_RATIO_MAX for precision. Maximum representable value is 33,554,431.
+    pub vote_credits: u32,
+}
+
+impl std::fmt::Display for ValidatorScoreComponents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Inflation Commission: {}\nMEV commission BPS: {}\nValidator Age: {}\nVote Credits: {}\n", self.inflation_commission, self.mev_commission_bps, self.validator_age, self.vote_credits)
+    }
+}
+
+impl ValidatorScoreComponents {
+    /// Decodes a raw validator score into its component parts.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use jito_steward::score::{encode_validator_score, ValidatorScoreComponents};
+    ///
+    /// // Perfect validator: 0% commissions, max age, max credits
+    /// let inflation_commission = 0;
+    /// let mev_commission_bps = 0;
+    /// let validator_age = 131071;
+    /// let vote_credits = 33554431;
+    ///
+    /// let score = encode_validator_score(inflation_commission, mev_commission_bps, validator_age, vote_credits).unwrap();
+    ///
+    /// let components = ValidatorScoreComponents::decode(score);
+    /// assert_eq!(components.inflation_commission, inflation_commission);
+    /// assert_eq!(components.mev_commission_bps, mev_commission_bps);
+    /// assert_eq!(components.validator_age, validator_age);
+    /// assert_eq!(components.vote_credits, vote_credits);
+    /// ```
+    pub fn decode(raw_score: u64) -> Self {
+        // Tier 1: Extract inflation commission score (bits 56-63) and invert
+        let inflation_score = (raw_score >> 56) & 0xFF;
+        let inflation_commission = 100u8.saturating_sub(inflation_score as u8);
+
+        // Tier 2: Extract MEV commission score (bits 42-55) and invert
+        let mev_score = (raw_score >> 42) & 0x3FFF; // 14 bits
+        let mev_commission_bps = 10000u16.saturating_sub(mev_score as u16);
+
+        // Tier 3: Extract validator age directly (bits 25-41)
+        let validator_age = ((raw_score >> 25) & 0x1FFFF) as u32; // 17 bits
+
+        // Tier 4: Extract vote credits directly (bits 0-24)
+        let vote_credits = (raw_score & 0x1FFFFFF) as u32; // 25 bits
+
+        Self {
+            inflation_commission,
+            mev_commission_bps,
+            validator_age,
+            vote_credits,
+        }
+    }
+}
 
 /// Encode a 4-tier validator score into a u64 with the following bit layout:
 /// Bits 56-63 (8 bits):  Inflation commission (inverted, 0-100%)
