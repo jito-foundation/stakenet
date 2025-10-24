@@ -162,10 +162,10 @@ jobs:
           name: jito_steward_test.so
           path: target/test/
       - name: Rename test artifact to jito_steward.so
-        run: mv ./target/test/jito_steward_test.so ./target/deploy/jito_steward.so
+        run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
         shell: bash
       - name: cargo test
-        run: cargo test --package tests --all-features --color auto
+        run: cargo test +nightly-2024-11-19 --package tests --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
