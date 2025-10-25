@@ -95,6 +95,14 @@ impl DirectedStakeMeta {
         }
         true
     }
+
+    pub fn total_staked_lamports(&self) -> u64 {
+        let mut total: u64 = 0;
+        for target in self.targets.iter() {
+            total = total.saturating_add(target.total_staked_lamports);
+        }
+        total
+    }
 }
 
 #[derive(BorshSerialize)]

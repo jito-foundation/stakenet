@@ -27,6 +27,7 @@ pub fn decrease_stake_calculation(
     _stake_pool_lamports: u64,
     _minimum_delegation: u64,
     _stake_rent: u64,
+    directed_unstake_cap_lamports: u64,
 ) -> Result<RebalanceType> {
     if target_index >= state.num_pool_validators as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
@@ -63,11 +64,12 @@ pub fn decrease_stake_calculation(
     let excess_proportion_bps: u128 =
         (excess_lamports as u128).saturating_mul(10_000) / (total_excess_lamports as u128);
 
-    let proportional_decrease_lamports: u64 = ((unstake_state.directed_unstake_cap as u128)
-        .saturating_mul(excess_proportion_bps)
-        / 10_000)
-        .try_into()
-        .map_err(|_| StewardError::ArithmeticError)?;
+    let unstake_total = directed_unstake_cap_lamports.min(total_excess_lamports);
+
+    let proportional_decrease_lamports: u64 =
+        ((unstake_total as u128).saturating_mul(excess_proportion_bps) / 10_000)
+            .try_into()
+            .map_err(|_| StewardError::ArithmeticError)?;
 
     Ok(RebalanceType::Decrease(DecreaseComponents {
         scoring_unstake_lamports: 0,
@@ -95,9 +97,15 @@ pub fn increase_stake_calculation(
     reserve_lamports: u64,
     _minimum_delegation: u64,
     _stake_rent: u64,
+    undirected_cap_reached: bool,
 ) -> Result<RebalanceType> {
     if target_index >= state.num_pool_validators as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
+    }
+
+    // If the undirected floor has been reached, no directed increases can be made
+    if undirected_cap_reached {
+        return Ok(RebalanceType::None);
     }
 
     let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
@@ -112,7 +120,7 @@ pub fn increase_stake_calculation(
     }
 
     let mut total_delta_lamports: u64 = 0u64;
-    let mut target_delta_lamports: u64 = 0u64;
+    let target_delta_lamports: u64 = target_lamports.saturating_sub(current_lamports);
 
     for target in directed_stake_meta.targets.iter() {
         let target_lamports = directed_stake_meta
@@ -123,9 +131,6 @@ pub fn increase_stake_calculation(
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
         let delta_lamports = target_lamports.saturating_sub(staked_lamports);
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
-        if target.vote_pubkey == vote_pubkey {
-            target_delta_lamports = delta_lamports;
-        }
     }
 
     if total_delta_lamports == 0 {
@@ -143,12 +148,9 @@ pub fn increase_stake_calculation(
     let adjusted_proportional_increase_lamports =
         proportional_increase_lamports.min(target_delta_lamports);
 
-    if current_lamports < target_lamports {
-        return Ok(RebalanceType::Increase(
-            adjusted_proportional_increase_lamports,
-        ));
-    }
-    Err(StewardError::ValidatorIndexOutOfBounds.into())
+    return Ok(RebalanceType::Increase(
+        adjusted_proportional_increase_lamports,
+    ));
 }
 
 #[derive(Default)]

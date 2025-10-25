@@ -355,11 +355,8 @@ pub mod steward {
     /* Directed Stake Instructions */
 
     /// Initialize DirectedStakeMeta account
-    pub fn initialize_directed_stake_meta(
-        ctx: Context<InitializeDirectedStakeMeta>,
-        total_stake_targets: u16,
-    ) -> Result<()> {
-        instructions::initialize_directed_stake_meta::handler(ctx, total_stake_targets)
+    pub fn initialize_directed_stake_meta(ctx: Context<InitializeDirectedStakeMeta>) -> Result<()> {
+        instructions::initialize_directed_stake_meta::handler(ctx)
     }
 
     /// Copy directed stake targets to the meta account

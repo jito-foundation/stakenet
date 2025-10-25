@@ -136,10 +136,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targe
                 true,
             ),
         ],
-        data: jito_steward::instruction::InitializeDirectedStakeMeta {
-            total_stake_targets: 0,
-        }
-        .data(),
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
     };
 
     let tx = Transaction::new_signed_with_payer(
@@ -211,6 +208,7 @@ async fn test_cycle() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
             }),
             None,
         )
@@ -454,6 +452,7 @@ async fn test_remove_validator_mid_epoch() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
             }),
             None,
         )
@@ -720,6 +719,7 @@ async fn test_add_validator_next_cycle() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
             }),
             None,
         )

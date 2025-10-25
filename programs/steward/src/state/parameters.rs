@@ -30,6 +30,7 @@ pub struct UpdateParametersArgs {
     pub scoring_unstake_cap_bps: Option<u32>,
     pub instant_unstake_cap_bps: Option<u32>,
     pub stake_deposit_unstake_cap_bps: Option<u32>,
+    pub undirected_stake_floor_lamports: Option<u64>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
     pub compute_score_slot_range: Option<u64>,
@@ -142,6 +143,11 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::F64)),
                         docs: Default::default(),
                     },
+                    IdlField {
+                        name: "undirected_stake_floor_lamports".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
                 ])),
             },
             docs: Default::default(),
@@ -244,14 +250,20 @@ pub struct Parameters {
     /// Maximum percentage of the pool to be unstaked from directed stake (in basis points)
     pub directed_stake_unstake_cap_bps: u16,
 
-    /// Maximum percentage of the pool to delegated via directed stake (in basis points)
-    pub directed_stake_global_cap_bps: u16,
+    /// Directed rebalance increases are allowed until stake pool TVL dips below this floor
+    /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
+    /// fields due to it being live on mainnet
+    pub undirected_stake_floor_lamports: [u8; 8],
 
-    pub _padding_0: [u8; 2],
-    pub _padding_1: [u64; 28],
+    pub _padding_0: [u8; 4],
+    pub _padding_1: [u64; 27],
 }
 
 impl Parameters {
+    pub fn undirected_stake_floor_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.undirected_stake_floor_lamports)
+    }
+
     /// Merges the updated parameters with the current parameters and validates them
     pub fn get_valid_updated_parameters(
         self,
@@ -280,6 +292,7 @@ impl Parameters {
             minimum_stake_lamports,
             minimum_voting_epochs,
             compute_score_epoch_progress,
+            undirected_stake_floor_lamports,
         } = *args;
 
         let mut new_parameters = self;

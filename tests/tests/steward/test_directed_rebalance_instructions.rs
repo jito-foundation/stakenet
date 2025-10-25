@@ -116,10 +116,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targe
                 true,
             ),
         ],
-        data: jito_steward::instruction::InitializeDirectedStakeMeta {
-            total_stake_targets,
-        }
-        .data(),
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
     };
 
     let tx = Transaction::new_signed_with_payer(

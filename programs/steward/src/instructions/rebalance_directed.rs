@@ -256,7 +256,18 @@ pub fn handler(
                 directed_unstake_cap: config.parameters.directed_stake_unstake_cap_bps as u64,
             };
 
-            // Try decrease first, then increase
+            let directed_unstake_cap_lamports = ((config.parameters.directed_stake_unstake_cap_bps
+                as u128
+                * stake_pool_lamports_with_fixed_cost as u128)
+                / 10_000u128) as u64;
+
+            let undirected_tvl_lamports = stake_pool_lamports_with_fixed_cost
+                .saturating_sub(directed_stake_meta.total_staked_lamports());
+
+            let undirected_floor_cap =
+                undirected_tvl_lamports < config.parameters.undirected_stake_floor_lamports();
+
+            // Try decrease first, then increase (if undirected floor cap does not apply)
             let decrease_result = decrease_stake_calculation(
                 &state_account.state,
                 &directed_stake_meta,
@@ -266,6 +277,7 @@ pub fn handler(
                 stake_pool_lamports_with_fixed_cost,
                 minimum_delegation,
                 stake_rent,
+                directed_unstake_cap_lamports,
             );
 
             match decrease_result {
@@ -279,6 +291,7 @@ pub fn handler(
                     reserve_lamports_with_rent,
                     minimum_delegation,
                     stake_rent,
+                    undirected_floor_cap,
                 ),
             }?
         };

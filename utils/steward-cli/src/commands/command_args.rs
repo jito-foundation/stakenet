@@ -113,6 +113,10 @@ pub struct ConfigParameters {
     /// Epoch progress for computing score
     #[arg(long, env)]
     pub compute_score_epoch_progress: Option<f64>,
+
+    /// Minimum lamports for undirected stake floor
+    #[arg(long, env)]
+    pub undirected_stake_floor_lamports: Option<u64>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -138,6 +142,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
             compute_score_epoch_progress: config.compute_score_epoch_progress,
+            undirected_stake_floor_lamports: config.undirected_stake_floor_lamports,
         }
     }
 }

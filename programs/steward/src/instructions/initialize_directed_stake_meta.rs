@@ -1,7 +1,6 @@
 use crate::state::directed_stake::DirectedStakeMeta;
-use crate::{constants::MAX_ALLOC_BYTES, errors::StewardError, Config};
+use crate::{constants::MAX_ALLOC_BYTES, Config};
 use anchor_lang::prelude::*;
-use borsh::{BorshDeserialize, BorshSerialize};
 use std::mem::size_of;
 
 #[derive(Accounts)]
@@ -30,6 +29,6 @@ impl InitializeDirectedStakeMeta<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
 }
 
-pub fn handler(ctx: Context<InitializeDirectedStakeMeta>, total_stake_targets: u16) -> Result<()> {
+pub fn handler(_ctx: Context<InitializeDirectedStakeMeta>) -> Result<()> {
     Ok(())
 }

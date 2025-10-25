@@ -41,9 +41,7 @@ pub async fn command_init_directed_stake_meta(
             authority: authority_pubkey,
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::InitializeDirectedStakeMeta {
-            total_stake_targets: args.total_stake_targets,
-        }
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}
         .data(),
     };
 

@@ -93,6 +93,7 @@ fn test_increase_stake_calculation_basic() {
         1_200_000,
         1_000,
         2_000_000,
+        false,
     );
 
     let validator1_proportion_bps = 3333;
@@ -105,6 +106,39 @@ fn test_increase_stake_calculation_basic() {
             assert!(amount == expected_amount);
         }
         _ => panic!("Expected Increase variant"),
+    }
+}
+
+#[test]
+fn test_increase_stake_undirected_cap_reached() {
+    let state = create_mock_steward_state(3);
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    let validator3 = Pubkey::new_unique();
+
+    let directed_stake_meta = create_mock_directed_stake_meta(vec![
+        (validator1, 1_000_000, 500_000),   // Needs 500k more
+        (validator2, 2_000_000, 1_000_000), // Needs 1M more
+        (validator3, 1_500_000, 1_500_000), // Already at target
+    ]);
+
+    // Test increasing stake for validator1
+    let result = increase_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        500_000,
+        2_000_000,
+        1_200_000,
+        1_000,
+        2_000_000,
+        true,
+    );
+
+    assert!(result.is_ok());
+    match result.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected None variant"),
     }
 }
 
@@ -126,6 +160,7 @@ fn test_increase_stake_calculation_no_increase_needed() {
         1_000_000, // reserve_lamports
         1_000,     // minimum_delegation
         2_000_000, // stake_rent
+        false,
     );
 
     assert!(result.is_ok());
@@ -154,6 +189,7 @@ fn test_increase_stake_calculation_index_out_of_bounds() {
         1_000_000,
         1_000,
         2_000_000,
+        false,
     );
 
     assert!(result.is_err());
@@ -177,6 +213,7 @@ fn test_increase_stake_calculation_zero_reserve() {
         0,
         1_000,
         2_000_000,
+        false,
     );
 
     assert!(result.is_ok());
@@ -216,6 +253,7 @@ fn test_decrease_stake_calculation_basic() {
         5_000_000,
         1_000,
         2_000_000,
+        1_000_000_000_000,
     );
 
     assert!(result.is_ok());
@@ -238,7 +276,6 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
     ]);
 
     let unstake_state = UnstakeState {
-        directed_unstake_cap: 1_000_000,
         ..Default::default()
     };
 
@@ -251,6 +288,7 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         5_000_000,
         1_000,
         2_000_000,
+        1_000_000_000_000,
     );
 
     assert!(result.is_ok());
@@ -271,7 +309,6 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         create_mock_directed_stake_meta(vec![(validator1, 1_000_000, 1_500_000)]);
 
     let unstake_state = UnstakeState {
-        directed_unstake_cap: 1_000_000,
         ..Default::default()
     };
 
@@ -284,6 +321,7 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         5_000_000,
         1_000,
         2_000_000,
+        1_000_000_000_000,
     );
 
     assert!(result.is_err());
@@ -299,7 +337,6 @@ fn test_decrease_stake_calculation_zero_cap() {
     ]);
 
     let unstake_state = UnstakeState {
-        directed_unstake_cap: 0, // No unstake capacity
         ..Default::default()
     };
 
@@ -312,6 +349,7 @@ fn test_decrease_stake_calculation_zero_cap() {
         5_000_000,
         1_000,
         2_000_000,
+        0,
     );
 
     assert!(result.is_ok());
@@ -348,6 +386,7 @@ fn test_increase_stake_calculation_proportional_distribution() {
         reserve_lamports,
         1_000,
         2_000_000,
+        false,
     );
 
     let validator1_proportion_bps = 3333;
@@ -372,6 +411,7 @@ fn test_increase_stake_calculation_proportional_distribution() {
         reserve_lamports,
         1_000,
         2_000_000,
+        false,
     );
 
     assert!(result2.is_ok());
@@ -403,7 +443,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
     ]);
 
     let unstake_state = UnstakeState {
-        directed_unstake_cap: 3_000_000,
         ..Default::default()
     };
 
@@ -416,13 +455,14 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         5_000_000,
         1_000,
         2_000_000,
+        1_000_000_000_000,
     );
 
     assert!(result.is_ok());
     match result.unwrap() {
         RebalanceType::Decrease(components1) => {
             println!("Components1: {:?}", components1);
-            assert!(components1.directed_unstake_lamports == 750_000);
+            assert!(components1.directed_unstake_lamports == 500_000);
         }
         _ => panic!("Expected Decrease variant"),
     }
@@ -436,13 +476,78 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         5_000_000,
         1_000,
         2_000_000,
+        1_000_000_000_000,
     );
 
     assert!(result.is_ok());
     match result.unwrap() {
         RebalanceType::Decrease(components2) => {
             println!("Components2: {:?}", components2);
-            assert!(components2.directed_unstake_lamports == 1_500_000);
+            assert!(components2.directed_unstake_lamports == 1_000_000);
+        }
+        _ => panic!("Expected Decrease variant"),
+    }
+}
+
+#[test]
+fn test_decrease_stake_directed_stake_lamports_with_cap() {
+    let state = create_mock_steward_state(5);
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+    let validator3 = Pubkey::new_unique();
+    let validator4 = Pubkey::new_unique();
+    let validator5 = Pubkey::new_unique();
+
+    let directed_stake_meta = create_mock_directed_stake_meta(vec![
+        (validator1, 500_000, 1_000_000), // Has 500k excess (25% of total excess)
+        (validator2, 1_000_000, 1_500_000), // Has 500k excess (25% of total excess)
+        (validator3, 500_000, 1_000_000), // Has 500k excess (25% of total excess)
+        (validator4, 1_000_000, 1_500_000), // Has 500k excess (25% of total excess)
+        (validator5, 1_500_000, 1_500_000), // At target
+    ]);
+
+    let unstake_state = UnstakeState {
+        ..Default::default()
+    };
+
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        unstake_state.clone(),
+        1_000_000,
+        5_000_000,
+        1_000,
+        2_000_000,
+        1_000_000,
+    );
+
+    assert!(result.is_ok());
+    match result.unwrap() {
+        RebalanceType::Decrease(components1) => {
+            println!("Components1: {:?}", components1);
+            assert!(components1.directed_unstake_lamports == 250_000);
+        }
+        _ => panic!("Expected Decrease variant"),
+    }
+
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        1,
+        unstake_state,
+        2_000_000,
+        5_000_000,
+        1_000,
+        2_000_000,
+        1_000_000,
+    );
+
+    assert!(result.is_ok());
+    match result.unwrap() {
+        RebalanceType::Decrease(components2) => {
+            println!("Components2: {:?}", components2);
+            assert!(components2.directed_unstake_lamports == 500_000);
         }
         _ => panic!("Expected Decrease variant"),
     }
@@ -458,7 +563,7 @@ fn test_edge_case_zero_values() {
     ]);
 
     // Test increase with zero values
-    let result = increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, 0, 0, 0);
+    let result = increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, 0, 0, 0, false);
 
     assert!(result.is_ok());
     match result.unwrap() {
