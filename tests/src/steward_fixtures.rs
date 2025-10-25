@@ -102,27 +102,31 @@ impl TestFixture {
 
            Returns a fixture with relevant account addresses and keypairs.
         */
-
-        let mut program = match std::env::var("SBF_OUT_DIR") {
-            Ok(_) | Err(_) => {
-                let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
-                program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
-                program.set_compute_max_units(1_400_000);
-                program
-            } // Err(_) => {
-              //     let mut program = ProgramTest::new(
-              //         "jito-steward",
-              //         jito_steward::ID,
-              //         processor!(jito_steward::entry),
-              //     );
-              //     program.add_program(
-              //         "spl-stake-pool",
-              //         spl_stake_pool::id(),
-              //         processor!(spl_stake_pool::processor::Processor::process),
-              //     );
-              //     program
-              // }
-        };
+        let mut program = ProgramTest::default();
+        program.prefer_bpf(true);
+        program.add_program("jito_steward", jito_steward::id(), None);
+        program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
+        program.set_compute_max_units(1_400_000);
+        // let mut program = match std::env::var("SBF_OUT_DIR") {
+        //     Ok(_) | Err(_) => {
+        //         let mut program = ProgramTest::new("jito-steward", jito_steward::ID, None);
+        //         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
+        //         program.set_compute_max_units(1_400_000);
+        //         program
+        //     } // Err(_) => {
+        //       //     let mut program = ProgramTest::new(
+        //       //         "jito-steward",
+        //       //         jito_steward::ID,
+        //       //         processor!(jito_steward::entry),
+        //       //     );
+        //       //     program.add_program(
+        //       //         "spl-stake-pool",
+        //       //         spl_stake_pool::id(),
+        //       //         processor!(spl_stake_pool::processor::Processor::process),
+        //       //     );
+        //       //     program
+        //       // }
+        // };
 
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
