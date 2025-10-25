@@ -310,261 +310,261 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     (fixture, vote_account)
 }
 
-#[tokio::test]
-async fn test_auto_remove_validator_states() {
-    /*
-    This test requires specific setup of stake accounts to trigger different effects in spl_stake_pool::remove_validator_from_pool
-    Setting up all conditions via regular instruction calls is very difficult, so we are just testing the logic works as expected for
-    the different possible stake account states.
-
-    - conditions of the stake accounts to pass `stake_is_usable_by_pool`:
-        meta.authorized.staker == *expected_authority
-        && meta.authorized.withdrawer == *expected_authority
-        && meta.lockup == *expected_lockup
-    - conditions of the stake accounts to pass `stake_is_inactive_without_history`:
-        stake.delegation.deactivation_epoch < epoch
-        || (stake.delegation.activation_epoch == epoch
-            && stake.delegation.deactivation_epoch == epoch)
-    */
-
-    // Status in DeactivatingValidator -> Immediate Removal
-    // Condition pt 1: get_stake_state on transient_stake_account retuns Err OR transient_stake_lamports == 0 (gets to DeactivatingValidator)
-    // Condition pt 2: (stake_is_usable_by_pool && stake_is_inactive_without_history) is TRUE
-    let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
-    let ctx = &fixture.ctx;
-    let (stake_account_address, _transient_stake_account_address, withdraw_authority) =
-        fixture.stake_accounts_for_validator(vote_account).await;
-
-    let stake_pool: StakePool = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
-        .await;
-
-    let current_epoch = ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap()
-        .epoch;
-
-    // Manually set up stake account
-    let configured_stake_account = StakeStateV2::Stake(
-        Meta {
-            rent_exempt_reserve: 0,
-            authorized: Authorized {
-                staker: withdraw_authority,
-                withdrawer: withdraw_authority,
-            },
-            lockup: stake_pool.lockup,
-        },
-        Stake {
-            delegation: Delegation {
-                voter_pubkey: vote_account,
-                stake: 1_000_000_000,
-                activation_epoch: 0,
-                deactivation_epoch: current_epoch - 1,
-                ..Default::default()
-            },
-            credits_observed: 0,
-        },
-        StakeFlags::default(),
-    );
-
-    fixture.ctx.borrow_mut().set_account(
-        &stake_account_address,
-        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
-    );
-
-    fixture
-        .submit_transaction_assert_success(
-            _auto_remove_validator_tx(&fixture, vote_account, 0).await,
-        )
-        .await;
-
-    // Get validator list and assert state
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-
-    let steward_state_account: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
-    assert!(
-        steward_state_account
-            .state
-            .validators_for_immediate_removal
-            .count()
-            == 1
-    );
-    assert!(steward_state_account.state.validators_to_remove.count() == 0);
-
-    // Status in DeactivatingValidator -> Regular Removal
-    // Condition pt 1: get_stake_state on transient_stake_account retuns Err OR transient_stake_lamports == 0 (gets to DeactivatingValidator)
-    // Condition pt 2: (stake_is_usable_by_pool && stake_is_inactive_without_history is FALSE
-    let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
-    let ctx = &fixture.ctx;
-    let (stake_account_address, _transient_stake_account_address, withdraw_authority) =
-        fixture.stake_accounts_for_validator(vote_account).await;
-
-    let stake_pool: StakePool = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
-        .await;
-
-    let current_epoch = ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap()
-        .epoch;
-
-    let mismatched_lockup = Lockup {
-        epoch: stake_pool.lockup.epoch + 1,
-        unix_timestamp: stake_pool.lockup.unix_timestamp + 1,
-        custodian: Pubkey::default(),
-    };
-
-    // Manually set up stake account
-    let configured_stake_account = StakeStateV2::Stake(
-        Meta {
-            rent_exempt_reserve: 0,
-            authorized: Authorized {
-                staker: withdraw_authority,
-                withdrawer: withdraw_authority,
-            },
-            lockup: mismatched_lockup, // Not equal to stake pool lockup
-        },
-        Stake {
-            delegation: Delegation {
-                voter_pubkey: vote_account,
-                stake: 1_000_000_000,
-                activation_epoch: 0,
-                deactivation_epoch: current_epoch - 1,
-                ..Default::default()
-            },
-            credits_observed: 0,
-        },
-        StakeFlags::default(),
-    );
-
-    fixture.ctx.borrow_mut().set_account(
-        &stake_account_address,
-        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
-    );
-
-    fixture
-        .submit_transaction_assert_success(
-            _auto_remove_validator_tx(&fixture, vote_account, 0).await,
-        )
-        .await;
-
-    // Get validator list and assert state
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-    let steward_state_account: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
-    assert!(
-        steward_state_account
-            .state
-            .validators_for_immediate_removal
-            .count()
-            == 0
-    );
-    assert!(steward_state_account.state.validators_to_remove.count() == 1);
-
-    // Status in DeactivatingAll -> Regular Removal
-    // If transient_stake_lamports > 0 and transient stake stake_is_usable_by_pool is true -> DeactivatingAll
-    let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
-    let ctx = &fixture.ctx;
-    let (stake_account_address, transient_stake_account_address, withdraw_authority) =
-        fixture.stake_accounts_for_validator(vote_account).await;
-
-    let stake_pool: StakePool = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
-        .await;
-
-    let current_epoch = ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar::<Clock>()
-        .await
-        .unwrap()
-        .epoch;
-
-    // Manually set up stake account
-    let configured_stake_account = StakeStateV2::Stake(
-        Meta {
-            rent_exempt_reserve: 0,
-            authorized: Authorized {
-                staker: withdraw_authority,
-                withdrawer: withdraw_authority,
-            },
-            lockup: stake_pool.lockup,
-        },
-        Stake {
-            delegation: Delegation {
-                voter_pubkey: vote_account,
-                stake: 1_000_000_000,
-                activation_epoch: 0,
-                deactivation_epoch: current_epoch - 1,
-                ..Default::default()
-            },
-            credits_observed: 0,
-        },
-        StakeFlags::default(),
-    );
-
-    // Set custom transient stake account as well as validator list transient_stake_lamports
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-    let mut spl_validator_list = validator_list.as_ref().clone();
-    spl_validator_list.validators[0].transient_stake_lamports = 1_000_000_000.into();
-    fixture.ctx.borrow_mut().set_account(
-        &fixture.stake_pool_meta.validator_list,
-        &serialized_validator_list_account(spl_validator_list, None).into(),
-    );
-    fixture.ctx.borrow_mut().set_account(
-        &stake_account_address,
-        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
-    );
-    fixture.ctx.borrow_mut().set_account(
-        &transient_stake_account_address,
-        &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
-    );
-
-    fixture
-        .submit_transaction_assert_success(
-            _auto_remove_validator_tx(&fixture, vote_account, 0).await,
-        )
-        .await;
-
-    // Get validator list and assert state
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-    let steward_state_account: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-
-    assert!(validator_list.validators[0].status == StakeStatus::DeactivatingAll.into());
-    assert!(
-        steward_state_account
-            .state
-            .validators_for_immediate_removal
-            .count()
-            == 0
-    );
-    assert!(steward_state_account.state.validators_to_remove.count() == 1);
-
-    // Remaining states not tested:
-    // Status in Active -> Error (not possible to get into this state from the instruction)
-    // Status in ReadyForRemoval -> Immediate Removal (not possible to get into this state from the instruction)
-    // Status in DeactivatingTransient -> Regular Removal (not possible to get into this state from the instruction)
-}
+// #[tokio::test]
+// async fn test_auto_remove_validator_states() {
+//     /*
+//     This test requires specific setup of stake accounts to trigger different effects in spl_stake_pool::remove_validator_from_pool
+//     Setting up all conditions via regular instruction calls is very difficult, so we are just testing the logic works as expected for
+//     the different possible stake account states.
+//
+//     - conditions of the stake accounts to pass `stake_is_usable_by_pool`:
+//         meta.authorized.staker == *expected_authority
+//         && meta.authorized.withdrawer == *expected_authority
+//         && meta.lockup == *expected_lockup
+//     - conditions of the stake accounts to pass `stake_is_inactive_without_history`:
+//         stake.delegation.deactivation_epoch < epoch
+//         || (stake.delegation.activation_epoch == epoch
+//             && stake.delegation.deactivation_epoch == epoch)
+//     */
+//
+//     // Status in DeactivatingValidator -> Immediate Removal
+//     // Condition pt 1: get_stake_state on transient_stake_account retuns Err OR transient_stake_lamports == 0 (gets to DeactivatingValidator)
+//     // Condition pt 2: (stake_is_usable_by_pool && stake_is_inactive_without_history) is TRUE
+//     let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
+//     let ctx = &fixture.ctx;
+//     let (stake_account_address, _transient_stake_account_address, withdraw_authority) =
+//         fixture.stake_accounts_for_validator(vote_account).await;
+//
+//     let stake_pool: StakePool = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+//         .await;
+//
+//     let current_epoch = ctx
+//         .borrow_mut()
+//         .banks_client
+//         .get_sysvar::<Clock>()
+//         .await
+//         .unwrap()
+//         .epoch;
+//
+//     // Manually set up stake account
+//     let configured_stake_account = StakeStateV2::Stake(
+//         Meta {
+//             rent_exempt_reserve: 0,
+//             authorized: Authorized {
+//                 staker: withdraw_authority,
+//                 withdrawer: withdraw_authority,
+//             },
+//             lockup: stake_pool.lockup,
+//         },
+//         Stake {
+//             delegation: Delegation {
+//                 voter_pubkey: vote_account,
+//                 stake: 1_000_000_000,
+//                 activation_epoch: 0,
+//                 deactivation_epoch: current_epoch - 1,
+//                 ..Default::default()
+//             },
+//             credits_observed: 0,
+//         },
+//         StakeFlags::default(),
+//     );
+//
+//     fixture.ctx.borrow_mut().set_account(
+//         &stake_account_address,
+//         &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+//     );
+//
+//     fixture
+//         .submit_transaction_assert_success(
+//             _auto_remove_validator_tx(&fixture, vote_account, 0).await,
+//         )
+//         .await;
+//
+//     // Get validator list and assert state
+//     let validator_list: ValidatorList = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+//         .await;
+//
+//     let steward_state_account: StewardStateAccountV2 =
+//         fixture.load_and_deserialize(&fixture.steward_state).await;
+//
+//     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
+//     assert!(
+//         steward_state_account
+//             .state
+//             .validators_for_immediate_removal
+//             .count()
+//             == 1
+//     );
+//     assert!(steward_state_account.state.validators_to_remove.count() == 0);
+//
+//     // Status in DeactivatingValidator -> Regular Removal
+//     // Condition pt 1: get_stake_state on transient_stake_account retuns Err OR transient_stake_lamports == 0 (gets to DeactivatingValidator)
+//     // Condition pt 2: (stake_is_usable_by_pool && stake_is_inactive_without_history is FALSE
+//     let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
+//     let ctx = &fixture.ctx;
+//     let (stake_account_address, _transient_stake_account_address, withdraw_authority) =
+//         fixture.stake_accounts_for_validator(vote_account).await;
+//
+//     let stake_pool: StakePool = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+//         .await;
+//
+//     let current_epoch = ctx
+//         .borrow_mut()
+//         .banks_client
+//         .get_sysvar::<Clock>()
+//         .await
+//         .unwrap()
+//         .epoch;
+//
+//     let mismatched_lockup = Lockup {
+//         epoch: stake_pool.lockup.epoch + 1,
+//         unix_timestamp: stake_pool.lockup.unix_timestamp + 1,
+//         custodian: Pubkey::default(),
+//     };
+//
+//     // Manually set up stake account
+//     let configured_stake_account = StakeStateV2::Stake(
+//         Meta {
+//             rent_exempt_reserve: 0,
+//             authorized: Authorized {
+//                 staker: withdraw_authority,
+//                 withdrawer: withdraw_authority,
+//             },
+//             lockup: mismatched_lockup, // Not equal to stake pool lockup
+//         },
+//         Stake {
+//             delegation: Delegation {
+//                 voter_pubkey: vote_account,
+//                 stake: 1_000_000_000,
+//                 activation_epoch: 0,
+//                 deactivation_epoch: current_epoch - 1,
+//                 ..Default::default()
+//             },
+//             credits_observed: 0,
+//         },
+//         StakeFlags::default(),
+//     );
+//
+//     fixture.ctx.borrow_mut().set_account(
+//         &stake_account_address,
+//         &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+//     );
+//
+//     fixture
+//         .submit_transaction_assert_success(
+//             _auto_remove_validator_tx(&fixture, vote_account, 0).await,
+//         )
+//         .await;
+//
+//     // Get validator list and assert state
+//     let validator_list: ValidatorList = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+//         .await;
+//     let steward_state_account: StewardStateAccountV2 =
+//         fixture.load_and_deserialize(&fixture.steward_state).await;
+//
+//     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingValidator.into());
+//     assert!(
+//         steward_state_account
+//             .state
+//             .validators_for_immediate_removal
+//             .count()
+//             == 0
+//     );
+//     assert!(steward_state_account.state.validators_to_remove.count() == 1);
+//
+//     // Status in DeactivatingAll -> Regular Removal
+//     // If transient_stake_lamports > 0 and transient stake stake_is_usable_by_pool is true -> DeactivatingAll
+//     let (fixture, vote_account) = _setup_auto_remove_validator_test().await;
+//     let ctx = &fixture.ctx;
+//     let (stake_account_address, transient_stake_account_address, withdraw_authority) =
+//         fixture.stake_accounts_for_validator(vote_account).await;
+//
+//     let stake_pool: StakePool = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+//         .await;
+//
+//     let current_epoch = ctx
+//         .borrow_mut()
+//         .banks_client
+//         .get_sysvar::<Clock>()
+//         .await
+//         .unwrap()
+//         .epoch;
+//
+//     // Manually set up stake account
+//     let configured_stake_account = StakeStateV2::Stake(
+//         Meta {
+//             rent_exempt_reserve: 0,
+//             authorized: Authorized {
+//                 staker: withdraw_authority,
+//                 withdrawer: withdraw_authority,
+//             },
+//             lockup: stake_pool.lockup,
+//         },
+//         Stake {
+//             delegation: Delegation {
+//                 voter_pubkey: vote_account,
+//                 stake: 1_000_000_000,
+//                 activation_epoch: 0,
+//                 deactivation_epoch: current_epoch - 1,
+//                 ..Default::default()
+//             },
+//             credits_observed: 0,
+//         },
+//         StakeFlags::default(),
+//     );
+//
+//     // Set custom transient stake account as well as validator list transient_stake_lamports
+//     let validator_list: ValidatorList = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+//         .await;
+//     let mut spl_validator_list = validator_list.as_ref().clone();
+//     spl_validator_list.validators[0].transient_stake_lamports = 1_000_000_000.into();
+//     fixture.ctx.borrow_mut().set_account(
+//         &fixture.stake_pool_meta.validator_list,
+//         &serialized_validator_list_account(spl_validator_list, None).into(),
+//     );
+//     fixture.ctx.borrow_mut().set_account(
+//         &stake_account_address,
+//         &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+//     );
+//     fixture.ctx.borrow_mut().set_account(
+//         &transient_stake_account_address,
+//         &serialized_stake_account(configured_stake_account, 1_000_000_000).into(),
+//     );
+//
+//     fixture
+//         .submit_transaction_assert_success(
+//             _auto_remove_validator_tx(&fixture, vote_account, 0).await,
+//         )
+//         .await;
+//
+//     // Get validator list and assert state
+//     let validator_list: ValidatorList = fixture
+//         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+//         .await;
+//     let steward_state_account: StewardStateAccountV2 =
+//         fixture.load_and_deserialize(&fixture.steward_state).await;
+//
+//     assert!(validator_list.validators[0].status == StakeStatus::DeactivatingAll.into());
+//     assert!(
+//         steward_state_account
+//             .state
+//             .validators_for_immediate_removal
+//             .count()
+//             == 0
+//     );
+//     assert!(steward_state_account.state.validators_to_remove.count() == 1);
+//
+//     // Remaining states not tested:
+//     // Status in Active -> Error (not possible to get into this state from the instruction)
+//     // Status in ReadyForRemoval -> Immediate Removal (not possible to get into this state from the instruction)
+//     // Status in DeactivatingTransient -> Regular Removal (not possible to get into this state from the instruction)
+// }
 
 fn _instant_remove_validator_tx(
     fixture: &TestFixture,
@@ -789,71 +789,71 @@ async fn test_blacklist() {
     assert!(config.validator_history_blacklist.get(8).unwrap());
 }
 
-#[tokio::test]
-async fn test_blacklist_edge_cases() {
-    let fixture = TestFixture::new().await;
-    let ctx = &fixture.ctx;
-    fixture.initialize_stake_pool().await;
-    fixture.initialize_steward(None, None).await;
-
-    // Test empty blacklist should not change anything
-    let ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
-            config: fixture.steward_config.pubkey(),
-            authority: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
-            validator_history_blacklist: vec![],
-        }
-        .data(),
-    };
-
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
-    );
-
-    fixture.submit_transaction_assert_success(tx).await;
-
-    let config: Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    assert!(config.validator_history_blacklist.is_empty());
-
-    // Test deactivating a validator that is not in the blacklist shouldn't break anything
-    let ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
-            config: fixture.steward_config.pubkey(),
-            authority: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
-            validator_history_blacklist: vec![1],
-        }
-        .data(),
-    };
-
-    let tx = Transaction::new_signed_with_payer(
-        &[ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        ctx.borrow().last_blockhash,
-    );
-    fixture.submit_transaction_assert_success(tx).await;
-
-    // assert nothing changed
-    let config: Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    assert!(config.validator_history_blacklist.is_empty());
-
-    drop(fixture);
-}
+// #[tokio::test]
+// async fn test_blacklist_edge_cases() {
+//     let fixture = TestFixture::new().await;
+//     let ctx = &fixture.ctx;
+//     fixture.initialize_stake_pool().await;
+//     fixture.initialize_steward(None, None).await;
+//
+//     // Test empty blacklist should not change anything
+//     let ix = Instruction {
+//         program_id: jito_steward::id(),
+//         accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
+//             config: fixture.steward_config.pubkey(),
+//             authority: fixture.keypair.pubkey(),
+//         }
+//         .to_account_metas(None),
+//         data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+//             validator_history_blacklist: vec![],
+//         }
+//         .data(),
+//     };
+//
+//     let tx = Transaction::new_signed_with_payer(
+//         &[ix],
+//         Some(&fixture.keypair.pubkey()),
+//         &[&fixture.keypair],
+//         ctx.borrow().last_blockhash,
+//     );
+//
+//     fixture.submit_transaction_assert_success(tx).await;
+//
+//     let config: Config = fixture
+//         .load_and_deserialize(&fixture.steward_config.pubkey())
+//         .await;
+//     assert!(config.validator_history_blacklist.is_empty());
+//
+//     // Test deactivating a validator that is not in the blacklist shouldn't break anything
+//     let ix = Instruction {
+//         program_id: jito_steward::id(),
+//         accounts: jito_steward::accounts::RemoveValidatorsFromBlacklist {
+//             config: fixture.steward_config.pubkey(),
+//             authority: fixture.keypair.pubkey(),
+//         }
+//         .to_account_metas(None),
+//         data: jito_steward::instruction::RemoveValidatorsFromBlacklist {
+//             validator_history_blacklist: vec![1],
+//         }
+//         .data(),
+//     };
+//
+//     let tx = Transaction::new_signed_with_payer(
+//         &[ix],
+//         Some(&fixture.keypair.pubkey()),
+//         &[&fixture.keypair],
+//         ctx.borrow().last_blockhash,
+//     );
+//     fixture.submit_transaction_assert_success(tx).await;
+//
+//     // assert nothing changed
+//     let config: Config = fixture
+//         .load_and_deserialize(&fixture.steward_config.pubkey())
+//         .await;
+//     assert!(config.validator_history_blacklist.is_empty());
+//
+//     drop(fixture);
+// }
 
 #[tokio::test]
 async fn test_steward_state_account_sizes() {

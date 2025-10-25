@@ -451,13 +451,10 @@ async fn test_remove_validator_mid_epoch() {
     drop(fixture);
 }
 
+/// Tests that a validator added at an arbitrary point during the cycle does not get included in the
+/// current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
 #[tokio::test]
 async fn test_add_validator_next_cycle() {
-    /*
-      Tests that a validator added at an arbitrary point during the cycle does not get included in the
-      current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
-    */
-
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
     let unit_test_fixtures = Box::<StateMachineFixtures>::default();
@@ -489,12 +486,13 @@ async fn test_add_validator_next_cycle() {
 
     fixture.advance_num_epochs(20, 10).await;
     fixture.initialize_stake_pool().await;
+
     fixture
         .initialize_steward(
             Some(UpdateParametersArgs {
-                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
-                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
-                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                mev_commission_range: Some(10),
+                epoch_credits_range: Some(10),
+                commission_range: Some(10),
                 scoring_delinquency_threshold_ratio: Some(0.85),
                 instant_unstake_delinquency_threshold_ratio: Some(0.70),
                 mev_commission_bps_threshold: Some(1000),

@@ -167,7 +167,6 @@ jobs:
         shell: bash
         env:
           RUST_MIN_STACK: 10000000
-          RUSTFLAGS: --cfg anchor_debug
 
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality
