@@ -454,7 +454,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
-                directed_stake_unstake_cap_bps: Some(10_000),
+                directed_stake_unstake_cap_bps: Some(100),
             }),
             None,
         )
@@ -538,6 +538,21 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
         &[0, 1, 2],
     )
     .await;
+
+    let directed_stake_meta: DirectedStakeMeta =
+        fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+    for target in directed_stake_meta.targets.iter() {
+        if target.vote_pubkey == Pubkey::default() {
+            continue;
+        }
+        println!(
+            "Staked lamports for validator {:?}: {:?}",
+            target.vote_pubkey, target.total_staked_lamports
+        );
+    }
+
+    assert!(false);
 
     drop(fixture);
 }
@@ -599,7 +614,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                undirected_stake_floor_lamports: Some(1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -684,6 +699,21 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
         &[0, 1, 2],
     )
     .await;
+
+    let directed_stake_meta: DirectedStakeMeta =
+        fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+    for target in directed_stake_meta.targets.iter() {
+        if target.vote_pubkey == Pubkey::default() {
+            continue;
+        }
+        println!(
+            "Staked lamports for validator {:?}: {:?}",
+            target.vote_pubkey, target.total_staked_lamports
+        );
+    }
+
+    assert!(false);
 
     drop(fixture);
 }
