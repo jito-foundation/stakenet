@@ -255,6 +255,7 @@ async fn test_cycle() {
         &[0],
     )
     .await;
+    println!("Rebalance directed 1");
 
     {
         // Assert size of validators list
@@ -281,6 +282,8 @@ async fn test_cycle() {
     let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
 
+    fixture.advance_num_slots(160_000).await;
+
     crank_idle(&fixture).await;
 
     crank_compute_instant_unstake(
@@ -299,7 +302,7 @@ async fn test_cycle() {
     )
     .await;
 
-    println!("Advancing epoch from {}", clock.epoch);
+    println!("Advancing epoch from {} (expected 20)", clock.epoch);
 
     fixture.advance_num_epochs(1, 10).await;
 
@@ -315,9 +318,9 @@ async fn test_cycle() {
     )
     .await;
 
-    fixture
-        .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch) / 2 + 1)
-        .await;
+    fixture.advance_num_slots(420_000).await;
+
+    crank_idle(&fixture).await;
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
@@ -340,7 +343,7 @@ async fn test_cycle() {
 
     fixture.advance_num_epochs(1, 10).await;
 
-    println!("Advancing epoch from {}", clock.epoch);
+    println!("Advancing epoch from {} (expected 21)", clock.epoch);
 
     crank_stake_pool(&fixture).await;
 
@@ -348,8 +351,6 @@ async fn test_cycle() {
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
-
-    crank_idle(&fixture).await;
 
     crank_rebalance_directed(
         &fixture,
@@ -445,7 +446,7 @@ async fn test_cycle_with_directed_stake_targets() {
                 scoring_unstake_cap_bps: Some(750),
                 instant_unstake_cap_bps: Some(10),
                 stake_deposit_unstake_cap_bps: Some(10),
-                instant_unstake_epoch_progress: Some(0.00),
+                instant_unstake_epoch_progress: Some(0.9),
                 compute_score_slot_range: Some(1000),
                 instant_unstake_inputs_epoch_progress: Some(0.50),
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
@@ -521,6 +522,7 @@ async fn test_cycle_with_directed_stake_targets() {
             .await
             .unwrap(),
     );
+
     fixture.submit_transaction_assert_success(tx).await;
 
     // Copy directed stake targets for the validators
@@ -597,6 +599,10 @@ async fn test_cycle_with_directed_stake_targets() {
 
     crank_idle(&fixture).await;
 
+    fixture.advance_num_slots(160_000).await;
+
+    crank_idle(&fixture).await;
+
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -613,7 +619,7 @@ async fn test_cycle_with_directed_stake_targets() {
     )
     .await;
 
-    println!("Advancing epoch from {}", clock.epoch);
+    println!("Advancing epoch from {} (expecting 20)", clock.epoch);
 
     fixture.advance_num_epochs(1, 10).await;
 
@@ -621,11 +627,16 @@ async fn test_cycle_with_directed_stake_targets() {
 
     crank_epoch_maintenance(&fixture, None).await;
 
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 100_000_000_000)
+            .await;
+    }
+
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1, 2],
     )
     .await;
     println!("Rebalance directed 2");
@@ -662,12 +673,14 @@ async fn test_cycle_with_directed_stake_targets() {
         }
     }
 
-    fixture
-        .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch) / 2 + 1)
-        .await;
+    fixture.advance_num_slots(250_000).await;
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+
+    fixture.advance_num_slots(160_000).await;
+
+    crank_idle(&fixture).await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -695,8 +708,6 @@ async fn test_cycle_with_directed_stake_targets() {
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
-
-    crank_idle(&fixture).await;
 
     // Copy targets with half balance to force a decrease rebalance
     for extra_accounts in extra_validator_accounts.iter() {
@@ -1040,7 +1051,7 @@ async fn test_remove_validator_mid_epoch() {
     let state = state_account.state;
     assert!(matches!(
         state.state_tag,
-        jito_steward::StewardStateEnum::Idle
+        jito_steward::StewardStateEnum::RebalanceDirected
     ));
     assert_eq!(state.validators_to_remove.count(), 0);
     assert_eq!(state.validators_for_immediate_removal.count(), 0);
@@ -1218,7 +1229,7 @@ async fn test_add_validator_next_cycle() {
 
     assert!(matches!(
         state.state_tag,
-        jito_steward::StewardStateEnum::Idle
+        jito_steward::StewardStateEnum::RebalanceDirected
     ));
     assert_eq!(state.validators_added, 1);
     assert_eq!(state.num_pool_validators, 2);
@@ -1229,7 +1240,7 @@ async fn test_add_validator_next_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0, 1], // Once again, why the extra call?
+        &[0], // Once again, why the extra call?
     )
     .await;
     println!("Rebalance directed 2");

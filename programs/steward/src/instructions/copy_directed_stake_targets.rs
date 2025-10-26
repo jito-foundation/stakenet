@@ -52,6 +52,12 @@ pub fn handler(
             msg!("Updating target index: {}", target_index);
             stake_meta.targets[target_index].total_target_lamports = target_lamports;
             stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
+            msg!(
+                "Updated target index: {} at epoch {} with value {}",
+                target_index,
+                clock.epoch,
+                target_lamports
+            );
         }
         None => {
             msg!(
@@ -71,6 +77,5 @@ pub fn handler(
             stake_meta.total_stake_targets += 1;
         }
     }
-
     Ok(())
 }
