@@ -486,13 +486,12 @@ async fn test_add_validator_next_cycle() {
 
     fixture.advance_num_epochs(20, 10).await;
     fixture.initialize_stake_pool().await;
-
     fixture
         .initialize_steward(
             Some(UpdateParametersArgs {
-                mev_commission_range: Some(10),
-                epoch_credits_range: Some(10),
-                commission_range: Some(10),
+                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
+                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
+                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
                 scoring_delinquency_threshold_ratio: Some(0.85),
                 instant_unstake_delinquency_threshold_ratio: Some(0.70),
                 mev_commission_bps_threshold: Some(1000),

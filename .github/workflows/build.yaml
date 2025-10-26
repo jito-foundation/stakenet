@@ -87,7 +87,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: solana-verify
-          version: "0.4.10"
+          version: "0.4.11"
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -153,15 +153,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
-      - name: Install Solana Toolsuite
-        run: sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.1/install)"
-      - name: Add Solana to path
-        run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-        # Build programs specifically for testing instead of using verified build
-      - name: Build validator-history for tests
-        run: cargo build-sbf --manifest-path programs/validator-history/Cargo.toml --sbf-out-dir target/deploy
-      - name: Build steward for tests
-        run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/deploy
+      # - name: Install Solana Toolsuite
+      #   run: sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.1/install)"
+      # - name: Add Solana to path
+      #   run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+      #   # Build programs specifically for testing instead of using verified build
+      # - name: Build validator-history for tests
+      #   run: cargo build-sbf --manifest-path programs/validator-history/Cargo.toml --sbf-out-dir target/deploy
+      # - name: Build steward for tests
+      #   run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/deploy
       - name: cargo test
         run: cargo test --package tests --all-features --color auto
         shell: bash

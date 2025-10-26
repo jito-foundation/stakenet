@@ -1896,7 +1896,6 @@ impl Default for StateMachineFixtures {
 
         // Setup Sysvars: Clock, EpochSchedule
         let epoch_schedule = EpochSchedule::default();
-
         let clock = Clock {
             epoch: current_epoch,
             slot: epoch_schedule.get_last_slot_in_epoch(current_epoch),
