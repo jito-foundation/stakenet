@@ -42,6 +42,11 @@ pub fn handler(
     }
 
     let clock = Clock::get()?;
+    msg!(
+        "Copying directed stake target for vote pubkey: {} at epoch {}",
+        vote_pubkey,
+        &clock.epoch
+    );
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {
             msg!("Updating target index: {}", target_index);

@@ -38,12 +38,24 @@ pub fn decrease_stake_calculation(
         .get_target_lamports(&vote_pubkey)
         .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
+    msg!(
+        "current_lamports: {}, target_lamports: {}",
+        current_lamports,
+        target_lamports
+    );
+
     // Check if we need to decrease (current > target)
     if current_lamports <= target_lamports {
+        msg!("Current lamports is less than or equal to target lamports, no directed decreases can be made.");
         return Ok(RebalanceType::None);
     }
 
     let excess_lamports = current_lamports.saturating_sub(target_lamports);
+    msg!("Excess lamports on target validator: {}", excess_lamports);
+    msg!(
+        "Directed unstake cap lamports: {}",
+        directed_unstake_cap_lamports
+    );
 
     let mut total_excess_lamports: u64 = 0u64;
     for target in directed_stake_meta.targets.iter() {
@@ -58,6 +70,7 @@ pub fn decrease_stake_calculation(
     }
 
     if total_excess_lamports == 0 {
+        msg!("Total excess lamports is 0, no directed decreases can be made.");
         return Ok(RebalanceType::None);
     }
 
@@ -70,6 +83,11 @@ pub fn decrease_stake_calculation(
         ((unstake_total as u128).saturating_mul(excess_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
+
+    msg!(
+        "Decreasing stake by {} lamports",
+        proportional_decrease_lamports
+    );
 
     Ok(RebalanceType::Decrease(DecreaseComponents {
         scoring_unstake_lamports: 0,
@@ -105,6 +123,7 @@ pub fn increase_stake_calculation(
 
     // If the undirected floor has been reached, no directed increases can be made
     if undirected_cap_reached {
+        msg!("Undirected TVL floor reached, no directed increases can be made.");
         return Ok(RebalanceType::None);
     }
 
@@ -113,9 +132,16 @@ pub fn increase_stake_calculation(
         .get_target_lamports(&vote_pubkey)
         .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
 
+    msg!(
+        "current_lamports: {}, target_lamports: {}",
+        current_lamports,
+        target_lamports
+    );
+
     let delta_lamports = target_lamports.saturating_sub(current_lamports);
 
     if delta_lamports == 0 {
+        msg!("Target lamports is equal to current lamports, no directed increases can be made.");
         return Ok(RebalanceType::None);
     }
 
@@ -134,6 +160,7 @@ pub fn increase_stake_calculation(
     }
 
     if total_delta_lamports == 0 {
+        msg!("Total delta lamports is 0, no directed increases can be made.");
         return Ok(RebalanceType::None);
     }
 
@@ -145,8 +172,16 @@ pub fn increase_stake_calculation(
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
-    let adjusted_proportional_increase_lamports =
-        proportional_increase_lamports.min(target_delta_lamports);
+    let adjusted_proportional_increase_lamports = {
+        let target_difference = target_lamports.saturating_sub(current_lamports);
+        let amount = proportional_increase_lamports.min(target_difference);
+        amount
+    };
+
+    msg!(
+        "Increasing stake by {} lamports",
+        adjusted_proportional_increase_lamports
+    );
 
     return Ok(RebalanceType::Increase(
         adjusted_proportional_increase_lamports,

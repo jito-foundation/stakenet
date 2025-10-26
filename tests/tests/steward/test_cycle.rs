@@ -210,6 +210,7 @@ async fn test_cycle() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
         )
@@ -452,6 +453,7 @@ async fn test_cycle_with_directed_stake_targets() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
         )
@@ -523,7 +525,8 @@ async fn test_cycle_with_directed_stake_targets() {
 
     // Copy directed stake targets for the validators
     for extra_accounts in extra_validator_accounts.iter() {
-        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1_000_000).await;
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 10_000_000_000)
+            .await;
     }
 
     crank_rebalance_directed(
@@ -533,7 +536,39 @@ async fn test_cycle_with_directed_stake_targets() {
         &[0, 1, 2],
     )
     .await;
+
     println!("Rebalance directed 1");
+    {
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
+        // Each target should have staked_last_updated_epoch set to 20
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Staked last updated epoch for validator {:?}: {:?}",
+                target.vote_pubkey, target.staked_last_updated_epoch
+            );
+            //assert_eq!(target.staked_last_updated_epoch, 20);
+        }
+
+        // Each target should have total_staked_lamports set to 9999000000
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Target last updated epoch: {:?}",
+                target.staked_last_updated_epoch
+            );
+            println!(
+                "Staked lamports for validator {:?}: {:?}",
+                target.vote_pubkey, target.total_staked_lamports
+            );
+            //assert_eq!(target.total_staked_lamports, 9999000000);
+        }
+    }
 
     {
         // Assert size of validators list
@@ -594,6 +629,38 @@ async fn test_cycle_with_directed_stake_targets() {
     )
     .await;
     println!("Rebalance directed 2");
+    {
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+        // Each target should have staked_last_updated_epoch set to 21
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Target last updated epoch: {:?}",
+                target.staked_last_updated_epoch
+            );
+            println!(
+                "Staked last updated epoch for validator {:?}: {:?}",
+                target.vote_pubkey, target.staked_last_updated_epoch
+            );
+            //assert_eq!(target.staked_last_updated_epoch, 21);
+        }
+
+        // Each target should have total_staked_lamports set to 9999000000
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Staked lamports for validator {:?}: {:?}",
+                target.vote_pubkey, target.total_staked_lamports
+            );
+            //assert_eq!(target.total_staked_lamports, 9999000000);
+        }
+    }
 
     fixture
         .advance_num_epochs(0, epoch_schedule.get_slots_in_epoch(clock.epoch) / 2 + 1)
@@ -631,6 +698,12 @@ async fn test_cycle_with_directed_stake_targets() {
 
     crank_idle(&fixture).await;
 
+    // Copy targets with half balance to force a decrease rebalance
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 5_000_000_000)
+            .await;
+    }
+
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
@@ -639,6 +712,39 @@ async fn test_cycle_with_directed_stake_targets() {
     )
     .await;
     println!("Rebalance directed 3");
+
+    {
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+        // Each target should have staked_last_updated_epoch set to 22
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Target last updated epoch: {:?}",
+                target.staked_last_updated_epoch
+            );
+            println!(
+                "Staked last updated epoch for validator {:?}: {:?}",
+                target.vote_pubkey, target.staked_last_updated_epoch
+            );
+            //assert_eq!(target.staked_last_updated_epoch, 22);
+        }
+
+        // Each target should have total_staked_lamports set to 9999000000
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Staked lamports for validator {:?}: {:?}",
+                target.vote_pubkey, target.total_staked_lamports
+            );
+            //assert_eq!(target.total_staked_lamports, 9999000000);
+        }
+    }
 
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
@@ -672,6 +778,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     // All other values are reset
 
+    assert!(false);
     drop(fixture);
 }
 
@@ -735,6 +842,7 @@ async fn test_remove_validator_mid_epoch() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
         )
@@ -1002,6 +1110,7 @@ async fn test_add_validator_next_cycle() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
         )

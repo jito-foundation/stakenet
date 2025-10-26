@@ -215,6 +215,7 @@ async fn test_update_parameters() {
             minimum_voting_epochs: Some(1),
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+            directed_stake_unstake_cap_bps: Some(10_000),
         },
         &fixture.keypair,
     )

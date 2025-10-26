@@ -144,7 +144,6 @@ pub fn handler(
     validator_list_index: usize,
 ) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
-    let mut state_account = ctx.accounts.state_account.load_mut()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
@@ -178,6 +177,8 @@ pub fn handler(
     let transient_seed: u64 =
         get_transient_stake_seed_at_index(&validator_list, validator_list_index as usize)?;
     {
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
+
         let current_epoch = clock.epoch;
         if (current_epoch > state_account.state.current_epoch
             || state_account.state.num_pool_validators == 0)
@@ -225,11 +226,14 @@ pub fn handler(
             Some(StewardStateEnum::RebalanceDirected),
         )?;
 
-        let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
-        let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
-        let stake_account_active_lamports = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
-            _ => return Err(StewardError::StakeStateIsNotStake.into()),
+        let stake_account_active_lamports = {
+            let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
+            let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+            let stake_account_active_lamports = match stake_state {
+                StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
+                _ => return Err(StewardError::StakeStateIsNotStake.into()),
+            };
+            stake_account_active_lamports
         };
 
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
@@ -239,6 +243,8 @@ pub fn handler(
             let stake_pool_lamports_with_fixed_cost =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+
+            msg!("reserve_lamports_with_rent: {}", reserve_lamports_with_rent);
 
             // Use directed delegation logic instead of regular rebalance
             use crate::directed_delegation::{
@@ -267,13 +273,18 @@ pub fn handler(
             let undirected_floor_cap =
                 undirected_tvl_lamports < config.parameters.undirected_stake_floor_lamports();
 
+            // Hmm this could be better
+            let staked_lamports_at_stake_meta_index = directed_stake_meta
+                .get_total_staked_lamports(&vote_pubkey_from_directed_stake_meta)
+                .unwrap_or(0);
+
             // Try decrease first, then increase (if undirected floor cap does not apply)
             let decrease_result = decrease_stake_calculation(
                 &state_account.state,
                 &directed_stake_meta,
                 directed_stake_meta_index,
                 unstake_state,
-                stake_account_active_lamports,
+                staked_lamports_at_stake_meta_index,
                 stake_pool_lamports_with_fixed_cost,
                 minimum_delegation,
                 stake_rent,
@@ -286,7 +297,7 @@ pub fn handler(
                     &state_account.state,
                     &directed_stake_meta,
                     directed_stake_meta_index,
-                    stake_account_active_lamports,
+                    staked_lamports_at_stake_meta_index,
                     stake_pool_lamports_with_fixed_cost,
                     reserve_lamports_with_rent,
                     minimum_delegation,
@@ -301,45 +312,49 @@ pub fn handler(
 
     match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
-            invoke_signed(
-                &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
-                    &ctx.accounts.stake_pool_program.key(),
-                    &ctx.accounts.stake_pool.key(),
-                    &ctx.accounts.state_account.key(),
-                    &ctx.accounts.withdraw_authority.key(),
-                    &ctx.accounts.validator_list.key(),
-                    &ctx.accounts.reserve_stake.key(),
-                    &ctx.accounts.stake_account.key(),
-                    &ctx.accounts.transient_stake_account.key(),
-                    decrease_components.total_unstake_lamports,
-                    transient_seed,
-                ),
-                &[
-                    ctx.accounts.stake_pool.to_account_info(),
-                    ctx.accounts.state_account.to_account_info(),
-                    ctx.accounts.withdraw_authority.to_owned(),
-                    ctx.accounts.validator_list.to_account_info(),
-                    ctx.accounts.reserve_stake.to_account_info(),
-                    ctx.accounts.stake_account.to_account_info(),
-                    ctx.accounts.transient_stake_account.to_account_info(),
-                    ctx.accounts.clock.to_account_info(),
-                    ctx.accounts.rent.to_account_info(),
-                    ctx.accounts.stake_history.to_account_info(),
-                    ctx.accounts.system_program.to_account_info(),
-                    ctx.accounts.stake_program.to_account_info(),
-                ],
-                &[&[
-                    StewardStateAccount::SEED,
-                    &ctx.accounts.config.key().to_bytes(),
-                    &[ctx.bumps.state_account],
-                ]],
-            )?;
-            msg!("decrease_validator_stake_with_reserve successful");
-            directed_stake_meta.subtract_from_total_staked_lamports(
-                &ctx.accounts.vote_account.key(),
-                decrease_components.total_unstake_lamports,
-                clock.epoch,
-            );
+            if decrease_components.directed_unstake_lamports > 0 {
+                invoke_signed(
+                    &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
+                        &ctx.accounts.stake_pool_program.key(),
+                        &ctx.accounts.stake_pool.key(),
+                        &ctx.accounts.state_account.key(),
+                        &ctx.accounts.withdraw_authority.key(),
+                        &ctx.accounts.validator_list.key(),
+                        &ctx.accounts.reserve_stake.key(),
+                        &ctx.accounts.stake_account.key(),
+                        &ctx.accounts.transient_stake_account.key(),
+                        decrease_components.directed_unstake_lamports,
+                        transient_seed,
+                    ),
+                    &[
+                        ctx.accounts.stake_pool.to_account_info(),
+                        ctx.accounts.state_account.to_account_info(),
+                        ctx.accounts.withdraw_authority.to_owned(),
+                        ctx.accounts.validator_list.to_account_info(),
+                        ctx.accounts.reserve_stake.to_account_info(),
+                        ctx.accounts.stake_account.to_account_info(),
+                        ctx.accounts.transient_stake_account.to_account_info(),
+                        ctx.accounts.clock.to_account_info(),
+                        ctx.accounts.rent.to_account_info(),
+                        ctx.accounts.stake_history.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                        ctx.accounts.stake_program.to_account_info(),
+                    ],
+                    &[&[
+                        StewardStateAccount::SEED,
+                        &ctx.accounts.config.key().to_bytes(),
+                        &[ctx.bumps.state_account],
+                    ]],
+                )?;
+                msg!("decrease_validator_stake_with_reserve successful");
+                directed_stake_meta.subtract_from_total_staked_lamports(
+                    &ctx.accounts.vote_account.key(),
+                    decrease_components.directed_unstake_lamports,
+                    clock.epoch,
+                );
+            } else {
+                msg!("Decrease component is zero.");
+            }
         }
         RebalanceType::Increase(lamports) => {
             invoke_signed(
@@ -392,6 +407,12 @@ pub fn handler(
         }
     }
 
+    let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+    if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+        state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+    }
+
     {
         emit!(rebalance_to_event(
             ctx.accounts.vote_account.key(),
@@ -400,9 +421,6 @@ pub fn handler(
         ));
     }
 
-    if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
-        state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
-    }
     if let Some(event) = maybe_transition(
         &mut state_account.state,
         &clock,
@@ -412,7 +430,6 @@ pub fn handler(
         emit!(event);
         return Ok(());
     }
-
     Ok(())
 }
 

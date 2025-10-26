@@ -30,6 +30,7 @@ pub struct UpdateParametersArgs {
     pub scoring_unstake_cap_bps: Option<u32>,
     pub instant_unstake_cap_bps: Option<u32>,
     pub stake_deposit_unstake_cap_bps: Option<u32>,
+    pub directed_stake_unstake_cap_bps: Option<u16>,
     pub undirected_stake_floor_lamports: Option<u64>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
@@ -106,6 +107,11 @@ impl IdlBuild for UpdateParametersArgs {
                     IdlField {
                         name: "stake_deposit_unstake_cap_bps".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U32)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "directed_stake_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
                         docs: Default::default(),
                     },
                     IdlField {
@@ -285,6 +291,7 @@ impl Parameters {
             scoring_unstake_cap_bps,
             instant_unstake_cap_bps,
             stake_deposit_unstake_cap_bps,
+            directed_stake_unstake_cap_bps,
             instant_unstake_epoch_progress,
             instant_unstake_inputs_epoch_progress,
             compute_score_slot_range,
@@ -347,6 +354,10 @@ impl Parameters {
 
         if let Some(stake_deposit_unstake_cap_bps) = stake_deposit_unstake_cap_bps {
             new_parameters.stake_deposit_unstake_cap_bps = stake_deposit_unstake_cap_bps;
+        }
+
+        if let Some(directed_stake_unstake_cap_bps) = directed_stake_unstake_cap_bps {
+            new_parameters.directed_stake_unstake_cap_bps = directed_stake_unstake_cap_bps;
         }
 
         if let Some(instant_unstake_epoch_progress) = instant_unstake_epoch_progress {

@@ -348,6 +348,7 @@ impl TestFixture {
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_floor_lamports: Some(10_000_000_000 * 1_000_000_000),
+            directed_stake_unstake_cap_bps: Some(10_000),
         });
 
         let update_priority_fee_parameters_args =
@@ -812,8 +813,8 @@ pub async fn crank_rebalance_directed(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
-                directed_stake_meta_index: 0u64,
-                validator_list_index: 0u64,
+                directed_stake_meta_index: i as u64,
+                validator_list_index: i as u64,
             }
             .data(),
         };

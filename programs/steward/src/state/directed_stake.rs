@@ -19,7 +19,7 @@ pub enum DirectedStakeRecordType {
     Protocol,
 }
 
-#[derive(BorshSerialize)]
+#[derive(BorshSerialize, Debug)]
 #[account(zero_copy)]
 pub struct DirectedStakeMeta {
     // u64 for alignment, max permissioned validators is much smaller
@@ -105,7 +105,7 @@ impl DirectedStakeMeta {
     }
 }
 
-#[derive(BorshSerialize)]
+#[derive(BorshSerialize, Debug)]
 #[account(zero_copy)]
 pub struct DirectedStakeTarget {
     /// Validator vote pubkey
