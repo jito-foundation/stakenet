@@ -20,7 +20,7 @@ pub struct CopyDirectedStakeTargets<'info> {
 
     #[account(
         mut,
-        address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
+        address = config.load()?.directed_stake_meta_upload_authority @ StewardError::Unauthorized
     )]
     pub authority: Signer<'info>,
 }
@@ -41,18 +41,23 @@ pub fn handler(
         return Err(error!(StewardError::Unauthorized));
     }
 
+    let clock = Clock::get()?;
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {
-            let clock = Clock::get()?;
+            msg!("Updating target index: {}", target_index);
             stake_meta.targets[target_index].total_target_lamports = target_lamports;
             stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
         }
         None => {
+            msg!(
+                "Adding new target index: {}",
+                stake_meta.total_stake_targets
+            );
             let new_target = DirectedStakeTarget {
                 vote_pubkey,
                 total_target_lamports: target_lamports,
                 total_staked_lamports: 0,
-                target_last_updated_epoch: 0,
+                target_last_updated_epoch: clock.epoch,
                 staked_last_updated_epoch: 0,
                 _padding0: [0; 32],
             };

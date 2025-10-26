@@ -12,6 +12,7 @@ pub struct AddToDirectedStakeWhitelist<'info> {
     pub config: AccountLoader<'info, Config>,
 
     #[account(
+        mut,
         seeds = [DirectedStakeWhitelist::SEED, config.key().as_ref()],
         bump
     )]

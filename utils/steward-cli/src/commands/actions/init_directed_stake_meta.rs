@@ -41,8 +41,7 @@ pub async fn command_init_directed_stake_meta(
             authority: authority_pubkey,
         }
         .to_account_metas(None),
-        data: jito_steward::instruction::InitializeDirectedStakeMeta {}
-        .data(),
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
     };
 
     let blockhash = client.get_latest_blockhash().await?;
