@@ -1,3 +1,4 @@
+use borsh1::BorshSerialize;
 use jito_steward::utils::get_transient_stake_seed_at_index;
 use solana_sdk::pubkey::Pubkey;
 use spl_pod::primitives::{PodU32, PodU64};
@@ -47,18 +48,29 @@ fn test_extract_transient_seed_from_validator_list() {
         spl_validator_list.validators[i] = *validator;
     }
 
-    assert!(false);
+    let mut buffer = Vec::new();
+    spl_validator_list.serialize(&mut buffer).unwrap();
 
-    //spl_validator_list.serialize(&mut buffer).unwrap();
+    let mut lamports: u64 = 0;
 
     // Serialize ValidatorList into a byte array with borsh and assign to AccountInfo data, pass
     // it to the utility function
+    let validator_list_account_info = solana_sdk::account_info::AccountInfo {
+        key: &Pubkey::new_unique(),
+        is_signer: false,
+        is_writable: false,
+        lamports: std::rc::Rc::new(std::cell::RefCell::new(&mut lamports)),
+        data: std::rc::Rc::new(std::cell::RefCell::new(&mut buffer)),
+        owner: &Pubkey::new_unique(),
+        executable: false,
+        rent_epoch: 0,
+    };
 
     // Test extracting transient seeds using the utility function
-    /*for i in 0..3 {
-        let extracted_seed = get_transient_stake_seed_at_index(&spl_validator_list, i).unwrap();
+    for i in 0..3 {
+        let extracted_seed =
+            get_transient_stake_seed_at_index(&validator_list_account_info, i).unwrap();
         let expected_seed = validators[i].transient_seed_suffix;
-
         assert_eq!(PodU64::from(extracted_seed), expected_seed);
-    }*/
+    }
 }
