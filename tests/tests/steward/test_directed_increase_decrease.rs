@@ -242,8 +242,7 @@ fn test_decrease_stake_calculation_basic() {
     ]);
 
     let unstake_state = UnstakeState {
-        directed_unstake_cap: 1_000_000,
-        ..Default::default()
+        directed_unstake_total: 1_000_000,
     };
 
     // Test decreasing stake for validator1

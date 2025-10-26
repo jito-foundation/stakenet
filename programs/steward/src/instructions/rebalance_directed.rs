@@ -226,16 +226,6 @@ pub fn handler(
             Some(StewardStateEnum::RebalanceDirected),
         )?;
 
-        let stake_account_active_lamports = {
-            let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
-            let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
-            let stake_account_active_lamports = match stake_state {
-                StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
-                _ => return Err(StewardError::StakeStateIsNotStake.into()),
-            };
-            stake_account_active_lamports
-        };
-
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 
@@ -252,14 +242,7 @@ pub fn handler(
             };
 
             let unstake_state = UnstakeState {
-                stake_deposit_unstake_total: 0,
-                instant_unstake_total: 0,
-                scoring_unstake_total: 0,
-                stake_deposit_unstake_cap: config.parameters.stake_deposit_unstake_cap_bps as u64,
-                instant_unstake_cap: config.parameters.instant_unstake_cap_bps as u64,
-                scoring_unstake_cap: config.parameters.scoring_unstake_cap_bps as u64,
-                directed_unstake_total: 0,
-                directed_unstake_cap: config.parameters.directed_stake_unstake_cap_bps as u64,
+                directed_unstake_total: state_account.state.directed_unstake_total,
             };
 
             let directed_unstake_cap_lamports = stake_pool_lamports_with_fixed_cost
@@ -425,6 +408,13 @@ pub fn handler(
     }
 
     let mut state_account = ctx.accounts.state_account.load_mut()?;
+
+    if let RebalanceType::Decrease(decrease_components) = &rebalance_type {
+        state_account.state.directed_unstake_total = state_account
+            .state
+            .directed_unstake_total
+            .saturating_add(decrease_components.directed_unstake_lamports);
+    }
 
     if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
         state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);

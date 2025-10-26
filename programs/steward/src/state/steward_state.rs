@@ -492,6 +492,8 @@ impl StewardState {
         } else if directed_rebalance_complete {
             self.progress = BitMask::default();
             self.state_tag = StewardStateEnum::Idle;
+            // This needs to be reset every cycle when RebalanceDirected is complete
+            self.directed_unstake_total = 0;
         }
         Ok(())
     }

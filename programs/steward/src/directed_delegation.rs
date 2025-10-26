@@ -190,30 +190,16 @@ pub fn increase_stake_calculation(
 
 #[derive(Default)]
 pub struct UnstakeAmounts {
-    pub stake_deposit_unstake_lamports: u64,
-    pub instant_unstake_lamports: u64,
-    pub scoring_unstake_lamports: u64,
     pub directed_unstake_lamports: u64,
 }
 
 impl UnstakeAmounts {
     pub fn total(&self) -> Result<u64> {
-        self.stake_deposit_unstake_lamports
-            .checked_add(self.instant_unstake_lamports)
-            .and_then(|s| s.checked_add(self.scoring_unstake_lamports))
-            .and_then(|s| s.checked_add(self.directed_unstake_lamports))
-            .ok_or_else(|| StewardError::ArithmeticError.into())
+        Ok(self.directed_unstake_lamports)
     }
 }
 
 #[derive(Default, Clone)]
 pub struct UnstakeState {
-    pub stake_deposit_unstake_total: u64,
-    pub instant_unstake_total: u64,
-    pub scoring_unstake_total: u64,
-    pub stake_deposit_unstake_cap: u64,
-    pub instant_unstake_cap: u64,
-    pub scoring_unstake_cap: u64,
     pub directed_unstake_total: u64,
-    pub directed_unstake_cap: u64,
 }
