@@ -24,6 +24,9 @@ pub enum DirectedStakeRecordType {
 pub struct DirectedStakeMeta {
     // u64 for alignment, max permissioned validators is much smaller
     pub total_stake_targets: u64,
+    pub epoch_increase_total_lamports: u64,
+    pub epoch_decrease_total_lamports: u64,
+    pub epoch_last_updated: u64,
     pub padding0: [u8; 64],
     pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
 }

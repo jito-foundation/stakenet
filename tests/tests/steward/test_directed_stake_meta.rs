@@ -9,6 +9,9 @@ fn test_get_target_index() {
     let epoch = 1;
     let mut meta = DirectedStakeMeta {
         total_stake_targets: 0,
+        epoch_last_updated: 0,
+        epoch_increase_total_lamports: 0,
+        epoch_decrease_total_lamports: 0,
         padding0: [0; 64],
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),

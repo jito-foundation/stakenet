@@ -290,6 +290,9 @@ async fn populate_directed_stake_meta_after_init(
     // Create the full DirectedStakeMeta with proper discriminator
     let meta = DirectedStakeMeta {
         total_stake_targets: 0,
+        epoch_last_updated: 0,
+        epoch_increase_total_lamports: 0,
+        epoch_decrease_total_lamports: 0,
         padding0: [0; 64],
         targets: {
             let mut targets = [DirectedStakeTarget {
