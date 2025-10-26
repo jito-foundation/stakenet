@@ -15,6 +15,7 @@ mod test_spl_passthrough;
 mod test_state_methods;
 mod test_state_transitions;
 mod test_steward;
+mod test_utils;
 
 use spl_stake_pool::state::{PodStakeStatus, ValidatorStakeInfo};
 

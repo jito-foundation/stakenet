@@ -11087,6 +11087,7 @@ dependencies = [
  "solana-sdk",
  "solana-version 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spl-associated-token-account",
+ "spl-pod",
  "spl-stake-pool",
  "spl-token 4.0.2",
  "test-case",

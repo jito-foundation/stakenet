@@ -262,16 +262,33 @@ pub fn handler(
                 directed_unstake_cap: config.parameters.directed_stake_unstake_cap_bps as u64,
             };
 
-            let directed_unstake_cap_lamports = ((config.parameters.directed_stake_unstake_cap_bps
-                as u128
-                * stake_pool_lamports_with_fixed_cost as u128)
-                / 10_000u128) as u64;
+            let directed_unstake_cap_lamports = stake_pool_lamports_with_fixed_cost
+                .saturating_mul(config.parameters.directed_stake_unstake_cap_bps as u64)
+                .saturating_div(10_000);
 
             let undirected_tvl_lamports = stake_pool_lamports_with_fixed_cost
                 .saturating_sub(directed_stake_meta.total_staked_lamports());
 
             let undirected_floor_cap =
                 undirected_tvl_lamports < config.parameters.undirected_stake_floor_lamports();
+
+            msg!(
+                "config parameters undirected stake floor lamports {}",
+                &config
+                    .parameters
+                    .undirected_stake_floor_lamports()
+                    .to_string()
+            );
+            msg!(
+                "directed_unstake_cap_bps: {}",
+                config.parameters.directed_stake_unstake_cap_bps
+            );
+            msg!(
+                "directed_unstake_cap_lamports: {}",
+                directed_unstake_cap_lamports
+            );
+            msg!("undirected_tvl_lamports: {}", undirected_tvl_lamports);
+            msg!("undirected_floor_cap: {}", undirected_floor_cap);
 
             // Hmm this could be better
             let staked_lamports_at_stake_meta_index = directed_stake_meta

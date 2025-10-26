@@ -209,7 +209,7 @@ async fn test_cycle() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                undirected_stake_floor_lamports: Some(0), // No undirected stake floor
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -453,7 +453,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                undirected_stake_floor_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(100),
             }),
             None,
@@ -464,6 +464,12 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
     let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture, 0).await;
     realloc_directed_stake_meta(&fixture).await;
+
+    // Assert config directed_stake_unstake_cap_bps is 0
+    let config: jito_steward::Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    assert_eq!(config.parameters.directed_stake_unstake_cap_bps, 100);
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -550,9 +556,81 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
             "Staked lamports for validator {:?}: {:?}",
             target.vote_pubkey, target.total_staked_lamports
         );
+        assert_eq!(target.total_staked_lamports, 10_000_000_000);
     }
 
-    assert!(false);
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_compute_delegations(&fixture).await;
+
+    let epoch_schedule: EpochSchedule = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
+    let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
+
+    fixture.advance_num_slots(160_000).await;
+
+    crank_idle(&fixture).await;
+
+    crank_compute_instant_unstake(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_rebalance(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    println!("Advancing epoch from {} (expected 20)", clock.epoch);
+
+    fixture.advance_num_epochs(1, 10).await;
+
+    crank_stake_pool(&fixture).await;
+
+    crank_epoch_maintenance(&fixture, None).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 0).await;
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0],
+    )
+    .await;
+
+    let directed_stake_meta: DirectedStakeMeta =
+        fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+    for target in directed_stake_meta.targets.iter() {
+        if target.vote_pubkey == Pubkey::default() {
+            continue;
+        }
+        println!(
+            "Staked lamports for validator {:?}: {:?}",
+            target.vote_pubkey, target.total_staked_lamports
+        );
+        // Small directed unstake will occur due to cap being 100bps despite 0 lamport target
+        assert!(target.total_staked_lamports < 10_000_000_000);
+        assert!(target.total_staked_lamports > 9_000_000_000);
+        assert!(target.staked_last_updated_epoch == 21);
+    }
 
     drop(fixture);
 }
@@ -614,7 +692,8 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(1_000_000_000),
+                undirected_stake_floor_lamports: Some(u64::MAX), // Set high floor to disable undirected
+                // stake increases
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -686,7 +765,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    // Copy directed stake targets for the validators
+    // Copy directed stake targets for the validators to trigger an attempted increase
     for extra_accounts in extra_validator_accounts.iter() {
         crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 10_000_000_000)
             .await;
@@ -711,9 +790,10 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
             "Staked lamports for validator {:?}: {:?}",
             target.vote_pubkey, target.total_staked_lamports
         );
+        assert_eq!(target.staked_last_updated_epoch, 20);
+        assert_eq!(target.total_staked_lamports, 0); // No directed stake increases due to high
+                                                     // undirected floor
     }
-
-    assert!(false);
 
     drop(fixture);
 }

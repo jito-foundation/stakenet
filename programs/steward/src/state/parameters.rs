@@ -389,6 +389,11 @@ impl Parameters {
             new_parameters.compute_score_epoch_progress = compute_score_epoch_progress;
         }
 
+        if let Some(undirected_stake_floor_lamports) = undirected_stake_floor_lamports {
+            new_parameters.undirected_stake_floor_lamports =
+                undirected_stake_floor_lamports.to_le_bytes();
+        }
+
         // Validation will throw an error if any of the parameters are invalid
         new_parameters.validate(current_epoch, slots_per_epoch)?;
 
