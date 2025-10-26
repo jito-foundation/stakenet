@@ -1230,10 +1230,19 @@ async fn test_rebalance_increase() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
+            directed_stake_meta: Pubkey::find_program_address(
+                &[
+                    DirectedStakeMeta::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
+            maybe_stake_meta_index: None,
         }
         .data(),
     };
@@ -1565,10 +1574,19 @@ async fn test_rebalance_decrease() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
+            directed_stake_meta: Pubkey::find_program_address(
+                &[
+                    DirectedStakeMeta::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
+            maybe_stake_meta_index: None,
         }
         .data(),
     };
@@ -1774,10 +1792,19 @@ async fn test_rebalance_other_cases() {
             stake_program: stake::program::id(),
             stake_config: stake::config::ID,
             stake_history: solana_program::sysvar::stake_history::id(),
+            directed_stake_meta: Pubkey::find_program_address(
+                &[
+                    DirectedStakeMeta::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
+            maybe_stake_meta_index: None,
         }
         .data(),
     };

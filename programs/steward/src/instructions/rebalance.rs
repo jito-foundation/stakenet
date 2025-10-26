@@ -19,6 +19,7 @@ use validator_history::ValidatorHistory;
 use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
     delegation::RebalanceType,
+    directed_stake::DirectedStakeMeta,
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition,
@@ -135,9 +136,21 @@ pub struct Rebalance<'info> {
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(address = stake::program::ID)]
     pub stake_program: AccountInfo<'info>,
+
+    /// Directed stake meta account may be required when increasing stake
+    #[account(
+        mut,
+        seeds = [DirectedStakeMeta::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
-pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
+pub fn handler(
+    ctx: Context<Rebalance>,
+    validator_list_index: usize,
+    maybe_directed_stake_index: Option<usize>,
+) -> Result<()> {
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
@@ -189,9 +202,29 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
         let stake_account_data = &mut ctx.accounts.stake_account.data.borrow();
         let stake_state = try_from_slice_unchecked::<StakeStateV2>(stake_account_data)?;
+        if !matches!(stake_state, StakeStateV2::Stake(_, _, _)) {
+            return Err(StewardError::InvalidStakeState.into());
+        }
+
+        // If there is active directed stake, subtract it from the active stake calculation
+        // otherwise the undirected stake delegation will be undercounted
         let stake_account_active_lamports = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
-            _ => return Err(StewardError::StakeStateIsNotStake.into()),
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                let lamports = if let Some(meta_index) = maybe_directed_stake_index {
+                    let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
+                    // Pubkey from validator list and directed stake meta must match
+                    require!(
+                        directed_stake_meta.targets[meta_index].vote_pubkey
+                            == validator_history.vote_account,
+                        StewardError::DirectedStakeVoteAccountMismatch
+                    );
+                    directed_stake_meta.targets[meta_index].total_staked_lamports
+                } else {
+                    0
+                };
+                stake.delegation.stake.saturating_sub(lamports)
+            }
+            _ => 0,
         };
 
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);

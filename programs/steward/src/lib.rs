@@ -148,8 +148,16 @@ pub mod steward {
 
     /// Increases or decreases stake for a validator at `validator_list_index` to match the target stake,
     /// given constraints on increase/decrease priority, reserve balance, and unstaking caps
-    pub fn rebalance(ctx: Context<Rebalance>, validator_list_index: u64) -> Result<()> {
-        instructions::rebalance::handler(ctx, validator_list_index as usize)
+    pub fn rebalance(
+        ctx: Context<Rebalance>,
+        validator_list_index: u64,
+        maybe_stake_meta_index: Option<u64>,
+    ) -> Result<()> {
+        instructions::rebalance::handler(
+            ctx,
+            validator_list_index as usize,
+            maybe_stake_meta_index.map(|x| x as usize),
+        )
     }
 
     /// Increases or decreases stake for a validator at `validator_list_index` using directed stake targets

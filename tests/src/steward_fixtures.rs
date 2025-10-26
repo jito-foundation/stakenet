@@ -1170,6 +1170,14 @@ pub async fn crank_rebalance(
                 stake_account: extra_accounts.stake_account_address,
                 transient_stake_account: extra_accounts.transient_stake_account_address,
                 vote_account: extra_accounts.vote_account,
+                directed_stake_meta: Pubkey::find_program_address(
+                    &[
+                        DirectedStakeMeta::SEED,
+                        fixture.steward_config.pubkey().as_ref(),
+                    ],
+                    &jito_steward::id(),
+                )
+                .0,
                 system_program: system_program::id(),
                 stake_program: stake::program::id(),
                 rent: solana_sdk::sysvar::rent::id(),
@@ -1180,6 +1188,7 @@ pub async fn crank_rebalance(
             .to_account_metas(None),
             data: jito_steward::instruction::Rebalance {
                 validator_list_index: i as u64,
+                maybe_stake_meta_index: None,
             }
             .data(),
         };
