@@ -35,19 +35,14 @@ pub struct TestFixture {
 }
 
 impl TestFixture {
+    /// Initializes test context with ValidatorHistory and TipDistribution programs loaded, as well as
+    /// a vote account and a system account for signing transactions.
+    ///
+    /// Returns a fixture with relevant account addresses and keypairs.
     pub async fn new() -> Self {
-        /*
-           Initializes test context with ValidatorHistory and TipDistribution programs loaded, as well as
-           a vote account and a system account for signing transactions.
-
-           Returns a fixture with relevant account addresses and keypairs.
-        */
-
         // prefer bpf on this to not run as a built-in program with actual runtime limitations
         // make sure the program is compiled and SBF_OUT_DIR is set correctly when running this!
-        let mut program = ProgramTest::default();
-        program.prefer_bpf(true);
-        program.add_program("validator_history", validator_history::ID, None);
+        let mut program = ProgramTest::new("validator_history", validator_history::ID, None);
         program.add_program("jito_tip_distribution", jito_tip_distribution::id(), None);
         program.add_program(
             "jito_priority_fee_distribution",

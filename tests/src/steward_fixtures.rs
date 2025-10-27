@@ -100,9 +100,7 @@ impl TestFixture {
     ///
     /// Returns a fixture with relevant account addresses and keypairs.
     pub async fn new() -> Self {
-        let mut program = ProgramTest::default();
-        program.prefer_bpf(true);
-        program.add_program("jito_steward", jito_steward::id(), None);
+        let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
         program.set_compute_max_units(1_400_000);
 
@@ -151,9 +149,7 @@ impl TestFixture {
         accounts_fixture: FixtureDefaultAccounts,
         additional_accounts: HashMap<Pubkey, Account>,
     ) -> Self {
-        let mut program = ProgramTest::default();
-        program.prefer_bpf(true);
-        program.add_program("jito_steward", jito_steward::ID, None);
+        let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
         program.add_program("validator_history", validator_history::id(), None);
         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
 
