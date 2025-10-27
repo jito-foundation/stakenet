@@ -104,6 +104,7 @@ pub async fn command_crank_rebalance(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
+                    directed_stake_meta: Pubkey::default(),
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {

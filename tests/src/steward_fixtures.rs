@@ -1188,7 +1188,6 @@ pub async fn crank_rebalance(
             .to_account_metas(None),
             data: jito_steward::instruction::Rebalance {
                 validator_list_index: i as u64,
-                maybe_stake_meta_index: None,
             }
             .data(),
         };
@@ -1887,7 +1886,7 @@ impl Default for StateMachineFixtures {
             min_epoch_progress_for_compute_directed_stake_meta: 0.50,
             max_epoch_progress_for_directed_rebalance: 0.1,
             compute_score_epoch_progress: 0.5,
-            undirected_stake_floor_lamports: ((10_000_000 * LAMPORTS_PER_SOL) as u64).to_le_bytes(),
+            undirected_stake_floor_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
             _padding_0: [0; 4],
             _padding_1: [0; 27],
         };

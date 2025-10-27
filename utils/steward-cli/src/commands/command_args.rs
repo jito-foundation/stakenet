@@ -117,6 +117,10 @@ pub struct ConfigParameters {
     /// Minimum lamports for undirected stake floor
     #[arg(long, env)]
     pub undirected_stake_floor_lamports: Option<u64>,
+
+    /// Percent of total pool lamports that can be unstaked due to directed stake requests
+    #[arg(long, env)]
+    pub directed_stake_unstake_cap_bps: Option<u16>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -143,6 +147,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             minimum_voting_epochs: config.minimum_voting_epochs,
             compute_score_epoch_progress: config.compute_score_epoch_progress,
             undirected_stake_floor_lamports: config.undirected_stake_floor_lamports,
+            directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
         }
     }
 }

@@ -22,7 +22,7 @@ pub fn decrease_stake_calculation(
     state: &StewardState,
     directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
-    unstake_state: UnstakeState,
+    _unstake_state: UnstakeState,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
     _stake_pool_lamports: u64,
     _minimum_delegation: u64,
@@ -174,8 +174,8 @@ pub fn increase_stake_calculation(
 
     let adjusted_proportional_increase_lamports = {
         let target_difference = target_lamports.saturating_sub(current_lamports);
-        let amount = proportional_increase_lamports.min(target_difference);
-        amount
+
+        proportional_increase_lamports.min(target_difference)
     };
 
     msg!(
@@ -183,9 +183,9 @@ pub fn increase_stake_calculation(
         adjusted_proportional_increase_lamports
     );
 
-    return Ok(RebalanceType::Increase(
+    Ok(RebalanceType::Increase(
         adjusted_proportional_increase_lamports,
-    ));
+    ))
 }
 
 #[derive(Default)]

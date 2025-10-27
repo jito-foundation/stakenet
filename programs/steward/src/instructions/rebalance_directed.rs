@@ -3,7 +3,6 @@ use std::num::NonZeroU32;
 use anchor_lang::{
     prelude::*,
     solana_program::{
-        borsh1::try_from_slice_unchecked,
         program::invoke_signed,
         stake::{self, state::StakeStateV2, tools::get_minimum_delegation},
         system_program, sysvar,
@@ -154,7 +153,7 @@ pub fn handler(
     let vote_pubkey_from_directed_stake_meta =
         directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey;
     let vote_pubkey_from_validator_list =
-        get_validator_stake_info_at_index(validator_list, validator_list_index as usize)?;
+        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
 
     // An empty meta means there are no directed stake targets, automatically transition to Idle
     if directed_stake_meta.total_stake_targets > 0 {
@@ -175,7 +174,7 @@ pub fn handler(
 
     let rebalance_type: RebalanceType;
     let transient_seed: u64 =
-        get_transient_stake_seed_at_index(&validator_list, validator_list_index as usize)?;
+        get_transient_stake_seed_at_index(validator_list, validator_list_index)?;
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 

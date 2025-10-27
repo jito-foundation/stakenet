@@ -85,7 +85,7 @@ async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
 }
 
 /// Helper function to initialize directed stake meta
-async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targets: u16) -> Pubkey {
+async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     let directed_stake_meta = Pubkey::find_program_address(
         &[
             DirectedStakeMeta::SEED,
@@ -139,7 +139,7 @@ async fn setup_directed_stake_fixture() -> TestFixture {
     fixture.realloc_steward_state().await;
     set_directed_stake_whitelist_authority(&fixture).await;
     initialize_directed_stake_whitelist(&fixture).await;
-    initialize_directed_stake_meta(&fixture, 1).await;
+    initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
     fixture
 }

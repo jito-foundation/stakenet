@@ -67,7 +67,7 @@ async fn realloc_directed_stake_meta(fixture: &TestFixture) {
 }
 
 /// Helper function to initialize directed stake meta
-async fn initialize_directed_stake_meta(fixture: &TestFixture, total_stake_targets: u16) -> Pubkey {
+async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     let directed_stake_meta = Pubkey::find_program_address(
         &[
             jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
@@ -177,7 +177,8 @@ async fn test_compute_delegations() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -317,7 +318,7 @@ async fn test_compute_scores() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
@@ -490,7 +491,7 @@ async fn test_compute_scores() {
                 0u64,
             )
             .0,
-            vote_account: vote_account,
+            vote_account,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -699,7 +700,8 @@ async fn test_compute_instant_unstake() {
         )
         .await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -931,7 +933,8 @@ async fn test_idle() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -1079,7 +1082,8 @@ async fn test_rebalance_increase() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1246,7 +1250,6 @@ async fn test_rebalance_increase() {
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
-            maybe_stake_meta_index: None,
         }
         .data(),
     };
@@ -1332,7 +1335,8 @@ async fn test_rebalance_decrease() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1591,7 +1595,6 @@ async fn test_rebalance_decrease() {
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
-            maybe_stake_meta_index: None,
         }
         .data(),
     };
@@ -1653,7 +1656,8 @@ async fn test_rebalance_other_cases() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
-    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
+    initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1810,7 +1814,6 @@ async fn test_rebalance_other_cases() {
         .to_account_metas(None),
         data: jito_steward::instruction::Rebalance {
             validator_list_index: MAX_VALIDATORS as u64 - 1,
-            maybe_stake_meta_index: None,
         }
         .data(),
     };

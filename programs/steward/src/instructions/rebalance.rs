@@ -146,11 +146,7 @@ pub struct Rebalance<'info> {
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
-pub fn handler(
-    ctx: Context<Rebalance>,
-    validator_list_index: usize,
-    maybe_directed_stake_index: Option<usize>,
-) -> Result<()> {
+pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
@@ -206,18 +202,15 @@ pub fn handler(
             return Err(StewardError::InvalidStakeState.into());
         }
 
-        // If there is active directed stake, subtract it from the active stake calculation
-        // otherwise the undirected stake delegation will be undercounted
+        // Do not count directed stake against the pool stake delegation
         let stake_account_active_lamports = match stake_state {
             StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
+                // CU expensive but permission-less method to access directed stake for a particular validator
+                // Validator list is dynamic and we cannot ensure stake meta indexes will match
+                let maybe_directed_stake_index = directed_stake_meta
+                    .get_target_index(&validator_stake_info.vote_account_address);
                 let lamports = if let Some(meta_index) = maybe_directed_stake_index {
-                    let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
-                    // Pubkey from validator list and directed stake meta must match
-                    require!(
-                        directed_stake_meta.targets[meta_index].vote_pubkey
-                            == validator_history.vote_account,
-                        StewardError::DirectedStakeVoteAccountMismatch
-                    );
                     directed_stake_meta.targets[meta_index].total_staked_lamports
                 } else {
                     0

@@ -2,7 +2,6 @@ use borsh1::BorshSerialize;
 use jito_steward::utils::get_transient_stake_seed_at_index;
 use solana_sdk::pubkey::Pubkey;
 use spl_pod::primitives::{PodU32, PodU64};
-use spl_stake_pool::state::ValidatorList;
 use spl_stake_pool::state::{PodStakeStatus, StakeStatus, ValidatorStakeInfo};
 #[test]
 fn test_extract_transient_seed_from_validator_list() {
@@ -66,7 +65,7 @@ fn test_extract_transient_seed_from_validator_list() {
         rent_epoch: 0,
     };
 
-    // Test extracting transient seeds using the utility function
+    #[allow(clippy::needless_range_loop)]
     for i in 0..3 {
         let extracted_seed =
             get_transient_stake_seed_at_index(&validator_list_account_info, i).unwrap();
