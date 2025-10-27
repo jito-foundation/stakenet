@@ -3,8 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::LAMPORT_BALANCE_DEFAULT, stake_pool_utils::ValidatorList, Config, Delegation,
-    StewardStateAccountV2,
+    constants::LAMPORT_BALANCE_DEFAULT, score::ValidatorScoreComponents,
+    stake_pool_utils::ValidatorList, Config, Delegation, StewardStateAccountV2,
 };
 use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -89,12 +89,10 @@ pub struct StateInfo {
     /// Used for efficient ranking and delegation decisions
     sorted_score_indices_count: usize,
 
-    /// Count of computed yield component scores
-    /// Used as secondary priority for unstaking order decisions
+    /// Count of computed raw scores
     raw_scores_count: usize,
 
-    /// Count of validator indices sorted by yield score (descending)
-    /// Used for efficient yield-based ranking
+    /// Count of validator indices sorted by raw score (descending)
     sorted_raw_score_indices_count: usize,
 
     /// Count of delegation entries (target stake allocations)
@@ -127,7 +125,7 @@ pub struct StateInfo {
     scoring_unstake_total: u64,
 
     /// Total lamports scheduled for instant unstaking
-    /// Accumulated during the current cycle  
+    /// Accumulated during the current cycle
     instant_unstake_total: u64,
 
     /// Total lamports from stake deposits scheduled for unstaking
@@ -296,14 +294,13 @@ pub struct ValidatorDetails {
     pub steward_list_index: usize,
 
     /// Overall rank among all validators (1-based, None if unranked)
-    /// Ranking is based on score (primary) and yield score (secondary)
     pub overall_rank: Option<usize>,
 
-    /// Performance score assigned by the steward (0 = failing, >0 = passing)
+    /// Validator's final score (0 if any eligibility criteria failed, otherwise equals raw_score)
     pub score: u64,
 
-    /// Yield score based on staking rewards performance
-    pub raw_score: u64,
+    /// Validator score componets
+    pub validator_score: ValidatorScoreComponents,
 
     /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
     pub passing_eligibility_criteria: String,
@@ -576,9 +573,9 @@ fn _print_default_state(
             "Sorted Score Indices Count: {}\n",
             output.state.sorted_score_indices_count
         );
-        formatted_string += &format!("Yield Scores Count: {}\n", output.state.raw_scores_count);
+        formatted_string += &format!("Raw Scores Count: {}\n", output.state.raw_scores_count);
         formatted_string += &format!(
-            "Sorted Yield Score Indices Count: {}\n",
+            "Sorted Raw Score Indices Count: {}\n",
             output.state.sorted_raw_score_indices_count
         );
         formatted_string += &format!("Delegations Count: {}\n", output.state.delegations_count);
@@ -783,7 +780,7 @@ fn build_verbose_state_output(
             steward_list_index: index,
             overall_rank,
             score: *score,
-            raw_score: *raw_score,
+            validator_score: ValidatorScoreComponents::decode(*raw_score),
             passing_eligibility_criteria: eligibility_criteria,
             target_delegation_percent,
             is_instant_unstake: steward_state_account
@@ -918,14 +915,11 @@ fn _print_verbose_state(
 
             formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
             formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
-            formatted_string += &format!(
-                "Yield Score: {}\n",
-                steward_state_account
-                    .state
-                    .raw_scores
-                    .get(index)
-                    .unwrap_or(&0)
-            );
+            if let Some(raw_score) = steward_state_account.state.raw_scores.get(index) {
+                let validator_score_components = ValidatorScoreComponents::decode(*raw_score);
+                formatted_string += &validator_score_components.to_string();
+            }
+
             formatted_string +=
                 &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
 
