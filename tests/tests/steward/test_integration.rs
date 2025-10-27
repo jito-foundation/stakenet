@@ -177,6 +177,7 @@ async fn test_compute_delegations() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -698,6 +699,7 @@ async fn test_compute_instant_unstake() {
         )
         .await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -929,6 +931,7 @@ async fn test_idle() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -1076,6 +1079,7 @@ async fn test_rebalance_increase() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1328,6 +1332,7 @@ async fn test_rebalance_decrease() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1648,6 +1653,7 @@ async fn test_rebalance_other_cases() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     fixture.realloc_steward_state().await;
+    initialize_directed_stake_meta(&fixture, MAX_VALIDATORS as u16).await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
