@@ -173,6 +173,15 @@ jobs:
           RUST_MIN_STACK: 10000000
           RUSTFLAGS: --cfg anchor_debug
 
+      - name: cargo test --doc
+        run: cargo test --doc --all-features --color auto
+        shell: bash
+        env:
+          RUST_LOG: trace
+          SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
+          RUST_MIN_STACK: 10000000
+          RUSTFLAGS: --cfg anchor_debug
+
   # release only runs on tagged commits
   # it should wait for all the other steps to finish, to ensure releases are the highest quality
   # after waiting, it will download the verified build and IDL from the verified_build step and release the artifacts
