@@ -29,6 +29,7 @@ solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
 spl-pod = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
+spl-associated-token-account = { workspace = true }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }

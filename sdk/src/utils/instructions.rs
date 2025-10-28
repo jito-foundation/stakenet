@@ -13,10 +13,13 @@ use spl_stake_pool::state::StakePool;
 use validator_history::{constants::MAX_ALLOC_BYTES, ValidatorHistory};
 
 use crate::{
-    models::errors::JitoTransactionError,
-    utils::accounts::{
-        get_directed_stake_meta_address, get_directed_stake_ticket_address,
-        get_directed_stake_tickets, get_directed_stake_whitelist_address,
+    models::errors::JitoInstructionError,
+    utils::{
+        accounts::{
+            get_directed_stake_meta_address, get_directed_stake_ticket_address,
+            get_directed_stake_tickets, get_directed_stake_whitelist_address,
+        },
+        helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
 };
 
@@ -140,7 +143,7 @@ pub fn update_directed_stake_ticket(
 /// # Example
 ///
 /// ```no_run
-/// use std::sync::Arc;
+/// use std::{str::FromStr, sync::Arc};
 ///
 /// use solana_client::nonblocking::rpc_client::RpcClient;
 /// use solana_sdk::pubkey::Pubkey;
@@ -148,13 +151,15 @@ pub fn update_directed_stake_ticket(
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
-/// let stake_pool = Pubkey::new_unique();
+/// let jitosol_mint_address = Pubkey::from_str("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn").unwrap();
+/// let stake_pool = Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb").unwrap();
 /// let steward_config = Pubkey::new_unique();
 /// let authority = Pubkey::new_unique();
 /// let program_id = Pubkey::new_unique();
 ///
 /// let instructions = compute_directed_stake_meta(
 ///     client,
+///     &jitosol_mint_address,
 ///     &stake_pool,
 ///     &steward_config,
 ///     &authority,
@@ -166,61 +171,41 @@ pub fn update_directed_stake_ticket(
 /// ```
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
+    token_mint_address: &Pubkey,
     stake_pool_address: &Pubkey,
     steward_config: &Pubkey,
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
-) -> Result<Vec<Instruction>, JitoTransactionError> {
-    let mut validator_target_delegations: HashMap<Pubkey, u64> = HashMap::new();
+) -> Result<Vec<Instruction>, JitoInstructionError> {
     let tickets = get_directed_stake_tickets(client.clone(), program_id).await?;
 
+    let stake_pool_account = client.get_account(stake_pool_address).await?;
+    let stake_pool =
+        StakePool::deserialize(&mut stake_pool_account.data.as_slice()).map_err(|e| {
+            JitoInstructionError::Custom(format!("Failed to deserialize stake pool: {e}"))
+        })?;
+    let conversion_rate_bps =
+        calculate_conversion_rate_bps(stake_pool.total_lamports, stake_pool.pool_token_supply)?;
+
+    let mut jitosol_balances = HashMap::new();
     for ticket in &tickets {
-        let (jitosol_balance, _jitosol_ui_amount) = match client
-            .get_token_account_balance(&ticket.ticket_update_authority)
-            .await
-        {
-            Ok(balance) => (balance.amount.clone(), balance.ui_amount.unwrap_or(0.0)),
-            Err(_) => ("0".to_string(), 0.0),
-        };
-
-        let stake_pool_account = client.get_account(&stake_pool_address).await?;
-        let stake_pool = StakePool::deserialize(&mut stake_pool_account.data.as_slice()).unwrap();
-
-        let total_lamports: u64 = stake_pool.total_lamports;
-        let pool_token_supply: u64 = stake_pool.pool_token_supply;
-        let conversion_rate_bps: u64 = (total_lamports as u128)
-            .checked_mul(10_000)
-            .unwrap()
-            .checked_div(pool_token_supply as u128)
-            .unwrap() as u64;
-
-        for preference in ticket.staker_preferences {
-            if preference.vote_pubkey != Pubkey::default() {
-                let total_lamports: u64 = jitosol_balance.parse::<u64>().unwrap();
-                let allocation_jito_sol = preference.get_allocation(total_lamports);
-                let allocation_lamports = allocation_jito_sol
-                    .checked_mul(conversion_rate_bps as u128)
-                    .unwrap()
-                    .checked_div(10_000)
-                    .unwrap() as u64;
-                let current_allocation = validator_target_delegations
-                    .get(&preference.vote_pubkey)
-                    .unwrap_or(&0);
-                validator_target_delegations.insert(
-                    preference.vote_pubkey,
-                    current_allocation.saturating_add(allocation_lamports),
-                );
-            }
-        }
+        let balance = get_token_balance(
+            client.clone(),
+            token_mint_address,
+            &ticket.ticket_update_authority,
+        )
+        .await?;
+        jitosol_balances.insert(ticket.ticket_update_authority, balance);
     }
 
-    let pending_keys: Vec<Pubkey> = validator_target_delegations.keys().cloned().collect();
+    let validator_targets =
+        aggregate_validator_targets(&tickets, &jitosol_balances, conversion_rate_bps)?;
 
-    let mut instructions = Vec::new();
-    for i in 0..pending_keys.len() {
-        let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
-        let instruction = Instruction {
+    let instructions = validator_targets
+        .iter()
+        .map(|(vote_pubkey, total_target_lamports)| Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::CopyDirectedStakeTargets {
                 config: *steward_config,
@@ -230,14 +215,11 @@ pub async fn compute_directed_stake_meta(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::CopyDirectedStakeTargets {
-                vote_pubkey: pending_keys[i],
-                total_target_lamports: validator_target_delegations[&pending_keys[i]],
+                vote_pubkey: *vote_pubkey,
+                total_target_lamports: *total_target_lamports,
             }
             .data(),
-        };
-
-        instructions.push(instruction);
-    }
-
+        })
+        .collect();
     Ok(instructions)
 }

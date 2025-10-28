@@ -304,7 +304,7 @@ pub async fn get_directed_stake_tickets(
 
     let accounts = client
         .get_program_accounts_with_config(
-            &program_id,
+            program_id,
             solana_client::rpc_config::RpcProgramAccountsConfig {
                 filters: Some(vec![memcmp_filter]),
                 account_config: solana_client::rpc_config::RpcAccountInfoConfig {
@@ -322,10 +322,7 @@ pub async fn get_directed_stake_tickets(
     let tickets: Vec<DirectedStakeTicket> = accounts
         .iter()
         .filter_map(|(_pda, account)| {
-            match DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()) {
-                Ok(ticket) => Some(ticket),
-                Err(_) => None,
-            }
+            DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok()
         })
         .collect();
 
@@ -681,7 +678,7 @@ pub fn get_directed_stake_whitelist_address(
 ) -> Pubkey {
     let (address, _bump) = Pubkey::find_program_address(
         &[DirectedStakeWhitelist::SEED, steward_config.as_ref()],
-        &program_id,
+        program_id,
     );
 
     address
@@ -713,7 +710,7 @@ pub fn get_directed_stake_whitelist_address(
 pub fn get_directed_stake_meta_address(steward_config: &Pubkey, program_id: &Pubkey) -> Pubkey {
     let (directed_stake_meta_pda, _bump) = Pubkey::find_program_address(
         &[DirectedStakeMeta::SEED, steward_config.as_ref()],
-        &program_id,
+        program_id,
     );
 
     directed_stake_meta_pda
@@ -744,7 +741,7 @@ pub fn get_directed_stake_meta_address(steward_config: &Pubkey, program_id: &Pub
 /// ```
 pub fn get_directed_stake_ticket_address(signer: &Pubkey, program_id: &Pubkey) -> Pubkey {
     let (directed_stake_ticket_pda, _bump) =
-        Pubkey::find_program_address(&[DirectedStakeTicket::SEED, signer.as_ref()], &program_id);
+        Pubkey::find_program_address(&[DirectedStakeTicket::SEED, signer.as_ref()], program_id);
 
     directed_stake_ticket_pda
 }

@@ -10780,6 +10780,7 @@ dependencies = [
  "solana-program",
  "solana-sdk",
  "solana-transaction-status 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spl-associated-token-account",
  "spl-pod",
  "spl-stake-pool",
  "thiserror 1.0.69",
