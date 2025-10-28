@@ -5,6 +5,7 @@ on:
       - master
       - steward-test-branch
       - feat/directed-staking
+      - ak/directed-staking-offchain
     tags:
       - "v*"
   pull_request:
@@ -12,6 +13,7 @@ on:
       - master
       - steward-test-branch
       - feat/directed-staking
+      - ak/directed-staking-offchain
 jobs:
   security_audit:
     name: security_audit
@@ -50,7 +52,6 @@ jobs:
       - run: cargo sort --workspace --check
       - run: cargo fmt --all --check
       - run: cargo +nightly-2025-02-19 clippy --all-features --all-targets --tests -- -D warnings
-
 
   udeps:
     name: udeps
