@@ -72,6 +72,14 @@ impl IdlBuild for AuthorityType {
                             ty: IdlType::Option(Box::new(IdlType::U8)),
                         }])),
                     },
+                    IdlEnumVariant {
+                        name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
                 ],
             },
             docs: Default::default(),

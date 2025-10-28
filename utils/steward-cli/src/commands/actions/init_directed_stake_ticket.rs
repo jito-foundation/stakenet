@@ -56,7 +56,6 @@ pub async fn command_init_directed_stake_ticket(
         .to_account_metas(None),
         data: jito_steward::instruction::InitializeDirectedStakeTicket {
             ticket_update_authority: args.ticket_update_authority,
-            ticket_close_authority: args.ticket_close_authority,
             ticket_holder_is_protocol: args.ticket_holder_is_protocol,
         }
         .data(),

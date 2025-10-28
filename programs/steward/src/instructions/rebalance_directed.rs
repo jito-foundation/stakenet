@@ -225,6 +225,15 @@ pub fn handler(
             Some(StewardStateEnum::RebalanceDirected),
         )?;
 
+        // Check if staked lamports have been updated for this epoch
+        if directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch
+            == clock.epoch
+            && clock.epoch > 0
+            && directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports > 0
+        {
+            return Err(StewardError::ValidatorAlreadyRebalanced.into());
+        }
+
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 
@@ -232,8 +241,6 @@ pub fn handler(
             let stake_pool_lamports_with_fixed_cost =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
-
-            msg!("reserve_lamports_with_rent: {}", reserve_lamports_with_rent);
 
             // Use directed delegation logic instead of regular rebalance
             use crate::directed_delegation::{
@@ -254,25 +261,6 @@ pub fn handler(
             let undirected_floor_cap =
                 undirected_tvl_lamports < config.parameters.undirected_stake_floor_lamports();
 
-            msg!(
-                "config parameters undirected stake floor lamports {}",
-                &config
-                    .parameters
-                    .undirected_stake_floor_lamports()
-                    .to_string()
-            );
-            msg!(
-                "directed_unstake_cap_bps: {}",
-                config.parameters.directed_stake_unstake_cap_bps
-            );
-            msg!(
-                "directed_unstake_cap_lamports: {}",
-                directed_unstake_cap_lamports
-            );
-            msg!("undirected_tvl_lamports: {}", undirected_tvl_lamports);
-            msg!("undirected_floor_cap: {}", undirected_floor_cap);
-
-            // Hmm this could be better
             let staked_lamports_at_stake_meta_index = directed_stake_meta
                 .get_total_staked_lamports(&vote_pubkey_from_directed_stake_meta)
                 .unwrap_or(0);
@@ -282,12 +270,11 @@ pub fn handler(
                 &state_account.state,
                 &directed_stake_meta,
                 directed_stake_meta_index,
-                unstake_state,
                 staked_lamports_at_stake_meta_index,
-                stake_pool_lamports_with_fixed_cost,
+                directed_unstake_cap_lamports,
+                unstake_state.directed_unstake_total,
                 minimum_delegation,
                 stake_rent,
-                directed_unstake_cap_lamports,
             );
 
             match decrease_result {
@@ -297,11 +284,10 @@ pub fn handler(
                     &directed_stake_meta,
                     directed_stake_meta_index,
                     staked_lamports_at_stake_meta_index,
-                    stake_pool_lamports_with_fixed_cost,
                     reserve_lamports_with_rent,
+                    undirected_floor_cap,
                     minimum_delegation,
                     stake_rent,
-                    undirected_floor_cap,
                 ),
             }?
         };

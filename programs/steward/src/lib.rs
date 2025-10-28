@@ -379,13 +379,11 @@ pub mod steward {
     pub fn initialize_directed_stake_ticket(
         ctx: Context<InitializeDirectedStakeTicket>,
         ticket_update_authority: Pubkey,
-        ticket_close_authority: Pubkey,
         ticket_holder_is_protocol: bool,
     ) -> Result<()> {
         instructions::initialize_directed_stake_ticket::handler(
             ctx,
             ticket_update_authority,
-            ticket_close_authority,
             ticket_holder_is_protocol,
         )
     }

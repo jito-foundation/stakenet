@@ -116,27 +116,22 @@ pub async fn command_compute_directed_stake_meta(
         Pubkey::from_str("3JD3jMmnR6g88qff2WZ3cMHJRjJMUk9yVZtmYTYeFrXf").unwrap();
     let galaxy_validator_pubkey =
         Pubkey::from_str("CvSb7wdQAFpHuSpTYTJnX5SYH4hCfQ9VuGnqrKaKwycB").unwrap();
-    let security_council_pubkey =
-        Pubkey::from_str("9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6").unwrap();
     let validator_pubkey =
         Pubkey::from_str("A4hyMd3FyvUJSRafDUSwtLLaQcxRP4r1BRC9w2AJ1to2").unwrap();
     let drift_validator_pubkey =
         Pubkey::from_str("DriFTm3wM9ugxhCA1K3wVQMSdC4Dv4LNmyZMmZiuHRpp").unwrap();
     let directed_stake_ticket = DirectedStakeTicket::new(
         kamino_reserve_pubkey,
-        security_council_pubkey,
         U8Bool::from(true),
         &[DirectedStakePreference::new(validator_pubkey, 10000)],
     );
     let drift_directed_stake_ticket = DirectedStakeTicket::new(
         drift_vault,
-        drift_validator_pubkey,
         U8Bool::from(true),
         &[DirectedStakePreference::new(drift_validator_pubkey, 10000)],
     );
 
     let whale_directed_stake_ticket = DirectedStakeTicket::new(
-        whale_pubkey,
         whale_pubkey,
         U8Bool::from(true),
         &[

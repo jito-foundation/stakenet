@@ -277,7 +277,6 @@ async fn populate_directed_stake_meta_after_init(
     target_lamports: u64,
     staked_lamports: u64,
 ) {
-    println!("Populating directed stake meta after initialization");
     let directed_stake_meta_pubkey = Pubkey::find_program_address(
         &[
             DirectedStakeMeta::SEED,
@@ -406,7 +405,6 @@ async fn test_simple_directed_rebalance_increase() {
     )
     .await;
 
-    println!("Directed stake meta populated... rebalancing");
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
@@ -934,6 +932,4 @@ async fn test_directed_rebalance_wrong_state() {
     fixture
         .submit_transaction_assert_error(tx, "InvalidState")
         .await;
-
-    println!("Expected failure (wrong state) - test passed");
 }

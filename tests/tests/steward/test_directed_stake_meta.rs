@@ -27,21 +27,10 @@ async fn setup_directed_stake_fixture() -> TestFixture {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    println!("Steward initialized");
     fixture.realloc_steward_state().await;
-    println!("Steward state reallocated");
-    println!("Fixture initialized");
-    // Set the directed stake whitelist authority to the fixture's keypair
     set_directed_stake_whitelist_authority(&fixture).await;
 
-    println!("Directed stake whitelist authority set");
-    // Initialize the directed stake whitelist first
     initialize_directed_stake_whitelist(&fixture).await;
-
-    println!("Directed stake whitelist initialized");
-
-    //initialize_directed_stake_meta(&fixture, 10).await;
-    //println!("Directed stake meta initialized");
 
     fixture
 }
@@ -148,7 +137,6 @@ async fn realloc_directed_stake_whitelist(fixture: &TestFixture) {
         fixture.ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
-    println!("Directed stake whitelist reallocated");
 }
 
 /// Helper function to initialize directed stake whitelist
@@ -320,7 +308,6 @@ async fn initialize_directed_stake_ticket(
     fixture: &TestFixture,
     signer: &Keypair,
     ticket_update_authority: Pubkey,
-    ticket_close_authority: Pubkey,
     ticket_holder_is_protocol: bool,
 ) -> Pubkey {
     let ticket_account = Pubkey::find_program_address(
@@ -358,7 +345,6 @@ async fn initialize_directed_stake_ticket(
         ],
         data: jito_steward::instruction::InitializeDirectedStakeTicket {
             ticket_update_authority,
-            ticket_close_authority,
             ticket_holder_is_protocol,
         }
         .data(),
@@ -544,31 +530,22 @@ async fn test_add_stakers_to_whitelist() {
 #[tokio::test]
 async fn test_initialize_directed_stake_ticket() {
     let fixture = setup_directed_stake_fixture().await;
-    println!("Fixture initialized");
-    // Create a funded test staker and add to whitelist
     let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
-    println!("Staker added to whitelist");
-    // Initialize a directed stake ticket
     let ticket_update_authority = Pubkey::new_unique();
-    let ticket_close_authority = Pubkey::new_unique();
     let ticket_holder_is_protocol = false;
 
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &staker,
         ticket_update_authority,
-        ticket_close_authority,
         ticket_holder_is_protocol,
     )
     .await;
-    println!("Ticket account: {}", ticket_account);
-    // Verify the ticket was created
     let ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
 
     assert_eq!(ticket.num_preferences, 0);
     assert_eq!(ticket.ticket_update_authority, ticket_update_authority);
-    assert_eq!(ticket.ticket_close_authority, ticket_close_authority);
     assert_eq!(
         bool::from(ticket.ticket_holder_is_protocol),
         ticket_holder_is_protocol
@@ -588,7 +565,6 @@ async fn test_update_directed_stake_ticket() {
         &fixture,
         &staker,
         staker.pubkey(), // ticket_update_authority
-        staker.pubkey(), // ticket_close_authority
         false,           // ticket_holder_is_protocol
     )
     .await;
@@ -637,14 +613,8 @@ async fn test_directed_stake_ticket_validation() {
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
 
     // Initialize a directed stake ticket
-    let ticket_account = initialize_directed_stake_ticket(
-        &fixture,
-        &staker,
-        staker.pubkey(),
-        staker.pubkey(),
-        false,
-    )
-    .await;
+    let ticket_account =
+        initialize_directed_stake_ticket(&fixture, &staker, staker.pubkey(), false).await;
 
     // Create test validators and add them to whitelist
     let validator1 = Pubkey::new_unique();
@@ -758,7 +728,6 @@ async fn test_directed_stake_ticket_unauthorized() {
         ],
         data: jito_steward::instruction::InitializeDirectedStakeTicket {
             ticket_update_authority: unauthorized_staker.pubkey(),
-            ticket_close_authority: unauthorized_staker.pubkey(),
             ticket_holder_is_protocol: false,
         }
         .data(),
@@ -804,28 +773,15 @@ async fn test_multiple_directed_stake_tickets() {
     add_validator_to_whitelist(&fixture, &validator3).await;
 
     // Initialize tickets for all stakers
-    let ticket1 = initialize_directed_stake_ticket(
-        &fixture,
-        &staker1,
-        staker1.pubkey(),
-        staker1.pubkey(),
-        false,
-    )
-    .await;
+    let ticket1 =
+        initialize_directed_stake_ticket(&fixture, &staker1, staker1.pubkey(), false).await;
 
-    let ticket2 = initialize_directed_stake_ticket(
-        &fixture,
-        &staker2,
-        staker2.pubkey(),
-        staker2.pubkey(),
-        false,
-    )
-    .await;
+    let ticket2 =
+        initialize_directed_stake_ticket(&fixture, &staker2, staker2.pubkey(), false).await;
 
     let ticket3 = initialize_directed_stake_ticket(
         &fixture,
         &protocol_staker,
-        protocol_staker.pubkey(),
         protocol_staker.pubkey(),
         true,
     )
@@ -898,14 +854,8 @@ async fn test_directed_stake_ticket_allocation_calculation() {
     add_validator_to_whitelist(&fixture, &validator2).await;
 
     // Initialize a directed stake ticket
-    let ticket_account = initialize_directed_stake_ticket(
-        &fixture,
-        &staker,
-        staker.pubkey(),
-        staker.pubkey(),
-        false,
-    )
-    .await;
+    let ticket_account =
+        initialize_directed_stake_ticket(&fixture, &staker, staker.pubkey(), false).await;
 
     // Create preferences with specific percentages
     let preferences = vec![

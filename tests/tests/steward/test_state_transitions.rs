@@ -117,7 +117,7 @@ pub fn test_rebalance_directed_noop() {
     let parameters = &fixtures.config.parameters;
     let state = &mut fixtures.state;
     state.state_tag = StewardStateEnum::RebalanceDirected;
-    clock.slot += 10_000;
+    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
 
     let res = state.transition(clock, parameters, epoch_schedule);
     assert!(res.is_ok());

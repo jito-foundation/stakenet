@@ -290,12 +290,6 @@ impl StewardState {
         let current_epoch = clock.epoch;
         let current_slot = clock.slot;
         let epoch_progress = epoch_progress(clock, epoch_schedule)?;
-        msg!(
-            "Epoch progress: {:.4}\nState: {} RebalanceDirected={}",
-            epoch_progress,
-            self.state_tag,
-            self.has_flag(REBALANCE_DIRECTED_COMPLETE)
-        );
         match self.state_tag {
             StewardStateEnum::ComputeScores => self.transition_compute_scores(
                 current_epoch,
@@ -329,6 +323,7 @@ impl StewardState {
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
+                epoch_progress,
             ),
         }
     }
@@ -340,11 +335,6 @@ impl StewardState {
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        msg!(
-            "Progress is complete: {}",
-            self.progress.is_complete(self.num_pool_validators).unwrap()
-        );
-        msg!("Num pool validators: {}", self.num_pool_validators);
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
                 current_epoch,
@@ -394,7 +384,6 @@ impl StewardState {
         let completed_compute_delegations = self.has_flag(COMPUTE_DELEGATIONS);
 
         if current_epoch >= self.next_cycle_epoch {
-            msg!("Resetting state for new cycle from Idle");
             self.reset_state_for_new_cycle(
                 current_epoch,
                 current_slot,
@@ -480,6 +469,7 @@ impl StewardState {
         current_epoch: u64,
         current_slot: u64,
         num_epochs_between_scoring: u64,
+        epoch_progress: f64,
     ) -> Result<()> {
         let directed_rebalance_complete = self.has_flag(REBALANCE_DIRECTED_COMPLETE);
 
@@ -494,6 +484,11 @@ impl StewardState {
             self.state_tag = StewardStateEnum::Idle;
             // This needs to be reset every cycle when RebalanceDirected is complete
             self.directed_unstake_total = 0;
+        } else if epoch_progress >= 0.5 {
+            // Do not stall the state machine if directed rebalance is not complete by the epoch
+            // midpoint, undirected stake should be uninterrupted
+            self.set_flag(REBALANCE_DIRECTED_COMPLETE);
+            self.state_tag = StewardStateEnum::Idle;
         }
         Ok(())
     }

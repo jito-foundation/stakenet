@@ -973,7 +973,6 @@ fn test_directed_stake_preferences_valid() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: Pubkey::default(),
-        ticket_close_authority: Pubkey::default(),
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };
@@ -1022,7 +1021,6 @@ fn test_directed_stake_get_allocations() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: Pubkey::default(),
-        ticket_close_authority: Pubkey::default(),
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };

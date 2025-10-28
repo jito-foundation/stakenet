@@ -5,7 +5,6 @@ mod test_directed_increase_decrease;
 mod test_directed_rebalance_instructions;
 mod test_directed_stake_instructions;
 mod test_directed_stake_meta;
-mod test_directed_stake_meta_instructions;
 mod test_epoch_maintenance;
 mod test_integration;
 mod test_parameters;

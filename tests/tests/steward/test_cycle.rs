@@ -651,6 +651,238 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
 }
 
 #[tokio::test]
+async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
+    let mut fixture_accounts = FixtureDefaultAccounts::default();
+
+    let unit_test_fixtures = StateMachineFixtures::default();
+
+    // Note that these parameters are overriden in initialize_steward, just included here for completeness
+    fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
+
+    fixture_accounts.validators = (0..3)
+        .map(|i| ValidatorEntry {
+            validator_history: unit_test_fixtures.validators[i],
+            vote_account: unit_test_fixtures.vote_accounts[i].clone(),
+            vote_address: unit_test_fixtures.validators[i].vote_account,
+        })
+        .collect();
+    fixture_accounts.cluster_history = unit_test_fixtures.cluster_history;
+
+    // Modify validator history account with desired values
+
+    let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
+    let ctx = &fixture.ctx;
+
+    fixture.steward_config = Keypair::new();
+    fixture.steward_state = Pubkey::find_program_address(
+        &[
+            StewardStateAccount::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    fixture.advance_num_epochs(20, 10).await;
+    fixture.initialize_stake_pool().await;
+    fixture
+        .initialize_steward(
+            Some(UpdateParametersArgs {
+                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
+                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
+                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                scoring_delinquency_threshold_ratio: Some(0.85),
+                instant_unstake_delinquency_threshold_ratio: Some(0.70),
+                mev_commission_bps_threshold: Some(1000),
+                commission_threshold: Some(5),
+                historical_commission_threshold: Some(50),
+                num_delegation_validators: Some(200),
+                scoring_unstake_cap_bps: Some(750),
+                instant_unstake_cap_bps: Some(10),
+                stake_deposit_unstake_cap_bps: Some(10),
+                instant_unstake_epoch_progress: Some(0.9),
+                compute_score_slot_range: Some(1000),
+                instant_unstake_inputs_epoch_progress: Some(0.50),
+                num_epochs_between_scoring: Some(2), // 2 epoch cycle
+                minimum_stake_lamports: Some(5_000_000_000),
+                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(0),
+                directed_stake_unstake_cap_bps: Some(10_000),
+            }),
+            None,
+        )
+        .await;
+    fixture.realloc_steward_state().await;
+
+    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
+
+    let mut extra_validator_accounts = vec![];
+    for i in 0..unit_test_fixtures.validators.len() {
+        let vote_account = unit_test_fixtures.validator_list[i].vote_account_address;
+        let (validator_history_address, _) = Pubkey::find_program_address(
+            &[ValidatorHistory::SEED, vote_account.as_ref()],
+            &validator_history::id(),
+        );
+
+        let (stake_account_address, transient_stake_account_address, withdraw_authority) =
+            fixture.stake_accounts_for_validator(vote_account).await;
+
+        extra_validator_accounts.push(ExtraValidatorAccounts {
+            vote_account,
+            validator_history_address,
+            stake_account_address,
+            transient_stake_account_address,
+            withdraw_authority,
+        })
+    }
+
+    crank_epoch_maintenance(&fixture, None).await;
+
+    // Auto add validator - adds to validator list
+    for extra_accounts in extra_validator_accounts.iter() {
+        auto_add_validator(&fixture, extra_accounts).await;
+    }
+
+    // Set up directed stake permissions (whitelist authority, add validators and staker to whitelist)
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    // Set the directed stake meta upload authority to the signer
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Copy directed stake targets for the validators
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 10_000_000_000)
+            .await;
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    let directed_stake_meta: DirectedStakeMeta =
+        fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+    for target in directed_stake_meta.targets.iter() {
+        if target.vote_pubkey == Pubkey::default() {
+            continue;
+        }
+        println!(
+            "Staked lamports for validator {:?}: {:?}",
+            target.vote_pubkey, target.total_staked_lamports
+        );
+        assert_eq!(target.total_staked_lamports, 10_000_000_000);
+    }
+
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_compute_delegations(&fixture).await;
+
+    let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
+
+    fixture.advance_num_slots(160_000).await;
+
+    crank_idle(&fixture).await;
+
+    crank_compute_instant_unstake(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_rebalance(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    println!("Advancing epoch from {} (expected 20)", clock.epoch);
+
+    fixture.advance_num_epochs(1, 10).await;
+
+    crank_stake_pool(&fixture).await;
+
+    crank_epoch_maintenance(&fixture, None).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 9_999_999_999)
+            .await;
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    let directed_stake_meta: DirectedStakeMeta =
+        fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+    for target in directed_stake_meta.targets.iter() {
+        if target.vote_pubkey == Pubkey::default() {
+            continue;
+        }
+        println!(
+            "Staked lamports for validator {:?}: {:?}",
+            target.vote_pubkey, target.total_staked_lamports
+        );
+        // Minimum delegation will result in no change to stake
+        assert!(target.staked_last_updated_epoch == 21);
+        assert!(target.total_staked_lamports == 10_000_000_000);
+    }
+
+    drop(fixture);
+}
+
+#[tokio::test]
 async fn test_cycle_with_directed_stake_unstake_cap() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
@@ -708,7 +940,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(0),
-                directed_stake_unstake_cap_bps: Some(1),
+                directed_stake_unstake_cap_bps: Some(100),
             }),
             None,
         )
@@ -873,10 +1105,9 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
             "Staked lamports for validator {:?}: {:?}",
             target.vote_pubkey, target.total_staked_lamports
         );
-        // Only a small directed unstake will occur due to cap being 1s despite 0 lamport target
         assert!(target.staked_last_updated_epoch == 21);
         assert!(target.total_staked_lamports < 10_000_000_000);
-        assert!(target.total_staked_lamports > 9_900_000_000);
+        assert!(target.total_staked_lamports > 9_000_000_000);
     }
 
     drop(fixture);
@@ -1440,6 +1671,168 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
         assert_eq!(target.staked_last_updated_epoch, 20);
         assert_eq!(target.total_staked_lamports, 0); // No directed stake increases due to high
                                                      // undirected floor
+    }
+
+    drop(fixture);
+}
+
+#[tokio::test]
+async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
+    let mut fixture_accounts = FixtureDefaultAccounts::default();
+
+    let unit_test_fixtures = StateMachineFixtures::default();
+
+    // Note that these parameters are overriden in initialize_steward, just included here for completeness
+    fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
+
+    fixture_accounts.validators = (0..3)
+        .map(|i| ValidatorEntry {
+            validator_history: unit_test_fixtures.validators[i],
+            vote_account: unit_test_fixtures.vote_accounts[i].clone(),
+            vote_address: unit_test_fixtures.validators[i].vote_account,
+        })
+        .collect();
+    fixture_accounts.cluster_history = unit_test_fixtures.cluster_history;
+
+    // Modify validator history account with desired values
+
+    let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
+
+    fixture.steward_config = Keypair::new();
+    fixture.steward_state = Pubkey::find_program_address(
+        &[
+            StewardStateAccount::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    fixture.advance_num_epochs(20, 10).await;
+    fixture.initialize_stake_pool().await;
+    fixture
+        .initialize_steward(
+            Some(UpdateParametersArgs {
+                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
+                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
+                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                scoring_delinquency_threshold_ratio: Some(0.85),
+                instant_unstake_delinquency_threshold_ratio: Some(0.70),
+                mev_commission_bps_threshold: Some(1000),
+                commission_threshold: Some(5),
+                historical_commission_threshold: Some(50),
+                num_delegation_validators: Some(200),
+                scoring_unstake_cap_bps: Some(750),
+                instant_unstake_cap_bps: Some(10),
+                stake_deposit_unstake_cap_bps: Some(10),
+                instant_unstake_epoch_progress: Some(0.9),
+                compute_score_slot_range: Some(1000),
+                instant_unstake_inputs_epoch_progress: Some(0.50),
+                num_epochs_between_scoring: Some(2), // 2 epoch cycle
+                minimum_stake_lamports: Some(5_000_000_000),
+                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(0),
+                directed_stake_unstake_cap_bps: Some(10_000),
+            }),
+            None,
+        )
+        .await;
+    fixture.realloc_steward_state().await;
+
+    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    realloc_directed_stake_meta(&fixture).await;
+
+    let mut extra_validator_accounts = vec![];
+    for i in 0..unit_test_fixtures.validators.len() {
+        let vote_account = unit_test_fixtures.validator_list[i].vote_account_address;
+        let (validator_history_address, _) = Pubkey::find_program_address(
+            &[ValidatorHistory::SEED, vote_account.as_ref()],
+            &validator_history::id(),
+        );
+
+        let (stake_account_address, transient_stake_account_address, withdraw_authority) =
+            fixture.stake_accounts_for_validator(vote_account).await;
+
+        extra_validator_accounts.push(ExtraValidatorAccounts {
+            vote_account,
+            validator_history_address,
+            stake_account_address,
+            transient_stake_account_address,
+            withdraw_authority,
+        })
+    }
+
+    crank_epoch_maintenance(&fixture, None).await;
+
+    // Auto add validator - adds to validator list
+    for extra_accounts in extra_validator_accounts.iter() {
+        auto_add_validator(&fixture, extra_accounts).await;
+    }
+
+    // Set up directed stake permissions (whitelist authority, add validators and staker to whitelist)
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    // Set the directed stake meta upload authority to the signer
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1).await;
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    {
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
+
+        for target in directed_stake_meta.targets.iter() {
+            if target.vote_pubkey == Pubkey::default() {
+                continue;
+            }
+            println!(
+                "Target last updated epoch: {:?}",
+                target.staked_last_updated_epoch
+            );
+            println!(
+                "Staked lamports for validator {:?}: {:?}",
+                target.vote_pubkey, target.total_staked_lamports
+            );
+        }
     }
 
     drop(fixture);
