@@ -165,7 +165,7 @@ jobs:
         run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
         shell: bash
       - name: cargo test
-        run: cargo test +nightly-2024-11-19 --package tests --all-features --color auto
+        run: cargo test --package tests --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace

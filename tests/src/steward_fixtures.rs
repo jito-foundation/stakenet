@@ -95,34 +95,14 @@ pub struct TestFixture {
 }
 
 impl TestFixture {
+    /// Initializes test context with Steward and Stake Pool programs loaded, as well as
+    /// a vote account and a system account for signing transactions.
+    ///
+    /// Returns a fixture with relevant account addresses and keypairs.
     pub async fn new() -> Self {
-        /*
-           Initializes test context with Steward and Stake Pool programs loaded, as well as
-           a vote account and a system account for signing transactions.
-
-           Returns a fixture with relevant account addresses and keypairs.
-        */
-
-        let mut program = match std::env::var("SBF_OUT_DIR") {
-            Ok(_) | Err(_) => {
-                let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
-                program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
-                program.set_compute_max_units(1_400_000);
-                program
-            } // Err(_) => {
-              //     let mut program = ProgramTest::new(
-              //         "jito-steward",
-              //         jito_steward::ID,
-              //         processor!(jito_steward::entry),
-              //     );
-              //     program.add_program(
-              //         "spl-stake-pool",
-              //         spl_stake_pool::id(),
-              //         processor!(spl_stake_pool::processor::Processor::process),
-              //     );
-              //     program
-              // }
-        };
+        let mut program = ProgramTest::new("jito_steward", jito_steward::ID, None);
+        program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
+        program.set_compute_max_units(1_400_000);
 
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();

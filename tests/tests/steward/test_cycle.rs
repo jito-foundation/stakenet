@@ -451,13 +451,10 @@ async fn test_remove_validator_mid_epoch() {
     drop(fixture);
 }
 
+/// Tests that a validator added at an arbitrary point during the cycle does not get included in the
+/// current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
 #[tokio::test]
 async fn test_add_validator_next_cycle() {
-    /*
-      Tests that a validator added at an arbitrary point during the cycle does not get included in the
-      current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
-    */
-
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
     let unit_test_fixtures = Box::<StateMachineFixtures>::default();
