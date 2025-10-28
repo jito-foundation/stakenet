@@ -10768,6 +10768,7 @@ dependencies = [
  "base64 0.21.7",
  "bincode",
  "borsh 0.10.4",
+ "borsh 1.5.7",
  "clap 4.5.48",
  "futures",
  "jito-steward",
