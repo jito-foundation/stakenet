@@ -20,7 +20,10 @@ jito-tip-distribution-sdk = { workspace = true }
 log = "0.4.18"
 rand = "0.8.5"
 regex = "1.10"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 solana-account-decoder = { workspace = true }
 solana-bincode = { workspace = true }
 solana-client = { workspace = true }
@@ -33,7 +36,9 @@ solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
 solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
+spl-associated-token-account = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
+spl-token = { workspace = true }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }

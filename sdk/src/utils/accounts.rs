@@ -10,12 +10,12 @@ use solana_client::{
 use solana_sdk::pubkey::Pubkey;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use validator_history::{ClusterHistory, ValidatorHistory};
+use validator_history::{ClusterHistory, Config as ValidatorHistoryConfig, ValidatorHistory};
 
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
     stake_pool_utils::{StakePool, ValidatorList},
-    Config as StewardConfig, StewardStateAccount,
+    Config as StewardConfig, StewardStateAccount, StewardStateAccountV2,
 };
 
 use solana_sdk::account::Account;
@@ -261,7 +261,6 @@ pub async fn get_all_steward_accounts(
         config_account,
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
-        reserve_stake_address,
         reserve_stake_account,
     }))
 }
@@ -283,12 +282,12 @@ pub async fn get_steward_state_account(
     client: &RpcClient,
     program_id: &Pubkey,
     steward_config: &Pubkey,
-) -> Result<Box<StewardStateAccount>, JitoTransactionError> {
+) -> Result<Box<StewardStateAccountV2>, JitoTransactionError> {
     let steward_state = get_steward_state_address(program_id, steward_config);
 
     let state_raw_account = client.get_account(&steward_state).await?;
 
-    StewardStateAccount::try_deserialize(&mut state_raw_account.data.as_slice())
+    StewardStateAccountV2::try_deserialize(&mut state_raw_account.data.as_slice())
         .map_err(|e| {
             JitoTransactionError::Custom(format!(
                 "Failed to deserialize steward state account: {}",
@@ -428,8 +427,9 @@ pub fn get_validator_history_address(
 }
 
 pub fn get_validator_history_config_address(validator_history_program_id: &Pubkey) -> Pubkey {
-    let (address, _) =
-        Pubkey::find_program_address(&[StewardConfig::SEED], validator_history_program_id);
-
+    let (address, _) = Pubkey::find_program_address(
+        &[ValidatorHistoryConfig::SEED],
+        validator_history_program_id,
+    );
     address
 }

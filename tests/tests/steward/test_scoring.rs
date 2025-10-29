@@ -87,12 +87,14 @@ fn create_validator_history(
         _padding0: [0; 7],
         last_ip_timestamp: 0,
         last_version_timestamp: 0,
-        _padding1: [0; 232],
+        validator_age: 0,
+        validator_age_last_updated_epoch: 0,
+        _padding1: [0; 226],
     }
 }
 
-mod test_calculate_mev_commission {
-    use jito_steward::score::calculate_mev_commission;
+mod test_calculate_max_mev_commission {
+    use jito_steward::score::calculate_max_mev_commission;
 
     #[test]
     fn test_normal() {
@@ -102,30 +104,30 @@ mod test_calculate_mev_commission {
         let threshold = 300;
 
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, current_epoch, threshold).unwrap();
+            calculate_max_mev_commission(&window, current_epoch, threshold).unwrap();
 
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
         assert_eq!(max_commission, 500);
         assert_eq!(max_epoch, 4);
-        assert_eq!(running_jito, 1.0);
+        assert_eq!(running_jito, 1);
 
         // All commissions below threshold, and epoch is first instance of max commission
         let window = [Some(100), Some(200), Some(250), Some(250)];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 3, 300).unwrap();
-        assert_eq!(score, 1.0);
+            calculate_max_mev_commission(&window, 3, 300).unwrap();
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 250);
         assert_eq!(max_epoch, 2);
-        assert_eq!(running_jito, 1.0);
+        assert_eq!(running_jito, 1);
 
         // Window with Nones
         let window = [None, None, None];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 2, 300).unwrap();
-        assert_eq!(score, 0.0);
+            calculate_max_mev_commission(&window, 2, 300).unwrap();
+        assert_eq!(score, 0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 2);
-        assert_eq!(running_jito, 0.0);
+        assert_eq!(running_jito, 0);
     }
 
     #[test]
@@ -133,24 +135,23 @@ mod test_calculate_mev_commission {
         // Empty window
         let window: [Option<u16>; 0] = [];
         let (score, max_commission, max_epoch, running_jito) =
-            calculate_mev_commission(&window, 0, 300).unwrap();
-        assert_eq!(score, 0.0);
+            calculate_max_mev_commission(&window, 0, 300).unwrap();
+        assert_eq!(score, 0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 0);
-        assert_eq!(running_jito, 0.0);
+        assert_eq!(running_jito, 0);
 
         // Test Arithmetic error
         let window = [Some(0), Some(0), Some(0)];
-        let result = calculate_mev_commission(&window, 0, 300);
+        let result = calculate_max_mev_commission(&window, 0, 300);
         assert!(result.is_err());
     }
 }
 
 mod test_calculate_epoch_credits {
     use jito_steward::constants::EPOCH_DEFAULT;
+    use jito_steward::score::calculate_epoch_credits;
     use validator_history::constants::TVC_MULTIPLIER;
-
-    use super::*;
 
     #[test]
     fn test_normal() {
@@ -163,11 +164,11 @@ mod test_calculate_epoch_credits {
         let epoch_start = 0;
         let threshold = 0.9;
 
-        let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, epoch_start, threshold).unwrap();
 
-        assert_eq!(ratio, 0.8);
-        assert_eq!(delinquency_score, 0.0);
+        assert_eq!(vote_credits_ratio, 0.8);
+        assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.8);
         assert_eq!(delinquency_epoch, 0);
     }
@@ -181,19 +182,19 @@ mod test_calculate_epoch_credits {
             Some(850 * TVC_MULTIPLIER),
         ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
-        let (_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+        let (_vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
-        assert_eq!(delinquency_score, 0.0);
+        assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.7);
         assert_eq!(delinquency_epoch, 0);
 
         // Missing data
         let epoch_credits = [None, Some(800 * TVC_MULTIPLIER), Some(900 * TVC_MULTIPLIER)];
         let total_blocks = [Some(1000), None, Some(1000)];
-        let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.9).unwrap();
-        assert_eq!(ratio, 1700. / 3000.);
-        assert_eq!(delinquency_score, 0.0);
+        assert_eq!(vote_credits_ratio, 1700. / 3000.);
+        assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.0);
         assert_eq!(delinquency_epoch, 0);
 
@@ -204,10 +205,10 @@ mod test_calculate_epoch_credits {
             Some(1000 * TVC_MULTIPLIER),
         ];
         let total_blocks = [Some(1000), Some(1000), Some(1000)];
-        let (ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+        let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.7).unwrap();
-        assert_eq!(ratio, 0.9);
-        assert_eq!(delinquency_score, 1.0);
+        assert_eq!(vote_credits_ratio, 0.9);
+        assert_eq!(delinquency_score, 1);
         assert_eq!(delinquency_ratio, 1.0);
         assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
 
@@ -223,7 +224,7 @@ mod test_calculate_epoch_credits {
         let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
         assert!(result.is_err());
 
-        // Test all blocks none error
+        // Test all blocks none - should error when no cluster data is available
         let epoch_credits = [Some(1), Some(1)];
         let total_blocks = [None, None];
         let result = calculate_epoch_credits(&epoch_credits, &total_blocks, u16::MAX, 0.9);
@@ -231,7 +232,7 @@ mod test_calculate_epoch_credits {
     }
 }
 
-mod test_calculate_commission {
+mod test_calculate_max_commission {
     use super::*;
 
     #[test]
@@ -241,17 +242,17 @@ mod test_calculate_commission {
         let threshold = 8;
 
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, current_epoch, threshold).unwrap();
+            calculate_max_commission(&commission_window, current_epoch, threshold).unwrap();
 
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 7);
         assert_eq!(max_epoch, 1);
 
         // Commission above threshold
         let commission_window = [Some(5), Some(10), Some(6)];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 2, 8).unwrap();
-        assert_eq!(score, 0.0);
+            calculate_max_commission(&commission_window, 2, 8).unwrap();
+        assert_eq!(score, 0);
         assert_eq!(max_commission, 10);
         assert_eq!(max_epoch, 1);
     }
@@ -261,22 +262,22 @@ mod test_calculate_commission {
         // Empty window
         let commission_window: [Option<u8>; 0] = [];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 0, 8).unwrap();
-        assert_eq!(score, 1.0);
+            calculate_max_commission(&commission_window, 0, 8).unwrap();
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 0);
         assert_eq!(max_epoch, 0);
 
         // Window with None values
         let commission_window = [None, Some(5), None];
         let (score, max_commission, max_epoch) =
-            calculate_commission(&commission_window, 2, 8).unwrap();
-        assert_eq!(score, 1.0);
+            calculate_max_commission(&commission_window, 2, 8).unwrap();
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 5);
         assert_eq!(max_epoch, 1);
 
         // Test Arithmetic error
         let commission_window = [Some(0), Some(0), Some(0)];
-        let result = calculate_commission(&commission_window, 0, 8);
+        let result = calculate_max_commission(&commission_window, 0, 8);
         assert!(result.is_err());
     }
 }
@@ -304,7 +305,7 @@ mod test_calculate_historical_commission {
         let (score, max_commission, max_epoch) =
             calculate_historical_commission(&validator, current_epoch, threshold).unwrap();
 
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 8);
         assert_eq!(max_epoch, 3);
 
@@ -320,7 +321,7 @@ mod test_calculate_historical_commission {
         );
         let (score, max_commission, max_epoch) =
             calculate_historical_commission(&validator, 9, 8).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
         assert_eq!(max_commission, 9);
         assert_eq!(max_epoch, 3);
     }
@@ -347,7 +348,7 @@ mod test_calculate_historical_commission {
             .push(validator_history::ValidatorHistoryEntry::default());
         let (score, max_commission, max_epoch) =
             calculate_historical_commission(&validator, 10, 8).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(max_commission, 8);
         assert_eq!(max_epoch, 3);
 
@@ -363,7 +364,7 @@ mod test_calculate_historical_commission {
         );
         let (score, max_comission, max_epoch) =
             calculate_historical_commission(&validator, 1, 8).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(max_comission, 0);
         assert_eq!(max_epoch, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH as u16);
     }
@@ -388,7 +389,7 @@ mod test_calculate_superminority {
             &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let (score, epoch) = calculate_superminority(&validator, 9, 10).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
         assert_eq!(epoch, 9);
 
         let validator = create_validator_history(
@@ -406,7 +407,7 @@ mod test_calculate_superminority {
         let (score, epoch) =
             calculate_superminority(&validator, current_epoch, commission_range).unwrap();
 
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(epoch, EPOCH_DEFAULT);
 
         // Superminority with missed uploads after epoch 3
@@ -430,7 +431,7 @@ mod test_calculate_superminority {
         let commission_range = 4;
         let (score, epoch) =
             calculate_superminority(&validator, current_epoch, commission_range).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
         assert_eq!(epoch, 3);
 
         // Superminority with missed uploads after epoch 3
@@ -454,7 +455,7 @@ mod test_calculate_superminority {
         let commission_range = 4;
         let (score, epoch) =
             calculate_superminority(&validator, current_epoch, commission_range).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(epoch, EPOCH_DEFAULT);
     }
 
@@ -492,7 +493,7 @@ mod test_calculate_superminority {
             .history
             .push(validator_history::ValidatorHistoryEntry::default());
         let (score, epoch) = calculate_superminority(&validator, 10, 10).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(epoch, EPOCH_DEFAULT);
     }
 }
@@ -506,10 +507,10 @@ mod test_calculate_blacklist {
         config.validator_history_blacklist.set(5, true).unwrap();
 
         let score = calculate_blacklist_score(&config, 5).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         let score = calculate_blacklist_score(&config, 6).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -545,7 +546,7 @@ mod test_calculate_merkle_root_authoirty {
             ..Default::default()
         });
         let score = calculate_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         // MerkleRootUploadAuthority::OldJitoLabs returns score of 1 **prior** to config switch
         validator.history.push(ValidatorHistoryEntry {
@@ -553,14 +554,14 @@ mod test_calculate_merkle_root_authoirty {
             ..Default::default()
         });
         let score = calculate_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         // MerkleRootUploadAuthority::TipRouter returns score of 1 always
         validator.history.push(ValidatorHistoryEntry {
             merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
             ..Default::default()
         });
         let score = calculate_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -568,7 +569,7 @@ mod test_calculate_merkle_root_authoirty {
         // Empty history
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let score = calculate_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 }
 
@@ -610,14 +611,14 @@ mod test_calculate_priority_fee_merkle_root_upload_authority {
             &[MerkleRootUploadAuthority::TipRouter; 1],
         );
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
     fn test_no_data() {
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -632,7 +633,7 @@ mod test_calculate_priority_fee_merkle_root_upload_authority {
             &[MerkleRootUploadAuthority::Unset; 1],
         );
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -647,7 +648,7 @@ mod test_calculate_priority_fee_merkle_root_upload_authority {
             &[MerkleRootUploadAuthority::OldJitoLabs; 1],
         );
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -662,7 +663,7 @@ mod test_calculate_priority_fee_merkle_root_upload_authority {
             &[MerkleRootUploadAuthority::Other; 1],
         );
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
     }
 
     #[test]
@@ -677,7 +678,7 @@ mod test_calculate_priority_fee_merkle_root_upload_authority {
             &[MerkleRootUploadAuthority::DNE; 1],
         );
         let score = calculate_priority_fee_merkle_root_authority_score(&validator).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
     }
 }
 
@@ -709,7 +710,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 10],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 10).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
 
         // With > priority_fee_lookback_epochs + offset and < 50% commission, score 1
         let validator = create_validator_history(
@@ -722,7 +723,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         // With > priority_fee_lookback_epochs and > 50% commission, score 0
         let validator = create_validator_history(
             &[0; 12],
@@ -734,7 +735,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::TipRouter; 12],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         // Missing priority_fee_tips should be counted as no tips were given to stakers
         let mut validator = create_validator_history(
@@ -748,7 +749,7 @@ mod test_calculate_priority_fee_commission {
         );
         validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         // With max commission and max commission epoch
         let mut validator = create_validator_history(
@@ -777,7 +778,7 @@ mod test_calculate_priority_fee_commission {
             &[MerkleRootUploadAuthority::Unset; 12],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
 
         // Unset PF MRUA is not considered in scoring
         let validator = create_validator_history(
@@ -803,7 +804,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         let validator = create_validator_history(
             &[0; 12],
@@ -828,7 +829,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
 
         // More valid MRUA than DNE with non-zero fees transferred should score 1
         let validator = create_validator_history(
@@ -854,7 +855,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
 
         // More DNE than valid MRUA with non-zero fees transferred should score 0
         let validator = create_validator_history(
@@ -880,7 +881,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         // All MerkleRootUploadAuthority values can be processed
         let validator = create_validator_history(
@@ -906,7 +907,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -932,7 +933,7 @@ mod test_calculate_priority_fee_commission {
         );
         validator.history.arr_mut()[6].priority_fee_tips = u64::MAX;
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 12).unwrap();
-        assert_eq!(score, 0.0);
+        assert_eq!(score, 0);
 
         config.parameters.priority_fee_scoring_start_epoch = EPOCH_DEFAULT;
         // Before priority_fee_scoring_start_epoch, result is always 1
@@ -940,7 +941,7 @@ mod test_calculate_priority_fee_commission {
             calculate_priority_fee_commission(&config, &validator, 12).unwrap();
         // Despite defaulting to 1.0 before go-live epoch, the avg_priority_fee_commission should
         // wire through
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(avg_priority_fee_commission, 5464);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }
@@ -951,7 +952,7 @@ mod test_calculate_priority_fee_commission {
         let config = create_config(300, 8, 10);
         let validator = create_validator_history(&[], &[], &[], &[], &[], &[], &[]);
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
 
         // Case where middle epoch data is missing, score 1
         let validator = create_validator_history(
@@ -1003,7 +1004,7 @@ mod test_calculate_priority_fee_commission {
             ],
         );
         let (score, _, _) = calculate_priority_fee_commission(&config, &validator, 0).unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
     }
 
     #[test]
@@ -1014,7 +1015,7 @@ mod test_calculate_priority_fee_commission {
         let res = calculate_priority_fee_commission(&config, &validator, 0);
         assert!(res.is_ok());
         let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(avg_priority_fee_commission, 0);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
 
@@ -1030,7 +1031,7 @@ mod test_calculate_priority_fee_commission {
         let res = calculate_priority_fee_commission(&config, &validator, 12);
         assert!(res.is_ok());
         let (score, avg_priority_fee_commission, max_priority_fee_commission_epoch) = res.unwrap();
-        assert_eq!(score, 1.0);
+        assert_eq!(score, 1);
         assert_eq!(avg_priority_fee_commission, 0);
         assert_eq!(max_priority_fee_commission_epoch, EPOCH_DEFAULT);
     }

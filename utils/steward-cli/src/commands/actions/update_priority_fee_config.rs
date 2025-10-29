@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::UpdatePriorityFeeParametersArgs;
 
@@ -11,27 +11,47 @@ use solana_sdk::{
 };
 
 use crate::commands::command_args::UpdatePriorityFeeConfig;
-use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
+use crate::utils::transactions::maybe_print_tx;
+use stakenet_sdk::utils::transactions::configure_instruction;
 
 pub async fn command_update_priority_fee_config(
     args: UpdatePriorityFeeConfig,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // Creates config account
-    let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
-        .expect("Failed reading keypair file ( Authority )");
-
     let steward_config = args.permissioned_parameters.steward_config;
 
     let update_priority_fee_parameters_args: UpdatePriorityFeeParametersArgs =
         args.config_parameters.into();
 
+    // Determine authority pubkey for the instruction. When printing, allow using provided flag or derive from on-chain config.
+    let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx
+        || args
+            .permissioned_parameters
+            .transaction_parameters
+            .print_gov_tx
+    {
+        if let Some(pubkey) = args.permissioned_parameters.authority_pubkey {
+            pubkey
+        } else {
+            // Fallback to reading on-chain config to get priority_fee_parameters_authority
+            let config_account = client.get_account(&steward_config).await?;
+            let config =
+                jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
+            config.priority_fee_parameters_authority
+        }
+    } else {
+        // We will load the keypair, so we can use its pubkey
+        read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
+            .expect("Failed reading keypair file ( Authority )")
+            .pubkey()
+    };
+
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::UpdatePriorityFeeParameters {
             config: steward_config,
-            authority: authority.pubkey(),
+            authority: authority_pubkey,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::UpdatePriorityFeeParameters {
@@ -39,11 +59,6 @@ pub async fn command_update_priority_fee_config(
         }
         .data(),
     };
-
-    let blockhash = client
-        .get_latest_blockhash()
-        .await
-        .expect("Failed to get recent blockhash");
 
     let configured_ix = configure_instruction(
         &[ix],
@@ -58,6 +73,23 @@ pub async fn command_update_priority_fee_config(
             .heap_size,
     );
 
+    // If we are printing, do so and return early without requiring the authority keypair
+    if maybe_print_tx(
+        &configured_ix,
+        &args.permissioned_parameters.transaction_parameters,
+    ) {
+        return Ok(());
+    }
+
+    // Otherwise, send transaction signed by the authority
+    let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
+        .expect("Failed reading keypair file ( Authority )");
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .await
+        .expect("Failed to get recent blockhash");
+
     let transaction = Transaction::new_signed_with_payer(
         &configured_ix,
         Some(&authority.pubkey()),
@@ -65,15 +97,11 @@ pub async fn command_update_priority_fee_config(
         blockhash,
     );
 
-    if args.permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .await?;
 
-        println!("Signature: {}", signature);
-    }
+    println!("Signature: {}", signature);
 
     Ok(())
 }

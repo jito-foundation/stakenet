@@ -44,6 +44,10 @@ pub struct UpdateParametersArgs {
 
 #[cfg(feature = "idl-build")]
 impl IdlBuild for UpdateParametersArgs {
+    fn get_full_path() -> String {
+        "UpdateParametersArgs".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "UpdateParametersArgs".to_string(),
@@ -162,6 +166,8 @@ impl IdlBuild for UpdateParametersArgs {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 static_assertions::const_assert_eq!(size_of::<Parameters>(), 352);
@@ -554,6 +560,10 @@ pub struct UpdatePriorityFeeParametersArgs {
 
 #[cfg(feature = "idl-build")]
 impl IdlBuild for UpdatePriorityFeeParametersArgs {
+    fn get_full_path() -> String {
+        "UpdatePriorityFeeParametersArgs".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "UpdatePriorityFeeParametersArgs".to_string(),
@@ -592,4 +602,6 @@ impl IdlBuild for UpdatePriorityFeeParametersArgs {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }

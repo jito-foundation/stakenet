@@ -3,7 +3,7 @@ use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     directed_delegation::{decrease_stake_calculation, increase_stake_calculation, RebalanceType},
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
-    Delegation, StewardState, StewardStateEnum, STATE_PADDING_0_SIZE,
+    Delegation, StewardStateEnum, StewardStateV2 as StewardState,
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -14,8 +14,8 @@ fn create_mock_steward_state(num_pool_validators: u16) -> StewardState {
         validator_lamport_balances: [0; MAX_VALIDATORS],
         scores: [0; MAX_VALIDATORS],
         sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
-        yield_scores: [0; MAX_VALIDATORS],
-        sorted_yield_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+        raw_scores: [0; MAX_VALIDATORS],
+        sorted_raw_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
         delegations: [Delegation::default(); MAX_VALIDATORS],
         instant_unstake: BitMask::default(),
         progress: BitMask::default(),
@@ -28,10 +28,9 @@ fn create_mock_steward_state(num_pool_validators: u16) -> StewardState {
         scoring_unstake_total: 0,
         instant_unstake_total: 0,
         stake_deposit_unstake_total: 0,
-        directed_unstake_total: 0,
         validators_added: 0,
         status_flags: 0,
-        _padding0: [0; STATE_PADDING_0_SIZE],
+        _padding0: [0; 2],
     }
 }
 
@@ -44,6 +43,7 @@ fn create_mock_directed_stake_meta(
         epoch_last_updated: 0,
         epoch_increase_total_lamports: 0,
         epoch_decrease_total_lamports: 0,
+        directed_unstake_total: 0,
         padding0: [0; 64],
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),

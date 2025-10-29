@@ -143,7 +143,7 @@ use jito_steward::DirectedStakeMeta;
 use jito_steward::{
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     stake_pool_utils::{StakePool, ValidatorList},
-    Config, Delegation, StewardStateAccount, StewardStateEnum, UpdateParametersArgs,
+    Config, Delegation, StewardStateAccountV2, StewardStateEnum, UpdateParametersArgs,
 };
 use solana_program_test::*;
 use solana_sdk::{
@@ -191,14 +191,14 @@ async fn test_compute_delegations() {
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.num_epochs_between_scoring = 10;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // sets state to compute delegations for 10,000 validators
     let mut rng = StdRng::from_seed([42; 32]);
     for i in 0..MAX_VALIDATORS {
         steward_state_account.state.scores[i] = rng.gen_range(1000, 1_000_000_000);
-        steward_state_account.state.yield_scores[i] = rng.gen_range(1000, 1_000_000_000);
+        steward_state_account.state.raw_scores[i] = rng.gen_range(1000, 1_000_000_000);
     }
 
     let mut score_vec = steward_state_account
@@ -209,7 +209,7 @@ async fn test_compute_delegations() {
         .collect::<Vec<_>>();
     let mut yield_score_vec = steward_state_account
         .state
-        .yield_scores
+        .raw_scores
         .iter()
         .enumerate()
         .collect::<Vec<_>>();
@@ -218,7 +218,7 @@ async fn test_compute_delegations() {
 
     for i in 0..MAX_VALIDATORS {
         steward_state_account.state.sorted_score_indices[i] = score_vec[i].0 as u16;
-        steward_state_account.state.sorted_yield_score_indices[i] = yield_score_vec[i].0 as u16;
+        steward_state_account.state.sorted_raw_score_indices[i] = yield_score_vec[i].0 as u16;
     }
 
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64;
@@ -261,7 +261,7 @@ async fn test_compute_delegations() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     assert!(steward_state_account.state.delegations.iter().all(|&x| x
@@ -374,16 +374,18 @@ async fn test_compute_scores() {
 
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
     steward_config.parameters.num_epochs_between_scoring = 10;
-    steward_config.parameters.epoch_credits_range = 511;
-    steward_config.parameters.mev_commission_range = 511;
-    steward_config.parameters.commission_range = 511;
+    // Limit on window sizes before the program heap is exhausted
+    // empirically tested
+    steward_config.parameters.epoch_credits_range = 390;
+    steward_config.parameters.mev_commission_range = 390;
+    steward_config.parameters.commission_range = 390;
     steward_config
         .parameters
         .scoring_delinquency_threshold_ratio = 0.1;
     steward_config.parameters.commission_threshold = 10;
     steward_config.parameters.mev_commission_bps_threshold = 1000;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Basic state setup
@@ -524,10 +526,20 @@ async fn test_compute_scores() {
         .data(),
     };
 
+    // First run epoch maintenance
+    let tx = Transaction::new_signed_with_payer(
+        &[epoch_maintenance_ix.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.get_latest_blockhash().await,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Then run compute scores with its own compute budget
     let tx = Transaction::new_signed_with_payer(
         &[
             // Only high because we are averaging 512 epochs
-            ComputeBudgetInstruction::set_compute_unit_limit(800_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(1_400_000),
             ComputeBudgetInstruction::request_heap_frame(128 * 1024),
             epoch_maintenance_ix.clone(),
             rebalance_directed_ix.clone(),
@@ -537,10 +549,9 @@ async fn test_compute_scores() {
         &[&fixture.keypair],
         fixture.get_latest_blockhash().await,
     );
-
     fixture.submit_transaction_assert_success(tx).await;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     println!("State {}", steward_state_account.state.state_tag);
@@ -548,16 +559,18 @@ async fn test_compute_scores() {
         steward_state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ));
-    assert_eq!(steward_state_account.state.scores[0], 1_000_000_000);
-    assert_eq!(steward_state_account.state.yield_scores[0], 1_000_000_000);
+    assert_eq!(steward_state_account.state.scores[0], 7249739868913833600);
+    assert_eq!(
+        steward_state_account.state.raw_scores[0],
+        7249739868913833600
+    );
     assert_eq!(steward_state_account.state.sorted_score_indices[0], 0);
-    assert_eq!(steward_state_account.state.sorted_yield_score_indices[0], 0);
+    assert_eq!(steward_state_account.state.sorted_raw_score_indices[0], 0);
     assert!(steward_state_account.state.progress.get(0).unwrap());
     assert!(!steward_state_account.state.progress.get(1).unwrap());
 
     // Transition out of this state
     // Reset current state, set progress[1] to true, progress[0] to false
-
     {
         // Reset Validator List, such that there are only 2 validators
         let mut validator_list_validators = (0..2)
@@ -583,10 +596,10 @@ async fn test_compute_scores() {
 
     steward_state_account.state.num_pool_validators = 2;
     steward_state_account.state.scores[..2].copy_from_slice(&[0, 0]);
-    steward_state_account.state.yield_scores[..2].copy_from_slice(&[0, 0]);
+    steward_state_account.state.raw_scores[..2].copy_from_slice(&[0, 0]);
     steward_state_account.state.sorted_score_indices[..2]
         .copy_from_slice(&[1, SORTED_INDEX_DEFAULT]);
-    steward_state_account.state.sorted_yield_score_indices[..2]
+    steward_state_account.state.sorted_raw_score_indices[..2]
         .copy_from_slice(&[1, SORTED_INDEX_DEFAULT]);
     steward_state_account.state.progress.set(0, false).unwrap();
     steward_state_account.state.progress.set(1, true).unwrap();
@@ -758,16 +771,16 @@ async fn test_compute_instant_unstake() {
 
     steward_config.parameters.num_delegation_validators = 2;
     steward_config.parameters.num_epochs_between_scoring = 10;
-    steward_config.parameters.epoch_credits_range = 512;
-    steward_config.parameters.mev_commission_range = 512;
-    steward_config.parameters.commission_range = 512;
+    steward_config.parameters.epoch_credits_range = 511;
+    steward_config.parameters.mev_commission_range = 511;
+    steward_config.parameters.commission_range = 511;
     steward_config
         .parameters
         .scoring_delinquency_threshold_ratio = 0.1;
     steward_config.parameters.commission_threshold = 10;
     steward_config.parameters.mev_commission_bps_threshold = 1000;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Basic state setup
@@ -850,7 +863,7 @@ async fn test_compute_instant_unstake() {
         fixture.get_latest_blockhash().await,
     );
 
-    let test_state_account: StewardStateAccount =
+    let test_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let validator_list: ValidatorList = fixture
@@ -944,7 +957,7 @@ async fn test_idle() {
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     steward_config.parameters.num_delegation_validators = MAX_VALIDATORS as u32;
@@ -989,12 +1002,7 @@ async fn test_idle() {
     println!("Submitting Idle tx: {:?}", tx);
     fixture.submit_transaction_assert_success(tx).await;
 
-    println!(
-        "steward_state_account.state.state_tag: {}",
-        steward_state_account.state.state_tag
-    );
-
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     assert!(matches!(
         steward_state_account.state.state_tag,
@@ -1088,7 +1096,7 @@ async fn test_rebalance_increase() {
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_config.parameters.scoring_unstake_cap_bps = 0;
     steward_config.parameters.instant_unstake_cap_bps = 0;
@@ -1119,7 +1127,7 @@ async fn test_rebalance_increase() {
 
     steward_state_account
         .state
-        .sorted_yield_score_indices
+        .sorted_raw_score_indices
         .copy_from_slice(&arr);
 
     // Unrealistic scenario to ensure target validator gets delegation
@@ -1267,7 +1275,7 @@ async fn test_rebalance_increase() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Force validator into the active set, don't wait for next cycle
@@ -1308,7 +1316,7 @@ async fn test_rebalance_increase() {
         pool_minimum_delegation
     );
 
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let validators_that_need_rent = steward_state_account.state.num_pool_validators + 1
@@ -1341,7 +1349,7 @@ async fn test_rebalance_decrease() {
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
         .await;
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // TODO FIX?
@@ -1375,7 +1383,7 @@ async fn test_rebalance_decrease() {
 
     steward_state_account
         .state
-        .sorted_yield_score_indices
+        .sorted_raw_score_indices
         .copy_from_slice(&arr);
 
     for i in 0..MAX_VALIDATORS {
@@ -1488,7 +1496,7 @@ async fn test_rebalance_decrease() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Force validator into the active set, don't wait for next cycle
@@ -1555,7 +1563,7 @@ async fn test_rebalance_decrease() {
         .into(),
     );
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.num_pool_validators += 1;
     ctx.borrow_mut().set_account(
@@ -1629,7 +1637,7 @@ async fn test_rebalance_decrease() {
     );
 
     // Assert delegations were modified properly
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     assert_eq!(
         steward_state_account.state.delegations[MAX_VALIDATORS - 1].numerator,
@@ -1693,7 +1701,7 @@ async fn test_rebalance_other_cases() {
         });
     }
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -1771,7 +1779,7 @@ async fn test_rebalance_other_cases() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     // Force validator into the active set, don't wait for next cycle
@@ -1839,7 +1847,7 @@ async fn test_rebalance_other_cases() {
         .await;
 
     // Test wrong state
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     steward_state_account.state.state_tag = StewardStateEnum::Idle;
@@ -1868,12 +1876,12 @@ async fn test_rebalance_other_cases() {
         .await;
 
     // Test transition to Idle when complete
-    let mut steward_state_account: StewardStateAccount =
+    let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
     for i in 0..MAX_VALIDATORS {
         steward_state_account.state.sorted_score_indices[i] = i as u16;
-        steward_state_account.state.sorted_yield_score_indices[i] = i as u16;
+        steward_state_account.state.sorted_raw_score_indices[i] = i as u16;
         // Skip over current validator
         if i != MAX_VALIDATORS - 1 {
             steward_state_account.state.progress.set(i, true).unwrap();
@@ -1899,7 +1907,7 @@ async fn test_rebalance_other_cases() {
     );
 
     fixture.submit_transaction_assert_success(tx).await;
-    let steward_state_account: StewardStateAccount =
+    let steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     assert!(matches!(
         steward_state_account.state.state_tag,

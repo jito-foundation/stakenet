@@ -6,7 +6,8 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs, EPOCH_MAINTENANCE,
+    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
+    UpdateParametersArgs, EPOCH_MAINTENANCE,
 };
 use solana_program_test::*;
 use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};
@@ -115,7 +116,6 @@ async fn _epoch_maintenance_setup() -> (
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -229,7 +229,7 @@ async fn test_epoch_maintenance_removes_validators() {
         .get_sysvar()
         .await
         .unwrap();
-    let state_account: Box<StewardStateAccount> =
+    let state_account: Box<StewardStateAccountV2> =
         Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
     let state = &state_account.state;
     assert_eq!(state.validators_added, 2);

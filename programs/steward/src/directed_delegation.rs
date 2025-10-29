@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::events::DecreaseComponents;
 use crate::state::directed_stake::DirectedStakeMeta;
-use crate::{errors::StewardError, StewardState};
+use crate::{errors::StewardError, StewardStateV2};
 #[derive(Debug, Clone)]
 pub enum RebalanceType {
     Increase(u64),
@@ -16,7 +16,7 @@ pub enum RebalanceType {
 /// and then the decrease is calculated proportionally amongst the validators that still require unstaking.
 #[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
-    state: &StewardState,
+    state: &StewardStateV2,
     directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
@@ -111,7 +111,7 @@ pub fn decrease_stake_calculation(
 /// becoming too concentrated in directed staking.
 #[allow(clippy::too_many_arguments)]
 pub fn increase_stake_calculation(
-    state: &StewardState,
+    state: &StewardStateV2,
     directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     current_lamports: u64,

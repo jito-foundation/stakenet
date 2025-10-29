@@ -9,7 +9,10 @@ use anchor_lang::{
 use jito_steward::instructions::AuthorityType;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::REBALANCE_DIRECTED_COMPLETE;
-use jito_steward::{stake_pool_utils::ValidatorList, StewardStateAccount, UpdateParametersArgs};
+use jito_steward::{
+    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
+    UpdateParametersArgs,
+};
 use solana_program::sysvar;
 use solana_program_test::*;
 #[allow(deprecated)]
@@ -156,7 +159,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
 async fn test_cycle() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     // Note that these parameters are overriden in initialize_steward, just included here for completeness
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
@@ -215,9 +218,9 @@ async fn test_cycle() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -373,7 +376,7 @@ async fn test_cycle() {
     .await;
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -460,7 +463,8 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -608,10 +612,10 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     .await;
 
     {
-        let state_account: StewardStateAccount =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
 
-        assert!(state_account.state.directed_unstake_total > 9_000_000_000);
+        assert!(directed_stake_meta.directed_unstake_total > 9_000_000_000);
     }
 
     crank_rebalance_directed(
@@ -623,10 +627,10 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     .await;
 
     {
-        let state_account: StewardStateAccount =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
 
-        assert!(state_account.state.directed_unstake_total > 19_000_000_000);
+        assert!(directed_stake_meta.directed_unstake_total > 19_000_000_000);
     }
 
     crank_rebalance_directed(
@@ -640,12 +644,15 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     {
         crank_idle(&fixture).await;
 
-        let state_account: StewardStateAccount =
+        let state_account: StewardStateAccountV2 =
             fixture.load_and_deserialize(&fixture.steward_state).await;
+
+        let directed_stake_meta: DirectedStakeMeta =
+            fixture.load_and_deserialize(&_directed_stake_meta).await;
 
         // Total is reset when rebalancing is flagged as complete
         assert!(state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE));
-        assert!(state_account.state.directed_unstake_total == 0);
+        assert!(directed_stake_meta.directed_unstake_total == 0);
     }
     drop(fixture);
 }
@@ -715,7 +722,8 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -947,7 +955,8 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -1177,7 +1186,8 @@ async fn test_cycle_with_directed_stake_noop_copy() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -1371,7 +1381,8 @@ async fn test_cycle_with_directed_stake_partial_copy() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -1579,7 +1590,8 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -1740,7 +1752,8 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -1903,7 +1916,8 @@ async fn test_cycle_with_directed_stake_targets() {
         .await;
     fixture.realloc_steward_state().await;
 
-    let _steward: StewardStateAccount = fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: StewardStateAccountV2 =
+        fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 
@@ -2211,7 +2225,7 @@ async fn test_cycle_with_directed_stake_targets() {
     .await;
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -2242,7 +2256,7 @@ async fn test_remove_validator_mid_epoch() {
 
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
 
@@ -2298,7 +2312,6 @@ async fn test_remove_validator_mid_epoch() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
@@ -2394,7 +2407,7 @@ async fn test_remove_validator_mid_epoch() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -2428,7 +2441,7 @@ async fn test_remove_validator_mid_epoch() {
     assert!(validator_list.validators.len() == 2);
 
     instant_remove_validator(&fixture, 2).await;
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -2486,7 +2499,7 @@ async fn test_remove_validator_mid_epoch() {
     assert!(validator_list.validators.len() == 2);
 
     crank_epoch_maintenance(&fixture, None).await;
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
     assert!(matches!(
@@ -2500,16 +2513,13 @@ async fn test_remove_validator_mid_epoch() {
     drop(fixture);
 }
 
+/// Tests that a validator added at an arbitrary point during the cycle does not get included in the
+/// current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
 #[tokio::test]
 async fn test_add_validator_next_cycle() {
-    /*
-      Tests that a validator added at an arbitrary point during the cycle does not get included in the
-      current cycle's consideration, but is included in the next cycle's scoring after ComputeScores is run.
-    */
-
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
-    let unit_test_fixtures = StateMachineFixtures::default();
+    let unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
     fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
 
@@ -2629,7 +2639,7 @@ async fn test_add_validator_next_cycle() {
     assert!(validator_list.validators.len() == 3);
 
     // Ensure that num_pool_validators isn't updated but validators_added is
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
     let state = state_account.state;
@@ -2663,7 +2673,7 @@ async fn test_add_validator_next_cycle() {
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
 
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 
@@ -2696,7 +2706,7 @@ async fn test_add_validator_next_cycle() {
     .await;
 
     // Ensure that num_pool_validators is updated and validators_added is reset
-    let state_account: StewardStateAccount =
+    let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let state = state_account.state;
 

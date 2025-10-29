@@ -32,6 +32,7 @@ pub fn test_compute_scores_to_compute_delegations() {
                 validator.index as usize,
                 cluster_history,
                 config,
+                state.num_pool_validators,
             )
             .unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));

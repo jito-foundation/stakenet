@@ -25,7 +25,8 @@ use crate::{
         get_stake_pool_address, get_transient_stake_seed_at_index, get_validator_list_length,
         get_validator_stake_info_at_index, state_checks,
     },
-    Config, StewardStateAccount, StewardStateEnum, REBALANCE_DIRECTED_COMPLETE,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
+    REBALANCE_DIRECTED_COMPLETE,
 };
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
@@ -37,7 +38,7 @@ pub struct RebalanceDirected<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     #[account(
         mut,
@@ -248,7 +249,7 @@ pub fn handler(
             };
 
             let unstake_state = UnstakeState {
-                directed_unstake_total: state_account.state.directed_unstake_total,
+                directed_unstake_total: directed_stake_meta.directed_unstake_total,
             };
 
             let directed_unstake_cap_lamports = stake_pool_lamports_with_fixed_cost
@@ -395,8 +396,7 @@ pub fn handler(
     let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     if let RebalanceType::Decrease(decrease_components) = &rebalance_type {
-        state_account.state.directed_unstake_total = state_account
-            .state
+        directed_stake_meta.directed_unstake_total = directed_stake_meta
             .directed_unstake_total
             .saturating_add(decrease_components.directed_unstake_lamports);
     }

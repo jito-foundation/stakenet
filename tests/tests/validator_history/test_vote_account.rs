@@ -69,6 +69,16 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[0].epoch_credits == 10);
     assert!(account.history.arr[0].commission == 9);
 
+    // Check validator_age - at epoch 0, no completed epochs yet, so age should be 0
+    assert_eq!(
+        account.validator_age, 0,
+        "Validator age should be 0 at epoch 0"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 0,
+        "Last updated epoch should be 0"
+    );
+
     // Skips epoch
     fixture.advance_num_epochs(2).await;
     let epoch_credits = vec![(0, 22, 10), (1, 35, 22), (2, 49, 35)];
@@ -120,6 +130,17 @@ async fn test_copy_vote_account() {
     assert!(account.history.arr[2].epoch_credits == 14);
     assert!(account.history.arr[1].epoch_credits == 13);
     assert!(account.history.arr[0].epoch_credits == 12);
+
+    // Check validator_age - at epoch 2, we should count epochs 0 and 1 (not 2, as it's current)
+    // Both epochs 0 and 1 have non-zero credits (12 and 13 respectively)
+    assert_eq!(
+        account.validator_age, 2,
+        "Validator age should be 2 at epoch 2 (counting epochs 0 and 1)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 1,
+        "Last updated epoch should be 1 (epoch 2 - 1)"
+    );
 }
 
 #[tokio::test]
@@ -260,6 +281,19 @@ async fn test_insert_missing_entries_compute() {
     assert!(account.history.arr[end_idx].epoch == 1000);
     assert!(account.history.arr[end_idx].epoch_credits == 10);
     assert!(account.history.arr[end_idx].commission == 9);
+
+    // Check validator_age - at epoch 1000, validator age was already calculated during the second
+    // transaction when we only had epochs 0 and 1000. At that time, only epoch 0 was counted
+    // (epoch 1000 is current and not counted). The third transaction adds historical data but
+    // doesn't recalculate age since we're still at epoch 1000 and it's idempotent.
+    assert_eq!(
+        account.validator_age, 1,
+        "Validator age should be 1 (only epoch 0 was present when age was calculated)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 999,
+        "Last updated epoch should be 999 (epoch 1000 - 1)"
+    );
     for i in end_idx + 1..ValidatorHistory::MAX_ITEMS {
         assert!(account.history.arr[i].epoch == ValidatorHistoryEntry::default().epoch);
         assert!(
@@ -376,5 +410,238 @@ async fn test_insert_missing_entries_wraparound() {
         }
     }
 
+    // Check validator_age - at epoch 610, count all epochs with credits up to 609
+    // We have epochs 99-609 in the buffer (512 entries total due to wraparound)
+    // All of them have non-zero credits (10 or 11)
+    // So validator_age should be the count of epochs from 99 to 609 = 511 epochs
+    assert_eq!(
+        account.validator_age, 511,
+        "Validator age should be 511 (epochs 99-609 with credits)"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 609,
+        "Last updated epoch should be 609 (epoch 610 - 1)"
+    );
+
     drop(fixture);
+}
+
+#[tokio::test]
+async fn test_validator_age_progression() {
+    // Test that validator_age correctly increments as epochs progress
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    // Start at epoch 0 with some credits
+    let epoch_credits = vec![(0, 100, 90)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            5,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    // At epoch 0, no completed epochs yet
+    assert_eq!(account.validator_age, 0, "Should be 0 at epoch 0");
+    assert_eq!(account.validator_age_last_updated_epoch, 0);
+
+    // Advance to epoch 1 and update
+    fixture.advance_num_epochs(1).await;
+    let epoch_credits = vec![(0, 100, 90), (1, 110, 100)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            5,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    // At epoch 1, epoch 0 is complete and has credits
+    assert_eq!(account.validator_age, 1, "Should count epoch 0 at epoch 1");
+    assert_eq!(account.validator_age_last_updated_epoch, 0);
+
+    // Advance to epoch 3 (skipping epoch 2) and update
+    fixture.advance_num_epochs(2).await;
+    let epoch_credits = vec![(0, 100, 90), (1, 110, 100), (2, 110, 110), (3, 130, 110)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            5,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    // At epoch 3, should count epochs 0 and 1 (epoch 2 has 0 credits, epoch 3 is current)
+    assert_eq!(
+        account.validator_age, 2,
+        "Should count epochs 0 and 1 at epoch 3"
+    );
+    assert_eq!(account.validator_age_last_updated_epoch, 2);
+}
+
+#[tokio::test]
+async fn test_validator_age_with_zero_credit_gaps() {
+    // Test validator_age behavior when validator has epochs with zero credits (inactive periods)
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    // Start by building history from epoch 0 to 5
+    // First, set up epoch 0
+    let epoch_credits = vec![(0, 100, 90)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            5,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction.clone()],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    // Now advance to epoch 5 and set up the full history
+    fixture.advance_num_epochs(5).await;
+
+    // Epochs 0,1,2: active with credits
+    // Epoch 3: zero credits (inactive)
+    // Epochs 4,5: active again
+    let epoch_credits = vec![
+        (0, 100, 90),  // 10 credits
+        (1, 110, 100), // 10 credits
+        (2, 120, 110), // 10 credits
+        (3, 120, 120), // 0 credits (inactive)
+        (4, 130, 120), // 10 credits
+        (5, 140, 130), // 10 credits
+    ];
+
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            5,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    // At epoch 5, count epochs 0-4 (not 5 as it's current)
+    // Epochs 0,1,2,4 have credits (4 epochs), epoch 3 has zero credits
+    assert_eq!(
+        account.validator_age, 4,
+        "Should count 4 epochs with non-zero credits"
+    );
+    assert_eq!(
+        account.validator_age_last_updated_epoch, 4,
+        "Should be updated to epoch 4"
+    );
+
+    // Verify the individual epochs have correct credits
+    assert_eq!(account.history.arr[0].epoch, 0);
+    assert_eq!(account.history.arr[0].epoch_credits, 10);
+    assert_eq!(account.history.arr[1].epoch, 1);
+    assert_eq!(account.history.arr[1].epoch_credits, 10);
+    assert_eq!(account.history.arr[2].epoch, 2);
+    assert_eq!(account.history.arr[2].epoch_credits, 10);
+    assert_eq!(account.history.arr[3].epoch, 3);
+    assert_eq!(
+        account.history.arr[3].epoch_credits, 0,
+        "Epoch 3 should have 0 credits"
+    );
+    assert_eq!(account.history.arr[4].epoch, 4);
+    assert_eq!(account.history.arr[4].epoch_credits, 10);
+    assert_eq!(account.history.arr[5].epoch, 5);
+    assert_eq!(account.history.arr[5].epoch_credits, 10);
 }

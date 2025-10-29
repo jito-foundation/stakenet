@@ -7,7 +7,7 @@ use crate::{
         get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
         state_checks,
     },
-    Config, StewardStateAccount, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -20,7 +20,7 @@ pub struct ComputeScore<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     pub validator_history: AccountLoader<'info, ValidatorHistory>,
 
@@ -61,10 +61,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         state_account.state.state_tag,
         StewardStateEnum::ComputeScores
     ) {
-        msg!(
-            "Attempting state transition to ComputeScores from {}",
-            state_account.state.state_tag
-        );
         if let Some(event) = maybe_transition(
             &mut state_account.state,
             &clock,
@@ -93,23 +89,10 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         validator_list_index,
         &cluster_history,
         &config,
+        num_pool_validators as u64,
     )? {
-        msg!(
-            "Scored validator at index {} / {}",
-            validator_list_index,
-            num_pool_validators
-        );
         emit!(score);
     }
-
-    // msg! the state progress
-    msg!(
-        "Scoring progress is complete: {:?}",
-        state_account
-            .state
-            .progress
-            .is_complete(num_pool_validators as u64)
-    );
 
     if let Some(event) = maybe_transition(
         &mut state_account.state,

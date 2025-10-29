@@ -193,7 +193,7 @@ async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
     fixture.submit_transaction_assert_success(tx).await;
 
     // Update steward state to reflect the added validator
-    let mut steward_state_account: jito_steward::StewardStateAccount =
+    let mut steward_state_account: jito_steward::StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.num_pool_validators += 1;
     steward_state_account.state.validators_added -= 1;
@@ -292,6 +292,7 @@ async fn populate_directed_stake_meta_after_init(
         epoch_last_updated: 0,
         epoch_increase_total_lamports: 0,
         epoch_decrease_total_lamports: 0,
+        directed_unstake_total: 0,
         padding0: [0; 64],
         targets: {
             let mut targets = [DirectedStakeTarget {
@@ -380,7 +381,7 @@ async fn test_simple_directed_rebalance_increase() {
         .set_account(&fixture.stake_pool_meta.reserve, &updated_reserve.into());
 
     // Set steward state to RebalanceDirected state
-    let mut steward_state_account: jito_steward::StewardStateAccount =
+    let mut steward_state_account: jito_steward::StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
     steward_state_account
@@ -514,7 +515,7 @@ async fn test_simple_directed_rebalance_decrease() {
         .set_account(&fixture.stake_pool_meta.reserve, &updated_reserve.into());
 
     // Set steward state to RebalanceDirected state
-    let mut steward_state_account: jito_steward::StewardStateAccount =
+    let mut steward_state_account: jito_steward::StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
     steward_state_account
@@ -641,7 +642,7 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         .borrow_mut()
         .set_account(&fixture.stake_pool_meta.reserve, &updated_reserve.into());
 
-    let mut steward_state_account: jito_steward::StewardStateAccount =
+    let mut steward_state_account: jito_steward::StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
     steward_state_account
@@ -766,7 +767,7 @@ async fn test_simple_directed_rebalance_no_targets() {
         .borrow_mut()
         .set_account(&fixture.stake_pool_meta.reserve, &updated_reserve.into());
 
-    let mut steward_state_account: jito_steward::StewardStateAccount =
+    let mut steward_state_account: jito_steward::StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     steward_state_account.state.state_tag = jito_steward::StewardStateEnum::RebalanceDirected;
     steward_state_account
