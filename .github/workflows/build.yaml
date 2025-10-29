@@ -85,7 +85,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install solana-verify from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -95,9 +94,9 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
-          version: "0.31.1"
+          version: "0.32.1"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.anza.xyz/v2.2.1/install)"
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.0.8/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error

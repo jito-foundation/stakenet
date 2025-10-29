@@ -132,16 +132,10 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake, sysvar},
     AnchorDeserialize, InstructionData, ToAccountMetas,
 };
-use jito_steward::state::steward_state::COMPUTE_INSTANT_UNSTAKES;
-use jito_steward::state::steward_state::EPOCH_MAINTENANCE;
-use jito_steward::state::steward_state::POST_LOOP_IDLE;
-use jito_steward::state::steward_state::PRE_LOOP_IDLE;
-use jito_steward::state::steward_state::REBALANCE;
 use jito_steward::state::steward_state::REBALANCE_DIRECTED_COMPLETE;
-use jito_steward::state::steward_state::RESET_TO_IDLE;
 use jito_steward::DirectedStakeMeta;
 use jito_steward::{
-    constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
+    constants::MAX_VALIDATORS,
     stake_pool_utils::{StakePool, ValidatorList},
     Config, Delegation, StewardStateAccountV2, StewardStateEnum, UpdateParametersArgs,
 };
@@ -164,11 +158,9 @@ use tests::{
     },
 };
 
-use spl_stake_pool::find_transient_stake_program_address;
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry,
-    Config as ValidatorHistoryConfig, MerkleRootUploadAuthority, ValidatorHistory,
-    ValidatorHistoryEntry,
+    Config as ValidatorHistoryConfig, ValidatorHistory, ValidatorHistoryEntry,
 };
 
 #[tokio::test]
