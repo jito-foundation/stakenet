@@ -461,7 +461,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -720,7 +719,6 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -953,7 +951,6 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -1184,7 +1181,6 @@ async fn test_cycle_with_directed_stake_noop_copy() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -1379,7 +1375,6 @@ async fn test_cycle_with_directed_stake_partial_copy() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -1588,7 +1583,6 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -1750,7 +1744,6 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -1914,7 +1907,6 @@ async fn test_cycle_with_directed_stake_targets() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
 
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
@@ -2576,7 +2568,6 @@ async fn test_add_validator_next_cycle() {
             None,
         )
         .await;
-    fixture.realloc_steward_state().await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     realloc_directed_stake_meta(&fixture).await;
 

@@ -136,7 +136,6 @@ async fn setup_directed_stake_fixture() -> TestFixture {
     let fixture = TestFixture::new().await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
-    fixture.realloc_steward_state().await;
     set_directed_stake_whitelist_authority(&fixture).await;
     initialize_directed_stake_whitelist(&fixture).await;
     initialize_directed_stake_meta(&fixture).await;
