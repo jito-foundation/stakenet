@@ -25,7 +25,7 @@ use crate::{
     maybe_transition,
     stake_pool_utils::deserialize_stake_pool,
     utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
-    Config, StewardStateAccount, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 
 #[derive(Accounts)]
@@ -38,7 +38,7 @@ pub struct Rebalance<'info> {
         seeds = [StewardStateAccount::SEED, config.key().as_ref()],
         bump
     )]
-    pub state_account: AccountLoader<'info, StewardStateAccount>,
+    pub state_account: AccountLoader<'info, StewardStateAccountV2>,
 
     #[account(
         seeds = [ValidatorHistory::SEED, vote_account.key().as_ref()],

@@ -8,6 +8,50 @@
   },
   "instructions": [
     {
+      "name": "add_to_directed_stake_whitelist",
+      "docs": [
+        "Add staker or validator to DirectedStakeWhitelist"
+      ],
+      "discriminator": [
+        205,
+        155,
+        82,
+        83,
+        239,
+        43,
+        144,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_whitelist",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "record_type",
+          "type": {
+            "defined": {
+              "name": "DirectedStakeRecordType"
+            }
+          }
+        },
+        {
+          "name": "record",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "add_validator_to_pool",
       "docs": [
         "Passthrough spl-stake-pool: Add a validator to the pool"
@@ -325,6 +369,68 @@
       ]
     },
     {
+      "name": "close_directed_stake_ticket",
+      "docs": [
+        "Close DirectedStakeTicket account"
+      ],
+      "discriminator": [
+        1,
+        73,
+        3,
+        142,
+        191,
+        122,
+        100,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "ticket_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_directed_stake_whitelist",
+      "docs": [
+        "Close DirectedStakeWhitelist account"
+      ],
+      "discriminator": [
+        107,
+        51,
+        18,
+        228,
+        152,
+        10,
+        93,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "whitelist_account",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_steward_accounts",
       "docs": [
         "Closes Steward PDA accounts associated with a given Config (StewardStateAccount, and Staker).",
@@ -463,6 +569,49 @@
       "args": [
         {
           "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "copy_directed_stake_targets",
+      "docs": [
+        "Copy directed stake targets to the meta account"
+      ],
+      "discriminator": [
+        135,
+        132,
+        9,
+        127,
+        189,
+        161,
+        14,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "vote_pubkey",
+          "type": "pubkey"
+        },
+        {
+          "name": "total_target_lamports",
           "type": "u64"
         }
       ]
@@ -901,6 +1050,127 @@
       ]
     },
     {
+      "name": "initialize_directed_stake_meta",
+      "docs": [
+        "Initialize DirectedStakeMeta account"
+      ],
+      "discriminator": [
+        211,
+        113,
+        64,
+        146,
+        80,
+        173,
+        13,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_directed_stake_ticket",
+      "docs": [
+        "Initialize DirectedStakeTicket account"
+      ],
+      "discriminator": [
+        234,
+        117,
+        183,
+        79,
+        199,
+        155,
+        59,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "whitelist_account"
+        },
+        {
+          "name": "ticket_account",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "ticket_update_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "ticket_close_authority",
+          "type": "pubkey"
+        },
+        {
+          "name": "ticket_holder_is_protocol",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "initialize_directed_stake_whitelist",
+      "docs": [
+        "Initialize DirectedStakeWhitelist account"
+      ],
+      "discriminator": [
+        56,
+        182,
+        164,
+        84,
+        17,
+        204,
+        80,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_whitelist",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_steward",
       "discriminator": [
         195,
@@ -995,6 +1265,32 @@
       ]
     },
     {
+      "name": "migrate_state_to_v2",
+      "docs": [
+        "Migrates the state account from V1 (u32 scores) to V2 (u64 scores with 4-tier encoding)"
+      ],
+      "discriminator": [
+        247,
+        27,
+        128,
+        73,
+        126,
+        99,
+        253,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "config"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "pause_steward",
       "docs": [
         "Pauses the steward, preventing any further state transitions"
@@ -1016,6 +1312,80 @@
         },
         {
           "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "realloc_directed_stake_meta",
+      "docs": [
+        "Reallocate DirectedStakeMeta account to proper size"
+      ],
+      "discriminator": [
+        247,
+        92,
+        35,
+        178,
+        94,
+        86,
+        221,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "realloc_directed_stake_whitelist",
+      "docs": [
+        "Reallocate DirectedStakeWhitelist account to proper size"
+      ],
+      "discriminator": [
+        145,
+        149,
+        55,
+        24,
+        74,
+        166,
+        122,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "directed_stake_whitelist",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_list"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "signer",
           "writable": true,
           "signer": true
         }
@@ -1134,12 +1504,150 @@
         },
         {
           "name": "stake_program"
+        },
+        {
+          "name": "directed_stake_meta",
+          "docs": [
+            "Directed stake meta account may be required when increasing stake"
+          ],
+          "writable": true
         }
       ],
       "args": [
         {
           "name": "validator_list_index",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "rebalance_directed",
+      "docs": [
+        "Increases or decreases stake for a validator at `validator_list_index` using directed stake targets"
+      ],
+      "discriminator": [
+        67,
+        174,
+        25,
+        124,
+        61,
+        182,
+        121,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "state_account",
+          "writable": true
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "stake_pool_program"
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "withdraw_authority"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "reserve_stake",
+          "writable": true
+        },
+        {
+          "name": "stake_account",
+          "writable": true
+        },
+        {
+          "name": "transient_stake_account",
+          "docs": [
+            "Account may not exist yet so no owner check done"
+          ],
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "rent"
+        },
+        {
+          "name": "stake_history"
+        },
+        {
+          "name": "stake_config"
+        },
+        {
+          "name": "system_program"
+        },
+        {
+          "name": "stake_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "directed_stake_meta_index",
+          "type": "u64"
+        },
+        {
+          "name": "validator_list_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "remove_from_directed_stake_whitelist",
+      "docs": [
+        "Remove staker or validator from DirectedStakeWhitelist"
+      ],
+      "discriminator": [
+        223,
+        91,
+        34,
+        162,
+        114,
+        190,
+        186,
+        245
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_whitelist"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "record_type",
+          "type": {
+            "defined": {
+              "name": "DirectedStakeRecordType"
+            }
+          }
+        },
+        {
+          "name": "record",
+          "type": "pubkey"
         }
       ]
     },
@@ -1475,6 +1983,51 @@
       "args": []
     },
     {
+      "name": "update_directed_stake_ticket",
+      "docs": [
+        "Update DirectedStakeTicket preferences"
+      ],
+      "discriminator": [
+        154,
+        57,
+        81,
+        51,
+        200,
+        137,
+        206,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "whitelist_account"
+        },
+        {
+          "name": "ticket_account",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "preferences",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "DirectedStakePreference"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "update_parameters",
       "docs": [
         "For parameters that are present in args, the instruction checks that they are within sensible bounds and saves them to config struct"
@@ -1577,6 +2130,45 @@
       ]
     },
     {
+      "name": "DirectedStakeMeta",
+      "discriminator": [
+        84,
+        14,
+        53,
+        223,
+        97,
+        77,
+        173,
+        174
+      ]
+    },
+    {
+      "name": "DirectedStakeTicket",
+      "discriminator": [
+        177,
+        40,
+        14,
+        41,
+        20,
+        30,
+        67,
+        63
+      ]
+    },
+    {
+      "name": "DirectedStakeWhitelist",
+      "discriminator": [
+        45,
+        147,
+        47,
+        192,
+        162,
+        167,
+        87,
+        214
+      ]
+    },
+    {
       "name": "StewardStateAccount",
       "discriminator": [
         55,
@@ -1587,6 +2179,19 @@
         67,
         228,
         29
+      ]
+    },
+    {
+      "name": "StewardStateAccountV2",
+      "discriminator": [
+        213,
+        198,
+        44,
+        174,
+        226,
+        145,
+        14,
+        103
       ]
     },
     {
@@ -1709,16 +2314,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV3",
+      "name": "ScoreComponentsV4",
       "discriminator": [
-        255,
-        128,
-        115,
-        82,
-        192,
-        199,
-        160,
-        185
+        117,
+        201,
+        193,
+        88,
+        0,
+        129,
+        58,
+        215
       ]
     },
     {
@@ -1925,6 +2530,11 @@
       "code": 6037,
       "name": "WhitelistAuthorityUnset",
       "msg": "Whitelist not initialized"
+    },
+    {
+      "code": 6038,
+      "name": "DirectedStakeVoteAccountMismatch",
+      "msg": "Vote pubkey referenced in directed stake meta index and validator list index do not match"
     }
   ],
   "types": [
@@ -1971,6 +2581,17 @@
             "fields": [
               {
                 "name": "SetPriorityFeeParameterAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetDirectedStakeWhitelistAuthority",
+            "fields": [
+              {
+                "name": "SetDirectedStakeWhitelistAuthority",
                 "type": {
                   "option": "u8"
                 }
@@ -2369,13 +2990,6 @@
             "type": "pubkey"
           },
           {
-            "name": "reserve_lock_authority",
-            "docs": [
-              "The authority that can invoke lock_reserve and unlock_reserve instructions"
-            ],
-            "type": "pubkey"
-          },
-          {
             "name": "directed_stake_whitelist_authority",
             "docs": [
               "The authority that can update the directed stake whitelist"
@@ -2390,7 +3004,7 @@
             "type": {
               "array": [
                 "u8",
-                888
+                920
               ]
             }
           }
@@ -2417,6 +3031,10 @@
           {
             "name": "total_unstake_lamports",
             "type": "u64"
+          },
+          {
+            "name": "directed_unstake_lamports",
+            "type": "u64"
           }
         ]
       }
@@ -2437,6 +3055,290 @@
           {
             "name": "denominator",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakeMeta",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_stake_targets",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_increase_total_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_decrease_total_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_last_updated",
+            "type": "u64"
+          },
+          {
+            "name": "padding0",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "targets",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "DirectedStakeTarget"
+                  }
+                },
+                2048
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakePreference",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_pubkey",
+            "docs": [
+              "Validator vote pubkey"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_share_bps",
+            "docs": [
+              "Percentage of directed stake allocated towards this validator"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                94
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakeRecordType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Validator"
+          },
+          {
+            "name": "User"
+          },
+          {
+            "name": "Protocol"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakeTarget",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_pubkey",
+            "docs": [
+              "Validator vote pubkey"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_target_lamports",
+            "docs": [
+              "Total directed stake target for this validator"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_staked_lamports",
+            "docs": [
+              "Total directed stake already applied to this validator"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "target_last_updated_epoch",
+            "docs": [
+              "Last updated epoch for target lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "staked_last_updated_epoch",
+            "docs": [
+              "Last updated epoch for staked lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakeTicket",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "num_preferences",
+            "type": "u16"
+          },
+          {
+            "name": "staker_preferences",
+            "docs": [
+              "The sum of staker preferences must be less than or equal to 10_000 bps"
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "DirectedStakePreference"
+                  }
+                },
+                8
+              ]
+            }
+          },
+          {
+            "name": "ticket_update_authority",
+            "docs": [
+              "Authority that can update the ticket preferences, for now this is the staker itself"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_close_authority",
+            "docs": [
+              "Override authority that can close the ticket in the event of whitelist removal due to abuse"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_holder_is_protocol",
+            "docs": [
+              "Is the ticket holder a protocol vs. an individual pubkey"
+            ],
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                125
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedStakeWhitelist",
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "permissioned_user_stakers",
+            "type": {
+              "array": [
+                "pubkey",
+                2048
+              ]
+            }
+          },
+          {
+            "name": "permissioned_protocol_stakers",
+            "type": {
+              "array": [
+                "pubkey",
+                2048
+              ]
+            }
+          },
+          {
+            "name": "permissioned_validators",
+            "type": {
+              "array": [
+                "pubkey",
+                2048
+              ]
+            }
+          },
+          {
+            "name": "total_permissioned_user_stakers",
+            "type": "u16"
+          },
+          {
+            "name": "total_permissioned_protocol_stakers",
+            "type": "u16"
+          },
+          {
+            "name": "total_permissioned_validators",
+            "type": "u16"
+          },
+          {
+            "name": "_padding0",
+            "type": {
+              "array": [
+                "u8",
+                250
+              ]
+            }
           }
         ]
       }
@@ -2835,6 +3737,20 @@
             "type": "f64"
           },
           {
+            "name": "min_epoch_progress_for_compute_directed_stake_meta",
+            "docs": [
+              "The minimum epoch progress for computing directed stake meta"
+            ],
+            "type": "f64"
+          },
+          {
+            "name": "max_epoch_progress_for_directed_rebalance",
+            "docs": [
+              "The maximum epoch progress for directed rebalance"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "num_epochs_between_scoring",
             "docs": [
               "Number of epochs a given validator set will be delegated to before recomputing scores"
@@ -2856,6 +3772,13 @@
             "type": "u64"
           },
           {
+            "name": "compute_score_epoch_progress",
+            "docs": [
+              "The minimum epoch progress for computing scores"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "priority_fee_scoring_start_epoch",
             "docs": [
               "The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs"
@@ -2870,18 +3793,25 @@
             "type": "u16"
           },
           {
-            "name": "directed_stake_global_cap_bps",
+            "name": "undirected_stake_floor_lamports",
             "docs": [
-              "Maximum percentage of the pool to delegated via directed stake (in basis points)"
+              "Directed rebalance increases are allowed until stake pool TVL dips below this floor",
+              "u64 does not agree with zero-copy alignment and we do not have the luxury of reordering",
+              "fields due to it being live on mainnet"
             ],
-            "type": "u16"
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           },
           {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                2
+                4
               ]
             }
           },
@@ -2890,7 +3820,7 @@
             "type": {
               "array": [
                 "u64",
-                31
+                27
               ]
             }
           }
@@ -3026,87 +3956,107 @@
       }
     },
     {
-      "name": "ScoreComponentsV3",
+      "name": "ScoreComponentsV4",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "score",
             "docs": [
-              "Product of all scoring components"
+              "Final score with binary filters applied to raw_score (0 if any filter fails, raw_score otherwise)"
             ],
-            "type": "f64"
+            "type": "u64"
           },
           {
-            "name": "yield_score",
+            "name": "raw_score",
             "docs": [
-              "vote_credits_ratio * (1 - commission)"
+              "The 4-tier encoded score (before binary filters)"
             ],
-            "type": "f64"
+            "type": "u64"
+          },
+          {
+            "name": "commission_max",
+            "docs": [
+              "Maximum inflation commission used in scoring (0-100)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "mev_commission_avg",
+            "docs": [
+              "Average MEV commission used in scoring (basis points)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "validator_age",
+            "docs": [
+              "Validator age in epochs (number of epochs with non-zero vote credits)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "vote_credits_avg",
+            "docs": [
+              "Average vote credits over the window"
+            ],
+            "type": "u32"
           },
           {
             "name": "mev_commission_score",
             "docs": [
-              "If max mev commission in mev_commission_range epochs is less than threshold, score is 1.0, else 0"
+              "If max mev commission in mev_commission_range epochs is less than threshold, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "blacklisted_score",
             "docs": [
-              "If validator is blacklisted, score is 0.0, else 1.0"
+              "If validator is blacklisted, score is 0, else 1"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "superminority_score",
             "docs": [
-              "If validator is not in the superminority, score is 1.0, else 0.0"
+              "If validator is not in the superminority, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "delinquency_score",
             "docs": [
-              "If delinquency is not > threshold in any epoch, score is 1.0, else 0.0"
+              "If delinquency is not > threshold in any epoch, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "running_jito_score",
             "docs": [
-              "If validator has a mev commission in the last 10 epochs, score is 1.0, else 0.0"
+              "If validator has a mev commission in the last 10 epochs, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "commission_score",
             "docs": [
-              "If max commission in commission_range epochs is less than commission_threshold, score is 1.0, else 0.0"
+              "If max commission in commission_range epochs is less than commission_threshold, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "historical_commission_score",
             "docs": [
-              "If max commission in all validator history epochs is less than historical_commission_threshold, score is 1.0, else 0.0"
+              "If max commission in all validator history epochs is less than historical_commission_threshold, score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "merkle_root_upload_authority_score",
             "docs": [
-              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1, else 0"
             ],
-            "type": "f64"
-          },
-          {
-            "name": "vote_credits_ratio",
-            "docs": [
-              "Average vote credits in last epoch_credits_range epochs / average blocks in last epoch_credits_range epochs",
-              "Excluding current epoch"
-            ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "vote_account",
@@ -3133,14 +4083,14 @@
               "If validator has realized priority fee commissions > config limits over a lookback range,",
               "score 0."
             ],
-            "type": "f64"
+            "type": "u8"
           },
           {
             "name": "priority_fee_merkle_root_upload_authority_score",
             "docs": [
-              "If validator is using TipRouter authority, OR OldJito authority then score is 1.0, else 0.0"
+              "If validator is using TipRouter authority, OR OldJito authority then score is 1, else 0"
             ],
-            "type": "f64"
+            "type": "u8"
           }
         ]
       }
@@ -3255,11 +4205,117 @@
       }
     },
     {
-      "name": "StewardState",
+      "name": "StewardStateAccount",
       "docs": [
-        "Tracks state of the stake pool.",
-        "Follow state transitions here:",
-        "https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png"
+        "V1 State Account"
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "StewardStateV1"
+              }
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardStateAccountV2",
+      "docs": [
+        "V2 State Account"
+      ],
+      "serialization": "bytemuck",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "StewardStateV2"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "_padding0",
+            "docs": [
+              "is_initialized byte repurposed as padding, as the v2 struct has a new discriminator and",
+              "cannot be passed into the init or realloc instructions."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardStateEnum",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ComputeScores"
+          },
+          {
+            "name": "ComputeDelegations"
+          },
+          {
+            "name": "Idle"
+          },
+          {
+            "name": "ComputeInstantUnstake"
+          },
+          {
+            "name": "Rebalance"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StewardStateV1",
+      "docs": [
+        "V1 State - Pure POD struct for deserialization of existing accounts",
+        "DO NOT ADD ANY IMPLEMENTATIONS TO THIS STRUCT"
       ],
       "serialization": "bytemuck",
       "repr": {
@@ -3474,15 +4530,27 @@
             "type": {
               "array": [
                 "u8",
-                40002
+                39994
               ]
             }
+          },
+          {
+            "name": "directed_unstake_total",
+            "docs": [
+              "Total lamports that have been due to directed stake unstake this cycle"
+            ],
+            "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "StewardStateAccount",
+      "name": "StewardStateV2",
+      "docs": [
+        "Tracks state of the stake pool.",
+        "Follow state transitions here:",
+        "https://github.com/jito-foundation/stakenet/blob/master/programs/steward/state-machine-diagram.png"
+      ],
       "serialization": "bytemuck",
       "repr": {
         "kind": "c"
@@ -3491,46 +4559,202 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "state",
+            "name": "state_tag",
+            "docs": [
+              "Current state of the Steward"
+            ],
             "type": {
               "defined": {
-                "name": "StewardState"
+                "name": "StewardStateEnum"
               }
             }
           },
           {
-            "name": "is_initialized",
+            "name": "validator_lamport_balances",
+            "docs": [
+              "Internal lamport balance of each validator, used to track stake deposits that need to be unstaked,",
+              "so not always equal to the stake account balance."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "scores",
+            "docs": [
+              "Overall score of validator, used to determine delegates and order for delegation."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "sorted_score_indices",
+            "docs": [
+              "Indices of validators, sorted by score descending"
+            ],
+            "type": {
+              "array": [
+                "u16",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "sorted_raw_score_indices",
+            "docs": [
+              "Indices of validators, sorted by raw score descending"
+            ],
+            "type": {
+              "array": [
+                "u16",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "delegations",
+            "docs": [
+              "Target share of pool represented as a proportion, indexed by spl_stake_pool::ValidatorList index"
+            ],
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "Delegation"
+                  }
+                },
+                5000
+              ]
+            }
+          },
+          {
+            "name": "instant_unstake",
+            "docs": [
+              "Each bit represents a validator, true if validator should be unstaked"
+            ],
             "type": {
               "defined": {
-                "name": "U8Bool"
+                "name": "BitMask"
               }
             }
           },
           {
-            "name": "bump",
-            "type": "u8"
+            "name": "progress",
+            "docs": [
+              "Tracks progress of states that require one instruction per validator"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
           },
           {
-            "name": "_padding",
+            "name": "validators_for_immediate_removal",
+            "docs": [
+              "Marks a validator for immediate removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This happens when a validator is able to be removed within the same epoch as it was marked"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "validators_to_remove",
+            "docs": [
+              "Marks a validator for removal after `remove_validator_from_pool` has been called on the stake pool",
+              "This is cleaned up in the next epoch"
+            ],
+            "type": {
+              "defined": {
+                "name": "BitMask"
+              }
+            }
+          },
+          {
+            "name": "start_computing_scores_slot",
+            "docs": [
+              "Slot of the first ComputeScores instruction in the current cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "current_epoch",
+            "docs": [
+              "Internal current epoch, for tracking when epoch has changed"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "next_cycle_epoch",
+            "docs": [
+              "Next cycle start"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "num_pool_validators",
+            "docs": [
+              "Number of validators in the stake pool, used to determine the number of validators to be scored.",
+              "Updated at the start of each cycle and when validators are removed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "scoring_unstake_total",
+            "docs": [
+              "Total lamports that have been due to scoring this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "instant_unstake_total",
+            "docs": [
+              "Total lamports that have been due to instant unstaking this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "stake_deposit_unstake_total",
+            "docs": [
+              "Total lamports that have been due to stake deposits this cycle"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status_flags",
+            "docs": [
+              "Flags to track state transitions and operations"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "validators_added",
+            "docs": [
+              "Number of validators added to the pool in the current cycle"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "_padding0",
             "type": {
               "array": [
                 "u8",
-                6
+                2
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "StewardStateEnum",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "ComputeScores"
           },
           {
+<<<<<<< HEAD
             "name": "ComputeDelegations"
           },
           {
@@ -3541,6 +4765,21 @@
           },
           {
             "name": "Rebalance"
+          },
+          {
+            "name": "RebalanceDirected"
+=======
+            "name": "raw_scores",
+            "docs": [
+              "Raw score without binary filters applied. Used as secondary priority, to determine order for unstaking."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                5000
+              ]
+            }
+>>>>>>> origin/master
           }
         ]
       }
@@ -3642,6 +4881,12 @@
             }
           },
           {
+            "name": "directed_stake_unstake_cap_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
             "name": "instant_unstake_epoch_progress",
             "type": {
               "option": "f64"
@@ -3673,6 +4918,18 @@
           },
           {
             "name": "minimum_voting_epochs",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "compute_score_epoch_progress",
+            "type": {
+              "option": "f64"
+            }
+          },
+          {
+            "name": "undirected_stake_floor_lamports",
             "type": {
               "option": "u64"
             }
@@ -3761,11 +5018,19 @@
             "type": "u64"
           },
           {
+            "name": "validator_age",
+            "type": "u32"
+          },
+          {
+            "name": "validator_age_last_updated_epoch",
+            "type": "u16"
+          },
+          {
             "name": "_padding1",
             "type": {
               "array": [
                 "u8",
-                232
+                226
               ]
             }
           },

@@ -15,7 +15,7 @@ use crate::{
         U64_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET,
     },
     errors::StewardError,
-    Config, Delegation, StewardStateAccount, StewardStateEnum,
+    Config, Delegation, StewardStateAccountV2, StewardStateEnum,
 };
 
 /// Checks called before any cranking state function. Note that expected_state is optional -
@@ -23,7 +23,7 @@ use crate::{
 pub fn state_checks(
     clock: &Clock,
     config: &Config,
-    state_account: &StewardStateAccount,
+    state_account: &StewardStateAccountV2,
     validator_list_account_info: &AccountInfo,
     expected_state: Option<StewardStateEnum>,
 ) -> Result<()> {
@@ -68,7 +68,7 @@ pub fn state_checks(
 pub fn remove_validator_check(
     clock: &Clock,
     config: &Config,
-    state_account: &StewardStateAccount,
+    state_account: &StewardStateAccountV2,
     validator_list_account_info: &AccountInfo,
 ) -> Result<()> {
     if config.is_paused() {
@@ -95,7 +95,7 @@ pub fn remove_validator_check(
 pub fn add_validator_check(
     clock: &Clock,
     config: &Config,
-    state_account: &StewardStateAccount,
+    state_account: &StewardStateAccountV2,
     validator_list_account_info: &AccountInfo,
 ) -> Result<()> {
     if config.is_paused() {

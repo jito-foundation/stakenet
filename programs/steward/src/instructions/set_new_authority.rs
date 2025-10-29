@@ -27,6 +27,10 @@ impl AuthorityType {
 // Implement IdlBuild for AuthorityType
 #[cfg(feature = "idl-build")]
 impl IdlBuild for AuthorityType {
+    fn get_full_path() -> String {
+        "AuthorityType".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "AuthorityType".to_string(),
@@ -72,6 +76,14 @@ impl IdlBuild for AuthorityType {
                             ty: IdlType::Option(Box::new(IdlType::U8)),
                         }])),
                     },
+                    IdlEnumVariant {
+                        name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
                 ],
             },
             docs: Default::default(),
@@ -80,6 +92,8 @@ impl IdlBuild for AuthorityType {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 #[derive(Accounts)]

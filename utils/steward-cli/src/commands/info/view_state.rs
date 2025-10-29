@@ -3,8 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
-    constants::LAMPORT_BALANCE_DEFAULT, stake_pool_utils::ValidatorList, Config, Delegation,
-    StewardStateAccount,
+    constants::LAMPORT_BALANCE_DEFAULT, score::ValidatorScoreComponents,
+    stake_pool_utils::ValidatorList, Config, Delegation, StewardStateAccountV2,
 };
 use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -89,13 +89,11 @@ pub struct StateInfo {
     /// Used for efficient ranking and delegation decisions
     sorted_score_indices_count: usize,
 
-    /// Count of computed yield component scores
-    /// Used as secondary priority for unstaking order decisions
-    yield_scores_count: usize,
+    /// Count of computed raw scores
+    raw_scores_count: usize,
 
-    /// Count of validator indices sorted by yield score (descending)
-    /// Used for efficient yield-based ranking
-    sorted_yield_score_indices_count: usize,
+    /// Count of validator indices sorted by raw score (descending)
+    sorted_raw_score_indices_count: usize,
 
     /// Count of delegation entries (target stake allocations)
     /// Each entry represents target share of pool as a proportion
@@ -127,7 +125,7 @@ pub struct StateInfo {
     scoring_unstake_total: u64,
 
     /// Total lamports scheduled for instant unstaking
-    /// Accumulated during the current cycle  
+    /// Accumulated during the current cycle
     instant_unstake_total: u64,
 
     /// Total lamports from stake deposits scheduled for unstaking
@@ -296,14 +294,13 @@ pub struct ValidatorDetails {
     pub steward_list_index: usize,
 
     /// Overall rank among all validators (1-based, None if unranked)
-    /// Ranking is based on score (primary) and yield score (secondary)
     pub overall_rank: Option<usize>,
 
-    /// Performance score assigned by the steward (0 = failing, >0 = passing)
-    pub score: u32,
+    /// Validator's final score (0 if any eligibility criteria failed, otherwise equals raw_score)
+    pub score: u64,
 
-    /// Yield score based on staking rewards performance
-    pub yield_score: u32,
+    /// Validator score componets
+    pub validator_score: ValidatorScoreComponents,
 
     /// Whether validator meets eligibility criteria ("Yes", "No", or "N/A")
     pub passing_eligibility_criteria: String,
@@ -337,7 +334,7 @@ pub struct RankedValidator {
     pub vote_account: String,
 
     /// Performance score assigned by the steward
-    pub score: u32,
+    pub score: u64,
 }
 
 /// Summary of all validators with non-zero scores, sorted by performance
@@ -442,7 +439,7 @@ pub async fn command_view_state(
 fn build_default_state_output(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
-    state_account: &StewardStateAccount,
+    state_account: &StewardStateAccountV2,
     validator_list_account: &ValidatorList,
     reserve_stake_account: &Account,
 ) -> DefaultStateOutput {
@@ -494,8 +491,8 @@ fn build_default_state_output(
             validator_lamport_balances_count: state.validator_lamport_balances.len(),
             scores_count: state.scores.len(),
             sorted_score_indices_count: state.sorted_score_indices.len(),
-            yield_scores_count: state.yield_scores.len(),
-            sorted_yield_score_indices_count: state.sorted_yield_score_indices.len(),
+            raw_scores_count: state.raw_scores.len(),
+            sorted_raw_score_indices_count: state.sorted_raw_score_indices.len(),
             delegations_count: state.delegations.len(),
             instant_unstake_count: state.instant_unstake.count(),
             start_computing_scores_slot: state.start_computing_scores_slot,
@@ -527,7 +524,7 @@ fn build_default_state_output(
 fn _print_default_state(
     steward_config: &Pubkey,
     steward_state: &Pubkey,
-    state_account: &StewardStateAccount,
+    state_account: &StewardStateAccountV2,
     validator_list_account: &ValidatorList,
     reserve_stake_account: &Account,
     print_json: bool,
@@ -576,10 +573,10 @@ fn _print_default_state(
             "Sorted Score Indices Count: {}\n",
             output.state.sorted_score_indices_count
         );
-        formatted_string += &format!("Yield Scores Count: {}\n", output.state.yield_scores_count);
+        formatted_string += &format!("Raw Scores Count: {}\n", output.state.raw_scores_count);
         formatted_string += &format!(
-            "Sorted Yield Score Indices Count: {}\n",
-            output.state.sorted_yield_score_indices_count
+            "Sorted Raw Score Indices Count: {}\n",
+            output.state.sorted_raw_score_indices_count
         );
         formatted_string += &format!("Delegations Count: {}\n", output.state.delegations_count);
         formatted_string += &format!("Instant Unstake: {}\n", output.state.instant_unstake_count);
@@ -668,19 +665,19 @@ fn _print_default_state(
 }
 
 /// Computes overall ranking of validators based on performance metrics
-fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usize> {
+fn compute_overall_ranks(steward_state_account: &StewardStateAccountV2) -> Vec<usize> {
     let state = &steward_state_account.state;
     let num_pool_validators = state.num_pool_validators as usize;
 
-    // (index, score, yield_score)
-    let mut sorted_validator_indices: Vec<(usize, u32, u32)> = (0..num_pool_validators)
-        .map(|i| (i, state.scores[i], state.yield_scores[i]))
+    // (index, score, raw_score)
+    let mut sorted_validator_indices: Vec<(usize, u64, u64)> = (0..num_pool_validators)
+        .map(|i| (i, state.scores[i], state.raw_scores[i]))
         .collect();
 
-    // Sorts based on score (descending) and yield_score (descending)
+    // Sorts based on score (descending) and raw_score (descending)
     sorted_validator_indices.sort_by(|a, b| {
         b.1.cmp(&a.1) // Compare scores (descending)
-            .then_with(|| b.2.cmp(&a.2)) // If scores are equal, compare yield_scores (descending)
+            .then_with(|| b.2.cmp(&a.2)) // If scores are equal, compare raw_scores (descending)
     });
 
     // final ranking vector
@@ -698,7 +695,7 @@ fn compute_overall_ranks(steward_state_account: &StewardStateAccount) -> Vec<usi
 /// metrics to create comprehensive validator details. Handles filtering for specific
 /// vote accounts and builds ranked summaries when appropriate.
 fn build_verbose_state_output(
-    steward_state_account: &StewardStateAccount,
+    steward_state_account: &StewardStateAccountV2,
     config_account: &Config,
     validator_list_account: &ValidatorList,
     validator_histories: &HashMap<Pubkey, Option<Account>>,
@@ -739,9 +736,9 @@ fn build_verbose_state_output(
         );
 
         let score = steward_state_account.state.scores.get(index).unwrap_or(&0);
-        let yield_score = steward_state_account
+        let raw_score = steward_state_account
             .state
-            .yield_scores
+            .raw_scores
             .get(index)
             .unwrap_or(&0);
 
@@ -783,7 +780,7 @@ fn build_verbose_state_output(
             steward_list_index: index,
             overall_rank,
             score: *score,
-            yield_score: *yield_score,
+            validator_score: ValidatorScoreComponents::decode(*raw_score),
             passing_eligibility_criteria: eligibility_criteria,
             target_delegation_percent,
             is_instant_unstake: steward_state_account
@@ -845,7 +842,7 @@ fn build_verbose_state_output(
 
 /// Display the information of [`VerboseStateOutput`]
 fn _print_verbose_state(
-    steward_state_account: &StewardStateAccount,
+    steward_state_account: &StewardStateAccountV2,
     config_account: &Config,
     validator_list_account: &ValidatorList,
     validator_histories: &HashMap<Pubkey, Option<Account>>,
@@ -862,7 +859,7 @@ fn _print_verbose_state(
         );
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
-        let mut top_scores: Vec<(Pubkey, u32)> = vec![];
+        let mut top_scores: Vec<(Pubkey, u64)> = vec![];
         let overall_ranks = compute_overall_ranks(steward_state_account);
 
         for (index, validator) in validator_list_account.validators.iter().enumerate() {
@@ -918,14 +915,11 @@ fn _print_verbose_state(
 
             formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
             formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
-            formatted_string += &format!(
-                "Yield Score: {}\n",
-                steward_state_account
-                    .state
-                    .yield_scores
-                    .get(index)
-                    .unwrap_or(&0)
-            );
+            if let Some(raw_score) = steward_state_account.state.raw_scores.get(index) {
+                let validator_score_components = ValidatorScoreComponents::decode(*raw_score);
+                formatted_string += &validator_score_components.to_string();
+            }
+
             formatted_string +=
                 &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
 

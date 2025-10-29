@@ -44,8 +44,8 @@ On-chain Steward accounts for JitoSOL:
 
 ### Required Versions
 
-- **Rust**: 1.84.1
-- **Cargo**: 1.84.1
+- **Rust**: 1.86.0
+- **Cargo**: 1.86.0
 - **Anchor CLI**: 0.31.1
 - **Solana CLI**: 2.2.1
 

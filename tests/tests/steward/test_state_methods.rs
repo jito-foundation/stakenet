@@ -11,7 +11,7 @@ use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
-    Delegation, StewardState, StewardStateEnum,
+    Delegation, StewardStateEnum, StewardStateV2,
 };
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use solana_sdk::pubkey::Pubkey;
@@ -53,6 +53,7 @@ fn test_compute_scores() {
             validator.index as usize,
             cluster_history,
             config,
+            3,
         );
         assert!(res.is_ok());
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -61,13 +62,19 @@ fn test_compute_scores() {
         .progress
         .is_complete(state.num_pool_validators)
         .unwrap());
-    assert!(state.scores[0..3] == [1_000_000_000, 0, 950_000_000]);
+    assert!(state.scores[0..3] == [7249739868913833600, 0, 6887252875468641920]);
     assert!(state.sorted_score_indices[0..3] == [0, 2, 1]);
-    assert!(state.sorted_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
-    assert!(state.yield_scores[0..3] == [1_000_000_000, 2_000_000, 950_000_000]);
-    assert!(state.sorted_yield_score_indices[0..3] == [0, 2, 1]);
-    assert!(state.sorted_yield_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
-    //assert!(state.start_computing_scores_slot == clock.slot); TODO: why is this failing now?
+    assert!(state.sorted_raw_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
+    assert!(state.raw_scores[0..3] == [1_000_000_000, 2_000_000, 950_000_000]);
+    assert!(state.sorted_raw_score_indices[0..3] == [0, 2, 1]);
+    assert!(state.sorted_raw_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
+    assert!(state.start_computing_scores_slot == clock.slot);
+    assert!(
+        state.raw_scores[0..3] == [7249739868913833600, 72057594039927936, 6887252875468641920]
+    );
+    assert!(state.sorted_raw_score_indices[0..3] == [0, 2, 1]);
+    assert!(state.sorted_raw_score_indices[3..] == [SORTED_INDEX_DEFAULT; MAX_VALIDATORS - 3]);
+    assert!(state.start_computing_scores_slot == clock.slot);
     assert!(state.next_cycle_epoch == current_epoch + parameters.num_epochs_between_scoring);
     assert!(state.current_epoch == current_epoch);
 
@@ -81,6 +88,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(res, Err(Error::from(StewardError::InvalidState)));
 
@@ -100,6 +108,7 @@ fn test_compute_scores() {
         validator.index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -119,6 +128,7 @@ fn test_compute_scores() {
         validator.index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -136,6 +146,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -158,13 +169,14 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
     // validator would not have a score of 0 if it was not blacklisted
     assert!(state.scores[validators[0].index as usize] == 0);
     assert!(state.sorted_score_indices[0] == 0);
-    assert!(state.yield_scores[0] == 1_000_000_000);
-    assert!(state.sorted_yield_score_indices[0] == 0);
+    assert!(state.raw_scores[0] == 7249739868913833600);
+    assert!(state.sorted_raw_score_indices[0] == 0);
 
     // Test reset scoring: 3 cases
 
@@ -179,9 +191,10 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
-    //assert!(state.start_computing_scores_slot == clock.slot); TODO: why is this failing now?
+    assert!(state.start_computing_scores_slot == clock.slot);
     assert!(state.next_cycle_epoch == current_epoch + parameters.num_epochs_between_scoring);
     assert!(state.num_pool_validators == 4);
 
@@ -207,10 +220,9 @@ fn test_compute_scores() {
     // 3) Progress started, but took >1000 slots to complete
     // Conditions: start_computing_scores_slot > 1000 slots ago, !progress.is_empty(), and clock.epoch == state.current_epoch
 
-    // TODO: why is this failing now?
-    /*assert!(
+    assert!(
         state.start_computing_scores_slot == epoch_schedule.get_last_slot_in_epoch(current_epoch)
-    );*/
+    );
     assert!(!state.progress.is_empty());
     assert!(state.current_epoch == clock.epoch);
     state.start_computing_scores_slot = epoch_schedule.get_first_slot_in_epoch(current_epoch);
@@ -221,9 +233,10 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
-    //assert!(state.start_computing_scores_slot == clock.slot); TODO: why is this failing now?
+    assert!(state.start_computing_scores_slot == clock.slot);
 }
 
 #[test]
@@ -240,7 +253,7 @@ fn test_compute_delegations() {
     // Regular run
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 1_000_000_000, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.state_tag = StewardStateEnum::ComputeDelegations;
     assert!(config.parameters.num_delegation_validators == 3);
     let res = state.compute_delegations(clock.epoch, config);
@@ -262,7 +275,7 @@ fn test_compute_delegations() {
     state.delegations = [Delegation::default(); MAX_VALIDATORS];
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 2, 1]);
     let res = state.compute_delegations(clock.epoch, config);
     assert!(res.is_ok());
     assert!(
@@ -539,7 +552,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
 
@@ -613,7 +626,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
     state.validator_lamport_balances[1] = 1000 * LAMPORTS_PER_SOL;
@@ -671,7 +684,7 @@ fn test_rebalance() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.instant_unstake.reset();
     state.instant_unstake.set(0, true).unwrap();
 
@@ -707,7 +720,7 @@ fn test_rebalance() {
     state.delegations[0..3].copy_from_slice(&[Delegation::new(1, 3); 3]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 1_000_000_000, 1_000_000_000]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.progress.reset();
     let res = state.rebalance(
         fixtures.current_epoch,
@@ -749,7 +762,7 @@ fn test_rebalance() {
 
 #[test]
 fn test_rebalance_default_lamports() {
-    let fixtures = StateMachineFixtures::default();
+    let fixtures = Box::<StateMachineFixtures>::default();
     let mut state = fixtures.state;
     let mut validator_list = fixtures.validator_list.clone();
 
@@ -832,12 +845,12 @@ fn test_rebalance_default_lamports() {
     }
 }
 
-fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState {
+fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV2 {
     let mut state = fixtures.state;
     // Set values for all of the values that are gonna get shifted
     state.validator_lamport_balances[0..3].copy_from_slice(&[0, 1, 2]);
     state.scores[0..3].copy_from_slice(&[0, 1, 2]);
-    state.yield_scores[0..3].copy_from_slice(&[0, 1, 2]);
+    state.raw_scores[0..3].copy_from_slice(&[0, 1, 2]);
     state.delegations[0..3].copy_from_slice(&[
         Delegation::new(0, 1),
         Delegation::new(1, 1),
@@ -854,7 +867,7 @@ fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardState
 fn test_remove_validator() {
     // Setup: create steward state based off StewardStateFixtures
     // mark index 1 to removal
-    let fixtures = StateMachineFixtures::default();
+    let fixtures = Box::<StateMachineFixtures>::default();
     let mut state = _test_remove_validator_setup(&fixtures);
 
     // test basic case - remove validator_to_remove
@@ -863,7 +876,7 @@ fn test_remove_validator() {
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
-    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.raw_scores[1], 2);
     assert_eq!(state.scores[1], 2);
     assert!(state.delegations[1] == Delegation::new(2, 1));
 
@@ -875,7 +888,7 @@ fn test_remove_validator() {
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
-    assert_eq!(state.yield_scores[1], 2);
+    assert_eq!(state.raw_scores[1], 2);
     assert_eq!(state.scores[1], 2);
     assert!(state.delegations[1] == Delegation::new(2, 1));
 
@@ -898,7 +911,7 @@ fn test_remove_validator() {
 
 #[test]
 fn test_remove_validator_fails() {
-    let fixtures = StateMachineFixtures::default();
+    let fixtures = Box::<StateMachineFixtures>::default();
     let mut state = fixtures.state;
 
     // Test fails if validator not marked to remove
@@ -915,6 +928,85 @@ fn test_remove_validator_fails() {
     let res = state.remove_validator(state.num_pool_validators as usize);
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
+}
+
+#[test]
+fn test_remove_validator_at_max_validators() {
+    // Test case where num_pool_validators == MAX_VALIDATORS
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = fixtures.state;
+    state.num_pool_validators = MAX_VALIDATORS as u64;
+    state.validators_added = 0;
+
+    // Remove second-to-last validator
+    let index = MAX_VALIDATORS - 2;
+    state.validators_to_remove.set(index, true).unwrap();
+
+    // Set test values
+    state.validator_lamport_balances[index] = 998;
+    state.validator_lamport_balances[index + 1] = 999;
+    state.scores[index] = 998;
+    state.scores[index + 1] = 999;
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+
+    // Verify shifting occurred - value at index should now be what was at index+1
+    assert_eq!(state.validator_lamport_balances[index], 999);
+    assert_eq!(state.scores[index], 999);
+
+    // Verify the last position was cleared after shifting
+    assert_eq!(
+        state.validator_lamport_balances[index + 1],
+        LAMPORT_BALANCE_DEFAULT
+    );
+    assert_eq!(state.scores[index + 1], 0);
+}
+
+#[test]
+fn test_remove_validator_at_sum_equals_max() {
+    // Test case where num_pool_validators + validators_added == MAX_VALIDATORS
+    let fixtures = Box::<StateMachineFixtures>::default();
+    let mut state = fixtures.state;
+
+    // Set up state where sum equals MAX_VALIDATORS
+    state.num_pool_validators = (MAX_VALIDATORS - 10) as u64;
+    state.validators_added = 10;
+
+    // Test removing from existing pool
+    let index = MAX_VALIDATORS - 100;
+    state.validators_to_remove.set(index, true).unwrap();
+
+    // Set values to verify shifting
+    state.validator_lamport_balances[index] = 100;
+    state.validator_lamport_balances[index + 1] = 101;
+    state.scores[index] = 100;
+    state.scores[index + 1] = 101;
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 11) as u64);
+    assert_eq!(state.validators_added, 10); // unchanged
+
+    // Verify shifting occurred
+    assert_eq!(state.validator_lamport_balances[index], 101);
+    assert_eq!(state.scores[index], 101);
+
+    // Test removing from added pool
+    let mut state = fixtures.state;
+    state.num_pool_validators = (MAX_VALIDATORS - 10) as u64;
+    state.validators_added = 10;
+
+    let index = MAX_VALIDATORS - 5;
+    state
+        .validators_for_immediate_removal
+        .set(index, true)
+        .unwrap();
+
+    let res = state.remove_validator(index);
+    assert!(res.is_ok());
+    assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 10) as u64); // unchanged
+    assert_eq!(state.validators_added, 9); // decremented
 }
 
 #[test]
@@ -940,7 +1032,7 @@ fn test_rebalance_max_lamports() {
     ]);
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 500_000_000, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
-    state.sorted_yield_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+    state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     // Second validator is instant unstakeable
     state.instant_unstake.set(1, true).unwrap();
 
@@ -973,7 +1065,6 @@ fn test_directed_stake_preferences_valid() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: Pubkey::default(),
-        ticket_close_authority: Pubkey::default(),
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };
@@ -1022,7 +1113,6 @@ fn test_directed_stake_get_allocations() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: Pubkey::default(),
-        ticket_close_authority: Pubkey::default(),
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };

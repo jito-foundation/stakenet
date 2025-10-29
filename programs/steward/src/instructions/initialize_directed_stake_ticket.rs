@@ -47,7 +47,6 @@ impl InitializeDirectedStakeTicket<'_> {
 pub fn handler(
     ctx: Context<InitializeDirectedStakeTicket>,
     ticket_update_authority: Pubkey,
-    ticket_close_authority: Pubkey,
     ticket_holder_is_protocol: bool,
 ) -> Result<()> {
     let whitelist = ctx.accounts.whitelist_account.load()?;
@@ -58,7 +57,6 @@ pub fn handler(
     ticket.staker_preferences =
         [DirectedStakePreference::empty(); crate::MAX_PREFERENCES_PER_TICKET];
     ticket.ticket_update_authority = ticket_update_authority;
-    ticket.ticket_close_authority = ticket_close_authority;
     ticket.ticket_holder_is_protocol = U8Bool::from(ticket_holder_is_protocol);
     ticket._padding0 = [0; 125];
 

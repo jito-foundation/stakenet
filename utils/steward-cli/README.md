@@ -14,7 +14,11 @@
 ### View Config
 
 ```bash
-cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-config --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    view-config \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
 ### View State
@@ -22,7 +26,10 @@ cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-confi
 Displays high level Steward internal operations including current state, total number of validators in the pool, next cycle epoch, etc.
 
 ```bash
-cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-state \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
 ### View State of Single Validator
@@ -30,7 +37,11 @@ cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $
 Displays state of a single Validator.
 
 ```bash
-cargo run -- --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --vote-account J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-state \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --vote-account J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
 ```
 
 Output:
@@ -40,10 +51,13 @@ Vote Account: J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
 Stake Account: 6PAY8LEswawgCGnzB3tKGJBtELUwDpeMfDCiNpCyNt8q
 Transient Stake Account: C2AurJCKxp5Q8DbaZ84aiSUiKKazqgRVsUiTiihqNYui
 Steward List Index: 3
-Overall Rank: 441
-Score: 0
-Yield Score: 912832510
-Passing Eligibility Criteria: No
+Overall Rank: 404
+Score: 6957991073806817273
+Inflation Commission: 4
+MEV commission BPS: 800
+Validator Age: 544
+Vote Credits: 9967609
+Passing Eligibility Criteria: Yes
 Target Delegation Percent: 0.0%
 
 Is Instant Unstake: false
@@ -51,9 +65,9 @@ Is blacklisted: false
 
 Validator History Index: 321
 
-Active Lamports: 3398839 (0.00 ◎)
+Active Lamports: 3289511 (0.00 ◎)
 Transient Lamports: 0 (0.00 ◎)
-Steward Internal Lamports: 114590
+Steward Internal Lamports: 0
 Status: 🟩 Active
 Marked for removal: false
 Marked for immediate removal: false
@@ -73,7 +87,13 @@ Marked for immediate removal: false
 
 `Score`: Validator's overall score
 
-`Yield Score`: Validator's relative yield score
+`Inflation Commission`: Validator's inflation commission
+
+`MEV Commission BPS`: Validator's mev commission bps
+
+`Validator Age`: Validator's age in epoch
+
+`Vote Credits`: Validator's vote credits
 
 `Target Delegation Percent`: Share of the stake pool TVL this validator is targeted to receive. Not a guaranteed amount - dependent on staking and unstaking priority.
 
@@ -98,13 +118,22 @@ Marked for immediate removal: false
 ### View State of All Validators
 
 ```bash
-cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') view-state --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --verbose
+cargo run -p steward-cli -- \
+    --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-state \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --verbose
 ```
 
 ### View Next Index To Remove
 
 ```bash
-cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 view-next-index-to-remove --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+cargo run -p steward-cli -- \
+    --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-next-index-to-remove \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
 ### Auto Remove Validator
@@ -282,8 +311,35 @@ cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 reset-stat
 
 ### Add To Blacklist
 
+**Direct execution:**
+
 ```bash
-cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-blacklist 2168
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ../../credentials/stakenet_test.json \
+  --validator-history-indices-to-blacklist 2168
+```
+
+**Creating a Squads multisig proposal with Ledger:**
+
+```bash
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ledger \
+  --validator-history-indices-to-blacklist 2168 \
+  --squads-proposal \
+  --squads-multisig 87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c \
+  --squads-vault-index 0
+```
+
+Note: `--squads-multisig` defaults to the blacklist authority multisig and `--squads-vault-index` defaults to the main vault, so they can be omitted:
+
+```bash
+cargo run -- --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ledger \
+  --validator-history-indices-to-blacklist 2168 \
+  --squads-proposal
 ```
 
 ### Remove From Blacklist

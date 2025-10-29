@@ -27,6 +27,7 @@ pub struct DirectedStakeMeta {
     pub epoch_increase_total_lamports: u64,
     pub epoch_decrease_total_lamports: u64,
     pub epoch_last_updated: u64,
+    pub directed_unstake_total: u64,
     pub padding0: [u8; 64],
     pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
 }
@@ -165,10 +166,8 @@ pub struct DirectedStakeTicket {
     pub num_preferences: u16,
     /// The sum of staker preferences must be less than or equal to 10_000 bps
     pub staker_preferences: [DirectedStakePreference; MAX_PREFERENCES_PER_TICKET],
-    /// Authority that can update the ticket preferences, for now this is the staker itself
+    /// Authority that can update the ticket preferences and close the ticket
     pub ticket_update_authority: Pubkey,
-    /// Override authority that can close the ticket in the event of whitelist removal due to abuse
-    pub ticket_close_authority: Pubkey,
     /// Is the ticket holder a protocol vs. an individual pubkey
     pub ticket_holder_is_protocol: U8Bool,
     // 15 bytes required for alignment
@@ -182,7 +181,6 @@ impl DirectedStakeTicket {
 
     pub fn new(
         ticket_update_authority: Pubkey,
-        ticket_close_authority: Pubkey,
         ticket_holder_is_protocol: U8Bool,
         staker_preferences: &[DirectedStakePreference],
     ) -> Self {
@@ -197,7 +195,6 @@ impl DirectedStakeTicket {
             num_preferences: staker_preferences.len() as u16,
             staker_preferences: staker_preferences_arr,
             ticket_update_authority,
-            ticket_close_authority,
             ticket_holder_is_protocol,
             _padding0: [0; 125],
         }

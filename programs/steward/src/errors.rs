@@ -85,4 +85,6 @@ pub enum StewardError {
         "Vote pubkey referenced in directed stake meta index and validator list index do not match"
     )]
     DirectedStakeVoteAccountMismatch,
+    #[msg("This validator has already been rebalanced for this epoch for this stake category.")]
+    ValidatorAlreadyRebalanced,
 }

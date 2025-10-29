@@ -23,7 +23,6 @@ fn test_directed_stake_record_type_serialization() {
 #[test]
 fn test_directed_stake_ticket_initialization() {
     let update_authority = Pubkey::new_unique();
-    let close_authority = Pubkey::new_unique();
 
     let ticket = DirectedStakeTicket {
         num_preferences: 0,
@@ -33,14 +32,12 @@ fn test_directed_stake_ticket_initialization() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: update_authority,
-        ticket_close_authority: close_authority,
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };
 
     assert_eq!(ticket.num_preferences, 0);
     assert_eq!(ticket.ticket_update_authority, update_authority);
-    assert_eq!(ticket.ticket_close_authority, close_authority);
     assert_eq!(ticket.ticket_holder_is_protocol, U8Bool::from(false));
 
     assert!(ticket.preferences_valid());
@@ -52,7 +49,6 @@ fn test_directed_stake_ticket_initialization() {
 #[test]
 fn test_directed_stake_ticket_with_preferences() {
     let update_authority = Pubkey::new_unique();
-    let close_authority = Pubkey::new_unique();
     let validator1 = Pubkey::new_unique();
     let validator2 = Pubkey::new_unique();
 
@@ -64,7 +60,6 @@ fn test_directed_stake_ticket_with_preferences() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: update_authority,
-        ticket_close_authority: close_authority,
         ticket_holder_is_protocol: U8Bool::from(true),
         _padding0: [0; 125],
     };
@@ -86,7 +81,6 @@ fn test_directed_stake_ticket_with_preferences() {
 #[test]
 fn test_directed_stake_ticket_invalid_preferences() {
     let update_authority = Pubkey::new_unique();
-    let close_authority = Pubkey::new_unique();
     let validator1 = Pubkey::new_unique();
     let validator2 = Pubkey::new_unique();
 
@@ -98,7 +92,6 @@ fn test_directed_stake_ticket_invalid_preferences() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: update_authority,
-        ticket_close_authority: close_authority,
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };
@@ -247,7 +240,6 @@ fn test_directed_stake_whitelist_edge_cases() {
 #[test]
 fn test_directed_stake_ticket_edge_cases() {
     let update_authority = Pubkey::new_unique();
-    let close_authority = Pubkey::new_unique();
 
     let mut ticket = DirectedStakeTicket {
         num_preferences: 0,
@@ -257,7 +249,6 @@ fn test_directed_stake_ticket_edge_cases() {
             _padding0: [0; 94],
         }; MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: update_authority,
-        ticket_close_authority: close_authority,
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };
@@ -480,7 +471,6 @@ fn test_ticket_authorization_scenarios() {
     let permissioned_validator = Pubkey::new_unique();
     let non_permissioned_validator = Pubkey::new_unique();
     let update_authority = Pubkey::new_unique();
-    let close_authority = Pubkey::new_unique();
 
     // Setup whitelist
     whitelist.add_user_staker(permissioned_staker).unwrap();
@@ -498,7 +488,6 @@ fn test_ticket_authorization_scenarios() {
         num_preferences: 0,
         staker_preferences: [DirectedStakePreference::empty(); MAX_PREFERENCES_PER_TICKET],
         ticket_update_authority: update_authority,
-        ticket_close_authority: close_authority,
         ticket_holder_is_protocol: U8Bool::from(false),
         _padding0: [0; 125],
     };

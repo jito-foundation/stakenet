@@ -244,6 +244,11 @@ pub mod steward {
         instructions::close_steward_accounts::handler(ctx)
     }
 
+    /// Migrates the state account from V1 (u32 scores) to V2 (u64 scores with 4-tier encoding)
+    pub fn migrate_state_to_v2(ctx: Context<MigrateStateToV2>) -> Result<()> {
+        instructions::migrate_state_to_v2::handler(ctx)
+    }
+
     /* Passthrough instructions */
     /* passthrough to spl-stake-pool, where the signer is Staker. Must be invoked by `config.authority` */
 
@@ -379,13 +384,11 @@ pub mod steward {
     pub fn initialize_directed_stake_ticket(
         ctx: Context<InitializeDirectedStakeTicket>,
         ticket_update_authority: Pubkey,
-        ticket_close_authority: Pubkey,
         ticket_holder_is_protocol: bool,
     ) -> Result<()> {
         instructions::initialize_directed_stake_ticket::handler(
             ctx,
             ticket_update_authority,
-            ticket_close_authority,
             ticket_holder_is_protocol,
         )
     }

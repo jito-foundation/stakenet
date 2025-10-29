@@ -41,6 +41,10 @@ impl From<spl_stake_pool::instruction::PreferredValidatorType> for PreferredVali
 
 #[cfg(feature = "idl-build")]
 impl IdlBuild for PreferredValidatorType {
+    fn get_full_path() -> String {
+        "PreferredValidatorType".to_string()
+    }
+
     fn create_type() -> Option<IdlTypeDef> {
         Some(IdlTypeDef {
             name: "PreferredValidatorType".to_string(),
@@ -62,6 +66,8 @@ impl IdlBuild for PreferredValidatorType {
             repr: Default::default(),
         })
     }
+
+    fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
 }
 
 // Below are nice to haves for deserializing accounts but not strictly necessary for on-chain logic

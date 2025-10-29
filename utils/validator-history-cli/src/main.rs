@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
-
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
 use clap::{arg, command, Parser, Subcommand};
+use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
+use rusqlite::Connection;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
@@ -13,11 +13,15 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
+use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
+use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
 };
-use validator_history_cli::validator_history_entry_output::ValidatorHistoryEntryOutput;
+use validator_history_cli::{
+    commands, validator_history_entry_output::ValidatorHistoryEntryOutput,
+};
 
 #[derive(Parser)]
 #[command(about = "CLI for validator history program", version)]
@@ -45,9 +49,12 @@ enum Commands {
     ViewConfig,
     History(History),
     BackfillClusterHistory(BackfillClusterHistory),
+    BackfillValidatorAge(commands::backfill_validator_age::BackfillValidatorAge),
     StakeByCountry(StakeByCountry),
     GetConfig,
     UpdateOracleAuthority(UpdateOracleAuthority),
+    DunePriorityFeeBackfill(DunePriorityFeeBackfill),
+    UploadValidatorAge(UploadValidatorAge),
 }
 
 #[derive(Parser)]
@@ -163,6 +170,50 @@ struct UpdateOracleAuthority {
     /// New oracle authority (Pubkey as base58 string)
     #[arg(long, env)]
     oracle_authority: Pubkey,
+}
+
+#[derive(Parser)]
+#[command(about = "Backfills the Priority Fee DB from Dune from the last 99 epochs")]
+struct DunePriorityFeeBackfill {
+    /// Path to the local SQLite file
+    #[arg(long, env, default_value = "../../keepers/block_keeper.db3")]
+    pub sqlite_path: PathBuf,
+
+    /// Dune API key
+    #[arg(long, env)]
+    dune_api_key: String,
+
+    #[arg(long, env, default_value = "5598354")]
+    query_id: String,
+
+    #[arg(long, env, default_value_t = 32000)]
+    batch_size: usize,
+
+    #[arg(long, env, default_value_t = 32000)]
+    chunk_size: usize,
+
+    #[arg(long, env, default_value_t = 0)]
+    starting_offset: usize,
+}
+
+#[derive(Parser)]
+#[command(about = "Upload validator age for a specific vote account")]
+struct UploadValidatorAge {
+    /// Path to oracle authority keypair
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    keypair_path: PathBuf,
+
+    /// Vote account pubkey to update
+    #[arg(short, long, env)]
+    vote_account: Pubkey,
+
+    /// Validator age value to set
+    #[arg(short, long, env)]
+    age: u32,
+
+    /// Epoch when validator age was last updated (defaults to current epoch)
+    #[arg(short, long, env)]
+    epoch: Option<u16>,
 }
 
 #[derive(Parser)]
@@ -347,6 +398,10 @@ fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<Validato
         .find(|entry| entry.epoch == epoch as u16)
 }
 
+fn format_option(opt: Option<String>) -> String {
+    opt.unwrap_or_else(|| "None".to_string())
+}
+
 fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
     let entry_output = ValidatorHistoryEntryOutput::from(entry);
 
@@ -356,56 +411,74 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
         let mut field_descriptions = Vec::new();
 
         field_descriptions.push(format!(
-            "Activated Stake Lamports: {:?}",
-            entry_output.activated_stake_lamports
-        ));
-        field_descriptions.push(format!("MEV Commission: {:?}", entry_output.mev_commission));
-        field_descriptions.push(format!("Epoch Credits: {:?}", entry_output.epoch_credits));
-        field_descriptions.push(format!("Commission: {:?}", entry_output.commission));
-        field_descriptions.push(format!("Client Type: {:?}", entry_output.client_type));
-        field_descriptions.push(format!("Client Version: {:?}", entry_output.version));
-        field_descriptions.push(format!("IP: {:?}", entry_output.ip));
-        field_descriptions.push(format!(
-            "Merkle Root Upload Authority: {:?}",
-            entry_output.merkle_root_upload_authority
+            "Activated Stake Lamports: {}",
+            format_option(entry_output.activated_stake_lamports)
         ));
         field_descriptions.push(format!(
-            "Superminority: {:?}",
-            entry_output.is_superminority
-        ));
-        field_descriptions.push(format!("Rank: {:?}", entry_output.rank));
-        field_descriptions.push(format!(
-            "Last Update: {:?}",
-            entry_output.vote_account_last_update_slot
-        ));
-        field_descriptions.push(format!("MEV Earned: {:?}", entry_output.mev_earned));
-        field_descriptions.push(format!(
-            "Priority Fee Commission: {:?}",
-            entry_output.priority_fee_commission
+            "MEV Commission: {}",
+            format_option(entry_output.mev_commission)
         ));
         field_descriptions.push(format!(
-            "Priority Fee Tips: {:?}",
-            entry_output.priority_fee_tips
+            "Epoch Credits: {}",
+            format_option(entry_output.epoch_credits)
         ));
         field_descriptions.push(format!(
-            "Total Priority Fees: {:?}",
-            entry_output.total_priority_fees
+            "Commission: {}",
+            format_option(entry_output.commission)
         ));
         field_descriptions.push(format!(
-            "Total Leader Slots: {:?}",
-            entry_output.total_leader_slots
+            "Client Type: {}",
+            format_option(entry_output.client_type)
         ));
         field_descriptions.push(format!(
-            "Blocks Produced: {:?}",
-            entry_output.blocks_produced
+            "Client Version: {}",
+            format_option(entry_output.version)
+        ));
+        field_descriptions.push(format!("IP: {}", format_option(entry_output.ip)));
+        field_descriptions.push(format!(
+            "Merkle Root Upload Authority: {}",
+            format_option(entry_output.merkle_root_upload_authority)
         ));
         field_descriptions.push(format!(
-            "Block Data Updated At Slot: {:?}",
-            entry_output.block_data_updated_at_slot
+            "Superminority: {}",
+            format_option(entry_output.is_superminority)
+        ));
+        field_descriptions.push(format!("Rank: {}", format_option(entry_output.rank)));
+        field_descriptions.push(format!(
+            "Last Update: {}",
+            format_option(entry_output.vote_account_last_update_slot)
         ));
         field_descriptions.push(format!(
-            "Priority Fee Merkle Root Upload Authority: {:?}",
-            entry_output.priority_fee_merkle_root_upload_authority
+            "MEV Earned: {}",
+            format_option(entry_output.mev_earned)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Commission: {}",
+            format_option(entry_output.priority_fee_commission)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Tips: {}",
+            format_option(entry_output.priority_fee_tips)
+        ));
+        field_descriptions.push(format!(
+            "Total Priority Fees: {}",
+            format_option(entry_output.total_priority_fees)
+        ));
+        field_descriptions.push(format!(
+            "Total Leader Slots: {}",
+            format_option(entry_output.total_leader_slots)
+        ));
+        field_descriptions.push(format!(
+            "Blocks Produced: {}",
+            format_option(entry_output.blocks_produced)
+        ));
+        field_descriptions.push(format!(
+            "Block Data Updated At Slot: {}",
+            format_option(entry_output.block_data_updated_at_slot)
+        ));
+        field_descriptions.push(format!(
+            "Priority Fee Merkle Root Upload Authority: {}",
+            format_option(entry_output.priority_fee_merkle_root_upload_authority)
         ));
 
         field_descriptions.join(" | ")
@@ -675,6 +748,10 @@ fn command_history(args: History, client: RpcClient) {
         println!(
             "History for validator {} | Validator History Account {}",
             args.validator, validator_history_pda
+        );
+        println!(
+            "Validator Age: {} | Validator Age Last Updated Epoch: {}",
+            validator_history.validator_age, validator_history.validator_age_last_updated_epoch
         );
 
         for epoch in start_epoch..=current_epoch {
@@ -1091,8 +1168,92 @@ fn command_get_config(client: RpcClient) {
     }
 }
 
+async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, client: RpcClient) {
+    let epoch_schedule = client
+        .get_epoch_schedule()
+        .expect("Could not get epoch schedule");
+
+    // Move the blocking operations into spawn_blocking
+    let entries_written = tokio::task::spawn_blocking(move || {
+        let mut connection = Connection::open(args.sqlite_path).expect("Failed to open database");
+
+        DBSlotInfo::fetch_and_insert_from_dune(
+            &mut connection,
+            &args.dune_api_key,
+            &args.query_id,
+            &epoch_schedule,
+            args.chunk_size,
+            args.batch_size,
+            args.starting_offset,
+        )
+    })
+    .await
+    .expect("Task panicked")
+    .expect("Error running backfill");
+
+    println!("Total entries written: {}", entries_written);
+}
+
+fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
+    // Upload validator age for a specific vote account
+    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+
+    // Get current epoch if not specified
+    let epoch = args.epoch.unwrap_or_else(|| {
+        let epoch_info = client.get_epoch_info().expect("Failed to get epoch info");
+        epoch_info.epoch as u16
+    });
+
+    // Get validator history account address
+    let (validator_history_pda, _) = Pubkey::find_program_address(
+        &[ValidatorHistory::SEED, args.vote_account.as_ref()],
+        &validator_history::ID,
+    );
+
+    // Get config account address
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+
+    let instruction = Instruction {
+        program_id: validator_history::ID,
+        accounts: validator_history::accounts::UploadValidatorAge {
+            validator_history_account: validator_history_pda,
+            vote_account: args.vote_account,
+            config: config_pda,
+            oracle_authority: keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::UploadValidatorAge {
+            validator_age: args.age,
+            validator_age_last_updated_epoch: epoch,
+        }
+        .data(),
+    };
+
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&keypair.pubkey()),
+        &[&keypair],
+        blockhash,
+    );
+
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .expect("Failed to send transaction");
+
+    println!("Successfully uploaded validator age:");
+    println!("  Vote Account: {}", args.vote_account);
+    println!("  Validator Age: {}", args.age);
+    println!("  Last Updated Epoch: {}", epoch);
+    println!("  Signature: {}", signature);
+}
+
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    env_logger::init();
     let args = Args::parse();
     let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
     match args.commands {
@@ -1107,5 +1268,12 @@ async fn main() {
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
+        Commands::DunePriorityFeeBackfill(args) => {
+            command_dune_priority_fee_backfill(args, client).await
+        }
+        Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
+        Commands::BackfillValidatorAge(command_args) => {
+            commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
     };
 }
