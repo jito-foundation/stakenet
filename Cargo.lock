@@ -2498,11 +2498,10 @@ dependencies = [
 
 [[package]]
 name = "home"
-version = "0.5.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
+version = "0.5.11"
+source = "git+https://github.com/rust-lang/cargo?tag=0.78.0#3fe68eabf93cbf3772bbcad09a9206c783e2de3f"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6624,9 +6623,9 @@ dependencies = [
 
 [[package]]
 name = "solana-instruction"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47298e2ce82876b64f71e9d13a46bc4b9056194e7f9937ad3084385befa50885"
+checksum = "c54769c7e58fc7653658c49b39b935ff6673260cba4ae033b21580a79ca73c90"
 dependencies = [
  "bincode",
  "borsh 1.5.7",
@@ -6635,6 +6634,7 @@ dependencies = [
  "num-traits",
  "serde",
  "serde_derive",
+ "serde_json",
  "solana-define-syscall",
  "solana-pubkey",
  "wasm-bindgen",
@@ -12830,8 +12830,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "home"
-version = "0.5.11"
-source = "git+https://github.com/rust-lang/cargo?tag=0.78.0#3fe68eabf93cbf3772bbcad09a9206c783e2de3f"
