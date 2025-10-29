@@ -39,9 +39,12 @@ impl DirectedStakeMeta {
 
     /// Get the index of a particular validator in the targets array
     pub fn get_target_index(&self, vote_pubkey: &Pubkey) -> Option<usize> {
-        self.targets
-            .iter()
-            .position(|target| target.vote_pubkey == *vote_pubkey)
+        for (index, target) in self.targets.iter().enumerate() {
+            if &target.vote_pubkey == vote_pubkey {
+                return Some(index);
+            }
+        }
+        None
     }
 
     /// Get the target lamports for a particular validator

@@ -37,33 +37,22 @@ pub fn handler(
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let config = ctx.accounts.config.load()?;
 
+    if vote_pubkey == Pubkey::default() {
+        return Err(error!(StewardError::Unauthorized));
+    }
+
     if ctx.accounts.authority.key() != config.directed_stake_meta_upload_authority {
         return Err(error!(StewardError::Unauthorized));
     }
 
     let clock = Clock::get()?;
-    msg!(
-        "Copying directed stake target for vote pubkey: {} at epoch {}",
-        vote_pubkey,
-        &clock.epoch
-    );
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {
             msg!("Updating target index: {}", target_index);
             stake_meta.targets[target_index].total_target_lamports = target_lamports;
             stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
-            msg!(
-                "Updated target index: {} at epoch {} with value {}",
-                target_index,
-                clock.epoch,
-                target_lamports
-            );
         }
         None => {
-            msg!(
-                "Adding new target index: {}",
-                stake_meta.total_stake_targets
-            );
             let new_target = DirectedStakeTarget {
                 vote_pubkey,
                 total_target_lamports: target_lamports,

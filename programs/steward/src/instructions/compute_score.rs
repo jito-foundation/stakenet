@@ -3,10 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{
     errors::StewardError,
     maybe_transition,
-    utils::{
-        get_validator_list, get_validator_list_length, get_validator_stake_info_at_index,
-        state_checks,
-    },
+    utils::{get_validator_list, get_validator_stake_info_at_index, state_checks},
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -80,8 +77,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         StewardError::InvalidState
     );
 
-    let num_pool_validators = get_validator_list_length(validator_list)?;
-
     if let Some(score) = state_account.state.compute_score(
         &clock,
         &epoch_schedule,
@@ -89,7 +84,6 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         validator_list_index,
         &cluster_history,
         &config,
-        num_pool_validators as u64,
     )? {
         emit!(score);
     }
