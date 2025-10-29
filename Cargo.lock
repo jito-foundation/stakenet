@@ -12830,3 +12830,8 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "home"
+version = "0.5.11"
+source = "git+https://github.com/rust-lang/cargo?tag=0.78.0#3fe68eabf93cbf3772bbcad09a9206c783e2de3f"
