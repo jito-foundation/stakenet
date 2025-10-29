@@ -1,6 +1,10 @@
 #![allow(unexpected_cfgs)]
 mod test_algorithms;
 mod test_cycle;
+mod test_directed_increase_decrease;
+mod test_directed_rebalance_instructions;
+mod test_directed_stake_instructions;
+mod test_directed_stake_meta;
 mod test_epoch_maintenance;
 mod test_integration;
 mod test_migrate_state_to_v2;
@@ -12,6 +16,7 @@ mod test_spl_passthrough;
 mod test_state_methods;
 mod test_state_transitions;
 mod test_steward;
+mod test_utils;
 
 use spl_stake_pool::state::{PodStakeStatus, ValidatorStakeInfo};
 

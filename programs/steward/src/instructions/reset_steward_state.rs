@@ -45,7 +45,7 @@ pub fn handler(ctx: Context<ResetStewardState>) -> Result<()> {
     let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
     let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
-    state_account.state.state_tag = StewardStateEnum::ComputeScores;
+    state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
     state_account.state.num_pool_validators = validator_list.len() as u64;
     state_account.state.validator_lamport_balances = [LAMPORT_BALANCE_DEFAULT; MAX_VALIDATORS];
     state_account.state.scores = [0; MAX_VALIDATORS];

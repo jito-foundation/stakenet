@@ -198,10 +198,15 @@ pub struct StewardStateV2 {
     // TODO ADD MORE PADDING
 }
 
+pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2) - 8;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
 pub enum StewardStateEnum {
     /// Start state
+    /// Rebalance directed stake
+    RebalanceDirected,
+
     /// Every `num_cycle_epochs` epochs, scores are computed and the top `num_delegation_validators` validators are selected.
     ComputeScores,
 
@@ -265,6 +270,7 @@ impl Display for StewardStateEnum {
                 write!(f, "ComputeInstantUnstake")
             }
             Self::Rebalance => write!(f, "Rebalance"),
+            Self::RebalanceDirected => write!(f, "RebalanceDirected"),
         }
     }
 }
@@ -300,6 +306,10 @@ impl IdlBuild for StewardStateEnum {
                         name: "Rebalance".to_string(),
                         fields: None,
                     },
+                    IdlEnumVariant {
+                        name: "RebalanceDirected".to_string(),
+                        fields: None,
+                    },
                 ],
             },
             docs: Default::default(),
@@ -314,13 +324,14 @@ impl IdlBuild for StewardStateEnum {
 
 // BITS 0-7 COMPLETED PROGRESS FLAGS
 // Used to mark the completion of a particular state
-pub const COMPUTE_SCORE: u32 = 1 << 0;
+pub const COMPUTE_SCORE: u32 = 1 << 7;
 pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
 pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
 pub const PRE_LOOP_IDLE: u32 = 1 << 3;
 pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
 pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
+pub const REBALANCE_DIRECTED_COMPLETE: u32 = 1 << 0;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
@@ -356,7 +367,6 @@ impl StewardStateV2 {
         let current_epoch = clock.epoch;
         let current_slot = clock.slot;
         let epoch_progress = epoch_progress(clock, epoch_schedule)?;
-
         match self.state_tag {
             StewardStateEnum::ComputeScores => self.transition_compute_scores(
                 current_epoch,
@@ -374,6 +384,7 @@ impl StewardStateV2 {
                 params.num_epochs_between_scoring,
                 epoch_progress,
                 params.instant_unstake_epoch_progress,
+                params.compute_score_epoch_progress,
             ),
             StewardStateEnum::ComputeInstantUnstake => self.transition_compute_instant_unstake(
                 current_epoch,
@@ -384,6 +395,12 @@ impl StewardStateV2 {
                 current_epoch,
                 current_slot,
                 params.num_epochs_between_scoring,
+            ),
+            StewardStateEnum::RebalanceDirected => self.transition_rebalance_directed(
+                current_epoch,
+                current_slot,
+                params.num_epochs_between_scoring,
+                epoch_progress,
             ),
         }
     }
@@ -437,8 +454,11 @@ impl StewardStateV2 {
         num_epochs_between_scoring: u64,
         epoch_progress: f64,
         min_epoch_progress_for_instant_unstake: f64,
+        min_epoch_progress_for_compute_scores: f64,
     ) -> Result<()> {
         let completed_loop = self.has_flag(REBALANCE);
+        let completed_directed_rebalance = self.has_flag(REBALANCE_DIRECTED_COMPLETE);
+        let completed_compute_delegations = self.has_flag(COMPUTE_DELEGATIONS);
 
         if current_epoch >= self.next_cycle_epoch {
             self.reset_state_for_new_cycle(
@@ -446,6 +466,13 @@ impl StewardStateV2 {
                 current_slot,
                 num_epochs_between_scoring,
             )?;
+        } else if completed_directed_rebalance
+            && !completed_compute_delegations
+            && epoch_progress >= min_epoch_progress_for_compute_scores
+        {
+            self.progress = BitMask::default();
+            self.state_tag = StewardStateEnum::ComputeScores;
+            self.instant_unstake = BitMask::default();
         } else if !completed_loop {
             self.unset_flag(RESET_TO_IDLE);
 
@@ -513,14 +540,42 @@ impl StewardStateV2 {
         Ok(())
     }
 
+    #[inline]
+    fn transition_rebalance_directed(
+        &mut self,
+        current_epoch: u64,
+        current_slot: u64,
+        num_epochs_between_scoring: u64,
+        epoch_progress: f64,
+    ) -> Result<()> {
+        let directed_rebalance_complete = self.has_flag(REBALANCE_DIRECTED_COMPLETE);
+
+        if current_epoch >= self.next_cycle_epoch {
+            self.reset_state_for_new_cycle(
+                current_epoch,
+                current_slot,
+                num_epochs_between_scoring,
+            )?;
+        } else if directed_rebalance_complete {
+            self.progress = BitMask::default();
+            self.state_tag = StewardStateEnum::Idle;
+        } else if epoch_progress >= 0.5 {
+            // Do not stall the state machine if directed rebalance is not complete by the epoch
+            // midpoint, undirected stake should be uninterrupted
+            self.set_flag(REBALANCE_DIRECTED_COMPLETE);
+            self.state_tag = StewardStateEnum::Idle;
+        }
+        Ok(())
+    }
+
     /// Update internal state when transitioning to a new cycle, and ComputeScores restarts
-    fn reset_state_for_new_cycle(
+    pub fn reset_state_for_new_cycle(
         &mut self,
         current_epoch: u64,
         current_slot: u64,
         num_epochs_between_scoring: u64,
     ) -> Result<()> {
-        self.state_tag = StewardStateEnum::ComputeScores;
+        self.state_tag = StewardStateEnum::RebalanceDirected;
         self.scores = [0; MAX_VALIDATORS];
         self.raw_scores = [0; MAX_VALIDATORS];
         self.progress = BitMask::default();
@@ -689,38 +744,9 @@ impl StewardStateV2 {
         index: usize,
         cluster: &ClusterHistory,
         config: &Config,
-        num_pool_validators: u64,
     ) -> Result<Option<ScoreComponentsV4>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
-            let current_slot = clock.slot;
-
-            /* Reset common state if:
-                - it's a new delegation cycle
-                - it's been more than `compute_score_slot_range` slots since compute scores started
-                - computation started last epoch and it's a new epoch
-            */
-            let slots_since_scoring_started = current_slot
-                .checked_sub(self.start_computing_scores_slot)
-                .ok_or(StewardError::ArithmeticError)?;
-            if self.progress.is_empty()
-                || current_epoch > self.current_epoch
-                || slots_since_scoring_started > config.parameters.compute_score_slot_range
-            {
-                self.reset_state_for_new_cycle(
-                    clock.epoch,
-                    clock.slot,
-                    config.parameters.num_epochs_between_scoring,
-                )?;
-                // Updates num_pool_validators at the start of the cycle so validator additions later won't be considered
-
-                require!(
-                    num_pool_validators == self.num_pool_validators + self.validators_added as u64,
-                    StewardError::ListStateMismatch
-                );
-                self.num_pool_validators = num_pool_validators;
-                self.validators_added = 0;
-            }
 
             // Skip scoring if already processed
             if self.progress.get(index)? {
@@ -805,6 +831,7 @@ impl StewardStateV2 {
             return Ok(Some(score_components));
         }
 
+        msg!("Steward state invalid for compute_score");
         Err(StewardError::InvalidState.into())
     }
 
@@ -1082,13 +1109,13 @@ impl StewardStateV2 {
                     instant_unstake_lamports,
                     stake_deposit_unstake_lamports,
                     total_unstake_lamports,
+                    directed_unstake_lamports: _,
                 }) => {
                     if self.validator_lamport_balances[index] != LAMPORT_BALANCE_DEFAULT {
                         self.validator_lamport_balances[index] = self.validator_lamport_balances
                             [index]
                             .saturating_sub(total_unstake_lamports);
                     }
-
                     self.scoring_unstake_total = self
                         .scoring_unstake_total
                         .checked_add(scoring_unstake_lamports)

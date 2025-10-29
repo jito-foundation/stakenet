@@ -52,6 +52,7 @@ pub struct DecreaseComponents {
     pub instant_unstake_lamports: u64,
     pub stake_deposit_unstake_lamports: u64,
     pub total_unstake_lamports: u64,
+    pub directed_unstake_lamports: u64,
 }
 
 #[event]

@@ -921,6 +921,7 @@ async fn _handle_rebalance(
                 clock: solana_sdk::sysvar::clock::id(),
                 stake_history: solana_sdk::sysvar::stake_history::id(),
                 stake_config: stake::config::ID,
+                directed_stake_meta: Pubkey::new_unique(), //TODO: part of on-chain work
             }
             .to_account_metas(None),
             data: jito_steward::instruction::Rebalance {
@@ -1116,8 +1117,15 @@ pub async fn crank_steward(
                     )
                     .await?
                 }
+                StewardStateEnum::RebalanceDirected => {
+                    println!("[Unimplemented] Cranking Rebalance Directed...");
+                    SubmitStats {
+                        successes: 0,
+                        errors: 0,
+                        results: vec![],
+                    }
+                }
             };
-
             return_stats.combine(&stats);
         }
     }

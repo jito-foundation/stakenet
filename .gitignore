@@ -17,4 +17,6 @@ test-ledger
 /scripts
 /data
 notes.md
+**/runbooks
+txtx.yml
 block_keeper.db3
