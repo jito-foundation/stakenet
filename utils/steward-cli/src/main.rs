@@ -46,7 +46,10 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
-use crate::cli_signer::CliSigner;
+use crate::{
+    cli_signer::CliSigner,
+    commands::actions::update_directed_stake_ticket::command_update_directed_stake_ticket,
+};
 
 pub mod cli_signer;
 pub mod commands;
@@ -156,6 +159,9 @@ async fn main() -> Result<()> {
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, program_id).await
+        }
+        Commands::UpdateDirectedStakeTicket(args) => {
+            command_update_directed_stake_ticket(args, &client, program_id).await
         }
 
         // --- Cranks ---

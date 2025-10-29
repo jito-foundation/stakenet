@@ -311,6 +311,8 @@ pub enum Commands {
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
 
+    UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+
     // Cranks
     CrankSteward(CrankSteward),
     CrankEpochMaintenance(CrankEpochMaintenance),
@@ -438,6 +440,20 @@ pub struct UpdateConfig {
 }
 
 #[derive(Parser)]
+#[command(about = "Updates directed stake ticket account")]
+pub(crate) struct UpdateDirectedStakeTicket {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
+    pub vote_pubkeys: Vec<Pubkey>,
+
+    /// Vote accounts of validators to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
+    pub stake_share_bps: Vec<u16>,
+}
+
+#[derive(Parser)]
 #[command(about = "Updates config priority fee parameters")]
 pub struct UpdatePriorityFeeConfig {
     #[command(flatten)]
@@ -503,6 +519,10 @@ pub struct AddToBlacklist {
     /// Squads program ID (defaults to mainnet Squads v4 program)
     #[arg(long, env)]
     pub squads_program_id: Option<Pubkey>,
+}
+
+fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
+    s.parse()
 }
 
 fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
