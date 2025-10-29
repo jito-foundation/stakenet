@@ -8,7 +8,7 @@ anchor-lang = "0.31.1"
 axum = "0.6.2"
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = "0.15.7"
-home = "=0.5.11"
+home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
 jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
@@ -53,7 +53,7 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 validator-history = { path = "programs/validator-history", version = "0.1.0" }
 
 [patch.crates-io]
-home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }
+# home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }
 
 [profile.release]
 overflow-checks = true

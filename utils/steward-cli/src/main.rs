@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
             command_update_validator_list_balance(&client, args, program_id).await
         }
         Commands::UpdateDirectedStakeTicket(args) => {
-            command_update_directed_stake_ticket(args, &client, program_id).await
+            command_update_directed_stake_ticket(args, client, program_id).await
         }
 
         // --- Cranks ---

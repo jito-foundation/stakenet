@@ -2498,10 +2498,11 @@ dependencies = [
 
 [[package]]
 name = "home"
-version = "0.5.11"
-source = "git+https://github.com/rust-lang/cargo?tag=0.78.0#3fe68eabf93cbf3772bbcad09a9206c783e2de3f"
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

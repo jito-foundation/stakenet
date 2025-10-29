@@ -441,7 +441,7 @@ pub struct UpdateConfig {
 
 #[derive(Parser)]
 #[command(about = "Updates directed stake ticket account")]
-pub(crate) struct UpdateDirectedStakeTicket {
+pub struct UpdateDirectedStakeTicket {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 

@@ -1,19 +1,17 @@
 use std::sync::Arc;
 
-use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
-use jito_steward::{DirectedStakePreference, UpdateParametersArgs};
+use anchor_lang::AccountDeserialize;
+use anyhow::anyhow;
+use jito_steward::DirectedStakePreference;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-use stakenet_sdk::utils::{
-    instructions::update_directed_stake_ticket, transactions::configure_instruction,
-};
+use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
 
 use crate::{
-    commands::command_args::{UpdateConfig, UpdateDirectedStakeTicket},
-    utils::transactions::maybe_print_tx,
+    commands::command_args::UpdateDirectedStakeTicket,
+    utils::transactions::{configure_instruction, maybe_print_tx},
 };
 
 pub(crate) async fn command_update_directed_stake_ticket(
@@ -50,11 +48,24 @@ pub(crate) async fn command_update_directed_stake_ticket(
         .iter()
         .zip(args.stake_share_bps)
         .map(|(vote_pubkey, stake_share_bps)| {
-            DirectedStakePreference::new(vote_pubkey, stake_share_bps)
+            DirectedStakePreference::new(*vote_pubkey, stake_share_bps)
         })
         .collect();
 
-    let ix = update_directed_stake_ticket(program_id, steward_config, signer, preferences);
+    let ix = update_directed_stake_ticket(&program_id, &steward_config, &signer, preferences);
+
+    let configured_ix = configure_instruction(
+        &[ix],
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size,
+    );
 
     // If we are printing, do so and return early without requiring the authority keypair
     if maybe_print_tx(
@@ -65,7 +76,8 @@ pub(crate) async fn command_update_directed_stake_ticket(
     }
 
     // Otherwise, send transaction signed by the authority
-    let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)?;
+    let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
+        .map_err(|e| anyhow!("Failed to read keypair file: {e}"))?;
 
     let blockhash = client.get_latest_blockhash().await?;
 

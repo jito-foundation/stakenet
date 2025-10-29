@@ -309,7 +309,6 @@ mod tests {
 
             DirectedStakeTicket {
                 num_preferences: 0,
-                ticket_close_authority: Pubkey::new_unique(),
                 ticket_holder_is_protocol: U8Bool::from(true),
                 ticket_update_authority: authority,
                 staker_preferences,
