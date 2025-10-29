@@ -1127,10 +1127,6 @@
           "type": "pubkey"
         },
         {
-          "name": "ticket_close_authority",
-          "type": "pubkey"
-        },
-        {
           "name": "ticket_holder_is_protocol",
           "type": "bool"
         }
@@ -2535,6 +2531,11 @@
       "code": 6038,
       "name": "DirectedStakeVoteAccountMismatch",
       "msg": "Vote pubkey referenced in directed stake meta index and validator list index do not match"
+    },
+    {
+      "code": 6039,
+      "name": "ValidatorAlreadyRebalanced",
+      "msg": "This validator has already been rebalanced for this epoch for this stake category."
     }
   ],
   "types": [
@@ -2592,6 +2593,17 @@
             "fields": [
               {
                 "name": "SetDirectedStakeWhitelistAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetDirectedStakeMetaUploadAuthority",
+            "fields": [
+              {
+                "name": "SetDirectedStakeMetaUploadAuthority",
                 "type": {
                   "option": "u8"
                 }
@@ -3085,6 +3097,10 @@
             "type": "u64"
           },
           {
+            "name": "directed_unstake_total",
+            "type": "u64"
+          },
+          {
             "name": "padding0",
             "type": {
               "array": [
@@ -3249,14 +3265,7 @@
           {
             "name": "ticket_update_authority",
             "docs": [
-              "Authority that can update the ticket preferences, for now this is the staker itself"
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "ticket_close_authority",
-            "docs": [
-              "Override authority that can close the ticket in the event of whitelist removal due to abuse"
+              "Authority that can update the ticket preferences and close the ticket"
             ],
             "type": "pubkey"
           },
@@ -4307,6 +4316,9 @@
           },
           {
             "name": "Rebalance"
+          },
+          {
+            "name": "RebalanceDirected"
           }
         ]
       }
@@ -4530,16 +4542,9 @@
             "type": {
               "array": [
                 "u8",
-                39994
+                40002
               ]
             }
-          },
-          {
-            "name": "directed_unstake_total",
-            "docs": [
-              "Total lamports that have been due to directed stake unstake this cycle"
-            ],
-            "type": "u64"
           }
         ]
       }
@@ -4754,21 +4759,6 @@
             }
           },
           {
-<<<<<<< HEAD
-            "name": "ComputeDelegations"
-          },
-          {
-            "name": "Idle"
-          },
-          {
-            "name": "ComputeInstantUnstake"
-          },
-          {
-            "name": "Rebalance"
-          },
-          {
-            "name": "RebalanceDirected"
-=======
             "name": "raw_scores",
             "docs": [
               "Raw score without binary filters applied. Used as secondary priority, to determine order for unstaking."
@@ -4779,7 +4769,6 @@
                 5000
               ]
             }
->>>>>>> origin/master
           }
         ]
       }
