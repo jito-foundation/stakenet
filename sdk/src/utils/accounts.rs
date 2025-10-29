@@ -15,7 +15,8 @@ use validator_history::{ClusterHistory, Config as ValidatorHistoryConfig, Valida
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
     stake_pool_utils::{StakePool, ValidatorList},
-    Config as StewardConfig, DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist, StewardStateAccount, StewardStateAccountV2,
+    Config as StewardConfig, DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
+    StewardStateAccount, StewardStateAccountV2,
 };
 
 use solana_sdk::account::Account;
