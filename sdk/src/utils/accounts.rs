@@ -1,13 +1,13 @@
 use anchor_lang::{AccountDeserialize, Discriminator};
 use jito_tip_distribution::state::TipDistributionAccount;
-use solana_account_decoder::UiDataSliceConfig;
+use solana_account_decoder::{UiAccountEncoding, UiDataSliceConfig};
 use solana_client::{
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
-    rpc_filter::{Memcmp, RpcFilterType},
+    rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType},
     rpc_response::RpcVoteAccountInfo,
 };
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use validator_history::{ClusterHistory, ValidatorHistory};
@@ -15,7 +15,8 @@ use validator_history::{ClusterHistory, ValidatorHistory};
 pub type Error = Box<dyn std::error::Error>;
 use jito_steward::{
     stake_pool_utils::{StakePool, ValidatorList},
-    Config as StewardConfig, StewardStateAccount,
+    Config as StewardConfig, DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
+    StewardStateAccount,
 };
 
 use solana_sdk::account::Account;
@@ -266,6 +267,68 @@ pub async fn get_all_steward_accounts(
     }))
 }
 
+/// Fetches and deserializes all [`DirectedStakeTicket`] accounts
+///
+/// This function retrieves all directed stake ticket accounts.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::{str::FromStr, sync::Arc};
+///
+/// use solana_client::nonblocking::rpc_client::RpcClient;
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_tickets;
+///
+/// # async fn example() {
+/// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let tickets = get_directed_stake_tickets(
+///     client,
+///     &program_id
+/// )
+/// .await
+/// .unwrap();
+/// # }
+/// ```
+pub async fn get_directed_stake_tickets(
+    client: Arc<RpcClient>,
+    program_id: &Pubkey,
+) -> Result<Vec<DirectedStakeTicket>, JitoTransactionError> {
+    let discriminator = <DirectedStakeTicket as Discriminator>::DISCRIMINATOR;
+    let memcmp_filter = RpcFilterType::Memcmp(Memcmp::new(
+        0,
+        MemcmpEncodedBytes::Base58(solana_sdk::bs58::encode(discriminator).into_string()),
+    ));
+
+    let accounts = client
+        .get_program_accounts_with_config(
+            program_id,
+            solana_client::rpc_config::RpcProgramAccountsConfig {
+                filters: Some(vec![memcmp_filter]),
+                account_config: solana_client::rpc_config::RpcAccountInfoConfig {
+                    encoding: Some(UiAccountEncoding::Base64),
+                    commitment: Some(CommitmentConfig::confirmed()),
+                    data_slice: None,
+                    min_context_slot: None,
+                },
+                with_context: Some(true),
+                sort_results: None,
+            },
+        )
+        .await?;
+
+    let tickets: Vec<DirectedStakeTicket> = accounts
+        .iter()
+        .filter_map(|(_pda, account)| {
+            DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok()
+        })
+        .collect();
+
+    Ok(tickets)
+}
+
 // ---------------- GET ACCOUNTS ----------------
 
 pub async fn get_steward_config_account(
@@ -362,6 +425,158 @@ pub async fn get_validator_list_account(
         .map(Box::new)
 }
 
+/// Fetches and deserializes the [`DirectedStakeWhitelist`] account
+///
+/// This function retrieves the directed stake whitelist account associated with a given
+/// steward configuration.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::{str::FromStr, sync::Arc};
+///
+/// use solana_client::nonblocking::rpc_client::RpcClient;
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_whitelist;
+///
+/// # async fn example() {
+/// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
+/// let steward_config = Pubkey::from_str("jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv").unwrap();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let whitelist = get_directed_stake_whitelist(
+///     client,
+///     &steward_config,
+///     &program_id
+/// )
+/// .await
+/// .unwrap();
+/// # }
+/// ```
+pub async fn get_directed_stake_whitelist(
+    client: Arc<RpcClient>,
+    steward_config_address: &Pubkey,
+    program_id: &Pubkey,
+) -> Result<DirectedStakeWhitelist, JitoTransactionError> {
+    let directed_stake_whitelist_pda =
+        get_directed_stake_whitelist_address(steward_config_address, program_id);
+
+    let whitelist_account_data = client
+        .get_account_data(&directed_stake_whitelist_pda)
+        .await?;
+
+    let whitelist = DirectedStakeWhitelist::try_deserialize(&mut whitelist_account_data.as_slice())
+        .map_err(|e| {
+            JitoTransactionError::Custom(format!(
+                "Failed to deserialize directed stake whitelist account: {}",
+                e
+            ))
+        })?;
+
+    Ok(whitelist)
+}
+
+/// Fetches and deserializes the [`DirectedStakeMeta`] account
+///
+/// This function retrieves the directed stake meta account associated with a given
+/// steward configuration.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::{str::FromStr, sync::Arc};
+///
+/// use solana_client::nonblocking::rpc_client::RpcClient;
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_meta;
+///
+/// # async fn example() {
+/// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
+/// let steward_config = Pubkey::from_str("jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv").unwrap();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let whitelist = get_directed_stake_meta(
+///     client,
+///     &steward_config,
+///     &program_id
+/// )
+/// .await
+/// .unwrap();
+/// # }
+/// ```
+pub async fn get_directed_stake_meta(
+    client: Arc<RpcClient>,
+    steward_config_address: &Pubkey,
+    program_id: &Pubkey,
+) -> Result<DirectedStakeMeta, JitoTransactionError> {
+    let directed_stake_meta_pda =
+        get_directed_stake_meta_address(steward_config_address, program_id);
+
+    let directed_stake_meta_account_data =
+        client.get_account_data(&directed_stake_meta_pda).await?;
+
+    let directed_stake_meta =
+        DirectedStakeMeta::try_deserialize(&mut directed_stake_meta_account_data.as_slice())
+            .map_err(|e| {
+                JitoTransactionError::Custom(format!(
+                    "Failed to deserialize directed stake meta account: {}",
+                    e
+                ))
+            })?;
+
+    Ok(directed_stake_meta)
+}
+
+/// Fetches and deserializes the [`DirectedStakeTicket`] account
+///
+/// This function retrieves the directed stake ticket account associated with a given
+/// signer address.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::{str::FromStr, sync::Arc};
+///
+/// use solana_client::nonblocking::rpc_client::RpcClient;
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_meta;
+///
+/// # async fn example() {
+/// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
+/// let signer = Pubkey::new_unique();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let whitelist = get_directed_stake_meta(
+///     client,
+///     &signer,
+///     &program_id
+/// )
+/// .await
+/// .unwrap();
+/// # }
+/// ```
+pub async fn get_directed_stake_ticket(
+    client: Arc<RpcClient>,
+    signer_address: &Pubkey,
+    program_id: &Pubkey,
+) -> Result<DirectedStakeTicket, JitoTransactionError> {
+    let directed_stake_meta_pda = get_directed_stake_meta_address(signer_address, program_id);
+
+    let directed_stake_ticket_account_data =
+        client.get_account_data(&directed_stake_meta_pda).await?;
+
+    let directed_stake_ticket =
+        DirectedStakeTicket::try_deserialize(&mut directed_stake_ticket_account_data.as_slice())
+            .map_err(|e| {
+                JitoTransactionError::Custom(format!(
+                    "Failed to deserialize directed stake ticket account: {}",
+                    e
+                ))
+            })?;
+
+    Ok(directed_stake_ticket)
+}
+
 // ---------------- GET ADDRESSES ----------------
 
 pub fn get_steward_state_address(steward_program_id: &Pubkey, steward_config: &Pubkey) -> Pubkey {
@@ -432,4 +647,101 @@ pub fn get_validator_history_config_address(validator_history_program_id: &Pubke
         Pubkey::find_program_address(&[StewardConfig::SEED], validator_history_program_id);
 
     address
+}
+
+/// Derives the Program Derived Address (PDA) for the [`DirectedStakeWhitelist`] account.
+///
+/// This function calculates the deterministic address of the whitelist account
+/// using the steward configuration and program ID.
+///
+/// # Example
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_whitelist_address;
+///
+/// let steward_config = Pubkey::from_str("jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv").unwrap();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let whitelist_address = get_directed_stake_whitelist_address(
+///     &steward_config,
+///     &program_id
+/// );
+///
+/// assert_ne!(whitelist_address, Pubkey::default())
+/// ```
+pub fn get_directed_stake_whitelist_address(
+    steward_config: &Pubkey,
+    program_id: &Pubkey,
+) -> Pubkey {
+    let (address, _bump) = Pubkey::find_program_address(
+        &[DirectedStakeWhitelist::SEED, steward_config.as_ref()],
+        program_id,
+    );
+
+    address
+}
+
+/// Derives the Program Derived Address (PDA) for the [`DirectedStakeMeta`] account.
+///
+/// This function calculates the deterministic address of the directed stake meta account
+/// using the steward configuration and program ID.
+///
+/// # Example
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_meta_address;
+///
+/// let steward_config = Pubkey::from_str("jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv").unwrap();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let directed_stake_meta_address = get_directed_stake_meta_address(
+///     &steward_config,
+///     &program_id
+/// );
+///
+/// assert_ne!(directed_stake_meta_address, Pubkey::default())
+/// ```
+pub fn get_directed_stake_meta_address(steward_config: &Pubkey, program_id: &Pubkey) -> Pubkey {
+    let (directed_stake_meta_pda, _bump) = Pubkey::find_program_address(
+        &[DirectedStakeMeta::SEED, steward_config.as_ref()],
+        program_id,
+    );
+
+    directed_stake_meta_pda
+}
+
+/// Derives the Program Derived Address (PDA) for the [`DirectedStakeTicket`] account.
+///
+/// This function calculates the deterministic address of the directed stake ticket account
+/// using the signer and program ID.
+///
+/// # Example
+///
+/// ```
+/// use std::str::FromStr;
+///
+/// use solana_sdk::pubkey::Pubkey;
+/// use stakenet_sdk::utils::accounts::get_directed_stake_ticket_address;
+///
+/// let signer = Pubkey::new_unique();
+/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
+///
+/// let directed_stake_ticket_address = get_directed_stake_ticket_address(
+///     &signer,
+///     &program_id
+/// );
+///
+/// assert_ne!(directed_stake_ticket_address, Pubkey::default())
+/// ```
+pub fn get_directed_stake_ticket_address(signer: &Pubkey, program_id: &Pubkey) -> Pubkey {
+    let (directed_stake_ticket_pda, _bump) =
+        Pubkey::find_program_address(&[DirectedStakeTicket::SEED, signer.as_ref()], program_id);
+
+    directed_stake_ticket_pda
 }

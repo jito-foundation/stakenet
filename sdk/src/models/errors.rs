@@ -46,3 +46,21 @@ pub enum JitoSendTransactionError {
     #[error("Verbose RPC Error")]
     RpcSimulateTransactionResult(RpcSimulateTransactionResult),
 }
+
+#[derive(ThisError, Debug)]
+pub enum JitoInstructionError {
+    #[error(transparent)]
+    JitoTransactionError(#[from] JitoTransactionError),
+
+    #[error(transparent)]
+    ClientError(#[from] ClientError),
+
+    #[error("An operation caused an overflow/underflow")]
+    ArithmeticError,
+
+    #[error("Failed to parse: {0}")]
+    ParseError(String),
+
+    #[error("Custom: {0}")]
+    Custom(String),
+}
