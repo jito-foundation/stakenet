@@ -43,6 +43,12 @@ pub(crate) async fn command_update_directed_stake_ticket(
             .pubkey()
     };
 
+    if args.vote_pubkeys.len().ne(&args.stake_share_bps.len()) {
+        return Err(anyhow!(
+            "Vote pubkeys and stake share bps should be same length"
+        ));
+    }
+
     let preferences = args
         .vote_pubkeys
         .iter()

@@ -296,10 +296,6 @@ fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
     s.parse()
 }
 
-fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
-    s.parse()
-}
-
 // Add helper to parse a Pubkey from string
 fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
     use std::str::FromStr;

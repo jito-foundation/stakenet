@@ -19,10 +19,7 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
-use crate::{
-    cli_signer::CliSigner,
-    commands::actions::update_directed_stake_ticket::command_update_directed_stake_ticket,
-};
+use crate::commands::actions::update_directed_stake_ticket::command_update_directed_stake_ticket;
 
 pub mod cli_signer;
 pub mod commands;
@@ -38,7 +35,7 @@ async fn main() -> Result<()> {
     ));
 
     let program_id = args.program_id;
-    let global_signer = args.signer.as_deref();
+    let _global_signer = args.signer.as_deref();
     let result = match args.commands {
         Commands::ViewDirectedStakeTickets(args) => {
             command_view_directed_stake_tickets(args, &client, program_id).await

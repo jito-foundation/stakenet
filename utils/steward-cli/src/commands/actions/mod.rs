@@ -19,6 +19,5 @@ pub mod revert_staker;
 pub mod set_staker;
 pub mod update_authority;
 pub mod update_config;
-pub mod update_directed_stake_ticket;
 pub mod update_priority_fee_config;
 pub mod update_validator_list_balance;

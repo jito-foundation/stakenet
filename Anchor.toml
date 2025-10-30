@@ -2,8 +2,8 @@
 resolution = false
 skip-lint = false
 [programs.localnet]
-validator_history = "9dKwzGZJRxcm3Q5n3Ezbp4q9DBq9QcfpCRwk775ksFfF"
-steward = "3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg"
+validator_history = "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa"
+steward = "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8"
 
 [workspace]
 members = [
