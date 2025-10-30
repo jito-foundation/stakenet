@@ -1745,8 +1745,6 @@ dependencies = [
  "solana-sdk",
  "spl-pod",
  "spl-stake-pool",
- "squads-multisig",
- "stakenet-keeper",
  "stakenet-sdk",
  "thiserror 1.0.69",
  "tokio",

@@ -283,7 +283,7 @@ async fn handle_copy_directed_stake_targets(
 
     let ixs = compute_directed_stake_meta(
         client.clone(),
-        &token_mint_address,
+        token_mint_address,
         &all_steward_accounts.stake_pool_address,
         &all_steward_accounts.config_address,
         &keypair.pubkey(),
