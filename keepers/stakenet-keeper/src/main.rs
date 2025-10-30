@@ -60,6 +60,9 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_priority_fee_commission {
         run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
+    if args.run_directed_staking {
+        run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
+    }
 
     run_flags
 }
@@ -408,6 +411,7 @@ fn main() {
             priority_fee_in_microlamports: args.priority_fees,
             steward_program_id: args.steward_program_id,
             steward_config: args.steward_config,
+            token_mint: args.token_mint,
             oracle_authority_keypair,
             gossip_entrypoints: Some(gossip_entrypoints),
             validator_history_interval: args.validator_history_interval,

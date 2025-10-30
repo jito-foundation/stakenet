@@ -673,6 +673,14 @@ pub struct UpdateValidatorListBalance {
 pub struct CrankSteward {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+
+    /// JitoSOL token mint address
+    #[arg(
+        long,
+        env,
+        default_value = "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
+    )]
+    pub token_mint: Pubkey,
 }
 
 #[derive(Parser)]

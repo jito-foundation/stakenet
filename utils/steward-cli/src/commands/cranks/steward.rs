@@ -55,6 +55,7 @@ pub async fn command_crank_steward(
         &all_steward_validator_accounts,
         &all_active_validator_accounts,
         priority_fee,
+        &args.token_mint,
     )
     .await?;
 

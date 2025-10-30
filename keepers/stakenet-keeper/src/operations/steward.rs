@@ -157,6 +157,7 @@ pub async fn run_crank_steward(
             .unwrap(),
         keeper_state.all_active_validator_accounts.as_ref().unwrap(),
         Some(keeper_config.priority_fee_in_microlamports),
+        &keeper_config.token_mint,
     )
     .await
 }
