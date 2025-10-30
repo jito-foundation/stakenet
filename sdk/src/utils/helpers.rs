@@ -99,7 +99,7 @@ impl DirectedRebalanceProgressionInfo {
             {
                 pregression_info.push(DirectedRebalanceProgressionInfo {
                     validator_list_index: validator_list_index as usize,
-                    directed_stake_meta_index: directed_stake_meta_index,
+                    directed_stake_meta_index,
                     vote_account,
                 });
             }

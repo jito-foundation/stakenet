@@ -1,6 +1,5 @@
 pub mod block_metadata;
 pub mod cluster_history;
-pub mod directed_staking;
 pub mod gossip_upload;
 pub mod keeper_operations;
 pub mod metrics_emit;
