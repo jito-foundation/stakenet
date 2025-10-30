@@ -1719,6 +1719,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "directed-staking-cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anyhow",
+ "base64 0.22.1",
+ "bincode",
+ "borsh 1.5.7",
+ "bytemuck",
+ "clap 4.5.51",
+ "dotenvy",
+ "futures",
+ "futures-util",
+ "jito-steward",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "solana-account-decoder 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-client 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-metrics 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-program",
+ "solana-remote-wallet 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-sdk",
+ "spl-pod",
+ "spl-stake-pool",
+ "squads-multisig",
+ "stakenet-keeper",
+ "stakenet-sdk",
+ "thiserror 1.0.69",
+ "tokio",
+ "uriparse",
+ "validator-history",
+]
+
+[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

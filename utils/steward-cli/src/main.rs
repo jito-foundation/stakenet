@@ -160,26 +160,27 @@ async fn main() -> Result<()> {
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, program_id).await
         }
+
         Commands::UpdateDirectedStakeTicket(args) => {
             command_update_directed_stake_ticket(args, client, program_id).await
         }
-
+        _ => todo!(),
         // --- Cranks ---
-        Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
-        Commands::CrankEpochMaintenance(args) => {
-            command_crank_epoch_maintenance(args, &client, program_id).await
-        }
-        Commands::CrankComputeScore(args) => {
-            command_crank_compute_score(args, &client, program_id).await
-        }
-        Commands::CrankComputeDelegations(args) => {
-            command_crank_compute_delegations(args, &client, program_id).await
-        }
-        Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
-        Commands::CrankComputeInstantUnstake(args) => {
-            command_crank_compute_instant_unstake(args, &client, program_id).await
-        }
-        Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
+        // Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
+        // Commands::CrankEpochMaintenance(args) => {
+        //     command_crank_epoch_maintenance(args, &client, program_id).await
+        // }
+        // Commands::CrankComputeScore(args) => {
+        //     command_crank_compute_score(args, &client, program_id).await
+        // }
+        // Commands::CrankComputeDelegations(args) => {
+        //     command_crank_compute_delegations(args, &client, program_id).await
+        // }
+        // Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
+        // Commands::CrankComputeInstantUnstake(args) => {
+        //     command_crank_compute_instant_unstake(args, &client, program_id).await
+        // }
+        // Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
     };
 
     if let Err(e) = result {
