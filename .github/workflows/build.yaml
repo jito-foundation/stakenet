@@ -74,6 +74,20 @@ jobs:
           version: "0.1.57"
       - run: cargo +nightly-2025-02-19 udeps --all-features --all-targets --tests
 
+  build_release:
+    name: build_release
+    runs-on: big-runner-1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Protobuf Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
+      - name: Build release
+        run: cargo build --release --all-features
+
   verified_build:
     name: verified_build
     runs-on: big-runner-1
