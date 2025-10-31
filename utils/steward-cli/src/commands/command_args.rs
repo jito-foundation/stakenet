@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        compute_directed_stake_meta::ComputeDirectedStakeMeta,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
     },
     info::view_directed_stake_ticket::ViewDirectedStakeTicket,
@@ -864,32 +865,4 @@ pub struct InitDirectedStakeTicket {
 
     #[command(flatten)]
     pub transaction_parameters: TransactionParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "Compute directed stake metadata including tickets and JitoSOL balances")]
-pub struct ComputeDirectedStakeMeta {
-    /// Print account information in JSON format
-    #[arg(
-        long,
-        default_value = "false",
-        help = "This will print out account information in JSON format"
-    )]
-    pub print_json: bool,
-
-    /// Copy stake targets on chain
-    #[arg(
-        long,
-        default_value = "false",
-        help = "Whether to copy the computed stake targets on-chain"
-    )]
-    pub copy_targets: bool,
-
-    /// Display progress bar
-    #[arg(long, env, default_value = "false")]
-    pub progress_bar: bool,
-
-    /// Authority keypair path, also used as payer
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
 }

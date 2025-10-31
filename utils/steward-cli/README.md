@@ -543,6 +543,7 @@ cargo r -p directed-staking-cli -- \
 #   Transaction signature: 39iHv6nWkmVremYN1s4EHYxREwattZMjQFSb19dZ5YrC8JN85Tr4e1A5TF5WDq5zVaEMwasmrNwqueLSDBEsUvCd
 #   DirectedStakeTicket account: 4j6nu2W19qimz61VJUHGVQ31fa5skaT1bfSRVUWNVnLJ
 ```
+
 ### Update Stake Ticket
 
 ```bash
@@ -557,6 +558,18 @@ cargo r -p directed-staking-cli -- \
     --vote-pubkey BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
     --stake-share-bps 50
 
+```
+
+### Compute Directed Stake Meta
+
+```bash
+cargo r -p directed-staking-cli -- \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    compute-directed-stake-meta \
+    --steward-config DLLuDbFmQscieKjW88MgtUsYcSRNCGvupEwEQZN36wXi \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --token-mint J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn
 ```
 
 # Deploy and Upgrade

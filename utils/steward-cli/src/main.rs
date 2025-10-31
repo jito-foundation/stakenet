@@ -22,7 +22,6 @@ use commands::{
         update_validator_list_balance::command_update_validator_list_balance,
     },
     command_args::{Args, Commands},
-    compute_directed_stake_meta::command_compute_directed_stake_meta,
     cranks::{
         compute_delegations::command_crank_compute_delegations,
         compute_instant_unstake::command_crank_compute_instant_unstake,
@@ -48,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            compute_directed_stake_meta::command_compute_directed_stake_meta,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         info::view_directed_stake_ticket::command_view_directed_stake_ticket,
