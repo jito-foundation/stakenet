@@ -34,8 +34,9 @@ use stakenet_sdk::{
     },
     utils::{
         accounts::{
-            get_cluster_history_address, get_directed_stake_meta, get_stake_address,
-            get_steward_state_account, get_transient_stake_address, get_validator_history_address,
+            get_cluster_history_address, get_directed_stake_meta, get_directed_stake_meta_address,
+            get_stake_address, get_steward_state_account, get_transient_stake_address,
+            get_validator_history_address,
         },
         helpers::{
             check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
@@ -1003,6 +1004,8 @@ async fn _handle_directed_rebalance(
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, JitoTransactionError> {
+    let directed_stake_meta_address =
+        get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
     let directed_stake_meta_account = get_directed_stake_meta(
         client.clone(),
         &all_steward_accounts.config_address,
@@ -1086,12 +1089,12 @@ async fn _handle_directed_rebalance(
                 clock: solana_sdk::sysvar::clock::id(),
                 stake_history: solana_sdk::sysvar::stake_history::id(),
                 stake_config: stake::config::ID,
-                directed_stake_meta: Pubkey::new_unique(), //TODO: part of on-chain work
+                directed_stake_meta: directed_stake_meta_address,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
-                directed_stake_meta_index: validator_index as u64,
-                validator_list_index: validator_info.directed_stake_meta_index as u64,
+                directed_stake_meta_index: validator_info.directed_stake_meta_index as u64,
+                validator_list_index: validator_index as u64,
             }
             .data(),
         }

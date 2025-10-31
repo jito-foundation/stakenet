@@ -38,7 +38,7 @@ pub struct UpdateDirectedStakeTicket {
     /// Must have the same length as `vote_pubkey`. Each value represents the
     /// desired stake allocation for the corresponding validator.
     ///
-    /// Example: `--stake-sahre-bps 5000,3000,2000` (50%, 30%, 20%)
+    /// Example: `--stake-share-bps 5000,3000,2000` (50%, 30%, 20%)
     #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
     pub stake_share_bps: Vec<u16>,
 }
