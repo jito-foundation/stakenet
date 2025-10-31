@@ -1,4 +1,11 @@
-use crate::commands::command_args::InitDirectedStakeMeta;
+//! Directed Stake Meta Account Initialization
+//!
+//! This command provides functionality to initialize the [`DirectedStakeMeta`] account
+//! in the `jito_steward` program. This account stores metadata for managing directed
+//! stake operations within the steward system.
+
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
@@ -9,8 +16,10 @@ use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
 use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
-use std::sync::Arc;
 
+use crate::commands::command_args::InitDirectedStakeMeta;
+
+/// Initializes the [`DirectedStakeMeta`] account for a given steward configuration.
 pub async fn command_init_directed_stake_meta(
     args: InitDirectedStakeMeta,
     client: &Arc<RpcClient>,
@@ -28,7 +37,6 @@ pub async fn command_init_directed_stake_meta(
     println!("Initializing DirectedStakeMeta...");
     println!("  Authority: {}", authority_pubkey);
     println!("  Steward Config: {}", args.steward_config);
-    println!("  Total Stake Targets: {}", args.total_stake_targets);
     println!("  DirectedStakeMeta PDA: {}", directed_stake_meta_pda);
 
     let instruction = Instruction {

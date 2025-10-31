@@ -7,6 +7,7 @@ use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        migrate_state_to_v2::MigrateStateToV2,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
     },
     info::view_directed_stake_ticket::ViewDirectedStakeTicket,
@@ -295,6 +296,7 @@ pub enum Commands {
     // Actions
     InitSteward(InitSteward),
     ReallocState(ReallocState),
+    MigrateStateToV2(MigrateStateToV2),
 
     SetStaker(SetStaker),
     RevertStaker(RevertStaker),
@@ -828,10 +830,6 @@ pub struct InitDirectedStakeMeta {
     #[arg(long, env)]
     pub steward_config: Pubkey,
 
-    /// Total number of stake targets to be uploaded
-    #[arg(long, env)]
-    pub total_stake_targets: u16,
-
     /// Authority keypair path, also used as payer
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
@@ -854,10 +852,6 @@ pub struct InitDirectedStakeTicket {
     /// Ticket update authority pubkey
     #[arg(long, env)]
     pub ticket_update_authority: Pubkey,
-
-    /// Ticket close authority pubkey
-    #[arg(long, env)]
-    pub ticket_close_authority: Pubkey,
 
     /// Whether the ticket holder is a protocol (default: false)
     #[arg(long, env, default_value = "false")]

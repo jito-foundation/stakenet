@@ -48,6 +48,7 @@ use crate::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
             compute_directed_stake_meta::command_compute_directed_stake_meta,
+            migrate_state_to_v2::command_migrate_state_to_v2,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         info::view_directed_stake_ticket::command_view_directed_stake_ticket,
@@ -122,6 +123,9 @@ async fn main() -> Result<()> {
         Commands::Pause(args) => command_pause(args, &client, program_id).await,
         Commands::Resume(args) => command_resume(args, &client, program_id).await,
         Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
+        Commands::MigrateStateToV2(args) => {
+            command_migrate_state_to_v2(args, &client, program_id).await
+        }
         Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
         Commands::ResetValidatorLamportBalances(args) => {
             command_reset_validator_lamport_balances(args, &client, program_id).await

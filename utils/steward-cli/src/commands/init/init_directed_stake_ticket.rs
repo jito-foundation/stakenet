@@ -1,4 +1,11 @@
-use crate::commands::command_args::InitDirectedStakeTicket;
+//! Directed Stake Ticket Account Initialization
+//!
+//! This command provides functionality to initialize the [`DirectedStakeTicket`] account
+//! in the `jito_steward` program. This account stores metadata for managing directed
+//! stake operations within the steward system.
+
+use std::sync::Arc;
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
 use jito_steward::state::directed_stake::{DirectedStakeTicket, DirectedStakeWhitelist};
@@ -9,7 +16,8 @@ use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
 use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
-use std::sync::Arc;
+
+use crate::commands::command_args::InitDirectedStakeTicket;
 
 pub async fn command_init_directed_stake_ticket(
     args: InitDirectedStakeTicket,
@@ -37,7 +45,6 @@ pub async fn command_init_directed_stake_ticket(
         "  Ticket Update Authority: {}",
         args.ticket_update_authority
     );
-    println!("  Ticket Close Authority: {}", args.ticket_close_authority);
     println!(
         "  Ticket Holder Is Protocol: {}",
         args.ticket_holder_is_protocol

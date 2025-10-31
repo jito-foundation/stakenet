@@ -8,6 +8,7 @@ pub mod instant_remove_validator;
 pub mod manually_copy_all_vote_accounts;
 pub mod manually_copy_vote_accounts;
 pub mod manually_remove_validator;
+pub mod migrate_state_to_v2;
 pub mod pause;
 pub mod remove_bad_validators;
 pub mod remove_from_blacklist;

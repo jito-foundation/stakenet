@@ -47,7 +47,7 @@ pub async fn command_realloc_state(
         match StewardStateAccount::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
             Ok(steward_state_account) => {
                 if steward_state_account.is_initialized.into() {
-                    println!("State account already exists");
+                    println!("State account already exists: {steward_state}");
                     return Ok(());
                 }
             }

@@ -1,3 +1,9 @@
+//! Directed Stake Ticket Update
+//!
+//! This module provides functionality to update the directed stake ticket account in the
+//! `jito_steward` program. The ticket allows specifying stake preferences across multiple
+//! validators with custom stake share allocations.
+
 use std::sync::Arc;
 
 use anchor_lang::AccountDeserialize;
@@ -21,14 +27,27 @@ pub struct UpdateDirectedStakeTicket {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
+    /// Vote accounts of validators to direct stake to (comma-separated)
+    ///
+    /// Example: `--vote-pubkey Vote1111...,Vote2222...,Vote3333...`
     #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
     pub vote_pubkey: Vec<Pubkey>,
 
-    /// Vote accounts of validators to blacklist (comma separated)
+    /// Stake share allocations in basis points for each validator (comma-separated)
+    ///
+    /// Must have the same length as `vote_pubkey`. Each value represents the
+    /// desired stake allocation for the corresponding validator.
+    ///
+    /// Example: `--stake-sahre-bps 5000,3000,2000` (50%, 30%, 20%)
     #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
     pub stake_share_bps: Vec<u16>,
 }
 
+/// Updates the directed stake ticket with new validator stake preferences.
+///
+/// This function creates or updates a directed stake ticket that specifies how stake
+/// should be distributed across multiple validators. Each validator is assigned a stake
+/// share in basis points, allowing precise control over stake allocation.
 pub(crate) async fn command_update_directed_stake_ticket(
     args: UpdateDirectedStakeTicket,
     client: Arc<RpcClient>,

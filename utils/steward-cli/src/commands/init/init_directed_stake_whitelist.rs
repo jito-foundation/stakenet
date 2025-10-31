@@ -1,3 +1,9 @@
+//! Directed Stake Whitelist Account Initialization
+//!
+//! This command provides functionality to initialize the [`DirectedStakeTicket`] account
+//! in the `jito_steward` program. This account stores metadata for managing directed
+//! stake operations within the steward system.
+
 use crate::commands::command_args::InitDirectedStakeWhitelist;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;

@@ -1,3 +1,25 @@
+//! Directed Stake Metadata Computation
+//!
+//! This module provides functionality to compute directed stake metadata in the
+//! `jito_steward` program. This computation aggregates information from directed stake tickets
+//! and JitoSOL token balances to update the system's stake distribution metadata.
+//!
+//! # Overview
+//!
+//! The directed stake metadata computation is an operation that:
+//! - Aggregates all directed stake tickets from validators
+//! - Computes JitoSOL token balances for relevant accounts
+//! - Updates the DirectedStakeMeta account with aggregated information
+//! - Ensures stake distribution reflects current preferences and holdings
+//!
+//! # Process
+//!
+//! 1. Load or determine the authority (keypair for execution, pubkey for printing)
+//! 2. Fetch all steward-related accounts (config, state, stake pool, etc.)
+//! 3. Generate computation instructions via the SDK utility
+//! 4. Configure transaction parameters (priority fee, compute limits)
+//! 5. Either print the transaction or submit it on-chain
+
 use std::sync::Arc;
 
 use anchor_lang::AccountDeserialize;
@@ -27,6 +49,12 @@ pub struct ComputeDirectedStakeMeta {
     pub token_mint: Pubkey,
 }
 
+/// Computes directed stake metadata by aggregating tickets and token balances.
+///
+/// This function executes a computation that updates the [`DirectedStakeMeta`] account
+/// with current information from all directed stake tickets and JitoSOL token
+/// balances. This metadata is essential for the steward system to accurately
+/// distribute stake according to validator preferences and token holder weights.
 pub async fn command_compute_directed_stake_meta(
     args: ComputeDirectedStakeMeta,
     client: &Arc<RpcClient>,
