@@ -37,7 +37,6 @@ pub async fn command_init_directed_stake_ticket(
         "  Ticket Update Authority: {}",
         args.ticket_update_authority
     );
-    println!("  Ticket Close Authority: {}", args.ticket_close_authority);
     println!(
         "  Ticket Holder Is Protocol: {}",
         args.ticket_holder_is_protocol

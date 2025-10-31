@@ -268,8 +268,8 @@ pub async fn get_all_steward_accounts(
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
         reserve_stake_account,
-        directed_stake_meta_account: Box::new(directed_stake_meta_account),
-        directed_stake_meta_address,
+        // directed_stake_meta_account: Box::new(directed_stake_meta_account),
+        // directed_stake_meta_address,
     }))
 }
 
@@ -566,7 +566,7 @@ pub async fn get_directed_stake_ticket(
     signer_address: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<DirectedStakeTicket, JitoTransactionError> {
-    let directed_stake_meta_pda = get_directed_stake_meta_address(signer_address, program_id);
+    let directed_stake_meta_pda = get_directed_stake_ticket_address(signer_address, program_id);
 
     let directed_stake_ticket_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;

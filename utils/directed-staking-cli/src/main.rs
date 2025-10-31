@@ -19,7 +19,18 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
-use crate::commands::actions::update_directed_stake_ticket::command_update_directed_stake_ticket;
+use crate::commands::{
+    actions::{
+        add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+        realloc_directed_stake_meta::command_realloc_directed_stake_meta,
+        realloc_directed_stake_whitelist::command_realloc_directed_stake_whitelist,
+        update_directed_stake_ticket::command_update_directed_stake_ticket,
+    },
+    info::{
+        view_config::command_view_config,
+        view_directed_stake_ticket::command_view_directed_stake_ticket,
+    },
+};
 
 pub mod cli_signer;
 pub mod commands;
@@ -37,8 +48,12 @@ async fn main() -> Result<()> {
     let program_id = args.program_id;
     let _global_signer = args.signer.as_deref();
     let result = match args.commands {
+        Commands::ViewConfig(args) => command_view_config(args, &client, program_id).await,
         Commands::ViewDirectedStakeTickets(args) => {
             command_view_directed_stake_tickets(args, &client, program_id).await
+        }
+        Commands::ViewDirectedStakeTicket(args) => {
+            command_view_directed_stake_ticket(args, &client, program_id).await
         }
         Commands::ViewDirectedStakeWhitelist(args) => {
             command_view_directed_stake_whitelist(args, &client, program_id).await
@@ -52,14 +67,23 @@ async fn main() -> Result<()> {
         Commands::InitDirectedStakeMeta(args) => {
             command_init_directed_stake_meta(args, &client, program_id).await
         }
+        Commands::ReallocDirectedStakeMeta(args) => {
+            command_realloc_directed_stake_meta(args, &client, program_id).await
+        }
         Commands::InitDirectedStakeWhitelist(args) => {
             command_init_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::ReallocDirectedStakeWhitelist(args) => {
+            command_realloc_directed_stake_whitelist(args, &client, program_id).await
         }
         Commands::InitDirectedStakeTicket(args) => {
             command_init_directed_stake_ticket(args, &client, program_id).await
         }
         Commands::UpdateDirectedStakeTicket(args) => {
             command_update_directed_stake_ticket(args, client, program_id).await
+        }
+        Commands::AddToDirectedStakeWhitelist(args) => {
+            command_add_to_directed_stake_whitelist(args, &client, program_id).await
         }
     };
 

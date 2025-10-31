@@ -93,16 +93,16 @@ impl DirectedRebalanceProgressionInfo {
             let vote_account = all_steward_accounts.validator_list_account.validators
                 [validator_list_index as usize]
                 .vote_account_address;
-            if let Some(directed_stake_meta_index) = all_steward_accounts
-                .directed_stake_meta_account
-                .get_target_index(&vote_account)
-            {
-                pregression_info.push(DirectedRebalanceProgressionInfo {
-                    validator_list_index: validator_list_index as usize,
-                    directed_stake_meta_index,
-                    vote_account,
-                });
-            }
+            // if let Some(directed_stake_meta_index) = all_steward_accounts
+            //     .directed_stake_meta_account
+            //     .get_target_index(&vote_account)
+            // {
+            //     pregression_info.push(DirectedRebalanceProgressionInfo {
+            //         validator_list_index: validator_list_index as usize,
+            //         directed_stake_meta_index,
+            //         vote_account,
+            //     });
+            // }
         }
 
         pregression_info

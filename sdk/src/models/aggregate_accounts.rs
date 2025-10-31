@@ -21,12 +21,11 @@ pub struct AllStewardAccounts {
     pub validator_list_account: Box<ValidatorList>,
     pub validator_list_address: Pubkey,
     pub reserve_stake_account: Account,
+    // Directed stake meta account
+    // pub directed_stake_meta_account: Box<DirectedStakeMeta>,
 
-    /// Directed stake meta account
-    pub directed_stake_meta_account: Box<DirectedStakeMeta>,
-
-    /// Directed stake meta address
-    pub directed_stake_meta_address: Pubkey,
+    // Directed stake meta address
+    // pub directed_stake_meta_address: Pubkey,
 }
 
 #[derive(Default)]

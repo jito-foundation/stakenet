@@ -268,14 +268,19 @@ pub struct ViewParameters {
 // ---------- COMMANDS ------------
 #[derive(Subcommand)]
 pub enum Commands {
+    ViewConfig(ViewConfig),
     ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
     InitDirectedStakeMeta(InitDirectedStakeMeta),
+    ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
     InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    ReallocDirectedStakeWhitelist(ReallocDirectedStakeWhitelist),
     InitDirectedStakeTicket(InitDirectedStakeTicket),
     UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
 }
 
 #[derive(Parser)]
@@ -303,6 +308,18 @@ fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError>
 }
 
 #[derive(Parser)]
+#[command(about = "View Config")]
+pub struct ViewConfig {
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub config: Pubkey,
+}
+
+#[derive(Parser)]
 #[command(about = "View DirectedStakeTickets using memcmp filter for discriminator")]
 pub struct ViewDirectedStakeTickets {
     /// Print account information in JSON format
@@ -312,6 +329,14 @@ pub struct ViewDirectedStakeTickets {
         help = "This will print out account information in JSON format"
     )]
     pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeTicket account")]
+pub struct ViewDirectedStakeTicket {
+    /// Directed stake ticket address
+    #[arg(long)]
+    pub ticket_signer: Pubkey,
 }
 
 #[derive(Parser)]
@@ -362,16 +387,29 @@ pub struct InitDirectedStakeWhitelist {
 }
 
 #[derive(Parser)]
+#[command(about = "Reallocate Directed Stake Whitelist account")]
+pub struct ReallocDirectedStakeWhitelist {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Reallocate Directed Stake Meta account")]
+pub struct ReallocDirectedStakeMeta {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+#[derive(Parser)]
 #[command(about = "Initialize DirectedStakeMeta account")]
 pub struct InitDirectedStakeMeta {
     /// Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,
 
-    /// Total number of stake targets to be uploaded
-    #[arg(long, env)]
-    pub total_stake_targets: u16,
-
+    // Total number of stake targets to be uploaded
+    // #[arg(long, env)]
+    // pub total_stake_targets: u16,
     /// Authority keypair path, also used as payer
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
@@ -395,13 +433,32 @@ pub struct InitDirectedStakeTicket {
     #[arg(long, env)]
     pub ticket_update_authority: Pubkey,
 
-    /// Ticket close authority pubkey
-    #[arg(long, env)]
-    pub ticket_close_authority: Pubkey,
-
     /// Whether the ticket holder is a protocol (default: false)
     #[arg(long, env, default_value = "false")]
     pub ticket_holder_is_protocol: bool,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Add to Directed stake whitelist")]
+pub struct AddToDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long)]
+    pub steward_config: Pubkey,
+
+    /// Record type
+    #[arg(long)]
+    pub record_type: String,
+
+    /// Record
+    #[arg(long)]
+    pub record: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
 
     #[command(flatten)]
     pub transaction_parameters: TransactionParameters,

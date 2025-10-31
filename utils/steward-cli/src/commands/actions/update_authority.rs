@@ -2,9 +2,6 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-
-use crate::commands::command_args::UpdateAuthority;
-use crate::utils::transactions::maybe_print_tx;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::{
@@ -12,13 +9,18 @@ use solana_sdk::{
 };
 use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
 
+use crate::{
+    commands::command_args::{AuthoritySubcommand, UpdateAuthority},
+    utils::transactions::maybe_print_tx,
+};
+
 pub async fn command_update_authority(
     args: UpdateAuthority,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
     let (permissioned_parameters, new_authority, authority_type) = match args.command {
-        crate::commands::command_args::AuthoritySubcommand::Blacklist {
+        AuthoritySubcommand::Blacklist {
             permissioned_parameters,
             new_authority,
         } => (
@@ -26,7 +28,7 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetBlacklistAuthority,
         ),
-        crate::commands::command_args::AuthoritySubcommand::Admin {
+        AuthoritySubcommand::Admin {
             permissioned_parameters,
             new_authority,
         } => (
@@ -34,7 +36,7 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetAdmin,
         ),
-        crate::commands::command_args::AuthoritySubcommand::Parameters {
+        AuthoritySubcommand::Parameters {
             permissioned_parameters,
             new_authority,
         } => (
@@ -42,13 +44,29 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetParametersAuthority,
         ),
-        crate::commands::command_args::AuthoritySubcommand::PriorityFeeParameters {
+        AuthoritySubcommand::PriorityFeeParameters {
             permissioned_parameters,
             new_authority,
         } => (
             permissioned_parameters,
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetPriorityFeeParameterAuthority,
+        ),
+        AuthoritySubcommand::DirectedStakeMetaUpload {
+            permissioned_parameters,
+            new_authority,
+        } => (
+            permissioned_parameters,
+            new_authority,
+            jito_steward::instructions::set_new_authority::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        ),
+        AuthoritySubcommand::DirectedStakeWhitelist {
+            permissioned_parameters,
+            new_authority,
+        } => (
+            permissioned_parameters,
+            new_authority,
+            jito_steward::instructions::set_new_authority::AuthorityType::SetDirectedStakeWhitelistAuthority,
         ),
     };
 

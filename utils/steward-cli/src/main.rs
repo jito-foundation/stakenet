@@ -73,30 +73,30 @@ async fn main() -> Result<()> {
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
-        Commands::ViewDirectedStakeTickets(args) => {
-            command_view_directed_stake_tickets(args, &client, program_id).await
-        }
-        Commands::ViewDirectedStakeWhitelist(args) => {
-            command_view_directed_stake_whitelist(args, &client, program_id).await
-        }
-        Commands::ViewDirectedStakeMeta(args) => {
-            command_view_directed_stake_meta(args, &client, program_id).await
-        }
+        // Commands::ViewDirectedStakeTickets(args) => {
+        //     command_view_directed_stake_tickets(args, &client, program_id).await
+        // }
+        // Commands::ViewDirectedStakeWhitelist(args) => {
+        //     command_view_directed_stake_whitelist(args, &client, program_id).await
+        // }
+        // Commands::ViewDirectedStakeMeta(args) => {
+        //     command_view_directed_stake_meta(args, &client, program_id).await
+        // }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, program_id).await
         }
-        Commands::ComputeDirectedStakeMeta(args) => {
-            command_compute_directed_stake_meta(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeMeta(args) => {
-            command_init_directed_stake_meta(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeWhitelist(args) => {
-            command_init_directed_stake_whitelist(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeTicket(args) => {
-            command_init_directed_stake_ticket(args, &client, program_id).await
-        }
+        // Commands::ComputeDirectedStakeMeta(args) => {
+        //     command_compute_directed_stake_meta(args, &client, program_id).await
+        // }
+        // Commands::InitDirectedStakeMeta(args) => {
+        //     command_init_directed_stake_meta(args, &client, program_id).await
+        // }
+        // Commands::InitDirectedStakeWhitelist(args) => {
+        //     command_init_directed_stake_whitelist(args, &client, program_id).await
+        // }
+        // Commands::InitDirectedStakeTicket(args) => {
+        //     command_init_directed_stake_ticket(args, &client, program_id).await
+        // }
 
         // --- Helpers ---
         Commands::ManuallyCopyVoteAccount(args) => {
@@ -159,21 +159,22 @@ async fn main() -> Result<()> {
         }
 
         // --- Cranks ---
-        Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
-        Commands::CrankEpochMaintenance(args) => {
-            command_crank_epoch_maintenance(args, &client, program_id).await
-        }
-        Commands::CrankComputeScore(args) => {
-            command_crank_compute_score(args, &client, program_id).await
-        }
-        Commands::CrankComputeDelegations(args) => {
-            command_crank_compute_delegations(args, &client, program_id).await
-        }
-        Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
-        Commands::CrankComputeInstantUnstake(args) => {
-            command_crank_compute_instant_unstake(args, &client, program_id).await
-        }
-        Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
+        // Commands::CrankSteward(args) => command_crank_steward(args, &client, program_id).await,
+        // Commands::CrankEpochMaintenance(args) => {
+        //     command_crank_epoch_maintenance(args, &client, program_id).await
+        // }
+        // Commands::CrankComputeScore(args) => {
+        //     command_crank_compute_score(args, &client, program_id).await
+        // }
+        // Commands::CrankComputeDelegations(args) => {
+        //     command_crank_compute_delegations(args, &client, program_id).await
+        // }
+        // Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
+        // Commands::CrankComputeInstantUnstake(args) => {
+        //     command_crank_compute_instant_unstake(args, &client, program_id).await
+        // }
+        // Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
+        _ => todo!(),
     };
 
     if let Err(e) = result {

@@ -28,7 +28,7 @@ pub async fn command_init_directed_stake_meta(
     println!("Initializing DirectedStakeMeta...");
     println!("  Authority: {}", authority_pubkey);
     println!("  Steward Config: {}", args.steward_config);
-    println!("  Total Stake Targets: {}", args.total_stake_targets);
+    // println!("  Total Stake Targets: {}", args.total_stake_targets);
     println!("  DirectedStakeMeta PDA: {}", directed_stake_meta_pda);
 
     let instruction = Instruction {

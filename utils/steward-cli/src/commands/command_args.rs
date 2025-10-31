@@ -273,14 +273,14 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
-    ViewDirectedStakeTickets(ViewDirectedStakeTickets),
-    ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
-    ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    // ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    // ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
+    // ViewDirectedStakeMeta(ViewDirectedStakeMeta),
     GetJitosolBalance(GetJitosolBalance),
-    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
-    InitDirectedStakeMeta(InitDirectedStakeMeta),
-    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
-    InitDirectedStakeTicket(InitDirectedStakeTicket),
+    // ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
+    // InitDirectedStakeMeta(InitDirectedStakeMeta),
+    // InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    // InitDirectedStakeTicket(InitDirectedStakeTicket),
 
     // Actions
     InitSteward(InitSteward),
@@ -421,6 +421,20 @@ pub enum AuthoritySubcommand {
     },
     /// Manages priority fee parameters authority
     PriorityFeeParameters {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages directed stake meta upload authority
+    DirectedStakeMetaUpload {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages directed stake whitelist authority
+    DirectedStakeWhitelist {
         #[command(flatten)]
         permissioned_parameters: PermissionedParameters,
         #[arg(long, env)]

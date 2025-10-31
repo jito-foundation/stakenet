@@ -1,27 +1,19 @@
-use crate::commands::command_args::ViewDirectedStakeMeta;
+use std::sync::Arc;
+
 use anyhow::Result;
-use bytemuck::from_bytes;
-use jito_steward::state::directed_stake::DirectedStakeMeta;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use std::sync::Arc;
+use stakenet_sdk::utils::accounts::get_directed_stake_meta;
+
+use crate::commands::command_args::ViewDirectedStakeMeta;
 
 pub async fn command_view_directed_stake_meta(
     args: ViewDirectedStakeMeta,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let (directed_stake_meta_pda, _bump) = Pubkey::find_program_address(
-        &[DirectedStakeMeta::SEED, args.steward_config.as_ref()],
-        &program_id,
-    );
-
-    println!("Fetching DirectedStakeMeta account...");
-    println!("  Steward Config: {}", args.steward_config);
-    println!("  DirectedStakeMeta PDA: {}", directed_stake_meta_pda);
-
-    let account = client.get_account(&directed_stake_meta_pda).await?;
-    let stake_meta = from_bytes::<DirectedStakeMeta>(&account.data);
+    let stake_meta =
+        get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
 
     println!("\n📊 DirectedStakeMeta Information:");
 
