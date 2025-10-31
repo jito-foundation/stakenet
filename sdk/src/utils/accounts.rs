@@ -233,6 +233,7 @@ pub async fn get_steward_history_accounts(
     Ok(map)
 }
 
+/// Get all accounts related to `jito_steward` program
 pub async fn get_all_steward_accounts(
     client: &Arc<RpcClient>,
     program_id: &Pubkey,
@@ -559,7 +560,7 @@ pub async fn get_directed_stake_ticket(
     signer_address: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<DirectedStakeTicket, JitoTransactionError> {
-    let directed_stake_meta_pda = get_directed_stake_meta_address(signer_address, program_id);
+    let directed_stake_meta_pda = get_directed_stake_ticket_address(signer_address, program_id);
 
     let directed_stake_ticket_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;

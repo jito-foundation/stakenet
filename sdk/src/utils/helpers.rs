@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeTicket};
+use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStakeTicket};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
 use spl_associated_token_account::get_associated_token_address;
@@ -69,6 +69,44 @@ pub fn get_unprogressed_validators(
             }
         })
         .collect::<Vec<ProgressionInfo>>()
+}
+
+pub struct DirectedRebalanceProgressionInfo {
+    /// Validator index
+    pub validator_list_index: usize,
+
+    /// Directed stake meta index
+    pub directed_stake_meta_index: usize,
+
+    /// Vote account pubkey
+    pub vote_account: Pubkey,
+}
+
+impl DirectedRebalanceProgressionInfo {
+    pub fn get_directed_staking_validators(
+        all_steward_accounts: &AllStewardAccounts,
+        directed_stake_meta: &DirectedStakeMeta,
+    ) -> Vec<DirectedRebalanceProgressionInfo> {
+        let mut progression_info = Vec::new();
+
+        for validator_list_index in 0..all_steward_accounts.state_account.state.num_pool_validators
+        {
+            let vote_account = all_steward_accounts.validator_list_account.validators
+                [validator_list_index as usize]
+                .vote_account_address;
+            if let Some(directed_stake_meta_index) =
+                directed_stake_meta.get_target_index(&vote_account)
+            {
+                progression_info.push(DirectedRebalanceProgressionInfo {
+                    validator_list_index: validator_list_index as usize,
+                    directed_stake_meta_index,
+                    vote_account,
+                });
+            }
+        }
+
+        progression_info
+    }
 }
 
 // ------------------- VALIDATOR CHECKS -------------------
