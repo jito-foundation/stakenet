@@ -3,6 +3,18 @@ use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
+use crate::commands::{
+    actions::{
+        add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        update_directed_stake_ticket::UpdateDirectedStakeTicket,
+    },
+    info::view_directed_stake_ticket::ViewDirectedStakeTicket,
+    init::{
+        realloc_directed_stake_meta::ReallocDirectedStakeMeta,
+        realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
+    },
+};
+
 #[derive(Parser)]
 #[command(about = "CLI for the steward program", version)]
 pub struct Args {
@@ -274,13 +286,10 @@ pub enum Commands {
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
     GetJitosolBalance(GetJitosolBalance),
-    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
-    InitDirectedStakeMeta(InitDirectedStakeMeta),
-    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
-    InitDirectedStakeTicket(InitDirectedStakeTicket),
 
     // Actions
     InitSteward(InitSteward),
@@ -310,6 +319,15 @@ pub enum Commands {
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
+
+    InitDirectedStakeMeta(InitDirectedStakeMeta),
+    ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
+    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    ReallocDirectedStakeWhitelist(ReallocDirectedStakeWhitelist),
+    InitDirectedStakeTicket(InitDirectedStakeTicket),
+    AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
+    UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
 
     // Cranks
     CrankSteward(CrankSteward),
@@ -519,12 +537,16 @@ pub struct AddToBlacklist {
     pub squads_program_id: Option<Pubkey>,
 }
 
-fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+pub(crate) fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
+    s.parse()
+}
+
+pub(crate) fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
     s.parse()
 }
 
 // Add helper to parse a Pubkey from string
-fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+pub(crate) fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
     use std::str::FromStr;
     Pubkey::from_str(s)
 }

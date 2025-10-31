@@ -8,9 +8,6 @@ use commands::{
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
         close_steward::command_close_steward,
-        init_directed_stake_meta::command_init_directed_stake_meta,
-        init_directed_stake_ticket::command_init_directed_stake_ticket,
-        init_directed_stake_whitelist::command_init_directed_stake_whitelist,
         instant_remove_validator::command_instant_remove_validator,
         manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
@@ -46,7 +43,23 @@ use commands::{
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
-use crate::cli_signer::CliSigner;
+use crate::{
+    cli_signer::CliSigner,
+    commands::{
+        actions::{
+            add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            update_directed_stake_ticket::command_update_directed_stake_ticket,
+        },
+        info::view_directed_stake_ticket::command_view_directed_stake_ticket,
+        init::{
+            init_directed_stake_meta::command_init_directed_stake_meta,
+            init_directed_stake_ticket::command_init_directed_stake_ticket,
+            init_directed_stake_whitelist::command_init_directed_stake_whitelist,
+            realloc_directed_stake_meta::command_realloc_directed_stake_meta,
+            realloc_directed_stake_whitelist::command_realloc_directed_stake_whitelist,
+        },
+    },
+};
 
 pub mod cli_signer;
 pub mod commands;
@@ -73,6 +86,9 @@ async fn main() -> Result<()> {
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, program_id).await
         }
+        Commands::ViewDirectedStakeTicket(args) => {
+            command_view_directed_stake_ticket(args, &client, program_id).await
+        }
         Commands::ViewDirectedStakeTickets(args) => {
             command_view_directed_stake_tickets(args, &client, program_id).await
         }
@@ -84,18 +100,6 @@ async fn main() -> Result<()> {
         }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, program_id).await
-        }
-        Commands::ComputeDirectedStakeMeta(args) => {
-            command_compute_directed_stake_meta(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeMeta(args) => {
-            command_init_directed_stake_meta(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeWhitelist(args) => {
-            command_init_directed_stake_whitelist(args, &client, program_id).await
-        }
-        Commands::InitDirectedStakeTicket(args) => {
-            command_init_directed_stake_ticket(args, &client, program_id).await
         }
 
         // --- Helpers ---
@@ -156,6 +160,30 @@ async fn main() -> Result<()> {
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, program_id).await
+        }
+        Commands::InitDirectedStakeMeta(args) => {
+            command_init_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::ReallocDirectedStakeMeta(args) => {
+            command_realloc_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::InitDirectedStakeWhitelist(args) => {
+            command_init_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::ReallocDirectedStakeWhitelist(args) => {
+            command_realloc_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::InitDirectedStakeTicket(args) => {
+            command_init_directed_stake_ticket(args, &client, program_id).await
+        }
+        Commands::AddToDirectedStakeWhitelist(args) => {
+            command_add_to_directed_stake_whitelist(args, &client, program_id).await
+        }
+        Commands::UpdateDirectedStakeTicket(args) => {
+            command_update_directed_stake_ticket(args, client.clone(), program_id).await
+        }
+        Commands::ComputeDirectedStakeMeta(args) => {
+            command_compute_directed_stake_meta(args, &client, program_id).await
         }
 
         // --- Cranks ---

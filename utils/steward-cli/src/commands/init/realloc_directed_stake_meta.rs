@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
+use clap::Parser;
 use jito_steward::{constants::MAX_ALLOC_BYTES, StewardStateAccount, StewardStateAccountV2};
 use solana_client::nonblocking::rpc_client::RpcClient;
 
@@ -15,18 +16,25 @@ use solana_sdk::{
 
 use stakenet_sdk::utils::{
     accounts::{
-        get_directed_stake_whitelist_address, get_stake_pool_account, get_steward_config_account,
+        get_directed_stake_meta_address, get_stake_pool_account, get_steward_config_account,
         get_steward_state_address,
     },
     transactions::{configure_instruction, print_base58_tx},
 };
 
-use crate::commands::command_args::ReallocDirectedStakeWhitelist;
+use crate::commands::command_args::PermissionedParameters;
 
 const REALLOCS_PER_TX: usize = 10;
 
-pub async fn command_realloc_directed_stake_whitelist(
-    args: ReallocDirectedStakeWhitelist,
+#[derive(Parser)]
+#[command(about = "Reallocate Directed Stake Meta account")]
+pub struct ReallocDirectedStakeMeta {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+}
+
+pub async fn command_realloc_directed_stake_meta(
+    args: ReallocDirectedStakeMeta,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
@@ -45,8 +53,7 @@ pub async fn command_realloc_directed_stake_whitelist(
 
     let validator_list = stake_pool_account.validator_list;
 
-    let directed_staking_whitelist =
-        get_directed_stake_whitelist_address(&steward_config, &program_id);
+    let directed_staking_meta = get_directed_stake_meta_address(&steward_config, &program_id);
 
     let steward_state_account_raw = client.get_account(&steward_state).await?;
 
@@ -78,7 +85,7 @@ pub async fn command_realloc_directed_stake_whitelist(
             client,
             &program_id,
             &authority,
-            directed_staking_whitelist,
+            directed_staking_meta,
             &steward_config,
             &validator_list,
             reallocs_per_transaction,
@@ -114,7 +121,7 @@ async fn _realloc_x_times(
     client: &RpcClient,
     program_id: &Pubkey,
     authority: &Keypair,
-    directed_stake_whitelist: Pubkey,
+    directed_stake_meta: Pubkey,
     steward_config: &Pubkey,
     validator_list: &Pubkey,
     count: usize,
@@ -126,15 +133,15 @@ async fn _realloc_x_times(
     let ixs = vec![
         Instruction {
             program_id: *program_id,
-            accounts: jito_steward::accounts::ReallocDirectedStakeWhitelist {
-                directed_stake_whitelist,
+            accounts: jito_steward::accounts::ReallocDirectedStakeMeta {
+                directed_stake_meta,
                 config: *steward_config,
                 validator_list: *validator_list,
                 system_program: anchor_lang::solana_program::system_program::id(),
                 signer: authority.pubkey(),
             }
             .to_account_metas(None),
-            data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
+            data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
         };
         count
     ];

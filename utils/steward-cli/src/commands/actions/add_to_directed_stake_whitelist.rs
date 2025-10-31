@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use jito_steward::DirectedStakeRecordType;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
@@ -13,7 +14,30 @@ use stakenet_sdk::utils::{
     transactions::{configure_instruction, print_base58_tx},
 };
 
-use crate::commands::command_args::AddToDirectedStakeWhitelist;
+use crate::commands::command_args::TransactionParameters;
+
+#[derive(Parser)]
+#[command(about = "Add to Directed stake whitelist")]
+pub struct AddToDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long)]
+    pub steward_config: Pubkey,
+
+    /// Record type
+    #[arg(long)]
+    pub record_type: String,
+
+    /// Record
+    #[arg(long)]
+    pub record: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
 
 pub async fn command_add_to_directed_stake_whitelist(
     args: AddToDirectedStakeWhitelist,

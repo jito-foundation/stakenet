@@ -1,10 +1,8 @@
 pub mod add_to_blacklist;
+pub mod add_to_directed_stake_whitelist;
 pub mod auto_add_validator_from_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_steward;
-pub mod init_directed_stake_meta;
-pub mod init_directed_stake_ticket;
-pub mod init_directed_stake_whitelist;
 pub mod instant_remove_validator;
 pub mod manually_copy_all_vote_accounts;
 pub mod manually_copy_vote_accounts;
@@ -19,5 +17,6 @@ pub mod revert_staker;
 pub mod set_staker;
 pub mod update_authority;
 pub mod update_config;
+pub mod update_directed_stake_ticket;
 pub mod update_priority_fee_config;
 pub mod update_validator_list_balance;

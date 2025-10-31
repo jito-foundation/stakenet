@@ -1,11 +1,18 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use stakenet_sdk::utils::accounts::get_directed_stake_ticket;
 
-use crate::commands::command_args::ViewDirectedStakeTicket;
+#[derive(Parser)]
+#[command(about = "View DirectedStakeTicket account")]
+pub struct ViewDirectedStakeTicket {
+    /// Directed stake ticket address
+    #[arg(long)]
+    pub ticket_signer: Pubkey,
+}
 
 pub async fn command_view_directed_stake_ticket(
     args: ViewDirectedStakeTicket,

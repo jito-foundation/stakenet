@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anchor_lang::AccountDeserialize;
 use anyhow::anyhow;
+use clap::Parser;
 use jito_steward::DirectedStakePreference;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -10,9 +11,23 @@ use solana_sdk::{
 use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
 
 use crate::{
-    commands::command_args::UpdateDirectedStakeTicket,
+    commands::command_args::{parse_pubkey, parse_u16, PermissionedParameters},
     utils::transactions::{configure_instruction, maybe_print_tx},
 };
+
+#[derive(Parser)]
+#[command(about = "Updates directed stake ticket account")]
+pub struct UpdateDirectedStakeTicket {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
+    pub vote_pubkey: Vec<Pubkey>,
+
+    /// Vote accounts of validators to blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
+    pub stake_share_bps: Vec<u16>,
+}
 
 pub(crate) async fn command_update_directed_stake_ticket(
     args: UpdateDirectedStakeTicket,
@@ -43,14 +58,14 @@ pub(crate) async fn command_update_directed_stake_ticket(
             .pubkey()
     };
 
-    if args.vote_pubkeys.len().ne(&args.stake_share_bps.len()) {
+    if args.vote_pubkey.len().ne(&args.stake_share_bps.len()) {
         return Err(anyhow!(
             "Vote pubkeys and stake share bps should be same length"
         ));
     }
 
     let preferences = args
-        .vote_pubkeys
+        .vote_pubkey
         .iter()
         .zip(args.stake_share_bps)
         .map(|(vote_pubkey, stake_share_bps)| {
