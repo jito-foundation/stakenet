@@ -17,8 +17,8 @@ futures-util = "0.3.21"
 home = "=0.5.11"
 http = { version = "0.2.1" }
 ipinfo = "3.1.1"
-jito-steward = { path = "programs/steward", features = ["no-entrypoint"]  }
 jito-priority-fee-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
+jito-steward = { path = "programs/steward", features = ["no-entrypoint"] }
 jito-tip-distribution = { features = ["no-entrypoint"], git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
 jito-tip-distribution-sdk = { git = "https://github.com/jito-foundation/jito-programs", branch = "master" }
 log = "0.4.18"

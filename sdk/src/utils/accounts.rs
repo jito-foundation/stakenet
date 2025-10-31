@@ -253,10 +253,6 @@ pub async fn get_all_steward_accounts(
     let reserve_stake_address = stake_pool_account.reserve_stake;
     let reserve_stake_account = client.get_account(&reserve_stake_address).await?;
 
-    let directed_stake_meta_address = get_directed_stake_meta_address(steward_config, program_id);
-    let directed_stake_meta_account =
-        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
-
     Ok(Box::new(AllStewardAccounts {
         stake_pool_account,
         config_address: *steward_config,
@@ -268,8 +264,6 @@ pub async fn get_all_steward_accounts(
         state_account: get_steward_state_account(client, program_id, steward_config).await?,
         state_address: steward_state_address,
         reserve_stake_account,
-        // directed_stake_meta_account: Box::new(directed_stake_meta_account),
-        // directed_stake_meta_address,
     }))
 }
 

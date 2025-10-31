@@ -34,11 +34,11 @@ use stakenet_sdk::{
     },
     utils::{
         accounts::{
-            get_cluster_history_address, get_stake_address, get_steward_state_account,
-            get_transient_stake_address, get_validator_history_address,
+            get_cluster_history_address, get_directed_stake_meta, get_stake_address,
+            get_steward_state_account, get_transient_stake_address, get_validator_history_address,
         },
         helpers::{
-            DirectedRebalanceProgressionInfo, {check_stake_accounts, get_unprogressed_validators},
+            check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
         },
         instructions::compute_directed_stake_meta,
         transactions::{
@@ -1003,8 +1003,16 @@ async fn _handle_directed_rebalance(
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, JitoTransactionError> {
-    let validators_to_run =
-        DirectedRebalanceProgressionInfo::get_directed_staking_validators(all_steward_accounts);
+    let directed_stake_meta_account = get_directed_stake_meta(
+        client.clone(),
+        &all_steward_accounts.config_address,
+        program_id,
+    )
+    .await?;
+    let validators_to_run = DirectedRebalanceProgressionInfo::get_directed_staking_validators(
+        all_steward_accounts,
+        &directed_stake_meta_account,
+    );
 
     let reserve_stake_acc = client
         .get_account(&all_steward_accounts.stake_pool_account.reserve_stake)
