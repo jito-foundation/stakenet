@@ -6,11 +6,9 @@ use std::{
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
 use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
 use jito_steward::StewardStateEnum;
-
 use log::{error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-
 use solana_sdk::signer::Signer;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
@@ -22,25 +20,32 @@ use spl_associated_token_account::get_associated_token_address;
 use spl_stake_pool::instruction::{
     cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
 };
-use spl_stake_pool::{find_withdraw_authority_program_address, MAX_VALIDATORS_TO_UPDATE};
 use spl_stake_pool::{
+    find_withdraw_authority_program_address,
     instruction::deposit_sol,
     state::{StakeStatus, ValidatorStakeInfo},
+    MAX_VALIDATORS_TO_UPDATE,
 };
-use stakenet_sdk::models::aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts};
-use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
-use stakenet_sdk::models::submit_stats::SubmitStats;
-
-use stakenet_sdk::utils::accounts::{
-    get_cluster_history_address, get_stake_address, get_steward_state_account,
-    get_transient_stake_address,
-};
-use stakenet_sdk::utils::helpers::{check_stake_accounts, get_unprogressed_validators};
-use stakenet_sdk::utils::{
-    accounts::get_validator_history_address,
-    transactions::{
-        configure_instruction, package_instructions, print_errors_if_any,
-        submit_packaged_transactions,
+use stakenet_sdk::{
+    models::{
+        aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
+        errors::{JitoSendTransactionError, JitoTransactionError},
+        submit_stats::SubmitStats,
+    },
+    utils::{
+        accounts::{
+            get_cluster_history_address, get_directed_stake_meta, get_directed_stake_meta_address,
+            get_stake_address, get_steward_state_account, get_transient_stake_address,
+            get_validator_history_address,
+        },
+        helpers::{
+            check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
+        },
+        instructions::compute_directed_stake_meta,
+        transactions::{
+            configure_instruction, package_instructions, print_errors_if_any,
+            submit_packaged_transactions,
+        },
     },
 };
 use validator_history::ValidatorHistory;
@@ -262,6 +267,44 @@ async fn _update_pool(
         submit_packaged_transactions(client, cleanup_txs_to_run, payer, Some(50), None).await?;
 
     stats.combine(&cleanup_stats);
+
+    Ok(stats)
+}
+
+/// Copy directed stake targets to [`DirectedStakeMeta`] account
+async fn handle_copy_directed_stake_targets(
+    client: Arc<RpcClient>,
+    keypair: Arc<Keypair>,
+    program_id: &Pubkey,
+    all_steward_accounts: &AllStewardAccounts,
+    token_mint_address: &Pubkey,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, JitoTransactionError> {
+    let mut stats = SubmitStats::default();
+
+    let ixs = compute_directed_stake_meta(
+        client.clone(),
+        token_mint_address,
+        &all_steward_accounts.stake_pool_address,
+        &all_steward_accounts.config_address,
+        &keypair.pubkey(),
+        program_id,
+    )
+    .await
+    .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
+
+    info!("Copy Directed Stake Targets");
+
+    let chunk_size = match ixs.len() {
+        0..=160 => 1,
+        _ => 8,
+    };
+    let update_txs_to_run =
+        package_instructions(&ixs, chunk_size, priority_fee, Some(1_400_000), None);
+    let update_stats =
+        submit_packaged_transactions(&client, update_txs_to_run, &keypair, Some(50), None).await?;
+
+    stats.combine(&update_stats);
 
     Ok(stats)
 }
@@ -941,6 +984,132 @@ async fn _handle_rebalance(
     Ok(stats)
 }
 
+/// Handles the directed rebalancing of validator stakes in a stake pool.
+///
+/// This function is responsible for redistributing stake across validators in a stake pool
+/// according to the steward's rebalancing algorithm. It identifies validators that need
+/// rebalancing, constructs the necessary instructions, and submits them as transactions.
+///
+/// # Note
+///
+/// ## Reserve Stake Pre-funding
+///
+/// Before submitting rebalance instructions, this function checks if the reserve stake
+/// account has sufficient lamports (N * transient stake account + ephemeral_stake account) to cover rent for all validators being
+/// processed.
+async fn _handle_directed_rebalance(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    program_id: &Pubkey,
+    all_steward_accounts: &AllStewardAccounts,
+    priority_fee: Option<u64>,
+) -> Result<SubmitStats, JitoTransactionError> {
+    let directed_stake_meta_address =
+        get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
+    let directed_stake_meta_account = get_directed_stake_meta(
+        client.clone(),
+        &all_steward_accounts.config_address,
+        program_id,
+    )
+    .await?;
+    let validators_to_run = DirectedRebalanceProgressionInfo::get_directed_staking_validators(
+        all_steward_accounts,
+        &directed_stake_meta_account,
+    );
+
+    let reserve_stake_acc = client
+        .get_account(&all_steward_accounts.stake_pool_account.reserve_stake)
+        .await?;
+
+    let stake_rent = client
+        .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
+        .await?;
+
+    let mut ixs_to_run = Vec::new();
+    if reserve_stake_acc
+        .lamports
+        .lt(&stake_rent.mul(validators_to_run.len() as u64))
+    {
+        let amount: u64 = stake_rent
+            .mul(validators_to_run.len() as u64)
+            .sub(reserve_stake_acc.lamports);
+
+        let acc_token_address = get_associated_token_address(
+            &payer.pubkey(),
+            &all_steward_accounts.stake_pool_account.pool_mint,
+        );
+
+        let instruction = deposit_sol(
+            &spl_stake_pool::id(),
+            &all_steward_accounts.stake_pool_address,
+            &all_steward_accounts.stake_pool_withdraw_authority,
+            &all_steward_accounts.stake_pool_account.reserve_stake,
+            &payer.pubkey(),
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.manager_fee_account,
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.pool_mint,
+            &spl_token::id(),
+            amount,
+        );
+
+        ixs_to_run.push(instruction);
+    }
+
+    ixs_to_run.extend(validators_to_run.iter().map(|validator_info| {
+        let validator_index = validator_info.validator_list_index;
+        let vote_account = &validator_info.vote_account;
+
+        let stake_address =
+            get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+        let transient_stake_address = get_transient_stake_address(
+            vote_account,
+            &all_steward_accounts.stake_pool_address,
+            &all_steward_accounts.validator_list_account,
+            validator_index,
+        );
+
+        Instruction {
+            program_id: *program_id,
+            accounts: jito_steward::accounts::RebalanceDirected {
+                config: all_steward_accounts.config_address,
+                state_account: all_steward_accounts.state_address,
+                stake_pool_program: spl_stake_pool::id(),
+                stake_pool: all_steward_accounts.stake_pool_address,
+                withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                validator_list: all_steward_accounts.validator_list_address,
+                reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                stake_account: stake_address,
+                transient_stake_account: transient_stake_address,
+                vote_account: *vote_account,
+                system_program: system_program::id(),
+                stake_program: stake::program::id(),
+                rent: solana_sdk::sysvar::rent::id(),
+                clock: solana_sdk::sysvar::clock::id(),
+                stake_history: solana_sdk::sysvar::stake_history::id(),
+                stake_config: stake::config::ID,
+                directed_stake_meta: directed_stake_meta_address,
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::RebalanceDirected {
+                directed_stake_meta_index: validator_info.directed_stake_meta_index as u64,
+                validator_list_index: validator_index as u64,
+            }
+            .data(),
+        }
+    }));
+
+    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+
+    info!("Submitting {} instructions", ixs_to_run.len());
+    info!("Submitting {} transactions", txs_to_run.len());
+
+    let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
+
+    Ok(stats)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn crank_steward(
     client: &Arc<RpcClient>,
@@ -951,9 +1120,12 @@ pub async fn crank_steward(
     all_steward_validator_accounts: &AllValidatorAccounts,
     all_active_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
+    token_mint_address: &Pubkey,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut return_stats = SubmitStats::default();
     let should_run_epoch_maintenance =
+        all_steward_accounts.state_account.state.current_epoch != epoch;
+    let should_run_copy_directed_targets =
         all_steward_accounts.state_account.state.current_epoch != epoch;
     let should_crank_state = !should_run_epoch_maintenance;
 
@@ -972,6 +1144,26 @@ pub async fn crank_steward(
         .await?;
 
         return_stats.combine(&stats);
+    }
+
+    {
+        // --------- CHECK AND HANDLE COPY DIRECTED TARGETS -----------
+
+        if should_run_copy_directed_targets {
+            info!("Cranking Copy Directed Targets...");
+
+            let stats = handle_copy_directed_stake_targets(
+                client.clone(),
+                payer.clone(),
+                program_id,
+                all_steward_accounts,
+                token_mint_address,
+                priority_fee,
+            )
+            .await?;
+
+            return_stats.combine(&stats);
+        }
     }
 
     {
@@ -1118,12 +1310,16 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::RebalanceDirected => {
-                    println!("[Unimplemented] Cranking Rebalance Directed...");
-                    SubmitStats {
-                        successes: 0,
-                        errors: 0,
-                        results: vec![],
-                    }
+                    info!("Cranking Rebalance Directed...");
+
+                    _handle_directed_rebalance(
+                        payer,
+                        client,
+                        program_id,
+                        all_steward_accounts,
+                        priority_fee,
+                    )
+                    .await?
                 }
             };
             return_stats.combine(&stats);

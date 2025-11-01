@@ -1,7 +1,14 @@
+//! Directed Stake Ticket Update
+//!
+//! This module provides functionality to update the directed stake ticket account in the
+//! `jito_steward` program. The ticket allows specifying stake preferences across multiple
+//! validators with custom stake share allocations.
+
 use std::sync::Arc;
 
 use anchor_lang::AccountDeserialize;
 use anyhow::anyhow;
+use clap::Parser;
 use jito_steward::DirectedStakePreference;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -10,10 +17,37 @@ use solana_sdk::{
 use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
 
 use crate::{
-    commands::command_args::UpdateDirectedStakeTicket,
+    commands::command_args::{parse_pubkey, parse_u16, PermissionedParameters},
     utils::transactions::{configure_instruction, maybe_print_tx},
 };
 
+#[derive(Parser)]
+#[command(about = "Updates directed stake ticket account")]
+pub struct UpdateDirectedStakeTicket {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Vote accounts of validators to direct stake to (comma-separated)
+    ///
+    /// Example: `--vote-pubkey Vote1111...,Vote2222...,Vote3333...`
+    #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
+    pub vote_pubkey: Vec<Pubkey>,
+
+    /// Stake share allocations in basis points for each validator (comma-separated)
+    ///
+    /// Must have the same length as `vote_pubkey`. Each value represents the
+    /// desired stake allocation for the corresponding validator.
+    ///
+    /// Example: `--stake-share-bps 5000,3000,2000` (50%, 30%, 20%)
+    #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
+    pub stake_share_bps: Vec<u16>,
+}
+
+/// Updates the directed stake ticket with new validator stake preferences.
+///
+/// This function creates or updates a directed stake ticket that specifies how stake
+/// should be distributed across multiple validators. Each validator is assigned a stake
+/// share in basis points, allowing precise control over stake allocation.
 pub(crate) async fn command_update_directed_stake_ticket(
     args: UpdateDirectedStakeTicket,
     client: Arc<RpcClient>,
@@ -43,8 +77,14 @@ pub(crate) async fn command_update_directed_stake_ticket(
             .pubkey()
     };
 
+    if args.vote_pubkey.len().ne(&args.stake_share_bps.len()) {
+        return Err(anyhow!(
+            "Vote pubkeys and stake share bps should be same length"
+        ));
+    }
+
     let preferences = args
-        .vote_pubkeys
+        .vote_pubkey
         .iter()
         .zip(args.stake_share_bps)
         .map(|(vote_pubkey, stake_share_bps)| {
