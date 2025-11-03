@@ -281,11 +281,14 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // ---------------------- EMIT ---------------------------------
 
         if should_fire(tick, metrics_interval) {
-            keeper_state.set_runs_errors_and_txs_for_epoch(operations::metrics_emit::fire(
-                &keeper_config,
-                &keeper_state,
-                keeper_config.cluster_name.as_str(),
-            ));
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                operations::metrics_emit::fire(
+                    &keeper_config,
+                    &keeper_state,
+                    keeper_config.cluster_name.as_str(),
+                )
+                .await,
+            );
         }
 
         if should_emit(tick, &intervals) {
