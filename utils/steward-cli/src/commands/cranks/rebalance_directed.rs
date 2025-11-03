@@ -31,7 +31,6 @@ pub async fn command_crank_rebalance_directed(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // Creates config account
     let payer = Arc::new(
         read_keypair_file(args.permissionless_parameters.payer_keypair_path)
             .expect("Failed reading keypair file ( Payer )"),
@@ -82,7 +81,7 @@ pub async fn command_crank_rebalance_directed(
             );
 
             Instruction {
-                program_id: program_id,
+                program_id,
                 accounts: jito_steward::accounts::RebalanceDirected {
                     config: steward_accounts.config_address,
                     state_account: steward_accounts.state_address,
