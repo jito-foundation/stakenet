@@ -33,7 +33,7 @@ pub struct UpdateDirectedStakeTicket {
     #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
     pub vote_pubkey: Vec<Pubkey>,
 
-    /// Stake share allocations in basis points for each validator (comma-separated)
+    /// Stake share allocations of JitoSOL in basis points for each validator (comma-separated)
     ///
     /// Must have the same length as `vote_pubkey`. Each value represents the
     /// desired stake allocation for the corresponding validator.

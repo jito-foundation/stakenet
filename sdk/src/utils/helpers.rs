@@ -319,41 +319,38 @@ mod tests {
 
     use super::*;
 
+    fn create_ticket(authority: Pubkey, preferences: Vec<(Pubkey, u16)>) -> DirectedStakeTicket {
+        let mut staker_preferences = [DirectedStakePreference {
+            vote_pubkey: Pubkey::default(),
+            stake_share_bps: 0,
+            _padding0: [0; 94],
+        }; 8];
+
+        for (i, (vote_pubkey, stake_share_bps)) in preferences.into_iter().enumerate() {
+            if i < 8 {
+                staker_preferences[i] = DirectedStakePreference {
+                    vote_pubkey,
+                    stake_share_bps,
+                    _padding0: [0; 94],
+                };
+            }
+        }
+
+        DirectedStakeTicket {
+            num_preferences: 0,
+            ticket_holder_is_protocol: U8Bool::from(true),
+            ticket_update_authority: authority,
+            staker_preferences,
+            _padding0: [0; 125],
+        }
+    }
+
     fn create_tickets(
         authority1: Pubkey,
         authority2: Pubkey,
         validator1: Pubkey,
         validator2: Pubkey,
     ) -> Vec<DirectedStakeTicket> {
-        fn create_ticket(
-            authority: Pubkey,
-            preferences: Vec<(Pubkey, u16)>,
-        ) -> DirectedStakeTicket {
-            let mut staker_preferences = [DirectedStakePreference {
-                vote_pubkey: Pubkey::default(),
-                stake_share_bps: 0,
-                _padding0: [0; 94],
-            }; 8];
-
-            for (i, (vote_pubkey, stake_share_bps)) in preferences.into_iter().enumerate() {
-                if i < 8 {
-                    staker_preferences[i] = DirectedStakePreference {
-                        vote_pubkey,
-                        stake_share_bps,
-                        _padding0: [0; 94],
-                    };
-                }
-            }
-
-            DirectedStakeTicket {
-                num_preferences: 0,
-                ticket_holder_is_protocol: U8Bool::from(true),
-                ticket_update_authority: authority,
-                staker_preferences,
-                _padding0: [0; 125],
-            }
-        }
-
         vec![
             create_ticket(authority1, vec![(validator1, 6000), (validator2, 4000)]),
             create_ticket(authority2, vec![(validator1, 6000), (validator2, 4000)]),
@@ -381,11 +378,11 @@ mod tests {
         let authority1 = Pubkey::new_unique();
         let authority2 = Pubkey::new_unique();
 
-        let mut balances = HashMap::new();
-        balances.insert(authority1, 100_000_000);
+        let mut jitosol_balances = HashMap::new();
+        jitosol_balances.insert(authority1, 100_000_000);
 
         let tickets = create_tickets(authority1, authority2, validator1, validator2);
-        let targets = aggregate_validator_targets(&tickets, &balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 2);
         assert_eq!(*targets.get(&validator1).unwrap(), 60_000_000);
@@ -398,15 +395,15 @@ mod tests {
         let authority1 = Pubkey::new_unique();
         let authority2 = Pubkey::new_unique();
 
-        let mut balances = HashMap::new();
-        balances.insert(authority1, 100_000_000);
-        balances.insert(authority2, 50_000_000);
+        let mut jitosol_balances = HashMap::new();
+        jitosol_balances.insert(authority1, 100_000_000);
+        jitosol_balances.insert(authority2, 50_000_000);
 
         let tickets = create_tickets(authority1, authority2, validator1, validator1);
-        let targets = aggregate_validator_targets(&tickets, &balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 1);
-        assert_eq!(*targets.get(&validator1).unwrap(), 150_000_000); // Sum of both
+        assert_eq!(*targets.get(&validator1).unwrap(), 150_000_000);
     }
 
     #[test]
@@ -418,11 +415,68 @@ mod tests {
 
         let tickets = create_tickets(authority1, authority2, validator1, validator2);
 
-        let mut balances = HashMap::new();
-        balances.insert(authority1, 100_000_000);
+        let mut jitosol_balances = HashMap::new();
+        jitosol_balances.insert(authority1, 100_000_000);
 
-        let targets = aggregate_validator_targets(&tickets, &balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 0);
+    }
+
+    #[test]
+    fn test_aggregate_validator_targets_with_real_conversion_rate_bps() {
+        let validator1 = Pubkey::new_unique();
+        let validator2 = Pubkey::new_unique();
+        let validator3 = Pubkey::new_unique();
+        let authority1 = Pubkey::new_unique();
+        let authority2 = Pubkey::new_unique();
+        let authority3 = Pubkey::new_unique();
+
+        // Set up JitoSOL balances for multiple authorities with realistic amounts
+        let mut jitosol_balances = HashMap::new();
+        jitosol_balances.insert(authority1, 50_000_000_000); // 50 JitoSOL (in lamports)
+        jitosol_balances.insert(authority2, 100_000_000_000); // 100 JitoSOL
+        jitosol_balances.insert(authority3, 25_000_000_000); // 25 JitoSOL, authority3 has balance but no ticket
+
+        // Create tickets with varied preferences
+        let tickets = vec![
+            create_ticket(authority1, vec![(validator1, 6000), (validator2, 4000)]),
+            create_ticket(
+                authority2,
+                vec![(validator1, 3000), (validator2, 5000), (validator3, 2000)],
+            ),
+            // authority3 has no ticket, so their balance won't be allocated
+        ];
+
+        // Real conversion rate: ~1.240 SOL per JitoSOL
+        let conversion_rate_bps = calculate_conversion_rate_bps(14110790, 11369805).unwrap();
+        assert_eq!(conversion_rate_bps, 12410);
+
+        let targets =
+            aggregate_validator_targets(&tickets, &jitosol_balances, conversion_rate_bps).unwrap();
+
+        // Expected calculations:
+        // authority1 (50 JitoSOL = 62.05 SOL):
+        //   - validator1: 62.05 * 0.60 = 37.23 SOL = 37_230_000_000 lamports
+        //   - validator2: 62.05 * 0.40 = 24.82 SOL = 24_820_000_000 lamports
+        // authority2 (100 JitoSOL = 124.11 SOL):
+        //   - validator1: 124.10 * 0.30 = 37.23 SOL = 37_230_000_000 lamports
+        //   - validator2: 124.10 * 0.50 = 62.05 SOL = 62_050_000_000 lamports
+        //   - validator3: 124.10 * 0.20 = 24.82 SOL = 24_820_000_000 lamports
+        // Total:
+        //   - validator1: 37_230_000_000 + 37_230_000_000 = 74_460_000_000
+        //   - validator2: 24_820_000_000 + 62_050_000_000 = 86_870_000_000
+        //   - validator3: 24_820_000_000
+
+        assert_eq!(targets.len(), 3);
+        assert_eq!(*targets.get(&validator1).unwrap(), 74_460_000_000);
+        assert_eq!(*targets.get(&validator2).unwrap(), 86_870_000_000);
+        assert_eq!(*targets.get(&validator3).unwrap(), 24_820_000_000);
+
+        // Verify total SOL allocated equals sum of converted JitoSOL balances (for authorities with tickets)
+        let total_allocated: u64 = targets.values().sum();
+        let expected_total =
+            50_000_000_000_u128 * 12410 / 10000 + 100_000_000_000_u128 * 12410 / 10000;
+        assert_eq!(total_allocated as u128, expected_total);
     }
 }
