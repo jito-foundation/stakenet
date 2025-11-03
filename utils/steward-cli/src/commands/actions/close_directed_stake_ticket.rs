@@ -27,7 +27,6 @@ pub async fn command_close_directed_stake_ticket(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // Creates config account
     let authority = read_keypair_file(args.permissioned_parameters.authority_keypair_path)
         .expect("Failed reading keypair file ( Authority )");
 
