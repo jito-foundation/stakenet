@@ -8,9 +8,13 @@ use crate::commands::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
-        compute_directed_stake_meta::ComputeDirectedStakeMeta,
         migrate_state_to_v2::MigrateStateToV2,
+        remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
+    },
+    cranks::{
+        compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        rebalance_directed::CrankRebalanceDirected,
     },
     info::view_directed_stake_ticket::ViewDirectedStakeTicket,
     init::{
@@ -333,6 +337,7 @@ pub enum Commands {
     AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
     UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
+    RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
 
@@ -344,6 +349,7 @@ pub enum Commands {
     CrankIdle(CrankIdle),
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
+    CrankRebalanceDirected(CrankRebalanceDirected),
 }
 
 // ---------- VIEWS ------------
