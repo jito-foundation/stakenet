@@ -7,7 +7,6 @@ use commands::{
         add_to_blacklist::command_add_to_blacklist,
         auto_add_validator_from_pool::command_auto_add_validator_from_pool,
         auto_remove_validator_from_pool::command_auto_remove_validator_from_pool,
-        close_steward::command_close_steward,
         instant_remove_validator::command_instant_remove_validator,
         manually_copy_all_vote_accounts::command_manually_copy_all_vote_accounts,
         manually_copy_vote_accounts::command_manually_copy_vote_account,
@@ -47,6 +46,9 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            close_directed_stake_ticket::command_close_directed_stake_ticket,
+            close_directed_stake_whitelist::command_close_directed_stake_whitelist,
+            close_steward::command_close_steward,
             compute_directed_stake_meta::command_compute_directed_stake_meta,
             migrate_state_to_v2::command_migrate_state_to_v2,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
@@ -188,6 +190,12 @@ async fn main() -> Result<()> {
         }
         Commands::ComputeDirectedStakeMeta(args) => {
             command_compute_directed_stake_meta(args, &client, program_id).await
+        }
+        Commands::CloseDirectedStakeTicket(args) => {
+            command_close_directed_stake_ticket(args, &client, program_id).await
+        }
+        Commands::CloseDirectedStakeWhitelist(args) => {
+            command_close_directed_stake_whitelist(args, &client, program_id).await
         }
 
         // --- Cranks ---
