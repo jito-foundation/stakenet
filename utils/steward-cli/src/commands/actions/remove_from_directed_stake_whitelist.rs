@@ -96,8 +96,8 @@ pub async fn command_remove_from_directed_stake_whitelist(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("✅ Remove from directed stake whitelist successfully!");
-        println!("  Transaction signature: {}", signature);
+        println!("✅ Removed from directed stake whitelist successfully!");
+        println!("  Transaction signature: {signature}");
     }
 
     Ok(())
