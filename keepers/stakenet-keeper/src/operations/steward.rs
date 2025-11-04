@@ -167,7 +167,7 @@ pub async fn run_crank_steward(
                 keeper_config.client.clone(),
                 keeper_config.keypair.clone(),
                 &keeper_config.steward_program_id,
-                &steward_accounts,
+                steward_accounts,
                 &keeper_config.token_mint,
                 Some(keeper_config.priority_fee_in_microlamports),
             )
