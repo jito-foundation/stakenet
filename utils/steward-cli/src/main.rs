@@ -48,10 +48,13 @@ use crate::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
-            close_steward::command_close_steward,
-            compute_directed_stake_meta::command_compute_directed_stake_meta,
-            migrate_state_to_v2::command_migrate_state_to_v2,
+            close_steward::command_close_steward, migrate_state_to_v2::command_migrate_state_to_v2,
+            remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
+        },
+        cranks::{
+            compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
+            rebalance_directed::command_crank_rebalance_directed,
         },
         info::view_directed_stake_ticket::command_view_directed_stake_ticket,
         init::{
@@ -188,8 +191,8 @@ async fn main() -> Result<()> {
         Commands::UpdateDirectedStakeTicket(args) => {
             command_update_directed_stake_ticket(args, client.clone(), program_id).await
         }
-        Commands::ComputeDirectedStakeMeta(args) => {
-            command_compute_directed_stake_meta(args, &client, program_id).await
+        Commands::RemoveFromDirectedStakeWhitelist(args) => {
+            command_remove_from_directed_stake_whitelist(args, &client, program_id).await
         }
         Commands::CloseDirectedStakeTicket(args) => {
             command_close_directed_stake_ticket(args, &client, program_id).await
@@ -209,11 +212,17 @@ async fn main() -> Result<()> {
         Commands::CrankComputeDelegations(args) => {
             command_crank_compute_delegations(args, &client, program_id).await
         }
+        Commands::ComputeDirectedStakeMeta(args) => {
+            command_crank_compute_directed_stake_meta(args, &client, program_id).await
+        }
         Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
         Commands::CrankComputeInstantUnstake(args) => {
             command_crank_compute_instant_unstake(args, &client, program_id).await
         }
         Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
+        Commands::CrankRebalanceDirected(args) => {
+            command_crank_rebalance_directed(args, &client, program_id).await
+        }
     };
 
     if let Err(e) = result {

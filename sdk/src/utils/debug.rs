@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use jito_steward::{
     StewardStateV2, COMPUTE_DELEGATIONS, COMPUTE_INSTANT_UNSTAKES, COMPUTE_SCORE,
-    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
+    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -45,12 +45,14 @@ pub async fn debug_send_single_transaction(
 
 pub enum StateCode {
     NoState = 0x00,
-    ComputeScore = 0x01 << 0,
     ComputeDelegations = 0x01 << 1,
     PreLoopIdle = 0x01 << 2,
-    ComputeInstantUnstake = 0x01 << 3,
-    Rebalance = 0x01 << 4,
-    PostLoopIdle = 0x01 << 5,
+    EpochMaintenance = 0x01 << 3,
+    ComputeInstantUnstake = 0x01 << 4,
+    Rebalance = 0x01 << 5,
+    PostLoopIdle = 0x01 << 6,
+    ComputeScore = 0x01 << 7,
+    RebalanceDirectedComplete = 0x01 << 0,
 }
 
 pub fn steward_state_to_state_code(steward_state: &StewardStateV2) -> StateCode {
@@ -66,6 +68,10 @@ pub fn steward_state_to_state_code(steward_state: &StewardStateV2) -> StateCode 
         StateCode::ComputeDelegations
     } else if steward_state.has_flag(COMPUTE_SCORE) {
         StateCode::ComputeScore
+    } else if steward_state.has_flag(EPOCH_MAINTENANCE) {
+        StateCode::EpochMaintenance
+    } else if steward_state.has_flag(REBALANCE_DIRECTED_COMPLETE) {
+        StateCode::RebalanceDirectedComplete
     } else {
         StateCode::NoState
     }
@@ -109,6 +115,12 @@ pub fn format_steward_state_string(steward_state: &StewardStateV2) -> String {
     }
 
     if steward_state.has_flag(REBALANCE) {
+        state_string += "▣"
+    } else {
+        state_string += "□"
+    }
+
+    if steward_state.has_flag(REBALANCE_DIRECTED_COMPLETE) {
         state_string += "▣"
     } else {
         state_string += "□"
@@ -158,6 +170,12 @@ pub fn format_simple_steward_state_string(steward_state: &StewardStateV2) -> Str
 
     if steward_state.has_flag(REBALANCE) {
         state_string += "R"
+    } else {
+        state_string += "-"
+    }
+
+    if steward_state.has_flag(REBALANCE_DIRECTED_COMPLETE) {
+        state_string += "C"
     } else {
         state_string += "-"
     }

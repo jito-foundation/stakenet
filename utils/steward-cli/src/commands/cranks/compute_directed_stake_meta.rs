@@ -55,7 +55,7 @@ pub struct ComputeDirectedStakeMeta {
 /// with current information from all directed stake tickets and JitoSOL token
 /// balances. This metadata is essential for the steward system to accurately
 /// distribute stake according to validator preferences and token holder weights.
-pub async fn command_compute_directed_stake_meta(
+pub async fn command_crank_compute_directed_stake_meta(
     args: ComputeDirectedStakeMeta,
     client: &Arc<RpcClient>,
     program_id: Pubkey,

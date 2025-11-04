@@ -498,11 +498,13 @@ pub fn emit_steward_stats(
     Ok(())
 }
 
+/// Emit directed stake metrics
 pub async fn emit_directed_stake_stats(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref all_steward_accounts) = keeper_state.all_steward_accounts {
+        let steward_state = all_steward_accounts.state_account.state;
         let meta = get_directed_stake_meta(
             keeper_config.client.clone(),
             &all_steward_accounts.config_address,
@@ -510,10 +512,27 @@ pub async fn emit_directed_stake_stats(
         )
         .await?;
 
+        let current_epoch = steward_state.current_epoch;
+
+        let active_targets = meta
+            .targets
+            .iter()
+            .filter(|target| target.vote_pubkey.ne(&Pubkey::default()));
+        let stake_updated_count = active_targets
+            .clone()
+            .filter(|target| target.staked_last_updated_epoch.eq(&current_epoch))
+            .count();
+        let target_updated_count = active_targets
+            .filter(|target| target.target_last_updated_epoch.eq(&current_epoch))
+            .count();
+
         datapoint_info!(
             "directed-stake-stats",
-            ("meta-epoch-last-updated", meta.epoch_last_updated, i64),
+            ("state", steward_state.state_tag.to_string(), String),
             ("meta-total-stake-targets", meta.total_stake_targets, i64),
+            ("meta-epoch-last-updated", meta.epoch_last_updated, i64),
+            ("stake-updated-current-epoch", stake_updated_count, i64),
+            ("target-updated-current-epoch", target_updated_count, i64),
             "cluster" => keeper_config.cluster_name,
         );
     }

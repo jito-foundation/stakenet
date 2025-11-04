@@ -41,7 +41,6 @@ use stakenet_sdk::{
         helpers::{
             check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
         },
-        instructions::compute_directed_stake_meta,
         transactions::{
             configure_instruction, package_instructions, print_errors_if_any,
             submit_packaged_transactions,
@@ -267,44 +266,6 @@ async fn _update_pool(
         submit_packaged_transactions(client, cleanup_txs_to_run, payer, Some(50), None).await?;
 
     stats.combine(&cleanup_stats);
-
-    Ok(stats)
-}
-
-/// Copy directed stake targets to [`DirectedStakeMeta`] account
-async fn handle_copy_directed_stake_targets(
-    client: Arc<RpcClient>,
-    keypair: Arc<Keypair>,
-    program_id: &Pubkey,
-    all_steward_accounts: &AllStewardAccounts,
-    token_mint_address: &Pubkey,
-    priority_fee: Option<u64>,
-) -> Result<SubmitStats, JitoTransactionError> {
-    let mut stats = SubmitStats::default();
-
-    let ixs = compute_directed_stake_meta(
-        client.clone(),
-        token_mint_address,
-        &all_steward_accounts.stake_pool_address,
-        &all_steward_accounts.config_address,
-        &keypair.pubkey(),
-        program_id,
-    )
-    .await
-    .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
-
-    info!("Copy Directed Stake Targets");
-
-    let chunk_size = match ixs.len() {
-        0..=160 => 1,
-        _ => 8,
-    };
-    let update_txs_to_run =
-        package_instructions(&ixs, chunk_size, priority_fee, Some(1_400_000), None);
-    let update_stats =
-        submit_packaged_transactions(&client, update_txs_to_run, &keypair, Some(50), None).await?;
-
-    stats.combine(&update_stats);
 
     Ok(stats)
 }
@@ -1110,6 +1071,16 @@ async fn _handle_directed_rebalance(
     Ok(stats)
 }
 
+/// Main steward cranking function that orchestrates all steward operations.
+///
+/// Executes operations in a specific order:
+/// 1. Update stake pool balances
+/// 2. Handle epoch maintenance (if at epoch boundary)
+/// 3. Process instant validator removals
+/// 4. Remove delinquent validators
+/// 5. Add new qualified validators
+/// 6. Progress through steward state machine
+/// 7. Log any errors encountered
 #[allow(clippy::too_many_arguments)]
 pub async fn crank_steward(
     client: &Arc<RpcClient>,
@@ -1120,12 +1091,9 @@ pub async fn crank_steward(
     all_steward_validator_accounts: &AllValidatorAccounts,
     all_active_validator_accounts: &AllValidatorAccounts,
     priority_fee: Option<u64>,
-    token_mint_address: &Pubkey,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut return_stats = SubmitStats::default();
     let should_run_epoch_maintenance =
-        all_steward_accounts.state_account.state.current_epoch != epoch;
-    let should_run_copy_directed_targets =
         all_steward_accounts.state_account.state.current_epoch != epoch;
     let should_crank_state = !should_run_epoch_maintenance;
 
@@ -1144,26 +1112,6 @@ pub async fn crank_steward(
         .await?;
 
         return_stats.combine(&stats);
-    }
-
-    {
-        // --------- CHECK AND HANDLE COPY DIRECTED TARGETS -----------
-
-        if should_run_copy_directed_targets {
-            info!("Cranking Copy Directed Targets...");
-
-            let stats = handle_copy_directed_stake_targets(
-                client.clone(),
-                payer.clone(),
-                program_id,
-                all_steward_accounts,
-                token_mint_address,
-                priority_fee,
-            )
-            .await?;
-
-            return_stats.combine(&stats);
-        }
     }
 
     {

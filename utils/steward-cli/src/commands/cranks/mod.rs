@@ -1,7 +1,9 @@
 pub mod compute_delegations;
+pub mod compute_directed_stake_meta;
 pub mod compute_instant_unstake;
 pub mod compute_score;
 pub mod epoch_maintenance;
 pub mod idle;
 pub mod rebalance;
+pub mod rebalance_directed;
 pub mod steward;
