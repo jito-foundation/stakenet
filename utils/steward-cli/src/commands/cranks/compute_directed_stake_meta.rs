@@ -20,7 +20,7 @@
 //! 4. Configure transaction parameters (priority fee, compute limits)
 //! 5. Either print the transaction or submit it on-chain
 
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
@@ -86,14 +86,10 @@ pub async fn command_crank_compute_directed_stake_meta(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    // FIXME:
-    let stake_pool_address = Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb")?;
-
     let ixs = compute_directed_stake_meta(
         client.clone(),
         &args.token_mint,
-        // &all_steward_accounts.stake_pool_address,
-        &stake_pool_address,
+        &all_steward_accounts.stake_pool_address,
         &all_steward_accounts.config_address,
         &signer,
         &program_id,
