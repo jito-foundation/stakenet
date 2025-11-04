@@ -132,7 +132,7 @@ pub(crate) async fn command_update_directed_stake_ticket(
         .send_and_confirm_transaction_with_spinner(&transaction)
         .await?;
 
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 
     Ok(())
 }

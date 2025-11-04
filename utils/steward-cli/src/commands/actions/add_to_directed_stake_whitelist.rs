@@ -96,8 +96,8 @@ pub async fn command_add_to_directed_stake_whitelist(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("✅ Add to directed stake whitelist successfully!");
-        println!("  Transaction signature: {}", signature);
+        println!("✅ Added to directed stake whitelist successfully!");
+        println!("  Transaction signature: {signature}");
     }
 
     Ok(())

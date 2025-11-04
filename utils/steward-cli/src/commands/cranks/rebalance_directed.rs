@@ -140,7 +140,7 @@ pub async fn command_crank_rebalance_directed(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

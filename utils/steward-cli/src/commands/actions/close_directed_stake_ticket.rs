@@ -79,7 +79,7 @@ pub async fn command_close_directed_stake_ticket(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())
