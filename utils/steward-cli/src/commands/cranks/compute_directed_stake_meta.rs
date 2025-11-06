@@ -20,7 +20,10 @@
 //! 4. Configure transaction parameters (priority fee, compute limits)
 //! 5. Either print the transaction or submit it on-chain
 
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
@@ -30,7 +33,9 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::{
-    accounts::get_all_steward_accounts, instructions::compute_directed_stake_meta,
+    accounts::{get_all_steward_accounts, get_directed_stake_tickets},
+    helpers::get_token_balance,
+    instructions::compute_directed_stake_meta,
 };
 
 use crate::{
@@ -61,6 +66,88 @@ pub async fn command_crank_compute_directed_stake_meta(
     program_id: Pubkey,
 ) -> Result<()> {
     let steward_config = args.permissioned_parameters.steward_config;
+
+    // Fetch directed stake tickets to show summary stats
+    let tickets = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let num_tickets = tickets.len();
+
+    // Count preferences in tickets
+    let mut ticket_validators = HashSet::new();
+    let mut total_preferences = 0;
+    let mut tickets_with_balance = 0;
+    let mut total_jitosol_directed = 0u64;
+
+    // Get JitoSOL balances for all ticket holders
+    let mut jitosol_balances: HashMap<Pubkey, u64> = HashMap::new();
+    for ticket in &tickets {
+        total_preferences += ticket.num_preferences as usize;
+        for i in 0..ticket.num_preferences as usize {
+            let vote_pubkey = ticket.staker_preferences[i].vote_pubkey;
+            if vote_pubkey != Pubkey::default() {
+                ticket_validators.insert(vote_pubkey);
+            }
+        }
+
+        let balance = get_token_balance(
+            client.clone(),
+            &args.token_mint,
+            &ticket.ticket_update_authority,
+        )
+        .await
+        .unwrap_or(0);
+
+        if balance > 0 {
+            jitosol_balances.insert(ticket.ticket_update_authority, balance);
+            tickets_with_balance += 1;
+            total_jitosol_directed = total_jitosol_directed.saturating_add(balance);
+        }
+    }
+
+    // Simulate aggregation to count final targets
+    // Note: You'll need to get the actual conversion rate from the stake pool
+    // This is a simplified version - adjust based on your actual implementation
+    let mut final_targets = std::collections::HashSet::new();
+    for ticket in &tickets {
+        let jitosol_balance = jitosol_balances
+            .get(&ticket.ticket_update_authority)
+            .copied()
+            .unwrap_or(0);
+        if jitosol_balance == 0 {
+            continue;
+        }
+        for i in 0..ticket.num_preferences as usize {
+            let pref = &ticket.staker_preferences[i];
+            if pref.vote_pubkey != Pubkey::default() {
+                final_targets.insert(pref.vote_pubkey);
+            }
+        }
+    }
+
+    let num_final_targets = final_targets.len();
+    let num_validators_in_tickets = ticket_validators.len();
+
+    println!("=== Directed Stake Metadata Computation Summary ===");
+    println!("Total Directed Stake Tickets: {}", num_tickets);
+    println!("Tickets with JitoSOL Balance: {}", tickets_with_balance);
+    println!("Total Stake Preferences: {}", total_preferences);
+    println!(
+        "Unique Validators in Tickets: {}",
+        num_validators_in_tickets
+    );
+    println!(
+        "Final Aggregated Targets: {} (after filtering by balance)",
+        num_final_targets
+    );
+
+    if tickets_with_balance < num_tickets {
+        println!(
+            "\n⚠️  {} tickets have no JitoSOL balance and will be excluded",
+            num_tickets - tickets_with_balance
+        );
+    }
+
+    println!("====================================================\n");
+
     // Determine authority pubkey for the instruction. When printing, allow using provided flag or derive from on-chain config.
     let signer = if args.permissioned_parameters.transaction_parameters.print_tx
         || args
@@ -135,7 +222,12 @@ pub async fn command_crank_compute_directed_stake_meta(
         .send_and_confirm_transaction_with_spinner(&transaction)
         .await?;
 
-    println!("Signature: {signature}");
+    println!("\n=== Transaction Successful ===");
+    println!("Signature: {}", signature);
+    println!("Updated metadata:");
+    println!("  - {} tickets processed", num_tickets);
+    println!("  - {} tickets with balance", tickets_with_balance);
+    println!("  - {} final validator targets", num_final_targets);
 
     Ok(())
 }

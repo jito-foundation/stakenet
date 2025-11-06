@@ -73,7 +73,7 @@ pub async fn command_realloc_directed_stake_meta(
     let data_length = directed_staking_meta_account_raw.data.len();
     let whats_left = DirectedStakeMeta::SIZE - data_length.min(DirectedStakeMeta::SIZE);
 
-    let mut reallocs_left_to_run = (whats_left + MAX_ALLOC_BYTES - 1) / MAX_ALLOC_BYTES;
+    let mut reallocs_left_to_run = whats_left.div_ceil(MAX_ALLOC_BYTES);
 
     let reallocs_to_run = reallocs_left_to_run;
     let mut reallocs_ran = 0;

@@ -75,7 +75,7 @@ pub async fn command_realloc_directed_stake_whitelist(
     let data_length = directed_stake_whitelist_account_raw.data.len();
     let whats_left = DirectedStakeWhitelist::SIZE - data_length.min(DirectedStakeWhitelist::SIZE);
 
-    let mut reallocs_left_to_run = (whats_left + MAX_ALLOC_BYTES - 1) / MAX_ALLOC_BYTES;
+    let mut reallocs_left_to_run = whats_left.div_ceil(MAX_ALLOC_BYTES);
 
     let reallocs_to_run = reallocs_left_to_run;
     let mut reallocs_ran = 0;
