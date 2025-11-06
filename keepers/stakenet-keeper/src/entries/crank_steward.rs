@@ -859,6 +859,9 @@ async fn _handle_rebalance(
         .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
         .await?;
 
+    let directed_stake_meta =
+        get_directed_stake_meta_address(&all_steward_accounts.config_address, &program_id);
+
     let mut ixs_to_run = Vec::new();
     if reserve_stake_acc
         .lamports
@@ -925,7 +928,7 @@ async fn _handle_rebalance(
                 clock: solana_sdk::sysvar::clock::id(),
                 stake_history: solana_sdk::sysvar::stake_history::id(),
                 stake_config: stake::config::ID,
-                directed_stake_meta: Pubkey::new_unique(), //TODO: part of on-chain work
+                directed_stake_meta,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::Rebalance {

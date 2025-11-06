@@ -10,7 +10,9 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
 use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use stakenet_sdk::utils::{
-    accounts::{get_all_steward_accounts, get_validator_history_address},
+    accounts::{
+        get_all_steward_accounts, get_directed_stake_meta_address, get_validator_history_address,
+    },
     transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
 use validator_history::id as validator_history_id;
@@ -30,6 +32,7 @@ pub async fn command_crank_rebalance(
     let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
+    let directed_stake_meta = get_directed_stake_meta_address(&steward_config, &program_id);
 
     match steward_accounts.state_account.state.state_tag {
         StewardStateEnum::Rebalance => { /* Continue */ }
@@ -104,7 +107,7 @@ pub async fn command_crank_rebalance(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
-                    directed_stake_meta: Pubkey::default(),
+                    directed_stake_meta,
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::Rebalance {
