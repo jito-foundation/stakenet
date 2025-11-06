@@ -45,14 +45,13 @@ pub async fn debug_send_single_transaction(
 
 pub enum StateCode {
     NoState = 0x00,
+    ComputeScore = 0x01 << 0,
     ComputeDelegations = 0x01 << 1,
     PreLoopIdle = 0x01 << 2,
-    EpochMaintenance = 0x01 << 3,
-    ComputeInstantUnstake = 0x01 << 4,
-    Rebalance = 0x01 << 5,
-    PostLoopIdle = 0x01 << 6,
-    ComputeScore = 0x01 << 7,
-    RebalanceDirectedComplete = 0x01 << 0,
+    ComputeInstantUnstake = 0x01 << 3,
+    Rebalance = 0x01 << 4,
+    PostLoopIdle = 0x01 << 5,
+    RebalanceDirectedComplete = 0x01 << 6,
 }
 
 pub fn steward_state_to_state_code(steward_state: &StewardStateV2) -> StateCode {
@@ -68,8 +67,6 @@ pub fn steward_state_to_state_code(steward_state: &StewardStateV2) -> StateCode 
         StateCode::ComputeDelegations
     } else if steward_state.has_flag(COMPUTE_SCORE) {
         StateCode::ComputeScore
-    } else if steward_state.has_flag(EPOCH_MAINTENANCE) {
-        StateCode::EpochMaintenance
     } else if steward_state.has_flag(REBALANCE_DIRECTED_COMPLETE) {
         StateCode::RebalanceDirectedComplete
     } else {

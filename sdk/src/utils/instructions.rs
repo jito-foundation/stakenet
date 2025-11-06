@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use borsh_1::BorshDeserialize;
 use jito_steward::DirectedStakePreference;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
@@ -9,7 +8,6 @@ use solana_sdk::{
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use spl_stake_pool::state::StakePool;
 use validator_history::{constants::MAX_ALLOC_BYTES, ValidatorHistory};
 
 use crate::{
@@ -18,6 +16,7 @@ use crate::{
         accounts::{
             get_directed_stake_meta_address, get_directed_stake_ticket_address,
             get_directed_stake_tickets, get_directed_stake_whitelist_address,
+            get_stake_pool_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -69,31 +68,6 @@ pub fn get_create_validator_history_instructions(
 ///
 /// This instruction allows a signer to update their stake delegation preferences by specifying
 /// which validators they want to direct their stake to and in what proportions.
-///
-/// # Example
-///
-/// ```no_run
-/// use std::{str::FromStr, sync::Arc};
-///
-/// use jito_steward::DirectedStakePreference;
-/// use solana_sdk::pubkey::Pubkey;
-/// use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
-///
-/// let program_id = Pubkey::from_str("Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8").unwrap();
-/// let steward_config = Pubkey::from_str("jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv").unwrap();
-/// let signer = Pubkey::new_unique();
-/// let validator_a = Pubkey::new_unique();
-/// let preferences = vec![
-///     DirectedStakePreference::new(validator_a, 10000)
-/// ];
-///
-/// let update_ix = update_directed_stake_ticket(
-///     &program_id,
-///     &steward_config,
-///     &signer,
-///     preferences
-/// );
-/// ```
 pub fn update_directed_stake_ticket(
     program_id: &Pubkey,
     steward_config: &Pubkey,
@@ -135,39 +109,10 @@ pub fn update_directed_stake_ticket(
 /// # Conversion Details
 ///
 /// The function converts JitoSOL holdings to lamports using:
+///
 /// ```text
 /// conversion_rate_bps = (stake_pool.total_lamports * 10,000) / pool_token_supply
 /// allocation_lamports = (allocation_jitosol * conversion_rate_bps) / 10,000
-/// ```
-///
-/// # Example
-///
-/// ```no_run
-/// use std::{str::FromStr, sync::Arc};
-///
-/// use solana_client::nonblocking::rpc_client::RpcClient;
-/// use solana_sdk::pubkey::Pubkey;
-/// use stakenet_sdk::utils::instructions::compute_directed_stake_meta;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let client = Arc::new(RpcClient::new("https://api.mainnet-beta.solana.com".to_string()));
-/// let jitosol_mint_address = Pubkey::from_str("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn").unwrap();
-/// let stake_pool = Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb").unwrap();
-/// let steward_config = Pubkey::new_unique();
-/// let authority = Pubkey::new_unique();
-/// let program_id = Pubkey::new_unique();
-///
-/// let instructions = compute_directed_stake_meta(
-///     client,
-///     &jitosol_mint_address,
-///     &stake_pool,
-///     &steward_config,
-///     &authority,
-///     &program_id,
-/// ).await?;
-///
-/// # Ok(())
-/// # }
 /// ```
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
@@ -179,11 +124,7 @@ pub async fn compute_directed_stake_meta(
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let tickets = get_directed_stake_tickets(client.clone(), program_id).await?;
 
-    let stake_pool_account = client.get_account(stake_pool_address).await?;
-    let stake_pool =
-        StakePool::deserialize(&mut stake_pool_account.data.as_slice()).map_err(|e| {
-            JitoInstructionError::Custom(format!("Failed to deserialize stake pool: {e}"))
-        })?;
+    let stake_pool = get_stake_pool_account(&client.clone(), stake_pool_address).await?;
     let conversion_rate_bps =
         calculate_conversion_rate_bps(stake_pool.total_lamports, stake_pool.pool_token_supply)?;
 

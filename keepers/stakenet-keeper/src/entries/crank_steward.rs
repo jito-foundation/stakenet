@@ -965,6 +965,8 @@ async fn _handle_directed_rebalance(
     all_steward_accounts: &AllStewardAccounts,
     priority_fee: Option<u64>,
 ) -> Result<SubmitStats, JitoTransactionError> {
+    let mut submit_stats = SubmitStats::default();
+
     let directed_stake_meta_address =
         get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
     let directed_stake_meta_account = get_directed_stake_meta(
@@ -986,7 +988,6 @@ async fn _handle_directed_rebalance(
         .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
         .await?;
 
-    let mut ixs_to_run = Vec::new();
     if reserve_stake_acc
         .lamports
         .lt(&stake_rent.mul(validators_to_run.len() as u64))
@@ -1014,10 +1015,14 @@ async fn _handle_directed_rebalance(
             amount,
         );
 
-        ixs_to_run.push(instruction);
+        let txs_to_run =
+            package_instructions(&[instruction], 1, priority_fee, Some(1_400_000), None);
+        let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
+        submit_stats.combine(&stats);
     }
 
-    ixs_to_run.extend(validators_to_run.iter().map(|validator_info| {
+    let mut ixs_to_run = Vec::new();
+    for validator_info in validators_to_run.iter() {
         let validator_index = validator_info.validator_list_index;
         let vote_account = &validator_info.vote_account;
 
@@ -1031,7 +1036,7 @@ async fn _handle_directed_rebalance(
             validator_index,
         );
 
-        Instruction {
+        let ix = Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::RebalanceDirected {
                 config: all_steward_accounts.config_address,
@@ -1058,8 +1063,9 @@ async fn _handle_directed_rebalance(
                 validator_list_index: validator_index as u64,
             }
             .data(),
-        }
-    }));
+        };
+        ixs_to_run.push(ix);
+    }
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
@@ -1067,8 +1073,9 @@ async fn _handle_directed_rebalance(
     info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
+    submit_stats.combine(&stats);
 
-    Ok(stats)
+    Ok(submit_stats)
 }
 
 /// Main steward cranking function that orchestrates all steward operations.

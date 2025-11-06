@@ -38,12 +38,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
 
     log::info!("Copy Directed Stake Targets");
 
-    let chunk_size = match ixs.len() {
-        0..=160 => 1,
-        _ => 8,
-    };
-    let update_txs_to_run =
-        package_instructions(&ixs, chunk_size, priority_fee, Some(1_400_000), None);
+    let update_txs_to_run = package_instructions(&ixs, 8, priority_fee, Some(1_400_000), None);
     let update_stats =
         submit_packaged_transactions(&client, update_txs_to_run, &keypair, Some(50), None).await?;
 
