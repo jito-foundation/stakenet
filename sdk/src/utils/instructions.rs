@@ -14,9 +14,9 @@ use crate::{
     models::errors::JitoInstructionError,
     utils::{
         accounts::{
-            get_directed_stake_meta_address, get_directed_stake_ticket_address,
-            get_directed_stake_tickets, get_directed_stake_whitelist_address,
-            get_stake_pool_account,
+            get_directed_stake_meta, get_directed_stake_meta_address,
+            get_directed_stake_ticket_address, get_directed_stake_tickets,
+            get_directed_stake_whitelist_address, get_stake_pool_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -139,8 +139,14 @@ pub async fn compute_directed_stake_meta(
         jitosol_balances.insert(ticket.ticket_update_authority, balance);
     }
 
-    let validator_targets =
-        aggregate_validator_targets(&tickets, &jitosol_balances, conversion_rate_bps)?;
+    let existing_directed_stake_meta =
+        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
+    let validator_targets = aggregate_validator_targets(
+        &existing_directed_stake_meta,
+        &tickets,
+        &jitosol_balances,
+        conversion_rate_bps,
+    )?;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
