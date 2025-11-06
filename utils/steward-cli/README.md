@@ -643,7 +643,6 @@ Displays a specific ticket's current preferences.
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     view-directed-stake-ticket \
-    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
     --ticket-signer BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
 ```
 

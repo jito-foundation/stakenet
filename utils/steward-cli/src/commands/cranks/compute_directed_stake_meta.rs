@@ -106,7 +106,7 @@ pub async fn command_crank_compute_directed_stake_meta(
     // Simulate aggregation to count final targets
     // Note: You'll need to get the actual conversion rate from the stake pool
     // This is a simplified version - adjust based on your actual implementation
-    let mut final_targets = std::collections::HashSet::new();
+    let mut final_targets = HashSet::new();
     for ticket in &tickets {
         let jitosol_balance = jitosol_balances
             .get(&ticket.ticket_update_authority)
@@ -127,17 +127,11 @@ pub async fn command_crank_compute_directed_stake_meta(
     let num_validators_in_tickets = ticket_validators.len();
 
     println!("=== Directed Stake Metadata Computation Summary ===");
-    println!("Total Directed Stake Tickets: {}", num_tickets);
-    println!("Tickets with JitoSOL Balance: {}", tickets_with_balance);
-    println!("Total Stake Preferences: {}", total_preferences);
-    println!(
-        "Unique Validators in Tickets: {}",
-        num_validators_in_tickets
-    );
-    println!(
-        "Final Aggregated Targets: {} (after filtering by balance)",
-        num_final_targets
-    );
+    println!("Total Directed Stake Tickets: {num_tickets}");
+    println!("Tickets with JitoSOL Balance: {tickets_with_balance}");
+    println!("Total Stake Preferences: {total_preferences}");
+    println!("Unique Validators in Tickets: {num_validators_in_tickets}");
+    println!("Final Aggregated Targets: {num_final_targets} (after filtering by balance)");
 
     if tickets_with_balance < num_tickets {
         println!(
@@ -225,9 +219,9 @@ pub async fn command_crank_compute_directed_stake_meta(
     println!("\n=== Transaction Successful ===");
     println!("Signature: {}", signature);
     println!("Updated metadata:");
-    println!("  - {} tickets processed", num_tickets);
-    println!("  - {} tickets with balance", tickets_with_balance);
-    println!("  - {} final validator targets", num_final_targets);
+    println!("  - {num_tickets} tickets processed");
+    println!("  - {tickets_with_balance} tickets with balance");
+    println!("  - {num_final_targets} final validator targets");
 
     Ok(())
 }
