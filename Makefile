@@ -1,5 +1,5 @@
 # Makefile for Stakenet
-.PHONY: check build test
+.PHONY: check build build-release test
 
 # Check the project
 check:
@@ -8,6 +8,10 @@ check:
 # Build the project
 build:
 	cargo build --features idl-build
+
+# Build the project
+build-release:
+	cargo build --release --features idl-build
 
 # Run tests
 test:

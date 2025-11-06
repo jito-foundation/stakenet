@@ -1,4 +1,6 @@
-# Accounts
+# Steward CLI
+
+## Accounts
 
 | Account        | Address                                      |
 | -------------- | -------------------------------------------- |
@@ -7,7 +9,13 @@
 | Steward State  | 9BAmGVLGxzqct6bkgjWmKSv3BFB6iKYXNBQp8GWG1LDY |
 | Authority      | 9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6 |
 
-# CLI Commands
+## CLI Commands
+
+### Build
+
+```bash
+make build-release
+```
 
 ## Permissionless Commands
 
@@ -437,7 +445,7 @@ Aggregate all tickets and compute the final stake distribution.
 Sets the authority that can upload and update directed stake metadata.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     update-authority \
@@ -452,7 +460,7 @@ cargo r -p steward-cli -- \
 Sets the authority that can add/remove entries from the directed stake whitelist.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     update-authority \
@@ -467,7 +475,7 @@ cargo r -p steward-cli -- \
 Creates the whitelist account that will store approved validators, users, and protocols.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     init-directed-stake-whitelist \
@@ -491,7 +499,7 @@ Initializing DirectedStakeWhitelist...
 Grows the whitelist account to its full size.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     realloc-directed-stake-whitelist \
@@ -504,7 +512,7 @@ cargo r -p steward-cli -- \
 Displays the current state of the whitelist for verification.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     view-directed-stake-whitelist \
@@ -517,7 +525,7 @@ Adds validators, users, or protocols to the whitelist, allowing them to submit s
 
 **Add a Validator:**
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     add-to-directed-stake-whitelist \
@@ -529,7 +537,7 @@ cargo r -p steward-cli -- \
 
 **Add a User:**
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     add-to-directed-stake-whitelist \
@@ -541,7 +549,7 @@ cargo r -p steward-cli -- \
 
 **Add a Protocol:**
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     add-to-directed-stake-whitelist \
@@ -556,7 +564,7 @@ cargo r -p steward-cli -- \
 Creates the metadata account that will store aggregated stake preferences.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     init-directed-stake-meta \
@@ -580,7 +588,7 @@ Initializing DirectedStakeMeta...
 Grows the metadata account to accommodate all aggregated data.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     realloc-directed-stake-meta \
@@ -593,7 +601,7 @@ cargo r -p steward-cli -- \
 Displays the current state of the metadata account.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     view-directed-stake-meta \
@@ -605,7 +613,7 @@ cargo r -p steward-cli -- \
 Creates a ticket for a whitelisted entity to express stake preferences. Run by or on behalf of each whitelisted entity.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     init-directed-stake-ticket \
@@ -631,7 +639,7 @@ Initializing DirectedStakeTicket...
 Displays a specific ticket's current preferences.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     view-directed-stake-ticket \
@@ -644,7 +652,7 @@ cargo r -p steward-cli -- \
 Lists all tickets in the system.
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     view-directed-stake-tickets
@@ -655,7 +663,7 @@ cargo r -p steward-cli -- \
 Updates a ticket with new validator preferences and stake allocations. Stake shares are specified in basis points (10000 bps = 100%).
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     update-directed-stake-ticket \
@@ -682,7 +690,7 @@ Aggregates all tickets and computes the final stake distribution. Should be run:
 - Before stake rebalancing operations
 
 ```bash
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     compute-directed-stake-meta \
@@ -699,7 +707,7 @@ The token mint (JitoSOL) is used to query balances and weight stake preferences 
 
 ```bash
 # Recompute metadata to reflect current balances and preferences
-cargo r -p steward-cli -- \
+./target/release/steward-cli \
     --json-rpc-url <RPC_URL> \
     --program-id <PROGRAM_ID> \
     compute-directed-stake-meta \
