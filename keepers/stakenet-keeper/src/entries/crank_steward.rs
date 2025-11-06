@@ -860,7 +860,7 @@ async fn _handle_rebalance(
         .await?;
 
     let directed_stake_meta =
-        get_directed_stake_meta_address(&all_steward_accounts.config_address, &program_id);
+        get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
 
     let mut ixs_to_run = Vec::new();
     if reserve_stake_acc
