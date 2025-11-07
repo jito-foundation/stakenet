@@ -1,5 +1,3 @@
-use std::num::NonZeroU32;
-
 use anchor_lang::{
     prelude::*,
     solana_program::{
@@ -9,9 +7,7 @@ use anchor_lang::{
     },
 };
 use borsh::BorshDeserialize;
-use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
-};
+use spl_stake_pool::minimum_delegation;
 
 use crate::{
     constants::STAKE_POOL_WITHDRAW_SEED,
