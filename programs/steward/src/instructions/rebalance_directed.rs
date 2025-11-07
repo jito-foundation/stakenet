@@ -81,34 +81,15 @@ pub struct RebalanceDirected<'info> {
     pub reserve_stake: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(
-        mut,
-        address = find_stake_program_address(
-            &spl_stake_pool::id(),
-            &vote_account.key(),
-            &stake_pool.key(),
-            NonZeroU32::new(
-                u32::from(
-                    get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?
-                        .validator_seed_suffix
-                )
-            )
-        ).0,
-        owner = stake::program::ID
-    )]
+    /// Account may not exist yet so no owner check done
+    /// TODO: PDA Check in handler
+    #[account(mut)]
     pub stake_account: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     /// Account may not exist yet so no owner check done
-    #[account(
-        mut,
-        address = find_transient_stake_program_address(
-            &spl_stake_pool::id(),
-            &vote_account.key(),
-            &stake_pool.key(),
-            get_validator_stake_info_at_index(&validator_list, validator_list_index as usize)?.transient_seed_suffix.into()
-        ).0
-    )]
+    /// TODO: PDA Check in handler
+    #[account(mut)]
     pub transient_stake_account: AccountInfo<'info>,
 
     /// CHECK: We check the owning program in the handler
@@ -153,16 +134,14 @@ pub fn handler(
     // if the directed stake meta has valid entries
     let vote_pubkey_from_directed_stake_meta =
         directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey;
-    let vote_pubkey_from_validator_list =
-        get_validator_stake_info_at_index(validator_list, validator_list_index)?;
+    let maybe_vote_pubkey_from_validator_list =
+        get_validator_stake_info_at_index(validator_list, validator_list_index);
 
-    // An empty meta means there are no directed stake targets, automatically transition to Idle
-    if directed_stake_meta.total_stake_targets > 0 {
-        require!(
-            vote_pubkey_from_directed_stake_meta
-                == vote_pubkey_from_validator_list.vote_account_address,
-            StewardError::DirectedStakeVoteAccountMismatch
-        );
+    if maybe_vote_pubkey_from_validator_list.is_err() {
+        directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch =
+            clock.epoch;
+        msg!("Validator no longer apart of validator list, marking as rebalanced for this epoch.");
+        return Ok(());
     }
 
     let rebalance_type: RebalanceType;
