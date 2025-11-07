@@ -87,25 +87,24 @@ impl DirectedRebalanceProgressionInfo {
         all_steward_accounts: &AllStewardAccounts,
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Vec<DirectedRebalanceProgressionInfo> {
-        let mut progression_info = Vec::new();
-
-        for validator_list_index in 0..all_steward_accounts.state_account.state.num_pool_validators
-        {
-            let vote_account = all_steward_accounts.validator_list_account.validators
-                [validator_list_index as usize]
-                .vote_account_address;
-            if let Some(directed_stake_meta_index) =
-                directed_stake_meta.get_target_index(&vote_account)
-            {
-                progression_info.push(DirectedRebalanceProgressionInfo {
-                    validator_list_index: validator_list_index as usize,
-                    directed_stake_meta_index,
-                    vote_account,
-                });
-            }
-        }
-
-        progression_info
+        all_steward_accounts
+            .validator_list_account
+            .validators
+            .iter()
+            .take(all_steward_accounts.state_account.state.num_pool_validators as usize)
+            .enumerate()
+            .filter_map(|(validator_list_index, validator)| {
+                directed_stake_meta
+                    .get_target_index(&validator.vote_account_address)
+                    .map(
+                        |directed_stake_meta_index| DirectedRebalanceProgressionInfo {
+                            validator_list_index,
+                            directed_stake_meta_index,
+                            vote_account: validator.vote_account_address,
+                        },
+                    )
+            })
+            .collect()
     }
 }
 
