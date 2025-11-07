@@ -3,6 +3,26 @@ use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
+use crate::commands::{
+    actions::{
+        add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        close_directed_stake_ticket::CloseDirectedStakeTicket,
+        close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
+        migrate_state_to_v2::MigrateStateToV2,
+        remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
+        update_directed_stake_ticket::UpdateDirectedStakeTicket,
+    },
+    cranks::{
+        compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        rebalance_directed::CrankRebalanceDirected,
+    },
+    info::view_directed_stake_ticket::ViewDirectedStakeTicket,
+    init::{
+        realloc_directed_stake_meta::ReallocDirectedStakeMeta,
+        realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
+    },
+};
+
 #[derive(Parser)]
 #[command(about = "CLI for the steward program", version)]
 pub struct Args {
@@ -274,17 +294,15 @@ pub enum Commands {
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
     GetJitosolBalance(GetJitosolBalance),
-    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
-    InitDirectedStakeMeta(InitDirectedStakeMeta),
-    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
-    InitDirectedStakeTicket(InitDirectedStakeTicket),
 
     // Actions
     InitSteward(InitSteward),
     ReallocState(ReallocState),
+    MigrateStateToV2(MigrateStateToV2),
 
     SetStaker(SetStaker),
     RevertStaker(RevertStaker),
@@ -311,6 +329,18 @@ pub enum Commands {
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
 
+    InitDirectedStakeMeta(InitDirectedStakeMeta),
+    ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
+    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    ReallocDirectedStakeWhitelist(ReallocDirectedStakeWhitelist),
+    InitDirectedStakeTicket(InitDirectedStakeTicket),
+    AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
+    UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
+    RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
+    CloseDirectedStakeTicket(CloseDirectedStakeTicket),
+    CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
+
     // Cranks
     CrankSteward(CrankSteward),
     CrankEpochMaintenance(CrankEpochMaintenance),
@@ -319,6 +349,7 @@ pub enum Commands {
     CrankIdle(CrankIdle),
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
+    CrankRebalanceDirected(CrankRebalanceDirected),
 }
 
 // ---------- VIEWS ------------
@@ -426,6 +457,20 @@ pub enum AuthoritySubcommand {
         #[arg(long, env)]
         new_authority: Pubkey,
     },
+    /// Manages directed stake meta upload authority
+    DirectedStakeMetaUpload {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages directed stake whitelist authority
+    DirectedStakeWhitelist {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
 }
 #[derive(Parser)]
 #[command(about = "Updates config account parameters")]
@@ -505,12 +550,16 @@ pub struct AddToBlacklist {
     pub squads_program_id: Option<Pubkey>,
 }
 
-fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+pub(crate) fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
+    s.parse()
+}
+
+pub(crate) fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
     s.parse()
 }
 
 // Add helper to parse a Pubkey from string
-fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+pub(crate) fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
     use std::str::FromStr;
     Pubkey::from_str(s)
 }
@@ -653,6 +702,14 @@ pub struct UpdateValidatorListBalance {
 pub struct CrankSteward {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+
+    /// JitoSOL token mint address
+    #[arg(
+        long,
+        env,
+        default_value = "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
+    )]
+    pub token_mint: Pubkey,
 }
 
 #[derive(Parser)]
@@ -783,10 +840,6 @@ pub struct InitDirectedStakeMeta {
     #[arg(long, env)]
     pub steward_config: Pubkey,
 
-    /// Total number of stake targets to be uploaded
-    #[arg(long, env)]
-    pub total_stake_targets: u16,
-
     /// Authority keypair path, also used as payer
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
@@ -810,42 +863,10 @@ pub struct InitDirectedStakeTicket {
     #[arg(long, env)]
     pub ticket_update_authority: Pubkey,
 
-    /// Ticket close authority pubkey
-    #[arg(long, env)]
-    pub ticket_close_authority: Pubkey,
-
     /// Whether the ticket holder is a protocol (default: false)
     #[arg(long, env, default_value = "false")]
     pub ticket_holder_is_protocol: bool,
 
     #[command(flatten)]
     pub transaction_parameters: TransactionParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "Compute directed stake metadata including tickets and JitoSOL balances")]
-pub struct ComputeDirectedStakeMeta {
-    /// Print account information in JSON format
-    #[arg(
-        long,
-        default_value = "false",
-        help = "This will print out account information in JSON format"
-    )]
-    pub print_json: bool,
-
-    /// Copy stake targets on chain
-    #[arg(
-        long,
-        default_value = "false",
-        help = "Whether to copy the computed stake targets on-chain"
-    )]
-    pub copy_targets: bool,
-
-    /// Display progress bar
-    #[arg(long, env, default_value = "false")]
-    pub progress_bar: bool,
-
-    /// Authority keypair path, also used as payer
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
 }

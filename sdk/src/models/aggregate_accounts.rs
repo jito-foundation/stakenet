@@ -14,6 +14,8 @@ pub struct AllStewardAccounts {
     pub state_account: Box<StewardStateAccountV2>,
     pub state_address: Pubkey,
     pub stake_pool_account: Box<StakePool>,
+
+    /// Jito stake pool address
     pub stake_pool_address: Pubkey,
     pub stake_pool_withdraw_authority: Pubkey,
     pub validator_list_account: Box<ValidatorList>,

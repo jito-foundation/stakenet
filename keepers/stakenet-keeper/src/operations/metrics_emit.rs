@@ -1,18 +1,20 @@
+//! This program starts several threads to manage the creation of validator history accounts,
+//! and the updating of the various data feeds within the accounts.
+//! It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+
 use std::str::FromStr;
 
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
 use solana_pubkey::Pubkey;
 use spl_stake_pool::state::StakeStatus;
-
-use stakenet_sdk::utils::debug::{
-    format_simple_steward_state_string, format_steward_state_string, steward_state_to_state_code,
+use stakenet_sdk::utils::{
+    accounts::get_directed_stake_meta,
+    debug::{
+        format_simple_steward_state_string, format_steward_state_string,
+        steward_state_to_state_code,
+    },
 };
 use validator_history::ValidatorHistoryEntry;
 
@@ -26,14 +28,19 @@ fn _should_run() -> bool {
     true
 }
 
-fn _process(keeper_state: &KeeperState, cluster: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn _process(
+    keeper_config: &KeeperConfig,
+    keeper_state: &KeeperState,
+    cluster: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     emit_validator_history_metrics(keeper_state, cluster)?;
     emit_keeper_stats(keeper_state, cluster)?;
     emit_steward_stats(keeper_state, cluster)?;
+    emit_directed_stake_stats(keeper_config, keeper_state).await?;
     Ok(())
 }
 
-pub fn fire(
+pub async fn fire(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
     cluster: &str,
@@ -45,7 +52,7 @@ pub fn fire(
     let should_run = _should_run() && check_flag(keeper_config.run_flags, operation);
 
     if should_run {
-        match _process(keeper_state, cluster) {
+        match _process(keeper_config, keeper_state, cluster).await {
             Ok(_) => {
                 runs_for_epoch += 1;
             }
@@ -487,6 +494,48 @@ pub fn emit_steward_stats(
         ("minimum_voting_epochs", minimum_voting_epochs, i64),
         "cluster" => cluster,
     );
+
+    Ok(())
+}
+
+/// Emit directed stake metrics
+pub async fn emit_directed_stake_stats(
+    keeper_config: &KeeperConfig,
+    keeper_state: &KeeperState,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(ref all_steward_accounts) = keeper_state.all_steward_accounts {
+        let steward_state = all_steward_accounts.state_account.state;
+        let meta = get_directed_stake_meta(
+            keeper_config.client.clone(),
+            &all_steward_accounts.config_address,
+            &keeper_config.steward_config,
+        )
+        .await?;
+
+        let current_epoch = steward_state.current_epoch;
+
+        let active_targets = meta
+            .targets
+            .iter()
+            .filter(|target| target.vote_pubkey.ne(&Pubkey::default()));
+        let stake_updated_count = active_targets
+            .clone()
+            .filter(|target| target.staked_last_updated_epoch.eq(&current_epoch))
+            .count();
+        let target_updated_count = active_targets
+            .filter(|target| target.target_last_updated_epoch.eq(&current_epoch))
+            .count();
+
+        datapoint_info!(
+            "directed-stake-stats",
+            ("state", steward_state.state_tag.to_string(), String),
+            ("meta-total-stake-targets", meta.total_stake_targets, i64),
+            ("meta-epoch-last-updated", meta.epoch_last_updated, i64),
+            ("stake-updated-current-epoch", stake_updated_count, i64),
+            ("target-updated-current-epoch", target_updated_count, i64),
+            "cluster" => keeper_config.cluster_name,
+        );
+    }
 
     Ok(())
 }

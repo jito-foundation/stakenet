@@ -1,11 +1,10 @@
-use std::fmt;
+use std::{fmt, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use clap::{arg, command, Parser};
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use stakenet_sdk::models::cluster::Cluster;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
 pub struct KeeperConfig {
@@ -16,6 +15,9 @@ pub struct KeeperConfig {
     pub priority_fee_distribution_program_id: Pubkey,
     pub steward_program_id: Pubkey,
     pub steward_config: Pubkey,
+    /// JitoSOL Token Mint Address
+    pub token_mint: Pubkey,
+
     pub priority_fee_in_microlamports: u64,
     pub tx_retry_count: u16,
     pub tx_confirmation_seconds: u64,
@@ -120,6 +122,14 @@ pub struct Args {
         default_value = "jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv"
     )]
     pub steward_config: Pubkey,
+
+    /// JitoSOL token mint address
+    #[arg(
+        long,
+        env,
+        default_value = "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
+    )]
+    pub token_mint: Pubkey,
 
     /// Interval to update Validator History Accounts (default 300 sec)
     #[arg(long, env, default_value = "300")]
@@ -227,6 +237,10 @@ pub struct Args {
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
 
+    /// Run Directed Staking Operation
+    #[arg(long, env, default_value = "false")]
+    pub run_directed_staking: bool,
+
     /// Number of epochs to look back for block metadata
     #[arg(long, env, default_value = "3")]
     pub lookback_epochs: u64,
@@ -256,6 +270,7 @@ impl fmt::Display for Args {
             Priority Fee Distribution Program ID: {}\n\
             Steward Program ID: {}\n\
             Steward Config: {}\n\
+            JitoSOL Token Mint: {}\n\
             Validator History Interval: {} seconds\n\
             Steward Interval: {} seconds\n\
             Metrics Interval: {} seconds\n\
@@ -284,6 +299,7 @@ impl fmt::Display for Args {
             Redundant RPC URLs: {:?}\n\
             Run Priority Fee Commission: {:?}\n\
             Validator History Min Stake: {:?} lamports\n\
+            Run Directed Staking Operation: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoints,
@@ -295,6 +311,7 @@ impl fmt::Display for Args {
             self.priority_fee_distribution_program_id,
             self.steward_program_id,
             self.steward_config,
+            self.token_mint,
             self.validator_history_interval,
             self.steward_interval,
             self.metrics_interval,
@@ -322,7 +339,8 @@ impl fmt::Display for Args {
             self.region,
             self.redundant_rpc_urls,
             self.run_priority_fee_commission,
-            self.validator_history_min_stake
+            self.validator_history_min_stake,
+            self.run_directed_staking,
         )
     }
 }

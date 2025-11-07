@@ -1,34 +1,23 @@
-use crate::commands::command_args::ViewDirectedStakeWhitelist;
-use anyhow::Result;
-use jito_steward::state::directed_stake::DirectedStakeWhitelist;
-use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::commitment_config::CommitmentConfig;
-use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
+
+use anyhow::Result;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::pubkey::Pubkey;
+use stakenet_sdk::utils::accounts::{
+    get_directed_stake_whitelist, get_directed_stake_whitelist_address,
+};
+
+use crate::commands::command_args::ViewDirectedStakeWhitelist;
 
 pub async fn command_view_directed_stake_whitelist(
     args: ViewDirectedStakeWhitelist,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let (directed_stake_whitelist_pda, _bump) = Pubkey::find_program_address(
-        &[DirectedStakeWhitelist::SEED, args.steward_config.as_ref()],
-        &program_id,
-    );
-
-    let whitelist_account = client
-        .get_account_with_commitment(&directed_stake_whitelist_pda, CommitmentConfig::confirmed())
-        .await?;
-
-    if whitelist_account.value.is_none() {
-        anyhow::bail!(
-            "DirectedStakeWhitelist account not found: {}",
-            directed_stake_whitelist_pda
-        );
-    }
-
-    let whitelist_data = whitelist_account.value.unwrap().data;
-    let whitelist = bytemuck::from_bytes::<DirectedStakeWhitelist>(&whitelist_data);
+    let directed_stake_whitelist_pda =
+        get_directed_stake_whitelist_address(&args.steward_config, &program_id);
+    let whitelist =
+        get_directed_stake_whitelist(client.clone(), &args.steward_config, &program_id).await?;
 
     if args.print_json {
         let mut json_output = serde_json::Map::new();
@@ -102,10 +91,7 @@ pub async fn command_view_directed_stake_whitelist(
 
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else {
-        println!(
-            "DirectedStakeWhitelist Account: {}",
-            directed_stake_whitelist_pda
-        );
+        println!("DirectedStakeWhitelist Account: {directed_stake_whitelist_pda}");
         println!(
             "Total User Stakers: {}",
             whitelist.total_permissioned_user_stakers

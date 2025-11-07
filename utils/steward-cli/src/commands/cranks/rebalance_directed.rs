@@ -1,98 +1,90 @@
 use std::sync::Arc;
 
-use crate::commands::command_args::CrankRebalance;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
+use clap::Parser;
 use jito_steward::StewardStateEnum;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
-use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
 use stakenet_sdk::utils::{
     accounts::{
-        get_all_steward_accounts, get_directed_stake_meta_address, get_validator_history_address,
+        get_all_steward_accounts, get_directed_stake_meta, get_directed_stake_meta_address,
+        get_stake_address, get_transient_stake_address,
     },
+    helpers::DirectedRebalanceProgressionInfo,
     transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
 };
-use validator_history::id as validator_history_id;
 
-pub async fn command_crank_rebalance(
-    args: CrankRebalance,
+use crate::commands::command_args::PermissionlessParameters;
+
+#[derive(Parser)]
+#[command(about = "Crank `rebalance_directed` state")]
+pub struct CrankRebalanceDirected {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+}
+
+pub async fn command_crank_rebalance_directed(
+    args: CrankRebalanceDirected,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // Creates config account
     let payer = Arc::new(
         read_keypair_file(args.permissionless_parameters.payer_keypair_path)
             .expect("Failed reading keypair file ( Payer )"),
     );
 
-    let validator_history_program_id = validator_history_id();
     let steward_config = args.permissionless_parameters.steward_config;
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
-    let directed_stake_meta = get_directed_stake_meta_address(&steward_config, &program_id);
 
-    match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::Rebalance => { /* Continue */ }
-        _ => {
-            println!(
-                "State account is not in Rebalance state: {}",
-                steward_accounts.state_account.state.state_tag
-            );
-            return Ok(());
-        }
+    if !matches!(
+        steward_accounts.state_account.state.state_tag,
+        StewardStateEnum::RebalanceDirected
+    ) {
+        println!(
+            "State account is not in RebalanceDirected state: {}",
+            steward_accounts.state_account.state.state_tag
+        );
+        return Ok(());
     }
 
-    let validators_to_run = (0..steward_accounts.state_account.state.num_pool_validators)
-        .filter_map(|validator_index| {
-            let has_been_rebalanced = steward_accounts
-                .state_account
-                .state
-                .progress
-                .get(validator_index as usize)
-                .expect("Index is not in progress bitmask");
-            if has_been_rebalanced {
-                None
-            } else {
-                let vote_account = steward_accounts.validator_list_account.validators
-                    [validator_index as usize]
-                    .vote_account_address;
-                let history_account =
-                    get_validator_history_address(&vote_account, &validator_history_program_id);
+    let directed_stake_meta_address =
+        get_directed_stake_meta_address(&steward_accounts.config_address, &program_id);
+    let directed_stake_meta_account = get_directed_stake_meta(
+        client.clone(),
+        &steward_accounts.config_address,
+        &program_id,
+    )
+    .await?;
+    let validators_to_run = DirectedRebalanceProgressionInfo::get_directed_staking_validators(
+        &steward_accounts,
+        &directed_stake_meta_account,
+    );
 
-                Some((validator_index as usize, vote_account, history_account))
-            }
-        })
-        .collect::<Vec<(usize, Pubkey, Pubkey)>>();
-
-    let ixs_to_run = validators_to_run
+    let ixs_to_run: Vec<Instruction> = validators_to_run
         .iter()
-        .map(|(validator_index, vote_account, history_account)| {
-            println!("vote_account ({}): {}", validator_index, vote_account);
+        .map(|validator_info| {
+            let validator_index = validator_info.validator_list_index;
+            let vote_account = &validator_info.vote_account;
 
-            let (stake_address, _) = find_stake_program_address(
-                &spl_stake_pool::id(),
+            let stake_address =
+                get_stake_address(vote_account, &steward_accounts.stake_pool_address);
+
+            let transient_stake_address = get_transient_stake_address(
                 vote_account,
                 &steward_accounts.stake_pool_address,
-                None,
+                &steward_accounts.validator_list_account,
+                validator_index,
             );
 
-            let (transient_stake_address, _) = find_transient_stake_program_address(
-                &spl_stake_pool::id(),
-                vote_account,
-                &steward_accounts.stake_pool_address,
-                steward_accounts.validator_list_account.validators[*validator_index]
-                    .transient_seed_suffix
-                    .into(),
-            );
             Instruction {
                 program_id,
-                accounts: jito_steward::accounts::Rebalance {
-                    config: steward_config,
+                accounts: jito_steward::accounts::RebalanceDirected {
+                    config: steward_accounts.config_address,
                     state_account: steward_accounts.state_address,
-                    validator_history: *history_account,
                     stake_pool_program: spl_stake_pool::id(),
                     stake_pool: steward_accounts.stake_pool_address,
                     withdraw_authority: steward_accounts.stake_pool_withdraw_authority,
@@ -107,16 +99,17 @@ pub async fn command_crank_rebalance(
                     clock: solana_sdk::sysvar::clock::id(),
                     stake_history: solana_sdk::sysvar::stake_history::id(),
                     stake_config: stake::config::ID,
-                    directed_stake_meta,
+                    directed_stake_meta: directed_stake_meta_address,
                 }
                 .to_account_metas(None),
-                data: jito_steward::instruction::Rebalance {
-                    validator_list_index: *validator_index as u64,
+                data: jito_steward::instruction::RebalanceDirected {
+                    directed_stake_meta_index: validator_info.directed_stake_meta_index as u64,
+                    validator_list_index: validator_index as u64,
                 }
                 .data(),
             }
         })
-        .collect::<Vec<Instruction>>();
+        .collect();
 
     let txs_to_run = package_instructions(
         &ixs_to_run,
@@ -147,7 +140,7 @@ pub async fn command_crank_rebalance(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

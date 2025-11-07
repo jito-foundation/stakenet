@@ -233,7 +233,7 @@ impl DirectedStakeTicket {
     }
 }
 
-#[derive(BorshSerialize)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[account(zero_copy)]
 pub struct DirectedStakeWhitelist {
     pub permissioned_user_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
