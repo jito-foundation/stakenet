@@ -1562,12 +1562,17 @@
         },
         {
           "name": "stake_account",
+          "docs": [
+            "Account may not exist yet so no owner check done",
+            "TODO: PDA Check in handler"
+          ],
           "writable": true
         },
         {
           "name": "transient_stake_account",
           "docs": [
-            "Account may not exist yet so no owner check done"
+            "Account may not exist yet so no owner check done",
+            "TODO: PDA Check in handler"
           ],
           "writable": true
         },
