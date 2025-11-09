@@ -27,9 +27,9 @@ pub struct Args {
 
     /// Validator History Program ID
     #[arg(
-            short,
-            long,
-            default_value_t = validator_history::id()
+        long,
+        env,
+        default_value_t = validator_history::id()
         )]
     pub validator_history_program_id: Pubkey,
 
