@@ -20,7 +20,7 @@ no-log-ix-name = []
 mainnet-beta = []
 testnet = []
 cpi = ["no-entrypoint"]
-default = ["custom-heap", "idl-build"]
+default = ["custom-heap"]
 custom-heap = []
 idl-build = ["anchor-lang/idl-build", "no-entrypoint"]
 

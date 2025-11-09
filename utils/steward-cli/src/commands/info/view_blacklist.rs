@@ -43,7 +43,7 @@ pub async fn command_view_blacklist(
         println!("No validators are currently blacklisted.");
     } else {
         println!("Blacklisted Validators: {}", blacklisted_validators.len());
-        println!("{:<8} {}", "Index", "Vote Account");
+        println!("{:<8} Vote Account", "Index");
         println!("{}", "-".repeat(60));
         for (index, vote_account) in blacklisted_validators {
             println!("{:<8} {}", index, vote_account);
