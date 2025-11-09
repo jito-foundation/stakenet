@@ -3,6 +3,8 @@ use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
+use crate::commands::info::view_blacklist::ViewBlacklist;
+
 #[derive(Parser)]
 #[command(about = "CLI for the steward program", version)]
 pub struct Args {
@@ -21,7 +23,15 @@ pub struct Args {
         env,
         default_value_t = jito_steward::id()
     )]
-    pub program_id: Pubkey,
+    pub steward_program_id: Pubkey,
+
+    /// Validator History Program ID
+    #[arg(
+            short,
+            long,
+            default_value_t = validator_history::id()
+        )]
+    pub validator_history_program_id: Pubkey,
 
     /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
     #[arg(long, global = true, env)]
@@ -250,6 +260,7 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewBlacklist(ViewBlacklist),
 
     // Actions
     InitSteward(InitSteward),
