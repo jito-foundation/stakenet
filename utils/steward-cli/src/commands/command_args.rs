@@ -3,7 +3,25 @@ use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 use std::path::PathBuf;
 
-use crate::commands::info::view_blacklist::ViewBlacklist;
+use crate::commands::{
+    actions::{
+        add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        close_directed_stake_ticket::CloseDirectedStakeTicket,
+        close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
+        migrate_state_to_v2::MigrateStateToV2,
+        remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
+        update_directed_stake_ticket::UpdateDirectedStakeTicket,
+    },
+    cranks::{
+        compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        rebalance_directed::CrankRebalanceDirected,
+    },
+    info::view_directed_stake_ticket::ViewDirectedStakeTicket,
+    init::{
+        realloc_directed_stake_meta::ReallocDirectedStakeMeta,
+        realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
+    },
+};
 
 #[derive(Parser)]
 #[command(about = "CLI for the steward program", version)]
@@ -116,6 +134,26 @@ pub struct ConfigParameters {
     /// Minimum number of consecutive epochs a validator has to vote before it can be considered for the pool
     #[arg(long, env)]
     pub minimum_voting_epochs: Option<u64>,
+
+    /// Minimum epoch progress for computing directed stake meta
+    #[arg(long, env)]
+    pub min_epoch_progress_for_compute_directed_stake_meta: Option<f64>,
+
+    /// Maximum epoch progress for directed rebalance
+    #[arg(long, env)]
+    pub max_epoch_progress_for_directed_rebalance: Option<f64>,
+
+    /// Epoch progress for computing score
+    #[arg(long, env)]
+    pub compute_score_epoch_progress: Option<f64>,
+
+    /// Minimum lamports for undirected stake floor
+    #[arg(long, env)]
+    pub undirected_stake_floor_lamports: Option<u64>,
+
+    /// Percent of total pool lamports that can be unstaked due to directed stake requests
+    #[arg(long, env)]
+    pub directed_stake_unstake_cap_bps: Option<u16>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -140,6 +178,9 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             num_epochs_between_scoring: config.num_epochs_between_scoring,
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
+            compute_score_epoch_progress: config.compute_score_epoch_progress,
+            undirected_stake_floor_lamports: config.undirected_stake_floor_lamports,
+            directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
         }
     }
 }
@@ -262,10 +303,16 @@ pub enum Commands {
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewBlacklist(ViewBlacklist),
+    ViewDirectedStakeTickets(ViewDirectedStakeTickets),
+    ViewDirectedStakeTicket(ViewDirectedStakeTicket),
+    ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
+    ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    GetJitosolBalance(GetJitosolBalance),
 
     // Actions
     InitSteward(InitSteward),
     ReallocState(ReallocState),
+    MigrateStateToV2(MigrateStateToV2),
 
     SetStaker(SetStaker),
     RevertStaker(RevertStaker),
@@ -292,6 +339,18 @@ pub enum Commands {
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
 
+    InitDirectedStakeMeta(InitDirectedStakeMeta),
+    ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
+    InitDirectedStakeWhitelist(InitDirectedStakeWhitelist),
+    ReallocDirectedStakeWhitelist(ReallocDirectedStakeWhitelist),
+    InitDirectedStakeTicket(InitDirectedStakeTicket),
+    AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
+    UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
+    RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
+    CloseDirectedStakeTicket(CloseDirectedStakeTicket),
+    CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
+
     // Cranks
     CrankSteward(CrankSteward),
     CrankEpochMaintenance(CrankEpochMaintenance),
@@ -300,6 +359,7 @@ pub enum Commands {
     CrankIdle(CrankIdle),
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
+    CrankRebalanceDirected(CrankRebalanceDirected),
 }
 
 // ---------- VIEWS ------------
@@ -407,6 +467,20 @@ pub enum AuthoritySubcommand {
         #[arg(long, env)]
         new_authority: Pubkey,
     },
+    /// Manages directed stake meta upload authority
+    DirectedStakeMetaUpload {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
+    /// Manages directed stake whitelist authority
+    DirectedStakeWhitelist {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
 }
 #[derive(Parser)]
 #[command(about = "Updates config account parameters")]
@@ -486,12 +560,16 @@ pub struct AddToBlacklist {
     pub squads_program_id: Option<Pubkey>,
 }
 
-fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+pub(crate) fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
+    s.parse()
+}
+
+pub(crate) fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
     s.parse()
 }
 
 // Add helper to parse a Pubkey from string
-fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
+pub(crate) fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
     use std::str::FromStr;
     Pubkey::from_str(s)
 }
@@ -634,6 +712,14 @@ pub struct UpdateValidatorListBalance {
 pub struct CrankSteward {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+
+    /// JitoSOL token mint address
+    #[arg(
+        long,
+        env,
+        default_value = "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn"
+    )]
+    pub token_mint: Pubkey,
 }
 
 #[derive(Parser)]
@@ -680,4 +766,117 @@ pub struct CrankComputeInstantUnstake {
 pub struct CrankRebalance {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeTickets using memcmp filter for discriminator")]
+pub struct ViewDirectedStakeTickets {
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeWhitelist account contents")]
+pub struct ViewDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View DirectedStakeMeta account contents")]
+pub struct ViewDirectedStakeMeta {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Get JitoSOL balance for a specific token account")]
+pub struct GetJitosolBalance {
+    /// Token account pubkey to check balance for
+    #[arg(long, env)]
+    pub token_account: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeWhitelist account")]
+pub struct InitDirectedStakeWhitelist {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeMeta account")]
+pub struct InitDirectedStakeMeta {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
+}
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeTicket account")]
+pub struct InitDirectedStakeTicket {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Authority keypair path, also used as payer
+    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
+    pub authority_keypair_path: PathBuf,
+
+    /// Ticket update authority pubkey
+    #[arg(long, env)]
+    pub ticket_update_authority: Pubkey,
+
+    /// Whether the ticket holder is a protocol (default: false)
+    #[arg(long, env, default_value = "false")]
+    pub ticket_holder_is_protocol: bool,
+
+    #[command(flatten)]
+    pub transaction_parameters: TransactionParameters,
 }

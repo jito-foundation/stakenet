@@ -1,4 +1,6 @@
-# Accounts
+# Steward CLI
+
+## Accounts
 
 | Account        | Address                                      |
 | -------------- | -------------------------------------------- |
@@ -7,7 +9,13 @@
 | Steward State  | 9BAmGVLGxzqct6bkgjWmKSv3BFB6iKYXNBQp8GWG1LDY |
 | Authority      | 9eZbWiHsPRsxLSiHxzg2pkXsAuQMwAjQrda7C7e21Fw6 |
 
-# CLI Commands
+## CLI Commands
+
+### Build
+
+```bash
+make build-release
+```
 
 ## Permissionless Commands
 
@@ -258,7 +266,21 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 in
 ### Realloc State
 
 ```bash
-cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 realloc-state --authority-keypair-path ../../credentials/stakenet_test.json --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+cargo run -p steward-cli -- \
+    --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    realloc-state \
+    --authority-keypair-path ../../credentials/stakenet_test.json \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
+```
+
+### Migrate State To V2
+
+```bash
+cargo run -p steward-cli -- \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    migrate-state-to-v2 \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
 ```
 
 ### Update Config
@@ -363,6 +385,355 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 re
 ```bash
 cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 close-steward --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ../../credentials/stakenet_test.json
 ```
+
+## Directed Stake
+
+Directed stake allows validators, users, and protocols to express preferences for how stake should be distributed across the validator set.
+
+### System Components
+
+- **DirectedStakeWhitelist**: Controls who can submit stake tickets (validators, users, protocols)
+- **DirectedStakeMeta**: Aggregates all tickets and token balances to compute final stake distribution
+- **DirectedStakeTicket**: Individual stake preference tickets submitted by whitelisted entities
+
+### Setup Workflow
+
+The complete setup follows five logical stages and should be performed in order:
+
+#### Stage 1: Authority Configuration
+
+Configure the authorities that can manage directed stake metadata and the whitelist.
+
+#### Stage 2: Whitelist Setup
+
+Create and configure the whitelist that controls who can submit directed stake tickets.
+
+#### Stage 3: Metadata Setup
+
+Create the aggregation system that combines all stake tickets and token balances.
+
+#### Stage 4: Ticket Management
+
+Enable whitelisted entities to create and manage their stake preference tickets.
+
+#### Stage 5: Computation
+
+Aggregate all tickets and compute the final stake distribution.
+
+### Setup Checklist
+
+**Phase 1: Authorities**
+- [ ] Update stake meta upload authority
+- [ ] Update stake whitelist authority
+
+**Phase 2: Whitelist**
+- [ ] Initialize DirectedStakeWhitelist account
+- [ ] Reallocate DirectedStakeWhitelist account (runs once, handles multiple transactions automatically)
+- [ ] Verify whitelist with view command
+- [ ] Add validators to whitelist (repeat as needed)
+- [ ] Add users to whitelist (repeat as needed)
+- [ ] Add protocols to whitelist (repeat as needed)
+
+**Phase 3: Metadata**
+- [ ] Initialize DirectedStakeMeta account
+- [ ] Reallocate DirectedStakeMeta account
+- [ ] Verify metadata with view command
+
+**Phase 4: Tickets** (per whitelisted entity)
+- [ ] Initialize DirectedStakeTicket for each entity
+- [ ] Verify tickets with view commands
+- [ ] Update tickets with preferences (can be done multiple times)
+
+**Phase 5: Computation**
+- [ ] Run compute-directed-stake-meta
+- [ ] Set up periodic computation (e.g., cron job)
+
+### Commands
+
+#### Update Stake Meta Upload Authority
+
+Sets the authority that can upload and update directed stake metadata.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    update-authority \
+    directed-stake-meta-upload \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --new-authority BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+#### Update Stake Whitelist Authority
+
+Sets the authority that can add/remove entries from the directed stake whitelist.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    update-authority \
+    directed-stake-whitelist  \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --new-authority BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+#### Initialize DirectedStakeWhitelist
+
+Creates the whitelist account that will store approved validators, users, and protocols.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    init-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+Expected output:
+```
+Initializing DirectedStakeWhitelist...
+  Authority: <AUTHORITY_PUBKEY>
+  Steward Config: F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
+  DirectedStakeWhitelist PDA: 83U6qSYdAuEZJiZYzkg4Rb7XyRiM4rpa2fjTE2ieA2X
+✅ DirectedStakeWhitelist initialized successfully!
+  Transaction signature: 3FDMPL4kJJPneNgo2CHikLxsBrSGu9sSeuf2qin9CYwmsaJRAYepr5ftMt2KgAnBaUQ51r3X2iRoahNavzPXQbZE
+  DirectedStakeWhitelist account: 83U6qSYdAuEZJiZYzkg4Rb7XyRiM4rpa2fjTE2ieA2X
+```
+
+#### Reallocate DirectedStakeWhitelist
+
+Grows the whitelist account to its full size.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    realloc-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+#### View DirectedStakeWhitelist
+
+Displays the current state of the whitelist for verification.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    view-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
+```
+
+#### Add to DirectedStakeWhitelist
+
+Adds validators, users, or protocols to the whitelist, allowing them to submit stake tickets.
+
+**Add a Validator:**
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    add-to-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --record-type "validator" \
+    --record BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+```
+
+**Add a User:**
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    add-to-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --record-type "user" \
+    --record BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+```
+
+**Add a Protocol:**
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    add-to-directed-stake-whitelist \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --record-type "protocol" \
+    --record BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+```
+
+#### Initialize DirectedStakeMeta
+
+Creates the metadata account that will store aggregated stake preferences.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    init-directed-stake-meta \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+Expected output:
+```
+Initializing DirectedStakeMeta...
+  Authority: <AUTHORITY_PUBKEY>
+  Steward Config: F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
+  DirectedStakeMeta PDA: HK1WwbCnpefRfiZMTacHNMhLyU621uonSPCyCpB6mdp
+✅ DirectedStakeMeta initialized successfully!
+  Transaction signature: 2LXz9D6B5o3rs4bkQxhUju4bQZLXrmBni2AkawJCoXKv8VDR7H6rYxwQYeAjCViw2NNcsY7wdU2s3p41LBjjsgyn
+  DirectedStakeMeta account: HK1WwbCnpefRfiZMTacHNMhLyU621uonSPCyCpB6mdp
+```
+
+#### Reallocate DirectedStakeMeta
+
+Grows the metadata account to accommodate all aggregated data.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    realloc-directed-stake-meta \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+#### View DirectedStakeMeta
+
+Displays the current state of the metadata account.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    view-directed-stake-meta \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
+```
+
+#### Initialize DirectedStakeTicket
+
+Creates a ticket for a whitelisted entity to express stake preferences. Run by or on behalf of each whitelisted entity.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    init-directed-stake-ticket \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --ticket-update-authority BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
+    --authority-keypair-path ~/.config/solana/id.json
+```
+
+Expected output:
+```
+Initializing DirectedStakeTicket...
+  Authority: BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+  Steward Config: F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
+  Ticket Update Authority: BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+  DirectedStakeTicket PDA: 4j6nu2W19qimz61VJUHGVQ31fa5skaT1bfSRVUWNVnLJ
+✅ DirectedStakeTicket initialized successfully!
+  Transaction signature: 39iHv6nWkmVremYN1s4EHYxREwattZMjQFSb19dZ5YrC8JN85Tr4e1A5TF5WDq5zVaEMwasmrNwqueLSDBEsUvCd
+  DirectedStakeTicket account: 4j6nu2W19qimz61VJUHGVQ31fa5skaT1bfSRVUWNVnLJ
+```
+
+#### View DirectedStakeTicket (Single)
+
+Displays a specific ticket's current preferences.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    view-directed-stake-ticket \
+    --ticket-signer BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA
+```
+
+#### View DirectedStakeTickets (All)
+
+Lists all tickets in the system.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    view-directed-stake-tickets
+```
+
+#### Update DirectedStakeTicket
+
+Updates a ticket with new validator preferences and stake allocations. Stake shares are specified in basis points (10000 bps = 100%).
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    update-directed-stake-ticket \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --vote-pubkey <VALIDATOR_1_VOTE_ACCOUNT> \
+    --stake-share-bps 5000 \
+    --vote-pubkey <VALIDATOR_2_VOTE_ACCOUNT> \
+    --stake-share-bps 3000 \
+    --vote-pubkey <VALIDATOR_3_VOTE_ACCOUNT> \
+    --stake-share-bps 2000
+```
+
+Example distributing 50%, 30%, 20% across three validators:
+- 5000 bps = 50%
+- 3000 bps = 30%
+- 2000 bps = 20%
+
+#### Compute DirectedStakeMeta
+
+Aggregates all tickets and computes the final stake distribution. Should be run:
+- After validators/users update their tickets
+- Refresh with current balances per epoch
+- Before stake rebalancing operations
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
+    compute-directed-stake-meta \
+    --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
+    --authority-keypair-path ~/.config/solana/id.json \
+    --token-mint J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn
+```
+
+The token mint (JitoSOL) is used to query balances and weight stake preferences accordingly.
+
+### Ongoing Operations
+
+**Regular Maintenance (Per Epoch):**
+
+```bash
+# Recompute metadata to reflect current balances and preferences
+./target/release/steward-cli \
+    --json-rpc-url <RPC_URL> \
+    --program-id <PROGRAM_ID> \
+    compute-directed-stake-meta \
+    --steward-config <CONFIG> \
+    --authority-keypair-path <PATH> \
+    --token-mint J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn
+```
+
+**Adding New Entities:**
+1. Add to whitelist
+2. Initialize ticket for entity
+3. Entity updates preferences
+4. Recompute metadata
+
+**Updating Preferences:**
+1. Entity updates ticket
+2. Recompute metadata
 
 # Deploy and Upgrade
 

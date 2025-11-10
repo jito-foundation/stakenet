@@ -14,6 +14,7 @@ use anchor_lang::{
     },
     AccountSerialize, AnchorSerialize, Discriminator, InstructionData, ToAccountMetas,
 };
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     bitmask::BitMask,
     constants::{MAX_VALIDATORS, SORTED_INDEX_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
@@ -364,6 +365,9 @@ impl TestFixture {
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
             minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            compute_score_epoch_progress: Some(0.50),
+            undirected_stake_floor_lamports: Some(10_000_000_000 * 1_000_000_000),
+            directed_stake_unstake_cap_bps: Some(10_000),
         });
 
         let update_priority_fee_parameters_args =
@@ -725,6 +729,22 @@ impl TestFixture {
             .expect("Failed warping to future epoch");
     }
 
+    pub async fn advance_num_slots(&self, additional_slots: u64) {
+        let clock: Clock = {
+            let banks_client = self.ctx.borrow_mut().banks_client.clone();
+            banks_client
+                .get_sysvar()
+                .await
+                .expect("Failed getting clock")
+        };
+        let target_slot = clock.slot + additional_slots;
+
+        self.ctx
+            .borrow_mut()
+            .warp_to_slot(target_slot)
+            .expect("Failed warping to future slot");
+    }
+
     pub async fn submit_transaction_assert_success(&self, transaction: Transaction) {
         let process_transaction_result = {
             let banks_client = self.ctx.borrow_mut().banks_client.clone();
@@ -810,6 +830,70 @@ pub async fn crank_stake_pool(fixture: &TestFixture) {
             .unwrap(),
     );
     fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_rebalance_directed(
+    fixture: &TestFixture,
+    _unit_test_fixtures: &StateMachineFixtures,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let ctx = &fixture.ctx;
+
+    for &i in indices {
+        let extra_accounts = &extra_validator_accounts[i];
+
+        let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
+        let ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::RebalanceDirected {
+                config: fixture.steward_config.pubkey(),
+                state_account: fixture.steward_state,
+                directed_stake_meta: Pubkey::find_program_address(
+                    &[
+                        DirectedStakeMeta::SEED,
+                        fixture.steward_config.pubkey().as_ref(),
+                    ],
+                    &jito_steward::id(),
+                )
+                .0,
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+                stake_pool_program: spl_stake_pool::id(),
+                withdraw_authority: extra_accounts.withdraw_authority,
+                validator_list: fixture.stake_pool_meta.validator_list,
+                reserve_stake: fixture.stake_pool_meta.reserve,
+                stake_account: extra_accounts.stake_account_address,
+                transient_stake_account: find_transient_stake_program_address(
+                    &spl_stake_pool::id(),
+                    &extra_accounts.vote_account,
+                    &fixture.stake_pool_meta.stake_pool,
+                    0u64,
+                )
+                .0,
+                vote_account: extra_accounts.vote_account,
+                clock: solana_sdk::sysvar::clock::id(),
+                rent: solana_sdk::sysvar::rent::id(),
+                stake_history: solana_sdk::sysvar::stake_history::id(),
+                stake_config: solana_sdk::stake::config::ID,
+                system_program: system_program::id(),
+                stake_program: solana_sdk::stake::program::id(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::RebalanceDirected {
+                directed_stake_meta_index: i as u64,
+                validator_list_index: i as u64,
+            }
+            .data(),
+        };
+        let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+        let tx = Transaction::new_signed_with_payer(
+            &[compute_budget_ix, ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            blockhash,
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
 }
 
 pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Option<&[usize]>) {
@@ -1155,6 +1239,14 @@ pub async fn crank_rebalance(
                 stake_account: extra_accounts.stake_account_address,
                 transient_stake_account: extra_accounts.transient_stake_account_address,
                 vote_account: extra_accounts.vote_account,
+                directed_stake_meta: Pubkey::find_program_address(
+                    &[
+                        DirectedStakeMeta::SEED,
+                        fixture.steward_config.pubkey().as_ref(),
+                    ],
+                    &jito_steward::id(),
+                )
+                .0,
                 system_program: system_program::id(),
                 stake_program: stake::program::id(),
                 rent: solana_sdk::sysvar::rent::id(),
@@ -1361,7 +1453,9 @@ impl Default for FixtureDefaultAccounts {
             paused: false.into(),
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
-            _padding: [0; 984],
+            directed_stake_meta_upload_authority: Pubkey::new_unique(),
+            directed_stake_whitelist_authority: Pubkey::new_unique(),
+            _padding: [0; 920],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -1373,7 +1467,7 @@ impl Default for FixtureDefaultAccounts {
         );
 
         let steward_state = StewardStateV2 {
-            state_tag: StewardStateEnum::ComputeScores,
+            state_tag: StewardStateEnum::RebalanceDirected,
             validator_lamport_balances: [0; MAX_VALIDATORS],
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
@@ -1871,8 +1965,13 @@ impl Default for StateMachineFixtures {
             priority_fee_max_commission_bps: 5_000,
             priority_fee_error_margin_bps: 10,
             priority_fee_scoring_start_epoch: 0,
-            _padding_0: [0; 6],
-            _padding_1: [0; 31],
+            directed_stake_unstake_cap_bps: 750,
+            min_epoch_progress_for_compute_directed_stake_meta: 0.50,
+            max_epoch_progress_for_directed_rebalance: 0.1,
+            compute_score_epoch_progress: 0.5,
+            undirected_stake_floor_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
+            _padding_0: [0; 4],
+            _padding_1: [0; 27],
         };
 
         // Setup Config
@@ -1887,7 +1986,9 @@ impl Default for StateMachineFixtures {
             validator_history_blacklist: LargeBitMask::default(),
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
-            _padding: [0; 984],
+            directed_stake_meta_upload_authority: Pubkey::new_unique(),
+            directed_stake_whitelist_authority: Pubkey::new_unique(),
+            _padding: [0; 920],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -2004,7 +2105,7 @@ impl Default for StateMachineFixtures {
 
         // Setup StewardState
         let state = StewardStateV2 {
-            state_tag: StewardStateEnum::ComputeScores, // Initial state
+            state_tag: StewardStateEnum::RebalanceDirected, // Initial state
             validator_lamport_balances,
             scores: [0; MAX_VALIDATORS],
             sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
@@ -2047,4 +2148,250 @@ impl Default for StateMachineFixtures {
             state,
         }
     }
+}
+
+pub async fn crank_copy_directed_stake_targets(
+    fixture: &TestFixture,
+    vote_pubkey: Pubkey,
+    target_lamports: u64,
+) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+            config: fixture.steward_config.pubkey(),
+            directed_stake_meta,
+            authority: fixture.keypair.pubkey(),
+            clock: solana_sdk::sysvar::clock::id(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::CopyDirectedStakeTargets {
+            vote_pubkey,
+            total_target_lamports: target_lamports,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+pub async fn crank_directed_stake_permissions(
+    fixture: &TestFixture,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+) {
+    use jito_steward::instructions::AuthorityType;
+    use jito_steward::state::directed_stake::DirectedStakeRecordType;
+
+    // First, set the whitelist authority to the signer
+    let set_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    // Submit the authority change first
+    let tx = Transaction::new_signed_with_payer(
+        &[set_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Initialize the directed stake whitelist first (this creates the account)
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    let init_whitelist_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::InitializeDirectedStakeWhitelist {
+            config: fixture.steward_config.pubkey(),
+            directed_stake_whitelist,
+            system_program: solana_sdk::system_program::id(),
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::InitializeDirectedStakeWhitelist {}.data(),
+    };
+
+    // Submit the whitelist initialization
+    let tx = Transaction::new_signed_with_payer(
+        &[init_whitelist_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Now reallocate the directed stake whitelist to proper size
+    realloc_directed_stake_whitelist(fixture).await;
+
+    // Add all validators to the whitelist
+    for extra_accounts in extra_validator_accounts.iter() {
+        let add_validator_ix = Instruction {
+            program_id: jito_steward::id(),
+            accounts: jito_steward::accounts::AddToDirectedStakeWhitelist {
+                config: fixture.steward_config.pubkey(),
+                directed_stake_whitelist,
+                authority: fixture.keypair.pubkey(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::AddToDirectedStakeWhitelist {
+                record_type: DirectedStakeRecordType::Validator,
+                record: extra_accounts.vote_account,
+            }
+            .data(),
+        };
+
+        let tx = Transaction::new_signed_with_payer(
+            &[add_validator_ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            fixture
+                .ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap(),
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+
+    // Add the caller as a user staker
+    let add_staker_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::AddToDirectedStakeWhitelist {
+            config: fixture.steward_config.pubkey(),
+            directed_stake_whitelist,
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::AddToDirectedStakeWhitelist {
+            record_type: DirectedStakeRecordType::User,
+            record: fixture.keypair.pubkey(),
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[add_staker_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+async fn realloc_directed_stake_whitelist(fixture: &TestFixture) {
+    let directed_stake_whitelist = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    // Get the validator list address from the config
+    let config: jito_steward::Config = fixture
+        .load_and_deserialize(&fixture.steward_config.pubkey())
+        .await;
+    let validator_list = config.validator_list;
+
+    // Calculate how many reallocs we need
+    let mut num_reallocs = (jito_steward::state::directed_stake::DirectedStakeWhitelist::SIZE
+        - jito_steward::constants::MAX_ALLOC_BYTES)
+        / jito_steward::constants::MAX_ALLOC_BYTES
+        + 1;
+    let mut ixs = vec![];
+
+    while num_reallocs > 0 {
+        ixs.extend(vec![
+            Instruction {
+                program_id: jito_steward::id(),
+                accounts: vec![
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        directed_stake_whitelist,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        fixture.steward_config.pubkey(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        validator_list,
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        anchor_lang::solana_program::system_program::id(),
+                        false,
+                    ),
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        fixture.keypair.pubkey(),
+                        true,
+                    ),
+                ],
+                data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
+            };
+            num_reallocs.min(10)
+        ]);
+        num_reallocs = num_reallocs.saturating_sub(10);
+    }
+
+    // Submit all reallocation instructions
+    let tx = Transaction::new_signed_with_payer(
+        &ixs,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(tx).await;
 }

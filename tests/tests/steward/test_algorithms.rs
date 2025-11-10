@@ -1870,6 +1870,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 500 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -1902,6 +1903,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -1937,6 +1939,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -1969,6 +1972,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 500 * LAMPORTS_PER_SOL,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -1999,6 +2003,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -2066,6 +2071,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                     total_unstake_lamports: 2000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -2096,6 +2102,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -2128,6 +2135,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 0,
                     stake_deposit_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });
@@ -2168,6 +2176,7 @@ fn test_decrease_stake_calculation() {
                     instant_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
                     stake_deposit_unstake_lamports: 0,
                     total_unstake_lamports: 1000 * LAMPORTS_PER_SOL,
+                    directed_unstake_lamports: 0,
                 },
         _ => false,
     });

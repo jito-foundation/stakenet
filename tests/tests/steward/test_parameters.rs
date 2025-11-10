@@ -212,6 +212,9 @@ async fn test_update_parameters() {
             num_epochs_between_scoring: Some(8),
             minimum_stake_lamports: Some(1),
             minimum_voting_epochs: Some(1),
+            compute_score_epoch_progress: Some(0.50),
+            undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+            directed_stake_unstake_cap_bps: Some(10_000),
         },
         &fixture.keypair,
     )
@@ -250,8 +253,13 @@ fn _test_parameter(
         priority_fee_max_commission_bps: 5_000,
         priority_fee_error_margin_bps: 10,
         priority_fee_scoring_start_epoch: 0,
-        _padding_0: [0; 6],
-        _padding_1: [0; 31],
+        directed_stake_unstake_cap_bps: 750,
+        min_epoch_progress_for_compute_directed_stake_meta: 0.5,
+        max_epoch_progress_for_directed_rebalance: 0.1,
+        compute_score_epoch_progress: 0.5,
+        undirected_stake_floor_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
+        _padding_0: [0; 4],
+        _padding_1: [0; 27],
     });
 
     // First Valid Epoch
