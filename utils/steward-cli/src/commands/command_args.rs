@@ -20,6 +20,7 @@ pub struct Args {
     /// Steward program ID
     #[arg(
         long,
+        alias = "program-id",
         env,
         default_value_t = jito_steward::id()
     )]
