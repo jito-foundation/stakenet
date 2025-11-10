@@ -4,6 +4,7 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
+use crate::entries::crank_copy_directed_stake_targets::crank_copy_directed_stake_targets;
 use crate::entries::crank_steward::crank_steward;
 use crate::state::keeper_state::{KeeperFlags, KeeperState};
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag};
@@ -141,11 +142,42 @@ pub async fn fire(
 
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
+/// Executes the main steward cranking operation with optional directed stake target copying.
+///
+/// This function orchestrates the steward cranking process in two phases:
+/// 1. Conditionally copies directed stake targets if needed (mid-epoch operation)
+/// 2. Executes the main steward crank operations
 pub async fn run_crank_steward(
     keeper_config: &KeeperConfig,
     keeper_state: &KeeperState,
 ) -> Result<SubmitStats, JitoTransactionError> {
-    crank_steward(
+    let mut submit_stats = SubmitStats::default();
+
+    if keeper_state
+        .should_copy_directed_stake_targets(
+            keeper_config.client.clone(),
+            &keeper_config.steward_program_id,
+        )
+        .await?
+    {
+        if let Some(steward_accounts) = &keeper_state.all_steward_accounts {
+            log::info!("Cranking Copy Directed Targets...");
+
+            let stats = crank_copy_directed_stake_targets(
+                keeper_config.client.clone(),
+                keeper_config.keypair.clone(),
+                &keeper_config.steward_program_id,
+                steward_accounts,
+                &keeper_config.token_mint,
+                Some(keeper_config.priority_fee_in_microlamports),
+            )
+            .await?;
+
+            submit_stats.combine(&stats);
+        }
+    }
+
+    let stats = crank_steward(
         &keeper_config.client,
         &keeper_config.keypair,
         &keeper_config.steward_program_id,
@@ -158,5 +190,8 @@ pub async fn run_crank_steward(
         keeper_state.all_active_validator_accounts.as_ref().unwrap(),
         Some(keeper_config.priority_fee_in_microlamports),
     )
-    .await
+    .await?;
+    submit_stats.combine(&stats);
+
+    Ok(submit_stats)
 }

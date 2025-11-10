@@ -14,6 +14,8 @@ pub enum AuthorityType {
     SetBlacklistAuthority = 1,
     SetParametersAuthority = 2,
     SetPriorityFeeParameterAuthority = 3,
+    SetDirectedStakeWhitelistAuthority = 4,
+    SetDirectedStakeMetaUploadAuthority = 5,
 }
 
 impl AuthorityType {
@@ -66,6 +68,22 @@ impl IdlBuild for AuthorityType {
                             ty: IdlType::Option(Box::new(IdlType::U8)),
                         }])),
                     },
+                    IdlEnumVariant {
+                        name: "SetDirectedStakeWhitelistAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetDirectedStakeWhitelistAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
+                    IdlEnumVariant {
+                        name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetDirectedStakeMetaUploadAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
                 ],
             },
             docs: Default::default(),
@@ -108,6 +126,12 @@ pub fn handler(ctx: Context<SetNewAuthority>, authority_type: AuthorityType) -> 
         }
         AuthorityType::SetPriorityFeeParameterAuthority => {
             config.priority_fee_parameters_authority = ctx.accounts.new_authority.key();
+        }
+        AuthorityType::SetDirectedStakeWhitelistAuthority => {
+            config.directed_stake_whitelist_authority = ctx.accounts.new_authority.key();
+        }
+        AuthorityType::SetDirectedStakeMetaUploadAuthority => {
+            config.directed_stake_meta_upload_authority = ctx.accounts.new_authority.key();
         }
     }
 

@@ -30,6 +30,8 @@ pub struct UpdateParametersArgs {
     pub scoring_unstake_cap_bps: Option<u32>,
     pub instant_unstake_cap_bps: Option<u32>,
     pub stake_deposit_unstake_cap_bps: Option<u32>,
+    pub directed_stake_unstake_cap_bps: Option<u16>,
+    pub undirected_stake_floor_lamports: Option<u64>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
     pub compute_score_slot_range: Option<u64>,
@@ -37,6 +39,7 @@ pub struct UpdateParametersArgs {
     pub num_epochs_between_scoring: Option<u64>,
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
+    pub compute_score_epoch_progress: Option<f64>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -111,6 +114,11 @@ impl IdlBuild for UpdateParametersArgs {
                         docs: Default::default(),
                     },
                     IdlField {
+                        name: "directed_stake_unstake_cap_bps".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
                         name: "instant_unstake_epoch_progress".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::F64)),
                         docs: Default::default(),
@@ -137,6 +145,16 @@ impl IdlBuild for UpdateParametersArgs {
                     },
                     IdlField {
                         name: "minimum_voting_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "compute_score_epoch_progress".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::F64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "undirected_stake_floor_lamports".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
@@ -220,6 +238,12 @@ pub struct Parameters {
     /// Validator history copy_vote_account and Cluster History must be updated past this epoch progress before calculating instant unstake
     pub instant_unstake_inputs_epoch_progress: f64,
 
+    /// The minimum epoch progress for computing directed stake meta
+    pub min_epoch_progress_for_compute_directed_stake_meta: f64,
+
+    /// The maximum epoch progress for directed rebalance
+    pub max_epoch_progress_for_directed_rebalance: f64,
+
     /// Number of epochs a given validator set will be delegated to before recomputing scores
     pub num_epochs_between_scoring: u64,
 
@@ -229,15 +253,29 @@ pub struct Parameters {
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
 
+    /// The minimum epoch progress for computing scores
+    pub compute_score_epoch_progress: f64,
+
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
-    pub _padding_0: [u8; 6],
+    /// Maximum percentage of the pool to be unstaked from directed stake (in basis points)
+    pub directed_stake_unstake_cap_bps: u16,
 
-    pub _padding_1: [u64; 31],
+    /// Directed rebalance increases are allowed until stake pool TVL dips below this floor
+    /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
+    /// fields due to it being live on mainnet
+    pub undirected_stake_floor_lamports: [u8; 8],
+
+    pub _padding_0: [u8; 4],
+    pub _padding_1: [u64; 27],
 }
 
 impl Parameters {
+    pub fn undirected_stake_floor_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.undirected_stake_floor_lamports)
+    }
+
     /// Merges the updated parameters with the current parameters and validates them
     pub fn get_valid_updated_parameters(
         self,
@@ -259,12 +297,15 @@ impl Parameters {
             scoring_unstake_cap_bps,
             instant_unstake_cap_bps,
             stake_deposit_unstake_cap_bps,
+            directed_stake_unstake_cap_bps,
             instant_unstake_epoch_progress,
             instant_unstake_inputs_epoch_progress,
             compute_score_slot_range,
             num_epochs_between_scoring,
             minimum_stake_lamports,
             minimum_voting_epochs,
+            compute_score_epoch_progress,
+            undirected_stake_floor_lamports,
         } = *args;
 
         let mut new_parameters = self;
@@ -321,6 +362,10 @@ impl Parameters {
             new_parameters.stake_deposit_unstake_cap_bps = stake_deposit_unstake_cap_bps;
         }
 
+        if let Some(directed_stake_unstake_cap_bps) = directed_stake_unstake_cap_bps {
+            new_parameters.directed_stake_unstake_cap_bps = directed_stake_unstake_cap_bps;
+        }
+
         if let Some(instant_unstake_epoch_progress) = instant_unstake_epoch_progress {
             new_parameters.instant_unstake_epoch_progress = instant_unstake_epoch_progress;
         }
@@ -344,6 +389,15 @@ impl Parameters {
 
         if let Some(minimum_voting_epochs) = minimum_voting_epochs {
             new_parameters.minimum_voting_epochs = minimum_voting_epochs;
+        }
+
+        if let Some(compute_score_epoch_progress) = compute_score_epoch_progress {
+            new_parameters.compute_score_epoch_progress = compute_score_epoch_progress;
+        }
+
+        if let Some(undirected_stake_floor_lamports) = undirected_stake_floor_lamports {
+            new_parameters.undirected_stake_floor_lamports =
+                undirected_stake_floor_lamports.to_le_bytes();
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -483,6 +537,10 @@ impl Parameters {
         }
 
         if self.priority_fee_error_margin_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.compute_score_epoch_progress < 0.0 || self.compute_score_epoch_progress >= 1.0 {
             return Err(StewardError::InvalidParameterValue.into());
         }
 

@@ -89,6 +89,7 @@ pub fn decrease_stake_calculation(
                 instant_unstake_lamports: unstake_amounts.instant_unstake_lamports,
                 stake_deposit_unstake_lamports: unstake_amounts.stake_deposit_unstake_lamports,
                 total_unstake_lamports,
+                directed_unstake_lamports: 0,
             }));
         }
     }

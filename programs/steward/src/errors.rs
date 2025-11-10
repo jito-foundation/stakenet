@@ -68,4 +68,23 @@ pub enum StewardError {
     InvalidStakeState,
     #[msg("Arithmetic casting error")]
     ArithmeticCastError,
+
+    #[msg("Directed stake validator whitelist is full")]
+    DirectedStakeValidatorListFull,
+    #[msg("Directed stake stakers list is full")]
+    DirectedStakeStakerListFull,
+    #[msg("Already permissioned")]
+    AlreadyPermissioned,
+    #[msg("Staker not found in whitelist")]
+    StakerNotInWhitelist,
+    #[msg("Validator not found in whitelist")]
+    ValidatorNotInWhitelist,
+    #[msg("Whitelist not initialized")]
+    WhitelistAuthorityUnset,
+    #[msg(
+        "Vote pubkey referenced in directed stake meta index and validator list index do not match"
+    )]
+    DirectedStakeVoteAccountMismatch,
+    #[msg("This validator has already been rebalanced for this epoch for this stake category.")]
+    ValidatorAlreadyRebalanced,
 }

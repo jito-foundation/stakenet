@@ -17,4 +17,7 @@ test-ledger
 /scripts
 /data
 notes.md
+**/runbooks
+txtx.yml
+.surfpool
 block_keeper.db3

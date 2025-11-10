@@ -13,12 +13,9 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{
-    commands::command_args::InitState,
-    utils::{
-        accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
-        transactions::configure_instruction,
-    },
+use crate::utils::{
+    accounts::{get_stake_pool_account, get_steward_config_account, get_steward_state_address},
+    transactions::configure_instruction,
 };
 
 const REALLOCS_PER_TX: usize = 10;
@@ -46,7 +43,8 @@ pub async fn command_init_state(
     let steward_state_account_raw = client.get_account(&steward_state).await?;
 
     if steward_state_account_raw.data.len() == StewardStateAccountV2::SIZE {
-        match StewardStateAccountV2::try_deserialize(&mut steward_state_account_raw.data.as_slice()) {
+        match StewardStateAccountV2::try_deserialize(&mut steward_state_account_raw.data.as_slice())
+        {
             Ok(steward_state_account) => {
                 if steward_state_account.is_initialized.into() {
                     println!("State account already exists");
