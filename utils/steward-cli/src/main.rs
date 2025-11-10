@@ -56,7 +56,10 @@ use crate::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
             rebalance_directed::command_crank_rebalance_directed,
         },
-        info::{view_directed_stake_ticket::command_view_directed_stake_ticket, view_blacklist::command_view_blacklist},
+        info::{
+            view_blacklist::command_view_blacklist,
+            view_directed_stake_ticket::command_view_directed_stake_ticket,
+        },
         init::{
             init_directed_stake_meta::command_init_directed_stake_meta,
             init_directed_stake_ticket::command_init_directed_stake_ticket,
@@ -103,19 +106,19 @@ async fn main() -> Result<()> {
             .await
         }
         Commands::ViewDirectedStakeTicket(args) => {
-            command_view_directed_stake_ticket(args, &client, program_id).await
+            command_view_directed_stake_ticket(args, &client, steward_program_id).await
         }
         Commands::ViewDirectedStakeTickets(args) => {
-            command_view_directed_stake_tickets(args, &client, program_id).await
+            command_view_directed_stake_tickets(args, &client, steward_program_id).await
         }
         Commands::ViewDirectedStakeWhitelist(args) => {
-            command_view_directed_stake_whitelist(args, &client, program_id).await
+            command_view_directed_stake_whitelist(args, &client, steward_program_id).await
         }
         Commands::ViewDirectedStakeMeta(args) => {
-            command_view_directed_stake_meta(args, &client, program_id).await
+            command_view_directed_stake_meta(args, &client, steward_program_id).await
         }
         Commands::GetJitosolBalance(args) => {
-            command_get_jitosol_balance(args, &client, program_id).await
+            command_get_jitosol_balance(args, &client, steward_program_id).await
         }
 
         // --- Helpers ---
@@ -139,15 +142,19 @@ async fn main() -> Result<()> {
         Commands::UpdateAuthority(args) => {
             command_update_authority(args, &client, steward_program_id).await
         }
-        Commands::SetStaker(args) => command_set_staker(args, &client, program_id).await,
-        Commands::RevertStaker(args) => command_revert_staker(args, &client, program_id).await,
-        Commands::Pause(args) => command_pause(args, &client, program_id).await,
-        Commands::Resume(args) => command_resume(args, &client, program_id).await,
-        Commands::ReallocState(args) => command_realloc_state(args, &client, program_id).await,
-        Commands::MigrateStateToV2(args) => {
-            command_migrate_state_to_v2(args, &client, program_id).await
+        Commands::SetStaker(args) => command_set_staker(args, &client, steward_program_id).await,
+        Commands::RevertStaker(args) => {
+            command_revert_staker(args, &client, steward_program_id).await
         }
-        Commands::ResetState(args) => command_reset_state(args, &client, program_id).await,
+        Commands::Pause(args) => command_pause(args, &client, steward_program_id).await,
+        Commands::Resume(args) => command_resume(args, &client, steward_program_id).await,
+        Commands::ReallocState(args) => {
+            command_realloc_state(args, &client, steward_program_id).await
+        }
+        Commands::MigrateStateToV2(args) => {
+            command_migrate_state_to_v2(args, &client, steward_program_id).await
+        }
+        Commands::ResetState(args) => command_reset_state(args, &client, steward_program_id).await,
         Commands::ResetValidatorLamportBalances(args) => {
             command_reset_validator_lamport_balances(args, &client, steward_program_id).await
         }
@@ -187,34 +194,34 @@ async fn main() -> Result<()> {
             command_update_validator_list_balance(&client, args, steward_program_id).await
         }
         Commands::InitDirectedStakeMeta(args) => {
-            command_init_directed_stake_meta(args, &client, program_id).await
+            command_init_directed_stake_meta(args, &client, steward_program_id).await
         }
         Commands::ReallocDirectedStakeMeta(args) => {
-            command_realloc_directed_stake_meta(args, &client, program_id).await
+            command_realloc_directed_stake_meta(args, &client, steward_program_id).await
         }
         Commands::InitDirectedStakeWhitelist(args) => {
-            command_init_directed_stake_whitelist(args, &client, program_id).await
+            command_init_directed_stake_whitelist(args, &client, steward_program_id).await
         }
         Commands::ReallocDirectedStakeWhitelist(args) => {
-            command_realloc_directed_stake_whitelist(args, &client, program_id).await
+            command_realloc_directed_stake_whitelist(args, &client, steward_program_id).await
         }
         Commands::InitDirectedStakeTicket(args) => {
-            command_init_directed_stake_ticket(args, &client, program_id).await
+            command_init_directed_stake_ticket(args, &client, steward_program_id).await
         }
         Commands::AddToDirectedStakeWhitelist(args) => {
-            command_add_to_directed_stake_whitelist(args, &client, program_id).await
+            command_add_to_directed_stake_whitelist(args, &client, steward_program_id).await
         }
         Commands::UpdateDirectedStakeTicket(args) => {
-            command_update_directed_stake_ticket(args, client.clone(), program_id).await
+            command_update_directed_stake_ticket(args, client.clone(), steward_program_id).await
         }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
-            command_remove_from_directed_stake_whitelist(args, &client, program_id).await
+            command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
         }
         Commands::CloseDirectedStakeTicket(args) => {
-            command_close_directed_stake_ticket(args, &client, program_id).await
+            command_close_directed_stake_ticket(args, &client, steward_program_id).await
         }
         Commands::CloseDirectedStakeWhitelist(args) => {
-            command_close_directed_stake_whitelist(args, &client, program_id).await
+            command_close_directed_stake_whitelist(args, &client, steward_program_id).await
         }
 
         // --- Cranks ---
@@ -231,18 +238,17 @@ async fn main() -> Result<()> {
             command_crank_compute_delegations(args, &client, steward_program_id).await
         }
         Commands::ComputeDirectedStakeMeta(args) => {
-            command_crank_compute_directed_stake_meta(args, &client, program_id).await
+            command_crank_compute_directed_stake_meta(args, &client, steward_program_id).await
         }
-        Commands::CrankIdle(args) => command_crank_idle(args, &client, program_id).await,
+        Commands::CrankIdle(args) => command_crank_idle(args, &client, steward_program_id).await,
         Commands::CrankComputeInstantUnstake(args) => {
             command_crank_compute_instant_unstake(args, &client, steward_program_id).await
         }
         Commands::CrankRebalance(args) => {
             command_crank_rebalance(args, &client, steward_program_id).await
         }
-        Commands::CrankRebalance(args) => command_crank_rebalance(args, &client, program_id).await,
         Commands::CrankRebalanceDirected(args) => {
-            command_crank_rebalance_directed(args, &client, program_id).await
+            command_crank_rebalance_directed(args, &client, steward_program_id).await
         }
     };
 

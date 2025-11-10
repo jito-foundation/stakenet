@@ -16,7 +16,7 @@ use crate::commands::{
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
         rebalance_directed::CrankRebalanceDirected,
     },
-    info::view_directed_stake_ticket::ViewDirectedStakeTicket,
+    info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
     init::{
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
