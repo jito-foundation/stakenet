@@ -964,7 +964,7 @@ async fn _handle_rebalance(
 ///
 /// ## If directed stake target is removed from validator list
 /// - Pass u64::MAX for `validator_list_index`
-/// - Pass Pubkey::default() for `transient_stake_address`
+/// - Pass Pubkey::new_unique() for `transient_stake_address`
 async fn _handle_directed_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,

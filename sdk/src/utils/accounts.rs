@@ -518,18 +518,18 @@ pub fn get_transient_stake_address(
     validator_list_account: &ValidatorList,
     validator_index: usize,
 ) -> Option<Pubkey> {
-    match validator_list_account.validators.get(validator_index) {
-        Some(v) => {
-            let (transient_stake_address, _) = find_transient_stake_program_address(
+    validator_list_account
+        .validators
+        .get(validator_index)
+        .map(|v| {
+            find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 vote_account_address,
                 stake_pool_address,
                 v.transient_seed_suffix.into(),
-            );
-            Some(transient_stake_address)
-        }
-        None => None,
-    }
+            )
+            .0
+        })
 }
 
 pub fn get_cluster_history_address(validator_history_program_id: &Pubkey) -> Pubkey {
