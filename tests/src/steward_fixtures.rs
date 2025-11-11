@@ -535,6 +535,149 @@ impl TestFixture {
         }
     }
 
+    pub async fn realloc_directed_stake_meta(&self) {
+        use jito_steward::state::directed_stake::DirectedStakeMeta;
+        use jito_steward::constants::MAX_ALLOC_BYTES;
+
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[DirectedStakeMeta::SEED, self.steward_config.pubkey().as_ref()],
+            &jito_steward::id(),
+        )
+        .0;
+
+        // Get the validator list address from the config
+        let config: jito_steward::Config = self
+            .load_and_deserialize(&self.steward_config.pubkey())
+            .await;
+        let validator_list = config.validator_list;
+
+        // Calculate how many reallocations we need
+        let mut num_reallocs = (DirectedStakeMeta::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut ixs = vec![];
+
+        while num_reallocs > 0 {
+            ixs.extend(vec![
+                Instruction {
+                    program_id: jito_steward::id(),
+                    accounts: vec![
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            directed_stake_meta,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            self.steward_config.pubkey(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            validator_list,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            anchor_lang::solana_program::system_program::id(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.keypair.pubkey(),
+                            true,
+                        ),
+                    ],
+                    data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+                };
+                num_reallocs.min(10)
+            ]);
+            num_reallocs = num_reallocs.saturating_sub(10);
+        }
+
+        // Submit all reallocation instructions
+        let tx = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(tx).await;
+
+        // Verify that is_initialized has been set after reallocation
+        let meta: DirectedStakeMeta = self.load_and_deserialize(&directed_stake_meta).await;
+        assert!(
+            bool::from(meta.is_initialized),
+            "DirectedStakeMeta should be initialized after reallocation"
+        );
+    }
+
+    pub async fn realloc_directed_stake_whitelist(&self) {
+        use jito_steward::state::directed_stake::DirectedStakeWhitelist;
+        use jito_steward::constants::MAX_ALLOC_BYTES;
+
+        let directed_stake_whitelist = Pubkey::find_program_address(
+            &[
+                DirectedStakeWhitelist::SEED,
+                self.steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+
+        // Get the validator list address from the config
+        let config: jito_steward::Config = self
+            .load_and_deserialize(&self.steward_config.pubkey())
+            .await;
+        let validator_list = config.validator_list;
+
+        // Calculate how many reallocations we need
+        let mut num_reallocs = (DirectedStakeWhitelist::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut ixs = vec![];
+
+        while num_reallocs > 0 {
+            ixs.extend(vec![
+                Instruction {
+                    program_id: jito_steward::id(),
+                    accounts: vec![
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            directed_stake_whitelist,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            self.steward_config.pubkey(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            validator_list,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            anchor_lang::solana_program::system_program::id(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.keypair.pubkey(),
+                            true,
+                        ),
+                    ],
+                    data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
+                };
+                num_reallocs.min(10)
+            ]);
+            num_reallocs = num_reallocs.saturating_sub(10);
+        }
+
+        // Submit all reallocation instructions
+        let tx = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(tx).await;
+
+        // Verify that is_initialized has been set after reallocation
+        let whitelist: DirectedStakeWhitelist = self.load_and_deserialize(&directed_stake_whitelist).await;
+        assert!(
+            bool::from(whitelist.is_initialized),
+            "DirectedStakeWhitelist should be initialized after reallocation"
+        );
+    }
+
     pub async fn initialize_validator_history_config(&self) {
         let instruction = Instruction {
             program_id: validator_history::id(),
@@ -2267,7 +2410,7 @@ pub async fn crank_directed_stake_permissions(
     fixture.submit_transaction_assert_success(tx).await;
 
     // Now reallocate the directed stake whitelist to proper size
-    realloc_directed_stake_whitelist(fixture).await;
+    fixture.realloc_directed_stake_whitelist().await;
 
     // Add all validators to the whitelist
     for extra_accounts in extra_validator_accounts.iter() {
@@ -2330,68 +2473,3 @@ pub async fn crank_directed_stake_permissions(
     fixture.submit_transaction_assert_success(tx).await;
 }
 
-async fn realloc_directed_stake_whitelist(fixture: &TestFixture) {
-    let directed_stake_whitelist = Pubkey::find_program_address(
-        &[
-            jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    // Get the validator list address from the config
-    let config: jito_steward::Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    let validator_list = config.validator_list;
-
-    // Calculate how many reallocs we need
-    let mut num_reallocs = (jito_steward::state::directed_stake::DirectedStakeWhitelist::SIZE
-        - jito_steward::constants::MAX_ALLOC_BYTES)
-        / jito_steward::constants::MAX_ALLOC_BYTES
-        + 1;
-    let mut ixs = vec![];
-
-    while num_reallocs > 0 {
-        ixs.extend(vec![
-            Instruction {
-                program_id: jito_steward::id(),
-                accounts: vec![
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        directed_stake_whitelist,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        fixture.steward_config.pubkey(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        validator_list,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        anchor_lang::solana_program::system_program::id(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        fixture.keypair.pubkey(),
-                        true,
-                    ),
-                ],
-                data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
-            };
-            num_reallocs.min(10)
-        ]);
-        num_reallocs = num_reallocs.saturating_sub(10);
-    }
-
-    // Submit all reallocation instructions
-    let tx = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.ctx.borrow().last_blockhash,
-    );
-    fixture.submit_transaction_assert_success(tx).await;
-}

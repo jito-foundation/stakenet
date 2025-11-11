@@ -1,70 +1,5 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
-async fn realloc_directed_stake_meta(fixture: &TestFixture) {
-    let directed_stake_meta = Pubkey::find_program_address(
-        &[
-            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    // Get the validator list address from the config
-    let config: jito_steward::Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    let validator_list = config.validator_list;
-
-    // Calculate how many reallocations we need
-    let mut num_reallocs = (jito_steward::state::directed_stake::DirectedStakeMeta::SIZE
-        - jito_steward::constants::MAX_ALLOC_BYTES)
-        / jito_steward::constants::MAX_ALLOC_BYTES
-        + 1;
-    let mut ixs = vec![];
-
-    while num_reallocs > 0 {
-        let instructions_to_add = num_reallocs.min(10);
-        for _ in 0..instructions_to_add {
-            ixs.push(Instruction {
-                program_id: jito_steward::id(),
-                accounts: vec![
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        directed_stake_meta,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        fixture.steward_config.pubkey(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        validator_list,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        anchor_lang::solana_program::system_program::id(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        fixture.keypair.pubkey(),
-                        true,
-                    ),
-                ],
-                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
-            });
-        }
-        num_reallocs = num_reallocs.saturating_sub(10);
-    }
-
-    // Submit all reallocation instructions
-    let tx = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.ctx.borrow().last_blockhash,
-    );
-    fixture.submit_transaction_assert_success(tx).await;
-}
 
 /// Helper function to initialize directed stake meta
 async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
@@ -169,7 +104,7 @@ async fn test_compute_delegations() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let clock: Clock = fixture.get_sysvar().await;
 
@@ -312,7 +247,7 @@ async fn test_compute_scores() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let epoch_credits: Vec<(u64, u64, u64)> =
         vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
@@ -706,7 +641,7 @@ async fn test_compute_instant_unstake() {
         )
         .await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let epoch_credits = vec![(0, 1, 0), (1, 2, 1), (2, 3, 2), (3, 4, 3), (4, 5, 4)];
     let vote_account = Pubkey::new_unique();
@@ -938,7 +873,7 @@ async fn test_idle() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let clock: Clock = fixture.get_sysvar().await;
     let epoch_schedule: EpochSchedule = fixture.get_sysvar().await;
@@ -1081,7 +1016,7 @@ async fn test_rebalance_increase() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1333,7 +1268,7 @@ async fn test_rebalance_decrease() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())
@@ -1653,7 +1588,7 @@ async fn test_rebalance_other_cases() {
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
     initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut steward_config: Config = fixture
         .load_and_deserialize(&fixture.steward_config.pubkey())

@@ -29,70 +29,6 @@ use tests::steward_fixtures::{
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-async fn realloc_directed_stake_meta(fixture: &TestFixture) {
-    let directed_stake_meta = Pubkey::find_program_address(
-        &[
-            DirectedStakeMeta::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    // Get the validator list address from the config
-    let config: jito_steward::Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    let validator_list = config.validator_list;
-
-    // Calculate how many reallocations we need
-    let mut num_reallocs = (DirectedStakeMeta::SIZE - jito_steward::constants::MAX_ALLOC_BYTES)
-        / jito_steward::constants::MAX_ALLOC_BYTES
-        + 1;
-    let mut ixs = vec![];
-
-    while num_reallocs > 0 {
-        ixs.extend(vec![
-            Instruction {
-                program_id: jito_steward::id(),
-                accounts: vec![
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        directed_stake_meta,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        fixture.steward_config.pubkey(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        validator_list,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        anchor_lang::solana_program::system_program::id(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        fixture.keypair.pubkey(),
-                        true,
-                    ),
-                ],
-                data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
-            };
-            num_reallocs.min(10)
-        ]);
-        num_reallocs = num_reallocs.saturating_sub(10);
-    }
-
-    // Submit all reallocation instructions
-    let tx = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.ctx.borrow().last_blockhash,
-    );
-    fixture.submit_transaction_assert_success(tx).await;
-}
 
 /// Helper function to initialize directed stake meta
 async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
@@ -222,7 +158,7 @@ async fn test_cycle() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -465,7 +401,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -723,7 +659,7 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -955,7 +891,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -1185,7 +1121,7 @@ async fn test_cycle_with_directed_stake_noop_copy() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -1379,7 +1315,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -1587,7 +1523,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -1748,7 +1684,7 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -1911,7 +1847,7 @@ async fn test_cycle_with_directed_stake_targets() {
     let _steward: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
@@ -2306,7 +2242,7 @@ async fn test_remove_validator_mid_epoch() {
         .await;
 
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for vote_account in unit_test_fixtures
@@ -2569,7 +2505,7 @@ async fn test_add_validator_next_cycle() {
         )
         .await;
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
-    realloc_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
