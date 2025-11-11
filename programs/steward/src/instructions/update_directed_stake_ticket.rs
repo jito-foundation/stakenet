@@ -34,14 +34,14 @@ impl UpdateDirectedStakeTicket<'_> {
     pub fn auth(
         ticket: &DirectedStakeTicket,
         whitelist: &DirectedStakeWhitelist,
-        authority_pubkey: &Pubkey,
+        signer_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
     ) -> Result<()> {
-        if !whitelist.is_staker_permissioned(authority_pubkey) {
+        if !whitelist.is_staker_permissioned(signer_pubkey) {
             return Err(error!(StewardError::Unauthorized));
         }
 
-        if authority_pubkey != &ticket.ticket_update_authority {
+        if signer_pubkey != &ticket.ticket_update_authority {
             msg!("Error: Only the ticket update authority can update ticket preferences");
             return Err(error!(StewardError::Unauthorized));
         }

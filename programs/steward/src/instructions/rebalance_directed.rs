@@ -154,7 +154,6 @@ pub fn handler(
         let current_epoch = clock.epoch;
         if (current_epoch > state_account.state.current_epoch
             || state_account.state.num_pool_validators == 0)
-            && !state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE)
         {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
