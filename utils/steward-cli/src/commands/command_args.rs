@@ -16,7 +16,7 @@ use crate::commands::{
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
         rebalance_directed::CrankRebalanceDirected,
     },
-    info::view_directed_stake_ticket::ViewDirectedStakeTicket,
+    info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
     init::{
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
@@ -38,10 +38,19 @@ pub struct Args {
     /// Steward program ID
     #[arg(
         long,
+        alias = "program-id",
         env,
         default_value_t = jito_steward::id()
     )]
-    pub program_id: Pubkey,
+    pub steward_program_id: Pubkey,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        env,
+        default_value_t = validator_history::id()
+        )]
+    pub validator_history_program_id: Pubkey,
 
     /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
     #[arg(long, global = true, env)]
@@ -293,6 +302,7 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewBlacklist(ViewBlacklist),
     ViewDirectedStakeTickets(ViewDirectedStakeTickets),
     ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
