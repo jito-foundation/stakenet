@@ -227,7 +227,7 @@ async fn test_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1, 2],
     )
     .await;
     println!("Rebalance directed 1");
@@ -288,7 +288,7 @@ async fn test_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1, 2],
     )
     .await;
 
@@ -330,7 +330,7 @@ async fn test_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1, 2],
     )
     .await;
 
@@ -342,8 +342,7 @@ async fn test_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0, 1, 2], // TODO: an extra 0 seems to force a state transition, let's have that
-                    // happen inside 2
+        &[0, 1, 2],
     )
     .await;
 
@@ -363,7 +362,7 @@ async fn test_cycle() {
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    // assert_eq!(state.status_flags, 3); // TODO
+    assert_eq!(state.status_flags, 3);
 
     // All other values are reset
 
@@ -2204,7 +2203,7 @@ async fn test_cycle_with_directed_stake_targets() {
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    // assert_eq!(state.status_flags, 3); // TODO
+    assert_eq!(state.status_flags, 3);
 
     // All other values are reset
 
@@ -2351,7 +2350,7 @@ async fn test_remove_validator_mid_epoch() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1, 2],
     )
     .await;
 
@@ -2647,10 +2646,9 @@ async fn test_add_validator_next_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0],
+        &[0, 1],
     )
     .await;
-    println!("Rebalance directed 1");
 
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
@@ -2727,10 +2725,9 @@ async fn test_add_validator_next_cycle() {
         &fixture,
         &unit_test_fixtures,
         &extra_validator_accounts,
-        &[0], // Once again, why the extra call?
+        &[0, 1],
     )
     .await;
-    println!("Rebalance directed 2");
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
     // Ensure we're in the next cycle
@@ -2752,9 +2749,9 @@ async fn test_add_validator_next_cycle() {
         jito_steward::StewardStateEnum::ComputeScores
     ));
 
-    //assert_eq!(state.validators_added, 0); TODO: why is this 1 now?
+    assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    //assert_eq!(state.num_pool_validators, 3); TODO: why is this different?
+    assert_eq!(state.num_pool_validators, 3);
 
     // Ensure we can crank the new validator
     crank_compute_score(
