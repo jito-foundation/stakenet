@@ -552,7 +552,7 @@ async fn _handle_delinquent_validators(
                 &all_steward_accounts.stake_pool_address,
                 &all_steward_accounts.validator_list_account,
                 validator_index,
-            );
+            )?;
 
             if all_steward_accounts
                 .state_account
@@ -893,7 +893,7 @@ async fn _handle_rebalance(
         ixs_to_run.push(instruction);
     }
 
-    ixs_to_run.extend(validators_to_run.iter().map(|validator_info| {
+    ixs_to_run.extend(validators_to_run.iter().filter_map(|validator_info| {
         let validator_index = validator_info.index;
         let vote_account = &validator_info.vote_account;
         let history_account = validator_info.history_account;
@@ -906,9 +906,9 @@ async fn _handle_rebalance(
             &all_steward_accounts.stake_pool_address,
             &all_steward_accounts.validator_list_account,
             validator_index,
-        );
+        )?;
 
-        Instruction {
+        Some(Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::Rebalance {
                 config: all_steward_accounts.config_address,
@@ -935,7 +935,7 @@ async fn _handle_rebalance(
                 validator_list_index: validator_index as u64,
             }
             .data(),
-        }
+        })
     }));
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
@@ -961,6 +961,10 @@ async fn _handle_rebalance(
 /// Before submitting rebalance instructions, this function checks if the reserve stake
 /// account has sufficient lamports (N * transient stake account + ephemeral_stake account) to cover rent for all validators being
 /// processed.
+///
+/// ## If directed stake target is removed from validator list
+/// - Pass u64::MAX for `validator_list_index`
+/// - Pass Pubkey::new_unique() for `transient_stake_address`
 async fn _handle_directed_rebalance(
     payer: &Arc<Keypair>,
     client: &Arc<RpcClient>,
@@ -1037,7 +1041,8 @@ async fn _handle_directed_rebalance(
             &all_steward_accounts.stake_pool_address,
             &all_steward_accounts.validator_list_account,
             validator_index,
-        );
+        )
+        .unwrap_or(Pubkey::new_unique());
 
         let ix = Instruction {
             program_id: *program_id,

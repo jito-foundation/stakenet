@@ -87,23 +87,30 @@ impl DirectedRebalanceProgressionInfo {
         all_steward_accounts: &AllStewardAccounts,
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Vec<DirectedRebalanceProgressionInfo> {
-        all_steward_accounts
+        let validator_map: HashMap<Pubkey, usize> = all_steward_accounts
             .validator_list_account
             .validators
             .iter()
             .take(all_steward_accounts.state_account.state.num_pool_validators as usize)
             .enumerate()
-            .filter_map(|(validator_list_index, validator)| {
-                directed_stake_meta
-                    .get_target_index(&validator.vote_account_address)
-                    .map(
-                        |directed_stake_meta_index| DirectedRebalanceProgressionInfo {
-                            validator_list_index,
-                            directed_stake_meta_index,
-                            vote_account: validator.vote_account_address,
-                        },
-                    )
-            })
+            .map(|(idx, v)| (v.vote_account_address, idx))
+            .collect();
+
+        directed_stake_meta
+            .targets
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.vote_pubkey != Pubkey::default())
+            .map(
+                |(directed_stake_meta_index, t)| DirectedRebalanceProgressionInfo {
+                    validator_list_index: validator_map
+                        .get(&t.vote_pubkey)
+                        .copied()
+                        .unwrap_or(usize::MAX),
+                    directed_stake_meta_index,
+                    vote_account: t.vote_pubkey,
+                },
+            )
             .collect()
     }
 }
