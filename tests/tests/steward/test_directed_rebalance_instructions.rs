@@ -3,6 +3,7 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{
     instructions::AuthorityType,
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
+    stake_pool_utils::ValidatorList,
     DirectedStakeWhitelist, REBALANCE_DIRECTED_COMPLETE,
 };
 use solana_program::{instruction::Instruction, sysvar};
@@ -203,6 +204,17 @@ async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
     );
 }
 
+/// Helper function to get vote account at validator list index
+async fn get_vote_account_at_index(
+    fixture: &TestFixture,
+    validator_list_index: usize,
+) -> Pubkey {
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    validator_list.validators[validator_list_index].vote_account_address
+}
+
 /// Helper function to populate directed stake meta after initialization
 async fn populate_directed_stake_meta_after_init(
     fixture: &TestFixture,
@@ -331,10 +343,14 @@ async fn test_simple_directed_rebalance_increase() {
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 500_000_000; // 0.5 SOL currently staked
 
+    // Get the vote account at the validator list index
+    let validator_list_index = 0;
+    let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
+
     // Populate the account data manually (after initialization sets discriminator)
     populate_directed_stake_meta_after_init(
         &fixture,
-        vote_pubkey,
+        vote_account_at_index,
         target_lamports,
         staked_lamports,
     )
@@ -356,18 +372,18 @@ async fn test_simple_directed_rebalance_increase() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_pubkey,
+                &vote_account_at_index,
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: vote_pubkey,
+            vote_account: vote_account_at_index,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -378,7 +394,7 @@ async fn test_simple_directed_rebalance_increase() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: 0,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -465,10 +481,14 @@ async fn test_simple_directed_rebalance_decrease() {
     let target_lamports = 500_000_000; // 0.5 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (excess)
 
+    // Get the vote account at the validator list index
+    let validator_list_index = 0;
+    let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
+
     // Populate the account data manually (after initialization sets discriminator)
     populate_directed_stake_meta_after_init(
         &fixture,
-        vote_pubkey,
+        vote_account_at_index,
         target_lamports,
         staked_lamports,
     )
@@ -490,18 +510,18 @@ async fn test_simple_directed_rebalance_decrease() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_pubkey,
+                &vote_account_at_index,
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: vote_pubkey,
+            vote_account: vote_account_at_index,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -512,7 +532,7 @@ async fn test_simple_directed_rebalance_decrease() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: 0,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -588,12 +608,16 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         &serialized_steward_state_account(steward_state_account).into(),
     );
 
+    // Get the vote account at the validator list index
+    let validator_list_index = 0;
+    let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
+
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 1_000_000_000; // 1 SOL currently staked (at target)
 
     populate_directed_stake_meta_after_init(
         &fixture,
-        vote_pubkey,
+        vote_account_at_index,
         target_lamports,
         staked_lamports,
     )
@@ -615,18 +639,18 @@ async fn test_simple_directed_rebalance_no_action_needed() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_pubkey,
+                &vote_account_at_index,
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: vote_pubkey,
+            vote_account: vote_account_at_index,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -637,7 +661,7 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: 0,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -713,6 +737,10 @@ async fn test_simple_directed_rebalance_no_targets() {
         &serialized_steward_state_account(steward_state_account).into(),
     );
 
+    // Get the vote account at the validator list index
+    let validator_list_index = 0;
+    let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
+
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
@@ -729,18 +757,18 @@ async fn test_simple_directed_rebalance_no_targets() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_pubkey,
+                &vote_account_at_index,
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: vote_pubkey,
+            vote_account: vote_account_at_index,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -751,7 +779,7 @@ async fn test_simple_directed_rebalance_no_targets() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: 0,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -795,10 +823,14 @@ async fn test_directed_rebalance_wrong_state() {
     let target_lamports = 1_000_000_000; // 1 SOL target
     let staked_lamports = 500_000_000; // 0.5 SOL currently staked
 
+    // Get the vote account at the validator list index
+    let validator_list_index = 0;
+    let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
+
     // Populate the account data manually (after initialization sets discriminator)
     populate_directed_stake_meta_after_init(
         &fixture,
-        vote_pubkey,
+        vote_account_at_index,
         target_lamports,
         staked_lamports,
     )
@@ -823,18 +855,18 @@ async fn test_directed_rebalance_wrong_state() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_pubkey).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_pubkey).await.0, // Get proper stake account
+            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
-                &vote_pubkey,
+                &vote_account_at_index,
                 &fixture.stake_pool_meta.stake_pool,
                 0u64,
             )
             .0,
-            vote_account: vote_pubkey,
+            vote_account: vote_account_at_index,
             clock: sysvar::clock::id(),
             rent: sysvar::rent::id(),
             stake_history: sysvar::stake_history::id(),
@@ -845,7 +877,7 @@ async fn test_directed_rebalance_wrong_state() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: 0,
+            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };

@@ -21,7 +21,7 @@ pub struct InitializeDirectedStakeTicket<'info> {
         init,
         payer = signer,
         space = DirectedStakeTicket::SIZE,
-        seeds = [DirectedStakeTicket::SEED, signer.key().as_ref()],
+        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), signer.key().as_ref()],
         bump
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,

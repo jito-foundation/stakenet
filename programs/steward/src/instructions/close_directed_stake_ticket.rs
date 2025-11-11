@@ -10,7 +10,9 @@ pub struct CloseDirectedStakeTicket<'info> {
 
     #[account(
         mut,
-        close = authority
+        close = authority,
+        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), authority.key().as_ref()],
+        bump
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 

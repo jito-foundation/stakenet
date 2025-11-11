@@ -182,7 +182,11 @@ async fn initialize_directed_stake_ticket(
     ticket_holder_is_protocol: bool,
 ) -> Pubkey {
     let ticket_account = Pubkey::find_program_address(
-        &[DirectedStakeTicket::SEED, signer.pubkey().as_ref()],
+        &[
+            DirectedStakeTicket::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+            signer.pubkey().as_ref(),
+        ],
         &jito_steward::id(),
     )
     .0;
@@ -561,6 +565,7 @@ async fn test_directed_stake_ticket_unauthorized() {
     let ticket_account = Pubkey::find_program_address(
         &[
             DirectedStakeTicket::SEED,
+            fixture.steward_config.pubkey().as_ref(),
             unauthorized_staker.pubkey().as_ref(),
         ],
         &jito_steward::id(),

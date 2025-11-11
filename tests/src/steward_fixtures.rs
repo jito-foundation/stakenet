@@ -990,6 +990,13 @@ pub async fn crank_rebalance_directed(
 
     for &i in indices {
         let extra_accounts = &extra_validator_accounts[i];
+        let validator_list_index = i;
+
+        // Get the vote account at the validator list index
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let vote_account_at_index = validator_list.validators[validator_list_index].vote_account_address;
 
         let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
         let ix = Instruction {
@@ -1013,12 +1020,12 @@ pub async fn crank_rebalance_directed(
                 stake_account: extra_accounts.stake_account_address,
                 transient_stake_account: find_transient_stake_program_address(
                     &spl_stake_pool::id(),
-                    &extra_accounts.vote_account,
+                    &vote_account_at_index,
                     &fixture.stake_pool_meta.stake_pool,
                     0u64,
                 )
                 .0,
-                vote_account: extra_accounts.vote_account,
+                vote_account: vote_account_at_index,
                 clock: solana_sdk::sysvar::clock::id(),
                 rent: solana_sdk::sysvar::rent::id(),
                 stake_history: solana_sdk::sysvar::stake_history::id(),
@@ -1029,7 +1036,7 @@ pub async fn crank_rebalance_directed(
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
                 directed_stake_meta_index: i as u64,
-                validator_list_index: i as u64,
+                validator_list_index: validator_list_index as u64,
             }
             .data(),
         };
