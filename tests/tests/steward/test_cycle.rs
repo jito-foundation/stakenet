@@ -186,6 +186,43 @@ async fn test_cycle() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
+    // Add validators to whitelist and directed_stake_meta before rebalancing
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    // Set the directed stake meta upload authority to the signer
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 0).await;
+    }
+
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
@@ -2273,6 +2310,43 @@ async fn test_remove_validator_mid_epoch() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
+    // Add validators to whitelist and directed_stake_meta before rebalancing
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    // Set the directed stake meta upload authority to the signer
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    for extra_accounts in extra_validator_accounts.iter().take(3) {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 0).await;
+    }
+
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
@@ -2530,6 +2604,43 @@ async fn test_add_validator_next_cycle() {
     // Auto add validator - adds validators 2 and 3
     for extra_accounts in extra_validator_accounts.iter().take(2) {
         auto_add_validator(&fixture, extra_accounts).await;
+    }
+
+    // Add validators to whitelist and directed_stake_meta before rebalancing
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    // Set the directed stake meta upload authority to the signer
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    for extra_accounts in extra_validator_accounts.iter().take(2) {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 0).await;
     }
 
     crank_rebalance_directed(

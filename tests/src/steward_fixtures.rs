@@ -998,20 +998,29 @@ pub async fn crank_rebalance_directed(
             .await;
         let vote_account_at_index = validator_list.validators[validator_list_index].vote_account_address;
 
+        // Find the directed_stake_meta_index by looking up the vote_pubkey in the directed_stake_meta
+        let directed_stake_meta_pubkey = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                fixture.steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+        let directed_stake_meta: DirectedStakeMeta = fixture
+            .load_and_deserialize(&directed_stake_meta_pubkey)
+            .await;
+        let directed_stake_meta_index = directed_stake_meta
+            .get_target_index(&vote_account_at_index)
+            .expect("Vote account not found in directed_stake_meta");
+
         let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
         let ix = Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::RebalanceDirected {
                 config: fixture.steward_config.pubkey(),
                 state_account: fixture.steward_state,
-                directed_stake_meta: Pubkey::find_program_address(
-                    &[
-                        DirectedStakeMeta::SEED,
-                        fixture.steward_config.pubkey().as_ref(),
-                    ],
-                    &jito_steward::id(),
-                )
-                .0,
+                directed_stake_meta: directed_stake_meta_pubkey,
                 stake_pool: fixture.stake_pool_meta.stake_pool,
                 stake_pool_program: spl_stake_pool::id(),
                 withdraw_authority: extra_accounts.withdraw_authority,
@@ -1035,7 +1044,7 @@ pub async fn crank_rebalance_directed(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
-                directed_stake_meta_index: i as u64,
+                directed_stake_meta_index: directed_stake_meta_index as u64,
                 validator_list_index: validator_list_index as u64,
             }
             .data(),

@@ -741,6 +741,17 @@ async fn test_simple_directed_rebalance_no_targets() {
     let validator_list_index = 0;
     let vote_account_at_index = get_vote_account_at_index(&fixture, validator_list_index).await;
 
+    // Populate the directed_stake_meta with the vote_pubkey at index 0 (even though target_lamports is 0)
+    // This is needed because the handler checks that directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey
+    // matches the vote_account passed in
+    populate_directed_stake_meta_after_init(
+        &fixture,
+        vote_account_at_index,
+        0, // target_lamports = 0 (no targets)
+        0, // staked_lamports = 0
+    )
+    .await;
+
     // Create the rebalance_directed instruction
     let rebalance_ix = Instruction {
         program_id: jito_steward::id(),
