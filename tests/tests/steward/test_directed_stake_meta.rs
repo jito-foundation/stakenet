@@ -74,7 +74,6 @@ async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
-
 /// Helper function to initialize directed stake whitelist
 async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
     let directed_stake_whitelist = Pubkey::find_program_address(
@@ -121,7 +120,6 @@ async fn initialize_directed_stake_whitelist(fixture: &TestFixture) {
     // Reallocate the account to its proper size
     fixture.realloc_directed_stake_whitelist().await;
 }
-
 
 /// Helper function to add a staker to the directed stake whitelist
 async fn add_staker_to_whitelist(

@@ -203,7 +203,6 @@ async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
     );
 }
 
-
 /// Helper function to populate directed stake meta after initialization
 async fn populate_directed_stake_meta_after_init(
     fixture: &TestFixture,

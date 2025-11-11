@@ -254,7 +254,14 @@ impl DirectedStakeWhitelist {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"whitelist";
     // Byte position of is_initialized field: 8 (discriminator) + 32*2048*2 (user + protocol stakers) + 32*2048 (validators) + 2*3 (u16 fields) + 248 (padding0) = 196866
-    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8 + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS + 32 * MAX_PERMISSIONED_DIRECTED_VALIDATORS + 2 + 2 + 2 + 249;
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8
+        + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
+        + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
+        + 32 * MAX_PERMISSIONED_DIRECTED_VALIDATORS
+        + 2
+        + 2
+        + 2
+        + 249;
 
     pub fn is_user_staker_permissioned(&self, staker: &Pubkey) -> bool {
         self.permissioned_user_stakers

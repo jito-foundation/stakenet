@@ -1,6 +1,5 @@
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
-
 /// Helper function to initialize directed stake meta
 async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     let directed_stake_meta = Pubkey::find_program_address(

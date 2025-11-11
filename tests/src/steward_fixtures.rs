@@ -536,11 +536,14 @@ impl TestFixture {
     }
 
     pub async fn realloc_directed_stake_meta(&self) {
-        use jito_steward::state::directed_stake::DirectedStakeMeta;
         use jito_steward::constants::MAX_ALLOC_BYTES;
+        use jito_steward::state::directed_stake::DirectedStakeMeta;
 
         let directed_stake_meta = Pubkey::find_program_address(
-            &[DirectedStakeMeta::SEED, self.steward_config.pubkey().as_ref()],
+            &[
+                DirectedStakeMeta::SEED,
+                self.steward_config.pubkey().as_ref(),
+            ],
             &jito_steward::id(),
         )
         .0;
@@ -606,8 +609,8 @@ impl TestFixture {
     }
 
     pub async fn realloc_directed_stake_whitelist(&self) {
-        use jito_steward::state::directed_stake::DirectedStakeWhitelist;
         use jito_steward::constants::MAX_ALLOC_BYTES;
+        use jito_steward::state::directed_stake::DirectedStakeWhitelist;
 
         let directed_stake_whitelist = Pubkey::find_program_address(
             &[
@@ -625,7 +628,8 @@ impl TestFixture {
         let validator_list = config.validator_list;
 
         // Calculate how many reallocations we need
-        let mut num_reallocs = (DirectedStakeWhitelist::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut num_reallocs =
+            (DirectedStakeWhitelist::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
         let mut ixs = vec![];
 
         while num_reallocs > 0 {
@@ -671,7 +675,8 @@ impl TestFixture {
         self.submit_transaction_assert_success(tx).await;
 
         // Verify that is_initialized has been set after reallocation
-        let whitelist: DirectedStakeWhitelist = self.load_and_deserialize(&directed_stake_whitelist).await;
+        let whitelist: DirectedStakeWhitelist =
+            self.load_and_deserialize(&directed_stake_whitelist).await;
         assert!(
             bool::from(whitelist.is_initialized),
             "DirectedStakeWhitelist should be initialized after reallocation"
@@ -2472,4 +2477,3 @@ pub async fn crank_directed_stake_permissions(
     );
     fixture.submit_transaction_assert_success(tx).await;
 }
-

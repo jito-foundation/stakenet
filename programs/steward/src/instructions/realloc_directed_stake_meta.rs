@@ -50,7 +50,9 @@ pub struct ReallocDirectedStakeMeta<'info> {
 
 pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
     let account_size = ctx.accounts.directed_stake_meta.as_ref().data_len();
-    if account_size >= DirectedStakeMeta::SIZE && !is_initialized(ctx.accounts.directed_stake_meta.as_ref()) {
+    if account_size >= DirectedStakeMeta::SIZE
+        && !is_initialized(ctx.accounts.directed_stake_meta.as_ref())
+    {
         let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
         // Initialize the targets array when the account reaches full size
         let default_target = crate::state::directed_stake::DirectedStakeTarget {

@@ -29,7 +29,6 @@ use tests::steward_fixtures::{
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-
 /// Helper function to initialize directed stake meta
 async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     let directed_stake_meta = Pubkey::find_program_address(

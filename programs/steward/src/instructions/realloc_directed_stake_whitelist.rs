@@ -50,7 +50,9 @@ pub struct ReallocDirectedStakeWhitelist<'info> {
 
 pub fn handler(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
     let account_size = ctx.accounts.directed_stake_whitelist.as_ref().data_len();
-    if account_size >= DirectedStakeWhitelist::SIZE && !is_initialized(ctx.accounts.directed_stake_whitelist.as_ref()) {
+    if account_size >= DirectedStakeWhitelist::SIZE
+        && !is_initialized(ctx.accounts.directed_stake_whitelist.as_ref())
+    {
         let mut whitelist = ctx.accounts.directed_stake_whitelist.load_mut()?;
         whitelist.permissioned_user_stakers =
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
