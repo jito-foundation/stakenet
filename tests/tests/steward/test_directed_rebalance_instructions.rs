@@ -2,8 +2,8 @@ use anchor_lang::Discriminator;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{
     instructions::AuthorityType,
-    state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
     stake_pool_utils::ValidatorList,
+    state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
     DirectedStakeWhitelist, REBALANCE_DIRECTED_COMPLETE,
 };
 use solana_program::{instruction::Instruction, sysvar};
@@ -17,7 +17,7 @@ use tests::steward_fixtures::{serialized_steward_state_account, TestFixture};
 
 /// Helper function to set the directed stake whitelist authority
 async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
-    let ix = Instruction {
+    let set_whitelist_auth_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
@@ -31,8 +31,22 @@ async fn set_directed_stake_whitelist_authority(fixture: &TestFixture) {
         .data(),
     };
 
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        }
+        .data(),
+    };
+
     let tx = Transaction::new_signed_with_payer(
-        &[ix],
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,
@@ -205,10 +219,7 @@ async fn add_validator_to_pool(fixture: &TestFixture, vote_pubkey: Pubkey) {
 }
 
 /// Helper function to get vote account at validator list index
-async fn get_vote_account_at_index(
-    fixture: &TestFixture,
-    validator_list_index: usize,
-) -> Pubkey {
+async fn get_vote_account_at_index(fixture: &TestFixture, validator_list_index: usize) -> Pubkey {
     let validator_list: ValidatorList = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
@@ -372,10 +383,16 @@ async fn test_simple_directed_rebalance_increase() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
+            stake_account: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_account_at_index,
@@ -510,10 +527,16 @@ async fn test_simple_directed_rebalance_decrease() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
+            stake_account: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_account_at_index,
@@ -639,10 +662,16 @@ async fn test_simple_directed_rebalance_no_action_needed() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
+            stake_account: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_account_at_index,
@@ -768,10 +797,16 @@ async fn test_simple_directed_rebalance_no_targets() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
+            stake_account: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_account_at_index,
@@ -866,10 +901,16 @@ async fn test_directed_rebalance_wrong_state() {
             .0,
             stake_pool: fixture.stake_pool_meta.stake_pool,
             stake_pool_program: spl_stake_pool::id(),
-            withdraw_authority: fixture.stake_accounts_for_validator(vote_account_at_index).await.2, // Get proper withdraw authority
+            withdraw_authority: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .2, // Get proper withdraw authority
             validator_list: fixture.stake_pool_meta.validator_list,
             reserve_stake: fixture.stake_pool_meta.reserve,
-            stake_account: fixture.stake_accounts_for_validator(vote_account_at_index).await.0, // Get proper stake account
+            stake_account: fixture
+                .stake_accounts_for_validator(vote_account_at_index)
+                .await
+                .0, // Get proper stake account
             transient_stake_account: find_transient_stake_program_address(
                 &spl_stake_pool::id(),
                 &vote_account_at_index,

@@ -26,9 +26,9 @@ impl CloseDirectedStakeTicket<'_> {
     pub fn auth(
         ticket: &DirectedStakeTicket,
         authority_pubkey: &Pubkey,
-        directed_stake_whitelist_authority: &Pubkey,
+        directed_stake_ticket_override_authority: &Pubkey,
     ) -> Result<()> {
-        if authority_pubkey != directed_stake_whitelist_authority
+        if authority_pubkey != directed_stake_ticket_override_authority
             && authority_pubkey != &ticket.ticket_update_authority
         {
             msg!("Error: Only the ticket update authority or directed stake whitelist authority can close the ticket.");
@@ -44,7 +44,7 @@ pub fn handler(ctx: Context<CloseDirectedStakeTicket>) -> Result<()> {
     CloseDirectedStakeTicket::auth(
         &ticket,
         ctx.accounts.authority.key,
-        &config.directed_stake_whitelist_authority,
+        &config.directed_stake_ticket_override_authority,
     )?;
     Ok(())
 }

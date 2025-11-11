@@ -35,9 +35,14 @@ pub struct InitializeDirectedStakeTicket<'info> {
 impl InitializeDirectedStakeTicket<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
 
-    pub fn auth(whitelist: &DirectedStakeWhitelist, signer_pubkey: &Pubkey, ticket_update_authority: &Pubkey) -> Result<()> {
+    pub fn auth(
+        whitelist: &DirectedStakeWhitelist,
+        signer_pubkey: &Pubkey,
+        ticket_update_authority: &Pubkey,
+        whitelist_authority: &Pubkey,
+    ) -> Result<()> {
         // If the signer is the whitelist authority, we can initialize the ticket as long as the ticket update authority is whitelisted
-        if signer_pubkey == &whitelist.authority {
+        if signer_pubkey == whitelist_authority {
             if !whitelist.is_staker_permissioned(ticket_update_authority) {
                 msg!("Error: Ticket update authority must be on the directed stake whitelist to initialize a ticket as the whitelist authority");
                 return Err(error!(StewardError::Unauthorized));
@@ -57,8 +62,14 @@ pub fn handler(
     ticket_update_authority: Pubkey,
     ticket_holder_is_protocol: bool,
 ) -> Result<()> {
+    let config = ctx.accounts.config.load()?;
     let whitelist = ctx.accounts.whitelist_account.load()?;
-    InitializeDirectedStakeTicket::auth(&whitelist, ctx.accounts.signer.key, &ticket_update_authority)?;
+    InitializeDirectedStakeTicket::auth(
+        &whitelist,
+        ctx.accounts.signer.key,
+        &ticket_update_authority,
+        &config.directed_stake_whitelist_authority,
+    )?;
 
     let mut ticket = ctx.accounts.ticket_account.load_init()?;
     ticket.num_preferences = 0;

@@ -740,6 +740,18 @@ impl TestFixture {
         );
     }
 
+    /// Get a validator from the validator list by index
+    pub async fn get_validator_from_list(&self, index: usize) -> Option<Pubkey> {
+        let validator_list: ValidatorList = self
+            .load_and_deserialize(&self.stake_pool_meta.validator_list)
+            .await;
+
+        validator_list
+            .validators
+            .get(index)
+            .map(|v| v.vote_account_address)
+    }
+
     // Turn this into a fixture creator
     pub async fn initialize_cluster_history_account(&self) -> ClusterHistory {
         todo!()
@@ -996,7 +1008,8 @@ pub async fn crank_rebalance_directed(
         let validator_list: ValidatorList = fixture
             .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
             .await;
-        let vote_account_at_index = validator_list.validators[validator_list_index].vote_account_address;
+        let vote_account_at_index =
+            validator_list.validators[validator_list_index].vote_account_address;
 
         // Find the directed_stake_meta_index by looking up the vote_pubkey in the directed_stake_meta
         let directed_stake_meta_pubkey = Pubkey::find_program_address(
@@ -1619,7 +1632,8 @@ impl Default for FixtureDefaultAccounts {
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 920],
+            directed_stake_ticket_override_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
@@ -2152,7 +2166,8 @@ impl Default for StateMachineFixtures {
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 920],
+            directed_stake_ticket_override_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -2365,8 +2380,8 @@ pub async fn crank_directed_stake_permissions(
     use jito_steward::instructions::AuthorityType;
     use jito_steward::state::directed_stake::DirectedStakeRecordType;
 
-    // First, set the whitelist authority to the signer
-    let set_auth_ix = Instruction {
+    // First, set the whitelist authority and ticket override authority to the signer
+    let set_whitelist_auth_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
@@ -2380,9 +2395,23 @@ pub async fn crank_directed_stake_permissions(
         .data(),
     };
 
-    // Submit the authority change first
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        }
+        .data(),
+    };
+
+    // Submit the authority changes first
     let tx = Transaction::new_signed_with_payer(
-        &[set_auth_ix],
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture
@@ -2441,6 +2470,8 @@ pub async fn crank_directed_stake_permissions(
                 config: fixture.steward_config.pubkey(),
                 directed_stake_whitelist,
                 authority: fixture.keypair.pubkey(),
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+                validator_list: fixture.stake_pool_meta.validator_list,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::AddToDirectedStakeWhitelist {
@@ -2471,6 +2502,8 @@ pub async fn crank_directed_stake_permissions(
             config: fixture.steward_config.pubkey(),
             directed_stake_whitelist,
             authority: fixture.keypair.pubkey(),
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddToDirectedStakeWhitelist {

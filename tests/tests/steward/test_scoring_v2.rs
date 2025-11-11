@@ -331,9 +331,10 @@ mod validator_score_integration_tests {
             paused: false.into(),
             _padding_0: [0u8; 7],
             priority_fee_parameters_authority: Pubkey::new_unique(),
-            _padding: [0; 920],
+            _padding: [0; 888],
             directed_stake_whitelist_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
+            directed_stake_ticket_override_authority: Pubkey::new_unique(),
         }
     }
 

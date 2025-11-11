@@ -10,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::{
-    accounts::get_directed_stake_whitelist_address,
+    accounts::{get_all_steward_accounts, get_directed_stake_whitelist_address},
     transactions::{configure_instruction, print_base58_tx},
 };
 
@@ -58,12 +58,18 @@ pub async fn command_add_to_directed_stake_whitelist(
         record_type => return Err(anyhow!("Failed to read record type: {record_type}")),
     };
 
+    // Fetch steward accounts to get stake_pool and validator_list addresses
+    let steward_accounts =
+        get_all_steward_accounts(client, &program_id, &args.steward_config).await?;
+
     let instruction = Instruction {
         program_id,
         accounts: jito_steward::accounts::AddToDirectedStakeWhitelist {
             config: args.steward_config,
             directed_stake_whitelist,
             authority: authority_pubkey,
+            stake_pool: steward_accounts.stake_pool_address,
+            validator_list: steward_accounts.validator_list_address,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddToDirectedStakeWhitelist {

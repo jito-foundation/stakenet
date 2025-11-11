@@ -36,8 +36,9 @@ impl UpdateDirectedStakeTicket<'_> {
         whitelist: &DirectedStakeWhitelist,
         signer_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
+        ticket_override_authority: &Pubkey,
     ) -> Result<()> {
-        if !whitelist.is_staker_permissioned(signer_pubkey) {
+        if !whitelist.is_staker_permissioned(signer_pubkey) || signer_pubkey != ticket_override_authority {
             return Err(error!(StewardError::Unauthorized));
         }
 
@@ -66,8 +67,9 @@ pub fn handler(
 ) -> Result<()> {
     let whitelist = ctx.accounts.whitelist_account.load()?;
     let mut ticket = ctx.accounts.ticket_account.load_mut()?;
+    let config = ctx.accounts.config.load()?;
 
-    UpdateDirectedStakeTicket::auth(&ticket, &whitelist, ctx.accounts.signer.key, &preferences)?;
+    UpdateDirectedStakeTicket::auth(&ticket, &whitelist, ctx.accounts.signer.key, &preferences, &config.directed_stake_ticket_override_authority)?;
 
     if preferences.len() > crate::MAX_PREFERENCES_PER_TICKET {
         msg!("Error: Too many preferences provided");

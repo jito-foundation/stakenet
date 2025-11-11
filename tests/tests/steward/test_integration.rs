@@ -11,7 +11,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     )
     .0;
 
-    let set_auth_ix = Instruction {
+    let set_whitelist_auth_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
@@ -22,6 +22,21 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
         data: jito_steward::instruction::SetNewAuthority {
             authority_type:
                 jito_steward::instructions::AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeTicketOverrideAuthority,
         }
         .data(),
     };
@@ -51,7 +66,7 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
     };
 
     let tx = Transaction::new_signed_with_payer(
-        &[set_auth_ix, ix],
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix, ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,

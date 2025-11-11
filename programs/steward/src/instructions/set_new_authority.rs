@@ -16,6 +16,7 @@ pub enum AuthorityType {
     SetPriorityFeeParameterAuthority = 3,
     SetDirectedStakeWhitelistAuthority = 4,
     SetDirectedStakeMetaUploadAuthority = 5,
+    SetDirectedStakeTicketOverrideAuthority = 6,
 }
 
 impl AuthorityType {
@@ -132,6 +133,9 @@ pub fn handler(ctx: Context<SetNewAuthority>, authority_type: AuthorityType) -> 
         }
         AuthorityType::SetDirectedStakeMetaUploadAuthority => {
             config.directed_stake_meta_upload_authority = ctx.accounts.new_authority.key();
+        }
+        AuthorityType::SetDirectedStakeTicketOverrideAuthority => {
+            config.directed_stake_ticket_override_authority = ctx.accounts.new_authority.key();
         }
     }
 

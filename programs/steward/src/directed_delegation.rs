@@ -176,12 +176,11 @@ pub fn increase_stake_calculation(
         ((available_lamports as u128).saturating_mul(delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
-            
+
     // Do not over-delegate if proportional increase would exceed the target delta lamports
     // This prevents future yield drag from unstaking excess lamports
     let adjusted_proportional_increase_lamports =
-        proportional_increase_lamports
-        .min(target_delta_lamports);
+        proportional_increase_lamports.min(target_delta_lamports);
 
     if adjusted_proportional_increase_lamports < (stake_rent.saturating_add(minimum_delegation)) {
         msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
