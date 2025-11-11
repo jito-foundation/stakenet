@@ -368,7 +368,8 @@ mod tests {
             epoch_decrease_total_lamports: 0,
             epoch_last_updated: 0,
             directed_unstake_total: 0,
-            padding0: [0; 64],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
             targets: [target; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
         }
     }
@@ -405,7 +406,8 @@ mod tests {
             epoch_decrease_total_lamports: 0,
             epoch_last_updated: 100,
             directed_unstake_total: 0,
-            padding0: [0; 64],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
             targets,
         }
     }

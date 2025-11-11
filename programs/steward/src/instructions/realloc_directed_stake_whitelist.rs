@@ -4,6 +4,12 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 
+fn is_initialized(account_info: &AccountInfo) -> bool {
+    // Checks position of is_initialized byte in account data
+    account_info.data_len() >= DirectedStakeWhitelist::SIZE
+        && account_info.data.borrow()[DirectedStakeWhitelist::IS_INITIALIZED_BYTE_POSITION] != 0
+}
+
 fn get_realloc_size(account_info: &AccountInfo) -> Result<usize> {
     let account_size = account_info.data_len();
 
@@ -44,7 +50,7 @@ pub struct ReallocDirectedStakeWhitelist<'info> {
 
 pub fn handler(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
     let account_size = ctx.accounts.directed_stake_whitelist.as_ref().data_len();
-    if account_size >= DirectedStakeWhitelist::SIZE {
+    if account_size >= DirectedStakeWhitelist::SIZE && !is_initialized(ctx.accounts.directed_stake_whitelist.as_ref()) {
         let mut whitelist = ctx.accounts.directed_stake_whitelist.load_mut()?;
         whitelist.permissioned_user_stakers =
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
@@ -55,6 +61,7 @@ pub fn handler(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
         whitelist.total_permissioned_user_stakers = 0;
         whitelist.total_permissioned_protocol_stakers = 0;
         whitelist.total_permissioned_validators = 0;
+        whitelist.is_initialized = true.into();
     }
     Ok(())
 }

@@ -28,7 +28,8 @@ pub struct DirectedStakeMeta {
     pub epoch_decrease_total_lamports: u64,
     pub epoch_last_updated: u64,
     pub directed_unstake_total: u64,
-    pub padding0: [u8; 64],
+    pub padding0: [u8; 63],
+    pub is_initialized: U8Bool,
     pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
 }
 
@@ -36,6 +37,8 @@ pub struct DirectedStakeMeta {
 impl DirectedStakeMeta {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"meta";
+    // Byte position of is_initialized field: 8 (discriminator) + 8*5 (u64 fields) + 62 (padding0) = 110
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8 + 8 * 5 + 63;
 
     /// Get the index of a particular validator in the targets array
     pub fn get_target_index(&self, vote_pubkey: &Pubkey) -> Option<usize> {
@@ -242,13 +245,16 @@ pub struct DirectedStakeWhitelist {
     pub total_permissioned_user_stakers: u16,
     pub total_permissioned_protocol_stakers: u16,
     pub total_permissioned_validators: u16,
-    // 250 bytes reserved for future use
-    pub _padding0: [u8; 250],
+    // 249 bytes reserved for future use (1 byte used for is_initialized)
+    pub _padding0: [u8; 249],
+    pub is_initialized: U8Bool,
 }
 
 impl DirectedStakeWhitelist {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"whitelist";
+    // Byte position of is_initialized field: 8 (discriminator) + 32*2048*2 (user + protocol stakers) + 32*2048 (validators) + 2*3 (u16 fields) + 248 (padding0) = 196866
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8 + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS + 32 * MAX_PERMISSIONED_DIRECTED_VALIDATORS + 2 + 2 + 2 + 249;
 
     pub fn is_user_staker_permissioned(&self, staker: &Pubkey) -> bool {
         self.permissioned_user_stakers

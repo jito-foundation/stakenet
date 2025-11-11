@@ -4,6 +4,12 @@ use crate::{
 };
 use anchor_lang::prelude::*;
 
+fn is_initialized(account_info: &AccountInfo) -> bool {
+    // Checks position of is_initialized byte in account data
+    account_info.data_len() >= DirectedStakeMeta::SIZE
+        && account_info.data.borrow()[DirectedStakeMeta::IS_INITIALIZED_BYTE_POSITION] != 0
+}
+
 fn get_realloc_size(account_info: &AccountInfo) -> Result<usize> {
     let account_size = account_info.data_len();
 
@@ -44,7 +50,7 @@ pub struct ReallocDirectedStakeMeta<'info> {
 
 pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
     let account_size = ctx.accounts.directed_stake_meta.as_ref().data_len();
-    if account_size >= DirectedStakeMeta::SIZE {
+    if account_size >= DirectedStakeMeta::SIZE && !is_initialized(ctx.accounts.directed_stake_meta.as_ref()) {
         let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
         // Initialize the targets array when the account reaches full size
         let default_target = crate::state::directed_stake::DirectedStakeTarget {
@@ -56,6 +62,7 @@ pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
             _padding0: [0; 32],
         };
         stake_meta.targets = [default_target; crate::MAX_PERMISSIONED_DIRECTED_VALIDATORS];
+        stake_meta.is_initialized = true.into();
     }
     Ok(())
 }

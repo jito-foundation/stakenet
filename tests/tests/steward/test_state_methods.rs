@@ -1185,7 +1185,8 @@ fn test_directed_stake_whitelist_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Add staker successfully
@@ -1244,7 +1245,8 @@ fn test_directed_stake_whitelist_remove_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Remove staker successfully
@@ -1303,7 +1305,8 @@ fn test_directed_stake_whitelist_remove_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
     let result = empty_whitelist.remove_user_staker(&Pubkey::new_unique());
     assert!(result.is_err());
@@ -1349,7 +1352,8 @@ fn test_directed_stake_whitelist_remove_array_shifting() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Verify array shifting for stakers
@@ -1435,7 +1439,8 @@ fn test_directed_stake_whitelist_capacity_limits() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Fill staker list to capacity
