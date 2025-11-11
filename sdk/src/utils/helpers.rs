@@ -87,7 +87,7 @@ impl DirectedRebalanceProgressionInfo {
         all_steward_accounts: &AllStewardAccounts,
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Vec<DirectedRebalanceProgressionInfo> {
-        let validator_map: HashMap<_, _> = all_steward_accounts
+        let validator_map: HashMap<Pubkey, usize> = all_steward_accounts
             .validator_list_account
             .validators
             .iter()
