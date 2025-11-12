@@ -10,7 +10,7 @@ COPY . .
 
 RUN --mount=type=cache,mode=0777,target=/home/root/app/target \
     --mount=type=cache,mode=0777,target=/usr/local/cargo/registry \
-	cargo build --release --bin stakenet-keeper
+	cargo build --release --features idl-build --bin stakenet-keeper
 
 #########
 
