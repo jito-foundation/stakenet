@@ -60,8 +60,11 @@ pub struct Config {
     /// The authority that can update the directed stake whitelist
     pub directed_stake_whitelist_authority: Pubkey,
 
+    /// The authoirty that can override directed stake tickets
+    pub directed_stake_ticket_override_authority: Pubkey,
+
     /// Padding for future governance parameters
-    pub _padding: [u8; 920],
+    pub _padding: [u8; 888],
 }
 
 impl Config {

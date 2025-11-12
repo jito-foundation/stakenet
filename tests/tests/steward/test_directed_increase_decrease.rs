@@ -44,7 +44,8 @@ fn create_mock_directed_stake_meta(
         epoch_increase_total_lamports: 0,
         epoch_decrease_total_lamports: 0,
         directed_unstake_total: 0,
-        padding0: [0; 64],
+        padding0: [0; 63],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),
             total_target_lamports: 0,

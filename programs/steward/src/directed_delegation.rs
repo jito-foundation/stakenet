@@ -169,8 +169,11 @@ pub fn increase_stake_calculation(
     let delta_proportion_bps: u128 =
         (target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
 
+    // We must preserve at least stake_rent in the reserve stake account for rent-exemption
+    let available_lamports = reserve_lamports.saturating_sub(stake_rent);
+
     let proportional_increase_lamports: u64 =
-        ((reserve_lamports as u128).saturating_mul(delta_proportion_bps) / 10_000)
+        ((available_lamports as u128).saturating_mul(delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 

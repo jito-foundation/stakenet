@@ -114,7 +114,8 @@ fn test_directed_stake_whitelist_initialization() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     assert_eq!(whitelist.total_permissioned_user_stakers, 0);
@@ -133,7 +134,8 @@ fn test_directed_stake_whitelist_add_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker = Pubkey::new_unique();
@@ -176,7 +178,8 @@ fn test_directed_stake_whitelist_remove_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker = Pubkey::new_unique();
@@ -223,7 +226,8 @@ fn test_directed_stake_whitelist_edge_cases() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let non_existent = Pubkey::new_unique();
@@ -282,7 +286,8 @@ fn test_directed_stake_whitelist_validation_logic() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();
@@ -353,7 +358,8 @@ fn test_permissioned_stakers_validation() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker1 = Pubkey::new_unique();
@@ -408,7 +414,8 @@ fn test_permissioned_validators_validation() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let validator1 = Pubkey::new_unique();
@@ -463,7 +470,8 @@ fn test_ticket_authorization_scenarios() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let permissioned_staker = Pubkey::new_unique();
@@ -527,7 +535,8 @@ fn test_whitelist_capacity_limits() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test that we can add up to the maximum number of user stakers
@@ -577,7 +586,8 @@ fn test_whitelist_removal_and_readdition() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();
@@ -620,7 +630,8 @@ fn test_preferences_validation_edge_cases() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let validator1 = Pubkey::new_unique();
@@ -692,7 +703,8 @@ fn test_user_and_protocol_staker_separation() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker1 = Pubkey::new_unique();
@@ -757,7 +769,8 @@ fn test_user_and_protocol_staker_capacity_limits() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Fill up user stakers
@@ -810,7 +823,8 @@ fn test_cross_category_staker_operations() {
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();

@@ -405,6 +405,28 @@ pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> R
     Ok(validator_list.len() as usize)
 }
 
+/// Check if a vote account exists in the validator list
+pub fn validator_exists_in_list(
+    validator_list_account_info: &AccountInfo,
+    vote_account: &Pubkey,
+) -> Result<bool> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+
+    for index in 0..validator_list.len() as usize {
+        let vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, index)?;
+        if vote_pubkey == *vote_account {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
 /// A boolean type stored as a u8.
 #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq)]
 #[zero_copy]

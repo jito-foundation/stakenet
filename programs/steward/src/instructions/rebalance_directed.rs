@@ -133,6 +133,11 @@ pub fn handler(
     let maybe_vote_pubkey_from_validator_list =
         get_validator_stake_info_at_index(validator_list, validator_list_index);
 
+    // Now we need to check if the vote_pubkey from above matches the vote_account
+    if vote_pubkey_from_directed_stake_meta != ctx.accounts.vote_account.key() {
+        return Err(StewardError::DirectedStakeVoteAccountMismatch.into());
+    }
+
     if maybe_vote_pubkey_from_validator_list.is_err() {
         directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch =
             clock.epoch;
@@ -149,7 +154,6 @@ pub fn handler(
         let current_epoch = clock.epoch;
         if (current_epoch > state_account.state.current_epoch
             || state_account.state.num_pool_validators == 0)
-            && !state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE)
         {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
