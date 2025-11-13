@@ -41,7 +41,6 @@ pub enum KeeperOperations {
     EmitMetrics,
     BlockMetadataKeeper,
     PriorityFeeCommission,
-    DirectedStaking,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {

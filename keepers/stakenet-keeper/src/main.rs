@@ -61,9 +61,6 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_priority_fee_commission {
         run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
-    if args.run_directed_staking {
-        run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
-    }
 
     run_flags
 }
@@ -141,7 +138,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     );
 
                     // Mark Steward block as completed so we don't double-fire
-                    execution_queue.mark_completed(ExecutionBlock::Steward);
+                    // execution_queue.mark_completed(ExecutionBlock::Steward);
 
                     info!("Epoch start Steward crank completed");
                 }
