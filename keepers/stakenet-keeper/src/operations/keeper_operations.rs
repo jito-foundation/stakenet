@@ -93,7 +93,7 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 impl KeeperOperations {
     pub const LEN: usize = 13;
 
-    /// Is operation sends many TXs
+    /// Returns true if the operation sends many transactions.
     pub fn is_heavy_operation(&self) -> bool {
         matches!(
             self,
@@ -317,8 +317,6 @@ impl KeeperOperations {
     }
 
     /// Execute operation
-    ///
-    /// Most of the logics are copied from main.rs
     pub async fn execute(
         &self,
         keeper_config: &KeeperConfig,
@@ -450,9 +448,9 @@ impl KeeperOperations {
                     } else {
                         operation_queue.mark_completed(operation);
                     }
+                } else {
+                    operation_queue.mark_completed(operation);
                 }
-
-                operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::GossipUpload => {
@@ -468,9 +466,9 @@ impl KeeperOperations {
                     } else {
                         operation_queue.mark_completed(operation);
                     }
+                } else {
+                    operation_queue.mark_completed(operation);
                 }
-
-                operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::PriorityFeeCommission => {
@@ -529,6 +527,8 @@ impl KeeperOperations {
                     } else {
                         operation_queue.mark_completed(operation);
                     }
+                } else {
+                    operation_queue.mark_completed(operation);
                 }
             }
 

@@ -234,8 +234,6 @@ impl OperationQueue {
     }
 
     /// Checks if any interval matches for update operations.
-    ///
-    /// Copied from main.rs
     fn should_update(&self, tick: u64) -> bool {
         self.get_all_intervals()
             .iter()
@@ -243,8 +241,6 @@ impl OperationQueue {
     }
 
     /// Checks if any interval matches for emit operations.
-    ///
-    /// Copied from main.rs
     fn should_emit(&self, tick: u64) -> bool {
         self.get_all_intervals()
             .iter()
