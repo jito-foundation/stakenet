@@ -501,14 +501,14 @@ impl KeeperOperations {
                     keeper_flags,
                 ));
 
-                if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                    random_cooldown(keeper_config.cool_down_range).await;
-                }
-
                 if errors > 0 {
                     operation_queue.mark_failed(operation);
                 } else {
                     operation_queue.mark_completed(operation);
+                }
+
+                if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                    random_cooldown(keeper_config.cool_down_range).await;
                 }
             }
 

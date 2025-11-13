@@ -104,7 +104,7 @@ impl OperationQueue {
 
         // Build tasks in execution order based on run_flags
 
-        // Fetch operations (validator_history_interval)
+        // Fetch operations
         if run_flags & (1 << KeeperOperations::PreCreateUpdate as u32) != 0 {
             tasks.push(OperationTask {
                 operation: KeeperOperations::PreCreateUpdate,
