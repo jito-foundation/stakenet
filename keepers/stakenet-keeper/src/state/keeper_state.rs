@@ -5,7 +5,9 @@ use std::{
 
 use anchor_lang::prelude::{EpochSchedule, SlotHistory};
 use bytemuck::Zeroable;
-use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
+use solana_client::{
+    client_error::ClientError, nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo,
+};
 use solana_metrics::datapoint_info;
 use solana_sdk::{
     account::Account, epoch_info::EpochInfo, pubkey::Pubkey,
@@ -128,7 +130,32 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
     pub cluster_name: String,
 }
+
 impl KeeperState {
+    /// Update `epoch_info` and `epoch_schedule` states in [`EpochState`]
+    pub async fn update_epoch_info_and_schedule(
+        &mut self,
+        client: &RpcClient,
+    ) -> Result<(), ClientError> {
+        match client.get_epoch_info().await {
+            Ok(latest_epoch) => {
+                self.epoch_info = latest_epoch.clone();
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        match client.get_epoch_schedule().await {
+            Ok(epoch_schedule) => self.epoch_schedule = epoch_schedule,
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn update_identity_to_vote_map(&mut self) {
         self.identity_to_vote_map = self
             .vote_account_map
@@ -348,6 +375,25 @@ impl KeeperState {
         }
 
         Ok(false)
+    }
+
+    pub async fn is_epoch_start(
+        &self,
+        client: Arc<RpcClient>,
+    ) -> Result<bool, JitoTransactionError> {
+        let current_slot = client.get_slot().await?;
+        let slots_in_epoch = self.epoch_schedule.slots_per_epoch;
+        let slot_index = current_slot
+            .checked_sub(
+                self.epoch_schedule
+                    .get_first_slot_in_epoch(self.epoch_info.epoch),
+            )
+            .ok_or(JitoTransactionError::Custom(
+                "Failed to calculate".to_string(),
+            ))?;
+        let epoch_progress = slot_index as f64 / slots_in_epoch as f64;
+
+        Ok(epoch_progress > 0.0)
     }
 }
 

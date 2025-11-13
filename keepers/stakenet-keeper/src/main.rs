@@ -18,6 +18,7 @@ use stakenet_keeper::{
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
+        execution::{BlockState, ExecutionBlock, ExecutionQueue},
         keeper_config::{Args, KeeperConfig},
         keeper_state::{KeeperFlag, KeeperState},
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
@@ -72,18 +73,6 @@ fn should_clear_startup_flag(tick: u64, intervals: &[u64]) -> bool {
     tick % (max_interval + 1) == 0
 }
 
-fn should_emit(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick % (interval + 1) == 0)
-}
-
-fn should_update(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick % interval == 0)
-}
-
-fn should_fire(tick: u64, interval: u64) -> bool {
-    tick % interval == 0
-}
-
 fn advance_tick(tick: &mut u64) {
     *tick += 1;
 }
@@ -120,192 +109,318 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     let mut keeper_state = KeeperState::default();
     keeper_state.set_cluster_name(&keeper_config.cluster_name);
 
+    let mut execution_queue = ExecutionQueue::new(
+        validator_history_interval,
+        steward_interval,
+        block_metadata_interval,
+        metrics_interval,
+        keeper_config.run_flags,
+    );
+
     let smallest_interval = intervals.iter().min().unwrap();
     let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
+    let mut last_seen_epoch = keeper_state.epoch_info.epoch;
 
     if keeper_config.full_startup {
         keeper_state.keeper_flags.set_flag(KeeperFlag::Startup);
     }
 
     loop {
-        // ---------------------- FETCH -----------------------------------
-        // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
-        // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
-        if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...({})", tick);
-            match pre_create_update(&keeper_config, &mut keeper_state).await {
-                Ok(_) => {
-                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
-                }
-                Err(e) => {
-                    error!("Failed to pre create update: {:?}", e);
+        match keeper_config.client.get_epoch_info().await {
+            Ok(epoch_info) => {
+                let current_epoch = epoch_info.epoch;
+                keeper_state.epoch_info = epoch_info;
 
-                    keeper_state
-                        .increment_update_error_for_epoch(KeeperOperations::PreCreateUpdate);
+                if current_epoch > last_seen_epoch {
+                    info!("EPOCH TRANSITION! {last_seen_epoch} -> {current_epoch} - IMMEDIATE STEWARD CRANK!");
+                    last_seen_epoch = current_epoch;
 
-                    advance_tick(&mut tick);
-                    continue;
+                    // Fire Steward immediately, bypass queue
+                    keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                        operations::steward::fire(&keeper_config, &keeper_state).await,
+                    );
+
+                    // Mark Steward block as completed so we don't double-fire
+                    execution_queue.mark_completed(ExecutionBlock::Steward);
+
+                    info!("Epoch start Steward crank completed");
                 }
             }
+            Err(e) => error!("Failed to check epoch: {e:?}"),
+        }
 
-            if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...({})", tick);
-                match create_missing_accounts(&keeper_config, &keeper_state).await {
-                    Ok(new_accounts_created) => {
-                        keeper_state.increment_update_run_for_epoch(
-                            KeeperOperations::CreateMissingAccounts,
-                        );
+        execution_queue.mark_should_fire(tick);
 
-                        let total_txs: usize =
-                            new_accounts_created.iter().map(|(_, txs)| txs).sum();
-                        keeper_state.increment_update_txs_for_epoch(
-                            KeeperOperations::CreateMissingAccounts,
-                            total_txs as u64,
-                        );
+        while let Some(task) = execution_queue.get_next_pending() {
+            task.state = BlockState::Running;
+            let block = task.block;
 
-                        new_accounts_created
-                            .iter()
-                            .for_each(|(operation, created_accounts)| {
-                                keeper_state.increment_creations_for_epoch((
-                                    operation.clone(),
-                                    *created_accounts as u64,
-                                ));
-                            });
+            info!("Executing block: {block:?}");
+
+            match block {
+                ExecutionBlock::Fetch => {
+                    // Pre-create update
+                    info!("Pre-fetching data for update...({})", tick);
+                    match pre_create_update(&keeper_config, &mut keeper_state).await {
+                        Ok(_) => {
+                            keeper_state
+                                .increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
+                        }
+                        Err(e) => {
+                            error!("Failed to pre create update: {:?}", e);
+                            keeper_state.increment_update_error_for_epoch(
+                                KeeperOperations::PreCreateUpdate,
+                            );
+                            execution_queue.mark_failed(ExecutionBlock::Fetch);
+                            break; // Skip rest if fetch fails
+                        }
                     }
-                    Err(e) => {
-                        error!("Failed to create missing accounts: {:?}", e);
 
-                        keeper_state.increment_update_error_for_epoch(
-                            KeeperOperations::CreateMissingAccounts,
-                        );
+                    // Check epoch after pre-create
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
 
-                        advance_tick(&mut tick);
-                        continue;
+                    // Create missing accounts
+                    if keeper_config.pay_for_new_accounts {
+                        info!("Creating missing accounts...({})", tick);
+                        match create_missing_accounts(&keeper_config, &keeper_state).await {
+                            Ok(new_accounts_created) => {
+                                keeper_state.increment_update_run_for_epoch(
+                                    KeeperOperations::CreateMissingAccounts,
+                                );
+                                let total_txs: usize =
+                                    new_accounts_created.iter().map(|(_, txs)| txs).sum();
+                                keeper_state.increment_update_txs_for_epoch(
+                                    KeeperOperations::CreateMissingAccounts,
+                                    total_txs as u64,
+                                );
+                                new_accounts_created.iter().for_each(
+                                    |(operation, created_accounts)| {
+                                        keeper_state.increment_creations_for_epoch((
+                                            operation.clone(),
+                                            *created_accounts as u64,
+                                        ));
+                                    },
+                                );
+                            }
+                            Err(e) => {
+                                error!("Failed to create missing accounts: {:?}", e);
+                                keeper_state.increment_update_error_for_epoch(
+                                    KeeperOperations::CreateMissingAccounts,
+                                );
+                                execution_queue.mark_failed(ExecutionBlock::Fetch);
+                                break;
+                            }
+                        }
                     }
+
+                    // Check epoch after create
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    // Post-create update
+                    info!("Post-fetching data for update...({})", tick);
+                    match post_create_update(&keeper_config, &mut keeper_state).await {
+                        Ok(_) => {
+                            keeper_state
+                                .increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
+                            execution_queue.mark_completed(ExecutionBlock::Fetch);
+                        }
+                        Err(e) => {
+                            error!("Failed to post create update: {:?}", e);
+                            keeper_state.increment_update_error_for_epoch(
+                                KeeperOperations::PostCreateUpdate,
+                            );
+                            execution_queue.mark_failed(ExecutionBlock::Fetch);
+                            break;
+                        }
+                    }
+
+                    // Check epoch after post-create
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+                }
+
+                ExecutionBlock::ValidatorHistory => {
+                    info!("Updating cluster history...");
+                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                        operations::cluster_history::fire(&keeper_config, &keeper_state).await,
+                    );
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    info!("Updating copy vote accounts...");
+                    keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                        operations::vote_account::fire(&keeper_config, &keeper_state).await,
+                    );
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    info!("Updating mev commission...");
+                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                        operations::mev_commission::fire(&keeper_config, &keeper_state).await,
+                    );
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    info!("Updating mev earned...");
+                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                        operations::mev_earned::fire(&keeper_config, &keeper_state).await,
+                    );
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    if keeper_config.oracle_authority_keypair.is_some() {
+                        info!("Updating stake accounts...");
+                        keeper_state.set_runs_errors_and_txs_for_epoch(
+                            operations::stake_upload::fire(&keeper_config, &keeper_state).await,
+                        );
+                        check_and_fire_steward_on_epoch_transition(
+                            &keeper_config,
+                            &mut keeper_state,
+                            &mut last_seen_epoch,
+                            &mut execution_queue,
+                        )
+                        .await;
+                    }
+
+                    if keeper_config.oracle_authority_keypair.is_some()
+                        && keeper_config.gossip_entrypoints.is_some()
+                    {
+                        info!("Updating gossip accounts...");
+                        keeper_state.set_runs_errors_and_txs_for_epoch(
+                            operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+                        );
+                        check_and_fire_steward_on_epoch_transition(
+                            &keeper_config,
+                            &mut keeper_state,
+                            &mut last_seen_epoch,
+                            &mut execution_queue,
+                        )
+                        .await;
+                    }
+
+                    info!("Updating priority fee commission...");
+                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                        operations::priority_fee_commission::fire(&keeper_config, &keeper_state)
+                            .await,
+                    );
+                    check_and_fire_steward_on_epoch_transition(
+                        &keeper_config,
+                        &mut keeper_state,
+                        &mut last_seen_epoch,
+                        &mut execution_queue,
+                    )
+                    .await;
+
+                    if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                        random_cooldown(keeper_config.cool_down_range).await;
+                    }
+
+                    execution_queue.mark_completed(ExecutionBlock::ValidatorHistory);
+                }
+
+                ExecutionBlock::Steward => {
+                    info!("Cranking Steward (normal interval)...");
+                    keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                        operations::steward::fire(&keeper_config, &keeper_state).await,
+                    );
+
+                    if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
+                        random_cooldown(keeper_config.cool_down_range).await;
+                    }
+
+                    execution_queue.mark_completed(ExecutionBlock::Steward);
+                }
+
+                ExecutionBlock::BlockMetadata => {
+                    if keeper_config
+                        .priority_fee_oracle_authority_keypair
+                        .is_some()
+                    {
+                        info!("Updating priority fee block metadata...");
+                        keeper_state.set_runs_errors_and_txs_for_epoch(
+                            operations::block_metadata::operations::fire(
+                                &keeper_config,
+                                &keeper_state,
+                            )
+                            .await,
+                        );
+                        check_and_fire_steward_on_epoch_transition(
+                            &keeper_config,
+                            &mut keeper_state,
+                            &mut last_seen_epoch,
+                            &mut execution_queue,
+                        )
+                        .await;
+                    }
+
+                    execution_queue.mark_completed(ExecutionBlock::BlockMetadata);
+                }
+
+                ExecutionBlock::MetricsEmit => {
+                    info!("Emitting metrics...");
+                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                        operations::metrics_emit::fire(
+                            &keeper_config,
+                            &keeper_state,
+                            keeper_config.cluster_name.as_str(),
+                        )
+                        .await,
+                    );
+
+                    keeper_state.emit();
+
+                    KeeperOperations::emit(
+                        &keeper_state.runs_for_epoch,
+                        &keeper_state.errors_for_epoch,
+                        &keeper_state.txs_for_epoch,
+                        keeper_config.cluster_name.as_str(),
+                    );
+
+                    KeeperCreates::emit(
+                        &keeper_state.created_accounts_for_epoch,
+                        &keeper_state.cluster_name,
+                    );
+
+                    execution_queue.mark_completed(ExecutionBlock::MetricsEmit);
                 }
             }
-
-            info!("Post-fetching data for update...({})", tick);
-            match post_create_update(&keeper_config, &mut keeper_state).await {
-                Ok(_) => {
-                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
-                }
-                Err(e) => {
-                    error!("Failed to post create update: {:?}", e);
-
-                    keeper_state
-                        .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
-
-                    advance_tick(&mut tick);
-                    continue;
-                }
-            }
-        }
-
-        // ---------------------- FIRE ------------------------------------
-
-        // VALIDATOR HISTORY
-        if should_fire(tick, validator_history_interval) {
-            info!("Firing operations...");
-
-            info!("Updating cluster history...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::cluster_history::fire(&keeper_config, &keeper_state).await,
-            );
-
-            info!("Updating copy vote accounts...");
-            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                operations::vote_account::fire(&keeper_config, &keeper_state).await,
-            );
-
-            info!("Updating mev commission...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::mev_commission::fire(&keeper_config, &keeper_state).await,
-            );
-
-            info!("Updating mev earned...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::mev_earned::fire(&keeper_config, &keeper_state).await,
-            );
-
-            if keeper_config.oracle_authority_keypair.is_some() {
-                info!("Updating stake accounts...");
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::stake_upload::fire(&keeper_config, &keeper_state).await,
-                );
-            }
-
-            if keeper_config.oracle_authority_keypair.is_some()
-                && keeper_config.gossip_entrypoints.is_some()
-            {
-                info!("Updating gossip accounts...");
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
-                );
-            }
-
-            info!("Updating priority fee commission...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
-            );
-
-            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown(keeper_config.cool_down_range).await;
-            }
-        }
-
-        // STEWARD
-        if should_fire(tick, steward_interval) {
-            info!("Cranking Steward...");
-            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                operations::steward::fire(&keeper_config, &keeper_state).await,
-            );
-
-            if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
-                random_cooldown(keeper_config.cool_down_range).await;
-            }
-        }
-
-        // PRIORITY FEE BLOCK METADATA
-        if should_fire(tick, block_metadata_interval)
-            && keeper_config
-                .priority_fee_oracle_authority_keypair
-                .is_some()
-        {
-            info!("Updating priority fee block metadata...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::block_metadata::operations::fire(&keeper_config, &keeper_state).await,
-            );
-        }
-
-        // ---------------------- EMIT ---------------------------------
-
-        if should_fire(tick, metrics_interval) {
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                operations::metrics_emit::fire(
-                    &keeper_config,
-                    &keeper_state,
-                    keeper_config.cluster_name.as_str(),
-                )
-                .await,
-            );
-        }
-
-        if should_emit(tick, &intervals) {
-            info!("Emitting metrics...");
-            keeper_state.emit();
-
-            KeeperOperations::emit(
-                &keeper_state.runs_for_epoch,
-                &keeper_state.errors_for_epoch,
-                &keeper_state.txs_for_epoch,
-                keeper_config.cluster_name.as_str(),
-            );
-
-            KeeperCreates::emit(
-                &keeper_state.created_accounts_for_epoch,
-                &keeper_state.cluster_name,
-            );
         }
 
         // ---------- CLEAR STARTUP ----------
@@ -315,6 +430,33 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
+    }
+}
+
+async fn check_and_fire_steward_on_epoch_transition(
+    keeper_config: &KeeperConfig,
+    keeper_state: &mut KeeperState,
+    last_seen_epoch: &mut u64,
+    execution_queue: &mut ExecutionQueue,
+) {
+    if let Ok(epoch_info) = keeper_config.client.get_epoch_info().await {
+        if epoch_info.epoch > *last_seen_epoch {
+            info!(
+                "🚀 EPOCH TRANSITION DETECTED DURING OPERATION! {} -> {}",
+                *last_seen_epoch, epoch_info.epoch
+            );
+
+            *last_seen_epoch = epoch_info.epoch;
+            keeper_state.epoch_info = epoch_info;
+
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                operations::steward::fire(keeper_config, keeper_state).await,
+            );
+
+            execution_queue.mark_completed(ExecutionBlock::Steward);
+
+            info!("✅ Epoch transition Steward crank completed, resuming operations");
+        }
     }
 }
 
