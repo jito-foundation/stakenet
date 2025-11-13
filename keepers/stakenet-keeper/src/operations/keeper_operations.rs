@@ -67,7 +67,7 @@ impl std::fmt::Display for KeeperOperations {
             KeeperOperations::ClusterHistory => write!(f, "cluster_history"),
             KeeperOperations::GossipUpload => write!(f, "gossip_upload"),
             KeeperOperations::StakeUpload => write!(f, "stake_upload"),
-            KeeperOperations::VoteAccount => write!(f, "vote_accuont"),
+            KeeperOperations::VoteAccount => write!(f, "vote_account"),
             KeeperOperations::MevEarned => write!(f, "mev_earned"),
             KeeperOperations::MevCommission => write!(f, "mev_commission"),
             KeeperOperations::Steward => write!(f, "steward"),
@@ -386,39 +386,72 @@ impl KeeperOperations {
             }
 
             KeeperOperations::ClusterHistory => {
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::cluster_history::fire(keeper_config, keeper_state).await,
-                );
-                operation_queue.mark_completed(operation);
+                let (operation, runs, errors, txs) =
+                    operations::cluster_history::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
 
             KeeperOperations::VoteAccount => {
-                keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                    operations::vote_account::fire(keeper_config, keeper_state).await,
-                );
-                operation_queue.mark_completed(operation);
+                let (operation, runs, errors, txs, keeper_flags) =
+                    operations::vote_account::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_txs_and_flags_for_epoch((
+                    operation,
+                    runs,
+                    errors,
+                    txs,
+                    keeper_flags,
+                ));
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
 
             KeeperOperations::MevCommission => {
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::mev_commission::fire(keeper_config, keeper_state).await,
-                );
-                operation_queue.mark_completed(operation);
+                let (operation, runs, errors, txs) =
+                    operations::mev_commission::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
 
             KeeperOperations::MevEarned => {
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::mev_earned::fire(keeper_config, keeper_state).await,
-                );
-                operation_queue.mark_completed(operation);
+                let (operation, runs, errors, txs) =
+                    operations::mev_earned::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
 
             KeeperOperations::StakeUpload => {
                 if keeper_config.oracle_authority_keypair.is_some() {
-                    keeper_state.set_runs_errors_and_txs_for_epoch(
-                        operations::stake_upload::fire(keeper_config, keeper_state).await,
-                    );
+                    let (operation, runs, errors, txs) =
+                        operations::stake_upload::fire(keeper_config, keeper_state).await;
+                    keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                    if errors > 0 {
+                        operation_queue.mark_failed(operation);
+                    } else {
+                        operation_queue.mark_completed(operation);
+                    }
                 }
+
                 operation_queue.mark_completed(operation);
             }
 
@@ -426,18 +459,30 @@ impl KeeperOperations {
                 if keeper_config.oracle_authority_keypair.is_some()
                     && keeper_config.gossip_entrypoints.is_some()
                 {
-                    keeper_state.set_runs_errors_and_txs_for_epoch(
-                        operations::gossip_upload::fire(keeper_config, keeper_state).await,
-                    );
+                    let (operation, runs, errors, txs) =
+                        operations::gossip_upload::fire(keeper_config, keeper_state).await;
+                    keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                    if errors > 0 {
+                        operation_queue.mark_failed(operation);
+                    } else {
+                        operation_queue.mark_completed(operation);
+                    }
                 }
+
                 operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::PriorityFeeCommission => {
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::priority_fee_commission::fire(keeper_config, keeper_state).await,
-                );
-                operation_queue.mark_completed(operation);
+                let (operation, runs, errors, txs) =
+                    operations::priority_fee_commission::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
 
                 // Cooldown after validator history operations complete
                 if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
@@ -447,14 +492,26 @@ impl KeeperOperations {
 
             KeeperOperations::Steward => {
                 info!("Cranking Steward (normal interval)...");
-                keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                    operations::steward::fire(keeper_config, keeper_state).await,
-                );
+
+                let (operation, runs, errors, txs, keeper_flags) =
+                    operations::steward::fire(keeper_config, keeper_state).await;
+                keeper_state.set_runs_errors_txs_and_flags_for_epoch((
+                    operation,
+                    runs,
+                    errors,
+                    txs,
+                    keeper_flags,
+                ));
 
                 if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                     random_cooldown(keeper_config.cool_down_range).await;
                 }
-                operation_queue.mark_completed(operation);
+
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
 
             KeeperOperations::BlockMetadataKeeper => {
@@ -462,23 +519,27 @@ impl KeeperOperations {
                     .priority_fee_oracle_authority_keypair
                     .is_some()
                 {
-                    keeper_state.set_runs_errors_and_txs_for_epoch(
+                    let (operation, runs, errors, txs) =
                         operations::block_metadata::operations::fire(keeper_config, keeper_state)
-                            .await,
-                    );
+                            .await;
+                    keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
+
+                    if errors > 0 {
+                        operation_queue.mark_failed(operation);
+                    } else {
+                        operation_queue.mark_completed(operation);
+                    }
                 }
-                operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::EmitMetrics => {
-                keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::metrics_emit::fire(
-                        keeper_config,
-                        keeper_state,
-                        keeper_config.cluster_name.as_str(),
-                    )
-                    .await,
-                );
+                let (operation, runs, errors, txs) = operations::metrics_emit::fire(
+                    keeper_config,
+                    keeper_state,
+                    keeper_config.cluster_name.as_str(),
+                )
+                .await;
+                keeper_state.set_runs_errors_and_txs_for_epoch((operation, runs, errors, txs));
 
                 keeper_state.emit();
 
@@ -494,7 +555,11 @@ impl KeeperOperations {
                     &keeper_state.cluster_name,
                 );
 
-                operation_queue.mark_completed(operation);
+                if errors > 0 {
+                    operation_queue.mark_failed(operation);
+                } else {
+                    operation_queue.mark_completed(operation);
+                }
             }
         }
 

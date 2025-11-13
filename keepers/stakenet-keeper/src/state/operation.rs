@@ -234,6 +234,8 @@ impl OperationQueue {
     }
 
     /// Checks if any interval matches for update operations.
+    ///
+    /// Copied from main.rs
     fn should_update(&self, tick: u64) -> bool {
         self.get_all_intervals()
             .iter()
@@ -241,6 +243,8 @@ impl OperationQueue {
     }
 
     /// Checks if any interval matches for emit operations.
+    ///
+    /// Copied from main.rs
     fn should_emit(&self, tick: u64) -> bool {
         self.get_all_intervals()
             .iter()
@@ -286,7 +290,7 @@ impl OperationQueue {
     pub fn get_next_pending(&mut self) -> Option<&mut OperationTask> {
         for i in self.current_index..self.tasks.len() {
             if self.tasks[i].state == OperationState::Pending {
-                self.current_index = i;
+                self.current_index = i + 1;
                 return Some(&mut self.tasks[i]);
             }
         }

@@ -181,7 +181,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         for task in operation_queue.tasks.iter() {
             if matches!(task.state, OperationState::Failed) {
-                error!("Operation failed: {}", task.operation.to_string());
+                error!("Operation failed: {}", task.operation);
             }
         }
 
@@ -202,14 +202,14 @@ async fn check_and_fire_steward_on_epoch_transition(
     last_seen_epoch: &mut Option<u64>,
 ) {
     if let Ok(epoch_info) = keeper_config.client.get_epoch_info().await {
-        if let Some(last_seen_epoch) = last_seen_epoch {
-            if epoch_info.epoch > *last_seen_epoch {
+        if let Some(ref seen_epoch) = last_seen_epoch {
+            if epoch_info.epoch > *seen_epoch {
                 info!(
-                    "EPOCH TRANSITION DETECTED DURING OPERATION! {last_seen_epoch} -> {}",
+                    "EPOCH TRANSITION DETECTED DURING OPERATION! {seen_epoch} -> {}",
                     epoch_info.epoch
                 );
 
-                *last_seen_epoch = epoch_info.epoch;
+                *last_seen_epoch = Some(epoch_info.epoch);
                 keeper_state.epoch_info = epoch_info;
 
                 keeper_state.set_runs_errors_txs_and_flags_for_epoch(
