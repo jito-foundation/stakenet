@@ -98,22 +98,28 @@ impl ExecutionQueue {
         }
     }
 
+    /// Copy from main function
+    ///
+    /// fn should_emit(tick: u64, intervals: &[u64]) -> bool {
+    ///   intervals.iter().any(|interval| tick % (interval + 1) == 0)
+    /// }
+    ///
+    /// fn should_update(tick: u64, intervals: &[u64]) -> bool {
+    ///     intervals.iter().any(|interval| tick % interval == 0)
+    /// }
+    ///
+    /// fn should_fire(tick: u64, interval: u64) -> bool {
+    ///     tick % interval == 0
+    /// }
     pub fn mark_should_fire(&mut self, tick: u64) {
         for task in &mut self.tasks {
             let should_fire = match task.firing_condition {
-                FiringCondition::Standard => {
-                    // tick % interval == 0
-                    tick % task.interval == 0
-                }
-                FiringCondition::EmitStyle => {
-                    // tick % (interval + 1) == 0
-                    // OR any interval from the intervals array matches
-                    self.intervals
-                        .iter()
-                        .any(|interval| tick % (interval + 1) == 0)
-                }
+                FiringCondition::Standard => tick % task.interval == 0,
+                FiringCondition::EmitStyle => self
+                    .intervals
+                    .iter()
+                    .any(|interval| tick % (interval + 1) == 0),
                 FiringCondition::UpdateStyle => {
-                    // Any interval matches: tick % interval == 0
                     self.intervals.iter().any(|interval| tick % interval == 0)
                 }
             };
@@ -147,17 +153,4 @@ impl ExecutionQueue {
             task.state = BlockState::Failed;
         }
     }
-
-    // pub fn reset_for_next_cycle(&mut self) {
-    //     self.current_index = 0;
-    //     // Don't reset state here - it gets set by mark_should_fire
-    // }
-
-    // pub fn all_completed(&self) -> bool {
-    //     self.tasks
-    //         .iter()
-    //         .filter(|t| t.state == BlockState::Pending || t.state == BlockState::Running)
-    //         .count()
-    //         == 0
-    // }
 }
