@@ -59,9 +59,6 @@ fn set_run_flags(args: &Args) -> u32 {
     if args.run_priority_fee_commission {
         run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
-    if args.run_directed_staking {
-        run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
-    }
 
     run_flags
 }
@@ -135,10 +132,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     // Mark Steward as completed
                     operation_queue.mark_completed(KeeperOperations::Steward);
 
-                    info!("✅ Epoch start Steward crank completed");
+                    info!("Epoch start Steward crank completed");
                 }
             }
-            Err(e) => error!("Failed to check epoch: {:?}", e),
+            Err(e) => error!("Failed to check epoch: {e:?}"),
         }
 
         operation_queue.mark_should_fire(tick);
@@ -151,14 +148,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 .execute(&keeper_config, &mut keeper_state, &mut operation_queue)
                 .await
             {
-                error!(
-                    "Operation {:?} failed, stopping execution: {:?}",
-                    operation, e
-                );
+                error!("Operation {operation:?} failed, stopping execution: {e:?}",);
                 break;
             }
 
-            // ✅ AUTOMATIC EPOCH CHECK AFTER EACH OPERATION
+            // AUTOMATIC EPOCH CHECK AFTER EACH OPERATION
             check_and_fire_steward_on_epoch_transition(
                 &keeper_config,
                 &mut keeper_state,
@@ -188,8 +182,8 @@ async fn check_and_fire_steward_on_epoch_transition(
     if let Ok(epoch_info) = keeper_config.client.get_epoch_info().await {
         if epoch_info.epoch > *last_seen_epoch {
             info!(
-                "🚀 EPOCH TRANSITION DETECTED DURING OPERATION! {} -> {}",
-                *last_seen_epoch, epoch_info.epoch
+                "EPOCH TRANSITION DETECTED DURING OPERATION! {last_seen_epoch} -> {}",
+                epoch_info.epoch
             );
 
             *last_seen_epoch = epoch_info.epoch;
@@ -198,8 +192,6 @@ async fn check_and_fire_steward_on_epoch_transition(
             keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::steward::fire(keeper_config, keeper_state).await,
             );
-
-            // execution_queue.mark_completed(OperationQueue::S);
 
             info!("Epoch transition Steward crank completed, resuming operations");
         }

@@ -56,7 +56,6 @@ pub enum KeeperOperations {
     EmitMetrics,
     BlockMetadataKeeper,
     PriorityFeeCommission,
-    DirectedStaking,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -293,12 +292,13 @@ impl KeeperOperations {
         operation_queue: &mut OperationQueue,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let operation = *self;
-        log::info!("Executing operation: {:?}", self);
+
+        log::info!("Executing operation: {operation:?}");
 
         // Execute the operation
         match self {
             KeeperOperations::PreCreateUpdate => {
-                match pre_create_update(&keeper_config, keeper_state).await {
+                match pre_create_update(keeper_config, keeper_state).await {
                     Ok(_) => {
                         keeper_state.increment_update_run_for_epoch(operation);
                         operation_queue.mark_completed(operation);
@@ -307,14 +307,13 @@ impl KeeperOperations {
                         error!("Failed to pre create update: {:?}", e);
                         keeper_state.increment_update_error_for_epoch(operation);
                         operation_queue.mark_failed(operation);
-                        // break; // Stop if fetch fails
                     }
                 }
             }
 
             KeeperOperations::CreateMissingAccounts => {
                 if keeper_config.pay_for_new_accounts {
-                    match create_missing_accounts(&keeper_config, &keeper_state).await {
+                    match create_missing_accounts(keeper_config, keeper_state).await {
                         Ok(new_accounts_created) => {
                             keeper_state.increment_update_run_for_epoch(operation);
                             let total_txs: usize =
@@ -328,10 +327,9 @@ impl KeeperOperations {
                             operation_queue.mark_completed(operation);
                         }
                         Err(e) => {
-                            error!("Failed to create missing accounts: {:?}", e);
+                            error!("Failed to create missing accounts: {e:?}");
                             keeper_state.increment_update_error_for_epoch(operation);
                             operation_queue.mark_failed(operation);
-                            //  break;
                         }
                     }
                 } else {
@@ -340,44 +338,43 @@ impl KeeperOperations {
             }
 
             KeeperOperations::PostCreateUpdate => {
-                match post_create_update(&keeper_config, keeper_state).await {
+                match post_create_update(keeper_config, keeper_state).await {
                     Ok(_) => {
                         keeper_state.increment_update_run_for_epoch(operation);
                         operation_queue.mark_completed(operation);
                     }
                     Err(e) => {
-                        error!("Failed to post create update: {:?}", e);
+                        error!("Failed to post create update: {e:?}");
                         keeper_state.increment_update_error_for_epoch(operation);
                         operation_queue.mark_failed(operation);
-                        // break;
                     }
                 }
             }
 
             KeeperOperations::ClusterHistory => {
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::cluster_history::fire(&keeper_config, &keeper_state).await,
+                    operations::cluster_history::fire(keeper_config, keeper_state).await,
                 );
                 operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::VoteAccount => {
                 keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                    operations::vote_account::fire(&keeper_config, &keeper_state).await,
+                    operations::vote_account::fire(keeper_config, keeper_state).await,
                 );
                 operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::MevCommission => {
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::mev_commission::fire(&keeper_config, &keeper_state).await,
+                    operations::mev_commission::fire(keeper_config, keeper_state).await,
                 );
                 operation_queue.mark_completed(operation);
             }
 
             KeeperOperations::MevEarned => {
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::mev_earned::fire(&keeper_config, &keeper_state).await,
+                    operations::mev_earned::fire(keeper_config, keeper_state).await,
                 );
                 operation_queue.mark_completed(operation);
             }
@@ -385,7 +382,7 @@ impl KeeperOperations {
             KeeperOperations::StakeUpload => {
                 if keeper_config.oracle_authority_keypair.is_some() {
                     keeper_state.set_runs_errors_and_txs_for_epoch(
-                        operations::stake_upload::fire(&keeper_config, &keeper_state).await,
+                        operations::stake_upload::fire(keeper_config, keeper_state).await,
                     );
                 }
                 operation_queue.mark_completed(operation);
@@ -396,7 +393,7 @@ impl KeeperOperations {
                     && keeper_config.gossip_entrypoints.is_some()
                 {
                     keeper_state.set_runs_errors_and_txs_for_epoch(
-                        operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
+                        operations::gossip_upload::fire(keeper_config, keeper_state).await,
                     );
                 }
                 operation_queue.mark_completed(operation);
@@ -404,7 +401,7 @@ impl KeeperOperations {
 
             KeeperOperations::PriorityFeeCommission => {
                 keeper_state.set_runs_errors_and_txs_for_epoch(
-                    operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+                    operations::priority_fee_commission::fire(keeper_config, keeper_state).await,
                 );
                 operation_queue.mark_completed(operation);
 
@@ -421,7 +418,7 @@ impl KeeperOperations {
                 // if slot_index > 30 {
                 info!("Cranking Steward (normal interval)...");
                 keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                    operations::steward::fire(&keeper_config, &keeper_state).await,
+                    operations::steward::fire(keeper_config, keeper_state).await,
                 );
 
                 if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
@@ -442,7 +439,7 @@ impl KeeperOperations {
                     .is_some()
                 {
                     keeper_state.set_runs_errors_and_txs_for_epoch(
-                        operations::block_metadata::operations::fire(&keeper_config, &keeper_state)
+                        operations::block_metadata::operations::fire(keeper_config, keeper_state)
                             .await,
                     );
                 }
@@ -452,8 +449,8 @@ impl KeeperOperations {
             KeeperOperations::EmitMetrics => {
                 keeper_state.set_runs_errors_and_txs_for_epoch(
                     operations::metrics_emit::fire(
-                        &keeper_config,
-                        &keeper_state,
+                        keeper_config,
+                        keeper_state,
                         keeper_config.cluster_name.as_str(),
                     )
                     .await,
@@ -473,11 +470,6 @@ impl KeeperOperations {
                     &keeper_state.cluster_name,
                 );
 
-                operation_queue.mark_completed(operation);
-            }
-
-            _ => {
-                warn!("Unhandled operation: {:?}", operation);
                 operation_queue.mark_completed(operation);
             }
         }
