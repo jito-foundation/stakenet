@@ -58,6 +58,26 @@ pub enum KeeperOperations {
     PriorityFeeCommission,
 }
 
+impl std::fmt::Display for KeeperOperations {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KeeperOperations::PreCreateUpdate => write!(f, "create_update"),
+            KeeperOperations::CreateMissingAccounts => write!(f, "create_missing_accounts"),
+            KeeperOperations::PostCreateUpdate => write!(f, "post_create_update"),
+            KeeperOperations::ClusterHistory => write!(f, "cluster_history"),
+            KeeperOperations::GossipUpload => write!(f, "gossip_upload"),
+            KeeperOperations::StakeUpload => write!(f, "stake_upload"),
+            KeeperOperations::VoteAccount => write!(f, "vote_accuont"),
+            KeeperOperations::MevEarned => write!(f, "mev_earned"),
+            KeeperOperations::MevCommission => write!(f, "mev_commission"),
+            KeeperOperations::Steward => write!(f, "steward"),
+            KeeperOperations::EmitMetrics => write!(f, "emit_metrics"),
+            KeeperOperations::BlockMetadataKeeper => write!(f, "block_metadata_keeper"),
+            KeeperOperations::PriorityFeeCommission => write!(f, "priority_fee_commission"),
+        }
+    }
+}
+
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
     run_flags | (0x01 << flag as u32)
 }
@@ -72,6 +92,17 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 
 impl KeeperOperations {
     pub const LEN: usize = 13;
+
+    /// Is operation sends many TXs
+    pub fn is_heavy_operation(&self) -> bool {
+        matches!(
+            self,
+            KeeperOperations::VoteAccount
+                | KeeperOperations::StakeUpload
+                | KeeperOperations::GossipUpload
+                | KeeperOperations::CreateMissingAccounts
+        )
+    }
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
@@ -285,6 +316,9 @@ impl KeeperOperations {
         );
     }
 
+    /// Execute operation
+    ///
+    /// Most of the logics are copied from main.rs
     pub async fn execute(
         &self,
         keeper_config: &KeeperConfig,
@@ -412,10 +446,6 @@ impl KeeperOperations {
             }
 
             KeeperOperations::Steward => {
-                // Check if we already fired at epoch start
-                // let slot_index = keeper_state.get_slot_index_in_epoch();
-
-                // if slot_index > 30 {
                 info!("Cranking Steward (normal interval)...");
                 keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                     operations::steward::fire(keeper_config, keeper_state).await,
@@ -424,12 +454,6 @@ impl KeeperOperations {
                 if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                     random_cooldown(keeper_config.cool_down_range).await;
                 }
-                // } else {
-                //     info!(
-                //         "Skipping Steward - already fired at epoch start (slot {})",
-                //         slot_index
-                //     );
-                // }
                 operation_queue.mark_completed(operation);
             }
 
