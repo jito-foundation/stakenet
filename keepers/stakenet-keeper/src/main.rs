@@ -29,6 +29,10 @@ use tokio::time::sleep;
 fn set_run_flags(args: &Args) -> u32 {
     let mut run_flags = 0;
 
+    run_flags = set_flag(run_flags, KeeperOperations::PreCreateUpdate);
+    run_flags = set_flag(run_flags, KeeperOperations::CreateMissingAccounts);
+    run_flags = set_flag(run_flags, KeeperOperations::PostCreateUpdate);
+
     if args.run_cluster_history {
         run_flags = set_flag(run_flags, KeeperOperations::ClusterHistory);
     }
@@ -102,7 +106,12 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         keeper_config.metrics_interval,
         keeper_config.run_flags,
     );
-    let mut last_seen_epoch = keeper_state.epoch_info.epoch;
+    let mut last_seen_epoch = keeper_config
+        .client
+        .get_epoch_info()
+        .await
+        .map(|epoch_info| epoch_info.epoch)
+        .unwrap_or(0);
 
     let smallest_interval = intervals.iter().min().unwrap();
     let mut tick: u64 = *smallest_interval; // 1 second ticks - start at metrics interval
@@ -119,8 +128,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
                 if current_epoch > last_seen_epoch {
                     info!(
-                        "EPOCH TRANSITION! {} -> {} - IMMEDIATE STEWARD!",
-                        last_seen_epoch, current_epoch
+                        "EPOCH TRANSITION! {last_seen_epoch} -> {current_epoch} - IMMEDIATE STEWARD!",
                     );
                     last_seen_epoch = current_epoch;
 
@@ -130,7 +138,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     );
 
                     // Mark Steward as completed
-                    operation_queue.mark_completed(KeeperOperations::Steward);
+                    // operation_queue.mark_completed(KeeperOperations::Steward);
 
                     info!("Epoch start Steward crank completed");
                 }
