@@ -28,6 +28,7 @@ use std::{
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use kobe_client::client::KobeClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
@@ -35,7 +36,7 @@ use solana_sdk::{
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_directed_stake_tickets},
     helpers::get_token_balance,
-    instructions::compute_directed_stake_meta,
+    instructions::{compute_bam_targets, compute_directed_stake_meta},
 };
 
 use crate::{
@@ -49,9 +50,13 @@ pub struct ComputeDirectedStakeMeta {
     #[command(flatten)]
     permissioned_parameters: PermissionedParameters,
 
-    // Jito SOL Token mint address
+    /// Jito SOL Token mint address
     #[arg(long, env)]
     pub token_mint: Pubkey,
+
+    /// Cluster name
+    #[arg(long, env)]
+    pub cluster_name: String,
 }
 
 /// Computes directed stake metadata by aggregating tickets and token balances.
@@ -167,7 +172,7 @@ pub async fn command_crank_compute_directed_stake_meta(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let ixs = compute_directed_stake_meta(
+    let mut ixs = compute_directed_stake_meta(
         client.clone(),
         &args.token_mint,
         &all_steward_accounts.stake_pool_address,
@@ -177,6 +182,23 @@ pub async fn command_crank_compute_directed_stake_meta(
     )
     .await
     .map_err(|e| anyhow!(e.to_string()))?;
+
+    let kobe_client = match args.cluster_name.as_str() {
+        "mainnet" => KobeClient::mainnet(),
+        "testnet" => KobeClient::testnet(),
+        _ => return Err(anyhow!("Failed to read cluster")),
+    };
+    let bam_ixs = compute_bam_targets(
+        client.clone(),
+        &kobe_client,
+        &all_steward_accounts.config_address,
+        &signer,
+        &program_id,
+    )
+    .await
+    .map_err(|e| anyhow!(e.to_string()))?;
+
+    ixs.extend(bam_ixs);
 
     let configured_ix = configure_instruction(
         &ixs,

@@ -16,6 +16,7 @@ dotenvy = { workspace = true }
 futures = "0.3.21"
 futures-util = "0.3.21"
 jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
+kobe-client = { workspace = true }
 log = "0.4.18"
 serde = { workspace = true }
 serde_json = { workspace = true }

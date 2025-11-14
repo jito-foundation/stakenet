@@ -1,7 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::DirectedStakePreference;
+use kobe_client::client::KobeClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -151,6 +152,81 @@ pub async fn compute_directed_stake_meta(
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
     let instructions = validator_targets
+        .iter()
+        .map(|(vote_pubkey, total_target_lamports)| Instruction {
+            program_id: *program_id,
+            accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                config: *steward_config,
+                directed_stake_meta: directed_stake_meta_pda,
+                authority: *authority_pubkey,
+                clock: solana_sdk::sysvar::clock::id(),
+            }
+            .to_account_metas(None),
+            data: jito_steward::instruction::CopyDirectedStakeTargets {
+                vote_pubkey: *vote_pubkey,
+                total_target_lamports: *total_target_lamports,
+            }
+            .data(),
+        })
+        .collect();
+    Ok(instructions)
+}
+
+/// Computes directed stake metadata and generates instructions to copy stake targets to the chain.
+///
+/// This function performs a comprehensive calculation of stake delegation targets across all validators
+/// based on directed stake tickets. It aggregates all ticket holders' preferences, converts JitoSOL
+/// balances to lamports, and generates the necessary instructions to update on-chain metadata.
+///
+/// # Process Overview
+///
+/// 1. Fetches all directed stake tickets from the program
+/// 2. For each ticket holder:
+///    - Retrieves their JitoSOL token balance
+///    - Converts JitoSOL to lamports using the stake pool's conversion rate
+///    - Applies their allocation preferences across validators
+/// 3. Aggregates total target delegations per validator
+/// 4. Generates `CopyDirectedStakeTargets` instructions for each validator
+///
+/// # Conversion Details
+///
+/// The function converts JitoSOL holdings to lamports using:
+///
+/// ```text
+/// conversion_rate_bps = (stake_pool.total_lamports * 10,000) / pool_token_supply
+/// allocation_lamports = (allocation_jitosol * conversion_rate_bps) / 10,000
+/// ```
+pub async fn compute_bam_targets(
+    client: Arc<RpcClient>,
+    kobe_client: &KobeClient,
+    steward_config: &Pubkey,
+    authority_pubkey: &Pubkey,
+    program_id: &Pubkey,
+) -> Result<Vec<Instruction>, JitoInstructionError> {
+    let epoch_info = client.get_epoch_info().await?;
+    let validator_res = kobe_client
+        .get_validators(Some(epoch_info.epoch))
+        .await
+        .map_err(|e| JitoInstructionError::Custom(e.to_string()))?;
+
+    // FIXME
+    let (available_bam_delegation_stake, bam_total_network_stake_weight) =
+        (1_000_000_000, 1_000_000_000);
+
+    let mut bam_validators = Vec::new();
+    for validator in validator_res.validators {
+        let vote_account = Pubkey::from_str(&validator.vote_account)
+            .map_err(|e| JitoInstructionError::Custom(e.to_string()))?;
+        if let Some(true) = validator.running_bam {
+            let share = validator.active_stake / bam_total_network_stake_weight;
+            let amount = available_bam_delegation_stake * share;
+            bam_validators.push((vote_account, amount))
+        }
+    }
+
+    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+
+    let instructions = bam_validators
         .iter()
         .map(|(vote_pubkey, total_target_lamports)| Instruction {
             program_id: *program_id,
