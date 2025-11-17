@@ -34,6 +34,7 @@ solana-packet = { workspace = true }
 solana-program = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
+solana-ed25519-program = "3.0.0"
 solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
 spl-associated-token-account = { workspace = true }

@@ -15,7 +15,9 @@ use solana_gossip::crds_data::CrdsData;
 use solana_gossip::crds_value::{CrdsValue, CrdsValueLabel};
 use solana_gossip::gossip_service::make_gossip_node;
 use solana_metrics::{datapoint_error, datapoint_info};
+use solana_sdk::message::{v0, VersionedMessage};
 use solana_sdk::signature::Signable;
+use solana_sdk::transaction::{Transaction, VersionedTransaction};
 use solana_sdk::{
     epoch_info::EpochInfo,
     instruction::Instruction,
@@ -394,6 +396,10 @@ pub async fn upload_gossip_values(
         if gossip_entries.is_empty() {
             continue;
         }
+
+        // for gossip_entry in gossip_entries.iter() {
+        //     log::info!("Gossip entry: {:?}", gossip_entry);
+        // }
 
         let update_transactions = gossip_entries
             .iter()
