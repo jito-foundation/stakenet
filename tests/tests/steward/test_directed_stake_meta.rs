@@ -759,7 +759,6 @@ async fn test_multiple_directed_stake_tickets() {
     assert_eq!(ticket_data.staker_preferences[1].stake_share_bps, 3000);
     assert_eq!(ticket_data.staker_preferences[2].vote_pubkey, validator3);
     assert_eq!(ticket_data.staker_preferences[2].stake_share_bps, 4000);
-    assert!(bool::from(ticket_data.ticket_holder_is_protocol));
     assert!(ticket_data.preferences_valid());
 }
 

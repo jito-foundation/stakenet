@@ -69,6 +69,9 @@ fn create_mock_directed_stake_meta(
         }
     }
 
+    // Set total_stake_targets to the actual number of targets provided
+    meta.total_stake_targets = targets.len().min(2048) as u64;
+
     meta
 }
 
