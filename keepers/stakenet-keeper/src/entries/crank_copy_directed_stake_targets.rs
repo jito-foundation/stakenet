@@ -40,10 +40,10 @@ pub(crate) async fn crank_copy_directed_stake_targets(
 
     let bam_ixs = compute_bam_targets(
         client.clone(),
-        &kobe_client,
+        kobe_client,
         &all_steward_accounts.config_address,
         &keypair.pubkey(),
-        &program_id,
+        program_id,
     )
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
