@@ -247,6 +247,7 @@ pub fn handler(
                 unstake_state.directed_unstake_total,
                 minimum_delegation,
                 stake_rent,
+                clock.epoch,
             );
 
             match decrease_result {
@@ -260,6 +261,7 @@ pub fn handler(
                     undirected_floor_cap,
                     minimum_delegation,
                     stake_rent,
+                    clock.epoch,
                 ),
             }?
         };

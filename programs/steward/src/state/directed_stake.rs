@@ -306,7 +306,7 @@ impl DirectedStakeWhitelist {
 
     pub fn add_user_staker(&mut self, staker: Pubkey) -> Result<()> {
         if !self.can_add_user_staker() {
-            return Err(error!(DirectedStakeStakerListFull));
+            return Err(error!(AlreadyPermissioned));
         }
         if self.is_staker_permissioned(&staker) {
             return Err(error!(AlreadyPermissioned));
@@ -318,7 +318,7 @@ impl DirectedStakeWhitelist {
 
     pub fn add_protocol_staker(&mut self, staker: Pubkey) -> Result<()> {
         if !self.can_add_protocol_staker() {
-            return Err(error!(DirectedStakeStakerListFull));
+            return Err(error!(AlreadyPermissioned));
         }
         if self.is_staker_permissioned(&staker) {
             return Err(error!(AlreadyPermissioned));

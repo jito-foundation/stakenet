@@ -24,8 +24,9 @@ pub fn decrease_stake_calculation(
     directed_unstake_total_lamports: u64,
     minimum_delegation: u64,
     stake_rent: u64,
+    epoch: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators as usize {
+    if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
@@ -54,6 +55,9 @@ pub fn decrease_stake_calculation(
 
     let mut total_excess_lamports: u64 = 0u64;
     for target in directed_stake_meta.targets.iter() {
+        if target.staked_last_updated_epoch == epoch {
+            continue;
+        }
         let target_lamports = directed_stake_meta
             .get_target_lamports(&target.vote_pubkey)
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
@@ -87,7 +91,7 @@ pub fn decrease_stake_calculation(
     let adjusted_proportional_decrease_lamports =
         proportional_decrease_lamports.min(target_delta_lamports);
 
-    if adjusted_proportional_decrease_lamports < (stake_rent + minimum_delegation) {
+    if adjusted_proportional_decrease_lamports < (minimum_delegation + stake_rent) {
         msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }
@@ -119,8 +123,9 @@ pub fn increase_stake_calculation(
     undirected_cap_reached: bool,
     minimum_delegation: u64,
     stake_rent: u64,
+    epoch: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators as usize {
+    if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
@@ -151,6 +156,9 @@ pub fn increase_stake_calculation(
     let mut total_delta_lamports: u64 = 0u64;
 
     for target in directed_stake_meta.targets.iter() {
+        if target.staked_last_updated_epoch == epoch {
+            continue;
+        }
         let target_lamports = directed_stake_meta
             .get_target_lamports(&target.vote_pubkey)
             .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
@@ -182,7 +190,7 @@ pub fn increase_stake_calculation(
     let adjusted_proportional_increase_lamports =
         proportional_increase_lamports.min(target_delta_lamports);
 
-    if adjusted_proportional_increase_lamports < (stake_rent.saturating_add(minimum_delegation)) {
+    if adjusted_proportional_increase_lamports < (minimum_delegation + stake_rent) {
         msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }

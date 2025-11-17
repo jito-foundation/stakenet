@@ -41,10 +41,6 @@ pub fn handler(
         return Err(error!(StewardError::Unauthorized));
     }
 
-    if ctx.accounts.authority.key() != config.directed_stake_meta_upload_authority {
-        return Err(error!(StewardError::Unauthorized));
-    }
-
     let clock = Clock::get()?;
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {

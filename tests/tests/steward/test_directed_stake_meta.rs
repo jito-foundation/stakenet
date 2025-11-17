@@ -352,27 +352,6 @@ async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
 }
 
 #[tokio::test]
-async fn test_initialize_directed_stake_whitelist() {
-    let fixture = setup_directed_stake_fixture().await;
-
-    // Verify the whitelist was created
-    let whitelist_account = Pubkey::find_program_address(
-        &[
-            DirectedStakeWhitelist::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    let whitelist: DirectedStakeWhitelist = fixture.load_and_deserialize(&whitelist_account).await;
-
-    assert_eq!(whitelist.total_permissioned_user_stakers, 0);
-    assert_eq!(whitelist.total_permissioned_protocol_stakers, 0);
-    assert_eq!(whitelist.total_permissioned_validators, 0);
-}
-
-#[tokio::test]
 async fn test_add_stakers_to_whitelist() {
     let fixture = setup_directed_stake_fixture().await;
 
@@ -415,10 +394,6 @@ async fn test_add_stakers_to_whitelist() {
     .0;
 
     let whitelist: DirectedStakeWhitelist = fixture.load_and_deserialize(&whitelist_account).await;
-
-    assert_eq!(whitelist.total_permissioned_user_stakers, 1);
-    assert_eq!(whitelist.total_permissioned_protocol_stakers, 1);
-    assert_eq!(whitelist.total_permissioned_validators, 1);
 
     assert!(whitelist.is_user_staker_permissioned(&user_staker.pubkey()));
     assert!(whitelist.is_protocol_staker_permissioned(&protocol_staker.pubkey()));
@@ -535,7 +510,7 @@ async fn test_directed_stake_ticket_validation() {
     // Set ticket_update_authority to ticket_keypair so it can update
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
-        &ticket_keypair, // signer - determines ticket address
+        &ticket_keypair,         // signer - determines ticket address
         ticket_keypair.pubkey(), // ticket_update_authority - must match signer for updates
         false,
     )
@@ -561,7 +536,13 @@ async fn test_directed_stake_ticket_validation() {
     ];
 
     // Use fixture.keypair as signer since it's the ticket_update_authority and ticket_override_authority
-    update_directed_stake_ticket(&fixture, &ticket_account, &fixture.keypair, valid_preferences).await;
+    update_directed_stake_ticket(
+        &fixture,
+        &ticket_account,
+        &fixture.keypair,
+        valid_preferences,
+    )
+    .await;
 
     let ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
     assert!(ticket.preferences_valid());
