@@ -1,6 +1,7 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use clap::{arg, command, Parser};
+use kobe_client::client::KobeClient;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
@@ -46,6 +47,9 @@ pub struct KeeperConfig {
 
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     pub validator_history_min_stake: u64,
+
+    /// A client for interacting with kobe api
+    pub kobe_client: KobeClient,
 }
 
 impl KeeperConfig {

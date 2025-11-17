@@ -172,76 +172,110 @@ pub async fn compute_directed_stake_meta(
     Ok(instructions)
 }
 
-/// Computes directed stake metadata and generates instructions to copy stake targets to the chain.
+// FIXME: Create temp response type from Kobe Client
+#[allow(dead_code)]
+struct BamValidator {
+    active_stake: u64,
+    epoch: u64,
+    identity_account: String,
+    is_eligible: bool,
+    ineligibility_reason: Option<String>,
+    vote_account: String,
+}
+
+// FIXME: Create temp response type from Kobe Client
+#[allow(dead_code)]
+struct BamEpochMetric {
+    allocation_bps: u64,
+    available_bam_delegation_stake: u64,
+    bam_stake: u64,
+    eligible_bam_validator_count: u64,
+    epoch: u64,
+    jitosol_stake: u64,
+    total_stake: u64,
+}
+
+/// Computes directed stake for bam delegation
 ///
-/// This function performs a comprehensive calculation of stake delegation targets across all validators
-/// based on directed stake tickets. It aggregates all ticket holders' preferences, converts JitoSOL
-/// balances to lamports, and generates the necessary instructions to update on-chain metadata.
+/// This function performs a calculation of stake delegation targets across all BAM validators
+/// based on response from Kobe API.
 ///
 /// # Process Overview
 ///
-/// 1. Fetches all directed stake tickets from the program
-/// 2. For each ticket holder:
-///    - Retrieves their JitoSOL token balance
-///    - Converts JitoSOL to lamports using the stake pool's conversion rate
-///    - Applies their allocation preferences across validators
-/// 3. Aggregates total target delegations per validator
-/// 4. Generates `CopyDirectedStakeTargets` instructions for each validator
-///
-/// # Conversion Details
-///
-/// The function converts JitoSOL holdings to lamports using:
-///
-/// ```text
-/// conversion_rate_bps = (stake_pool.total_lamports * 10,000) / pool_token_supply
-/// allocation_lamports = (allocation_jitosol * conversion_rate_bps) / 10,000
-/// ```
+/// 1. Fetches all bam validators
+/// 2. For each eligible bam validaotr:
+///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount)
+/// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
 pub async fn compute_bam_targets(
     client: Arc<RpcClient>,
-    kobe_client: &KobeClient,
+    _kobe_client: &KobeClient,
     steward_config: &Pubkey,
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let epoch_info = client.get_epoch_info().await?;
-    let validator_res = kobe_client
-        .get_validators(Some(epoch_info.epoch))
-        .await
-        .map_err(|e| JitoInstructionError::Custom(e.to_string()))?;
+    let _last_epoch = epoch_info.epoch - 1;
 
-    // FIXME
-    let (available_bam_delegation_stake, bam_total_network_stake_weight) =
-        (1_000_000_000, 1_000_000_000);
+    // FIXME: get response from kobe api
+    let bam_validators = vec![
+        BamValidator {
+            active_stake: 152458755252594,
+            epoch: 881,
+            identity_account: "BxkAkLR2W3agWtjMXBNvhxmB8vsn7zhjNQcyfost99KY".to_string(),
+            is_eligible: true,
+            ineligibility_reason: None,
+            vote_account: "FSDKGroWxgBf7VmV6X1NLDhnncrWW2ekztwRWiJrPf3k".to_string(),
+        },
+        BamValidator {
+            active_stake: 184516161965281,
+            epoch: 881,
+            identity_account: "6xUK9Nbonr4eoJNtHGoUEMmYKoPz5mipKzyDBv6deX4d".to_string(),
+            is_eligible: true,
+            ineligibility_reason: None,
+            vote_account: "8vyuJTHSDkx7k1zymea4TMsgvixf3rCYBXHPDQajePkE".to_string(),
+        },
+    ];
 
-    let mut bam_validators = Vec::new();
-    for validator in validator_res.validators {
-        let vote_account = Pubkey::from_str(&validator.vote_account)
-            .map_err(|e| JitoInstructionError::Custom(e.to_string()))?;
-        if let Some(true) = validator.running_bam {
-            let share = validator.active_stake / bam_total_network_stake_weight;
-            let amount = available_bam_delegation_stake * share;
-            bam_validators.push((vote_account, amount))
-        }
-    }
+    // FIXME: get response from kobe api
+    let bam_epoch_metric = BamEpochMetric {
+        allocation_bps: 2000,
+        epoch: 881,
+        available_bam_delegation_stake: 2824663853562698,
+        bam_stake: 9681152794462484,
+        eligible_bam_validator_count: 44,
+        jitosol_stake: 14123319267813492,
+        total_stake: 413389737234469800,
+    };
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
-    let instructions = bam_validators
+    let bam_eligible_validators: Vec<BamValidator> = bam_validators
+        .into_iter()
+        .filter(|bv| bv.is_eligible)
+        .collect();
+
+    let instructions = bam_eligible_validators
         .iter()
-        .map(|(vote_pubkey, total_target_lamports)| Instruction {
-            program_id: *program_id,
-            accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                config: *steward_config,
-                directed_stake_meta: directed_stake_meta_pda,
-                authority: *authority_pubkey,
-                clock: solana_sdk::sysvar::clock::id(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::CopyDirectedStakeTargets {
-                vote_pubkey: *vote_pubkey,
-                total_target_lamports: *total_target_lamports,
-            }
-            .data(),
+        .filter_map(|bv| {
+            let vote_pubkey = Pubkey::from_str(&bv.vote_account).ok()?;
+            let total_target_lamports = (bv.active_stake / bam_epoch_metric.bam_stake)
+                * bam_epoch_metric.available_bam_delegation_stake;
+
+            Some(Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                    config: *steward_config,
+                    directed_stake_meta: directed_stake_meta_pda,
+                    authority: *authority_pubkey,
+                    clock: solana_sdk::sysvar::clock::id(),
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::CopyDirectedStakeTargets {
+                    vote_pubkey,
+                    total_target_lamports,
+                }
+                .data(),
+            })
         })
         .collect();
     Ok(instructions)
