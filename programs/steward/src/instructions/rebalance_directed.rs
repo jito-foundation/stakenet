@@ -23,6 +23,7 @@ use crate::{
     },
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
     REBALANCE_DIRECTED_COMPLETE,
+    COMPUTE_SCORE,
 };
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
@@ -152,9 +153,7 @@ pub fn handler(
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 
         let current_epoch = clock.epoch;
-        if (current_epoch > state_account.state.current_epoch
-            || state_account.state.num_pool_validators == 0)
-        {
+        if current_epoch == state_account.state.next_cycle_epoch && state_account.state.has_flag(COMPUTE_SCORE) {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
                 clock.slot,

@@ -69,6 +69,7 @@ pub fn handler(ctx: Context<ComputeScore>, validator_list_index: usize) -> Resul
         }
     }
 
+    msg!("state_account.state.state_tag: {}", state_account.state.state_tag);
     require!(
         matches!(
             state_account.state.state_tag,
