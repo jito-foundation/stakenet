@@ -497,8 +497,8 @@ async fn test_directed_stake_ticket_validation() {
     // Initialize a directed stake ticket
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
-        &fixture.keypair,         
-        fixture.keypair.pubkey(), 
+        &fixture.keypair,
+        fixture.keypair.pubkey(),
         false,
     )
     .await;
@@ -561,7 +561,10 @@ async fn test_directed_stake_ticket_validation() {
                 false,
             ),
             anchor_lang::solana_program::instruction::AccountMeta::new(ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new(fixture.keypair.pubkey(), true),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
         ],
         data: jito_steward::instruction::UpdateDirectedStakeTicket {
             preferences: _invalid_preferences.clone(),

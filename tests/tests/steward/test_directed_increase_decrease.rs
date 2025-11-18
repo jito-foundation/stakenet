@@ -98,7 +98,7 @@ fn test_increase_stake_calculation_basic() {
         false,
         0,
         0,
-        800
+        800,
     );
 
     let validator1_proportion_bps = 3333;
@@ -207,8 +207,17 @@ fn test_increase_stake_calculation_zero_reserve() {
         (validator1, 1_000_000, 500_000), // Needs 500k more
     ]);
 
-    let result =
-        increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 0, false, 0, 0, 800);
+    let result = increase_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        500_000,
+        0,
+        false,
+        0,
+        0,
+        800,
+    );
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -317,8 +326,17 @@ fn test_decrease_stake_calculation_zero_cap() {
         (validator1, 500_000_000, 1_000_000_000), // Has 500m more than target
     ]);
 
-    let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0, 0, 800);
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        1_000_000_000,
+        0,
+        0,
+        0,
+        0,
+        800,
+    );
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -517,8 +535,17 @@ fn test_edge_case_zero_values() {
     ]);
 
     // Test increase with zero values
-    let result =
-        increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, false, 1_000_000, 0, 800);
+    let result = increase_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        0,
+        0,
+        false,
+        1_000_000,
+        0,
+        800,
+    );
 
     assert!(result.is_ok());
     match result.unwrap() {

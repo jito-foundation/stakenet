@@ -191,8 +191,7 @@ pub fn increase_stake_calculation(
 
     // Do not over-delegate if proportional increase would exceed the target delta lamports
     // This prevents future yield drag from unstaking excess lamports
-    let adjusted_proportional_increase_lamports =
-        proportional_increase_lamports
+    let adjusted_proportional_increase_lamports = proportional_increase_lamports
         .min(target_delta_lamports)
         .min(reserve_lamports);
 
