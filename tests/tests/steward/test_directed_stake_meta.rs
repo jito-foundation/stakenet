@@ -510,8 +510,8 @@ async fn test_directed_stake_ticket_validation() {
     // Set ticket_update_authority to ticket_keypair so it can update
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
-        &ticket_keypair,         // signer - determines ticket address
-        ticket_keypair.pubkey(), // ticket_update_authority - must match signer for updates
+        &fixture.keypair,         
+        fixture.keypair.pubkey(), 
         false,
     )
     .await;
@@ -556,6 +556,7 @@ async fn test_directed_stake_ticket_validation() {
     let directed_stake_whitelist = Pubkey::find_program_address(
         &[
             DirectedStakeWhitelist::SEED,
+            fixture.keypair.pubkey().as_ref(),
             fixture.steward_config.pubkey().as_ref(),
         ],
         &jito_steward::id(),
