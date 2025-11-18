@@ -1,6 +1,7 @@
 use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
 use bytemuck::{bytes_of, Pod, Zeroable};
+use log::info;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, instruction::Instruction, pubkey::Pubkey,
     signature::Signature,
@@ -62,6 +63,8 @@ impl GossipEntry {
                 &self.message,
             ),
         ];
+
+        // info!("Ed25519 instruction data length: {}", ixs[0].data.len());
 
         ixs.push(Instruction {
             program_id: self.program_id,

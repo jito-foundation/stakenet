@@ -356,6 +356,10 @@ pub async fn parallel_execute_transactions(
         .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
     let mut signed_txs = sign_txs(transactions, signer, blockhash);
 
+    //      for signed_tx in signed_txs.iter() {
+    //          info!("Signed tx: {:?}", signed_tx.message);
+    //      }
+
     while retries < retry_count {
         let mut submitted_signatures = HashMap::new();
         let mut is_blockhash_not_found = false;
