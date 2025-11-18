@@ -942,6 +942,7 @@ impl TestFixture {
     }
 }
 
+#[derive(Clone)]
 pub struct ExtraValidatorAccounts {
     pub vote_account: Pubkey,
     pub validator_history_address: Pubkey,

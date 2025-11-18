@@ -1960,7 +1960,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     // Copy directed stake targets for the validators
     for extra_accounts in extra_validator_accounts.iter() {
-        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 10_000_000_000)
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1_000_000_000)
             .await;
     }
 
@@ -1972,7 +1972,6 @@ async fn test_cycle_with_directed_stake_targets() {
     )
     .await;
 
-    println!("Rebalance directed 1");
     {
         let directed_stake_meta: DirectedStakeMeta =
             fixture.load_and_deserialize(&_directed_stake_meta).await;
@@ -2011,7 +2010,6 @@ async fn test_cycle_with_directed_stake_targets() {
             .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
             .await;
         assert_eq!(validator_list.validators.len(), 3);
-        println!("Validator List Length: {}", validator_list.validators.len());
     }
 
     fixture.advance_num_slots(250_000).await;
@@ -2060,7 +2058,7 @@ async fn test_cycle_with_directed_stake_targets() {
     crank_epoch_maintenance(&fixture, None).await;
 
     for extra_accounts in extra_validator_accounts.iter() {
-        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 100_000_000_000)
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 2_000_000_000)
             .await;
     }
 
@@ -2615,12 +2613,15 @@ async fn test_add_validator_next_cycle() {
 
     crank_epoch_maintenance(&fixture, None).await;
     // Auto add validator - adds validators 2 and 3
+    let mut added_validators = vec![];
     for extra_accounts in extra_validator_accounts.iter().take(2) {
         auto_add_validator(&fixture, extra_accounts).await;
+        added_validators.push(extra_accounts.clone());
     }
 
     // Add validators to whitelist and directed_stake_meta before rebalancing
-    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+    // Only add validators that were actually added to the validator list
+    crank_directed_stake_permissions(&fixture, &added_validators).await;
 
     // Set the directed stake meta upload authority to the signer
     let set_meta_auth_ix = Instruction {
@@ -2763,9 +2764,9 @@ async fn test_add_validator_next_cycle() {
         jito_steward::StewardStateEnum::ComputeScores
     ));
 
-    assert_eq!(state.validators_added, 0);
+    assert_eq!(state.validators_added, 1);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.num_pool_validators, 3);
+    assert_eq!(state.num_pool_validators, 2);
 
     // Ensure we can crank the new validator
     crank_compute_score(

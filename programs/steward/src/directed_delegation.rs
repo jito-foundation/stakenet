@@ -54,7 +54,9 @@ pub fn decrease_stake_calculation(
     );
 
     let mut total_excess_lamports: u64 = 0u64;
-    for target in directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter() {
+    for target in
+        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
+    {
         if target.staked_last_updated_epoch == epoch {
             continue;
         }
@@ -91,8 +93,8 @@ pub fn decrease_stake_calculation(
     let adjusted_proportional_decrease_lamports =
         proportional_decrease_lamports.min(target_delta_lamports);
 
-    if adjusted_proportional_decrease_lamports < (minimum_delegation + stake_rent) {
-        msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
+    if adjusted_proportional_decrease_lamports < (minimum_delegation) {
+        msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }
 
@@ -155,7 +157,9 @@ pub fn increase_stake_calculation(
 
     let mut total_delta_lamports: u64 = 0u64;
 
-    for target in directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter() {
+    for target in
+        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
+    {
         if target.staked_last_updated_epoch == epoch {
             continue;
         }
@@ -188,10 +192,12 @@ pub fn increase_stake_calculation(
     // Do not over-delegate if proportional increase would exceed the target delta lamports
     // This prevents future yield drag from unstaking excess lamports
     let adjusted_proportional_increase_lamports =
-        proportional_increase_lamports.min(target_delta_lamports);
+        proportional_increase_lamports
+        .min(target_delta_lamports)
+        .min(reserve_lamports);
 
-    if adjusted_proportional_increase_lamports < (minimum_delegation + stake_rent) {
-        msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
+    if adjusted_proportional_increase_lamports < (minimum_delegation) {
+        msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }
 
