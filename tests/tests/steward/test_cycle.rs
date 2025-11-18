@@ -309,6 +309,7 @@ async fn test_cycle() {
     println!("Rebalance directed 2");
 
     fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
@@ -323,9 +324,9 @@ async fn test_cycle() {
 
     crank_compute_delegations(&fixture).await;
 
-    crank_idle(&fixture).await;
-
     fixture.advance_num_slots(160_000).await;
+
+    crank_idle(&fixture).await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -364,14 +365,6 @@ async fn test_cycle() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-    // In new cycle
-    crank_compute_score(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0, 1, 2],
-    )
-    .await;
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let state_account: StewardStateAccountV2 =
@@ -380,7 +373,7 @@ async fn test_cycle() {
 
     assert!(matches!(
         state.state_tag,
-        jito_steward::StewardStateEnum::ComputeDelegations
+        jito_steward::StewardStateEnum::Idle
     ));
     assert_eq!(state.current_epoch, clock.epoch);
     assert_eq!(state.next_cycle_epoch, clock.epoch + 2);
@@ -389,7 +382,7 @@ async fn test_cycle() {
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.status_flags, 3);
+    assert_eq!(state.status_flags, 5);
 
     // All other values are reset
 
