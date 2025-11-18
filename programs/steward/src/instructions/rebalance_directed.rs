@@ -25,7 +25,6 @@ use crate::{
     REBALANCE_DIRECTED_COMPLETE,
 };
 #[derive(Accounts)]
-#[instruction(validator_list_index: u64)]
 pub struct RebalanceDirected<'info> {
     pub config: AccountLoader<'info, Config>,
 

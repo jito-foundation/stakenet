@@ -365,7 +365,6 @@ async fn test_cycle() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
