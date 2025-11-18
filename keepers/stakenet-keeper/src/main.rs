@@ -131,28 +131,17 @@ async fn run_keeper(keeper_config: KeeperConfig) {
     }
 
     loop {
-        if let Some(seen_epoch) = last_seen_epoch {
-            match keeper_config.client.get_epoch_info().await {
-                Ok(epoch_info) => {
-                    let current_epoch = epoch_info.epoch;
-                    keeper_state.epoch_info = epoch_info;
+        if keeper_state
+            .check_last_update_epoch(keeper_config.client.clone(), &mut last_seen_epoch)
+            .await
+        {
+            info!("Epoch transition Steward cranking");
 
-                    if current_epoch > seen_epoch {
-                        info!(
-                        "EPOCH TRANSITION! {seen_epoch} -> {current_epoch} - IMMEDIATE STEWARD!",
-                    );
-                        last_seen_epoch = Some(current_epoch);
+            keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                operations::steward::fire(&keeper_config, &keeper_state).await,
+            );
 
-                        // Fire Steward immediately
-                        keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                            operations::steward::fire(&keeper_config, &keeper_state).await,
-                        );
-
-                        info!("Epoch start Steward crank completed");
-                    }
-                }
-                Err(e) => error!("Failed to check epoch: {e:?}"),
-            }
+            info!("Epoch transition Steward crank completed");
         }
 
         operation_queue.mark_should_fire(tick);
@@ -168,14 +157,20 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 break;
             }
 
-            // After sending many tx, check epoch info
+            // After sending many tx, check `last_update_epoch` in stake pool
             if operation.is_heavy_operation() {
-                check_and_fire_steward_on_epoch_transition(
-                    &keeper_config,
-                    &mut keeper_state,
-                    &mut last_seen_epoch,
-                )
-                .await;
+                if keeper_state
+                    .check_last_update_epoch(keeper_config.client.clone(), &mut last_seen_epoch)
+                    .await
+                {
+                    info!("Epoch transition Steward cranking");
+
+                    keeper_state.set_runs_errors_txs_and_flags_for_epoch(
+                        operations::steward::fire(&keeper_config, &keeper_state).await,
+                    );
+
+                    info!("Epoch transition Steward crank completed");
+                }
             }
         }
 
@@ -193,32 +188,6 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // ---------- SLEEP ----------
         sleep_and_tick(&mut tick).await;
-    }
-}
-
-async fn check_and_fire_steward_on_epoch_transition(
-    keeper_config: &KeeperConfig,
-    keeper_state: &mut KeeperState,
-    last_seen_epoch: &mut Option<u64>,
-) {
-    if let Ok(epoch_info) = keeper_config.client.get_epoch_info().await {
-        if let Some(ref seen_epoch) = last_seen_epoch {
-            if epoch_info.epoch > *seen_epoch {
-                info!(
-                    "EPOCH TRANSITION DETECTED DURING OPERATION! {seen_epoch} -> {}",
-                    epoch_info.epoch
-                );
-
-                *last_seen_epoch = Some(epoch_info.epoch);
-                keeper_state.epoch_info = epoch_info;
-
-                keeper_state.set_runs_errors_txs_and_flags_for_epoch(
-                    operations::steward::fire(keeper_config, keeper_state).await,
-                );
-
-                info!("Epoch transition Steward crank completed, resuming operations");
-            }
-        }
     }
 }
 

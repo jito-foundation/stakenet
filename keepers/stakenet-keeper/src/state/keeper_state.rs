@@ -16,7 +16,9 @@ use stakenet_sdk::{
         aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
         errors::JitoTransactionError,
     },
-    utils::accounts::{get_directed_stake_meta, get_validator_history_address},
+    utils::accounts::{
+        get_directed_stake_meta, get_stake_pool_account, get_validator_history_address,
+    },
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -348,6 +350,36 @@ impl KeeperState {
         }
 
         Ok(false)
+    }
+
+    /// Check `last_update_epoch` field in Stake Pool
+    ///
+    /// # Process
+    ///
+    /// 1. Check the field `last_update_epoch` in StakePool account
+    /// 2. If the `last_update_epoch` has updated, trigger steward operation
+    /// 3. Otherwise, continue next operation
+    pub async fn check_last_update_epoch(
+        &mut self,
+        client: Arc<RpcClient>,
+        last_seen_epoch: &mut Option<u64>,
+    ) -> bool {
+        if let Some(all_steward_accounts) = self.all_steward_accounts.as_ref() {
+            if let Ok(stake_pool) =
+                get_stake_pool_account(&client, &all_steward_accounts.stake_pool_address).await
+            {
+                if let Some(ref mut seen_epoch) = last_seen_epoch {
+                    let has_updated = stake_pool.last_update_epoch > *seen_epoch;
+                    *seen_epoch = stake_pool.last_update_epoch;
+                    return has_updated;
+                } else {
+                    *last_seen_epoch = Some(stake_pool.last_update_epoch);
+                    return false;
+                }
+            }
+        }
+
+        false
     }
 }
 
