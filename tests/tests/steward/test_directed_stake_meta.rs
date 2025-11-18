@@ -12,7 +12,6 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    constants::MAX_ALLOC_BYTES,
     instructions::AuthorityType,
     state::directed_stake::{DirectedStakePreference, DirectedStakeRecordType},
     DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
