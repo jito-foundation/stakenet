@@ -34,6 +34,13 @@
           "name": "authority",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
         }
       ],
       "args": [
@@ -3014,6 +3021,13 @@
             "type": "pubkey"
           },
           {
+            "name": "directed_stake_ticket_override_authority",
+            "docs": [
+              "The authoirty that can override directed stake tickets"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -3021,7 +3035,7 @@
             "type": {
               "array": [
                 "u8",
-                920
+                888
               ]
             }
           }
@@ -3110,8 +3124,16 @@
             "type": {
               "array": [
                 "u8",
-                64
+                63
               ]
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
             }
           },
           {
@@ -3350,8 +3372,16 @@
             "type": {
               "array": [
                 "u8",
-                250
+                249
               ]
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
             }
           }
         ]
