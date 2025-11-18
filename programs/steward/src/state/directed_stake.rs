@@ -1,8 +1,8 @@
 use std::mem::size_of;
 
 use crate::errors::StewardError::{
-    AlreadyPermissioned, DirectedStakeStakerListFull, DirectedStakeValidatorListFull,
-    StakerNotInWhitelist, ValidatorNotInWhitelist,
+    AlreadyPermissioned, DirectedStakeValidatorListFull, StakerNotInWhitelist,
+    ValidatorNotInWhitelist,
 };
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;

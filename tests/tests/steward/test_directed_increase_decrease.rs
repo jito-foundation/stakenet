@@ -22,7 +22,7 @@ fn create_mock_steward_state(num_pool_validators: u16) -> StewardState {
         validators_to_remove: BitMask::default(),
         validators_for_immediate_removal: BitMask::default(),
         start_computing_scores_slot: 0,
-        current_epoch: 0,
+        current_epoch: 800,
         next_cycle_epoch: 10,
         num_pool_validators: num_pool_validators.into(),
         scoring_unstake_total: 0,
@@ -98,7 +98,6 @@ fn test_increase_stake_calculation_basic() {
         false,
         0,
         0,
-        800,
     );
 
     let validator1_proportion_bps = 3333;
@@ -135,7 +134,6 @@ fn test_increase_stake_undirected_cap_reached() {
         true,
         0,
         0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -163,7 +161,6 @@ fn test_increase_stake_calculation_no_increase_needed() {
         false,
         0,
         0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -192,7 +189,6 @@ fn test_increase_stake_calculation_index_out_of_bounds() {
         false,
         0,
         0,
-        800,
     );
 
     assert!(result.is_err());
@@ -207,17 +203,8 @@ fn test_increase_stake_calculation_zero_reserve() {
         (validator1, 1_000_000, 500_000), // Needs 500k more
     ]);
 
-    let result = increase_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        500_000,
-        0,
-        false,
-        0,
-        0,
-        800,
-    );
+    let result =
+        increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 0, false, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -250,8 +237,6 @@ fn test_decrease_stake_calculation_basic() {
         1_000_000_000_000,
         0,
         0,
-        0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -281,8 +266,6 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         1_000_000_000_000,
         0,
         1_000_000,
-        0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -310,8 +293,6 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         1_000_000_000_000,
         0,
         0,
-        0,
-        800,
     );
 
     assert!(result.is_err());
@@ -326,17 +307,8 @@ fn test_decrease_stake_calculation_zero_cap() {
         (validator1, 500_000_000, 1_000_000_000), // Has 500m more than target
     ]);
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        1_000_000_000,
-        0,
-        0,
-        0,
-        0,
-        800,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -372,7 +344,6 @@ fn test_increase_stake_calculation_proportional_distribution() {
         false,
         0,
         0,
-        800,
     );
 
     let validator1_proportion_bps = 3333;
@@ -396,7 +367,6 @@ fn test_increase_stake_calculation_proportional_distribution() {
         false,
         0,
         0,
-        800,
     );
 
     assert!(result2.is_ok());
@@ -434,8 +404,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1_000_000_000_000,
         0,
         0,
-        0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -454,8 +422,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1_000_000_000_000,
         0,
         0,
-        0,
-        800,
     );
 
     assert!(result.is_ok());
@@ -484,17 +450,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         (validator5, 1_500_000, 1_500_000), // At target
     ]);
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        1_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-        800,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -504,17 +461,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         _ => panic!("Expected Decrease variant"),
     }
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        1,
-        2_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-        800,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 1, 2_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -535,17 +483,8 @@ fn test_edge_case_zero_values() {
     ]);
 
     // Test increase with zero values
-    let result = increase_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        0,
-        0,
-        false,
-        1_000_000,
-        0,
-        800,
-    );
+    let result =
+        increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, false, 1_000_000, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {

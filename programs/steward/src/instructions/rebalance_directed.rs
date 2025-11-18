@@ -6,7 +6,6 @@ use anchor_lang::{
         system_program, sysvar,
     },
 };
-use borsh::BorshDeserialize;
 use spl_stake_pool::minimum_delegation;
 
 use crate::{
@@ -21,7 +20,7 @@ use crate::{
         get_stake_pool_address, get_transient_stake_seed_at_index, get_validator_list_length,
         get_validator_stake_info_at_index, state_checks,
     },
-    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_SCORE,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
     REBALANCE_DIRECTED_COMPLETE,
 };
 #[derive(Accounts)]
@@ -225,7 +224,6 @@ pub fn handler(
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
-            // Use directed delegation logic instead of regular rebalance
             use crate::directed_delegation::{
                 decrease_stake_calculation, increase_stake_calculation,
             };
@@ -257,8 +255,6 @@ pub fn handler(
                 directed_unstake_cap_lamports,
                 unstake_state.directed_unstake_total,
                 minimum_delegation,
-                stake_rent,
-                clock.epoch,
             );
 
             match decrease_result {
@@ -272,7 +268,6 @@ pub fn handler(
                     undirected_floor_cap,
                     minimum_delegation,
                     stake_rent,
-                    clock.epoch,
                 ),
             }?
         };

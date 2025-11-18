@@ -23,8 +23,6 @@ pub fn decrease_stake_calculation(
     directed_unstake_cap_lamports: u64,
     directed_unstake_total_lamports: u64,
     minimum_delegation: u64,
-    stake_rent: u64,
-    epoch: u64,
 ) -> Result<RebalanceType> {
     if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
@@ -57,7 +55,7 @@ pub fn decrease_stake_calculation(
     for target in
         directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
     {
-        if target.staked_last_updated_epoch == epoch {
+        if target.staked_last_updated_epoch == state.current_epoch {
             continue;
         }
         let target_lamports = directed_stake_meta
@@ -125,7 +123,6 @@ pub fn increase_stake_calculation(
     undirected_cap_reached: bool,
     minimum_delegation: u64,
     stake_rent: u64,
-    epoch: u64,
 ) -> Result<RebalanceType> {
     if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
@@ -160,7 +157,7 @@ pub fn increase_stake_calculation(
     for target in
         directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
     {
-        if target.staked_last_updated_epoch == epoch {
+        if target.staked_last_updated_epoch == state.current_epoch {
             continue;
         }
         let target_lamports = directed_stake_meta

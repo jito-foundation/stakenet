@@ -35,7 +35,6 @@ pub fn handler(
     target_lamports: u64,
 ) -> Result<()> {
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
-    let config = ctx.accounts.config.load()?;
 
     if vote_pubkey == Pubkey::default() {
         return Err(error!(StewardError::Unauthorized));
