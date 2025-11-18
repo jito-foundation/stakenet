@@ -494,20 +494,7 @@ async fn test_directed_stake_ticket_validation() {
     let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
 
-    // Create a unique keypair for this ticket (ticket address is derived from signer)
-    // This keypair will be used as both signer and ticket_update_authority
-    let ticket_keypair = Keypair::new();
-    // Add the ticket keypair to the whitelist so it can initialize and update
-    add_staker_to_whitelist(
-        &fixture,
-        &ticket_keypair.pubkey(),
-        DirectedStakeRecordType::User,
-    )
-    .await;
-
     // Initialize a directed stake ticket
-    // Use ticket_keypair as signer so we have a unique ticket address
-    // Set ticket_update_authority to ticket_keypair so it can update
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &fixture.keypair,         
@@ -556,7 +543,6 @@ async fn test_directed_stake_ticket_validation() {
     let directed_stake_whitelist = Pubkey::find_program_address(
         &[
             DirectedStakeWhitelist::SEED,
-            fixture.keypair.pubkey().as_ref(),
             fixture.steward_config.pubkey().as_ref(),
         ],
         &jito_steward::id(),
@@ -575,7 +561,7 @@ async fn test_directed_stake_ticket_validation() {
                 false,
             ),
             anchor_lang::solana_program::instruction::AccountMeta::new(ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new(staker.pubkey(), true),
+            anchor_lang::solana_program::instruction::AccountMeta::new(fixture.keypair.pubkey(), true),
         ],
         data: jito_steward::instruction::UpdateDirectedStakeTicket {
             preferences: _invalid_preferences.clone(),
@@ -585,8 +571,8 @@ async fn test_directed_stake_ticket_validation() {
 
     let tx = Transaction::new_signed_with_payer(
         &[ix],
-        Some(&staker.pubkey()),
-        &[&staker],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,
     );
 
