@@ -151,6 +151,13 @@ pub fn handler(
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 
+        // Check state first before allowing any reset logic
+        // This ensures we fail with InvalidState if called from wrong state
+        require!(
+            state_account.state.state_tag == StewardStateEnum::RebalanceDirected,
+            StewardError::InvalidState
+        );
+
         let current_epoch = clock.epoch;
         let slots_since_scoring_started = clock
             .slot

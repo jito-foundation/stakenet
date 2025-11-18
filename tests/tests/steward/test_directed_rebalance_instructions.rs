@@ -861,7 +861,7 @@ async fn test_directed_rebalance_wrong_state() {
     let mut steward_state_account = fixture
         .load_and_deserialize::<jito_steward::StewardStateAccountV2>(&fixture.steward_state)
         .await;
-    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::Idle;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::ComputeScores;
     fixture.ctx.borrow_mut().set_account(
         &fixture.steward_state,
         &serialized_steward_state_account(steward_state_account).into(),
