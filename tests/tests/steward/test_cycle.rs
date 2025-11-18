@@ -274,6 +274,16 @@ async fn test_cycle() {
 
     crank_idle(&fixture).await;
 
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_compute_delegations(&fixture).await;
+
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -2108,9 +2118,19 @@ async fn test_cycle_with_directed_stake_targets() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-    fixture.advance_num_slots(160_000).await;
-
     crank_idle(&fixture).await;
+
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_compute_delegations(&fixture).await;
+
+    fixture.advance_num_slots(160_000).await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -2764,9 +2784,9 @@ async fn test_add_validator_next_cycle() {
         jito_steward::StewardStateEnum::ComputeScores
     ));
 
-    assert_eq!(state.validators_added, 1);
+    assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.num_pool_validators, 2);
+    assert_eq!(state.num_pool_validators, 3);
 
     // Ensure we can crank the new validator
     crank_compute_score(

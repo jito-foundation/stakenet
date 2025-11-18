@@ -858,6 +858,15 @@ async fn test_directed_rebalance_wrong_state() {
     // Test case: Try to call rebalance_directed when not in the right state
     let fixture = setup_directed_stake_fixture().await;
 
+    let mut steward_state_account = fixture
+        .load_and_deserialize::<jito_steward::StewardStateAccountV2>(&fixture.steward_state)
+        .await;
+    steward_state_account.state.state_tag = jito_steward::StewardStateEnum::Idle;
+    fixture.ctx.borrow_mut().set_account(
+        &fixture.steward_state,
+        &serialized_steward_state_account(steward_state_account).into(),
+    );
+
     // Create a validator
     let validator = Keypair::new();
     let vote_pubkey = validator.pubkey();

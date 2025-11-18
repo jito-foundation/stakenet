@@ -21,9 +21,8 @@ use crate::{
         get_stake_pool_address, get_transient_stake_seed_at_index, get_validator_list_length,
         get_validator_stake_info_at_index, state_checks,
     },
-    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
+    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_SCORE,
     REBALANCE_DIRECTED_COMPLETE,
-    COMPUTE_SCORE,
 };
 #[derive(Accounts)]
 #[instruction(validator_list_index: u64)]
@@ -153,7 +152,14 @@ pub fn handler(
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 
         let current_epoch = clock.epoch;
-        if current_epoch == state_account.state.next_cycle_epoch && state_account.state.has_flag(COMPUTE_SCORE) {
+        let slots_since_scoring_started = clock
+            .slot
+            .checked_sub(state_account.state.start_computing_scores_slot)
+            .ok_or(StewardError::ArithmeticError)?;
+        if state_account.state.progress.is_empty()
+            || current_epoch > state_account.state.current_epoch
+            || slots_since_scoring_started > config.parameters.compute_score_slot_range
+        {
             state_account.state.reset_state_for_new_cycle(
                 clock.epoch,
                 clock.slot,
