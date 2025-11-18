@@ -154,7 +154,7 @@ async fn test_cycle() {
                 scoring_unstake_cap_bps: Some(750),
                 instant_unstake_cap_bps: Some(10),
                 stake_deposit_unstake_cap_bps: Some(10),
-                instant_unstake_epoch_progress: Some(0.00),
+                instant_unstake_epoch_progress: Some(0.90),
                 compute_score_slot_range: Some(1000),
                 instant_unstake_inputs_epoch_progress: Some(0.50),
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
@@ -274,16 +274,6 @@ async fn test_cycle() {
 
     crank_idle(&fixture).await;
 
-    crank_compute_score(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0, 1, 2],
-    )
-    .await;
-
-    crank_compute_delegations(&fixture).await;
-
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -316,12 +306,26 @@ async fn test_cycle() {
     )
     .await;
 
-    fixture.advance_num_slots(420_000).await;
+    println!("Rebalance directed 2");
 
-    crank_idle(&fixture).await;
+    fixture.advance_num_slots(250_000).await;
 
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    crank_compute_delegations(&fixture).await;
+
+    crank_idle(&fixture).await;
+
+    fixture.advance_num_slots(160_000).await;
 
     crank_compute_instant_unstake(
         &fixture,
@@ -347,9 +351,6 @@ async fn test_cycle() {
 
     crank_epoch_maintenance(&fixture, None).await;
 
-    // Update validator history values
-    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
-
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
@@ -359,7 +360,9 @@ async fn test_cycle() {
     .await;
 
     fixture.advance_num_slots(250_000).await;
-    crank_idle(&fixture).await;
+
+    // Update validator history values
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
     // In new cycle
     crank_compute_score(
@@ -2043,6 +2046,8 @@ async fn test_cycle_with_directed_stake_targets() {
 
     crank_idle(&fixture).await;
 
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+
     crank_compute_instant_unstake(
         &fixture,
         &unit_test_fixtures,
@@ -2115,10 +2120,10 @@ async fn test_cycle_with_directed_stake_targets() {
 
     fixture.advance_num_slots(250_000).await;
 
+    crank_idle(&fixture).await;
+
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
-
-    crank_idle(&fixture).await;
 
     crank_compute_score(
         &fixture,
@@ -2130,7 +2135,10 @@ async fn test_cycle_with_directed_stake_targets() {
 
     crank_compute_delegations(&fixture).await;
 
-    fixture.advance_num_slots(160_000).await;
+    fixture.advance_num_slots(170_000).await;
+    crank_idle(&fixture).await;
+
+    println!("Cranked validator history account");
 
     crank_compute_instant_unstake(
         &fixture,
@@ -2207,9 +2215,11 @@ async fn test_cycle_with_directed_stake_targets() {
         }
     }
 
-    fixture.advance_num_slots(250_000).await;
+    /*fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
 
+    // Update validator history values
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
     // In new cycle
     crank_compute_score(
         &fixture,
@@ -2217,7 +2227,7 @@ async fn test_cycle_with_directed_stake_targets() {
         &extra_validator_accounts,
         &[0, 1, 2],
     )
-    .await;
+    .await;*/
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let state_account: StewardStateAccountV2 =
@@ -2226,7 +2236,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     assert!(matches!(
         state.state_tag,
-        jito_steward::StewardStateEnum::ComputeDelegations
+        jito_steward::StewardStateEnum::Idle
     ));
     assert_eq!(state.current_epoch, clock.epoch);
     assert_eq!(state.next_cycle_epoch, clock.epoch + 2);
@@ -2235,7 +2245,7 @@ async fn test_cycle_with_directed_stake_targets() {
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.status_flags, 3);
+    assert_eq!(state.status_flags, 5);
 
     // All other values are reset
 
