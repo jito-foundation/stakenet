@@ -481,6 +481,7 @@ pub enum AuthoritySubcommand {
         #[arg(long, env)]
         new_authority: Pubkey,
     },
+    /// Manages override directed stake tickets authority
     DirectedStakeTicketOverrideAuthority {
         #[command(flatten)]
         permissioned_parameters: PermissionedParameters,
