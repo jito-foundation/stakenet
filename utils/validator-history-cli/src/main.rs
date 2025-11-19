@@ -14,13 +14,19 @@ use solana_sdk::{
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
 };
 use validator_history_cli::{
-    commands, validator_history_entry_output::ValidatorHistoryEntryOutput,
+    commands::{
+        self,
+        cranks::copy_gossip_contact_info::{
+            command_crank_copy_gossip_contact_info, CrankCopyGossipContactInfo,
+        },
+    },
+    validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
 
 #[derive(Parser)]
@@ -55,6 +61,7 @@ enum Commands {
     UpdateOracleAuthority(UpdateOracleAuthority),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
+    CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
 }
 
 #[derive(Parser)]
@@ -1274,6 +1281,14 @@ async fn main() {
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
+        Commands::CrankCopyGossipContactInfo(command_args) => {
+            let client = solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
+                args.json_rpc_url.clone(),
+                Duration::from_secs(60),
+            );
+            let client = Arc::new(client);
+            command_crank_copy_gossip_contact_info(command_args, client).await
         }
     };
 }
