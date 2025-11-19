@@ -70,7 +70,7 @@ pub async fn command_crank_compute_directed_stake_meta(
 
     // Fetch directed stake tickets to show summary stats
     let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
-    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().map(|t| *t).collect();
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let num_tickets = tickets.len();
 
     // Count preferences in tickets

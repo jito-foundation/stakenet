@@ -14,7 +14,7 @@ pub async fn command_view_directed_stake_tickets(
     program_id: Pubkey,
 ) -> Result<()> {
     let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
-    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().map(|t| *t).collect();
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let tickets_count = tickets.len();
 
     if args.print_json {
