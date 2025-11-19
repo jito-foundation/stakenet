@@ -228,7 +228,8 @@ pub async fn command_crank_compute_directed_stake_meta(
         get_directed_stake_meta(client.clone(), &steward_config, &program_id).await?;
 
     println!("\nValidator Targets:");
-    for target in directed_stake_meta.targets {
+    for i in 0..directed_stake_meta.total_stake_targets as usize {
+        let target = &directed_stake_meta.targets[i];
         if target.vote_pubkey != Pubkey::default() {
             println!("  Vote Pubkey: {}", target.vote_pubkey);
             println!(
