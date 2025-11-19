@@ -28,6 +28,7 @@ use std::{
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use jito_steward::DirectedStakeTicket;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
@@ -68,7 +69,8 @@ pub async fn command_crank_compute_directed_stake_meta(
     let steward_config = args.permissioned_parameters.steward_config;
 
     // Fetch directed stake tickets to show summary stats
-    let tickets = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().map(|t| *t).collect();
     let num_tickets = tickets.len();
 
     // Count preferences in tickets
