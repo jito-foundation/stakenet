@@ -2823,7 +2823,6 @@ async fn test_directed_stake_large_target_low_reserve() {
     // Modify validator history account with desired values
 
     let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
-    let ctx = &fixture.ctx;
 
     fixture.steward_config = Keypair::new();
     fixture.steward_state = Pubkey::find_program_address(
@@ -2932,7 +2931,12 @@ async fn test_directed_stake_large_target_low_reserve() {
     fixture.submit_transaction_assert_success(tx).await;
 
     for extra_accounts in extra_validator_accounts.iter() {
-        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1_000_000_000_000_000).await;
+        crank_copy_directed_stake_targets(
+            &fixture,
+            extra_accounts.vote_account,
+            1_000_000_000_000_000,
+        )
+        .await;
     }
 
     crank_rebalance_directed(
@@ -2949,13 +2953,19 @@ async fn test_directed_stake_large_target_low_reserve() {
             if target.vote_pubkey == Pubkey::default() {
                 continue;
             }
-            println!("Staked lamports for validator {:?}: {:?}", target.vote_pubkey, target.total_staked_lamports);
+            println!(
+                "Staked lamports for validator {:?}: {:?}",
+                target.vote_pubkey, target.total_staked_lamports
+            );
         }
         for target in directed_stake_meta.targets.iter() {
             if target.vote_pubkey == Pubkey::default() {
                 continue;
             }
-            println!("Target last updated epoch: {:?}", target.staked_last_updated_epoch);
+            println!(
+                "Target last updated epoch: {:?}",
+                target.staked_last_updated_epoch
+            );
         }
     }
     drop(fixture);

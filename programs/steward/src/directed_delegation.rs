@@ -52,8 +52,10 @@ pub fn decrease_stake_calculation(
     );
 
     let mut total_excess_lamports: u64 = 0u64;
-    for (index, target) in
-        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter().enumerate()
+    for (index, target) in directed_stake_meta.targets
+        [..directed_stake_meta.total_stake_targets as usize]
+        .iter()
+        .enumerate()
     {
         if target.staked_last_updated_epoch == state.current_epoch {
             continue;
@@ -150,8 +152,10 @@ pub fn increase_stake_calculation(
 
     let mut total_delta_lamports: u64 = 0u64;
 
-    for (index, target) in
-        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter().enumerate()
+    for (index, target) in directed_stake_meta.targets
+        [..directed_stake_meta.total_stake_targets as usize]
+        .iter()
+        .enumerate()
     {
         if target.staked_last_updated_epoch == state.current_epoch {
             continue;
