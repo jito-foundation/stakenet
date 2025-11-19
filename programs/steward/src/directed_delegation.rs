@@ -52,18 +52,14 @@ pub fn decrease_stake_calculation(
     );
 
     let mut total_excess_lamports: u64 = 0u64;
-    for target in
-        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
+    for (index, target) in
+        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter().enumerate()
     {
         if target.staked_last_updated_epoch == state.current_epoch {
             continue;
         }
-        let target_lamports = directed_stake_meta
-            .get_target_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
-        let staked_lamports = directed_stake_meta
-            .get_total_staked_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+        let target_lamports = directed_stake_meta.targets[index].total_target_lamports;
+        let staked_lamports = directed_stake_meta.targets[index].total_staked_lamports;
         let excess = staked_lamports.saturating_sub(target_lamports);
         total_excess_lamports = total_excess_lamports.saturating_add(excess);
     }
@@ -154,18 +150,14 @@ pub fn increase_stake_calculation(
 
     let mut total_delta_lamports: u64 = 0u64;
 
-    for target in
-        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter()
+    for (index, target) in
+        directed_stake_meta.targets[..directed_stake_meta.total_stake_targets as usize].iter().enumerate()
     {
         if target.staked_last_updated_epoch == state.current_epoch {
             continue;
         }
-        let target_lamports = directed_stake_meta
-            .get_target_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
-        let staked_lamports = directed_stake_meta
-            .get_total_staked_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+        let target_lamports = directed_stake_meta.targets[index].total_target_lamports;
+        let staked_lamports = directed_stake_meta.targets[index].total_staked_lamports;
         let delta_lamports = target_lamports.saturating_sub(staked_lamports);
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
     }
@@ -176,7 +168,7 @@ pub fn increase_stake_calculation(
     }
 
     let delta_proportion_bps: u128 =
-        (target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
+        ((target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128)).min(10_000);
 
     // We must preserve at least stake_rent in the reserve stake account for rent-exemption
     let available_lamports = reserve_lamports.saturating_sub(stake_rent);
