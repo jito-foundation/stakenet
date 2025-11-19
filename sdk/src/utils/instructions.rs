@@ -129,7 +129,7 @@ pub async fn compute_directed_stake_meta(
         calculate_conversion_rate_bps(stake_pool.total_lamports, stake_pool.pool_token_supply)?;
 
     let mut jitosol_balances = HashMap::new();
-    for (_pda, ticket) in &ticket_map {
+    for ticket in &ticket_map.values() {
         let balance = get_token_balance(
             client.clone(),
             token_mint_address,
@@ -141,7 +141,7 @@ pub async fn compute_directed_stake_meta(
 
     let existing_directed_stake_meta =
         get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
-    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().map(|t| *t).collect();
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied();
     let validator_targets = aggregate_validator_targets(
         &existing_directed_stake_meta,
         &tickets,
