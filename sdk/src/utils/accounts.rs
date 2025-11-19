@@ -273,7 +273,7 @@ pub async fn get_all_steward_accounts(
 pub async fn get_directed_stake_tickets(
     client: Arc<RpcClient>,
     program_id: &Pubkey,
-) -> Result<HashMap<Pubkey, DirectedStakeTicket>, JitoTransactionError> {
+) -> Result<Vec<DirectedStakeTicket>, JitoTransactionError> {
     let discriminator = <DirectedStakeTicket as Discriminator>::DISCRIMINATOR;
     let memcmp_filter = RpcFilterType::Memcmp(Memcmp::new(
         0,
@@ -297,11 +297,10 @@ pub async fn get_directed_stake_tickets(
         )
         .await?;
 
-    let tickets: HashMap<Pubkey, DirectedStakeTicket> = accounts
+    let tickets: Vec<DirectedStakeTicket> = accounts
         .iter()
-        .filter_map(|(pda, account)| {
-            let ticket = DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok();
-            Some((pda, account))
+        .filter_map(|(_pda, account)| {
+            DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok()
         })
         .collect();
 
