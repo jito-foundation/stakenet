@@ -16,7 +16,8 @@ pub async fn command_view_directed_stake_meta(
     let stake_meta =
         get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
 
-    println!("\n📊 DirectedStakeMeta Information {stake_meta_address}:");
+    println!("\n📊 DirectedStakeMeta Information:");
+    println!("DirectedStakeMeta Account: {stake_meta_address}");
 
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {
