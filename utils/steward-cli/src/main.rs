@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use commands::{
     actions::{
@@ -86,6 +86,7 @@ async fn main() -> Result<()> {
     let steward_program_id = args.steward_program_id;
     let validator_history_program_id = args.validator_history_program_id;
     let global_signer = args.signer.as_deref();
+
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, steward_program_id).await,
@@ -140,7 +141,17 @@ async fn main() -> Result<()> {
             command_update_priority_fee_config(args, &client, steward_program_id).await
         }
         Commands::UpdateAuthority(args) => {
-            command_update_authority(args, &client, steward_program_id).await
+            // Use global signer - required for this command
+            let signer_path = global_signer.ok_or_else(|| {
+                anyhow!("--signer flag is required for the 'update-authority' command")
+            })?;
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_update_authority(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::SetStaker(args) => command_set_staker(args, &client, steward_program_id).await,
         Commands::RevertStaker(args) => {
