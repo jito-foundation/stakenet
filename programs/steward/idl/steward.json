@@ -607,6 +607,10 @@
           "name": "clock"
         },
         {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
           "name": "authority",
           "writable": true,
           "signer": true
@@ -620,6 +624,10 @@
         {
           "name": "total_target_lamports",
           "type": "u64"
+        },
+        {
+          "name": "validator_list_index",
+          "type": "u32"
         }
       ]
     },
@@ -831,6 +839,10 @@
         },
         {
           "name": "stake_pool"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
         }
       ],
       "args": [
@@ -1258,6 +1270,10 @@
         },
         {
           "name": "stake_pool"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
         }
       ],
       "args": [
@@ -3190,7 +3206,16 @@
                     "name": "DirectedStakeTarget"
                   }
                 },
-                2048
+                5000
+              ]
+            }
+          },
+          {
+            "name": "directed_stake_lamports",
+            "type": {
+              "array": [
+                "u64",
+                5000
               ]
             }
           }
@@ -3396,7 +3421,7 @@
             "type": {
               "array": [
                 "pubkey",
-                2048
+                5000
               ]
             }
           },

@@ -20,9 +20,10 @@ pub struct CopyDirectedStakeTargets<'info> {
 
     pub clock: Sysvar<'info, Clock>,
 
+    /// CHECK: Used to get validator_list_index of target
     #[account(
         mut,
-        address = get_validator_list(&config)?
+        address = get_validator_list(&config)?,
     )]
     pub validator_list: AccountInfo<'info>,
 
