@@ -307,7 +307,7 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
 
 **Creating a Squads multisig proposal with Ledger:**
 
-`blacklist` | `admin`
+`blacklist` | `admin` | `directed-stake-whitelist`
 
 ```bash
 ./target/release/steward-cli \
