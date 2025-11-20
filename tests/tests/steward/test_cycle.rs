@@ -8,10 +8,12 @@ use anchor_lang::{
 };
 use jito_steward::instructions::AuthorityType;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
-use jito_steward::REBALANCE_DIRECTED_COMPLETE;
 use jito_steward::{
     stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
     UpdateParametersArgs,
+};
+use jito_steward::{
+    COMPUTE_DELEGATIONS, COMPUTE_SCORE, EPOCH_MAINTENANCE, REBALANCE_DIRECTED_COMPLETE,
 };
 use solana_program::sysvar;
 use solana_program_test::*;
@@ -314,16 +316,7 @@ async fn test_cycle() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-    crank_compute_score(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0, 1, 2],
-    )
-    .await;
-
-    crank_compute_delegations(&fixture).await;
-
+    // Not a scoring cycle, skip cranking scores and delegations
     fixture.advance_num_slots(160_000).await;
 
     crank_idle(&fixture).await;
@@ -361,9 +354,16 @@ async fn test_cycle() {
     .await;
 
     fixture.advance_num_slots(250_000).await;
-
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+    crank_idle(&fixture).await;
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
 
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
     let state_account: StewardStateAccountV2 =
@@ -372,7 +372,7 @@ async fn test_cycle() {
 
     assert!(matches!(
         state.state_tag,
-        jito_steward::StewardStateEnum::Idle
+        jito_steward::StewardStateEnum::ComputeDelegations
     ));
     assert_eq!(state.current_epoch, clock.epoch);
     assert_eq!(state.next_cycle_epoch, clock.epoch + 2);
@@ -381,10 +381,12 @@ async fn test_cycle() {
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.status_flags, 5);
+    assert_eq!(
+        state.status_flags,
+        COMPUTE_SCORE | REBALANCE_DIRECTED_COMPLETE | EPOCH_MAINTENANCE
+    );
 
     // All other values are reset
-
     drop(fixture);
 }
 
@@ -2117,16 +2119,7 @@ async fn test_cycle_with_directed_stake_targets() {
     // Update validator history values
     crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
 
-    crank_compute_score(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0, 1, 2],
-    )
-    .await;
-
-    crank_compute_delegations(&fixture).await;
-
+    // Not a scoring cycle, skip cranking scores and delegations
     fixture.advance_num_slots(170_000).await;
     crank_idle(&fixture).await;
 
@@ -2161,8 +2154,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     // Copy targets with half balance to force a decrease rebalance
     for extra_accounts in extra_validator_accounts.iter() {
-        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 5_000_000_000)
-            .await;
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 5_000_000).await;
     }
 
     crank_rebalance_directed(
@@ -2231,13 +2223,16 @@ async fn test_cycle_with_directed_stake_targets() {
         jito_steward::StewardStateEnum::Idle
     ));
     assert_eq!(state.current_epoch, clock.epoch);
-    assert_eq!(state.next_cycle_epoch, clock.epoch + 2);
+    assert_eq!(state.next_cycle_epoch, clock.epoch);
     assert_eq!(state.instant_unstake_total, 0);
     assert_eq!(state.scoring_unstake_total, 0);
     assert_eq!(state.stake_deposit_unstake_total, 0);
     assert_eq!(state.validators_added, 0);
     assert!(state.validators_to_remove.is_empty());
-    assert_eq!(state.status_flags, 5);
+    assert_eq!(
+        state.status_flags,
+        COMPUTE_SCORE | REBALANCE_DIRECTED_COMPLETE | EPOCH_MAINTENANCE | COMPUTE_DELEGATIONS
+    );
 
     // All other values are reset
 

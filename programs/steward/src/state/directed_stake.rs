@@ -63,35 +63,17 @@ impl DirectedStakeMeta {
     }
 
     /// Add to the total staked lamports for a particular validator
-    pub fn add_to_total_staked_lamports(
-        &mut self,
-        vote_pubkey: &Pubkey,
-        lamports: u64,
-        epoch: u64,
-    ) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].total_staked_lamports += lamports;
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn add_to_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
+        self.targets[vote_pubkey_index].total_staked_lamports += lamports;
     }
 
     /// Subtract from the total staked lamports for a particular validator
-    pub fn subtract_from_total_staked_lamports(
-        &mut self,
-        vote_pubkey: &Pubkey,
-        lamports: u64,
-        epoch: u64,
-    ) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].total_staked_lamports -= lamports;
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
+        self.targets[vote_pubkey_index].total_staked_lamports -= lamports;
     }
 
-    pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey: &Pubkey, epoch: u64) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey_index: usize, epoch: u64) {
+        self.targets[vote_pubkey_index].staked_last_updated_epoch = epoch;
     }
 
     pub fn all_targets_rebalanced_for_epoch(&self, epoch: u64) -> bool {

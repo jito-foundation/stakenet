@@ -1,4 +1,5 @@
 use crate::{
+    bitmask::BitMask,
     errors::StewardError,
     events::EpochMaintenanceEvent,
     stake_pool_utils::deserialize_stake_pool,
@@ -8,7 +9,6 @@ use crate::{
     },
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_INSTANT_UNSTAKES,
     EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE,
-    RESET_TO_IDLE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -110,11 +110,11 @@ pub fn handler(
                     | POST_LOOP_IDLE
                     | REBALANCE_DIRECTED_COMPLETE,
             );
-            state_account
-                .state
-                .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
+            state_account.state.set_flag(EPOCH_MAINTENANCE);
+            state_account.state.progress = BitMask::default();
+            state_account.state.instant_unstake = BitMask::default();
+            state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
         }
-        state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
             validator_list_length: get_validator_list_length(&ctx.accounts.validator_list)? as u64,
