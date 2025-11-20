@@ -85,6 +85,14 @@ impl IdlBuild for AuthorityType {
                             ty: IdlType::Option(Box::new(IdlType::U8)),
                         }])),
                     },
+                    IdlEnumVariant {
+                        name: "SetDirectedStakeTicketOverrideAuthority".to_string(),
+                        fields: Some(IdlDefinedFields::Named(vec![IdlField {
+                            name: "SetDirectedStakeTicketOverrideAuthority".to_string(),
+                            docs: Default::default(),
+                            ty: IdlType::Option(Box::new(IdlType::U8)),
+                        }])),
+                    },
                 ],
             },
             docs: Default::default(),

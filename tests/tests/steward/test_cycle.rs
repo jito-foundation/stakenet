@@ -640,20 +640,20 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     )
     .await;
 
+    fixture.advance_num_epochs(1, 10).await;
+
+    // Epoch maintenance can reset an incomplete state machine cycle
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
+
     {
-        crank_idle(&fixture).await;
-
-        let state_account: Box<StewardStateAccountV2> =
-            Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
-
         let directed_stake_meta: Box<DirectedStakeMeta> = Box::new(
             fixture
                 .load_and_deserialize(&fixture.directed_stake_meta)
                 .await,
         );
 
-        // Total is reset when rebalancing is flagged as complete
-        assert!(state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE));
+        // Total is reset at epoch maintenance
         assert!(directed_stake_meta.directed_unstake_total == 0);
     }
     drop(fixture);
@@ -1299,6 +1299,11 @@ async fn test_cycle_with_directed_stake_noop_copy() {
     )
     .await;
 
+    fixture.advance_num_epochs(1, 10).await;
+
+    // Epoch maintenance can reset an incomplete state machine cycle
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
     {
         let directed_stake_meta: DirectedStakeMeta =
             fixture.load_and_deserialize(&_directed_stake_meta).await;
@@ -1311,6 +1316,14 @@ async fn test_cycle_with_directed_stake_noop_copy() {
             assert_eq!(target.staked_last_updated_epoch, 21);
         }
     }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
 
     // State machine can progress despite no directed stake target changes
     crank_idle(&fixture).await;

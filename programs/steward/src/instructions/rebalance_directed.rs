@@ -160,7 +160,6 @@ pub fn handler(
         // This will cause the state to transition to Idle
         if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
             state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
-            directed_stake_meta.directed_unstake_total = 0;
         }
 
         if let Some(event) = maybe_transition(
@@ -329,7 +328,7 @@ pub fn handler(
         }
     }
 
-    // No matter the rebalance type or amount, we need to mark the target as rebalanced for this epoch
+    // No matter the rebalance type or, we need to mark the target as rebalanced for this epoch
     directed_stake_meta.update_staked_last_updated_epoch(directed_stake_meta_index, clock.epoch);
 
     let mut state_account = ctx.accounts.state_account.load_mut()?;
@@ -342,7 +341,6 @@ pub fn handler(
 
     if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
         state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
-        directed_stake_meta.directed_unstake_total = 0;
     }
 
     {

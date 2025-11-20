@@ -206,10 +206,6 @@ pub const STATE_PADDING_0_SIZE: usize = (MAX_VALIDATORS * 8 + 2) - 8;
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u64)]
 pub enum StewardStateEnum {
-    /// Start state
-    /// Rebalance directed stake
-    RebalanceDirected,
-
     /// Every `num_cycle_epochs` epochs, scores are computed and the top `num_delegation_validators` validators are selected.
     ComputeScores,
 
@@ -225,6 +221,10 @@ pub enum StewardStateEnum {
     /// Stake rebalances computed and executed, adjusting delegations if instant_unstake validators are hit
     /// Transition back to Idle, or ComputeScores if new cycle
     Rebalance,
+
+    /// Start state
+    /// Rebalance directed stake
+    RebalanceDirected,
 }
 
 #[derive(BorshSerialize, PartialEq, Eq, Debug)]

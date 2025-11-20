@@ -123,6 +123,7 @@ pub fn handler(
             state_account.state.progress = BitMask::default();
             state_account.state.instant_unstake = BitMask::default();
             state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
+            directed_stake_meta.directed_unstake_total = 0;
         }
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
