@@ -35,6 +35,7 @@ services:
       - GOSSIP_ENTRYPOINTS=${GOSSIP_ENTRYPOINTS}
       - REGION=${REGION}
       - VALIDATOR_HISTORY_MIN_STAKE=${VALIDATOR_HISTORY_MIN_STAKE}
+      - TOKEN_MINT=${TOKEN_MINT}
     volumes:
       - ./credentials:/credentials
     restart: on-failure:5
@@ -110,6 +111,7 @@ services:
       - LOOKBACK_EPOCHS=${LOOKBACK_EPOCHS}
       - LOOKBACK_START_OFFSET_EPOCHS=${LOOKBACK_START_OFFSET_EPOCHS}
       - GOSSIP_ENTRYPOINTS=
+      - TOKEN_MINT=${TOKEN_MINT}
     volumes:
       - ./credentials:/credentials
       - ./data:/data

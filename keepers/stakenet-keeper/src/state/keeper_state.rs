@@ -319,7 +319,7 @@ impl KeeperState {
     ///
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
-    /// - Directed stake metadata hasn't been updated this epoch
+    /// - One of the target has not updated in this epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
@@ -341,8 +341,13 @@ impl KeeperState {
             let meta =
                 get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
 
-            let should_run_copy_directed_targets =
-                epoch_progress > 0.5 && meta.epoch_last_updated.ne(&self.epoch_info.epoch);
+            let has_stale_targets = meta
+                .targets
+                .iter()
+                .filter(|target| target.vote_pubkey.ne(&Pubkey::default()))
+                .any(|target| target.target_last_updated_epoch.ne(&self.epoch_info.epoch));
+
+            let should_run_copy_directed_targets = epoch_progress > 0.5 && has_stale_targets;
 
             return Ok(should_run_copy_directed_targets);
         }

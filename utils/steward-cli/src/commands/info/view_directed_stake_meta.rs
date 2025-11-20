@@ -17,7 +17,27 @@ pub async fn command_view_directed_stake_meta(
         get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
 
     println!("\n📊 DirectedStakeMeta Information:");
-    println!("DirectedStakeMeta Account: {stake_meta_address}");
+    println!("\nDirectedStakeMeta Account: {stake_meta_address}");
+    println!(
+        "DirectedStakeMeta Total Stake Targets: {}",
+        stake_meta.total_stake_targets
+    );
+    println!(
+        "DirectedStakeMeta Epoch Increase Total Lamports: {}",
+        stake_meta.epoch_increase_total_lamports
+    );
+    println!(
+        "DirectedStakeMeta Epoch Decrease Total Lamports: {}",
+        stake_meta.epoch_decrease_total_lamports
+    );
+    println!(
+        "DirectedStakeMeta Epoch Last Updated: {}",
+        stake_meta.epoch_last_updated
+    );
+    println!(
+        "DirectedStakeMeta Directed Unstake Total: {}",
+        stake_meta.directed_unstake_total
+    );
 
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {
