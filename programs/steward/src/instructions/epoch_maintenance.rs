@@ -7,8 +7,9 @@ use crate::{
         check_validator_list_has_stake_status_other_than, get_stake_pool_address,
         get_validator_list, get_validator_list_length,
     },
-    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_INSTANT_UNSTAKES,
-    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE,
+    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
+    COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
+    REBALANCE_DIRECTED_COMPLETE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -92,9 +93,10 @@ pub fn handler(
             StewardError::ListStateMismatch
         );
         if let Some(validator_index_to_remove) = validator_index_to_remove {
-            state_account
-                .state
-                .remove_validator(validator_index_to_remove, &mut directed_stake_meta.directed_stake_lamports)?;
+            state_account.state.remove_validator(
+                validator_index_to_remove,
+                &mut directed_stake_meta.directed_stake_lamports,
+            )?;
         }
     }
 

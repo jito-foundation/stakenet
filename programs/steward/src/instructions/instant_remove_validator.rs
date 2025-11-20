@@ -4,7 +4,7 @@ use crate::{
     utils::{
         get_stake_pool_address, get_validator_list, get_validator_list_length, tally_stake_status,
     },
-    Config, StewardStateAccount, StewardStateAccountV2, DirectedStakeMeta,
+    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2,
 };
 use anchor_lang::prelude::*;
 
@@ -94,9 +94,10 @@ pub fn handler(
         StewardError::ListStateMismatch
     );
 
-    state_account
-        .state
-        .remove_validator(validator_index_to_remove, &mut directed_stake_meta.directed_stake_lamports)?;
+    state_account.state.remove_validator(
+        validator_index_to_remove,
+        &mut directed_stake_meta.directed_stake_lamports,
+    )?;
 
     Ok(())
 }

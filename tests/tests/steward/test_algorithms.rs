@@ -13,6 +13,7 @@
 // Specifically: 100 << 56 = 7,205,759,403,792,793,600 (starts with 7.2...)
 // Adding the other perfect tier scores increases this to ~7.24... × 10^18
 use crate::steward::serialize_validator_list;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     constants::{
         EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
@@ -37,7 +38,6 @@ use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistoryEntry, MerkleRootUploadAuthority,
     ValidatorHistoryEntry,
 };
-use jito_steward::state::directed_stake::DirectedStakeMeta;
 
 #[test]
 fn test_compute_score() {

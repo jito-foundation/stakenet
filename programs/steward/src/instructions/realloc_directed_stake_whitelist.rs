@@ -1,6 +1,9 @@
 use crate::DirectedStakeWhitelist;
 use crate::{
-    constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS}, errors::StewardError, state::Config, utils::get_validator_list,
+    constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS},
+    errors::StewardError,
+    state::Config,
+    utils::get_validator_list,
 };
 use anchor_lang::prelude::*;
 
@@ -58,8 +61,7 @@ pub fn handler(ctx: Context<ReallocDirectedStakeWhitelist>) -> Result<()> {
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
         whitelist.permissioned_protocol_stakers =
             [Pubkey::default(); crate::MAX_PERMISSIONED_DIRECTED_STAKERS];
-        whitelist.permissioned_validators =
-            [Pubkey::default(); MAX_VALIDATORS];
+        whitelist.permissioned_validators = [Pubkey::default(); MAX_VALIDATORS];
         whitelist.total_permissioned_user_stakers = 0;
         whitelist.total_permissioned_protocol_stakers = 0;
         whitelist.total_permissioned_validators = 0;

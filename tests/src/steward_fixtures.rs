@@ -108,14 +108,11 @@ impl TestFixture {
 
         let steward_config = Keypair::new();
         let directed_stake_meta = Pubkey::find_program_address(
-            &[
-                DirectedStakeMeta::SEED,
-                steward_config.pubkey().as_ref(),
-            ],
+            &[DirectedStakeMeta::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
         )
         .0;
-        
+
         let stake_pool_meta = StakePoolMetadata::default();
         let steward_state = Pubkey::find_program_address(
             &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
@@ -1122,10 +1119,12 @@ pub async fn crank_rebalance_directed(
         let directed_stake_meta: DirectedStakeMeta = fixture
             .load_and_deserialize(&directed_stake_meta_pubkey)
             .await;
-        
+
         // Skip if the vote account is not in directed_stake_meta (e.g., was removed by copy_directed_stake_targets with 0 lamports)
         // This ensures we only process validators that exist in both the validator_list and the directed_stake_meta
-        let Some(directed_stake_meta_index) = directed_stake_meta.get_target_index(&vote_account_at_index) else {
+        let Some(directed_stake_meta_index) =
+            directed_stake_meta.get_target_index(&vote_account_at_index)
+        else {
             continue;
         };
 

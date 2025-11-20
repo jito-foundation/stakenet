@@ -7,6 +7,7 @@
 */
 use crate::steward::serialize_validator_list;
 use anchor_lang::error::Error;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
@@ -18,7 +19,6 @@ use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
-use jito_steward::state::directed_stake::DirectedStakeMeta;
 
 #[test]
 fn test_compute_scores() {
@@ -562,7 +562,6 @@ fn test_rebalance() {
 
     let res = state.rebalance(
         &DirectedStakeMeta::default(),
-
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -934,7 +933,10 @@ fn test_remove_validator_fails() {
         .validators_for_immediate_removal
         .set(state.num_pool_validators as usize, true)
         .unwrap();
-    let res = state.remove_validator(state.num_pool_validators as usize, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(
+        state.num_pool_validators as usize,
+        &mut [0u64; MAX_VALIDATORS],
+    );
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
 }
@@ -1193,9 +1195,7 @@ fn test_directed_stake_get_allocations() {
 
 #[test]
 fn test_directed_stake_whitelist_operations() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
@@ -1252,9 +1252,7 @@ fn test_directed_stake_whitelist_operations() {
 
 #[test]
 fn test_directed_stake_whitelist_remove_operations() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
@@ -1358,9 +1356,7 @@ fn test_directed_stake_whitelist_remove_operations() {
 
 #[test]
 fn test_directed_stake_whitelist_remove_array_shifting() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
@@ -1444,9 +1440,7 @@ fn test_directed_stake_whitelist_remove_array_shifting() {
 
 #[test]
 fn test_directed_stake_whitelist_capacity_limits() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],

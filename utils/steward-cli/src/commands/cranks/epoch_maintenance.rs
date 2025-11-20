@@ -39,8 +39,7 @@ pub async fn command_crank_epoch_maintenance(
         return Ok(());
     }
 
-    let directed_stake_meta =
-        get_directed_stake_meta_address(&steward_config, &program_id);
+    let directed_stake_meta = get_directed_stake_meta_address(&steward_config, &program_id);
 
     let ix = Instruction {
         program_id,

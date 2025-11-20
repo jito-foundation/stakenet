@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 use spl_stake_pool::big_vec::BigVec;
 
-use crate::state::directed_stake::DirectedStakeMeta;
 use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
+use crate::state::directed_stake::DirectedStakeMeta;
 use crate::{
     errors::StewardError,
     utils::{get_target_lamports, stake_lamports_at_validator_list_index},

@@ -153,7 +153,8 @@ pub async fn compute_directed_stake_meta(
     let config_account = get_steward_config_account(&client, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
-    let validator_list_account = get_validator_list_account(&client, &validator_list_address).await?;
+    let validator_list_account =
+        get_validator_list_account(&client, &validator_list_address).await?;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 

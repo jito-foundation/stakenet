@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
 
 use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
-use crate::{errors::StewardError, Config};
-use std::mem::size_of;
-use crate::utils::vote_pubkey_at_validator_list_index;
 use crate::utils::get_validator_list;
+use crate::utils::vote_pubkey_at_validator_list_index;
+use crate::{errors::StewardError, Config};
 use spl_stake_pool::state::ValidatorListHeader;
+use std::mem::size_of;
 #[derive(Accounts)]
 pub struct CopyDirectedStakeTargets<'info> {
     #[account()]
@@ -51,8 +51,9 @@ pub fn handler(
         header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
         StewardError::ValidatorListTypeMismatch
     );
-    let validator_list_vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, validator_list_index)?;
-    
+    let validator_list_vote_pubkey =
+        vote_pubkey_at_validator_list_index(&validator_list, validator_list_index)?;
+
     if validator_list_vote_pubkey != vote_pubkey {
         msg!("Validator list vote pubkey does not match vote pubkey");
         return Err(error!(StewardError::Unauthorized));

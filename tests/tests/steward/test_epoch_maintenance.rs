@@ -6,9 +6,8 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
-    state::directed_stake::DirectedStakeMeta,
-    stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
-    UpdateParametersArgs, EPOCH_MAINTENANCE,
+    stake_pool_utils::ValidatorList, state::directed_stake::DirectedStakeMeta, StewardStateAccount,
+    StewardStateAccountV2, UpdateParametersArgs, EPOCH_MAINTENANCE,
 };
 use solana_program_test::*;
 use solana_sdk::{clock::Clock, signature::Keypair, signer::Signer, transaction::Transaction};
@@ -16,9 +15,9 @@ use spl_stake_pool::state::{StakeStatus, ValidatorList as SPLValidatorList};
 use tests::{
     stake_pool_utils::serialized_validator_list_account,
     steward_fixtures::{
-        auto_add_validator, crank_epoch_maintenance, crank_stake_pool, initialize_directed_stake_meta,
-        manual_remove_validator, ExtraValidatorAccounts, FixtureDefaultAccounts,
-        StateMachineFixtures, TestFixture, ValidatorEntry,
+        auto_add_validator, crank_epoch_maintenance, crank_stake_pool,
+        initialize_directed_stake_meta, manual_remove_validator, ExtraValidatorAccounts,
+        FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
     },
 };
 use validator_history::ValidatorHistory;

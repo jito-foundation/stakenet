@@ -1,10 +1,10 @@
 use std::mem::size_of;
 
+use crate::constants::MAX_VALIDATORS;
 use crate::errors::StewardError::{
     AlreadyPermissioned, DirectedStakeValidatorListFull, StakerNotInWhitelist,
     ValidatorNotInWhitelist,
 };
-use crate::constants::MAX_VALIDATORS;
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -119,7 +119,7 @@ impl DirectedStakeMeta {
     }
 }
 
-#[derive(BorshSerialize, Debug)]
+#[derive(BorshSerialize, Debug, Default)]
 #[account(zero_copy)]
 pub struct DirectedStakeTarget {
     /// Validator vote pubkey
@@ -134,19 +134,6 @@ pub struct DirectedStakeTarget {
     pub staked_last_updated_epoch: u64,
     // Alignment compliant reserve space for future use
     pub _padding0: [u8; 32],
-}
-
-impl Default for DirectedStakeTarget {
-    fn default() -> Self {
-        Self {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 32],
-        }
-    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]

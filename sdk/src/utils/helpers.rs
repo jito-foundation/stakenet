@@ -308,8 +308,7 @@ pub fn aggregate_validator_targets(
 #[cfg(test)]
 mod tests {
     use jito_steward::{
-        constants::MAX_VALIDATORS,
-        utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
+        constants::MAX_VALIDATORS, utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
     };
 
     use super::*;
@@ -371,6 +370,7 @@ mod tests {
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),
             targets: [target; MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
         }
     }
 
@@ -409,6 +409,7 @@ mod tests {
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),
             targets,
+            directed_stake_lamports: [0; MAX_VALIDATORS],
         }
     }
 

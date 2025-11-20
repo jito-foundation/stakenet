@@ -2,7 +2,6 @@ use borsh::BorshSerialize;
 use std::fmt::Display;
 
 use crate::{
-    state::directed_stake::DirectedStakeMeta,
     bitmask::BitMask,
     constants::{
         LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
@@ -15,6 +14,7 @@ use crate::{
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV4,
     },
+    state::directed_stake::DirectedStakeMeta,
     utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
     Config, Parameters,
 };
@@ -530,7 +530,11 @@ impl StewardStateV2 {
     }
 
     /// Update internal state when a validator is removed from the pool
-    pub fn remove_validator(&mut self, index: usize, directed_stake_lamports: &mut [u64; MAX_VALIDATORS]) -> Result<()> {
+    pub fn remove_validator(
+        &mut self,
+        index: usize,
+        directed_stake_lamports: &mut [u64; MAX_VALIDATORS],
+    ) -> Result<()> {
         let marked_for_regular_removal = self.validators_to_remove.get(index)?;
         let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
 
