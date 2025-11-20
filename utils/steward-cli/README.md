@@ -294,6 +294,8 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
 
 ### Update Authority
 
+**Direct execution:**
+
 `blacklist` | `admin` | `parameters`
 
 ```bash
@@ -302,6 +304,34 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
   --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
   --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8
 ```
+
+**Creating a Squads multisig proposal with Ledger:**
+
+`blacklist` | `admin` | `parameters`
+
+```bash
+./target/release/steward-cli \
+  --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+  --json-rpc-url "https://api.testnet.solana.com" \
+  update-authority \
+  --signer ledger \
+  --squads-proposal \
+  --squads-multisig 87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c \
+  blacklist \
+  --steward-config 5pZmpk3ktweGZW9xFknpEHhQoWeAKTzSGwnCUyVdiye \
+  --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8 \
+```
+
+Note: `--squads-multisig` defaults to the authority multisig and `--squads-vault-index` defaults to the main vault, so they can be omitted:
+
+```bash
+cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
+  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+  --signer ledger \
+  --validator-history-indices-to-blacklist 2168 \
+  --squads-proposal
+```
+
 
 ### Set Staker
 
