@@ -2650,6 +2650,17 @@
                 }
               }
             ]
+          },
+          {
+            "name": "SetDirectedStakeTicketOverrideAuthority",
+            "fields": [
+              {
+                "name": "SetDirectedStakeTicketOverrideAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
           }
         ]
       }
@@ -3162,18 +3173,6 @@
         "fields": [
           {
             "name": "total_stake_targets",
-            "type": "u64"
-          },
-          {
-            "name": "epoch_increase_total_lamports",
-            "type": "u64"
-          },
-          {
-            "name": "epoch_decrease_total_lamports",
-            "type": "u64"
-          },
-          {
-            "name": "epoch_last_updated",
             "type": "u64"
           },
           {
