@@ -2,6 +2,7 @@ use borsh::BorshSerialize;
 use std::fmt::Display;
 
 use crate::{
+    state::directed_stake::DirectedStakeMeta,
     bitmask::BitMask,
     constants::{
         LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
@@ -529,7 +530,7 @@ impl StewardStateV2 {
     }
 
     /// Update internal state when a validator is removed from the pool
-    pub fn remove_validator(&mut self, index: usize) -> Result<()> {
+    pub fn remove_validator(&mut self, index: usize, directed_stake_lamports: &mut [u64; MAX_VALIDATORS]) -> Result<()> {
         let marked_for_regular_removal = self.validators_to_remove.get(index)?;
         let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
 
@@ -573,6 +574,7 @@ impl StewardStateV2 {
             self.instant_unstake
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
+            directed_stake_lamports[i] = directed_stake_lamports[next_i];
         }
 
         // For state that can be valid past num_pool_validators, we still need to shift the values
@@ -623,6 +625,7 @@ impl StewardStateV2 {
 
         // Clear values on empty last index
         self.validator_lamport_balances[num_pool_validators] = LAMPORT_BALANCE_DEFAULT;
+        directed_stake_lamports[num_pool_validators] = 0;
         self.scores[num_pool_validators] = 0;
         self.raw_scores[num_pool_validators] = 0;
         self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
@@ -914,6 +917,7 @@ impl StewardStateV2 {
     #[allow(clippy::too_many_arguments)]
     pub fn rebalance(
         &mut self,
+        directed_stake_meta: &DirectedStakeMeta,
         current_epoch: u64,
         index: usize,
         validator_list: &BigVec<'_>,
@@ -1037,6 +1041,7 @@ impl StewardStateV2 {
 
                 decrease_stake_calculation(
                     self,
+                    directed_stake_meta,
                     index,
                     unstake_state,
                     current_lamports,
@@ -1048,6 +1053,7 @@ impl StewardStateV2 {
             } else if !some_transient_lamports && current_lamports < target_lamports {
                 increase_stake_calculation(
                     self,
+                    directed_stake_meta,
                     index,
                     current_lamports,
                     stake_pool_lamports,

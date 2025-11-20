@@ -369,8 +369,14 @@ pub mod steward {
         ctx: Context<CopyDirectedStakeTargets>,
         vote_pubkey: Pubkey,
         total_target_lamports: u64,
+        validator_list_index: u32,
     ) -> Result<()> {
-        instructions::copy_directed_stake_targets::handler(ctx, vote_pubkey, total_target_lamports)
+        instructions::copy_directed_stake_targets::handler(
+            ctx,
+            vote_pubkey,
+            total_target_lamports,
+            validator_list_index as usize,
+        )
     }
 
     /// Initialize DirectedStakeWhitelist account

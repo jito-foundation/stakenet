@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use spl_stake_pool::big_vec::BigVec;
 
+use crate::state::directed_stake::DirectedStakeMeta;
 use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
 use crate::{
@@ -26,6 +27,7 @@ pub enum RebalanceType {
 #[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
     state: &StewardStateV2,
+    directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     mut unstake_state: UnstakeState,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
@@ -55,6 +57,9 @@ pub fn decrease_stake_calculation(
 
         let (mut temp_current_lamports, some_transient_stake) =
             stake_lamports_at_validator_list_index(validator_list, temp_index)?;
+
+        temp_current_lamports = temp_current_lamports
+            .saturating_sub(directed_stake_meta.directed_stake_lamports[temp_index]);
 
         // ValidatorList includes base lamports in active_stake_lamports
         temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);
@@ -107,6 +112,7 @@ pub fn decrease_stake_calculation(
 #[allow(clippy::too_many_arguments)]
 pub fn increase_stake_calculation(
     state: &StewardStateV2,
+    directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     current_lamports: u64,
     stake_pool_lamports: u64,
@@ -136,6 +142,9 @@ pub fn increase_stake_calculation(
 
                 let (mut temp_current_lamports, some_transient_stake) =
                     stake_lamports_at_validator_list_index(validator_list, temp_index)?;
+
+                temp_current_lamports = temp_current_lamports
+                    .saturating_sub(directed_stake_meta.directed_stake_lamports[temp_index]);
 
                 // ValidatorList includes base lamports in active_stake_lamports
                 temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);

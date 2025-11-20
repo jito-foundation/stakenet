@@ -4,12 +4,12 @@ use crate::errors::StewardError::{
     AlreadyPermissioned, DirectedStakeValidatorListFull, StakerNotInWhitelist,
     ValidatorNotInWhitelist,
 };
+use crate::constants::MAX_VALIDATORS;
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const MAX_PERMISSIONED_DIRECTED_STAKERS: usize = 2048;
-pub const MAX_PERMISSIONED_DIRECTED_VALIDATORS: usize = 2048;
 pub const MAX_PREFERENCES_PER_TICKET: usize = 8;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
@@ -30,7 +30,9 @@ pub struct DirectedStakeMeta {
     pub directed_unstake_total: u64,
     pub padding0: [u8; 63],
     pub is_initialized: U8Bool,
-    pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    pub targets: [DirectedStakeTarget; MAX_VALIDATORS],
+    // Total staked lamports indexed by validator list index
+    pub directed_stake_lamports: [u64; MAX_VALIDATORS],
 }
 
 #[allow(dead_code)]
@@ -227,7 +229,7 @@ impl DirectedStakeTicket {
 pub struct DirectedStakeWhitelist {
     pub permissioned_user_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
     pub permissioned_protocol_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
-    pub permissioned_validators: [Pubkey; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    pub permissioned_validators: [Pubkey; MAX_VALIDATORS],
     pub total_permissioned_user_stakers: u16,
     pub total_permissioned_protocol_stakers: u16,
     pub total_permissioned_validators: u16,
@@ -243,7 +245,7 @@ impl DirectedStakeWhitelist {
     pub const IS_INITIALIZED_BYTE_POSITION: usize = 8
         + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
         + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
-        + 32 * MAX_PERMISSIONED_DIRECTED_VALIDATORS
+        + 32 * MAX_VALIDATORS
         + 2
         + 2
         + 2
@@ -287,7 +289,7 @@ impl DirectedStakeWhitelist {
     }
 
     pub fn can_add_validator(&self) -> bool {
-        (self.total_permissioned_validators as usize) < MAX_PERMISSIONED_DIRECTED_VALIDATORS
+        (self.total_permissioned_validators as usize) < MAX_VALIDATORS
     }
 
     pub fn add_user_staker(&mut self, staker: Pubkey) -> Result<()> {

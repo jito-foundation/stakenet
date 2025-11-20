@@ -7,7 +7,7 @@ use crate::{
         check_validator_list_has_stake_status_other_than, get_stake_pool_address,
         get_validator_list, get_validator_list_length,
     },
-    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_INSTANT_UNSTAKES,
+    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_INSTANT_UNSTAKES,
     EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE,
 };
 use anchor_lang::prelude::*;
@@ -33,6 +33,13 @@ pub struct EpochMaintenance<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [DirectedStakeMeta::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
 /// Runs maintenance tasks at the start of each epoch, needs to be run multiple times
@@ -44,7 +51,7 @@ pub fn handler(
 ) -> Result<()> {
     let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
-
+    let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let clock = Clock::get()?;
 
     require!(
@@ -87,7 +94,7 @@ pub fn handler(
         if let Some(validator_index_to_remove) = validator_index_to_remove {
             state_account
                 .state
-                .remove_validator(validator_index_to_remove)?;
+                .remove_validator(validator_index_to_remove, &mut directed_stake_meta.directed_stake_lamports)?;
         }
     }
 

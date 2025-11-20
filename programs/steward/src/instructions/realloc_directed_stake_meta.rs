@@ -1,6 +1,6 @@
 use crate::DirectedStakeMeta;
 use crate::{
-    constants::MAX_ALLOC_BYTES, errors::StewardError, state::Config, utils::get_validator_list,
+    constants::{MAX_ALLOC_BYTES, MAX_VALIDATORS}, errors::StewardError, state::Config, utils::get_validator_list,
 };
 use anchor_lang::prelude::*;
 
@@ -63,7 +63,8 @@ pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
             staked_last_updated_epoch: 0,
             _padding0: [0; 32],
         };
-        stake_meta.targets = [default_target; crate::MAX_PERMISSIONED_DIRECTED_VALIDATORS];
+        stake_meta.targets = [default_target; MAX_VALIDATORS];
+        stake_meta.directed_stake_lamports = [0; MAX_VALIDATORS];
         stake_meta.is_initialized = true.into();
     }
     Ok(())
