@@ -11020,6 +11020,7 @@ dependencies = [
  "solana-program",
  "solana-remote-wallet 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-sdk",
+ "solana-system-interface",
  "spl-pod",
  "spl-stake-pool",
  "squads-multisig",
