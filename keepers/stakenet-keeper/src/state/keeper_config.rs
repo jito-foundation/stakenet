@@ -39,9 +39,9 @@ pub struct KeeperConfig {
     pub sqlite_connection: Arc<Mutex<Connection>>,
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
 
-    /// The keypair of directed stake oracle authority keypair
+    /// The directed stake oracle authority keypair
     ///
-    /// This is used to be signer of `copy_directed_stake_target` ix
+    /// This keypair is used to be signer of `copy_directed_stake_target` ix
     pub directed_stake_oracle_authority_keypair: Option<Arc<Keypair>>,
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
