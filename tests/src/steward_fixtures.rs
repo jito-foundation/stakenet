@@ -567,12 +567,17 @@ impl TestFixture {
         let validator_list = config.validator_list;
 
         // Calculate how many reallocations we need
-        let mut num_reallocs = (DirectedStakeMeta::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
-        let mut ixs = vec![];
+        let num_reallocs = (DirectedStakeMeta::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        const INSTRUCTIONS_PER_TX: usize = 10;
 
-        while num_reallocs > 0 {
-            ixs.extend(vec![
-                Instruction {
+        // Submit reallocations in batches to avoid exceeding instruction trace length
+        let mut remaining = num_reallocs;
+        while remaining > 0 {
+            let batch_size = remaining.min(INSTRUCTIONS_PER_TX);
+            let mut ixs = vec![];
+
+            for _ in 0..batch_size {
+                ixs.push(Instruction {
                     program_id: jito_steward::id(),
                     accounts: vec![
                         anchor_lang::solana_program::instruction::AccountMeta::new(
@@ -597,20 +602,26 @@ impl TestFixture {
                         ),
                     ],
                     data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
-                };
-                num_reallocs.min(10)
-            ]);
-            num_reallocs = num_reallocs.saturating_sub(10);
-        }
+                });
+            }
 
-        // Submit all reallocation instructions
-        let tx = Transaction::new_signed_with_payer(
-            &ixs,
-            Some(&self.keypair.pubkey()),
-            &[&self.keypair],
-            self.ctx.borrow().last_blockhash,
-        );
-        self.submit_transaction_assert_success(tx).await;
+            let blockhash = self
+                .ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap();
+
+            let tx = Transaction::new_signed_with_payer(
+                &ixs,
+                Some(&self.keypair.pubkey()),
+                &[&self.keypair],
+                blockhash,
+            );
+            self.submit_transaction_assert_success(tx).await;
+
+            remaining = remaining.saturating_sub(batch_size);
+        }
 
         // Verify that is_initialized has been set after reallocation
         let meta: DirectedStakeMeta = self.load_and_deserialize(&directed_stake_meta).await;
@@ -961,6 +972,81 @@ pub struct ExtraValidatorAccounts {
     pub stake_account_address: Pubkey,
     pub transient_stake_account_address: Pubkey,
     pub withdraw_authority: Pubkey,
+}
+
+/// Helper function to initialize directed stake meta
+pub async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    let set_whitelist_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        }
+        .data(),
+    };
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(directed_stake_meta, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix, ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    directed_stake_meta
 }
 
 pub async fn crank_stake_pool(fixture: &TestFixture) {

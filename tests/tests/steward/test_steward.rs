@@ -25,9 +25,10 @@ use spl_stake_pool::state::StakeStatus;
 use tests::{
     stake_pool_utils::serialized_validator_list_account,
     steward_fixtures::{
-        closed_vote_account, crank_epoch_maintenance, crank_stake_pool, manual_remove_validator,
-        new_vote_account, serialized_stake_account, serialized_validator_history_account,
-        system_account, validator_history_default, TestFixture,
+        closed_vote_account, crank_epoch_maintenance, crank_stake_pool,
+        initialize_directed_stake_meta, manual_remove_validator, new_vote_account,
+        serialized_stake_account, serialized_validator_history_account, system_account,
+        validator_history_default, TestFixture,
     },
 };
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
@@ -140,6 +141,9 @@ async fn test_auto_remove() {
 
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
+
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let vote_account = Pubkey::new_unique();
 
@@ -300,6 +304,9 @@ async fn _setup_auto_remove_validator_test() -> (TestFixture, Pubkey) {
     fixture.advance_num_epochs(1, 10).await;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
+
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
@@ -600,6 +607,9 @@ async fn test_instant_remove_validator() {
     let _ctx = &fixture.ctx;
     fixture.initialize_stake_pool().await;
     fixture.initialize_steward(None, None).await;
+
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let vote_account = Pubkey::new_unique();
 

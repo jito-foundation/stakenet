@@ -6,6 +6,7 @@ use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
+    state::directed_stake::DirectedStakeMeta,
     stake_pool_utils::ValidatorList, StewardStateAccount, StewardStateAccountV2,
     UpdateParametersArgs, EPOCH_MAINTENANCE,
 };
@@ -15,9 +16,9 @@ use spl_stake_pool::state::{StakeStatus, ValidatorList as SPLValidatorList};
 use tests::{
     stake_pool_utils::serialized_validator_list_account,
     steward_fixtures::{
-        auto_add_validator, crank_epoch_maintenance, crank_stake_pool, manual_remove_validator,
-        ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures, TestFixture,
-        ValidatorEntry,
+        auto_add_validator, crank_epoch_maintenance, crank_stake_pool, initialize_directed_stake_meta,
+        manual_remove_validator, ExtraValidatorAccounts, FixtureDefaultAccounts,
+        StateMachineFixtures, TestFixture, ValidatorEntry,
     },
 };
 use validator_history::ValidatorHistory;
@@ -86,6 +87,14 @@ async fn _epoch_maintenance_setup() -> (
         &jito_steward::id(),
     )
     .0;
+    fixture.directed_stake_meta = Pubkey::find_program_address(
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
 
     fixture.advance_num_epochs(20, 10).await;
     fixture.initialize_stake_pool().await;
@@ -117,6 +126,9 @@ async fn _epoch_maintenance_setup() -> (
             None,
         )
         .await;
+
+    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
