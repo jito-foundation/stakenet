@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use commands::{
     actions::{
@@ -142,7 +142,9 @@ async fn main() -> Result<()> {
         }
         Commands::UpdateAuthority(args) => {
             // Use global signer - required for this command
-            let signer_path = global_signer.expect("--signer flag is required for this command");
+            let signer_path = global_signer.ok_or_else(|| {
+                anyhow!("--signer flag is required for the 'update-authority' command")
+            })?;
             // Create the appropriate signer based on the path
             let cli_signer = if signer_path == "ledger" {
                 CliSigner::new_ledger()

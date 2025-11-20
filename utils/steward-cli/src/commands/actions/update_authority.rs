@@ -121,7 +121,7 @@ pub async fn command_update_authority(
         let proposal_pda =
             get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
 
-        if vault_pda.ne(&admin) {
+        if vault_pda != admin {
             return Err(anyhow::anyhow!(
                 "Vault PDA {} does not match configured admin {}",
                 vault_pda,
