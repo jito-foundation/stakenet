@@ -1,6 +1,7 @@
 use anchor_lang::Discriminator;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{
+    constants::MAX_VALIDATORS,
     instructions::AuthorityType,
     stake_pool_utils::ValidatorList,
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
@@ -259,7 +260,7 @@ async fn populate_directed_stake_meta_after_init(
                 target_last_updated_epoch: 0,
                 staked_last_updated_epoch: 0,
                 _padding0: [0; 32],
-            }; 2048];
+            }; MAX_VALIDATORS];
 
             // Set the first target
             targets[0] = DirectedStakeTarget {
@@ -273,6 +274,7 @@ async fn populate_directed_stake_meta_after_init(
 
             targets
         },
+        directed_stake_lamports: [0; MAX_VALIDATORS],
     };
 
     // Serialize with discriminator

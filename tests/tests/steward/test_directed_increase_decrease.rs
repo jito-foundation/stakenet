@@ -46,6 +46,7 @@ fn create_mock_directed_stake_meta(
         directed_unstake_total: 0,
         padding0: [0; 63],
         is_initialized: jito_steward::utils::U8Bool::from(true),
+        directed_stake_lamports: [0; MAX_VALIDATORS],
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),
             total_target_lamports: 0,
@@ -53,7 +54,7 @@ fn create_mock_directed_stake_meta(
             target_last_updated_epoch: 0,
             staked_last_updated_epoch: 0,
             _padding0: [0; 32],
-        }; 2048],
+        }; MAX_VALIDATORS],
     };
 
     for (i, (vote_pubkey, target_lamports, staked_lamports)) in targets.iter().enumerate() {

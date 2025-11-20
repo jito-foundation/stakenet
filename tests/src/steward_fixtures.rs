@@ -93,6 +93,7 @@ pub struct TestFixture {
     pub cluster_history_account: Pubkey,
     pub validator_history_config: Pubkey,
     pub keypair: Keypair,
+    pub directed_stake_meta: Pubkey,
 }
 
 impl TestFixture {
@@ -105,8 +106,17 @@ impl TestFixture {
         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
         program.set_compute_max_units(1_400_000);
 
-        let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+        
+        let stake_pool_meta = StakePoolMetadata::default();
         let steward_state = Pubkey::find_program_address(
             &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
@@ -143,6 +153,7 @@ impl TestFixture {
             validator_history_config,
             cluster_history_account,
             keypair,
+            directed_stake_meta,
         }
     }
 
@@ -174,6 +185,7 @@ impl TestFixture {
         Self {
             ctx,
             stake_pool_meta: accounts_fixture.stake_pool_meta,
+            directed_stake_meta: accounts_fixture.directed_stake_meta,
             steward_config: accounts_fixture.steward_config_keypair,
             steward_state: Pubkey::find_program_address(
                 &[StewardStateAccount::SEED, steward_config_address.as_ref()],
@@ -1076,6 +1088,14 @@ pub async fn crank_rebalance_directed(
 
 pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Option<&[usize]>) {
     let ctx = &fixture.ctx;
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
     // Epoch Maintenence
     if let Some(indices) = remove_indices {
         for i in indices {
@@ -1086,6 +1106,7 @@ pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Opti
                     state_account: fixture.steward_state,
                     validator_list: fixture.stake_pool_meta.validator_list,
                     stake_pool: fixture.stake_pool_meta.stake_pool,
+                    directed_stake_meta,
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::EpochMaintenance {
@@ -1110,6 +1131,7 @@ pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Opti
                 state_account: fixture.steward_state,
                 validator_list: fixture.stake_pool_meta.validator_list,
                 stake_pool: fixture.stake_pool_meta.stake_pool,
+                directed_stake_meta,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::EpochMaintenance {
@@ -1210,6 +1232,14 @@ pub async fn auto_remove_validator(
 }
 
 pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::InstantRemoveValidator {
@@ -1217,6 +1247,7 @@ pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
             state_account: fixture.steward_state,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_pool: fixture.stake_pool_meta.stake_pool,
+            directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InstantRemoveValidator {
@@ -1596,6 +1627,7 @@ impl Default for ValidatorEntry {
 
 pub struct FixtureDefaultAccounts {
     pub stake_pool_meta: StakePoolMetadata,
+    pub directed_stake_meta: Pubkey,
     pub stake_pool: spl_stake_pool::state::StakePool,
     pub validator_list: SPLValidatorList,
     pub steward_config_keypair: Keypair,
@@ -1636,6 +1668,15 @@ impl Default for FixtureDefaultAccounts {
             directed_stake_ticket_override_authority: Pubkey::new_unique(),
             _padding: [0; 888],
         };
+
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                steward_config_keypair.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
             &[
@@ -1704,6 +1745,7 @@ impl Default for FixtureDefaultAccounts {
             cluster_history,
             validators: vec![],
             keypair,
+            directed_stake_meta,
         }
     }
 }
@@ -2344,6 +2386,16 @@ pub async fn crank_copy_directed_stake_targets(
     )
     .0;
 
+    // Find the validator_list_index for this vote_pubkey
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    let validator_list_index = validator_list
+        .validators
+        .iter()
+        .position(|v| v.vote_account_address == vote_pubkey)
+        .expect("Vote account not found in validator list");
+
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::CopyDirectedStakeTargets {
@@ -2351,11 +2403,13 @@ pub async fn crank_copy_directed_stake_targets(
             directed_stake_meta,
             authority: fixture.keypair.pubkey(),
             clock: solana_sdk::sysvar::clock::id(),
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::CopyDirectedStakeTargets {
             vote_pubkey,
             total_target_lamports: target_lamports,
+            validator_list_index: validator_list_index as u32,
         }
         .data(),
     };

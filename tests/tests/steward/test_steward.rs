@@ -220,6 +220,7 @@ async fn test_auto_remove() {
             state_account: fixture.steward_state,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_pool: fixture.stake_pool_meta.stake_pool,
+            directed_stake_meta: fixture.directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InstantRemoveValidator {
@@ -574,6 +575,7 @@ fn _instant_remove_validator_tx(
         &[Instruction {
             program_id: jito_steward::id(),
             accounts: jito_steward::accounts::InstantRemoveValidator {
+                directed_stake_meta: fixture.directed_stake_meta,
                 config: fixture.steward_config.pubkey(),
                 state_account: fixture.steward_state,
                 validator_list: fixture.stake_pool_meta.validator_list,

@@ -18,6 +18,7 @@ use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::ValidatorHistoryEntry;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 
 #[test]
 fn test_compute_scores() {
@@ -523,6 +524,7 @@ fn test_rebalance() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -559,6 +561,8 @@ fn test_rebalance() {
     // Validator index 2: 1000 SOL, 0 score, 0 delegation -> Decrease stake, from "regular unstake" category
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -598,6 +602,7 @@ fn test_rebalance() {
 
     // Test that rebalance will be skipped if validator has already been run
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -635,6 +640,7 @@ fn test_rebalance() {
 
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -688,6 +694,7 @@ fn test_rebalance() {
 
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -721,6 +728,7 @@ fn test_rebalance() {
     state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -740,6 +748,7 @@ fn test_rebalance() {
     // Invalid State
     state.state_tag = StewardStateEnum::Idle;
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -783,6 +792,7 @@ fn test_rebalance_default_lamports() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -821,6 +831,7 @@ fn test_rebalance_default_lamports() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -870,7 +881,7 @@ fn test_remove_validator() {
 
     // test basic case - remove validator_to_remove
     state.validators_to_remove.set(1, true).unwrap();
-    let res = state.remove_validator(1);
+    let res = state.remove_validator(1, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -882,7 +893,7 @@ fn test_remove_validator() {
     let mut state = _test_remove_validator_setup(&fixtures);
 
     state.validators_for_immediate_removal.set(1, true).unwrap();
-    let res = state.remove_validator(1);
+    let res = state.remove_validator(1, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -899,7 +910,7 @@ fn test_remove_validator() {
     state.validators_for_immediate_removal.set(4, true).unwrap();
     state.validators_added = 2;
     // both validators were removed from pool and now the validator list is down to 3
-    let res = state.remove_validator(3);
+    let res = state.remove_validator(3, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
 
     assert_eq!(state.num_pool_validators, 3);
@@ -914,7 +925,7 @@ fn test_remove_validator_fails() {
 
     // Test fails if validator not marked to remove
     state.validators_for_immediate_removal.reset();
-    let res = state.remove_validator(0);
+    let res = state.remove_validator(0, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorNotMarkedForRemoval)));
 
@@ -923,7 +934,7 @@ fn test_remove_validator_fails() {
         .validators_for_immediate_removal
         .set(state.num_pool_validators as usize, true)
         .unwrap();
-    let res = state.remove_validator(state.num_pool_validators as usize);
+    let res = state.remove_validator(state.num_pool_validators as usize, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
 }
@@ -946,7 +957,7 @@ fn test_remove_validator_at_max_validators() {
     state.scores[index] = 998;
     state.scores[index + 1] = 999;
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
 
     // Verify shifting occurred - value at index should now be what was at index+1
@@ -981,7 +992,7 @@ fn test_remove_validator_at_sum_equals_max() {
     state.scores[index] = 100;
     state.scores[index + 1] = 101;
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 11) as u64);
     assert_eq!(state.validators_added, 10); // unchanged
@@ -1001,7 +1012,7 @@ fn test_remove_validator_at_sum_equals_max() {
         .set(index, true)
         .unwrap();
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 10) as u64); // unchanged
     assert_eq!(state.validators_added, 9); // decremented
@@ -1035,6 +1046,7 @@ fn test_rebalance_max_lamports() {
     state.instant_unstake.set(1, true).unwrap();
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -1183,13 +1195,12 @@ fn test_directed_stake_get_allocations() {
 fn test_directed_stake_whitelist_operations() {
     use jito_steward::{
         DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
@@ -1243,13 +1254,12 @@ fn test_directed_stake_whitelist_operations() {
 fn test_directed_stake_whitelist_remove_operations() {
     use jito_steward::{
         DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
@@ -1309,7 +1319,7 @@ fn test_directed_stake_whitelist_remove_operations() {
     let mut empty_whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
@@ -1350,13 +1360,12 @@ fn test_directed_stake_whitelist_remove_operations() {
 fn test_directed_stake_whitelist_remove_array_shifting() {
     use jito_steward::{
         DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
@@ -1437,13 +1446,12 @@ fn test_directed_stake_whitelist_remove_array_shifting() {
 fn test_directed_stake_whitelist_capacity_limits() {
     use jito_steward::{
         DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
@@ -1468,7 +1476,7 @@ fn test_directed_stake_whitelist_capacity_limits() {
     assert!(result.is_err());
 
     // Test case 3: Fill validator list to capacity
-    for i in 0..MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+    for i in 0..MAX_VALIDATORS {
         let validator = Pubkey::new_unique();
         let result = whitelist.add_validator(validator);
         assert!(result.is_ok());

@@ -34,6 +34,7 @@ async fn _epoch_maintenance_tx(
             state_account: fixture.steward_state,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_pool: fixture.stake_pool_meta.stake_pool,
+            directed_stake_meta: fixture.directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::EpochMaintenance {

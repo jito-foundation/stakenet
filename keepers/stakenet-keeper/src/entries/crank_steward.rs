@@ -301,6 +301,9 @@ async fn _handle_instant_removal_validators(
 
         info!("Validator Index to Remove: {:?}", validator_index_to_remove);
 
+        let directed_stake_meta =
+            get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
+
         let ix = Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::InstantRemoveValidator {
@@ -308,6 +311,7 @@ async fn _handle_instant_removal_validators(
                 state_account: all_steward_accounts.state_address,
                 validator_list: all_steward_accounts.validator_list_address,
                 stake_pool: all_steward_accounts.stake_pool_address,
+                directed_stake_meta,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::InstantRemoveValidator {
@@ -639,6 +643,9 @@ async fn _handle_epoch_maintenance(
 
         info!("Validator Index to Remove: {:?}", validator_index_to_remove);
 
+        let directed_stake_meta =
+            get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
+
         let ix = Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::EpochMaintenance {
@@ -646,6 +653,7 @@ async fn _handle_epoch_maintenance(
                 state_account: all_steward_accounts.state_address,
                 validator_list: all_steward_accounts.validator_list_address,
                 stake_pool: all_steward_accounts.stake_pool_address,
+                directed_stake_meta,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::EpochMaintenance {

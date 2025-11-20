@@ -11,7 +11,7 @@ use solana_sdk::{
 
 use crate::commands::command_args::CrankEpochMaintenance;
 use stakenet_sdk::utils::{
-    accounts::get_all_steward_accounts,
+    accounts::{get_all_steward_accounts, get_directed_stake_meta_address},
     transactions::{configure_instruction, print_base58_tx},
 };
 
@@ -39,6 +39,9 @@ pub async fn command_crank_epoch_maintenance(
         return Ok(());
     }
 
+    let directed_stake_meta =
+        get_directed_stake_meta_address(&steward_config, &program_id);
+
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::EpochMaintenance {
@@ -46,6 +49,7 @@ pub async fn command_crank_epoch_maintenance(
             state_account: all_steward_accounts.state_address,
             validator_list: all_steward_accounts.validator_list_address,
             stake_pool: all_steward_accounts.stake_pool_address,
+            directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::EpochMaintenance {

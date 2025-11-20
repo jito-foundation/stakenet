@@ -308,8 +308,8 @@ pub fn aggregate_validator_targets(
 #[cfg(test)]
 mod tests {
     use jito_steward::{
+        constants::MAX_VALIDATORS,
         utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
     };
 
     use super::*;
@@ -370,7 +370,7 @@ mod tests {
             directed_unstake_total: 0,
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),
-            targets: [target; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+            targets: [target; MAX_VALIDATORS],
         }
     }
 
@@ -384,11 +384,11 @@ mod tests {
             _padding0: [0; 32],
         };
 
-        let mut targets = [empty_target; MAX_PERMISSIONED_DIRECTED_VALIDATORS];
+        let mut targets = [empty_target; MAX_VALIDATORS];
 
         // Populate the first N slots with the provided validators
         for (i, validator) in validators.iter().enumerate() {
-            if i < MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+            if i < MAX_VALIDATORS {
                 targets[i] = DirectedStakeTarget {
                     vote_pubkey: *validator,
                     total_target_lamports: 1_000_000_000, // Some non-zero amount to simulate existing allocation

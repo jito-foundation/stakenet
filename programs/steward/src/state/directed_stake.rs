@@ -35,6 +35,22 @@ pub struct DirectedStakeMeta {
     pub directed_stake_lamports: [u64; MAX_VALIDATORS],
 }
 
+impl Default for DirectedStakeMeta {
+    fn default() -> Self {
+        Self {
+            total_stake_targets: 0,
+            epoch_increase_total_lamports: 0,
+            epoch_decrease_total_lamports: 0,
+            epoch_last_updated: 0,
+            directed_unstake_total: 0,
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            targets: [DirectedStakeTarget::default(); MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+        }
+    }
+}
+
 #[allow(dead_code)]
 impl DirectedStakeMeta {
     pub const SIZE: usize = 8 + size_of::<Self>();
@@ -118,6 +134,19 @@ pub struct DirectedStakeTarget {
     pub staked_last_updated_epoch: u64,
     // Alignment compliant reserve space for future use
     pub _padding0: [u8; 32],
+}
+
+impl Default for DirectedStakeTarget {
+    fn default() -> Self {
+        Self {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: 0,
+            total_staked_lamports: 0,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 32],
+        }
+    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]

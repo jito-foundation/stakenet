@@ -454,9 +454,11 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         )
         .await;
 
-    let _steward: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
+    let _steward: Box<StewardStateAccountV2> =
+        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
+    {
     let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    }
     fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
@@ -532,9 +534,9 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         &[0, 1, 2],
     )
     .await;
-
-    let directed_stake_meta: DirectedStakeMeta =
-        fixture.load_and_deserialize(&_directed_stake_meta).await;
+    {
+    let directed_stake_meta: Box<DirectedStakeMeta> =
+        Box::new(fixture.load_and_deserialize(&fixture.directed_stake_meta).await);
 
     for target in directed_stake_meta.targets.iter() {
         if target.vote_pubkey == Pubkey::default() {
@@ -546,7 +548,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         );
         assert_eq!(target.total_staked_lamports, 10_000_000_000);
     }
-
+    } 
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
 
@@ -604,7 +606,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
 
     {
         let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+            fixture.load_and_deserialize(&fixture.directed_stake_meta).await;
 
         assert!(directed_stake_meta.directed_unstake_total > 9_000_000_000);
     }
@@ -619,7 +621,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
 
     {
         let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+            fixture.load_and_deserialize(&fixture.directed_stake_meta).await;
 
         assert!(directed_stake_meta.directed_unstake_total > 19_000_000_000);
     }
@@ -635,11 +637,11 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     {
         crank_idle(&fixture).await;
 
-        let state_account: StewardStateAccountV2 =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
+        let state_account: Box<StewardStateAccountV2> =
+            Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
 
-        let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+        let directed_stake_meta: Box<DirectedStakeMeta> =
+            Box::new(fixture.load_and_deserialize(&fixture.directed_stake_meta).await);
 
         // Total is reset when rebalancing is flagged as complete
         assert!(state_account.state.has_flag(REBALANCE_DIRECTED_COMPLETE));
@@ -1288,6 +1290,7 @@ async fn test_cycle_with_directed_stake_noop_copy() {
     )
     .await;
 
+    {
     let directed_stake_meta: DirectedStakeMeta =
         fixture.load_and_deserialize(&_directed_stake_meta).await;
     for target in directed_stake_meta.targets.iter() {
@@ -1297,6 +1300,7 @@ async fn test_cycle_with_directed_stake_noop_copy() {
         // Staked lamports remain the same, but last updated epoch changes
         assert_eq!(target.total_staked_lamports, 10_000_000_000);
         assert_eq!(target.staked_last_updated_epoch, 21);
+    }
     }
 
     // State machine can progress despite no directed stake target changes
@@ -1486,7 +1490,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
         &[0, 1, 2],
     )
     .await;
-
+    {
     let directed_stake_meta: DirectedStakeMeta =
         fixture.load_and_deserialize(&_directed_stake_meta).await;
     for target in directed_stake_meta.targets.iter() {
@@ -1505,7 +1509,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
         .sum();
 
     assert_eq!(total_staked_lamports, 40_000_000_000);
-
+    }
     // State machine can progress despite no directed stake target changes
     crank_idle(&fixture).await;
 
@@ -1900,9 +1904,10 @@ async fn test_cycle_with_directed_stake_targets() {
         )
         .await;
 
-    let _steward: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-    let _directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    let _steward: Box<StewardStateAccountV2> =
+        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
+    
+    let _directed_stake_meta: Pubkey = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
     let mut extra_validator_accounts = vec![];
@@ -1981,7 +1986,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     {
         let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+            fixture.load_and_deserialize(&fixture.directed_stake_meta).await;
         // Each target should have staked_last_updated_epoch set to 20
         for target in directed_stake_meta.targets.iter() {
             if target.vote_pubkey == Pubkey::default() {
@@ -2081,7 +2086,7 @@ async fn test_cycle_with_directed_stake_targets() {
     println!("Rebalance directed 2");
     {
         let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+            fixture.load_and_deserialize(&fixture.directed_stake_meta).await;
 
         // Each target should have staked_last_updated_epoch set to 21
         for target in directed_stake_meta.targets.iter() {
@@ -2168,7 +2173,7 @@ async fn test_cycle_with_directed_stake_targets() {
 
     {
         let directed_stake_meta: DirectedStakeMeta =
-            fixture.load_and_deserialize(&_directed_stake_meta).await;
+            fixture.load_and_deserialize(&fixture.directed_stake_meta).await;
 
         // Each target should have staked_last_updated_epoch set to 22
         for target in directed_stake_meta.targets.iter() {
@@ -2199,24 +2204,10 @@ async fn test_cycle_with_directed_stake_targets() {
         }
     }
 
-    /*fixture.advance_num_slots(250_000).await;
-    crank_idle(&fixture).await;
-
-    // Update validator history values
-    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
-    // In new cycle
-    crank_compute_score(
-        &fixture,
-        &unit_test_fixtures,
-        &extra_validator_accounts,
-        &[0, 1, 2],
-    )
-    .await;*/
-
     let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-    let state_account: StewardStateAccountV2 =
-        fixture.load_and_deserialize(&fixture.steward_state).await;
-    let state = state_account.state;
+    let state_account: Box<StewardStateAccountV2> =
+        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
+    let state = Box::new(state_account.state);
 
     assert!(matches!(
         state.state_tag,
