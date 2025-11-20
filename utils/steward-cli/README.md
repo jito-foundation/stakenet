@@ -296,7 +296,7 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
 
 **Direct execution:**
 
-`blacklist` | `admin` | `parameters`
+`blacklist` | `admin` | `parameters` | `priority-fee-parameters` | `directed-stake-meta-upload` | `directed-stake-whitelist`
 
 ```bash
 cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 update-authority blacklist \
@@ -307,7 +307,7 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
 
 **Creating a Squads multisig proposal with Ledger:**
 
-`blacklist` | `admin` | `parameters`
+`blacklist` | `admin` | `parameters` | `priority-fee-parameters` | `directed-stake-meta-upload` | `directed-stake-whitelist`
 
 ```bash
 ./target/release/steward-cli \
@@ -321,17 +321,6 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
   --steward-config 5pZmpk3ktweGZW9xFknpEHhQoWeAKTzSGwnCUyVdiye \
   --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8 \
 ```
-
-Note: `--squads-multisig` defaults to the authority multisig and `--squads-vault-index` defaults to the main vault, so they can be omitted:
-
-```bash
-cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 add-to-blacklist \
-  --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
-  --signer ledger \
-  --validator-history-indices-to-blacklist 2168 \
-  --squads-proposal
-```
-
 
 ### Set Staker
 

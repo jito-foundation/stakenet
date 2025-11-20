@@ -92,7 +92,7 @@ pub async fn command_update_authority(
         accounts: jito_steward::accounts::SetNewAuthority {
             config: steward_config,
             new_authority,
-            admin: admin,
+            admin,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::SetNewAuthority { authority_type }.data(),
@@ -124,10 +124,9 @@ pub async fn command_update_authority(
         let proposal_pda =
             get_proposal_pda(&multisig, transaction_index, Some(&squads_program_id)).0;
 
-        // Assert vault PDA is blacklist authority
         if vault_pda.ne(&admin) {
             return Err(anyhow::anyhow!(
-                "Vault PDA {} does not match configured blacklist authority {}",
+                "Vault PDA {} does not match configured admin {}",
                 vault_pda,
                 admin
             ));
