@@ -64,12 +64,16 @@ impl DirectedStakeMeta {
 
     /// Add to the total staked lamports for a particular validator
     pub fn add_to_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
-        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index].total_staked_lamports.saturating_add(lamports);
+        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
+            .total_staked_lamports
+            .saturating_add(lamports);
     }
 
     /// Subtract from the total staked lamports for a particular validator
     pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
-        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index].total_staked_lamports.saturating_sub(lamports);
+        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
+            .total_staked_lamports
+            .saturating_sub(lamports);
     }
 
     pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey_index: usize, epoch: u64) {
