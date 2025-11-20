@@ -1122,9 +1122,12 @@ pub async fn crank_rebalance_directed(
         let directed_stake_meta: DirectedStakeMeta = fixture
             .load_and_deserialize(&directed_stake_meta_pubkey)
             .await;
-        let directed_stake_meta_index = directed_stake_meta
-            .get_target_index(&vote_account_at_index)
-            .expect("Vote account not found in directed_stake_meta");
+        
+        // Skip if the vote account is not in directed_stake_meta (e.g., was removed by copy_directed_stake_targets with 0 lamports)
+        // This ensures we only process validators that exist in both the validator_list and the directed_stake_meta
+        let Some(directed_stake_meta_index) = directed_stake_meta.get_target_index(&vote_account_at_index) else {
+            continue;
+        };
 
         let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
         let ix = Instruction {
