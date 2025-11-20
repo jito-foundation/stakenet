@@ -2257,6 +2257,19 @@
       ]
     },
     {
+      "name": "DirectedRebalanceEvent",
+      "discriminator": [
+        187,
+        63,
+        59,
+        72,
+        191,
+        64,
+        113,
+        29
+      ]
+    },
+    {
       "name": "EpochMaintenanceEvent",
       "discriminator": [
         255,
@@ -3086,6 +3099,38 @@
           {
             "name": "denominator",
             "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DirectedRebalanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "rebalance_type_tag",
+            "type": {
+              "defined": {
+                "name": "RebalanceTypeTag"
+              }
+            }
+          },
+          {
+            "name": "increase_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "decrease_lamports",
+            "type": "u64"
           }
         ]
       }
