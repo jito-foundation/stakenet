@@ -109,6 +109,11 @@ pub fn handler(
                 .is_empty();
 
         if okay_to_update {
+            // When upgrading the StewardState with additional padding we should move this total
+            // to the StewardStateAccount and clear it in the reset for new cycle function instead
+            if state_account.state.current_epoch == state_account.state.next_cycle_epoch {
+                directed_stake_meta.directed_unstake_total = 0;
+            }
             state_account.state.current_epoch = clock.epoch;
 
             // We keep Compute Scores and Compute Delegations to be unset on next epoch cycle
@@ -123,7 +128,6 @@ pub fn handler(
             state_account.state.progress = BitMask::default();
             state_account.state.instant_unstake = BitMask::default();
             state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
-            directed_stake_meta.directed_unstake_total = 0;
         }
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),

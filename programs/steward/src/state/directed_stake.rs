@@ -24,9 +24,6 @@ pub enum DirectedStakeRecordType {
 pub struct DirectedStakeMeta {
     // u64 for alignment, max permissioned validators is much smaller
     pub total_stake_targets: u64,
-    pub epoch_increase_total_lamports: u64,
-    pub epoch_decrease_total_lamports: u64,
-    pub epoch_last_updated: u64,
     pub directed_unstake_total: u64,
     pub padding0: [u8; 63],
     pub is_initialized: U8Bool,
@@ -39,9 +36,6 @@ impl Default for DirectedStakeMeta {
     fn default() -> Self {
         Self {
             total_stake_targets: 0,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 0,
             directed_unstake_total: 0,
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),

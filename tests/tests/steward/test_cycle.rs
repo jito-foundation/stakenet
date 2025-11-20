@@ -428,9 +428,9 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     fixture
         .initialize_steward(
             Some(UpdateParametersArgs {
-                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
-                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
-                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                mev_commission_range: Some(10),
+                epoch_credits_range: Some(20),
+                commission_range: Some(20),
                 scoring_delinquency_threshold_ratio: Some(0.85),
                 instant_unstake_delinquency_threshold_ratio: Some(0.70),
                 mev_commission_bps_threshold: Some(1000),
@@ -443,9 +443,9 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
                 instant_unstake_epoch_progress: Some(0.9),
                 compute_score_slot_range: Some(1000),
                 instant_unstake_inputs_epoch_progress: Some(0.50),
-                num_epochs_between_scoring: Some(2), // 2 epoch cycle
+                num_epochs_between_scoring: Some(1), // 1 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
-                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
@@ -697,9 +697,9 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
     fixture
         .initialize_steward(
             Some(UpdateParametersArgs {
-                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
-                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
-                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                mev_commission_range: Some(10),
+                epoch_credits_range: Some(20),
+                commission_range: Some(20),
                 scoring_delinquency_threshold_ratio: Some(0.85),
                 instant_unstake_delinquency_threshold_ratio: Some(0.70),
                 mev_commission_bps_threshold: Some(1000),
@@ -714,7 +714,7 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
                 instant_unstake_inputs_epoch_progress: Some(0.50),
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
-                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
@@ -1283,8 +1283,6 @@ async fn test_cycle_with_directed_stake_noop_copy() {
             "Target last updated epoch: {:?}",
             target.target_last_updated_epoch
         );
-        //assert_eq!(target.staked_last_updated_epoch, 20);
-        //assert_eq!(target.target_last_updated_epoch, 20);
         // undirected floor
     }
 

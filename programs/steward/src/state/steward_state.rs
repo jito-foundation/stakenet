@@ -327,14 +327,14 @@ impl IdlBuild for StewardStateEnum {
 
 // BITS 0-7 COMPLETED PROGRESS FLAGS
 // Used to mark the completion of a particular state
-pub const COMPUTE_SCORE: u32 = 1 << 7;
+pub const COMPUTE_SCORE: u32 = 1 << 0;
 pub const COMPUTE_DELEGATIONS: u32 = 1 << 1;
 pub const EPOCH_MAINTENANCE: u32 = 1 << 2;
 pub const PRE_LOOP_IDLE: u32 = 1 << 3;
 pub const COMPUTE_INSTANT_UNSTAKES: u32 = 1 << 4;
 pub const REBALANCE: u32 = 1 << 5;
 pub const POST_LOOP_IDLE: u32 = 1 << 6;
-pub const REBALANCE_DIRECTED_COMPLETE: u32 = 1 << 0;
+pub const REBALANCE_DIRECTED_COMPLETE: u32 = 1 << 7;
 // BITS 8-15 RESERVED FOR FUTURE USE
 // BITS 16-23 OPERATIONAL FLAGS
 /// In epoch maintenance, when a new epoch is detected, we need a flag to tell the
@@ -512,7 +512,6 @@ impl StewardStateV2 {
         self.start_computing_scores_slot = current_slot;
         self.scoring_unstake_total = 0;
         self.instant_unstake_total = 0;
-        self.stake_deposit_unstake_total = 0;
         self.delegations = [Delegation::default(); MAX_VALIDATORS];
         self.instant_unstake = BitMask::default();
 

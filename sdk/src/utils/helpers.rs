@@ -363,9 +363,6 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: 0,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 0,
             directed_unstake_total: 0,
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),
@@ -402,9 +399,6 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: validators.len() as u64,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 100,
             directed_unstake_total: 0,
             padding0: [0; 63],
             is_initialized: U8Bool::from(true),
