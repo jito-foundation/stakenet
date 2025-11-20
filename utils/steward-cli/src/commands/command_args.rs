@@ -439,7 +439,7 @@ pub struct UpdateAuthority {
 
     /// Squads multisig account address.
     /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
-    /// multisig address and will act as the signing authority for the blacklist operation.
+    /// multisig address and will act as the signing authority for the operation.
     #[arg(
         long,
         env,

@@ -109,10 +109,7 @@ pub async fn command_update_authority(
 
         // Fetch the multisig account to get the transaction index
         println!("  Fetching multisig account...");
-        let multisig_account = get_multisig(client, &multisig).await.map_err(|e| {
-            eprintln!("❌ Failed to fetch multisig account: {}", e);
-            e
-        })?;
+        let multisig_account = get_multisig(client, &multisig).await?;
         let transaction_index = multisig_account.transaction_index + 1;
         println!("  Next transaction index: {}", transaction_index);
 
@@ -151,7 +148,7 @@ pub async fn command_update_authority(
             args.squads_vault_index,
             0, // num_ephemeral_signers
             &message,
-            Some("Update new authority".to_string()),
+            Some("Set new authority".to_string()),
             Some(squads_program_id),
         );
 
@@ -198,10 +195,7 @@ pub async fn command_update_authority(
             println!("Signature: {}", signature);
         }
     } else {
-        let blockhash = client
-            .get_latest_blockhash()
-            .await
-            .expect("Failed to get recent blockhash");
+        let blockhash = client.get_latest_blockhash().await?;
 
         let configured_ix = configure_instruction(
             &[ix],

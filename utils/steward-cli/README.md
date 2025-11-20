@@ -478,6 +478,7 @@ Sets the authority that can upload and update directed stake metadata.
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     update-authority \
+    --signer ~/.config/solana/id.json \
     directed-stake-meta-upload \
     --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
     --new-authority BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
@@ -493,6 +494,7 @@ Sets the authority that can add/remove entries from the directed stake whitelist
     --json-rpc-url http://127.0.0.1:8899 \
     --program-id 3YeBnUPN2ZW8MBVb8695Hdffu8jBpRjm6BUazRexHDTg \
     update-authority \
+    --signer ~/.config/solana/id.json \
     directed-stake-whitelist  \
     --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP \
     --new-authority BBBATax9kikSHQp8UTcyQL3tfU3BmQD9yid5qhC7QEAA \
