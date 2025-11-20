@@ -299,7 +299,11 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 up
 `blacklist` | `admin` | `parameters` | `priority-fee-parameters` | `directed-stake-meta-upload` | `directed-stake-whitelist`
 
 ```bash
-cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 update-authority blacklist \
+./target/release/steward-cli \
+  --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+  update-authority \
+  --signer  ../../credentials/stakenet_test.json \
+  blacklist \
   --authority-keypair-path ../../credentials/stakenet_test.json \
   --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
   --new-authority aaaDerwdMyzNkoX1aSoTi3UtFe2W45vh5wCgQNhsjF8
