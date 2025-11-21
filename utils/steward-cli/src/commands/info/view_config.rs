@@ -46,6 +46,14 @@ fn _print_default_config(
         "Parameter Auth:   {}\n",
         config_account.parameters_authority
     );
+    formatted_string += &format!(
+        "Directed Stake Whitelist Auth:   {}\n",
+        config_account.directed_stake_whitelist_authority
+    );
+    formatted_string += &format!(
+        "Directed Stake Meta Upload Auth:   {}\n",
+        config_account.directed_stake_meta_upload_authority
+    );
     formatted_string += &format!("Staker:      {}\n", staker);
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
