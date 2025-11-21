@@ -1,9 +1,13 @@
 use anchor_lang::prelude::*;
 
-use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
+use crate::state::directed_stake::{
+    DirectedStakeMeta, DirectedStakeTarget, DirectedStakeWhitelist,
+};
+use crate::utils::get_validator_list;
+use crate::utils::vote_pubkey_at_validator_list_index;
 use crate::{errors::StewardError, Config};
+use spl_stake_pool::state::ValidatorListHeader;
 use std::mem::size_of;
-
 #[derive(Accounts)]
 pub struct CopyDirectedStakeTargets<'info> {
     #[account()]
@@ -17,6 +21,19 @@ pub struct CopyDirectedStakeTargets<'info> {
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 
     pub clock: Sysvar<'info, Clock>,
+
+    /// CHECK: Used to get validator_list_index of target
+    #[account(
+        mut,
+        address = get_validator_list(&config)?,
+    )]
+    pub validator_list: AccountInfo<'info>,
+
+    #[account(
+        seeds = [DirectedStakeWhitelist::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub whitelist_account: AccountLoader<'info, DirectedStakeWhitelist>,
 
     #[account(
         mut,
@@ -33,24 +50,54 @@ pub fn handler(
     ctx: Context<CopyDirectedStakeTargets>,
     vote_pubkey: Pubkey,
     target_lamports: u64,
+    validator_list_index: usize,
 ) -> Result<()> {
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
-    let config = ctx.accounts.config.load()?;
 
-    if vote_pubkey == Pubkey::default() {
+    let mut validator_list_data = ctx.accounts.validator_list.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+    let validator_list_vote_pubkey =
+        vote_pubkey_at_validator_list_index(&validator_list, validator_list_index)?;
+
+    if validator_list_vote_pubkey != vote_pubkey {
+        msg!("Validator list vote pubkey does not match vote pubkey");
         return Err(error!(StewardError::Unauthorized));
     }
 
-    if ctx.accounts.authority.key() != config.directed_stake_meta_upload_authority {
-        return Err(error!(StewardError::Unauthorized));
-    }
+    let whitelist = ctx.accounts.whitelist_account.load()?;
+    require!(
+        whitelist.is_validator_permissioned(&vote_pubkey),
+        StewardError::ValidatorNotInWhitelist
+    );
 
     let clock = Clock::get()?;
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {
-            msg!("Updating target index: {}", target_index);
-            stake_meta.targets[target_index].total_target_lamports = target_lamports;
-            stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
+            if target_lamports > 0 {
+                msg!("Updating target index: {}", target_index);
+                stake_meta.targets[target_index].total_target_lamports = target_lamports;
+                stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
+            } else {
+                msg!("Removing target index: {}", target_index);
+                let total_targets = stake_meta.total_stake_targets as usize;
+                for i in target_index..total_targets - 1 {
+                    stake_meta.targets[i] = stake_meta.targets[i + 1];
+                }
+                stake_meta.targets[total_targets - 1] = DirectedStakeTarget {
+                    vote_pubkey: Pubkey::default(),
+                    total_target_lamports: 0,
+                    total_staked_lamports: 0,
+                    target_last_updated_epoch: 0,
+                    staked_last_updated_epoch: 0,
+                    _padding0: [0; 32],
+                };
+                // Directed stake lamports will be cleaned up in remove_validator
+                stake_meta.total_stake_targets -= 1;
+            }
         }
         None => {
             let new_target = DirectedStakeTarget {
@@ -64,6 +111,7 @@ pub fn handler(
             let target_index = stake_meta.total_stake_targets as usize;
             stake_meta.targets[target_index] = new_target;
             stake_meta.total_stake_targets += 1;
+            stake_meta.directed_stake_lamports[validator_list_index] = target_lamports;
         }
     }
     Ok(())

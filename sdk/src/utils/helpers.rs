@@ -315,8 +315,7 @@ pub fn aggregate_validator_targets(
 #[cfg(test)]
 mod tests {
     use jito_steward::{
-        utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+        constants::MAX_VALIDATORS, utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
     };
 
     use super::*;
@@ -371,12 +370,11 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: 0,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 0,
             directed_unstake_total: 0,
-            padding0: [0; 64],
-            targets: [target; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            targets: [target; MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
         }
     }
 
@@ -390,11 +388,11 @@ mod tests {
             _padding0: [0; 32],
         };
 
-        let mut targets = [empty_target; MAX_PERMISSIONED_DIRECTED_VALIDATORS];
+        let mut targets = [empty_target; MAX_VALIDATORS];
 
         // Populate the first N slots with the provided validators
         for (i, validator) in validators.iter().enumerate() {
-            if i < MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+            if i < MAX_VALIDATORS {
                 targets[i] = DirectedStakeTarget {
                     vote_pubkey: *validator,
                     total_target_lamports: 1_000_000_000, // Some non-zero amount to simulate existing allocation
@@ -408,12 +406,11 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: validators.len() as u64,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 100,
             directed_unstake_total: 0,
-            padding0: [0; 64],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
             targets,
+            directed_stake_lamports: [0; MAX_VALIDATORS],
         }
     }
 

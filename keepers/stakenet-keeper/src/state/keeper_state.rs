@@ -16,7 +16,7 @@ use stakenet_sdk::{
         aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
         errors::JitoTransactionError,
     },
-    utils::accounts::{get_directed_stake_meta, get_validator_history_address},
+    utils::accounts::get_validator_history_address,
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -323,9 +323,9 @@ impl KeeperState {
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
-        program_id: &Pubkey,
+        _program_id: &Pubkey,
     ) -> Result<bool, JitoTransactionError> {
-        if let Some(ref steward_state) = self.all_steward_accounts {
+        if let Some(ref _steward_state) = self.all_steward_accounts {
             let current_slot = client.get_slot().await?;
             let slots_in_epoch = self.epoch_schedule.slots_per_epoch;
             let slot_index = current_slot
@@ -338,11 +338,7 @@ impl KeeperState {
                 ))?;
             let epoch_progress = slot_index as f64 / slots_in_epoch as f64;
 
-            let meta =
-                get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
-
-            let should_run_copy_directed_targets =
-                epoch_progress > 0.5 && meta.epoch_last_updated.ne(&self.epoch_info.epoch);
+            let should_run_copy_directed_targets = epoch_progress > 0.5;
 
             return Ok(should_run_copy_directed_targets);
         }

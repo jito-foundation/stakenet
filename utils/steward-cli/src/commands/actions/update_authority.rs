@@ -77,6 +77,11 @@ pub async fn command_update_authority(
             new_authority,
             jito_steward::instructions::set_new_authority::AuthorityType::SetDirectedStakeWhitelistAuthority,
         ),
+        AuthoritySubcommand::DirectedStakeTicketOverrideAuthority { permissioned_parameters, new_authority } => (
+            permissioned_parameters,
+            new_authority,
+            jito_steward::instructions::set_new_authority::AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        )
     };
 
     let config_account = client

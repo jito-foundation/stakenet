@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    errors::StewardError, state::directed_stake::DirectedStakeRecordType, Config,
-    DirectedStakeWhitelist,
+    errors::StewardError,
+    stake_pool_utils::deserialize_stake_pool,
+    state::directed_stake::DirectedStakeRecordType,
+    utils::{get_stake_pool_address, validator_exists_in_list},
+    Config, DirectedStakeWhitelist,
 };
 use std::mem::size_of;
 
@@ -23,6 +26,17 @@ pub struct AddToDirectedStakeWhitelist<'info> {
         address = config.load()?.directed_stake_whitelist_authority @ StewardError::Unauthorized
     )]
     pub authority: Signer<'info>,
+
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(address = get_stake_pool_address(&config)?)]
+    pub stake_pool: AccountInfo<'info>,
+
+    /// CHECK: passing through, checks are done by spl-stake-pool
+    #[account(
+        mut,
+        address = deserialize_stake_pool(&stake_pool)?.validator_list
+    )]
+    pub validator_list: AccountInfo<'info>,
 }
 
 impl AddToDirectedStakeWhitelist<'_> {
@@ -38,6 +52,9 @@ pub fn handler(
 
     match record_type {
         DirectedStakeRecordType::Validator => {
+            // Ensure the validator exists in the validator list
+            let exists = validator_exists_in_list(&ctx.accounts.validator_list, &record)?;
+            require!(exists, StewardError::ValidatorNotInList);
             whitelist.add_validator(record)?;
         }
         DirectedStakeRecordType::User => {

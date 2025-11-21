@@ -202,19 +202,12 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             return Err(StewardError::InvalidStakeState.into());
         }
 
+        let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
+
         // Do not count directed stake against the pool stake delegation
         let stake_account_active_lamports = match stake_state {
             StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
-                // CU expensive but permission-less method to access directed stake for a particular validator
-                // Validator list is dynamic and we cannot ensure stake meta indexes will match
-                let maybe_directed_stake_index = directed_stake_meta
-                    .get_target_index(&validator_stake_info.vote_account_address);
-                let lamports = if let Some(meta_index) = maybe_directed_stake_index {
-                    directed_stake_meta.targets[meta_index].total_staked_lamports
-                } else {
-                    0
-                };
+                let lamports = directed_stake_meta.directed_stake_lamports[validator_list_index];
                 stake.delegation.stake.saturating_sub(lamports)
             }
             _ => 0,
@@ -229,13 +222,19 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
             let stake_pool_lamports_with_fixed_cost =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
+
+            let undirected_stake_pool_lamports_with_fixed_cost =
+                stake_pool_lamports_with_fixed_cost
+                    .saturating_sub(directed_stake_meta.total_staked_lamports());
+
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
             state_account.state.rebalance(
+                &directed_stake_meta,
                 clock.epoch,
                 validator_list_index,
                 &validator_list,
-                stake_pool_lamports_with_fixed_cost,
+                undirected_stake_pool_lamports_with_fixed_cost,
                 reserve_lamports_with_rent,
                 stake_account_active_lamports,
                 minimum_delegation,
