@@ -47,7 +47,7 @@ impl UpdateDirectedStakeTicket<'_> {
         if signer_pubkey != &ticket.ticket_update_authority
             && signer_pubkey != ticket_override_authority
         {
-            msg!("Error: Only a valid ticket authority can close tickets.");
+            msg!("Error: Only a valid ticket authority can update tickets.");
             return Err(error!(StewardError::Unauthorized));
         }
 
