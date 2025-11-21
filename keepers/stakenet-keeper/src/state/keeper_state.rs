@@ -16,7 +16,9 @@ use stakenet_sdk::{
         aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
         errors::JitoTransactionError,
     },
-    utils::accounts::{get_directed_stake_meta, get_validator_history_address},
+    utils::accounts::{
+        get_directed_stake_meta, get_stake_pool_account, get_validator_history_address,
+    },
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -127,7 +129,11 @@ pub struct KeeperState {
     pub all_active_validator_accounts: Option<Box<AllValidatorAccounts>>,
     pub steward_progress_flags: StewardProgressFlags,
     pub cluster_name: String,
+
+    /// The epoch when the stake pool was last updated
+    last_update_epoch_stake_pool: Option<u64>,
 }
+
 impl KeeperState {
     pub fn update_identity_to_vote_map(&mut self) {
         self.identity_to_vote_map = self
@@ -349,6 +355,35 @@ impl KeeperState {
 
         Ok(false)
     }
+
+    /// Check `last_update_epoch` field in Stake Pool
+    ///
+    /// # Process
+    ///
+    /// 1. Check the field `last_update_epoch` in StakePool account
+    /// 2. If the `last_update_epoch` has updated, trigger steward operation
+    /// 3. Otherwise, continue next operation
+    pub async fn check_last_update_epoch(&mut self, client: Arc<RpcClient>) -> bool {
+        if let Some(all_steward_accounts) = self.all_steward_accounts.as_ref() {
+            if let Ok(stake_pool) =
+                get_stake_pool_account(&client, &all_steward_accounts.stake_pool_address).await
+            {
+                match self.last_update_epoch_stake_pool.as_mut() {
+                    Some(last_update_epoch) => {
+                        let has_updated = stake_pool.last_update_epoch > *last_update_epoch;
+                        *last_update_epoch = stake_pool.last_update_epoch;
+                        return has_updated;
+                    }
+                    None => {
+                        self.last_update_epoch_stake_pool = Some(stake_pool.last_update_epoch);
+                        return false;
+                    }
+                }
+            }
+        }
+
+        false
+    }
 }
 
 impl Default for KeeperState {
@@ -383,6 +418,7 @@ impl Default for KeeperState {
             all_active_validator_accounts: None,
             steward_progress_flags: StewardProgressFlags { flags: 0 },
             cluster_name: String::new(),
+            last_update_epoch_stake_pool: None,
         }
     }
 }

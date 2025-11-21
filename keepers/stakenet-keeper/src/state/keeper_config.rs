@@ -237,10 +237,6 @@ pub struct Args {
     #[arg(long, env, default_value = "false")]
     pub run_priority_fee_commission: bool,
 
-    /// Run Directed Staking Operation
-    #[arg(long, env, default_value = "false")]
-    pub run_directed_staking: bool,
-
     /// Number of epochs to look back for block metadata
     #[arg(long, env, default_value = "3")]
     pub lookback_epochs: u64,
@@ -299,7 +295,6 @@ impl fmt::Display for Args {
             Redundant RPC URLs: {:?}\n\
             Run Priority Fee Commission: {:?}\n\
             Validator History Min Stake: {:?} lamports\n\
-            Run Directed Staking Operation: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoints,
@@ -340,7 +335,6 @@ impl fmt::Display for Args {
             self.redundant_rpc_urls,
             self.run_priority_fee_commission,
             self.validator_history_min_stake,
-            self.run_directed_staking,
         )
     }
 }
