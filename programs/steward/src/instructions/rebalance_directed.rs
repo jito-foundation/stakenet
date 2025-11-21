@@ -9,7 +9,8 @@ use crate::{
     state::directed_stake::DirectedStakeMeta,
     utils::{
         get_stake_pool_address, get_transient_stake_seed_at_index,
-        get_validator_stake_info_at_index, state_checks,
+        get_transient_stake_seed_at_index_from_big_vec, state_checks,
+        vote_pubkey_at_validator_list_index,
     },
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
     REBALANCE_DIRECTED_COMPLETE,
@@ -22,7 +23,7 @@ use anchor_lang::{
         system_program, sysvar,
     },
 };
-use spl_stake_pool::minimum_delegation;
+use spl_stake_pool::{minimum_delegation, state::ValidatorListHeader};
 #[derive(Accounts)]
 pub struct RebalanceDirected<'info> {
     pub config: AccountLoader<'info, Config>,
@@ -113,11 +114,7 @@ pub struct RebalanceDirected<'info> {
     pub stake_program: AccountInfo<'info>,
 }
 
-pub fn handler(
-    ctx: Context<RebalanceDirected>,
-    directed_stake_meta_index: usize,
-    validator_list_index: usize,
-) -> Result<()> {
+pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
@@ -128,19 +125,40 @@ pub fn handler(
     // if the directed stake meta has valid entries
     let vote_pubkey_from_directed_stake_meta =
         directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey;
-    let maybe_vote_pubkey_from_validator_list =
-        get_validator_stake_info_at_index(validator_list, validator_list_index);
 
     // Now we need to check if the vote_pubkey from above matches the vote_account
     if vote_pubkey_from_directed_stake_meta != ctx.accounts.vote_account.key() {
         return Err(StewardError::DirectedStakeVoteAccountMismatch.into());
     }
 
-    if maybe_vote_pubkey_from_validator_list.is_err() {
-        directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch =
-            clock.epoch;
-        msg!("Validator no longer apart of validator list, marking as rebalanced for this epoch.");
-        return Ok(());
+    let mut validator_list_index = 0;
+    let mut transient_seed = 0;
+    let mut found = false;
+    {
+        let mut validator_list_data = ctx.accounts.validator_list.try_borrow_mut_data()?;
+        let (header, validator_list) =
+            ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+        require!(
+            header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+            StewardError::ValidatorListTypeMismatch
+        );
+        let validator_list_size = validator_list.len() as usize;
+        for index in 0..validator_list_size {
+            let vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, index)?;
+            if vote_pubkey == vote_pubkey_from_directed_stake_meta {
+                validator_list_index = index;
+                transient_seed =
+                    get_transient_stake_seed_at_index_from_big_vec(&validator_list, index)?;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            msg!("Validator not found in validator list");
+            directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch =
+                clock.epoch;
+            return Ok(());
+        }
     }
 
     let rebalance_type: RebalanceType;

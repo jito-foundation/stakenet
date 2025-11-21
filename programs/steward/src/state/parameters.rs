@@ -544,6 +544,10 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
+        if self.directed_stake_unstake_cap_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
         Ok(())
     }
 }

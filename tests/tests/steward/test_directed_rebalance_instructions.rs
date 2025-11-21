@@ -410,7 +410,6 @@ async fn test_simple_directed_rebalance_increase() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -554,7 +553,6 @@ async fn test_simple_directed_rebalance_decrease() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -689,7 +687,6 @@ async fn test_simple_directed_rebalance_no_action_needed() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -824,7 +821,6 @@ async fn test_simple_directed_rebalance_no_targets() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };
@@ -937,7 +933,6 @@ async fn test_directed_rebalance_wrong_state() {
         .to_account_metas(None),
         data: jito_steward::instruction::RebalanceDirected {
             directed_stake_meta_index: 0,
-            validator_list_index: validator_list_index as u64,
         }
         .data(),
     };

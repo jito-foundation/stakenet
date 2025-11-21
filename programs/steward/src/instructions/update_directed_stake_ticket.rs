@@ -39,13 +39,15 @@ impl UpdateDirectedStakeTicket<'_> {
         ticket_override_authority: &Pubkey,
     ) -> Result<()> {
         if !whitelist.is_staker_permissioned(signer_pubkey)
-            || signer_pubkey != ticket_override_authority
+            && signer_pubkey != ticket_override_authority
         {
             return Err(error!(StewardError::Unauthorized));
         }
 
-        if signer_pubkey != &ticket.ticket_update_authority {
-            msg!("Error: Only the ticket update authority can update ticket preferences");
+        if signer_pubkey != &ticket.ticket_update_authority
+            && signer_pubkey != ticket_override_authority
+        {
+            msg!("Error: Only a valid ticket authority can close tickets.");
             return Err(error!(StewardError::Unauthorized));
         }
 
@@ -58,7 +60,6 @@ impl UpdateDirectedStakeTicket<'_> {
                 return Err(error!(StewardError::Unauthorized));
             }
         }
-
         Ok(())
     }
 }

@@ -1159,7 +1159,6 @@ pub async fn crank_rebalance_directed(
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
                 directed_stake_meta_index: directed_stake_meta_index as u64,
-                validator_list_index: validator_list_index as u64,
             }
             .data(),
         };
