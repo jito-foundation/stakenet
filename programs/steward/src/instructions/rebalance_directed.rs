@@ -1,6 +1,6 @@
 use crate::directed_delegation::{decrease_stake_calculation, increase_stake_calculation};
 use crate::{
-    constants::STAKE_POOL_WITHDRAW_SEED,
+    constants::{LAMPORT_BALANCE_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     directed_delegation::{RebalanceType, UnstakeState},
     errors::StewardError,
     events::{DirectedRebalanceEvent, RebalanceTypeTag},
@@ -130,6 +130,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
     }
 
     let mut transient_seed = 0;
+    let mut validator_list_index = 0;
     let mut found = false;
     {
         let mut validator_list_data = ctx.accounts.validator_list.try_borrow_mut_data()?;
@@ -145,6 +146,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             if vote_pubkey == vote_pubkey_from_directed_stake_meta {
                 transient_seed =
                     get_transient_stake_seed_at_index_from_big_vec(&validator_list, index)?;
+                validator_list_index = index;
                 found = true;
                 break;
             }
@@ -222,7 +224,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
 
             let undirected_floor_cap_reached =
                 undirected_tvl_lamports <= config.parameters.undirected_stake_floor_lamports();
-            // better name
+
             let staked_lamports_at_stake_meta_index = directed_stake_meta
                 .get_total_staked_lamports(&vote_pubkey_from_directed_stake_meta)
                 .unwrap_or(0);
@@ -294,6 +296,14 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 directed_stake_meta_index,
                 decrease_components.directed_unstake_lamports,
             );
+            let mut state_account = ctx.accounts.state_account.load_mut()?;
+            if state_account.state.validator_lamport_balances[validator_list_index]
+                != LAMPORT_BALANCE_DEFAULT
+            {
+                state_account.state.validator_lamport_balances[validator_list_index] =
+                    state_account.state.validator_lamport_balances[validator_list_index]
+                        .saturating_sub(decrease_components.directed_unstake_lamports);
+            }
         }
         RebalanceType::Increase(lamports) => {
             invoke_signed(
@@ -333,17 +343,25 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 ]],
             )?;
             msg!("increase_validator_stake successful");
+            let mut state_account = ctx.accounts.state_account.load_mut()?;
             directed_stake_meta.add_to_total_staked_lamports(directed_stake_meta_index, lamports);
+            if state_account.state.validator_lamport_balances[validator_list_index]
+                != LAMPORT_BALANCE_DEFAULT
+            {
+                state_account.state.validator_lamport_balances[validator_list_index] =
+                    state_account.state.validator_lamport_balances[validator_list_index]
+                        .checked_add(lamports)
+                        .ok_or(StewardError::ArithmeticError)?;
+            }
         }
         RebalanceType::None => {
             msg!("RebalanceType::None");
         }
     }
 
+    let mut state_account = ctx.accounts.state_account.load_mut()?;
     // No matter the rebalance type or, we need to mark the target as rebalanced for this epoch
     directed_stake_meta.update_staked_last_updated_epoch(directed_stake_meta_index, clock.epoch);
-
-    let mut state_account = ctx.accounts.state_account.load_mut()?;
 
     if let RebalanceType::Decrease(decrease_components) = &rebalance_type {
         directed_stake_meta.directed_unstake_total = directed_stake_meta

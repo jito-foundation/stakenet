@@ -222,6 +222,11 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
             let stake_pool_lamports_with_fixed_cost =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
+
+            let undirected_stake_pool_lamports_with_fixed_cost =
+                stake_pool_lamports_with_fixed_cost
+                    .saturating_sub(directed_stake_meta.total_staked_lamports());
+
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
             state_account.state.rebalance(
@@ -229,7 +234,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 clock.epoch,
                 validator_list_index,
                 &validator_list,
-                stake_pool_lamports_with_fixed_cost,
+                undirected_stake_pool_lamports_with_fixed_cost,
                 reserve_lamports_with_rent,
                 stake_account_active_lamports,
                 minimum_delegation,
