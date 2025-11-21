@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use stakenet_sdk::utils::accounts::get_directed_stake_meta;
+use stakenet_sdk::utils::accounts::{get_directed_stake_meta, get_directed_stake_meta_address};
 
 use crate::commands::command_args::ViewDirectedStakeMeta;
 
@@ -14,6 +14,9 @@ pub async fn command_view_directed_stake_meta(
 ) -> Result<()> {
     let stake_meta =
         get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
+    let stake_meta_address = get_directed_stake_meta_address(&args.steward_config, &program_id);
+
+    println!("Directed stake meta: {}", stake_meta_address);
 
     println!("\n📊 DirectedStakeMeta Information:");
 
