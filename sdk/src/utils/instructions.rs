@@ -76,7 +76,7 @@ pub fn update_directed_stake_ticket(
     preferences: Vec<DirectedStakePreference>,
 ) -> Instruction {
     let whitelist_account = get_directed_stake_whitelist_address(steward_config, program_id);
-    let ticket_account = get_directed_stake_ticket_address(signer, program_id);
+    let ticket_account = get_directed_stake_ticket_address(steward_config, signer, program_id);
 
     Instruction {
         program_id: *program_id,

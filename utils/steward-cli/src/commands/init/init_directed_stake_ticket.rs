@@ -8,14 +8,16 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
-use jito_steward::state::directed_stake::{DirectedStakeTicket, DirectedStakeWhitelist};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::Transaction;
-use stakenet_sdk::utils::transactions::{configure_instruction, print_base58_tx};
+use stakenet_sdk::utils::{
+    accounts::{get_directed_stake_ticket_address, get_directed_stake_whitelist_address},
+    transactions::{configure_instruction, print_base58_tx},
+};
 
 use crate::commands::command_args::InitDirectedStakeTicket;
 
@@ -28,15 +30,11 @@ pub async fn command_init_directed_stake_ticket(
         .map_err(|e| anyhow::anyhow!("Failed to read keypair: {}", e))?;
     let authority_pubkey = authority_keypair.pubkey();
 
-    let (directed_stake_whitelist_pda, _bump) = Pubkey::find_program_address(
-        &[DirectedStakeWhitelist::SEED, args.steward_config.as_ref()],
-        &program_id,
-    );
+    let directed_stake_whitelist_pda =
+        get_directed_stake_whitelist_address(&args.steward_config, &program_id);
 
-    let (directed_stake_ticket_pda, _bump) = Pubkey::find_program_address(
-        &[DirectedStakeTicket::SEED, authority_pubkey.as_ref()],
-        &program_id,
-    );
+    let directed_stake_ticket_pda =
+        get_directed_stake_ticket_address(&args.steward_config, &authority_pubkey, &program_id);
 
     println!("Initializing DirectedStakeTicket...");
     println!("  Authority: {}", authority_pubkey);

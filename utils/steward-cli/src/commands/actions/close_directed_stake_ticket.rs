@@ -37,7 +37,11 @@ pub async fn command_close_directed_stake_ticket(
     )
     .await?;
 
-    let ticket_account = get_directed_stake_ticket_address(&authority.pubkey(), &program_id);
+    let ticket_account = get_directed_stake_ticket_address(
+        &args.permissioned_parameters.steward_config,
+        &authority.pubkey(),
+        &program_id,
+    );
 
     let ix = Instruction {
         program_id,
