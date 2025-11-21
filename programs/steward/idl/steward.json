@@ -399,6 +399,9 @@
           "writable": true
         },
         {
+          "name": "whitelist_account"
+        },
+        {
           "name": "authority",
           "writable": true,
           "signer": true
@@ -609,6 +612,9 @@
         {
           "name": "validator_list",
           "writable": true
+        },
+        {
+          "name": "whitelist_account"
         },
         {
           "name": "authority",
@@ -1625,10 +1631,6 @@
         {
           "name": "directed_stake_meta_index",
           "type": "u64"
-        },
-        {
-          "name": "validator_list_index",
-          "type": "u64"
         }
       ]
     },
@@ -1652,7 +1654,8 @@
           "name": "config"
         },
         {
-          "name": "directed_stake_whitelist"
+          "name": "directed_stake_whitelist",
+          "writable": true
         },
         {
           "name": "authority",

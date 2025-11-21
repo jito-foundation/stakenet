@@ -2491,6 +2491,14 @@ pub async fn crank_copy_directed_stake_targets(
             authority: fixture.keypair.pubkey(),
             clock: solana_sdk::sysvar::clock::id(),
             validator_list: fixture.stake_pool_meta.validator_list,
+            whitelist_account: Pubkey::find_program_address(
+                &[
+                    jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
+                    fixture.steward_config.pubkey().as_ref(),
+                ],
+                &jito_steward::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::CopyDirectedStakeTargets {

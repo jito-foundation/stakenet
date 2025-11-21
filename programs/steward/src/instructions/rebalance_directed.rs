@@ -8,8 +8,7 @@ use crate::{
     stake_pool_utils::deserialize_stake_pool,
     state::directed_stake::DirectedStakeMeta,
     utils::{
-        get_stake_pool_address, get_transient_stake_seed_at_index,
-        get_transient_stake_seed_at_index_from_big_vec, state_checks,
+        get_stake_pool_address, get_transient_stake_seed_at_index_from_big_vec, state_checks,
         vote_pubkey_at_validator_list_index,
     },
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
@@ -116,7 +115,6 @@ pub struct RebalanceDirected<'info> {
 
 pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
-    let validator_list = &ctx.accounts.validator_list;
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
@@ -131,7 +129,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
         return Err(StewardError::DirectedStakeVoteAccountMismatch.into());
     }
 
-    let mut validator_list_index = 0;
     let mut transient_seed = 0;
     let mut found = false;
     {
@@ -146,7 +143,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
         for index in 0..validator_list_size {
             let vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, index)?;
             if vote_pubkey == vote_pubkey_from_directed_stake_meta {
-                validator_list_index = index;
                 transient_seed =
                     get_transient_stake_seed_at_index_from_big_vec(&validator_list, index)?;
                 found = true;
@@ -162,8 +158,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
     }
 
     let rebalance_type: RebalanceType;
-    let transient_seed: u64 =
-        get_transient_stake_seed_at_index(validator_list, validator_list_index)?;
     {
         let mut state_account = ctx.accounts.state_account.load_mut()?;
 

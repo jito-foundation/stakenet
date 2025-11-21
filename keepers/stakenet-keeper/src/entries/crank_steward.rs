@@ -1071,7 +1071,6 @@ async fn _handle_directed_rebalance(
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
                 directed_stake_meta_index: validator_info.directed_stake_meta_index as u64,
-                validator_list_index: validator_index as u64,
             }
             .data(),
         };

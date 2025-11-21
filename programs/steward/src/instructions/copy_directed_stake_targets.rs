@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
+use crate::state::directed_stake::{
+    DirectedStakeMeta, DirectedStakeTarget, DirectedStakeWhitelist,
+};
 use crate::utils::get_validator_list;
 use crate::utils::vote_pubkey_at_validator_list_index;
 use crate::{errors::StewardError, Config};
@@ -26,6 +28,12 @@ pub struct CopyDirectedStakeTargets<'info> {
         address = get_validator_list(&config)?,
     )]
     pub validator_list: AccountInfo<'info>,
+
+    #[account(
+        seeds = [DirectedStakeWhitelist::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub whitelist_account: AccountLoader<'info, DirectedStakeWhitelist>,
 
     #[account(
         mut,
@@ -59,6 +67,12 @@ pub fn handler(
         msg!("Validator list vote pubkey does not match vote pubkey");
         return Err(error!(StewardError::Unauthorized));
     }
+
+    let whitelist = ctx.accounts.whitelist_account.load()?;
+    require!(
+        whitelist.is_validator_permissioned(&vote_pubkey),
+        StewardError::ValidatorNotInWhitelist
+    );
 
     let clock = Clock::get()?;
     match stake_meta.get_target_index(&vote_pubkey) {
