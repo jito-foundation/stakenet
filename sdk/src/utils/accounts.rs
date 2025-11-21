@@ -463,10 +463,12 @@ pub async fn get_directed_stake_meta(
 /// signer address.
 pub async fn get_directed_stake_ticket(
     client: Arc<RpcClient>,
+    steward_config_address: &Pubkey,
     signer_address: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<DirectedStakeTicket, JitoTransactionError> {
-    let directed_stake_meta_pda = get_directed_stake_ticket_address(signer_address, program_id);
+    let directed_stake_meta_pda =
+        get_directed_stake_ticket_address(steward_config_address, signer_address, program_id);
 
     let directed_stake_ticket_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;
@@ -589,9 +591,19 @@ pub fn get_directed_stake_meta_address(steward_config: &Pubkey, program_id: &Pub
 ///
 /// This function calculates the deterministic address of the directed stake ticket account
 /// using the signer and program ID.
-pub fn get_directed_stake_ticket_address(signer: &Pubkey, program_id: &Pubkey) -> Pubkey {
-    let (directed_stake_ticket_pda, _bump) =
-        Pubkey::find_program_address(&[DirectedStakeTicket::SEED, signer.as_ref()], program_id);
+pub fn get_directed_stake_ticket_address(
+    steward_config: &Pubkey,
+    signer: &Pubkey,
+    program_id: &Pubkey,
+) -> Pubkey {
+    let (directed_stake_ticket_pda, _bump) = Pubkey::find_program_address(
+        &[
+            DirectedStakeTicket::SEED,
+            steward_config.as_ref(),
+            signer.as_ref(),
+        ],
+        program_id,
+    );
 
     directed_stake_ticket_pda
 }
