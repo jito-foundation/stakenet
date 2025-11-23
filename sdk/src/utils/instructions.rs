@@ -175,14 +175,6 @@ pub async fn compute_directed_stake_meta(
                     authority: *authority_pubkey,
                     clock: solana_sdk::sysvar::clock::id(),
                     validator_list: validator_list_address,
-                    whitelist_account: Pubkey::find_program_address(
-                        &[
-                            jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
-                            steward_config.as_ref(),
-                        ],
-                        program_id,
-                    )
-                    .0,
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::CopyDirectedStakeTargets {

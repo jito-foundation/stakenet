@@ -8,8 +8,8 @@ use crate::{
     stake_pool_utils::deserialize_stake_pool,
     state::directed_stake::DirectedStakeMeta,
     utils::{
-        get_stake_pool_address, get_transient_stake_seed_at_index_from_big_vec, state_checks,
-        vote_pubkey_at_validator_list_index,
+        get_stake_pool_address, get_transient_stake_seed_at_index_from_big_vec,
+        stake_lamports_at_validator_list_index, state_checks, vote_pubkey_at_validator_list_index,
     },
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
     REBALANCE_DIRECTED_COMPLETE,
@@ -113,6 +113,56 @@ pub struct RebalanceDirected<'info> {
     pub stake_program: AccountInfo<'info>,
 }
 
+pub fn adjust_directed_stake_for_deposits_and_withdrawals(
+    target_total_staked_lamports: u64,
+    validator_list_index: usize,
+    directed_stake_meta_index: usize,
+    directed_stake_meta: &mut DirectedStakeMeta,
+    state_account: &mut StewardStateAccountV2,
+) -> Result<()> {
+    let steward_state_total_lamports =
+        state_account.state.validator_lamport_balances[validator_list_index];
+    let directed_stake_target_lamports =
+        directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
+    let directed_stake_applied_lamports =
+        directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+    if target_total_staked_lamports < steward_state_total_lamports {
+        let withdrawal_lamports =
+            directed_stake_applied_lamports.saturating_sub(target_total_staked_lamports);
+        // If the withdrawal lamports is greated than the applied directed stake, then we need to roll-over the remainder
+        // to the undirected stake
+        if withdrawal_lamports > directed_stake_applied_lamports {
+            let remainder = withdrawal_lamports.saturating_sub(directed_stake_applied_lamports);
+            // Subtract from directed stake
+            directed_stake_meta.subtract_from_total_staked_lamports(
+                directed_stake_meta_index,
+                directed_stake_target_lamports.saturating_sub(remainder),
+            );
+            // Implicitly subtract from undirected stake by subtracting from steward state total lamports
+            state_account.state.validator_lamport_balances[validator_list_index] =
+                state_account.state.validator_lamport_balances[validator_list_index]
+                    .saturating_sub(remainder);
+        } else {
+            directed_stake_meta.subtract_from_total_staked_lamports(
+                directed_stake_meta_index,
+                withdrawal_lamports,
+            );
+        }
+    }
+    if target_total_staked_lamports > steward_state_total_lamports
+        && (directed_stake_applied_lamports < directed_stake_target_lamports)
+    {
+        let directed_deficit_lamports =
+            directed_stake_target_lamports.saturating_sub(directed_stake_applied_lamports);
+        let deposit_lamports =
+            target_total_staked_lamports.saturating_sub(steward_state_total_lamports);
+        let increase_lamports = directed_deficit_lamports.min(deposit_lamports);
+        directed_stake_meta
+            .add_to_total_staked_lamports(directed_stake_meta_index, increase_lamports);
+    }
+    Ok(())
+}
+
 pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize) -> Result<()> {
     let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let clock = Clock::get()?;
@@ -141,6 +191,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             StewardError::ValidatorListTypeMismatch
         );
         let validator_list_size = validator_list.len() as usize;
+        let mut state_account = ctx.accounts.state_account.load_mut()?;
         for index in 0..validator_list_size {
             let vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, index)?;
             if vote_pubkey == vote_pubkey_from_directed_stake_meta {
@@ -148,6 +199,15 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                     get_transient_stake_seed_at_index_from_big_vec(&validator_list, index)?;
                 validator_list_index = index;
                 found = true;
+                let (target_total_staked_lamports, _) =
+                    stake_lamports_at_validator_list_index(&validator_list, index)?;
+                adjust_directed_stake_for_deposits_and_withdrawals(
+                    target_total_staked_lamports,
+                    index,
+                    directed_stake_meta_index,
+                    &mut directed_stake_meta,
+                    &mut state_account,
+                )?;
                 break;
             }
         }
@@ -225,16 +285,15 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             let undirected_floor_cap_reached =
                 undirected_tvl_lamports <= config.parameters.undirected_stake_floor_lamports();
 
-            let staked_lamports_at_stake_meta_index = directed_stake_meta
-                .get_total_staked_lamports(&vote_pubkey_from_directed_stake_meta)
-                .unwrap_or(0);
+            let target_staked_lamports =
+                directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
 
             // Try decrease first, then increase (if undirected floor cap does not apply)
             let decrease_result = decrease_stake_calculation(
                 &state_account.state,
                 &directed_stake_meta,
                 directed_stake_meta_index,
-                staked_lamports_at_stake_meta_index,
+                target_staked_lamports,
                 directed_unstake_cap_lamports,
                 unstake_state.directed_unstake_total,
                 minimum_delegation,
@@ -246,7 +305,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                     &state_account.state,
                     &directed_stake_meta,
                     directed_stake_meta_index,
-                    staked_lamports_at_stake_meta_index,
+                    target_staked_lamports,
                     reserve_lamports_with_rent,
                     undirected_floor_cap_reached,
                     minimum_delegation,
@@ -420,5 +479,237 @@ fn rebalance_to_event(
             increase_lamports: 0,
             decrease_lamports: decrease_components.directed_unstake_lamports,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        constants::MAX_VALIDATORS, state::directed_stake::DirectedStakeTarget, utils::U8Bool,
+        BitMask,
+    };
+    use anchor_lang::prelude::Pubkey;
+
+    fn create_default_directed_stake_meta() -> DirectedStakeMeta {
+        DirectedStakeMeta {
+            total_stake_targets: 0,
+            directed_unstake_total: 0,
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            targets: [DirectedStakeTarget {
+                vote_pubkey: Pubkey::default(),
+                total_target_lamports: 0,
+                total_staked_lamports: 0,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            }; MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+        }
+    }
+
+    fn create_default_steward_state_account() -> StewardStateAccountV2 {
+        StewardStateAccountV2 {
+            state: crate::state::steward_state::StewardStateV2 {
+                state_tag: StewardStateEnum::RebalanceDirected,
+                validator_lamport_balances: [0; MAX_VALIDATORS],
+                scores: [0; MAX_VALIDATORS],
+                sorted_score_indices: [crate::constants::SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+                raw_scores: [0; MAX_VALIDATORS],
+                sorted_raw_score_indices: [crate::constants::SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+                delegations: [crate::Delegation::default(); MAX_VALIDATORS],
+                instant_unstake: BitMask::default(),
+                progress: BitMask::default(),
+                validators_to_remove: BitMask::default(),
+                validators_for_immediate_removal: BitMask::default(),
+                start_computing_scores_slot: 0,
+                current_epoch: 0,
+                next_cycle_epoch: 10,
+                num_pool_validators: 0,
+                scoring_unstake_total: 0,
+                instant_unstake_total: 0,
+                stake_deposit_unstake_total: 0,
+                validators_added: 0,
+                status_flags: 0,
+                _padding0: [0; 2],
+            },
+            bump: 0,
+            _padding0: [0; 7],
+        }
+    }
+
+    #[test]
+    fn test_adjust_directed_stake_no_adjustment_needed() {
+        // Scenario: Everything is in sync - no deposits or withdrawals detected
+        // target_total_staked_lamports = steward_state_total_lamports = 1000
+        // directed_stake_applied_lamports = 500, directed_stake_target_lamports = 1000
+        // No adjustment should occur
+
+        let mut directed_stake_meta = create_default_directed_stake_meta();
+
+        let validator_list_index = 0;
+        let directed_stake_meta_index = 0;
+        let target_total_staked_lamports = 1000;
+        let steward_state_total_lamports = 1000;
+        let directed_stake_target_lamports = 1000;
+        let directed_stake_applied_lamports = 500;
+
+        // Set up the state
+        let mut state_account = create_default_steward_state_account();
+        state_account.state.validator_lamport_balances[validator_list_index] =
+            steward_state_total_lamports;
+
+        directed_stake_meta.targets[directed_stake_meta_index] = DirectedStakeTarget {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: directed_stake_target_lamports,
+            total_staked_lamports: directed_stake_applied_lamports,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 32],
+        };
+
+        let initial_staked_lamports =
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+
+        // Call the function
+        let result = adjust_directed_stake_for_deposits_and_withdrawals(
+            target_total_staked_lamports,
+            validator_list_index,
+            directed_stake_meta_index,
+            &mut directed_stake_meta,
+            &mut state_account,
+        );
+
+        assert!(result.is_ok());
+        // No adjustment should have occurred
+        assert_eq!(
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports,
+            initial_staked_lamports
+        );
+    }
+
+    #[test]
+    fn test_adjust_directed_stake_deposit_side_adjustment() {
+        let mut directed_stake_meta = create_default_directed_stake_meta();
+        let validator_list_index = 0;
+        let directed_stake_meta_index = 0;
+        let target_total_staked_lamports = 1600; // Stake pool shows higher than expected amount
+        let steward_state_total_lamports = 1000;
+        let directed_stake_target_lamports = 1000; // Directed stake is at target
+        let directed_stake_applied_lamports = 500;
+
+        // Set up the state
+        let mut state_account = create_default_steward_state_account();
+        state_account.state.validator_lamport_balances[validator_list_index] =
+            steward_state_total_lamports;
+
+        directed_stake_meta.targets[directed_stake_meta_index] = DirectedStakeTarget {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: directed_stake_target_lamports,
+            total_staked_lamports: directed_stake_applied_lamports,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 32],
+        };
+
+        // Call the function
+        let result = adjust_directed_stake_for_deposits_and_withdrawals(
+            target_total_staked_lamports,
+            validator_list_index,
+            directed_stake_meta_index,
+            &mut directed_stake_meta,
+            &mut state_account,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports,
+            directed_stake_applied_lamports + 500 // 500 is the min of deposit 600 and deficit of 500
+        );
+    }
+
+    #[test]
+    fn test_adjust_directed_stake_withdrawal_detected_no_adjustment() {
+        let mut directed_stake_meta = create_default_directed_stake_meta();
+        let validator_list_index = 0;
+        let directed_stake_meta_index = 0;
+        let target_total_staked_lamports = 1100; // Stake pool shows higher than expected amount
+        let steward_state_total_lamports = 1000;
+        let directed_stake_target_lamports = 1000; // Directed stake is at target
+        let directed_stake_applied_lamports = 1000;
+
+        // Set up the state
+        let mut state_account = create_default_steward_state_account();
+        state_account.state.validator_lamport_balances[validator_list_index] =
+            steward_state_total_lamports;
+
+        directed_stake_meta.targets[directed_stake_meta_index] = DirectedStakeTarget {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: directed_stake_target_lamports,
+            total_staked_lamports: directed_stake_applied_lamports,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 32],
+        };
+
+        let initial_staked_lamports =
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+
+        // Call the function
+        let result = adjust_directed_stake_for_deposits_and_withdrawals(
+            target_total_staked_lamports,
+            validator_list_index,
+            directed_stake_meta_index,
+            &mut directed_stake_meta,
+            &mut state_account,
+        );
+
+        assert!(result.is_ok());
+        // No adjustment should have occurred since applied (400) <= target (500)
+        assert_eq!(
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports,
+            initial_staked_lamports
+        );
+    }
+
+    #[test]
+    fn test_adjust_directed_stake_withdrawal_side_adjustment() {
+        let mut directed_stake_meta = create_default_directed_stake_meta();
+        let validator_list_index = 0;
+        let directed_stake_meta_index = 0;
+        let target_total_staked_lamports = 700; // Stake pool shows lower than expected amount
+        let steward_state_total_lamports = 1000;
+        let directed_stake_target_lamports = 1000; // Directed stake is at target
+        let directed_stake_applied_lamports = 1000;
+
+        // Set up the state
+        let mut state_account = create_default_steward_state_account();
+        state_account.state.validator_lamport_balances[validator_list_index] =
+            steward_state_total_lamports;
+
+        directed_stake_meta.targets[directed_stake_meta_index] = DirectedStakeTarget {
+            vote_pubkey: Pubkey::default(),
+            total_target_lamports: directed_stake_target_lamports,
+            total_staked_lamports: directed_stake_applied_lamports,
+            target_last_updated_epoch: 0,
+            staked_last_updated_epoch: 0,
+            _padding0: [0; 32],
+        };
+
+        // Call the function
+        let result = adjust_directed_stake_for_deposits_and_withdrawals(
+            target_total_staked_lamports,
+            validator_list_index,
+            directed_stake_meta_index,
+            &mut directed_stake_meta,
+            &mut state_account,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports,
+            directed_stake_applied_lamports - 300
+        );
     }
 }
