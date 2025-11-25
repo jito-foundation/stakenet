@@ -63,7 +63,7 @@ pub fn decrease_stake_calculation(
             .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
                 temp_current_lamports,
                 temp_index,
-                directed_stake_meta_index,
+                directed_stake_meta_index as usize,
                 directed_stake_meta,
             )?;
 
@@ -158,7 +158,7 @@ pub fn increase_stake_calculation(
                     .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
                         temp_current_lamports,
                         temp_index,
-                        directed_stake_meta_index,
+                        directed_stake_meta_index as usize,
                         directed_stake_meta,
                     )?;
 

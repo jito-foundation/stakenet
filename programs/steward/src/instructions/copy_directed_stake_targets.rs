@@ -98,7 +98,7 @@ pub fn handler(
             stake_meta.targets[target_index] = new_target;
             stake_meta.total_stake_targets += 1;
             stake_meta.directed_stake_lamports[validator_list_index] = target_lamports;
-            stake_meta.directed_stake_meta_indices[validator_list_index] = target_index;
+            stake_meta.directed_stake_meta_indices[validator_list_index] = target_index as u64;
         }
     }
     Ok(())

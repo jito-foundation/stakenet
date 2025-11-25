@@ -368,6 +368,7 @@ mod tests {
             is_initialized: U8Bool::from(true),
             targets: [target; MAX_VALIDATORS],
             directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         }
     }
 
@@ -404,6 +405,7 @@ mod tests {
             is_initialized: U8Bool::from(true),
             targets,
             directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         }
     }
 

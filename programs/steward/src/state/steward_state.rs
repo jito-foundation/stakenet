@@ -633,7 +633,7 @@ impl StewardStateV2 {
         // Clear values on empty last index
         self.validator_lamport_balances[num_pool_validators] = LAMPORT_BALANCE_DEFAULT;
         directed_stake_meta.directed_stake_lamports[num_pool_validators] = 0;
-        directed_stake_meta.directed_stake_meta_indices[num_pool_validators] = 0;
+        directed_stake_meta.directed_stake_meta_indices[num_pool_validators] = u64::MAX;
         self.scores[num_pool_validators] = 0;
         self.raw_scores[num_pool_validators] = 0;
         self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
@@ -921,7 +921,7 @@ impl StewardStateV2 {
         directed_stake_meta_index: usize,
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Result<(u64, u64)> {
-        if directed_stake_meta.directed_stake_lamports[validator_list_index] == 0 {
+        if directed_stake_meta.directed_stake_meta_indices[validator_list_index] == u64::MAX {
             return Ok((0, target_total_staked_lamports));
         }
         let (mut new_directed_stake_lamports, mut new_total_stake_lamports) = (0u64, 0u64);

@@ -509,7 +509,7 @@ mod tests {
                 _padding0: [0; 32],
             }; MAX_VALIDATORS],
             directed_stake_lamports: [0; MAX_VALIDATORS],
-            directed_stake_meta_indices: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         }
     }
 
