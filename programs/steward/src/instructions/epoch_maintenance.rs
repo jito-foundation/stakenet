@@ -93,10 +93,9 @@ pub fn handler(
             StewardError::ListStateMismatch
         );
         if let Some(validator_index_to_remove) = validator_index_to_remove {
-            state_account.state.remove_validator(
-                validator_index_to_remove,
-                &mut directed_stake_meta.directed_stake_lamports,
-            )?;
+            state_account
+                .state
+                .remove_validator(validator_index_to_remove, &mut directed_stake_meta)?;
         }
     }
 
@@ -110,7 +109,7 @@ pub fn handler(
 
         if okay_to_update {
             // When upgrading the StewardState with additional padding we should move this total
-            // to the StewardStateAccount and clear it in the reset for new cycle function instead
+            // to the StewardStateAccount and clear it in the reset_state_for_new_cycle method
             if state_account.state.current_epoch == state_account.state.next_cycle_epoch {
                 directed_stake_meta.directed_unstake_total = 0;
             }

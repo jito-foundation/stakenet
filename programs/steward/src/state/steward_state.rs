@@ -512,6 +512,7 @@ impl StewardStateV2 {
         self.start_computing_scores_slot = current_slot;
         self.scoring_unstake_total = 0;
         self.instant_unstake_total = 0;
+        self.stake_deposit_unstake_total = 0;
         self.delegations = [Delegation::default(); MAX_VALIDATORS];
         self.instant_unstake = BitMask::default();
 
@@ -532,7 +533,7 @@ impl StewardStateV2 {
     pub fn remove_validator(
         &mut self,
         index: usize,
-        directed_stake_lamports: &mut [u64; MAX_VALIDATORS],
+        directed_stake_meta: &mut DirectedStakeMeta,
     ) -> Result<()> {
         let marked_for_regular_removal = self.validators_to_remove.get(index)?;
         let marked_for_immediate_removal = self.validators_for_immediate_removal.get(index)?;
@@ -577,7 +578,10 @@ impl StewardStateV2 {
             self.instant_unstake
                 .set(i, self.instant_unstake.get(next_i)?)?;
             self.progress.set(i, self.progress.get(next_i)?)?;
-            directed_stake_lamports[i] = directed_stake_lamports[next_i];
+            directed_stake_meta.directed_stake_lamports[i] =
+                directed_stake_meta.directed_stake_lamports[next_i];
+            directed_stake_meta.directed_stake_meta_indices[i] =
+                directed_stake_meta.directed_stake_meta_indices[next_i];
         }
 
         // For state that can be valid past num_pool_validators, we still need to shift the values
@@ -628,7 +632,8 @@ impl StewardStateV2 {
 
         // Clear values on empty last index
         self.validator_lamport_balances[num_pool_validators] = LAMPORT_BALANCE_DEFAULT;
-        directed_stake_lamports[num_pool_validators] = 0;
+        directed_stake_meta.directed_stake_lamports[num_pool_validators] = 0;
+        directed_stake_meta.directed_stake_meta_indices[num_pool_validators] = 0;
         self.scores[num_pool_validators] = 0;
         self.raw_scores[num_pool_validators] = 0;
         self.sorted_score_indices[num_pool_validators] = SORTED_INDEX_DEFAULT;
@@ -907,6 +912,58 @@ impl StewardStateV2 {
             return Ok(Some(instant_unstake_result));
         }
         Err(StewardError::InvalidState.into())
+    }
+
+    pub fn simulate_adjust_directed_stake_for_deposits_and_withdrawals(
+        &self,
+        target_total_staked_lamports: u64,
+        validator_list_index: usize,
+        directed_stake_meta_index: usize,
+        directed_stake_meta: &DirectedStakeMeta,
+    ) -> Result<(u64, u64)> {
+        if directed_stake_meta.directed_stake_lamports[validator_list_index] == 0 {
+            return Ok((
+                0,
+                target_total_staked_lamports,
+            ));
+        }
+        let (mut new_directed_stake_lamports, mut new_total_stake_lamports) = (0u64, 0u64);
+        let steward_state_total_lamports = self.validator_lamport_balances[validator_list_index];
+        let directed_stake_target_lamports =
+            directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
+        let directed_stake_applied_lamports =
+            directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+        if target_total_staked_lamports < steward_state_total_lamports {
+            let withdrawal_lamports =
+                steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
+            // If the withdrawal lamports is greated than the applied directed stake, then we need to roll-over the remainder
+            // to the undirected stake
+            if withdrawal_lamports > directed_stake_applied_lamports {
+                let remainder = withdrawal_lamports.saturating_sub(directed_stake_applied_lamports);
+                // Subtract from directed stake
+                new_directed_stake_lamports = 0;
+                // Implicitly subtract from undirected stake by subtracting from steward state total lamports
+                new_total_stake_lamports = steward_state_total_lamports.saturating_sub(remainder);
+            } else {
+                new_directed_stake_lamports = directed_stake_meta.directed_stake_lamports
+                    [validator_list_index]
+                    .saturating_sub(withdrawal_lamports);
+                new_total_stake_lamports = self.validator_lamport_balances[validator_list_index];
+            }
+        } else if target_total_staked_lamports > steward_state_total_lamports
+            && (directed_stake_applied_lamports < directed_stake_target_lamports)
+        {
+            let directed_deficit_lamports =
+                directed_stake_target_lamports.saturating_sub(directed_stake_applied_lamports);
+            let deposit_lamports =
+                target_total_staked_lamports.saturating_sub(steward_state_total_lamports);
+            let increase_lamports = directed_deficit_lamports.min(deposit_lamports);
+            new_directed_stake_lamports = directed_stake_meta.directed_stake_lamports
+                [validator_list_index]
+                .saturating_add(increase_lamports);
+            new_total_stake_lamports = self.validator_lamport_balances[validator_list_index];
+        }
+        Ok((new_directed_stake_lamports, new_total_stake_lamports))
     }
 
     /// One instruction per validator.

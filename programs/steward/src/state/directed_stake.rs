@@ -30,6 +30,7 @@ pub struct DirectedStakeMeta {
     pub targets: [DirectedStakeTarget; MAX_VALIDATORS],
     // Total staked lamports indexed by validator list index
     pub directed_stake_lamports: [u64; MAX_VALIDATORS],
+    pub directed_stake_meta_indices: [usize; MAX_VALIDATORS],
 }
 
 impl Default for DirectedStakeMeta {
@@ -41,6 +42,7 @@ impl Default for DirectedStakeMeta {
             is_initialized: U8Bool::from(true),
             targets: [DirectedStakeTarget::default(); MAX_VALIDATORS],
             directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [0; MAX_VALIDATORS],
         }
     }
 }

@@ -880,7 +880,7 @@ fn test_remove_validator() {
 
     // test basic case - remove validator_to_remove
     state.validators_to_remove.set(1, true).unwrap();
-    let res = state.remove_validator(1, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(1, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -892,7 +892,7 @@ fn test_remove_validator() {
     let mut state = _test_remove_validator_setup(&fixtures);
 
     state.validators_for_immediate_removal.set(1, true).unwrap();
-    let res = state.remove_validator(1, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(1, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -909,7 +909,7 @@ fn test_remove_validator() {
     state.validators_for_immediate_removal.set(4, true).unwrap();
     state.validators_added = 2;
     // both validators were removed from pool and now the validator list is down to 3
-    let res = state.remove_validator(3, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(3, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
 
     assert_eq!(state.num_pool_validators, 3);
@@ -924,7 +924,7 @@ fn test_remove_validator_fails() {
 
     // Test fails if validator not marked to remove
     state.validators_for_immediate_removal.reset();
-    let res = state.remove_validator(0, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(0, &mut DirectedStakeMeta::default());
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorNotMarkedForRemoval)));
 
@@ -935,7 +935,7 @@ fn test_remove_validator_fails() {
         .unwrap();
     let res = state.remove_validator(
         state.num_pool_validators as usize,
-        &mut [0u64; MAX_VALIDATORS],
+        &mut DirectedStakeMeta::default(),
     );
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
@@ -959,7 +959,7 @@ fn test_remove_validator_at_max_validators() {
     state.scores[index] = 998;
     state.scores[index + 1] = 999;
 
-    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
 
     // Verify shifting occurred - value at index should now be what was at index+1
@@ -994,7 +994,7 @@ fn test_remove_validator_at_sum_equals_max() {
     state.scores[index] = 100;
     state.scores[index + 1] = 101;
 
-    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 11) as u64);
     assert_eq!(state.validators_added, 10); // unchanged
@@ -1014,7 +1014,7 @@ fn test_remove_validator_at_sum_equals_max() {
         .set(index, true)
         .unwrap();
 
-    let res = state.remove_validator(index, &mut [0u64; MAX_VALIDATORS]);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 10) as u64); // unchanged
     assert_eq!(state.validators_added, 9); // decremented

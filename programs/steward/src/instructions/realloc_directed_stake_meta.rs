@@ -68,6 +68,7 @@ pub fn handler(ctx: Context<ReallocDirectedStakeMeta>) -> Result<()> {
         };
         stake_meta.targets = [default_target; MAX_VALIDATORS];
         stake_meta.directed_stake_lamports = [0; MAX_VALIDATORS];
+        stake_meta.directed_stake_meta_indices = [0; MAX_VALIDATORS];
         stake_meta.is_initialized = true.into();
     }
     Ok(())

@@ -81,7 +81,7 @@ pub fn handler(
                     staked_last_updated_epoch: 0,
                     _padding0: [0; 32],
                 };
-                // Directed stake lamports will be cleaned up in remove_validator
+                // Directed stake lamports and indices will be cleaned up in remove_validator
                 stake_meta.total_stake_targets -= 1;
             }
         }
@@ -98,6 +98,7 @@ pub fn handler(
             stake_meta.targets[target_index] = new_target;
             stake_meta.total_stake_targets += 1;
             stake_meta.directed_stake_lamports[validator_list_index] = target_lamports;
+            stake_meta.directed_stake_meta_indices[validator_list_index] = target_index;
         }
     }
     Ok(())

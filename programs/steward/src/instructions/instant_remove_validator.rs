@@ -94,10 +94,9 @@ pub fn handler(
         StewardError::ListStateMismatch
     );
 
-    state_account.state.remove_validator(
-        validator_index_to_remove,
-        &mut directed_stake_meta.directed_stake_lamports,
-    )?;
+    state_account
+        .state
+        .remove_validator(validator_index_to_remove, &mut directed_stake_meta)?;
 
     Ok(())
 }

@@ -1290,6 +1290,7 @@ async fn test_rebalance_decrease() {
     let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
+    println!("Loaded config and state.");
     // TODO FIX?
     steward_config.parameters.scoring_unstake_cap_bps = 250;
     steward_config.parameters.instant_unstake_cap_bps = 250;
@@ -1340,6 +1341,7 @@ async fn test_rebalance_decrease() {
             .set(i, true)
             .unwrap();
     }
+    println!("Set instant unstake for {} validators", MAX_VALIDATORS / 2);
     steward_state_account
         .state
         .instant_unstake
@@ -1434,6 +1436,8 @@ async fn test_rebalance_decrease() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
+    println!("Submitted add validator to pool transaction.");
+
     let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
 
@@ -1450,6 +1454,8 @@ async fn test_rebalance_decrease() {
 
     let mut stake_account =
         StakeStateV2::deserialize(&mut stake_account_data.data.as_slice()).unwrap();
+
+    println!("Loaded stake account.");
 
     let (stake_meta, mut stake_stake, stake_flags) =
         if let StakeStateV2::Stake(meta, stake, flags) = stake_account {
@@ -1557,13 +1563,18 @@ async fn test_rebalance_decrease() {
     );
     fixture.submit_transaction_assert_success(tx).await;
 
-    let stake_account_data = fixture.get_account(&stake_account_address).await;
+    println!("Submitted rebalance transaction.");
 
+    let stake_account_data = fixture.get_account(&stake_account_address).await;
+    println!("Loaded stake account data.");
     let stake_account = StakeStateV2::deserialize(&mut stake_account_data.data.as_slice()).unwrap();
 
     let transient_stake_account = fixture.get_account(&transient_stake_account_address).await;
+    println!("Loaded transient stake account data.");
     let transient_stake_account =
         StakeStateV2::deserialize(&mut transient_stake_account.data.as_slice()).unwrap();
+
+    println!("Loaded stake and transient stake accounts.");
 
     assert_eq!(
         stake_account.stake().unwrap().delegation.stake,

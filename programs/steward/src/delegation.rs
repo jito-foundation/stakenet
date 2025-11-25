@@ -58,8 +58,17 @@ pub fn decrease_stake_calculation(
         let (mut temp_current_lamports, some_transient_stake) =
             stake_lamports_at_validator_list_index(validator_list, temp_index)?;
 
-        temp_current_lamports = temp_current_lamports
-            .saturating_sub(directed_stake_meta.directed_stake_lamports[temp_index]);
+        let directed_stake_meta_index = directed_stake_meta.directed_stake_meta_indices[temp_index];
+        let (new_directed_stake_lamports, new_total_stake_lamports) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
+                temp_current_lamports,
+                temp_index,
+                directed_stake_meta_index,
+                directed_stake_meta,
+            )?;
+
+        temp_current_lamports =
+            new_total_stake_lamports.saturating_sub(new_directed_stake_lamports);
 
         // ValidatorList includes base lamports in active_stake_lamports
         temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);
@@ -143,8 +152,18 @@ pub fn increase_stake_calculation(
                 let (mut temp_current_lamports, some_transient_stake) =
                     stake_lamports_at_validator_list_index(validator_list, temp_index)?;
 
-                temp_current_lamports = temp_current_lamports
-                    .saturating_sub(directed_stake_meta.directed_stake_lamports[temp_index]);
+                let directed_stake_meta_index =
+                    directed_stake_meta.directed_stake_meta_indices[temp_index];
+                let (new_directed_stake_lamports, new_total_stake_lamports) = state
+                    .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
+                        temp_current_lamports,
+                        temp_index,
+                        directed_stake_meta_index,
+                        directed_stake_meta,
+                    )?;
+
+                temp_current_lamports =
+                    new_total_stake_lamports.saturating_sub(new_directed_stake_lamports);
 
                 // ValidatorList includes base lamports in active_stake_lamports
                 temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);

@@ -272,6 +272,7 @@ async fn populate_directed_stake_meta_after_init(
             targets
         },
         directed_stake_lamports: [0; MAX_VALIDATORS],
+        directed_stake_meta_indices: [0; MAX_VALIDATORS],
     };
 
     // Serialize with discriminator

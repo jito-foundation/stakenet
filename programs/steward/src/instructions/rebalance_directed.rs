@@ -145,7 +145,9 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
                 directed_stake_meta_index,
                 withdrawal_lamports,
             );
-            directed_stake_meta.directed_stake_lamports[validator_list_index] =  directed_stake_meta.directed_stake_lamports[validator_list_index].saturating_sub(withdrawal_lamports);
+            directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
+                .directed_stake_lamports[validator_list_index]
+                .saturating_sub(withdrawal_lamports);
         }
     } else if target_total_staked_lamports > steward_state_total_lamports
         && (directed_stake_applied_lamports < directed_stake_target_lamports)
@@ -157,8 +159,9 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         let increase_lamports = directed_deficit_lamports.min(deposit_lamports);
         directed_stake_meta
             .add_to_total_staked_lamports(directed_stake_meta_index, increase_lamports);
-        directed_stake_meta.directed_stake_lamports[validator_list_index] =
-            directed_stake_meta.directed_stake_lamports[validator_list_index].saturating_add(increase_lamports);
+        directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
+            .directed_stake_lamports[validator_list_index]
+            .saturating_add(increase_lamports);
     }
     Ok(())
 }
@@ -506,6 +509,7 @@ mod tests {
                 _padding0: [0; 32],
             }; MAX_VALIDATORS],
             directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [0; MAX_VALIDATORS],
         }
     }
 
@@ -752,7 +756,8 @@ mod tests {
             0
         );
 
-        let withdrawal_lamports = steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
+        let withdrawal_lamports =
+            steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
         // The entire remaining lamports should be undirected stake, equal to the old total minus the withdrawal lamports
         assert_eq!(
             state_account.state.validator_lamport_balances[validator_list_index],

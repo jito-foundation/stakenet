@@ -1630,7 +1630,7 @@ fn test_increase_stake_calculation() {
         RebalanceType::Increase(lamports) => lamports == 500 * LAMPORTS_PER_SOL,
         _ => false,
     });
-
+    
     // Same scenario but targeting first validator
     let target_validator = default_fixture.validators[0];
     let result = increase_stake_calculation(
@@ -1645,6 +1645,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
+    println!("result: {:?}", result);
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 2000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -1719,6 +1720,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
+    println!("result: {:?}", result);
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 1000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -2057,6 +2059,7 @@ fn test_decrease_stake_calculation() {
         0,
         0,
     );
+    println!("Should be None: {:?}", result);
     assert!(matches!(result.unwrap(), RebalanceType::None));
 
     // Test: Stake deposit cap reached on target validator
