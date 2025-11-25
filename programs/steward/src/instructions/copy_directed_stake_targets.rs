@@ -63,27 +63,9 @@ pub fn handler(
     let clock = Clock::get()?;
     match stake_meta.get_target_index(&vote_pubkey) {
         Some(target_index) => {
-            if target_lamports > 0 {
-                msg!("Updating target index: {}", target_index);
-                stake_meta.targets[target_index].total_target_lamports = target_lamports;
-                stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
-            } else {
-                msg!("Removing target index: {}", target_index);
-                let total_targets = stake_meta.total_stake_targets as usize;
-                for i in target_index..total_targets - 1 {
-                    stake_meta.targets[i] = stake_meta.targets[i + 1];
-                }
-                stake_meta.targets[total_targets - 1] = DirectedStakeTarget {
-                    vote_pubkey: Pubkey::default(),
-                    total_target_lamports: 0,
-                    total_staked_lamports: 0,
-                    target_last_updated_epoch: 0,
-                    staked_last_updated_epoch: 0,
-                    _padding0: [0; 32],
-                };
-                // Directed stake lamports and indices will be cleaned up in remove_validator
-                stake_meta.total_stake_targets -= 1;
-            }
+            msg!("Updating target index: {}", target_index);
+            stake_meta.targets[target_index].total_target_lamports = target_lamports;
+            stake_meta.targets[target_index].target_last_updated_epoch = clock.epoch;
         }
         None => {
             let new_target = DirectedStakeTarget {
