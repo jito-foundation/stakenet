@@ -922,10 +922,7 @@ impl StewardStateV2 {
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Result<(u64, u64)> {
         if directed_stake_meta.directed_stake_lamports[validator_list_index] == 0 {
-            return Ok((
-                0,
-                target_total_staked_lamports,
-            ));
+            return Ok((0, target_total_staked_lamports));
         }
         let (mut new_directed_stake_lamports, mut new_total_stake_lamports) = (0u64, 0u64);
         let steward_state_total_lamports = self.validator_lamport_balances[validator_list_index];

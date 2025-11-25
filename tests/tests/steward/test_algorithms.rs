@@ -1630,7 +1630,7 @@ fn test_increase_stake_calculation() {
         RebalanceType::Increase(lamports) => lamports == 500 * LAMPORTS_PER_SOL,
         _ => false,
     });
-    
+
     // Same scenario but targeting first validator
     let target_validator = default_fixture.validators[0];
     let result = increase_stake_calculation(
