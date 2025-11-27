@@ -20,11 +20,25 @@ pub async fn command_view_directed_stake_meta(
 
     println!("\n📊 DirectedStakeMeta Information:");
 
+    println!("\nTotal stake targets: {}", stake_meta.total_stake_targets);
+    println!(
+        "Total staked lamports: {}",
+        stake_meta.total_staked_lamports()
+    );
+    println!(
+        "Directed unstake total: {}",
+        stake_meta.directed_unstake_total
+    );
+
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {
         let validator = &stake_meta.targets[i];
         if validator.vote_pubkey != Pubkey::default() {
             println!("  Target {}:", i + 1);
+            println!(
+                "    Target Index: {:?}",
+                stake_meta.get_target_index(&validator.vote_pubkey)
+            );
             println!("    Vote Pubkey: {}", validator.vote_pubkey);
             println!("    Target Lamports: {}", validator.total_target_lamports);
             println!(
