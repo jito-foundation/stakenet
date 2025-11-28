@@ -11,6 +11,7 @@ use anyhow::Result;
 use jito_steward::state::directed_stake::{DirectedStakeTicket, DirectedStakeWhitelist};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::read_keypair_file;
 use solana_sdk::signer::Signer;
@@ -88,7 +89,11 @@ pub async fn command_init_directed_stake_ticket(
         print_base58_tx(&configured_ix)
     } else {
         let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
+            .send_and_confirm_transaction_with_spinner_and_config(
+                &transaction,
+                CommitmentConfig::processed(),
+                RpcSendTransactionConfig::default(),
+            )
             .await?;
 
         println!("✅ DirectedStakeTicket initialized successfully!");

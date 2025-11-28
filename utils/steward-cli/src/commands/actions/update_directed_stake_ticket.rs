@@ -10,9 +10,10 @@ use anchor_lang::AccountDeserialize;
 use anyhow::anyhow;
 use clap::Parser;
 use jito_steward::DirectedStakePreference;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
 
@@ -129,7 +130,11 @@ pub(crate) async fn command_update_directed_stake_ticket(
     );
 
     let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
+        .send_and_confirm_transaction_with_spinner_and_config(
+            &transaction,
+            CommitmentConfig::processed(),
+            RpcSendTransactionConfig::default(),
+        )
         .await?;
 
     println!("Signature: {signature}");

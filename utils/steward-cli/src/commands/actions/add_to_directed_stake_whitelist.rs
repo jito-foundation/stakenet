@@ -4,10 +4,11 @@ use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use jito_steward::DirectedStakeRecordType;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::{
     accounts::get_directed_stake_whitelist_address,
@@ -93,7 +94,11 @@ pub async fn command_add_to_directed_stake_whitelist(
         print_base58_tx(&configured_ix)
     } else {
         let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
+            .send_and_confirm_transaction_with_spinner_and_config(
+                &transaction,
+                CommitmentConfig::processed(),
+                RpcSendTransactionConfig::default(),
+            )
             .await?;
 
         println!("✅ Added to directed stake whitelist successfully!");

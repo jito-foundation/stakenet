@@ -439,21 +439,22 @@ pub async fn get_directed_stake_meta(
     client: Arc<RpcClient>,
     steward_config_address: &Pubkey,
     program_id: &Pubkey,
-) -> Result<DirectedStakeMeta, JitoTransactionError> {
-    let directed_stake_meta_pda =
+) -> Result<Box<DirectedStakeMeta>, JitoTransactionError> {
+let directed_stake_meta_pda =
         get_directed_stake_meta_address(steward_config_address, program_id);
 
     let directed_stake_meta_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;
 
-    let directed_stake_meta =
+    let directed_stake_meta = Box::new(
         DirectedStakeMeta::try_deserialize(&mut directed_stake_meta_account_data.as_slice())
             .map_err(|e| {
                 JitoTransactionError::Custom(format!(
                     "Failed to deserialize directed stake meta account: {}",
                     e
                 ))
-            })?;
+            })?,
+    );
 
     Ok(directed_stake_meta)
 }
