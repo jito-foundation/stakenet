@@ -4,7 +4,8 @@ use std::{
     sync::Arc,
 };
 
-use clap::{arg, command, Parser};
+use anyhow::anyhow;
+use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{account::Account, pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
 use stakenet_keeper::entries::copy_vote_account_entry::CopyVoteAccountEntry;
@@ -18,24 +19,24 @@ use stakenet_sdk::{
 };
 
 #[derive(Parser)]
-#[command(about = "Copy vote account")]
+#[command(about = "Crank to copy vote account data to validator history accounts")]
 pub struct CrankCopyVoteAccount {
-    /// Path to oracle authority keypair
+    /// Path to keypair for transaction signing
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
 }
 
-pub async fn command_crank_copy_vote_account(args: CrankCopyVoteAccount, rpc_url: String) {
-    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<()> {
+    let keypair = read_keypair_file(args.keypair_path)
+        .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
     let client = RpcClient::new(rpc_url);
     let client = Arc::new(client);
 
-    let epoch_info = client.get_epoch_info().await.unwrap();
+    let epoch_info = client.get_epoch_info().await?;
 
-    let validator_histories = get_all_validator_history_accounts(&client, validator_history::id())
-        .await
-        .expect("Failed to get all validator history accounts");
+    let validator_histories =
+        get_all_validator_history_accounts(&client, validator_history::id()).await?;
 
     let validator_history_map = HashMap::from_iter(
         validator_histories
@@ -47,9 +48,7 @@ pub async fn command_crank_copy_vote_account(args: CrankCopyVoteAccount, rpc_url
         validator_history_map.keys().cloned().collect();
 
     let all_history_vote_accounts =
-        get_multiple_accounts_batched(all_history_vote_account_pubkeys.as_slice(), &client)
-            .await
-            .unwrap();
+        get_multiple_accounts_batched(all_history_vote_account_pubkeys.as_slice(), &client).await?;
 
     let all_history_vote_account_map = all_history_vote_account_pubkeys
         .into_iter()
@@ -104,4 +103,6 @@ pub async fn command_crank_copy_vote_account(args: CrankCopyVoteAccount, rpc_url
     .await;
 
     println!("Submit Result: {submit_result:?}");
+
+    Ok(())
 }

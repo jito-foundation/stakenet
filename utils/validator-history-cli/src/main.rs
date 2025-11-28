@@ -20,10 +20,7 @@ use validator_history::{
     ValidatorHistoryEntry,
 };
 use validator_history_cli::{
-    commands::{
-        self,
-        cranks::copy_vote_account::{command_crank_copy_vote_account, CrankCopyVoteAccount},
-    },
+    commands::{self, cranks::copy_vote_account::CrankCopyVoteAccount},
     validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
 
@@ -1258,7 +1255,7 @@ fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenv().ok();
     env_logger::init();
     let args = Args::parse();
@@ -1283,7 +1280,9 @@ async fn main() {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
         }
         Commands::CrankCopyVoteAccount(command_args) => {
-            command_crank_copy_vote_account(command_args, args.json_rpc_url).await
+            commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
         }
     };
+
+    Ok(())
 }
