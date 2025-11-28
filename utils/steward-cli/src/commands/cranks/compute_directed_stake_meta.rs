@@ -28,9 +28,10 @@ use std::{
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_config::RpcSendTransactionConfig};
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_directed_stake_tickets},
@@ -213,7 +214,11 @@ pub async fn command_crank_compute_directed_stake_meta(
     );
 
     let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
+        .send_and_confirm_transaction_with_spinner_and_config(
+            &transaction,
+            CommitmentConfig::processed(),
+            RpcSendTransactionConfig::default(),
+        )
         .await?;
 
     println!("\n=== Transaction Successful ===");
