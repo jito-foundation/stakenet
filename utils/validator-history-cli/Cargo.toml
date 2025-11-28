@@ -5,8 +5,8 @@ edition = "2021"
 description = "CLI to manage validator history program"
 
 [dependencies]
-anyhow = { workspace = true }
 anchor-lang = "0.31.1"
+anyhow = { workspace = true }
 borsh = { package = "borsh", version = "1.5.7" }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = { workspace = true }
