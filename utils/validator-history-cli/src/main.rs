@@ -20,7 +20,11 @@ use validator_history::{
     ValidatorHistoryEntry,
 };
 use validator_history_cli::{
-    commands, validator_history_entry_output::ValidatorHistoryEntryOutput,
+    commands::{
+        self,
+        cranks::copy_vote_account::{command_crank_copy_vote_account, CrankCopyVoteAccount},
+    },
+    validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
 
 #[derive(Parser)]
@@ -55,6 +59,9 @@ enum Commands {
     UpdateOracleAuthority(UpdateOracleAuthority),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
+
+    // Cranks
+    CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
 #[derive(Parser)]
@@ -1274,6 +1281,9 @@ async fn main() {
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
+        Commands::CrankCopyVoteAccount(command_args) => {
+            command_crank_copy_vote_account(command_args, args.json_rpc_url).await
         }
     };
 }
