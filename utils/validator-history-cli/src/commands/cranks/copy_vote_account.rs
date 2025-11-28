@@ -12,10 +12,10 @@ use stakenet_sdk::{
     models::entries::UpdateInstruction,
     utils::{
         accounts::get_all_validator_history_accounts,
+        helpers::vote_account_uploaded_recently,
         transactions::{get_multiple_accounts_batched, submit_instructions},
     },
 };
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 #[derive(Parser)]
 #[command(about = "Copy vote account")]
@@ -104,24 +104,4 @@ pub async fn command_crank_copy_vote_account(args: CrankCopyVoteAccount, rpc_url
     .await;
 
     println!("Submit Result: {submit_result:?}");
-}
-
-fn vote_account_uploaded_recently(
-    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-    vote_account: &Pubkey,
-    epoch: u64,
-    slot: u64,
-) -> bool {
-    if let Some(validator_history) = validator_history_map.get(vote_account) {
-        if let Some(entry) = validator_history.history.last() {
-            if entry.epoch == epoch as u16
-                && entry.vote_account_last_update_slot
-                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
-                && entry.vote_account_last_update_slot > slot - 50000
-            {
-                return true;
-            }
-        }
-    }
-    false
 }
