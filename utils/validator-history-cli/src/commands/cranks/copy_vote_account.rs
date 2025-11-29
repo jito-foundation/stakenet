@@ -6,15 +6,18 @@ use std::{
 
 use anyhow::anyhow;
 use clap::Parser;
+use futures::future::join_all;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{account::Account, pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
+use solana_sdk::{
+    account::Account, instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
+};
 use stakenet_keeper::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use stakenet_sdk::{
     models::entries::UpdateInstruction,
     utils::{
-        accounts::get_all_validator_history_accounts,
-        helpers::vote_account_uploaded_recently,
-        transactions::{get_multiple_accounts_batched, submit_instructions},
+        accounts::get_all_validator_history_accounts, helpers::vote_account_uploaded_recently,
+        transactions::get_multiple_accounts_batched,
     },
 };
 
@@ -90,19 +93,39 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
         .map(|copy_vote_account_entry| copy_vote_account_entry.update_instruction())
         .collect::<Vec<_>>();
 
-    let submit_result = submit_instructions(
-        &client,
-        update_instructions,
-        &keypair,
-        0,
-        50,
-        0,
-        Some(300_000),
-        false,
-    )
-    .await;
+    let hash = client.get_latest_blockhash().await?;
 
-    println!("Submit Result: {submit_result:?}");
+    let send_futures = update_instructions.into_iter().map(|ix| {
+        let client = Arc::clone(&client);
+        let keypair = Arc::clone(&keypair);
+        send_transaction(client, keypair, ix, hash)
+    });
 
+    let results = join_all(send_futures).await;
+
+    for result in results {
+        if let Err(e) = result {
+            eprintln!("Transaction failed: {e}");
+        }
+    }
+
+    Ok(())
+}
+
+async fn send_transaction(
+    client: Arc<RpcClient>,
+    keypair: Arc<solana_sdk::signature::Keypair>,
+    ix: Instruction,
+    hash: solana_sdk::hash::Hash,
+) -> anyhow::Result<()> {
+    let transaction = Transaction::new_signed_with_payer(
+        &[ix],
+        Some(&keypair.pubkey()),
+        &[keypair.as_ref()],
+        hash,
+    );
+    client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .await?;
     Ok(())
 }

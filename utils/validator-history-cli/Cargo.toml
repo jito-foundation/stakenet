@@ -11,6 +11,7 @@ borsh = { package = "borsh", version = "1.5.7" }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = { workspace = true }
 env_logger = "0.10.0"
+futures = { workspace = true }
 ipinfo = { workspace = true }
 log = "0.4.18"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
