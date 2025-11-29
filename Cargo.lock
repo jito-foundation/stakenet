@@ -12014,6 +12014,7 @@ name = "validator-history-cli"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "anyhow",
  "borsh 1.5.7",
  "clap 4.5.51",
  "dotenvy",

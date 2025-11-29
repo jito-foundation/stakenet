@@ -4,6 +4,7 @@ use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStake
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
 use spl_associated_token_account::get_associated_token_address;
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::models::{
     aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
@@ -12,6 +13,26 @@ use crate::models::{
 use solana_program::borsh1::try_from_slice_unchecked;
 
 use super::accounts::get_validator_history_address;
+
+pub fn vote_account_uploaded_recently(
+    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
+    vote_account: &Pubkey,
+    epoch: u64,
+    slot: u64,
+) -> bool {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
+        if let Some(entry) = validator_history.history.last() {
+            if entry.epoch == epoch as u16
+                && entry.vote_account_last_update_slot
+                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
+                && entry.vote_account_last_update_slot > slot - 50000
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
 
 // ------------------- BALANCE --------------------------
 pub async fn get_balance_with_retry(
