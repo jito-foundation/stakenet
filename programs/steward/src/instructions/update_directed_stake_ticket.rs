@@ -19,7 +19,7 @@ pub struct UpdateDirectedStakeTicket<'info> {
 
     #[account(
         mut,
-        seeds = [DirectedStakeTicket::SEED, signer.key().as_ref()],
+        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), signer.key().as_ref()],
         bump
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
@@ -34,15 +34,20 @@ impl UpdateDirectedStakeTicket<'_> {
     pub fn auth(
         ticket: &DirectedStakeTicket,
         whitelist: &DirectedStakeWhitelist,
-        authority_pubkey: &Pubkey,
+        signer_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
+        ticket_override_authority: &Pubkey,
     ) -> Result<()> {
-        if !whitelist.is_staker_permissioned(authority_pubkey) {
+        if !whitelist.is_staker_permissioned(signer_pubkey)
+            && signer_pubkey != ticket_override_authority
+        {
             return Err(error!(StewardError::Unauthorized));
         }
 
-        if authority_pubkey != &ticket.ticket_update_authority {
-            msg!("Error: Only the ticket update authority can update ticket preferences");
+        if signer_pubkey != &ticket.ticket_update_authority
+            && signer_pubkey != ticket_override_authority
+        {
+            msg!("Error: Only a valid ticket authority can update tickets.");
             return Err(error!(StewardError::Unauthorized));
         }
 
@@ -55,7 +60,6 @@ impl UpdateDirectedStakeTicket<'_> {
                 return Err(error!(StewardError::Unauthorized));
             }
         }
-
         Ok(())
     }
 }
@@ -66,8 +70,15 @@ pub fn handler(
 ) -> Result<()> {
     let whitelist = ctx.accounts.whitelist_account.load()?;
     let mut ticket = ctx.accounts.ticket_account.load_mut()?;
+    let config = ctx.accounts.config.load()?;
 
-    UpdateDirectedStakeTicket::auth(&ticket, &whitelist, ctx.accounts.signer.key, &preferences)?;
+    UpdateDirectedStakeTicket::auth(
+        &ticket,
+        &whitelist,
+        ctx.accounts.signer.key,
+        &preferences,
+        &config.directed_stake_ticket_override_authority,
+    )?;
 
     if preferences.len() > crate::MAX_PREFERENCES_PER_TICKET {
         msg!("Error: Too many preferences provided");

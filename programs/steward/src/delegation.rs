@@ -3,6 +3,7 @@ use spl_stake_pool::big_vec::BigVec;
 
 use crate::constants::LAMPORT_BALANCE_DEFAULT;
 use crate::events::DecreaseComponents;
+use crate::state::directed_stake::DirectedStakeMeta;
 use crate::{
     errors::StewardError,
     utils::{get_target_lamports, stake_lamports_at_validator_list_index},
@@ -26,6 +27,7 @@ pub enum RebalanceType {
 #[allow(clippy::too_many_arguments)]
 pub fn decrease_stake_calculation(
     state: &StewardStateV2,
+    directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     mut unstake_state: UnstakeState,
     current_lamports: u64, // active lamports in target stake account adjusted for minimum delegation
@@ -55,6 +57,18 @@ pub fn decrease_stake_calculation(
 
         let (mut temp_current_lamports, some_transient_stake) =
             stake_lamports_at_validator_list_index(validator_list, temp_index)?;
+
+        let directed_stake_meta_index = directed_stake_meta.directed_stake_meta_indices[temp_index];
+        let (new_directed_stake_lamports, new_total_stake_lamports) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
+                temp_current_lamports,
+                temp_index,
+                directed_stake_meta_index as usize,
+                directed_stake_meta,
+            )?;
+
+        temp_current_lamports =
+            new_total_stake_lamports.saturating_sub(new_directed_stake_lamports);
 
         // ValidatorList includes base lamports in active_stake_lamports
         temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);
@@ -107,6 +121,7 @@ pub fn decrease_stake_calculation(
 #[allow(clippy::too_many_arguments)]
 pub fn increase_stake_calculation(
     state: &StewardStateV2,
+    directed_stake_meta: &DirectedStakeMeta,
     target_index: usize,
     current_lamports: u64,
     stake_pool_lamports: u64,
@@ -136,6 +151,19 @@ pub fn increase_stake_calculation(
 
                 let (mut temp_current_lamports, some_transient_stake) =
                     stake_lamports_at_validator_list_index(validator_list, temp_index)?;
+
+                let directed_stake_meta_index =
+                    directed_stake_meta.directed_stake_meta_indices[temp_index];
+                let (new_directed_stake_lamports, new_total_stake_lamports) = state
+                    .simulate_adjust_directed_stake_for_deposits_and_withdrawals(
+                        temp_current_lamports,
+                        temp_index,
+                        directed_stake_meta_index as usize,
+                        directed_stake_meta,
+                    )?;
+
+                temp_current_lamports =
+                    new_total_stake_lamports.saturating_sub(new_directed_stake_lamports);
 
                 // ValidatorList includes base lamports in active_stake_lamports
                 temp_current_lamports = temp_current_lamports.saturating_sub(base_lamport_balance);

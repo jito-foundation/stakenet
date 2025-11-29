@@ -269,6 +269,24 @@ pub fn get_transient_stake_seed_at_index(
     Ok(transient_seed)
 }
 
+pub fn get_transient_stake_seed_at_index_from_big_vec(
+    validator_list: &BigVec<'_>,
+    index: usize,
+) -> Result<u64> {
+    let transient_seed_index = VEC_SIZE_BYTES
+        .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
+        .saturating_add(TRANSIENT_STAKE_SEED_OFFSET);
+    let transient_seed_end_index = transient_seed_index
+        .checked_add(TRANSIENT_STAKE_SEED_LENGTH)
+        .ok_or(StewardError::ArithmeticError)?;
+    let slice: [u8; TRANSIENT_STAKE_SEED_LENGTH] = validator_list.data
+        [transient_seed_index..transient_seed_end_index]
+        .try_into()
+        .map_err(|_| StewardError::ArithmeticError)?;
+    let transient_seed = u64::from_le_bytes(slice);
+    Ok(transient_seed)
+}
+
 pub struct StakeStatusTally {
     pub active: u64,
     pub deactivating_transient: u64,
@@ -403,6 +421,28 @@ pub fn get_validator_list_length(validator_list_account_info: &AccountInfo) -> R
         StewardError::ValidatorListTypeMismatch
     );
     Ok(validator_list.len() as usize)
+}
+
+/// Check if a vote account exists in the validator list
+pub fn validator_exists_in_list(
+    validator_list_account_info: &AccountInfo,
+    vote_account: &Pubkey,
+) -> Result<bool> {
+    let mut validator_list_data = validator_list_account_info.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+
+    for index in 0..validator_list.len() as usize {
+        let vote_pubkey = vote_pubkey_at_validator_list_index(&validator_list, index)?;
+        if vote_pubkey == *vote_account {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// A boolean type stored as a u8.

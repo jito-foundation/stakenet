@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 
 use crate::state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget};
+use crate::utils::get_validator_list;
+use crate::utils::vote_pubkey_at_validator_list_index;
 use crate::{errors::StewardError, Config};
+use spl_stake_pool::state::ValidatorListHeader;
 use std::mem::size_of;
-
 #[derive(Accounts)]
 pub struct CopyDirectedStakeTargets<'info> {
     #[account()]
@@ -17,6 +19,13 @@ pub struct CopyDirectedStakeTargets<'info> {
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 
     pub clock: Sysvar<'info, Clock>,
+
+    /// CHECK: Used to get validator_list_index of target
+    #[account(
+        mut,
+        address = get_validator_list(&config)?,
+    )]
+    pub validator_list: AccountInfo<'info>,
 
     #[account(
         mut,
@@ -33,15 +42,21 @@ pub fn handler(
     ctx: Context<CopyDirectedStakeTargets>,
     vote_pubkey: Pubkey,
     target_lamports: u64,
+    validator_list_index: usize,
 ) -> Result<()> {
     let mut stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
-    let config = ctx.accounts.config.load()?;
 
-    if vote_pubkey == Pubkey::default() {
-        return Err(error!(StewardError::Unauthorized));
-    }
+    let mut validator_list_data = ctx.accounts.validator_list.try_borrow_mut_data()?;
+    let (header, validator_list) = ValidatorListHeader::deserialize_vec(&mut validator_list_data)?;
+    require!(
+        header.account_type == spl_stake_pool::state::AccountType::ValidatorList,
+        StewardError::ValidatorListTypeMismatch
+    );
+    let validator_list_vote_pubkey =
+        vote_pubkey_at_validator_list_index(&validator_list, validator_list_index)?;
 
-    if ctx.accounts.authority.key() != config.directed_stake_meta_upload_authority {
+    if validator_list_vote_pubkey != vote_pubkey {
+        msg!("Validator list vote pubkey does not match vote pubkey");
         return Err(error!(StewardError::Unauthorized));
     }
 
@@ -64,6 +79,8 @@ pub fn handler(
             let target_index = stake_meta.total_stake_targets as usize;
             stake_meta.targets[target_index] = new_target;
             stake_meta.total_stake_targets += 1;
+            stake_meta.directed_stake_lamports[validator_list_index] = target_lamports;
+            stake_meta.directed_stake_meta_indices[validator_list_index] = target_index as u64;
         }
     }
     Ok(())

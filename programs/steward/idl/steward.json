@@ -34,6 +34,13 @@
           "name": "authority",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "stake_pool"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
         }
       ],
       "args": [
@@ -392,6 +399,9 @@
           "writable": true
         },
         {
+          "name": "whitelist_account"
+        },
+        {
           "name": "authority",
           "writable": true,
           "signer": true
@@ -600,6 +610,10 @@
           "name": "clock"
         },
         {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
           "name": "authority",
           "writable": true,
           "signer": true
@@ -613,6 +627,10 @@
         {
           "name": "total_target_lamports",
           "type": "u64"
+        },
+        {
+          "name": "validator_list_index",
+          "type": "u32"
         }
       ]
     },
@@ -824,6 +842,10 @@
         },
         {
           "name": "stake_pool"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
         }
       ],
       "args": [
@@ -1251,6 +1273,10 @@
         },
         {
           "name": "stake_pool"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
         }
       ],
       "args": [
@@ -1602,10 +1628,6 @@
         {
           "name": "directed_stake_meta_index",
           "type": "u64"
-        },
-        {
-          "name": "validator_list_index",
-          "type": "u64"
         }
       ]
     },
@@ -1629,7 +1651,8 @@
           "name": "config"
         },
         {
-          "name": "directed_stake_whitelist"
+          "name": "directed_stake_whitelist",
+          "writable": true
         },
         {
           "name": "authority",
@@ -2250,6 +2273,19 @@
       ]
     },
     {
+      "name": "DirectedRebalanceEvent",
+      "discriminator": [
+        187,
+        63,
+        59,
+        72,
+        191,
+        64,
+        113,
+        29
+      ]
+    },
+    {
       "name": "EpochMaintenanceEvent",
       "discriminator": [
         255,
@@ -2609,6 +2645,17 @@
             "fields": [
               {
                 "name": "SetDirectedStakeMetaUploadAuthority",
+                "type": {
+                  "option": "u8"
+                }
+              }
+            ]
+          },
+          {
+            "name": "SetDirectedStakeTicketOverrideAuthority",
+            "fields": [
+              {
+                "name": "SetDirectedStakeTicketOverrideAuthority",
                 "type": {
                   "option": "u8"
                 }
@@ -3014,6 +3061,13 @@
             "type": "pubkey"
           },
           {
+            "name": "directed_stake_ticket_override_authority",
+            "docs": [
+              "The authoirty that can override directed stake tickets"
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "_padding",
             "docs": [
               "Padding for future governance parameters"
@@ -3021,7 +3075,7 @@
             "type": {
               "array": [
                 "u8",
-                920
+                888
               ]
             }
           }
@@ -3077,6 +3131,38 @@
       }
     },
     {
+      "name": "DirectedRebalanceEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vote_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u16"
+          },
+          {
+            "name": "rebalance_type_tag",
+            "type": {
+              "defined": {
+                "name": "RebalanceTypeTag"
+              }
+            }
+          },
+          {
+            "name": "increase_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "decrease_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "DirectedStakeMeta",
       "serialization": "bytemuck",
       "repr": {
@@ -3090,18 +3176,6 @@
             "type": "u64"
           },
           {
-            "name": "epoch_increase_total_lamports",
-            "type": "u64"
-          },
-          {
-            "name": "epoch_decrease_total_lamports",
-            "type": "u64"
-          },
-          {
-            "name": "epoch_last_updated",
-            "type": "u64"
-          },
-          {
             "name": "directed_unstake_total",
             "type": "u64"
           },
@@ -3110,8 +3184,16 @@
             "type": {
               "array": [
                 "u8",
-                64
+                63
               ]
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
             }
           },
           {
@@ -3123,7 +3205,25 @@
                     "name": "DirectedStakeTarget"
                   }
                 },
-                2048
+                5000
+              ]
+            }
+          },
+          {
+            "name": "directed_stake_lamports",
+            "type": {
+              "array": [
+                "u64",
+                5000
+              ]
+            }
+          },
+          {
+            "name": "directed_stake_meta_indices",
+            "type": {
+              "array": [
+                "u64",
+                5000
               ]
             }
           }
@@ -3329,7 +3429,7 @@
             "type": {
               "array": [
                 "pubkey",
-                2048
+                5000
               ]
             }
           },
@@ -3350,8 +3450,16 @@
             "type": {
               "array": [
                 "u8",
-                250
+                249
               ]
+            }
+          },
+          {
+            "name": "is_initialized",
+            "type": {
+              "defined": {
+                "name": "U8Bool"
+              }
             }
           }
         ]
@@ -3751,20 +3859,6 @@
             "type": "f64"
           },
           {
-            "name": "min_epoch_progress_for_compute_directed_stake_meta",
-            "docs": [
-              "The minimum epoch progress for computing directed stake meta"
-            ],
-            "type": "f64"
-          },
-          {
-            "name": "max_epoch_progress_for_directed_rebalance",
-            "docs": [
-              "The maximum epoch progress for directed rebalance"
-            ],
-            "type": "f64"
-          },
-          {
             "name": "num_epochs_between_scoring",
             "docs": [
               "Number of epochs a given validator set will be delegated to before recomputing scores"
@@ -3786,13 +3880,6 @@
             "type": "u64"
           },
           {
-            "name": "compute_score_epoch_progress",
-            "docs": [
-              "The minimum epoch progress for computing scores"
-            ],
-            "type": "f64"
-          },
-          {
             "name": "priority_fee_scoring_start_epoch",
             "docs": [
               "The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs"
@@ -3800,11 +3887,45 @@
             "type": "u16"
           },
           {
+            "name": "_padding_0",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "_padding_1",
+            "type": {
+              "array": [
+                "u64",
+                28
+              ]
+            }
+          },
+          {
+            "name": "compute_score_epoch_progress",
+            "docs": [
+              "The minimum epoch progress for computing scores"
+            ],
+            "type": "f64"
+          },
+          {
             "name": "directed_stake_unstake_cap_bps",
             "docs": [
               "Maximum percentage of the pool to be unstaked from directed stake (in basis points)"
             ],
             "type": "u16"
+          },
+          {
+            "name": "_padding_2",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
           },
           {
             "name": "undirected_stake_floor_lamports",
@@ -3817,24 +3938,6 @@
               "array": [
                 "u8",
                 8
-              ]
-            }
-          },
-          {
-            "name": "_padding_0",
-            "type": {
-              "array": [
-                "u8",
-                4
-              ]
-            }
-          },
-          {
-            "name": "_padding_1",
-            "type": {
-              "array": [
-                "u64",
-                27
               ]
             }
           }

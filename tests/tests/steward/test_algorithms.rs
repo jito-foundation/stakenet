@@ -13,6 +13,7 @@
 // Specifically: 100 << 56 = 7,205,759,403,792,793,600 (starts with 7.2...)
 // Adding the other perfect tier scores increases this to ~7.24... × 10^18
 use crate::steward::serialize_validator_list;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     constants::{
         EPOCH_DEFAULT, LAMPORT_BALANCE_DEFAULT, SORTED_INDEX_DEFAULT, TVC_ACTIVATION_EPOCH,
@@ -1600,6 +1601,7 @@ fn test_increase_stake_calculation() {
     // All reserve SOL should go to validator[0] since its score is 1.0 > 0.95
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         target_validator.index as usize,
         u64::from(validator_list[2].active_stake_lamports),
         4000 * LAMPORTS_PER_SOL,
@@ -1614,6 +1616,7 @@ fn test_increase_stake_calculation() {
     // Same scenario but 2500 SOL in reserve, 2000 goes to validator[0] and 500 goes to validator[2]
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         target_validator.index as usize,
         u64::from(validator_list[2].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
@@ -1632,6 +1635,7 @@ fn test_increase_stake_calculation() {
     let target_validator = default_fixture.validators[0];
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         target_validator.index as usize,
         u64::from(validator_list[0].active_stake_lamports),
         5000 * LAMPORTS_PER_SOL,
@@ -1641,6 +1645,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
+    println!("result: {:?}", result);
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 2000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -1661,6 +1666,7 @@ fn test_increase_stake_calculation() {
 
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         0,
         u64::from(validator_list[0].active_stake_lamports),
         4000 * LAMPORTS_PER_SOL,
@@ -1677,6 +1683,7 @@ fn test_increase_stake_calculation() {
     // Bad index validator error
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         3,
         u64::from(validator_list[0].active_stake_lamports),
         4000 * LAMPORTS_PER_SOL,
@@ -1703,6 +1710,7 @@ fn test_increase_stake_calculation() {
     state.instant_unstake.set(0, true).unwrap();
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         u64::from(validator_list[2].active_stake_lamports),
         4000 * LAMPORTS_PER_SOL,
@@ -1712,6 +1720,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
+    println!("result: {:?}", result);
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 1000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -1720,6 +1729,7 @@ fn test_increase_stake_calculation() {
     // target validator is instant unstake
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         0,
         u64::from(validator_list[0].active_stake_lamports),
         4000 * LAMPORTS_PER_SOL,
@@ -1745,6 +1755,7 @@ fn test_increase_stake_calculation() {
     };
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         u64::from(validator_list[2].active_stake_lamports),
         2000 * LAMPORTS_PER_SOL,
@@ -1773,6 +1784,7 @@ fn test_increase_stake_calculation() {
     let minimum_delegation = 2 * LAMPORTS_PER_SOL;
     let result = increase_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         0,
         u64::from(validator_list[0].active_stake_lamports) - minimum_delegation,
         2000 * LAMPORTS_PER_SOL - (state.num_pool_validators * minimum_delegation),
@@ -1832,6 +1844,7 @@ fn test_decrease_stake_calculation() {
     };
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -1853,6 +1866,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -1886,6 +1900,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -1922,6 +1937,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -1956,6 +1972,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -1987,6 +2004,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -2032,6 +2050,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -2040,6 +2059,7 @@ fn test_decrease_stake_calculation() {
         0,
         0,
     );
+    println!("Should be None: {:?}", result);
     assert!(matches!(result.unwrap(), RebalanceType::None));
 
     // Test: Stake deposit cap reached on target validator
@@ -2055,6 +2075,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -2086,6 +2107,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -2119,6 +2141,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         current_lamports,
@@ -2159,6 +2182,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         2,
         unstake_state,
         u64::from(validator_list[2].active_stake_lamports),
@@ -2194,6 +2218,7 @@ fn test_decrease_stake_calculation() {
 
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         0,
         unstake_state,
         u64::from(validator_list[0].active_stake_lamports),
@@ -2208,6 +2233,7 @@ fn test_decrease_stake_calculation() {
     // Test errors
     let result = decrease_stake_calculation(
         &state,
+        &DirectedStakeMeta::default(),
         3,
         UnstakeState::default(),
         u64::from(validator_list[2].active_stake_lamports), // validator doesn't exist but include reasonable value

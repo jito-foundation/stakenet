@@ -12,7 +12,7 @@ use solana_sdk::{
 
 use crate::commands::command_args::InstantRemoveValidator;
 use stakenet_sdk::utils::{
-    accounts::get_all_steward_accounts,
+    accounts::{get_all_steward_accounts, get_directed_stake_meta_address},
     transactions::{configure_instruction, print_base58_tx},
 };
 
@@ -28,6 +28,8 @@ pub async fn command_instant_remove_validator(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
+    let directed_stake_meta = get_directed_stake_meta_address(&steward_config, &program_id);
+
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::InstantRemoveValidator {
@@ -35,6 +37,7 @@ pub async fn command_instant_remove_validator(
             state_account: steward_accounts.state_address,
             validator_list: steward_accounts.validator_list_address,
             stake_pool: steward_accounts.stake_pool_address,
+            directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InstantRemoveValidator {

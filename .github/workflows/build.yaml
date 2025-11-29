@@ -187,7 +187,7 @@ jobs:
         env:
           RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
-          RUST_MIN_STACK: 10000000
+          RUST_MIN_STACK: 20000000
           RUSTFLAGS: --cfg anchor_debug
 
       - name: cargo test --doc

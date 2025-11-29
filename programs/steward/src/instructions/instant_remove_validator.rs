@@ -4,7 +4,7 @@ use crate::{
     utils::{
         get_stake_pool_address, get_validator_list, get_validator_list_length, tally_stake_status,
     },
-    Config, StewardStateAccount, StewardStateAccountV2,
+    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2,
 };
 use anchor_lang::prelude::*;
 
@@ -28,6 +28,13 @@ pub struct InstantRemoveValidator<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [DirectedStakeMeta::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
 /// Removes validators from the pool that have been marked for immediate removal
@@ -37,6 +44,7 @@ pub fn handler(
 ) -> Result<()> {
     let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
+    let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
 
     let clock = Clock::get()?;
     let validators_for_immediate_removal =
@@ -88,7 +96,7 @@ pub fn handler(
 
     state_account
         .state
-        .remove_validator(validator_index_to_remove)?;
+        .remove_validator(validator_index_to_remove, &mut directed_stake_meta)?;
 
     Ok(())
 }

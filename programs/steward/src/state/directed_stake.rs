@@ -1,15 +1,15 @@
 use std::mem::size_of;
 
+use crate::constants::MAX_VALIDATORS;
 use crate::errors::StewardError::{
-    AlreadyPermissioned, DirectedStakeStakerListFull, DirectedStakeValidatorListFull,
-    StakerNotInWhitelist, ValidatorNotInWhitelist,
+    AlreadyPermissioned, DirectedStakeValidatorListFull, StakerNotInWhitelist,
+    ValidatorNotInWhitelist,
 };
 use crate::utils::U8Bool;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const MAX_PERMISSIONED_DIRECTED_STAKERS: usize = 2048;
-pub const MAX_PERMISSIONED_DIRECTED_VALIDATORS: usize = 2048;
 pub const MAX_PREFERENCES_PER_TICKET: usize = 8;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq)]
@@ -24,18 +24,35 @@ pub enum DirectedStakeRecordType {
 pub struct DirectedStakeMeta {
     // u64 for alignment, max permissioned validators is much smaller
     pub total_stake_targets: u64,
-    pub epoch_increase_total_lamports: u64,
-    pub epoch_decrease_total_lamports: u64,
-    pub epoch_last_updated: u64,
     pub directed_unstake_total: u64,
-    pub padding0: [u8; 64],
-    pub targets: [DirectedStakeTarget; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    pub padding0: [u8; 63],
+    pub is_initialized: U8Bool,
+    pub targets: [DirectedStakeTarget; MAX_VALIDATORS],
+    // Total staked lamports indexed by validator list index
+    pub directed_stake_lamports: [u64; MAX_VALIDATORS],
+    pub directed_stake_meta_indices: [u64; MAX_VALIDATORS],
+}
+
+impl Default for DirectedStakeMeta {
+    fn default() -> Self {
+        Self {
+            total_stake_targets: 0,
+            directed_unstake_total: 0,
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            targets: [DirectedStakeTarget::default(); MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
+        }
+    }
 }
 
 #[allow(dead_code)]
 impl DirectedStakeMeta {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"meta";
+    // Byte position of is_initialized field: 8 (discriminator) + 8*5 (u64 fields) + 62 (padding0) = 110
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8 + 8 * 5 + 63;
 
     /// Get the index of a particular validator in the targets array
     pub fn get_target_index(&self, vote_pubkey: &Pubkey) -> Option<usize> {
@@ -60,35 +77,21 @@ impl DirectedStakeMeta {
     }
 
     /// Add to the total staked lamports for a particular validator
-    pub fn add_to_total_staked_lamports(
-        &mut self,
-        vote_pubkey: &Pubkey,
-        lamports: u64,
-        epoch: u64,
-    ) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].total_staked_lamports += lamports;
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn add_to_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
+        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
+            .total_staked_lamports
+            .saturating_add(lamports);
     }
 
     /// Subtract from the total staked lamports for a particular validator
-    pub fn subtract_from_total_staked_lamports(
-        &mut self,
-        vote_pubkey: &Pubkey,
-        lamports: u64,
-        epoch: u64,
-    ) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].total_staked_lamports -= lamports;
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
+        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
+            .total_staked_lamports
+            .saturating_sub(lamports);
     }
 
-    pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey: &Pubkey, epoch: u64) {
-        if let Some(index) = self.get_target_index(vote_pubkey) {
-            self.targets[index].staked_last_updated_epoch = epoch;
-        }
+    pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey_index: usize, epoch: u64) {
+        self.targets[vote_pubkey_index].staked_last_updated_epoch = epoch;
     }
 
     pub fn all_targets_rebalanced_for_epoch(&self, epoch: u64) -> bool {
@@ -112,7 +115,7 @@ impl DirectedStakeMeta {
     }
 }
 
-#[derive(BorshSerialize, Debug)]
+#[derive(BorshSerialize, Debug, Default)]
 #[account(zero_copy)]
 pub struct DirectedStakeTarget {
     /// Validator vote pubkey
@@ -238,17 +241,27 @@ impl DirectedStakeTicket {
 pub struct DirectedStakeWhitelist {
     pub permissioned_user_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
     pub permissioned_protocol_stakers: [Pubkey; MAX_PERMISSIONED_DIRECTED_STAKERS],
-    pub permissioned_validators: [Pubkey; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+    pub permissioned_validators: [Pubkey; MAX_VALIDATORS],
     pub total_permissioned_user_stakers: u16,
     pub total_permissioned_protocol_stakers: u16,
     pub total_permissioned_validators: u16,
-    // 250 bytes reserved for future use
-    pub _padding0: [u8; 250],
+    // 249 bytes reserved for future use (1 byte used for is_initialized)
+    pub _padding0: [u8; 249],
+    pub is_initialized: U8Bool,
 }
 
 impl DirectedStakeWhitelist {
     pub const SIZE: usize = 8 + size_of::<Self>();
     pub const SEED: &'static [u8] = b"whitelist";
+    // Byte position of is_initialized field: 8 (discriminator) + 32*2048*2 (user + protocol stakers) + 32*2048 (validators) + 2*3 (u16 fields) + 248 (padding0) = 196866
+    pub const IS_INITIALIZED_BYTE_POSITION: usize = 8
+        + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
+        + 32 * MAX_PERMISSIONED_DIRECTED_STAKERS
+        + 32 * MAX_VALIDATORS
+        + 2
+        + 2
+        + 2
+        + 249;
 
     pub fn is_user_staker_permissioned(&self, staker: &Pubkey) -> bool {
         self.permissioned_user_stakers
@@ -288,12 +301,12 @@ impl DirectedStakeWhitelist {
     }
 
     pub fn can_add_validator(&self) -> bool {
-        (self.total_permissioned_validators as usize) < MAX_PERMISSIONED_DIRECTED_VALIDATORS
+        (self.total_permissioned_validators as usize) < MAX_VALIDATORS
     }
 
     pub fn add_user_staker(&mut self, staker: Pubkey) -> Result<()> {
         if !self.can_add_user_staker() {
-            return Err(error!(DirectedStakeStakerListFull));
+            return Err(error!(AlreadyPermissioned));
         }
         if self.is_staker_permissioned(&staker) {
             return Err(error!(AlreadyPermissioned));
@@ -305,7 +318,7 @@ impl DirectedStakeWhitelist {
 
     pub fn add_protocol_staker(&mut self, staker: Pubkey) -> Result<()> {
         if !self.can_add_protocol_staker() {
-            return Err(error!(DirectedStakeStakerListFull));
+            return Err(error!(AlreadyPermissioned));
         }
         if self.is_staker_permissioned(&staker) {
             return Err(error!(AlreadyPermissioned));

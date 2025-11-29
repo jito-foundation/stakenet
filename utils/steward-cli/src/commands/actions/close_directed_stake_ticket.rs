@@ -9,7 +9,10 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::{
-    accounts::{get_all_steward_accounts, get_directed_stake_ticket_address},
+    accounts::{
+        get_all_steward_accounts, get_directed_stake_ticket_address,
+        get_directed_stake_whitelist_address,
+    },
     transactions::{configure_instruction, print_base58_tx},
 };
 
@@ -37,13 +40,21 @@ pub async fn command_close_directed_stake_ticket(
     )
     .await?;
 
-    let ticket_account = get_directed_stake_ticket_address(&authority.pubkey(), &program_id);
+    let ticket_account = get_directed_stake_ticket_address(
+        &args.permissioned_parameters.steward_config,
+        &authority.pubkey(),
+        &program_id,
+    );
 
     let ix = Instruction {
         program_id,
         accounts: jito_steward::accounts::CloseDirectedStakeTicket {
             config: all_steward_accounts.config_address,
             ticket_account,
+            whitelist_account: get_directed_stake_whitelist_address(
+                &all_steward_accounts.config_address,
+                &program_id,
+            ),
             authority: authority.pubkey(),
         }
         .to_account_metas(None),
