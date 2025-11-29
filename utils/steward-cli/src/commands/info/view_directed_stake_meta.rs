@@ -12,6 +12,7 @@ pub async fn command_view_directed_stake_meta(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
+    let stake_meta_address = get_directed_stake_meta_address(&args.steward_config, &program_id);
     let stake_meta =
         get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
     let _stake_meta_address = get_directed_stake_meta_address(&args.steward_config, &program_id);
@@ -19,6 +20,7 @@ pub async fn command_view_directed_stake_meta(
     println!("Directed stake meta: {}", _stake_meta_address);
 
     println!("\n📊 DirectedStakeMeta Information:");
+    println!("DirectedStakeMeta Account: {stake_meta_address}");
 
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {

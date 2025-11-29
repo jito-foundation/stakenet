@@ -273,7 +273,7 @@ pub async fn get_all_steward_accounts(
 pub async fn get_directed_stake_tickets(
     client: Arc<RpcClient>,
     program_id: &Pubkey,
-) -> Result<Vec<DirectedStakeTicket>, JitoTransactionError> {
+) -> Result<HashMap<Pubkey, DirectedStakeTicket>, JitoTransactionError> {
     let discriminator = <DirectedStakeTicket as Discriminator>::DISCRIMINATOR;
     let memcmp_filter = RpcFilterType::Memcmp(Memcmp::new(
         0,
@@ -297,10 +297,11 @@ pub async fn get_directed_stake_tickets(
         )
         .await?;
 
-    let tickets: Vec<DirectedStakeTicket> = accounts
+    let tickets: HashMap<Pubkey, DirectedStakeTicket> = accounts
         .iter()
-        .filter_map(|(_pda, account)| {
-            DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok()
+        .filter_map(|(pda, account)| {
+            let ticket = DirectedStakeTicket::try_deserialize(&mut account.data.as_slice()).ok()?;
+            Some((*pda, ticket))
         })
         .collect();
 
@@ -519,17 +520,19 @@ pub fn get_transient_stake_address(
     stake_pool_address: &Pubkey,
     validator_list_account: &ValidatorList,
     validator_index: usize,
-) -> Pubkey {
-    let (transient_stake_address, _) = find_transient_stake_program_address(
-        &spl_stake_pool::id(),
-        vote_account_address,
-        stake_pool_address,
-        validator_list_account.validators[validator_index]
-            .transient_seed_suffix
-            .into(),
-    );
-
-    transient_stake_address
+) -> Option<Pubkey> {
+    validator_list_account
+        .validators
+        .get(validator_index)
+        .map(|v| {
+            find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                vote_account_address,
+                stake_pool_address,
+                v.transient_seed_suffix.into(),
+            )
+            .0
+        })
 }
 
 pub fn get_cluster_history_address(validator_history_program_id: &Pubkey) -> Pubkey {

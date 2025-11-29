@@ -4,6 +4,7 @@ use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStake
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
 use spl_associated_token_account::get_associated_token_address;
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::models::{
     aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
@@ -12,6 +13,26 @@ use crate::models::{
 use solana_program::borsh1::try_from_slice_unchecked;
 
 use super::accounts::get_validator_history_address;
+
+pub fn vote_account_uploaded_recently(
+    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
+    vote_account: &Pubkey,
+    epoch: u64,
+    slot: u64,
+) -> bool {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
+        if let Some(entry) = validator_history.history.last() {
+            if entry.epoch == epoch as u16
+                && entry.vote_account_last_update_slot
+                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
+                && entry.vote_account_last_update_slot > slot - 50000
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
 
 // ------------------- BALANCE --------------------------
 pub async fn get_balance_with_retry(
@@ -87,23 +108,30 @@ impl DirectedRebalanceProgressionInfo {
         all_steward_accounts: &AllStewardAccounts,
         directed_stake_meta: &DirectedStakeMeta,
     ) -> Vec<DirectedRebalanceProgressionInfo> {
-        all_steward_accounts
+        let validator_map: HashMap<Pubkey, usize> = all_steward_accounts
             .validator_list_account
             .validators
             .iter()
             .take(all_steward_accounts.state_account.state.num_pool_validators as usize)
             .enumerate()
-            .filter_map(|(validator_list_index, validator)| {
-                directed_stake_meta
-                    .get_target_index(&validator.vote_account_address)
-                    .map(
-                        |directed_stake_meta_index| DirectedRebalanceProgressionInfo {
-                            validator_list_index,
-                            directed_stake_meta_index,
-                            vote_account: validator.vote_account_address,
-                        },
-                    )
-            })
+            .map(|(idx, v)| (v.vote_account_address, idx))
+            .collect();
+
+        directed_stake_meta
+            .targets
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.vote_pubkey != Pubkey::default())
+            .map(
+                |(directed_stake_meta_index, t)| DirectedRebalanceProgressionInfo {
+                    validator_list_index: validator_map
+                        .get(&t.vote_pubkey)
+                        .copied()
+                        .unwrap_or(usize::MAX),
+                    directed_stake_meta_index,
+                    vote_account: t.vote_pubkey,
+                },
+            )
             .collect()
     }
 }

@@ -433,6 +433,28 @@ pub struct InitSteward {
 #[derive(Parser)]
 #[command(about = "Updates authority account parameters")]
 pub struct UpdateAuthority {
+    /// Create a Squads multisig proposal instead of direct execution
+    #[arg(long, env, default_value = "false")]
+    pub squads_proposal: bool,
+
+    /// Squads multisig account address.
+    /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
+    /// multisig address and will act as the signing authority for the operation.
+    #[arg(
+        long,
+        env,
+        default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c"
+    )]
+    pub squads_multisig: Pubkey,
+
+    /// Vault index for the Squads multisig (default: 0)
+    #[arg(long, env, default_value = "0")]
+    pub squads_vault_index: u8,
+
+    /// Squads program ID (defaults to mainnet Squads v4 program)
+    #[arg(long, env)]
+    pub squads_program_id: Option<Pubkey>,
+
     #[command(subcommand)]
     pub command: AuthoritySubcommand,
 }
@@ -489,6 +511,7 @@ pub enum AuthoritySubcommand {
         new_authority: Pubkey,
     },
 }
+
 #[derive(Parser)]
 #[command(about = "Updates config account parameters")]
 pub struct UpdateConfig {

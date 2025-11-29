@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use jito_steward::DirectedStakePreference;
+use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -123,14 +123,14 @@ pub async fn compute_directed_stake_meta(
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let tickets = get_directed_stake_tickets(client.clone(), program_id).await?;
+    let ticket_map = get_directed_stake_tickets(client.clone(), program_id).await?;
 
     let stake_pool = get_stake_pool_account(&client.clone(), stake_pool_address).await?;
     let conversion_rate_bps =
         calculate_conversion_rate_bps(stake_pool.total_lamports, stake_pool.pool_token_supply)?;
 
     let mut jitosol_balances = HashMap::new();
-    for ticket in &tickets {
+    for ticket in ticket_map.values().copied() {
         let balance = get_token_balance(
             client.clone(),
             token_mint_address,
@@ -142,6 +142,7 @@ pub async fn compute_directed_stake_meta(
 
     let existing_directed_stake_meta =
         get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let validator_targets = aggregate_validator_targets(
         &existing_directed_stake_meta,
         &tickets,

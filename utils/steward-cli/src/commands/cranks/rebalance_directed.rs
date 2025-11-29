@@ -78,7 +78,8 @@ pub async fn command_crank_rebalance_directed(
                 &steward_accounts.stake_pool_address,
                 &steward_accounts.validator_list_account,
                 validator_index,
-            );
+            )
+            .unwrap_or(Pubkey::new_unique());
 
             Instruction {
                 program_id,
