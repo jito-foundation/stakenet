@@ -86,7 +86,7 @@ pub async fn command_crank_compute_score(
         args.permissionless_parameters
             .transaction_parameters
             .chunk_size
-            .unwrap_or(11),
+            .unwrap_or(2),
         args.permissionless_parameters
             .transaction_parameters
             .priority_fee,
