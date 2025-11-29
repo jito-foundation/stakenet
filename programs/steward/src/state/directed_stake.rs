@@ -78,16 +78,30 @@ impl DirectedStakeMeta {
 
     /// Add to the total staked lamports for a particular validator
     pub fn add_to_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
-        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
-            .total_staked_lamports
-            .saturating_add(lamports);
+        let before = self.targets[vote_pubkey_index].total_staked_lamports;
+        let after = before.saturating_add(lamports);
+        msg!(
+            "add_to_total_staked_lamports[index={}, before={}, +{}, after={}]",
+            vote_pubkey_index,
+            before,
+            lamports,
+            after
+        );
+        self.targets[vote_pubkey_index].total_staked_lamports = after;
     }
 
     /// Subtract from the total staked lamports for a particular validator
     pub fn subtract_from_total_staked_lamports(&mut self, vote_pubkey_index: usize, lamports: u64) {
-        self.targets[vote_pubkey_index].total_staked_lamports = self.targets[vote_pubkey_index]
-            .total_staked_lamports
-            .saturating_sub(lamports);
+        let before = self.targets[vote_pubkey_index].total_staked_lamports;
+        let after = before.saturating_sub(lamports);
+        msg!(
+            "subtract_from_total_staked_lamports[index={}, before={}, -{}, after={}]",
+            vote_pubkey_index,
+            before,
+            lamports,
+            after
+        );
+        self.targets[vote_pubkey_index].total_staked_lamports = after;
     }
 
     pub fn update_staked_last_updated_epoch(&mut self, vote_pubkey_index: usize, epoch: u64) {
@@ -111,6 +125,7 @@ impl DirectedStakeMeta {
         for target in self.targets.iter() {
             total = total.saturating_add(target.total_staked_lamports);
         }
+        msg!("DirectedStakeMeta::total_staked_lamports total = {}", total);
         total
     }
 }
@@ -160,9 +175,16 @@ impl DirectedStakePreference {
     }
 
     pub fn get_allocation(&self, total_lamports: u64) -> u128 {
-        (total_lamports as u128)
-            .saturating_mul(self.stake_share_bps as u128)
-            .saturating_div(10_000)
+        let product = (total_lamports as u128).saturating_mul(self.stake_share_bps as u128);
+        let allocation = product.saturating_div(10_000);
+        msg!(
+            "DirectedStakePreference::get_allocation total_lamports={}, stake_share_bps={}, product={}, allocation={}",
+            total_lamports,
+            self.stake_share_bps,
+            product,
+            allocation
+        );
+        allocation
     }
 }
 
@@ -214,6 +236,10 @@ impl DirectedStakeTicket {
             .take(self.num_preferences as usize)
             .map(|pref| pref.stake_share_bps as u32)
             .sum();
+        msg!(
+            "DirectedStakeTicket::preferences_valid total_bps = {} (<= 10000 is valid)",
+            total_bps
+        );
         total_bps <= 10_000
     }
 
@@ -229,6 +255,13 @@ impl DirectedStakeTicket {
                 .saturating_mul(pref.stake_share_bps as u128)
                 .saturating_div(10_000);
             if lamports > 0 {
+                msg!(
+                    "DirectedStakeTicket::get_allocations vote_pubkey={}, stake_share_bps={}, total_lamports={}, allocation_lamports={}",
+                    pref.vote_pubkey,
+                    pref.stake_share_bps,
+                    total_lamports,
+                    lamports
+                );
                 allocations.push((pref.vote_pubkey, lamports));
             }
         }

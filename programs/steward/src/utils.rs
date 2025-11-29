@@ -158,12 +158,21 @@ pub fn get_config_priority_fee_parameter_authority(
 
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {
     let current_epoch = clock.epoch;
+    msg!("current_epoch: {}", current_epoch);
+
     let current_slot = clock.slot;
+    msg!("current_slot: {}", current_slot);
+
     let slots_in_epoch = epoch_schedule.slots_per_epoch;
-    let slot_index = current_slot
-        .checked_sub(epoch_schedule.get_first_slot_in_epoch(current_epoch))
-        .ok_or(StewardError::ArithmeticError)?;
-    Ok(slot_index as f64 / slots_in_epoch as f64)
+    msg!("slots_in_epoch: {}", slots_in_epoch);
+
+    let slot_index = epoch_schedule.get_epoch_and_slot_index(current_slot).1;
+    msg!("slot_index: {}", slot_index);
+
+    let progress = slot_index as f64 / slots_in_epoch as f64;
+    msg!("epoch_progress: {}", progress);
+
+    Ok(progress)
 }
 
 /// Safely gets the target lamports for a validator based on the delegation and current stake pool lamports.

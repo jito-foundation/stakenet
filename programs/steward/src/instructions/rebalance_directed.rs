@@ -1,4 +1,5 @@
 use crate::directed_delegation::{decrease_stake_calculation, increase_stake_calculation};
+use crate::utils::epoch_progress;
 use crate::{
     constants::{LAMPORT_BALANCE_DEFAULT, STAKE_POOL_WITHDRAW_SEED},
     directed_delegation::{RebalanceType, UnstakeState},
@@ -177,6 +178,12 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
     let vote_pubkey_from_directed_stake_meta =
         directed_stake_meta.targets[directed_stake_meta_index].vote_pubkey;
 
+    msg!(
+        "Loaded vote_pubkey_from_directed_stake_meta={}, directed_stake_meta_index={}",
+        vote_pubkey_from_directed_stake_meta,
+        directed_stake_meta_index
+    );
+
     // Now we need to check if the vote_pubkey from above matches the vote_account
     if vote_pubkey_from_directed_stake_meta != ctx.accounts.vote_account.key() {
         return Err(StewardError::DirectedStakeVoteAccountMismatch.into());
@@ -204,6 +211,12 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 found = true;
                 let (target_total_staked_lamports, _) =
                     stake_lamports_at_validator_list_index(&validator_list, index)?;
+                msg!(
+                    "Matched validator in list: index={}, transient_seed={}, target_total_staked_lamports={}",
+                    validator_list_index,
+                    transient_seed,
+                    target_total_staked_lamports
+                );
                 adjust_directed_stake_for_deposits_and_withdrawals(
                     target_total_staked_lamports,
                     index,
@@ -237,7 +250,19 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
         // This will cause the state to transition to Idle
         if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
             state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+            msg!("All targets rebalanced");
         }
+
+        msg!(
+            "min_epoch_progress_for_compute_scores: {}",
+            config.parameters.compute_score_epoch_progress
+        );
+        msg!("Clock sysvar: {:?}", clock);
+        msg!("Epoch schedule: {:?}", epoch_schedule);
+        msg!(
+            "epoch progress: {}",
+            epoch_progress(&clock, &epoch_schedule)?
+        );
 
         if let Some(event) = maybe_transition(
             &mut state_account.state,
@@ -268,11 +293,21 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
 
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
+        msg!(
+            "minimum_delegation={}, stake_rent={}",
+            minimum_delegation,
+            stake_rent
+        );
 
         rebalance_type = {
             let stake_pool_lamports_with_fixed_cost =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+            msg!(
+                "stake_pool_total_lamports={}, reserve_lamports_with_rent={}",
+                stake_pool_lamports_with_fixed_cost,
+                reserve_lamports_with_rent
+            );
 
             let unstake_state = UnstakeState {
                 directed_unstake_total: directed_stake_meta.directed_unstake_total,
@@ -281,15 +316,32 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             let directed_unstake_cap_lamports = stake_pool_lamports_with_fixed_cost
                 .saturating_mul(config.parameters.directed_stake_unstake_cap_bps as u64)
                 .saturating_div(10_000);
+            msg!(
+                "directed_unstake_total={}, directed_unstake_cap_bps={}, directed_unstake_cap_lamports={}",
+                unstake_state.directed_unstake_total,
+                config.parameters.directed_stake_unstake_cap_bps,
+                directed_unstake_cap_lamports
+            );
 
             let undirected_tvl_lamports = stake_pool_lamports_with_fixed_cost
                 .saturating_sub(directed_stake_meta.total_staked_lamports());
 
             let undirected_floor_cap_reached =
                 undirected_tvl_lamports <= config.parameters.undirected_stake_floor_lamports();
+            msg!(
+                "undirected_tvl_lamports={}, undirected_floor={}, undirected_floor_cap_reached={}",
+                undirected_tvl_lamports,
+                config.parameters.undirected_stake_floor_lamports(),
+                undirected_floor_cap_reached
+            );
 
             let target_staked_lamports =
                 directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+            msg!(
+                "target_staked_lamports (directed applied) for validator index {} = {}",
+                directed_stake_meta_index,
+                target_staked_lamports
+            );
 
             // Try decrease first, then increase (if undirected floor cap does not apply)
             let decrease_result = decrease_stake_calculation(
@@ -320,6 +372,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
 
     match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
+            msg!(
+                "Preparing decrease_validator_stake_with_reserve: directed_unstake_lamports={}, transient_seed={}",
+                decrease_components.directed_unstake_lamports,
+                transient_seed
+            );
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
                     &ctx.accounts.stake_pool_program.key(),
@@ -368,6 +425,11 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             }
         }
         RebalanceType::Increase(lamports) => {
+            msg!(
+                "Preparing increase_validator_stake: lamports={}, transient_seed={}",
+                lamports,
+                transient_seed
+            );
             invoke_signed(
                 &spl_stake_pool::instruction::increase_validator_stake(
                     &ctx.accounts.stake_pool_program.key(),
@@ -764,4 +826,20 @@ mod tests {
             steward_state_total_lamports.saturating_sub(withdrawal_lamports)
         );
     }
+
+    #[test]
+    fn test_print_first_slot_of_epoch_887() {
+        let epoch_schedule = EpochSchedule {
+            slots_per_epoch: 432_000,
+            leader_schedule_slot_offset: 432_000,
+            warmup: true,
+            first_normal_epoch: 14,
+            first_normal_slot: 524_256,
+        };
+        println!(
+            "First slot of epoch 887: {}",
+            epoch_schedule.get_first_slot_in_epoch(887)
+        );
+    }
+
 }

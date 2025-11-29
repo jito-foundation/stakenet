@@ -63,6 +63,11 @@ pub fn decrease_stake_calculation(
         total_excess_lamports = total_excess_lamports.saturating_add(excess);
     }
 
+    msg!(
+        "Total excess lamports across validators (excluding current epoch): {}",
+        total_excess_lamports
+    );
+
     if total_excess_lamports == 0 {
         msg!("Total excess lamports is 0, no directed decrease to perform.");
         return Ok(RebalanceType::None);
@@ -71,10 +76,26 @@ pub fn decrease_stake_calculation(
     let target_delta_proportion_bps: u128 =
         (target_delta_lamports as u128).saturating_mul(10_000) / (total_excess_lamports as u128);
 
+    msg!(
+        "target_delta_proportion_bps = ({} * 10000) / {} = {}",
+        target_delta_lamports,
+        total_excess_lamports,
+        target_delta_proportion_bps
+    );
+
     // Apply the remaining directed unstake cap to the total excess lamports
     let unstake_total = directed_unstake_cap_lamports
         .saturating_sub(directed_unstake_total_lamports)
         .min(total_excess_lamports);
+
+    msg!(
+        "unstake_total = min(directed_unstake_cap - directed_unstake_total = {} - {} = {}, total_excess = {}) = {}",
+        directed_unstake_cap_lamports,
+        directed_unstake_total_lamports,
+        directed_unstake_cap_lamports.saturating_sub(directed_unstake_total_lamports),
+        total_excess_lamports,
+        unstake_total
+    );
 
     // Calculate the proportional decrease amongst the validators that still require decreases
     let target_proportional_decrease_lamports: u64 =
@@ -82,9 +103,23 @@ pub fn decrease_stake_calculation(
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
+    msg!(
+        "target_proportional_decrease_lamports = ({} * {}) / 10000 = {}",
+        unstake_total,
+        target_delta_proportion_bps,
+        target_proportional_decrease_lamports
+    );
+
     // Do not unstake more than the excess lamports on the target validator to prevent yield drag
     let capped_proportional_decrease_lamports =
         target_proportional_decrease_lamports.min(target_delta_lamports);
+
+    msg!(
+        "capped_proportional_decrease_lamports = min({}, {}) = {}",
+        target_proportional_decrease_lamports,
+        target_delta_lamports,
+        capped_proportional_decrease_lamports
+    );
 
     if capped_proportional_decrease_lamports < (minimum_delegation) {
         msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
@@ -139,6 +174,13 @@ pub fn increase_stake_calculation(
 
     let target_delta_lamports: u64 = target_lamports.saturating_sub(current_lamports);
 
+    msg!(
+        "target_delta_lamports = {} - {} = {}",
+        target_lamports,
+        current_lamports,
+        target_delta_lamports
+    );
+
     if target_delta_lamports == 0 {
         msg!("Target lamports is equal to current lamports, no directed increases can be made.");
         return Ok(RebalanceType::None);
@@ -160,6 +202,11 @@ pub fn increase_stake_calculation(
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
     }
 
+    msg!(
+        "Total deficit lamports across validators (excluding current epoch): {}",
+        total_delta_lamports
+    );
+
     if total_delta_lamports == 0 {
         msg!("Total delta lamports is 0, no directed increases can be made.");
         return Ok(RebalanceType::None);
@@ -168,21 +215,49 @@ pub fn increase_stake_calculation(
     let target_delta_proportion_bps: u128 =
         (target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
 
+    msg!(
+        "target_delta_proportion_bps = ({} * 10000) / {} = {}",
+        target_delta_lamports,
+        total_delta_lamports,
+        target_delta_proportion_bps
+    );
+
     // We must preserve at least 2*stake_rent in the reserve stake account and transient stake account for rent-exemption
     let available_lamports = reserve_lamports.saturating_sub(stake_rent.saturating_mul(2));
+
+    msg!(
+        "available_lamports = reserve_lamports - 2*stake_rent = {} - {} = {}",
+        reserve_lamports,
+        stake_rent.saturating_mul(2),
+        available_lamports
+    );
 
     let target_proportional_increase_lamports: u64 =
         ((available_lamports as u128).saturating_mul(target_delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
+    msg!(
+        "target_proportional_increase_lamports = ({} * {}) / 10000 = {}",
+        available_lamports,
+        target_delta_proportion_bps,
+        target_proportional_increase_lamports
+    );
+
     // Do not over-delegate if proportional increase would exceed the target delta lamports
     // This prevents future yield drag from unstaking excess lamports
     let capped_proportional_increase_lamports =
         target_proportional_increase_lamports.min(target_delta_lamports);
 
+    msg!(
+        "capped_proportional_increase_lamports = min({}, {}) = {}",
+        target_proportional_increase_lamports,
+        target_delta_lamports,
+        capped_proportional_increase_lamports
+    );
+
     if capped_proportional_increase_lamports < (minimum_delegation) {
-        msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
+        msg!("Adjusted proportional increase lamports is less than minimum delegation for transient stake account. No stake will be performed.");
         return Ok(RebalanceType::None);
     }
 
