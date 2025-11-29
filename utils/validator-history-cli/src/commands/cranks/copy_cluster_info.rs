@@ -8,9 +8,7 @@ use solana_sdk::{
     instruction::Instruction, signature::read_keypair_file, signer::Signer,
     transaction::Transaction,
 };
-use stakenet_sdk::utils::{
-    accounts::get_cluster_history_address, transactions::submit_instructions,
-};
+use stakenet_sdk::utils::accounts::get_cluster_history_address;
 use validator_history::ClusterHistory;
 
 #[derive(Parser)]

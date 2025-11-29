@@ -20,8 +20,12 @@ use validator_history::{
     ValidatorHistoryEntry,
 };
 use validator_history_cli::{
-    commands::{self, cranks::copy_cluster_info::CrankCopyClusterInfo},
-    commands::{self, cranks::copy_vote_account::CrankCopyVoteAccount},
+    commands::{
+        self,
+        cranks::{
+            copy_cluster_info::CrankCopyClusterInfo, copy_vote_account::CrankCopyVoteAccount,
+        },
+    },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
 
@@ -1283,6 +1287,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+        }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
         }
