@@ -28,12 +28,14 @@ use std::{
 use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
 use clap::Parser;
+use jito_steward::DirectedStakeTicket;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
+    transaction::Transaction,
 };
 use stakenet_sdk::utils::{
-    accounts::{get_all_steward_accounts, get_directed_stake_tickets},
+    accounts::{get_all_steward_accounts, get_directed_stake_meta, get_directed_stake_tickets},
     helpers::get_token_balance,
     instructions::compute_directed_stake_meta,
 };
@@ -68,7 +70,8 @@ pub async fn command_crank_compute_directed_stake_meta(
     let steward_config = args.permissioned_parameters.steward_config;
 
     // Fetch directed stake tickets to show summary stats
-    let tickets = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let num_tickets = tickets.len();
 
     // Count preferences in tickets
@@ -222,6 +225,22 @@ pub async fn command_crank_compute_directed_stake_meta(
     println!("  - {num_tickets} tickets processed");
     println!("  - {tickets_with_balance} tickets with balance");
     println!("  - {num_final_targets} final validator targets");
+
+    let directed_stake_meta =
+        get_directed_stake_meta(client.clone(), &steward_config, &program_id).await?;
+
+    println!("\nValidator Targets:");
+    for i in 0..directed_stake_meta.total_stake_targets as usize {
+        let target = &directed_stake_meta.targets[i];
+        if target.vote_pubkey != Pubkey::default() {
+            println!("  Vote Pubkey: {}", target.vote_pubkey);
+            println!(
+                "    Target: {} lamports ({:.2} SOL)",
+                target.total_target_lamports,
+                target.total_target_lamports as f64 / LAMPORTS_PER_SOL as f64
+            );
+        }
+    }
 
     Ok(())
 }

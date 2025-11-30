@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use jito_steward::DirectedStakeTicket;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use stakenet_sdk::utils::accounts::get_directed_stake_tickets;
@@ -12,7 +13,8 @@ pub async fn command_view_directed_stake_tickets(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let tickets = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let tickets_count = tickets.len();
 
     if args.print_json {
@@ -94,8 +96,8 @@ pub async fn command_view_directed_stake_tickets(
     } else {
         println!("Found {} DirectedStakeTicket accounts:\n", tickets_count);
 
-        for ticket in tickets {
-            println!("Ticket:");
+        for (pda, ticket) in ticket_map {
+            println!("Ticket: {pda}");
             println!("  Update Authority: {}", ticket.ticket_update_authority);
             println!(
                 "  Is Protocol: {}",

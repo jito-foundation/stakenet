@@ -4,6 +4,8 @@ and the updating of the various data feeds within the accounts.
 It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 */
 
+use std::sync::Arc;
+
 use crate::state::keeper_state::{KeeperFlag, KeeperFlags, KeeperState};
 use crate::{
     entries::copy_vote_account_entry::CopyVoteAccountEntry, state::keeper_config::KeeperConfig,
@@ -18,10 +20,8 @@ use solana_sdk::{
 use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
+use stakenet_sdk::utils::helpers::vote_account_uploaded_recently;
 use stakenet_sdk::utils::transactions::submit_instructions;
-use std::{collections::HashMap, sync::Arc};
-use validator_history::ValidatorHistory;
-use validator_history::ValidatorHistoryEntry;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
@@ -177,24 +177,4 @@ pub async fn update_vote_accounts(
     .await;
 
     submit_result.map_err(|e| e.into())
-}
-
-fn vote_account_uploaded_recently(
-    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-    vote_account: &Pubkey,
-    epoch: u64,
-    slot: u64,
-) -> bool {
-    if let Some(validator_history) = validator_history_map.get(vote_account) {
-        if let Some(entry) = validator_history.history.last() {
-            if entry.epoch == epoch as u16
-                && entry.vote_account_last_update_slot
-                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
-                && entry.vote_account_last_update_slot > slot - 50000
-            {
-                return true;
-            }
-        }
-    }
-    false
 }

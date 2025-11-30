@@ -11020,6 +11020,7 @@ dependencies = [
  "solana-program",
  "solana-remote-wallet 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "solana-sdk",
+ "solana-system-interface",
  "spl-pod",
  "spl-stake-pool",
  "squads-multisig",
@@ -12014,6 +12015,7 @@ name = "validator-history-cli"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "anyhow",
  "borsh 1.5.7",
  "bytemuck",
  "clap 4.5.51",

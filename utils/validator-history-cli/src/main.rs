@@ -24,6 +24,8 @@ use validator_history_cli::{
         self,
         cranks::copy_gossip_contact_info::{
             command_crank_copy_gossip_contact_info, CrankCopyGossipContactInfo,
+        cranks::{
+            copy_cluster_info::CrankCopyClusterInfo, copy_vote_account::CrankCopyVoteAccount,
         },
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
@@ -62,6 +64,10 @@ enum Commands {
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
     CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
+
+    // Cranks
+    CrankCopyClusterInfo(CrankCopyClusterInfo),
+    CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
 #[derive(Parser)]
@@ -1258,7 +1264,7 @@ fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenv().ok();
     env_logger::init();
     let args = Args::parse();
@@ -1289,6 +1295,13 @@ async fn main() {
             );
             let client = Arc::new(client);
             command_crank_copy_gossip_contact_info(command_args, client).await
+        Commands::CrankCopyClusterInfo(command_args) => {
+            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+        }
+        Commands::CrankCopyVoteAccount(command_args) => {
+            commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
         }
     };
+
+    Ok(())
 }
