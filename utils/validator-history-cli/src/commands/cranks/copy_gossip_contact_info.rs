@@ -1,47 +1,49 @@
-use std::collections::HashMap;
-use std::net::IpAddr;
-use std::net::Ipv4Addr;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use std::sync::RwLockReadGuard;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        {Arc, RwLockReadGuard},
+    },
+    time::Duration,
+};
 
-use anchor_lang::InstructionData;
-use anchor_lang::ToAccountMetas;
+use anchor_lang::{InstructionData, ToAccountMetas};
 use bytemuck::{bytes_of, Pod, Zeroable};
 use clap::Parser;
 use log::info;
-use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_gossip::crds::Crds;
-use solana_gossip::crds_data::CrdsData;
-use solana_gossip::crds_value::CrdsValue;
-use solana_gossip::crds_value::CrdsValueLabel;
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_gossip::gossip_service::make_gossip_node;
-use solana_sdk::signature::read_keypair_file;
-use solana_sdk::signature::Keypair;
-use solana_sdk::signature::Signable;
-use solana_sdk::signer::Signer;
+use solana_gossip::{
+    crds::Crds,
+    crds_data::CrdsData,
+    crds_value::{CrdsValue, CrdsValueLabel},
+};
 use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction, instruction::Instruction, pubkey::Pubkey,
+    compute_budget::ComputeBudgetInstruction,
+    instruction::Instruction,
+    pubkey::Pubkey,
     signature::Signature,
+    signature::{read_keypair_file, Keypair, Signable, Signer},
 };
 use solana_streamer::socket::SocketAddrSpace;
-use stakenet_sdk::models::entries::Address;
-use stakenet_sdk::utils::accounts::get_all_validator_history_accounts;
-use stakenet_sdk::utils::accounts::get_validator_history_address;
-use stakenet_sdk::utils::accounts::get_validator_history_config_address;
-use stakenet_sdk::utils::transactions::get_vote_accounts_with_retry;
-use stakenet_sdk::utils::transactions::submit_transactions;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
-use validator_history::ValidatorHistory;
-use validator_history::ValidatorHistoryEntry;
+use stakenet_sdk::{
+    models::entries::Address,
+    utils::{
+        accounts::{
+            get_all_validator_history_accounts, get_validator_history_address,
+            get_validator_history_config_address,
+        },
+        transactions::{get_vote_accounts_with_retry, submit_transactions},
+    },
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
