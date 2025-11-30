@@ -372,10 +372,7 @@ pub struct CrankCopyGossipContactInfo {
     oracle_source: PathBuf,
 }
 
-pub async fn command_crank_copy_gossip_contact_info(
-    args: CrankCopyGossipContactInfo,
-    client: Arc<RpcClient>,
-) {
+pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) {
     // let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
     let program_id = validator_history::id();
     let vote_accounts = get_vote_accounts_with_retry(&client, 5, None)

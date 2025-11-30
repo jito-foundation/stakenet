@@ -1,7 +1,6 @@
 use anchor_lang::InstructionData;
 use anchor_lang::ToAccountMetas;
 use bytemuck::{bytes_of, Pod, Zeroable};
-use log::info;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, instruction::Instruction, pubkey::Pubkey,
     signature::Signature,

@@ -22,10 +22,10 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
-        cranks::copy_gossip_contact_info::{
-            command_crank_copy_gossip_contact_info, CrankCopyGossipContactInfo,
         cranks::{
-            copy_cluster_info::CrankCopyClusterInfo, copy_vote_account::CrankCopyVoteAccount,
+            copy_cluster_info::CrankCopyClusterInfo,
+            copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_vote_account::CrankCopyVoteAccount,
         },
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
@@ -63,10 +63,10 @@ enum Commands {
     UpdateOracleAuthority(UpdateOracleAuthority),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
-    CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
+    CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
@@ -1288,15 +1288,16 @@ async fn main() -> anyhow::Result<()> {
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
         }
+        Commands::CrankCopyClusterInfo(command_args) => {
+            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+        }
         Commands::CrankCopyGossipContactInfo(command_args) => {
             let client = solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
                 args.json_rpc_url.clone(),
                 Duration::from_secs(60),
             );
             let client = Arc::new(client);
-            command_crank_copy_gossip_contact_info(command_args, client).await
-        Commands::CrankCopyClusterInfo(command_args) => {
-            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_gossip_contact_info::run(command_args, client).await
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
