@@ -11,9 +11,10 @@ use std::{
 };
 
 use anchor_lang::{InstructionData, ToAccountMetas};
+use anyhow::anyhow;
 use bytemuck::{bytes_of, Pod, Zeroable};
 use clap::Parser;
-use log::info;
+use log::{error, info};
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_gossip::{
     crds::Crds,
@@ -139,9 +140,9 @@ pub struct Ed25519SignatureOffsets {
     message_instruction_index: u16,    // index of instruction data to get message data
 }
 
-// This code is modified from solana_sdk/src/ed25519_instruction.rs
-// due to that function requiring a keypair, and generating the signature within the function.
-// In our case we don't have the keypair, we just have the signature and pubkey.
+/// This code is modified from solana_sdk/src/ed25519_instruction.rs
+/// due to that function requiring a keypair, and generating the signature within the function.
+/// In our case we don't have the keypair, we just have the signature and pubkey.
 pub fn build_verify_signature_ix(
     signature: &[u8],
     pubkey: [u8; 32],
@@ -288,15 +289,17 @@ impl Ipv4EchoClient {
     }
 }
 
+/// Check entry is valid
+///
+/// Filters out invalid gossip entries that would fail transaction submission. Checks for:
+/// 0. Entry belongs to one of the expected types
+/// 1. Entry timestamp is not too old
+/// 2. Entry is for the correct validator
 fn check_entry_valid(
     entry: &CrdsValue,
     validator_history: &ValidatorHistory,
     validator_identity: Pubkey,
 ) -> bool {
-    // Filters out invalid gossip entries that would fail transaction submission. Checks for:
-    // 0. Entry belongs to one of the expected types
-    // 1. Entry timestamp is not too old
-    // 2. Entry is for the correct validator
     match &entry.data {
         CrdsData::ContactInfo(contact_info) => {
             if contact_info.wallclock() < validator_history.last_ip_timestamp
@@ -313,10 +316,10 @@ fn check_entry_valid(
     let signer = entry.pubkey();
 
     if signer != validator_identity {
-        // error!(
-        //     "Invalid gossip value retrieved for validator {}",
-        //     validator_identity
-        // );
+        error!(
+            "Invalid gossip value retrieved for validator {}",
+            validator_identity
+        );
         return false;
     }
     true
@@ -363,34 +366,23 @@ pub struct CrankCopyGossipContactInfo {
     /// Path to oracle authority keypair
     #[arg(short, long, env)]
     entrypoint: String,
-
-    /// Path to oracle source CSV file
-    #[arg(
-        short,
-        long,
-        env,
-        default_value = "/data/validator-age/oracle/data.csv"
-    )]
-    oracle_source: PathBuf,
 }
 
-pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) {
-    // let vote_accounts = keeper_state.vote_account_map.values().collect::<Vec<_>>();
+pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> anyhow::Result<()> {
     let program_id = validator_history::id();
-    let vote_accounts = get_vote_accounts_with_retry(&client, 5, None)
-        .await
-        .expect("msg");
+    let vote_accounts = get_vote_accounts_with_retry(&client, 5, None).await?;
     let entrypoint = solana_net_utils::parse_host_port(&args.entrypoint).unwrap_or_else(|err| {
         panic!(
             "Failed to parse gossip entrypoint '{}': {}",
             args.entrypoint, err
         )
     });
-    let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let keypair = read_keypair_file(args.keypair_path)
+        .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
     let validator_histories = get_all_validator_history_accounts(&client, program_id)
         .await
-        .expect("Failed to read validator histories");
+        .map_err(|e| anyhow!("Failed to read validator histories: {e}"))?;
     let validator_history_map: HashMap<Pubkey, ValidatorHistory> = HashMap::from_iter(
         validator_histories
             .iter()
@@ -406,7 +398,6 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) {
         Ok(res) => res,
         Err(e) => {
             panic!("Failed to fetch IP and shred version from gossip entrypoint: {entrypoint}, Error: {e}");
-            // continue;
         }
     };
 
@@ -435,12 +426,10 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) {
     tokio::time::sleep(Duration::from_secs(150)).await;
 
     let gossip_entries = {
-        let crds = cluster_info
-            .gossip
-            .crds
-            .read()
-            .map_err(|e: std::sync::PoisonError<RwLockReadGuard<Crds>>| e.to_string())
-            .expect("msg");
+        let crds =
+            cluster_info.gossip.crds.read().map_err(
+                |e: std::sync::PoisonError<RwLockReadGuard<Crds>>| anyhow!(e.to_string()),
+            )?;
 
         vote_accounts
             .iter()
@@ -471,14 +460,9 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) {
         .map(|entry| entry.build_update_tx(0))
         .collect::<Vec<_>>();
 
-    submit_transactions(&client, update_transactions, &keypair, 5, 5)
-        .await
-        .expect("msg");
+    submit_transactions(&client, update_transactions, &keypair, 5, 5).await?;
 
-    // return submit_result.map_err(|e| e.into());
-    // }
-
-    // Err("Failed to discover gossip entries from any of the provided entrypoints".into())
+    Ok(())
 }
 
 fn _gossip_data_uploaded(
@@ -496,83 +480,3 @@ fn _gossip_data_uploaded(
     }
     false
 }
-
-// CODE BELOW SLIGHTLY MODIFIED FROM
-// solana_sdk/src/ed25519_instruction.rs
-
-// pub const PUBKEY_SERIALIZED_SIZE: usize = 32;
-// pub const SIGNATURE_SERIALIZED_SIZE: usize = 64;
-// pub const SIGNATURE_OFFSETS_SERIALIZED_SIZE: usize = 14;
-// // bytemuck requires structures to be aligned
-// pub const SIGNATURE_OFFSETS_START: usize = 2;
-// pub const DATA_START: usize = SIGNATURE_OFFSETS_SERIALIZED_SIZE + SIGNATURE_OFFSETS_START;
-//
-// #[derive(Default, Debug, Copy, Clone, Zeroable, Pod, Eq, PartialEq)]
-// #[repr(C)]
-// pub struct Ed25519SignatureOffsets {
-//     signature_offset: u16,             // offset to ed25519 signature of 64 bytes
-//     signature_instruction_index: u16,  // instruction index to find signature
-//     public_key_offset: u16,            // offset to public key of 32 bytes
-//     public_key_instruction_index: u16, // instruction index to find public key
-//     message_data_offset: u16,          // offset to start of message data
-//     message_data_size: u16,            // size of message data
-//     message_instruction_index: u16,    // index of instruction data to get message data
-// }
-//
-// // This code is modified from solana_sdk/src/ed25519_instruction.rs
-// // due to that function requiring a keypair, and generating the signature within the function.
-// // In our case we don't have the keypair, we just have the signature and pubkey.
-// pub fn build_verify_signature_ix(
-//     signature: &[u8],
-//     pubkey: [u8; 32],
-//     message: &[u8],
-// ) -> Instruction {
-//     assert_eq!(pubkey.len(), PUBKEY_SERIALIZED_SIZE);
-//     assert_eq!(signature.len(), SIGNATURE_SERIALIZED_SIZE);
-//
-//     let mut instruction_data = Vec::with_capacity(
-//         DATA_START
-//             .saturating_add(SIGNATURE_SERIALIZED_SIZE)
-//             .saturating_add(PUBKEY_SERIALIZED_SIZE)
-//             .saturating_add(message.len()),
-//     );
-//
-//     let num_signatures: u8 = 1;
-//     let public_key_offset = DATA_START;
-//     let signature_offset = public_key_offset.saturating_add(PUBKEY_SERIALIZED_SIZE);
-//     let message_data_offset = signature_offset.saturating_add(SIGNATURE_SERIALIZED_SIZE);
-//
-//     // add padding byte so that offset structure is aligned
-//     instruction_data.extend_from_slice(bytes_of(&[num_signatures, 0]));
-//
-//     let offsets = Ed25519SignatureOffsets {
-//         signature_offset: signature_offset as u16,
-//         signature_instruction_index: u16::MAX,
-//         public_key_offset: public_key_offset as u16,
-//         public_key_instruction_index: u16::MAX,
-//         message_data_offset: message_data_offset as u16,
-//         message_data_size: message.len() as u16,
-//         message_instruction_index: u16::MAX,
-//     };
-//
-//     instruction_data.extend_from_slice(bytes_of(&offsets));
-//
-//     debug_assert_eq!(instruction_data.len(), public_key_offset);
-//
-//     instruction_data.extend_from_slice(&pubkey);
-//
-//     debug_assert_eq!(instruction_data.len(), signature_offset);
-//
-//     instruction_data.extend_from_slice(signature);
-//
-//     debug_assert_eq!(instruction_data.len(), message_data_offset);
-//
-//     instruction_data.extend_from_slice(message);
-//
-//     Instruction {
-//         program_id: solana_program::ed25519_program::id(),
-//         accounts: vec![],
-//         data: instruction_data,
-//     }
-// }
-//

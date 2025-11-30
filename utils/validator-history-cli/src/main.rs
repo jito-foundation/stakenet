@@ -1297,7 +1297,7 @@ async fn main() -> anyhow::Result<()> {
                 Duration::from_secs(60),
             );
             let client = Arc::new(client);
-            commands::cranks::copy_gossip_contact_info::run(command_args, client).await
+            commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
