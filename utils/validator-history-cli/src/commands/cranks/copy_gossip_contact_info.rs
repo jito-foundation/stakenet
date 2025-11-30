@@ -44,7 +44,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::ValidatorHistory;
 
 #[derive(Clone, Debug)]
 pub struct GossipEntry {
@@ -99,8 +99,6 @@ impl GossipEntry {
                 &self.message,
             ),
         ];
-
-        // info!("Ed25519 instruction data length: {}", ixs[0].data.len());
 
         ixs.push(Instruction {
             program_id: self.program_id,
@@ -389,7 +387,6 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> an
             .map(|vote_history| (vote_history.vote_account, *vote_history)),
     );
 
-    // for entrypoint in entrypoints {
     // Modified from solana-gossip::main::process_spy and discover
     let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
     let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
@@ -404,11 +401,10 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> an
     let gossip_ip = ip_echo_response.ip;
     let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);
 
-    let gossip_addr = SocketAddr::new(
-        gossip_ip,
+    let port =
         solana_net_utils::find_available_port_in_range(IpAddr::V4(Ipv4Addr::UNSPECIFIED), (0, 1))
-            .expect("unable to find an available gossip port"),
-    );
+            .map_err(|e| anyhow!("Unable to find an available gossip port: {e}"))?;
+    let gossip_addr = SocketAddr::new(gossip_ip, port);
 
     let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
         Keypair::from_base58_string(keypair.to_base58_string().as_str()),
@@ -452,7 +448,7 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> an
     exit.store(true, Ordering::Relaxed);
 
     if gossip_entries.is_empty() {
-        // continue;
+        return Err(anyhow!("Could not find gossip entries"));
     }
 
     let update_transactions = gossip_entries
@@ -463,20 +459,4 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> an
     submit_transactions(&client, update_transactions, &keypair, 5, 5).await?;
 
     Ok(())
-}
-
-fn _gossip_data_uploaded(
-    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-    vote_account: Pubkey,
-    epoch: u64,
-) -> bool {
-    if let Some(validator_history) = validator_history_map.get(&vote_account) {
-        if let Some(latest_entry) = validator_history.history.last() {
-            return latest_entry.epoch == epoch as u16
-                && latest_entry.ip != ValidatorHistoryEntry::default().ip
-                && latest_entry.version.major != ValidatorHistoryEntry::default().version.major
-                && latest_entry.client_type != ValidatorHistoryEntry::default().client_type;
-        }
-    }
-    false
 }
