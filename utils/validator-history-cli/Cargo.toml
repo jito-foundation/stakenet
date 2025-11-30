@@ -20,12 +20,12 @@ serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-gossip = { workspace = true }
-solana-streamer = { workspace = true }
 solana-metrics = { workspace = true }
-solana-net-utils = { workspace = true }
 solana-native-token = { workspace = true }
+solana-net-utils = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
+solana-streamer = { workspace = true }
 spl-stake-pool = { workspace = true }
 stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
 stakenet-sdk = { path = "../../sdk" }

@@ -339,7 +339,7 @@ fn build_gossip_entry(
     // are fully deprecated and will not be transmitted on the gossip network.
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
-            println!("Invalid entry for validator {}", validator_vote_pubkey);
+            error!("Invalid entry for validator {}", validator_vote_pubkey);
             return None;
         }
         return Some(vec![GossipEntry::new(
@@ -361,7 +361,7 @@ pub struct CrankCopyGossipContactInfo {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
 
-    /// Path to oracle authority keypair
+    /// Gossip network entrypoint address
     #[arg(short, long, env)]
     entrypoint: String,
 }
@@ -369,12 +369,13 @@ pub struct CrankCopyGossipContactInfo {
 pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> anyhow::Result<()> {
     let program_id = validator_history::id();
     let vote_accounts = get_vote_accounts_with_retry(&client, 5, None).await?;
-    let entrypoint = solana_net_utils::parse_host_port(&args.entrypoint).unwrap_or_else(|err| {
-        panic!(
+    let entrypoint = solana_net_utils::parse_host_port(&args.entrypoint).map_err(|err| {
+        anyhow!(
             "Failed to parse gossip entrypoint '{}': {}",
-            args.entrypoint, err
+            args.entrypoint,
+            err
         )
-    });
+    })?;
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
