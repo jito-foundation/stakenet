@@ -15,11 +15,11 @@ use bytemuck::{bytes_of, Pod, Zeroable};
 use clap::Parser;
 use log::info;
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
-use solana_gossip::gossip_service::make_gossip_node;
 use solana_gossip::{
     crds::Crds,
     crds_data::CrdsData,
     crds_value::{CrdsValue, CrdsValueLabel},
+    gossip_service::make_gossip_node,
 };
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
