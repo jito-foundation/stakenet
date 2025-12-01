@@ -406,7 +406,6 @@ pub async fn _parallel_execute_transactions_surfpool(
                 .iter()
                 .map(|(idx, tx)| {
                     let client = client.clone();
-                    let config = config.clone();
                     let idx = *idx;
                     let tx = tx.clone();
                     async move { (idx, client.send_transaction_with_config(&tx, config).await) }
