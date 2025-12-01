@@ -1,0 +1,1 @@
+./target/debug/steward-cli --json-rpc-url http://localhost:8899 copy-directed-stake-targets --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ~/.config/solana/id.json --vote-pubkey H3GhqPMwvGLdxWg3QJGjXDSkFSJCsFk3Wx9XBTdYZykc --target-lamports 200000000000
