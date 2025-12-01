@@ -365,6 +365,9 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 state_account.state.validator_lamport_balances[validator_list_index] =
                     state_account.state.validator_lamport_balances[validator_list_index]
                         .saturating_sub(decrease_components.directed_unstake_lamports);
+                directed_stake_meta.directed_stake_lamports[validator_list_index] =
+                    directed_stake_meta.directed_stake_lamports[validator_list_index]
+                        .saturating_sub(decrease_components.directed_unstake_lamports);
             }
         }
         RebalanceType::Increase(lamports) => {
@@ -414,6 +417,9 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                     state_account.state.validator_lamport_balances[validator_list_index]
                         .checked_add(lamports)
                         .ok_or(StewardError::ArithmeticError)?;
+                directed_stake_meta.directed_stake_lamports[validator_list_index] =
+                    directed_stake_meta.directed_stake_lamports[validator_list_index]
+                        .saturating_add(lamports);
             }
         }
         RebalanceType::None => {
