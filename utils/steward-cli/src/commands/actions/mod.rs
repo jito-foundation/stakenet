@@ -5,6 +5,7 @@ pub mod auto_remove_validator_from_pool;
 pub mod close_directed_stake_ticket;
 pub mod close_directed_stake_whitelist;
 pub mod close_steward;
+pub mod copy_directed_stake_targets;
 pub mod instant_remove_validator;
 pub mod manually_copy_all_vote_accounts;
 pub mod manually_copy_vote_accounts;

@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -14,7 +15,9 @@ use stakenet_sdk::{
     utils::{
         accounts::get_all_validator_history_accounts,
         helpers::vote_account_uploaded_recently,
-        transactions::{get_multiple_accounts_batched, submit_instructions},
+        transactions::{
+            get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
+        },
     },
 };
 
@@ -24,6 +27,10 @@ pub struct CrankCopyVoteAccount {
     /// Path to keypair for transaction signing
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
+
+    /// Only process validators returned by get_vote_accounts RPC (active validators)
+    #[arg(long, env, default_value_t = false)]
+    active_only: bool,
 }
 
 pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<()> {
@@ -43,6 +50,22 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             .iter()
             .map(|vote_history| (vote_history.vote_account, *vote_history)),
     );
+
+    // If active_only is set, fetch active vote accounts from get_vote_accounts RPC
+    let active_vote_accounts: Option<HashSet<Pubkey>> = if args.active_only {
+        let vote_accounts = get_vote_accounts_with_retry(&client, 0, None).await?;
+        let active_set: HashSet<Pubkey> = vote_accounts
+            .iter()
+            .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
+            .collect();
+        println!(
+            "Filtering to {} active vote accounts from get_vote_accounts RPC",
+            active_set.len()
+        );
+        Some(active_set)
+    } else {
+        None
+    };
 
     let all_history_vote_account_pubkeys: Vec<Pubkey> =
         validator_history_map.keys().cloned().collect();
@@ -69,6 +92,11 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
         })
         .collect();
 
+    // Filter to only active vote accounts if the flag is set
+    if let Some(ref active_set) = active_vote_accounts {
+        vote_accounts_to_update.retain(|vote_account| active_set.contains(vote_account));
+    }
+
     vote_accounts_to_update.retain(|vote_account| {
         !vote_account_uploaded_recently(
             &validator_history_map,
@@ -77,6 +105,11 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             epoch_info.absolute_slot,
         )
     });
+
+    println!(
+        "Found {} vote accounts to update",
+        vote_accounts_to_update.len()
+    );
 
     let entries = vote_accounts_to_update
         .iter()
