@@ -344,7 +344,7 @@ const SURFPOOL_BATCH_SIZE: usize = 100;
 
 /// Fast transaction submission optimized for local surfpool node.
 #[allow(unused)]
-pub async fn _parallel_execute_transactions_surfpool(
+pub async fn parallel_execute_transactions(
     client: &Arc<RpcClient>,
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
@@ -455,7 +455,7 @@ pub async fn _parallel_execute_transactions_surfpool(
 
     Ok(results)
 }
-pub async fn parallel_execute_transactions(
+pub async fn _parallel_execute_transactions(
     client: &Arc<RpcClient>,
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,

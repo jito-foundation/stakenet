@@ -28,9 +28,10 @@ pub struct CrankCopyVoteAccount {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
 
-    /// Only process validators returned by get_vote_accounts RPC (active validators)
-    #[arg(long, env, default_value_t = false)]
-    active_only: bool,
+    /// Only process validators returned by get_vote_accounts RPC (active validators).
+    /// Optionally provide a separate RPC URL to fetch vote accounts from (e.g., mainnet).
+    #[arg(long, env)]
+    active_only: Option<String>,
 }
 
 pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<()> {
@@ -51,21 +52,24 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             .map(|vote_history| (vote_history.vote_account, *vote_history)),
     );
 
-    // If active_only is set, fetch active vote accounts from get_vote_accounts RPC
-    let active_vote_accounts: Option<HashSet<Pubkey>> = if args.active_only {
-        let vote_accounts = get_vote_accounts_with_retry(&client, 0, None).await?;
-        let active_set: HashSet<Pubkey> = vote_accounts
-            .iter()
-            .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
-            .collect();
-        println!(
-            "Filtering to {} active vote accounts from get_vote_accounts RPC",
-            active_set.len()
-        );
-        Some(active_set)
-    } else {
-        None
-    };
+    // If active_only is set, fetch active vote accounts from the specified RPC URL
+    let active_vote_accounts: Option<HashSet<Pubkey>> =
+        if let Some(ref active_rpc_url) = args.active_only {
+            let active_client = Arc::new(RpcClient::new(active_rpc_url.clone()));
+            let vote_accounts = get_vote_accounts_with_retry(&active_client, 0, None).await?;
+            let active_set: HashSet<Pubkey> = vote_accounts
+                .iter()
+                .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
+                .collect();
+            println!(
+                "Filtering to {} active vote accounts from {}",
+                active_set.len(),
+                active_rpc_url
+            );
+            Some(active_set)
+        } else {
+            None
+        };
 
     let all_history_vote_account_pubkeys: Vec<Pubkey> =
         validator_history_map.keys().cloned().collect();
@@ -130,7 +134,7 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
         0,
         50,
         0,
-        Some(300_000),
+        Some(1_400_000),
         false,
     )
     .await;
