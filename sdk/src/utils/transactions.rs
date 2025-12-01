@@ -4,6 +4,7 @@ use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use log::*;
+use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_client::rpc_response::{
     Response, RpcResult, RpcSimulateTransactionResult, RpcVoteAccountInfo,
 };
@@ -11,6 +12,7 @@ use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClien
 use solana_metrics::datapoint_error;
 use solana_program::hash::Hash;
 use solana_sdk::bs58;
+use solana_sdk::commitment_config::CommitmentLevel;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::packet::PACKET_DATA_SIZE;
 use solana_sdk::transaction::TransactionError;
@@ -337,6 +339,122 @@ fn sign_txs(
         .collect()
 }
 
+/// Batch size for parallel submission - keeps blockhash fresh between batches
+const SURFPOOL_BATCH_SIZE: usize = 100;
+
+/// Fast transaction submission optimized for local surfpool node.
+#[allow(unused)]
+pub async fn _parallel_execute_transactions_surfpool(
+    client: &Arc<RpcClient>,
+    transactions: &[&[Instruction]],
+    signer: &Arc<Keypair>,
+    retry_count: u16,
+    _confirmation_time: u64,
+) -> Result<Vec<Result<(), JitoSendTransactionError>>, JitoTransactionExecutionError> {
+    if transactions.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut results = vec![Err(JitoSendTransactionError::ExceededRetries); transactions.len()];
+
+    let config = RpcSendTransactionConfig {
+        skip_preflight: true,
+        preflight_commitment: Some(CommitmentLevel::Processed),
+        ..Default::default()
+    };
+
+    // Process in batches to keep blockhash fresh
+    for (batch_start, batch) in transactions.chunks(SURFPOOL_BATCH_SIZE).enumerate() {
+        let batch_offset = batch_start * SURFPOOL_BATCH_SIZE;
+        let mut retries = 0;
+
+        while retries < retry_count {
+            // Fresh blockhash for each batch attempt
+            let blockhash = get_latest_blockhash_with_retry(client)
+                .await
+                .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
+
+            // Only sign/submit transactions in this batch that haven't succeeded
+            let pending: Vec<(usize, Transaction)> = batch
+                .iter()
+                .enumerate()
+                .filter_map(|(i, ixs)| {
+                    let global_idx = batch_offset + i;
+                    if matches!(
+                        results[global_idx],
+                        Err(JitoSendTransactionError::ExceededRetries)
+                    ) {
+                        let tx = Transaction::new_signed_with_payer(
+                            ixs,
+                            Some(&signer.pubkey()),
+                            &[signer.as_ref()],
+                            blockhash,
+                        );
+                        Some((global_idx, tx))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if pending.is_empty() {
+                break;
+            }
+
+            // Submit batch in parallel
+            let futures: Vec<_> = pending
+                .iter()
+                .map(|(idx, tx)| {
+                    let client = client.clone();
+                    let idx = *idx;
+                    let tx = tx.clone();
+                    async move { (idx, client.send_transaction_with_config(&tx, config).await) }
+                })
+                .collect();
+
+            let send_results = futures::future::join_all(futures).await;
+
+            let mut needs_retry = false;
+
+            for (idx, result) in send_results {
+                match result {
+                    Ok(_) => {
+                        results[idx] = Ok(());
+                    }
+                    Err(e) => {
+                        if let Some(tx_err) = e.get_transaction_error() {
+                            match tx_err {
+                                TransactionError::AlreadyProcessed => {
+                                    results[idx] = Ok(());
+                                }
+                                TransactionError::BlockhashNotFound => {
+                                    // Will retry with fresh blockhash
+                                    needs_retry = true;
+                                }
+                                _ => {
+                                    results[idx] = Err(JitoSendTransactionError::TransactionError(
+                                        format!("TX Error: {:?}", tx_err),
+                                    ));
+                                }
+                            }
+                        } else {
+                            results[idx] =
+                                Err(JitoSendTransactionError::TransactionError(e.to_string()));
+                        }
+                    }
+                }
+            }
+
+            if needs_retry {
+                retries += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    Ok(results)
+}
 pub async fn parallel_execute_transactions(
     client: &Arc<RpcClient>,
     transactions: &[&[Instruction]],

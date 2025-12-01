@@ -8,6 +8,7 @@ use crate::commands::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
+        copy_directed_stake_targets::CopyDirectedStakeTargets,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
@@ -346,6 +347,7 @@ pub enum Commands {
     InitDirectedStakeTicket(InitDirectedStakeTicket),
     AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
     UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    CopyDirectedStakeTargets(CopyDirectedStakeTargets),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
     RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
@@ -360,6 +362,7 @@ pub enum Commands {
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
     CrankRebalanceDirected(CrankRebalanceDirected),
+    CrankUpdateStakePool(CrankUpdateStakePool),
 }
 
 // ---------- VIEWS ------------
@@ -591,6 +594,10 @@ pub(crate) fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
     s.parse()
 }
 
+pub(crate) fn parse_u64(s: &str) -> Result<u64, std::num::ParseIntError> {
+    s.parse()
+}
+
 // Add helper to parse a Pubkey from string
 pub(crate) fn parse_pubkey(s: &str) -> Result<Pubkey, solana_sdk::pubkey::ParsePubkeyError> {
     use std::str::FromStr;
@@ -789,6 +796,19 @@ pub struct CrankComputeInstantUnstake {
 pub struct CrankRebalance {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Update stake pool - runs update_validator_list_balance, update_stake_pool_balance, and cleanup_removed_validator_entries"
+)]
+pub struct CrankUpdateStakePool {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Skip the merge step when updating validator list balances
+    #[arg(long, env, default_value_t = false)]
+    pub no_merge: bool,
 }
 
 #[derive(Parser)]

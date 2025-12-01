@@ -27,6 +27,7 @@ use commands::{
         compute_score::command_crank_compute_score,
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
         rebalance::command_crank_rebalance, steward::command_crank_steward,
+        update_stake_pool::command_crank_update_stake_pool,
     },
     info::{
         get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
@@ -48,7 +49,9 @@ use crate::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
-            close_steward::command_close_steward, migrate_state_to_v2::command_migrate_state_to_v2,
+            close_steward::command_close_steward,
+            copy_directed_stake_targets::command_copy_directed_stake_targets,
+            migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
@@ -225,6 +228,9 @@ async fn main() -> Result<()> {
         Commands::UpdateDirectedStakeTicket(args) => {
             command_update_directed_stake_ticket(args, client.clone(), steward_program_id).await
         }
+        Commands::CopyDirectedStakeTargets(args) => {
+            command_copy_directed_stake_targets(args, client.clone(), steward_program_id).await
+        }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
             command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
         }
@@ -260,6 +266,9 @@ async fn main() -> Result<()> {
         }
         Commands::CrankRebalanceDirected(args) => {
             command_crank_rebalance_directed(args, &client, steward_program_id).await
+        }
+        Commands::CrankUpdateStakePool(args) => {
+            command_crank_update_stake_pool(args, &client, steward_program_id).await
         }
     };
 
