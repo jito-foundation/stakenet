@@ -65,6 +65,16 @@ pub struct RebalanceEvent {
     pub decrease_components: DecreaseComponents,
 }
 
+#[event]
+#[derive(Debug, Clone)]
+pub struct DirectedRebalanceEvent {
+    pub vote_account: Pubkey,
+    pub epoch: u16,
+    pub rebalance_type_tag: RebalanceTypeTag,
+    pub increase_lamports: u64,
+    pub decrease_lamports: u64,
+}
+
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum RebalanceTypeTag {
     None,

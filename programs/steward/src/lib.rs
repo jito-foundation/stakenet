@@ -156,13 +156,8 @@ pub mod steward {
     pub fn rebalance_directed(
         ctx: Context<RebalanceDirected>,
         directed_stake_meta_index: u64,
-        validator_list_index: u64,
     ) -> Result<()> {
-        instructions::rebalance_directed::handler(
-            ctx,
-            directed_stake_meta_index as usize,
-            validator_list_index as usize,
-        )
+        instructions::rebalance_directed::handler(ctx, directed_stake_meta_index as usize)
     }
 
     /* Admin instructions */
@@ -369,8 +364,14 @@ pub mod steward {
         ctx: Context<CopyDirectedStakeTargets>,
         vote_pubkey: Pubkey,
         total_target_lamports: u64,
+        validator_list_index: u32,
     ) -> Result<()> {
-        instructions::copy_directed_stake_targets::handler(ctx, vote_pubkey, total_target_lamports)
+        instructions::copy_directed_stake_targets::handler(
+            ctx,
+            vote_pubkey,
+            total_target_lamports,
+            validator_list_index as usize,
+        )
     }
 
     /// Initialize DirectedStakeWhitelist account
