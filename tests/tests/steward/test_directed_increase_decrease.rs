@@ -22,7 +22,7 @@ fn create_mock_steward_state(num_pool_validators: u16) -> StewardState {
         validators_to_remove: BitMask::default(),
         validators_for_immediate_removal: BitMask::default(),
         start_computing_scores_slot: 0,
-        current_epoch: 0,
+        current_epoch: 800,
         next_cycle_epoch: 10,
         num_pool_validators: num_pool_validators.into(),
         scoring_unstake_total: 0,
@@ -40,11 +40,11 @@ fn create_mock_directed_stake_meta(
 ) -> DirectedStakeMeta {
     let mut meta = DirectedStakeMeta {
         total_stake_targets: 0,
-        epoch_last_updated: 0,
-        epoch_increase_total_lamports: 0,
-        epoch_decrease_total_lamports: 0,
         directed_unstake_total: 0,
-        padding0: [0; 64],
+        padding0: [0; 63],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
+        directed_stake_lamports: [0; MAX_VALIDATORS],
+        directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         targets: [DirectedStakeTarget {
             vote_pubkey: Pubkey::default(),
             total_target_lamports: 0,
@@ -52,7 +52,7 @@ fn create_mock_directed_stake_meta(
             target_last_updated_epoch: 0,
             staked_last_updated_epoch: 0,
             _padding0: [0; 32],
-        }; 2048],
+        }; MAX_VALIDATORS],
     };
 
     for (i, (vote_pubkey, target_lamports, staked_lamports)) in targets.iter().enumerate() {
@@ -67,6 +67,9 @@ fn create_mock_directed_stake_meta(
             };
         }
     }
+
+    // Set total_stake_targets to the actual number of targets provided
+    meta.total_stake_targets = targets.len().min(2048) as u64;
 
     meta
 }
@@ -233,7 +236,6 @@ fn test_decrease_stake_calculation_basic() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_ok());
@@ -263,7 +265,6 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         1_000_000_000_000,
         0,
         1_000_000,
-        0,
     );
 
     assert!(result.is_ok());
@@ -291,7 +292,6 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_err());
@@ -307,7 +307,7 @@ fn test_decrease_stake_calculation_zero_cap() {
     ]);
 
     let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0, 0);
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -403,7 +403,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_ok());
@@ -420,7 +419,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1,
         2_000_000,
         1_000_000_000_000,
-        0,
         0,
         0,
     );
@@ -451,16 +449,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         (validator5, 1_500_000, 1_500_000), // At target
     ]);
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        1_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -470,16 +460,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         _ => panic!("Expected Decrease variant"),
     }
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        1,
-        2_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 1, 2_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {

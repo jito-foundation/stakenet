@@ -530,7 +530,6 @@ pub async fn emit_directed_stake_stats(
             "directed-stake-stats",
             ("state", steward_state.state_tag.to_string(), String),
             ("meta-total-stake-targets", meta.total_stake_targets, i64),
-            ("meta-epoch-last-updated", meta.epoch_last_updated, i64),
             ("stake-updated-current-epoch", stake_updated_count, i64),
             ("target-updated-current-epoch", target_updated_count, i64),
             "cluster" => keeper_config.cluster_name,

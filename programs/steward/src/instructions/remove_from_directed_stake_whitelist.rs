@@ -12,6 +12,7 @@ pub struct RemoveFromDirectedStakeWhitelist<'info> {
     pub config: AccountLoader<'info, Config>,
 
     #[account(
+        mut,
         seeds = [DirectedStakeWhitelist::SEED, config.key().as_ref()],
         bump
     )]
@@ -33,7 +34,7 @@ pub fn handler(
     record_type: DirectedStakeRecordType,
     record: Pubkey,
 ) -> Result<()> {
-    let mut whitelist = ctx.accounts.directed_stake_whitelist.load_init()?;
+    let mut whitelist = ctx.accounts.directed_stake_whitelist.load_mut()?;
 
     match record_type {
         DirectedStakeRecordType::Validator => {

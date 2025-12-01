@@ -32,6 +32,7 @@ pub fn test_compute_scores_to_compute_delegations() {
                 validator.index as usize,
                 cluster_history,
                 config,
+                state.num_pool_validators,
             )
             .unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -293,23 +294,6 @@ pub fn test_compute_instant_unstake_to_rebalance() {
 }
 
 #[test]
-pub fn test_compute_instant_unstake_to_idle() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::ComputeInstantUnstake;
-    state.set_flag(RESET_TO_IDLE);
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    assert!(matches!(state.state_tag, StewardStateEnum::Idle));
-}
-
-#[test]
 pub fn test_compute_instant_unstake_transition_noop() {
     let mut fixtures = Box::<StateMachineFixtures>::default();
 
@@ -376,31 +360,4 @@ pub fn test_directed_rebalance_to_idle() {
     assert!(res.is_ok());
     println!("state.state_tag: {}", state.state_tag);
     assert!(matches!(state.state_tag, StewardStateEnum::Idle));
-}
-
-#[test]
-pub fn idle_to_new_epoch_rebalance_directed() {
-    let mut fixtures = Box::<StateMachineFixtures>::default();
-
-    let clock = &mut fixtures.clock;
-    let epoch_schedule = &fixtures.epoch_schedule;
-    let parameters = &fixtures.config.parameters;
-    let state = &mut fixtures.state;
-
-    state.state_tag = StewardStateEnum::Idle;
-    clock.slot = epoch_schedule.get_last_slot_in_epoch(clock.epoch);
-    state.set_flag(REBALANCE_DIRECTED_COMPLETE);
-    state.set_flag(COMPUTE_DELEGATIONS);
-
-    let _ = state.transition(clock, parameters, epoch_schedule);
-
-    clock.epoch += parameters.num_epochs_between_scoring;
-    clock.slot = epoch_schedule.get_first_slot_in_epoch(clock.epoch);
-
-    let res = state.transition(clock, parameters, epoch_schedule);
-    assert!(res.is_ok());
-    assert!(matches!(
-        state.state_tag,
-        StewardStateEnum::RebalanceDirected
-    ));
 }

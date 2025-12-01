@@ -9,6 +9,10 @@ use stakenet_sdk::utils::accounts::get_directed_stake_ticket;
 #[derive(Parser)]
 #[command(about = "View DirectedStakeTicket account")]
 pub struct ViewDirectedStakeTicket {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
     /// Directed stake ticket address
     #[arg(long)]
     pub ticket_signer: Pubkey,
@@ -19,8 +23,13 @@ pub async fn command_view_directed_stake_ticket(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let ticket =
-        get_directed_stake_ticket(client.clone(), &args.ticket_signer, &program_id).await?;
+    let ticket = get_directed_stake_ticket(
+        client.clone(),
+        &args.steward_config,
+        &args.ticket_signer,
+        &program_id,
+    )
+    .await?;
 
     println!("num_preferences: {:?}", ticket.num_preferences);
 
