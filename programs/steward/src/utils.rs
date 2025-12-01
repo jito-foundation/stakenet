@@ -12,7 +12,7 @@ use spl_stake_pool::{
 use crate::{
     constants::{
         PUBKEY_SIZE, STAKE_STATUS_OFFSET, TRANSIENT_STAKE_SEED_LENGTH, TRANSIENT_STAKE_SEED_OFFSET,
-        U64_SIZE, VALIDATOR_LIST_HEADER_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET,
+        U64_SIZE, VEC_SIZE_BYTES, VOTE_ADDRESS_OFFSET,
     },
     errors::StewardError,
     Config, Delegation, StewardStateAccountV2, StewardStateEnum,
