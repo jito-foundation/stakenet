@@ -440,7 +440,7 @@ pub async fn get_directed_stake_meta(
     steward_config_address: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Box<DirectedStakeMeta>, JitoTransactionError> {
-let directed_stake_meta_pda =
+    let directed_stake_meta_pda =
         get_directed_stake_meta_address(steward_config_address, program_id);
 
     let directed_stake_meta_account_data =

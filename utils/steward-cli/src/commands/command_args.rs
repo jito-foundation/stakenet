@@ -799,7 +799,9 @@ pub struct CrankRebalance {
 }
 
 #[derive(Parser)]
-#[command(about = "Update stake pool - runs update_validator_list_balance, update_stake_pool_balance, and cleanup_removed_validator_entries")]
+#[command(
+    about = "Update stake pool - runs update_validator_list_balance, update_stake_pool_balance, and cleanup_removed_validator_entries"
+)]
 pub struct CrankUpdateStakePool {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,

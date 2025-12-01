@@ -15,7 +15,9 @@ use stakenet_sdk::{
     utils::{
         accounts::get_all_validator_history_accounts,
         helpers::vote_account_uploaded_recently,
-        transactions::{get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions},
+        transactions::{
+            get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
+        },
     },
 };
 
@@ -56,7 +58,10 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             .iter()
             .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
             .collect();
-        println!("Filtering to {} active vote accounts from get_vote_accounts RPC", active_set.len());
+        println!(
+            "Filtering to {} active vote accounts from get_vote_accounts RPC",
+            active_set.len()
+        );
         Some(active_set)
     } else {
         None
@@ -101,7 +106,10 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
         )
     });
 
-    println!("Found {} vote accounts to update", vote_accounts_to_update.len());
+    println!(
+        "Found {} vote accounts to update",
+        vote_accounts_to_update.len()
+    );
 
     let entries = vote_accounts_to_update
         .iter()

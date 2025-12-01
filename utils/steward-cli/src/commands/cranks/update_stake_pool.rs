@@ -7,13 +7,17 @@ use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 #[allow(deprecated)]
 use spl_stake_pool::{
     find_withdraw_authority_program_address,
-    instruction::{cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance},
+    instruction::{
+        cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
+    },
     state::StakeStatus,
     MAX_VALIDATORS_TO_UPDATE,
 };
 use stakenet_sdk::utils::{
     accounts::get_all_steward_accounts,
-    transactions::{print_base58_tx, submit_packaged_transactions, configure_instruction, print_errors_if_any},
+    transactions::{
+        configure_instruction, print_base58_tx, print_errors_if_any, submit_packaged_transactions,
+    },
 };
 
 use crate::commands::command_args::CrankUpdateStakePool;
@@ -99,10 +103,20 @@ pub async fn command_crank_update_stake_pool(
         ),
     ];
 
-    let priority_fee = args.permissionless_parameters.transaction_parameters.priority_fee;
-    let compute_limit = args.permissionless_parameters.transaction_parameters.compute_limit;
+    let priority_fee = args
+        .permissionless_parameters
+        .transaction_parameters
+        .priority_fee;
+    let compute_limit = args
+        .permissionless_parameters
+        .transaction_parameters
+        .compute_limit;
 
-    if args.permissionless_parameters.transaction_parameters.print_tx {
+    if args
+        .permissionless_parameters
+        .transaction_parameters
+        .print_tx
+    {
         println!("=== Update Validator List Balance Instructions ===");
         for ix in &update_list_instructions {
             print_base58_tx(&[ix.clone()]);
@@ -114,13 +128,19 @@ pub async fn command_crank_update_stake_pool(
 
     // Execute update_validator_list_balance transactions
     if !update_list_instructions.is_empty() {
-        println!("Updating validator list balances ({} transactions)...", update_list_instructions.len());
+        println!(
+            "Updating validator list balances ({} transactions)...",
+            update_list_instructions.len()
+        );
         let update_txs: Vec<Vec<Instruction>> = update_list_instructions
             .into_iter()
-            .map(|ix| configure_instruction(&[ix], priority_fee, compute_limit.or(Some(1_400_000)), None))
+            .map(|ix| {
+                configure_instruction(&[ix], priority_fee, compute_limit.or(Some(1_400_000)), None)
+            })
             .collect();
 
-        let update_stats = submit_packaged_transactions(client, update_txs, &payer, Some(50), None).await?;
+        let update_stats =
+            submit_packaged_transactions(client, update_txs, &payer, Some(50), None).await?;
         println!(
             "Update validator list: {} succeeded, {} failed",
             update_stats.successes, update_stats.errors
@@ -134,10 +154,13 @@ pub async fn command_crank_update_stake_pool(
     println!("Updating stake pool balance and cleaning up...");
     let cleanup_txs: Vec<Vec<Instruction>> = final_instructions
         .into_iter()
-        .map(|ix| configure_instruction(&[ix], priority_fee, compute_limit.or(Some(1_400_000)), None))
+        .map(|ix| {
+            configure_instruction(&[ix], priority_fee, compute_limit.or(Some(1_400_000)), None)
+        })
         .collect();
 
-    let cleanup_stats = submit_packaged_transactions(client, cleanup_txs, &payer, Some(50), None).await?;
+    let cleanup_stats =
+        submit_packaged_transactions(client, cleanup_txs, &payer, Some(50), None).await?;
     println!(
         "Cleanup: {} succeeded, {} failed",
         cleanup_stats.successes, cleanup_stats.errors
