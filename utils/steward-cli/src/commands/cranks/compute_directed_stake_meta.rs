@@ -216,11 +216,7 @@ pub async fn command_crank_compute_directed_stake_meta(
     );
 
     let signature = client
-        .send_and_confirm_transaction_with_spinner_and_config(
-            &transaction,
-            CommitmentConfig::processed(),
-            RpcSendTransactionConfig::default(),
-        )
+        .send_and_confirm_transaction_with_spinner(&transaction)
         .await?;
 
     println!("\n=== Transaction Successful ===");

@@ -103,7 +103,7 @@ pub(crate) async fn command_copy_directed_stake_targets(
     let mut instructions = Vec::new();
     for (vote_pubkey, target_lamports) in args.vote_pubkey.iter().zip(args.target_lamports.iter()) {
         // Find the index of this vote_pubkey in the validator list
-        let validator_list_index = validator_list_account
+        let _validator_list_index = validator_list_account
             .validators
             .iter()
             .position(|v| v.vote_account_address == *vote_pubkey)
@@ -116,13 +116,13 @@ pub(crate) async fn command_copy_directed_stake_targets(
                 directed_stake_meta: directed_stake_meta_pda,
                 authority: authority_pubkey,
                 clock: solana_sdk::sysvar::clock::id(),
-                validator_list: validator_list_address,
+                // validator_list: validator_list_address, // TODO: add back in when updated branch is merged
             }
             .to_account_metas(None),
             data: jito_steward::instruction::CopyDirectedStakeTargets {
                 vote_pubkey: *vote_pubkey,
                 total_target_lamports: *target_lamports,
-                validator_list_index: validator_list_index as u32,
+                // validator_list_index: validator_list_index as u32, // TODO: add back in when updated branch is merged
             }
             .data(),
         };

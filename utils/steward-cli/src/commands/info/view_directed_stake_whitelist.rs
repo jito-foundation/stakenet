@@ -16,9 +16,8 @@ pub async fn command_view_directed_stake_whitelist(
 ) -> Result<()> {
     let directed_stake_whitelist_pda =
         get_directed_stake_whitelist_address(&args.steward_config, &program_id);
-    let whitelist = Box::new(
-        get_directed_stake_whitelist(client.clone(), &args.steward_config, &program_id).await?,
-    );
+    let whitelist =
+        get_directed_stake_whitelist(client.clone(), &args.steward_config, &program_id).await?;
 
     if args.print_json {
         let mut json_output = serde_json::Map::new();

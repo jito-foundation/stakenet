@@ -343,7 +343,8 @@ fn sign_txs(
 const SURFPOOL_BATCH_SIZE: usize = 100;
 
 /// Fast transaction submission optimized for local surfpool node.
-pub async fn parallel_execute_transactions(
+#[allow(unused)]
+pub async fn _parallel_execute_transactions_surfpool(
     client: &Arc<RpcClient>,
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
@@ -455,7 +456,7 @@ pub async fn parallel_execute_transactions(
 
     Ok(results)
 }
-pub async fn parallel_execute_transactions_original(
+pub async fn parallel_execute_transactions(
     client: &Arc<RpcClient>,
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
