@@ -218,6 +218,19 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             msg!("Validator not found in validator list");
             directed_stake_meta.targets[directed_stake_meta_index].staked_last_updated_epoch =
                 clock.epoch;
+            // If a missing validator is the last target to be rebalanced we must ensure a state transition
+            if directed_stake_meta.all_targets_rebalanced_for_epoch(clock.epoch) {
+                state_account.state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+            }
+            if let Some(event) = maybe_transition(
+                &mut state_account.state,
+                &clock,
+                &config.parameters,
+                &epoch_schedule,
+            )? {
+                emit!(event);
+                return Ok(());
+            }
             return Ok(());
         }
     }
