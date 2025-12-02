@@ -1,9 +1,8 @@
 use borsh1::BorshSerialize;
-use jito_steward::utils::get_transient_stake_seed_at_index_from_big_vec;
+use jito_steward::utils::get_validator_stake_info_at_index;
 use solana_sdk::pubkey::Pubkey;
 use spl_pod::primitives::{PodU32, PodU64};
-use spl_stake_pool::state::{PodStakeStatus, StakeStatus, ValidatorListHeader, ValidatorStakeInfo};
-
+use spl_stake_pool::state::{PodStakeStatus, StakeStatus, ValidatorStakeInfo};
 #[test]
 fn test_extract_transient_seed_from_validator_list() {
     // Create a validator list with hardcoded transient seeds
@@ -48,23 +47,29 @@ fn test_extract_transient_seed_from_validator_list() {
         spl_validator_list.validators[i] = *validator;
     }
 
-    // Serialize ValidatorList into a byte array with borsh
     let mut buffer = Vec::new();
     spl_validator_list.serialize(&mut buffer).unwrap();
 
-    // Deserialize to get BigVec
-    let mut validator_list_data = buffer.as_mut_slice();
-    let (header, validator_list) =
-        ValidatorListHeader::deserialize_vec(&mut validator_list_data).unwrap();
-    assert_eq!(
-        header.account_type,
-        spl_stake_pool::state::AccountType::ValidatorList
-    );
+    let mut lamports: u64 = 0;
 
-    for i in 0..3 {
-        let extracted_seed =
-            get_transient_stake_seed_at_index_from_big_vec(&validator_list, i).unwrap();
-        let expected_seed = validators[i].transient_seed_suffix;
-        assert_eq!(PodU64::from(extracted_seed), expected_seed);
+    // Serialize ValidatorList into a byte array with borsh and assign to AccountInfo data, pass
+    // it to the utility function
+    let validator_list_account_info = solana_sdk::account_info::AccountInfo {
+        key: &Pubkey::new_unique(),
+        is_signer: false,
+        is_writable: false,
+        lamports: std::rc::Rc::new(std::cell::RefCell::new(&mut lamports)),
+        data: std::rc::Rc::new(std::cell::RefCell::new(&mut buffer)),
+        owner: &Pubkey::new_unique(),
+        executable: false,
+        rent_epoch: 0,
+    };
+
+    for (i, validator) in validators.iter().enumerate().take(3) {
+        let validator_stake_info =
+            get_validator_stake_info_at_index(&validator_list_account_info, i).unwrap();
+        let extracted_seed = validator_stake_info.transient_seed_suffix;
+        let expected_seed = validator.transient_seed_suffix;
+        assert_eq!(extracted_seed, expected_seed);
     }
 }
