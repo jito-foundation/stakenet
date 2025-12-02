@@ -3,17 +3,13 @@ on:
   push:
     branches:
       - master
-      - steward-test-branch
-      - feat/directed-staking
-      - ak/directed-staking-offchain
+
     tags:
       - "v*"
   pull_request:
     branches:
       - master
-      - steward-test-branch
-      - feat/directed-staking
-      - ak/directed-staking-offchain
+
 jobs:
   security_audit:
     name: security_audit
