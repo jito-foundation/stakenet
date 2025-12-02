@@ -250,25 +250,6 @@ pub fn get_validator_stake_info_at_index(
     Ok(validator_stake_info)
 }
 
-/// Utility to efficiently extract transient seed from a validator list.
-pub fn get_transient_stake_seed_at_index(
-    validator_list_account: &AccountInfo,
-    index: usize,
-) -> Result<u64> {
-    let transient_seed_index = VEC_SIZE_BYTES
-        .saturating_add(index.saturating_mul(ValidatorStakeInfo::LEN))
-        .saturating_add(TRANSIENT_STAKE_SEED_OFFSET);
-    let transient_seed_end_index = transient_seed_index
-        .checked_add(TRANSIENT_STAKE_SEED_LENGTH)
-        .ok_or(StewardError::ArithmeticError)?;
-    let slice: [u8; TRANSIENT_STAKE_SEED_LENGTH] = validator_list_account.try_borrow_data()?
-        [transient_seed_index..transient_seed_end_index]
-        .try_into()
-        .map_err(|_| StewardError::ArithmeticError)?;
-    let transient_seed = u64::from_le_bytes(slice);
-    Ok(transient_seed)
-}
-
 pub fn get_transient_stake_seed_at_index_from_big_vec(
     validator_list: &BigVec<'_>,
     index: usize,
