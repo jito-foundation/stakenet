@@ -53,6 +53,7 @@ use crate::{
             copy_directed_stake_targets::command_copy_directed_stake_targets,
             migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
+            remove_validator_from_pool::command_remove_validator_from_pool,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         cranks::{
@@ -189,6 +190,9 @@ async fn main() -> Result<()> {
         }
         Commands::RemoveBadValidators(args) => {
             command_remove_bad_validators(args, &client, steward_program_id).await
+        }
+        Commands::RemoveValidatorFromPool(args) => {
+            command_remove_validator_from_pool(args, &client, steward_program_id).await
         }
         Commands::AddToBlacklist(args) => {
             // Use global signer - required for this command

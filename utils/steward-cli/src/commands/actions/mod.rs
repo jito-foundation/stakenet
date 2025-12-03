@@ -15,6 +15,7 @@ pub mod pause;
 pub mod remove_bad_validators;
 pub mod remove_from_blacklist;
 pub mod remove_from_directed_stake_whitelist;
+pub mod remove_validator_from_pool;
 pub mod reset_state;
 pub mod reset_validator_lamport_balances;
 pub mod resume;
