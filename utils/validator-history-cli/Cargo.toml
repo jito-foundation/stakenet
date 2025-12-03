@@ -8,6 +8,7 @@ description = "CLI to manage validator history program"
 anchor-lang = "0.31.1"
 anyhow = { workspace = true }
 borsh = { package = "borsh", version = "1.5.7" }
+bytemuck = { workspace = true }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = { workspace = true }
 env_logger = "0.10.0"
@@ -18,10 +19,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
+solana-gossip = { workspace = true }
 solana-metrics = { workspace = true }
 solana-native-token = { workspace = true }
+solana-net-utils = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
+solana-streamer = { workspace = true }
 spl-stake-pool = { workspace = true }
 stakenet-keeper = { path = "../../keepers/stakenet-keeper" }
 stakenet-sdk = { path = "../../sdk" }

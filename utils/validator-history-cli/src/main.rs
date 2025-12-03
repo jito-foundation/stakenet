@@ -14,7 +14,7 @@ use solana_sdk::{
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
-use std::{collections::HashMap, path::PathBuf, thread::sleep, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -23,7 +23,9 @@ use validator_history_cli::{
     commands::{
         self,
         cranks::{
-            copy_cluster_info::CrankCopyClusterInfo, copy_vote_account::CrankCopyVoteAccount,
+            copy_cluster_info::CrankCopyClusterInfo,
+            copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_vote_account::CrankCopyVoteAccount,
         },
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
@@ -64,6 +66,7 @@ enum Commands {
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
+    CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
@@ -1287,6 +1290,14 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+        }
+        Commands::CrankCopyGossipContactInfo(command_args) => {
+            let client = solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
+                args.json_rpc_url.clone(),
+                Duration::from_secs(60),
+            );
+            let client = Arc::new(client);
+            commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
