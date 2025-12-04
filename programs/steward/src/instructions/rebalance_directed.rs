@@ -114,7 +114,7 @@ pub struct RebalanceDirected<'info> {
 }
 
 pub fn adjust_directed_stake_for_deposits_and_withdrawals(
-    target_total_staked_lamports: u64,
+    validator_list_staked_lamports: u64,
     validator_list_index: usize,
     directed_stake_meta_index: usize,
     directed_stake_meta: &mut DirectedStakeMeta,
@@ -126,9 +126,9 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
     let directed_stake_applied_lamports =
         directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
-    if target_total_staked_lamports < steward_state_total_lamports {
+    if validator_list_staked_lamports < steward_state_total_lamports {
         let withdrawal_lamports =
-            steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
+            steward_state_total_lamports.saturating_sub(validator_list_staked_lamports);
         // If the withdrawal lamports is greated than the applied directed stake, then we need to roll-over the remainder
         // to the undirected stake
         if withdrawal_lamports > directed_stake_applied_lamports {
@@ -149,13 +149,13 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
                 .directed_stake_lamports[validator_list_index]
                 .saturating_sub(withdrawal_lamports);
         }
-    } else if target_total_staked_lamports > steward_state_total_lamports
+    } else if validator_list_staked_lamports > steward_state_total_lamports
         && (directed_stake_applied_lamports < directed_stake_target_lamports)
     {
         let directed_deficit_lamports =
             directed_stake_target_lamports.saturating_sub(directed_stake_applied_lamports);
         let deposit_lamports =
-            target_total_staked_lamports.saturating_sub(steward_state_total_lamports);
+            validator_list_staked_lamports.saturating_sub(steward_state_total_lamports);
         let increase_lamports = directed_deficit_lamports.min(deposit_lamports);
         directed_stake_meta
             .add_to_total_staked_lamports(directed_stake_meta_index, increase_lamports);

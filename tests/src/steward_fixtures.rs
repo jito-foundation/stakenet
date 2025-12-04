@@ -52,7 +52,7 @@ use spl_stake_pool::{
         ValidatorStakeInfo,
     },
 };
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
+use std::{cell::RefCell, collections::HashMap, num::NonZeroU32, rc::Rc, str::FromStr, vec};
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
@@ -1019,10 +1019,6 @@ impl TestFixture {
         &self,
         vote_account: Pubkey,
     ) -> (Pubkey, Pubkey, Pubkey) {
-        let stake_pool: StakePool = self
-            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
-            .await;
-
         let (withdraw_authority, _) = find_withdraw_authority_program_address(
             &spl_stake_pool::id(),
             &self.stake_pool_meta.stake_pool,
@@ -1052,6 +1048,7 @@ impl TestFixture {
             withdraw_authority,
         )
     }
+
 
     pub async fn fetch_minimum_delegation(&self) -> u64 {
         let ix = solana_program::stake::instruction::get_minimum_delegation();
