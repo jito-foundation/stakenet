@@ -868,7 +868,6 @@ async fn test_directed_stake_ticket_allocation_calculation() {
 async fn test_ticket_pda_seeds_with_ticket_update_authority() {
     let fixture = setup_directed_stake_fixture().await;
 
-    // Create a funded test staker and add to whitelist
     let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
 
@@ -881,17 +880,15 @@ async fn test_ticket_pda_seeds_with_ticket_update_authority() {
     )
     .await;
 
-    // Initialize a ticket with ticket_update_authority
-    // The signer can be different from ticket_update_authority (as long as signer is whitelisted)
+    // The signer can be different from ticket_update_authority as long as it is the ticket_override_authority
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
-        &staker,                 // signer - whitelisted staker
+        &staker, // signer - whitelisted staker
         ticket_update_authority, // ticket_update_authority - different from signer
         false,
     )
     .await;
 
-    // Verify the ticket was created with correct PDA seeds
     let expected_ticket_address = Pubkey::find_program_address(
         &[
             DirectedStakeTicket::SEED,
@@ -904,7 +901,6 @@ async fn test_ticket_pda_seeds_with_ticket_update_authority() {
 
     assert_eq!(ticket_account, expected_ticket_address);
 
-    // Verify the ticket has the correct ticket_update_authority
     let ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
     assert_eq!(ticket.ticket_update_authority, ticket_update_authority);
 }
@@ -913,7 +909,6 @@ async fn test_ticket_pda_seeds_with_ticket_update_authority() {
 async fn test_ticket_update_authority_can_update_own_ticket() {
     let fixture = setup_directed_stake_fixture().await;
 
-    // Create a funded test staker and add to whitelist
     let ticket_update_authority_keypair = create_funded_staker(&fixture).await;
     let ticket_update_authority = ticket_update_authority_keypair.pubkey();
     add_staker_to_whitelist(
@@ -923,7 +918,6 @@ async fn test_ticket_update_authority_can_update_own_ticket() {
     )
     .await;
 
-    // Get validators from the validator list
     let validator1 = fixture
         .get_validator_from_list(0)
         .await
@@ -935,29 +929,21 @@ async fn test_ticket_update_authority_can_update_own_ticket() {
     add_validator_to_whitelist(&fixture, &validator1).await;
     add_validator_to_whitelist(&fixture, &validator2).await;
 
-    // Initialize a ticket with ticket_update_authority as the authority
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &ticket_update_authority_keypair, // signer
-        ticket_update_authority,          // ticket_update_authority - same as signer
+        ticket_update_authority,         // ticket_update_authority - same as signer
         false,
     )
     .await;
 
-    // Create preferences
     let preferences = vec![
         DirectedStakePreference::new(validator1, 6000), // 60%
         DirectedStakePreference::new(validator2, 4000), // 40%
     ];
 
     // The ticket_update_authority should be able to update their own ticket
-    update_directed_stake_ticket(
-        &fixture,
-        &ticket_account,
-        &ticket_update_authority_keypair,
-        preferences,
-    )
-    .await;
+    update_directed_stake_ticket(&fixture, &ticket_account, &ticket_update_authority_keypair, preferences).await;
 
     // Verify the ticket was updated
     let ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
@@ -972,7 +958,6 @@ async fn test_ticket_update_authority_can_update_own_ticket() {
 async fn test_ticket_override_authority_can_update_any_ticket() {
     let fixture = setup_directed_stake_fixture().await;
 
-    // Create a funded test staker and add to whitelist
     let ticket_update_authority_keypair = create_funded_staker(&fixture).await;
     let ticket_update_authority = ticket_update_authority_keypair.pubkey();
     add_staker_to_whitelist(
@@ -982,7 +967,6 @@ async fn test_ticket_override_authority_can_update_any_ticket() {
     )
     .await;
 
-    // Get validators from the validator list
     let validator1 = fixture
         .get_validator_from_list(0)
         .await
@@ -994,7 +978,6 @@ async fn test_ticket_override_authority_can_update_any_ticket() {
     add_validator_to_whitelist(&fixture, &validator1).await;
     add_validator_to_whitelist(&fixture, &validator2).await;
 
-    // Initialize a ticket with ticket_update_authority
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &ticket_update_authority_keypair,
@@ -1003,7 +986,6 @@ async fn test_ticket_override_authority_can_update_any_ticket() {
     )
     .await;
 
-    // Create preferences
     let preferences = vec![
         DirectedStakePreference::new(validator1, 7000), // 70%
         DirectedStakePreference::new(validator2, 3000), // 30%
@@ -1143,11 +1125,21 @@ async fn test_multiple_tickets_with_different_update_authorities() {
     add_validator_to_whitelist(&fixture, &validator2).await;
 
     // Initialize tickets with different ticket_update_authorities
-    let ticket1 =
-        initialize_directed_stake_ticket(&fixture, &authority1_keypair, authority1, false).await;
+    let ticket1 = initialize_directed_stake_ticket(
+        &fixture,
+        &authority1_keypair,
+        authority1,
+        false,
+    )
+    .await;
 
-    let ticket2 =
-        initialize_directed_stake_ticket(&fixture, &authority2_keypair, authority2, false).await;
+    let ticket2 = initialize_directed_stake_ticket(
+        &fixture,
+        &authority2_keypair,
+        authority2,
+        false,
+    )
+    .await;
 
     // Verify tickets have different addresses (different PDAs)
     assert_ne!(ticket1, ticket2);
@@ -1181,17 +1173,11 @@ async fn test_multiple_tickets_with_different_update_authorities() {
     let ticket2_updated: DirectedStakeTicket = fixture.load_and_deserialize(&ticket2).await;
 
     assert_eq!(ticket1_updated.num_preferences, 1);
-    assert_eq!(
-        ticket1_updated.staker_preferences[0].vote_pubkey,
-        validator1
-    );
+    assert_eq!(ticket1_updated.staker_preferences[0].vote_pubkey, validator1);
     assert_eq!(ticket1_updated.staker_preferences[0].stake_share_bps, 10000);
 
     assert_eq!(ticket2_updated.num_preferences, 1);
-    assert_eq!(
-        ticket2_updated.staker_preferences[0].vote_pubkey,
-        validator2
-    );
+    assert_eq!(ticket2_updated.staker_preferences[0].vote_pubkey, validator2);
     assert_eq!(ticket2_updated.staker_preferences[0].stake_share_bps, 10000);
 }
 
@@ -1288,7 +1274,6 @@ async fn test_ticket_pda_verification_rejects_wrong_address() {
 async fn test_ticket_override_authority_can_close_any_ticket() {
     let fixture = setup_directed_stake_fixture().await;
 
-    // Create a funded test staker and add to whitelist
     let ticket_update_authority_keypair = create_funded_staker(&fixture).await;
     let ticket_update_authority = ticket_update_authority_keypair.pubkey();
     add_staker_to_whitelist(
@@ -1298,7 +1283,6 @@ async fn test_ticket_override_authority_can_close_any_ticket() {
     )
     .await;
 
-    // Initialize a ticket with ticket_update_authority
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &ticket_update_authority_keypair,
@@ -1307,24 +1291,18 @@ async fn test_ticket_override_authority_can_close_any_ticket() {
     )
     .await;
 
-    // Verify ticket exists
     let _ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
 
-    // The ticket_override_authority (fixture.keypair) should be able to close any ticket
     close_directed_stake_ticket(&fixture, &ticket_account, &fixture.keypair).await;
 
-    // Verify ticket is closed (account should not exist or be closed)
-    // Note: In Anchor, closed accounts are typically deleted, so we'd expect an error when trying to load
     let account_info = fixture.get_account(&ticket_account).await;
-    // The account should be closed (lamports = 0 or account doesn't exist)
-    // This depends on Anchor's close behavior, but typically the account is deleted
+    assert_eq!(account_info.lamports, 0);
 }
 
 #[tokio::test]
 async fn test_ticket_update_authority_can_close_own_ticket() {
     let fixture = setup_directed_stake_fixture().await;
 
-    // Create a funded test staker and add to whitelist
     let ticket_update_authority_keypair = create_funded_staker(&fixture).await;
     let ticket_update_authority = ticket_update_authority_keypair.pubkey();
     add_staker_to_whitelist(
@@ -1334,7 +1312,6 @@ async fn test_ticket_update_authority_can_close_own_ticket() {
     )
     .await;
 
-    // Initialize a ticket with ticket_update_authority
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &ticket_update_authority_keypair,
@@ -1343,13 +1320,10 @@ async fn test_ticket_update_authority_can_close_own_ticket() {
     )
     .await;
 
-    // Verify ticket exists
     let _ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
 
-    // The ticket_update_authority should be able to close their own ticket
     close_directed_stake_ticket(&fixture, &ticket_account, &ticket_update_authority_keypair).await;
 
-    // Verify ticket is closed
     let account_info = fixture.get_account(&ticket_account).await;
-    // The account should be closed
+    assert_eq!(account_info.lamports, 0);
 }

@@ -81,7 +81,7 @@ pub fn handler(
     require_keys_eq!(
         ctx.accounts.ticket_account.key(),
         expected_ticket_address,
-        StewardError::InvalidAccount
+        StewardError::Unauthorized
     );
 
     let mut ticket = ctx.accounts.ticket_account.load_init()?;
