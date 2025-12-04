@@ -20,9 +20,7 @@ pub struct InitializeDirectedStakeTicket<'info> {
     #[account(
         init,
         payer = signer,
-        space = DirectedStakeTicket::SIZE,
-        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), signer.key().as_ref()],
-        bump
+        space = DirectedStakeTicket::SIZE
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 
@@ -70,6 +68,21 @@ pub fn handler(
         &ticket_update_authority,
         &config.directed_stake_whitelist_authority,
     )?;
+
+    // Verify the PDA: seeds should be [SEED, config.key(), ticket_update_authority]
+    let (expected_ticket_address, _bump) = Pubkey::find_program_address(
+        &[
+            DirectedStakeTicket::SEED,
+            ctx.accounts.config.key().as_ref(),
+            ticket_update_authority.as_ref(),
+        ],
+        ctx.program_id,
+    );
+    require_keys_eq!(
+        ctx.accounts.ticket_account.key(),
+        expected_ticket_address,
+        StewardError::InvalidAccount
+    );
 
     let mut ticket = ctx.accounts.ticket_account.load_init()?;
     ticket.num_preferences = 0;

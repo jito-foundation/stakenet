@@ -17,11 +17,7 @@ pub struct UpdateDirectedStakeTicket<'info> {
     )]
     pub whitelist_account: AccountLoader<'info, DirectedStakeWhitelist>,
 
-    #[account(
-        mut,
-        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), signer.key().as_ref()],
-        bump
-    )]
+    #[account(mut)]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 
     #[account(mut)]
@@ -71,6 +67,21 @@ pub fn handler(
     let whitelist = ctx.accounts.whitelist_account.load()?;
     let mut ticket = ctx.accounts.ticket_account.load_mut()?;
     let config = ctx.accounts.config.load()?;
+
+    // Verify the PDA: seeds should be [SEED, config.key(), ticket_update_authority]
+    let (expected_ticket_address, _bump) = Pubkey::find_program_address(
+        &[
+            DirectedStakeTicket::SEED,
+            ctx.accounts.config.key().as_ref(),
+            ticket.ticket_update_authority.as_ref(),
+        ],
+        ctx.program_id,
+    );
+    require_keys_eq!(
+        ctx.accounts.ticket_account.key(),
+        expected_ticket_address,
+        StewardError::InvalidAccount
+    );
 
     UpdateDirectedStakeTicket::auth(
         &ticket,
