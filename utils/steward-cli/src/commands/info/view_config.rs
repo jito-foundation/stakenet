@@ -54,6 +54,10 @@ fn _print_default_config(
         "Directed Stake Meta Upload Auth:   {}\n",
         config_account.directed_stake_meta_upload_authority
     );
+    formatted_string += &format!(
+        "Directed Stake Ticket Override Auth:   {}\n",
+        config_account.directed_stake_ticket_override_authority
+    );
     formatted_string += &format!("Staker:      {}\n", staker);
     formatted_string += &format!("State:       {}\n", steward_state);
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
@@ -147,6 +151,10 @@ fn _print_default_config(
         "Minimum Voting Epochs:  {:?}\n",
         config_account.parameters.minimum_voting_epochs
     );
+    formatted_string += &format!(
+        "Compute Score Epoch Progress:  {:?}\n",
+        config_account.parameters.compute_score_epoch_progress
+    );
     formatted_string += "\n⚙️ Priority Fee Parameters ⚙️\n";
     formatted_string += &format!(
         "Priority Fee Lookback Epochs:  {:?}\n",
@@ -167,6 +175,15 @@ fn _print_default_config(
     formatted_string += &format!(
         "Priority Fee Scoring Start Epoch:  {:?}\n",
         config_account.parameters.priority_fee_scoring_start_epoch
+    );
+    formatted_string += "\n⚙️ Directed Stake Parameters ⚙️\n";
+    formatted_string += &format!(
+        "Directed Stake Unstake CAP BPS:  {:?}\n",
+        config_account.parameters.directed_stake_unstake_cap_bps
+    );
+    formatted_string += &format!(
+        "Undirected Stake Floor Lamports:  {:?}\n",
+        config_account.parameters.undirected_stake_floor_lamports()
     );
     formatted_string += "---------------------";
 
