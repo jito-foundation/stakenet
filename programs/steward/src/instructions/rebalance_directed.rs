@@ -162,6 +162,9 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
             .directed_stake_lamports[validator_list_index]
             .saturating_add(increase_lamports);
+        state_account.state.validator_lamport_balances[validator_list_index] = 
+            state_account.state.validator_lamport_balances[validator_list_index]
+            .saturating_add(increase_lamports);
     }
     Ok(())
 }
