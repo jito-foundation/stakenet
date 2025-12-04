@@ -8,16 +8,14 @@ use std::{
 use anyhow::anyhow;
 use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_sdk::{account::Account, pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
+use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
 use stakenet_keeper::entries::copy_vote_account_entry::CopyVoteAccountEntry;
 use stakenet_sdk::{
     models::entries::UpdateInstruction,
     utils::{
-        accounts::get_all_validator_history_accounts,
+        accounts::{get_all_validator_history_accounts, get_validator_list_account},
         helpers::vote_account_uploaded_recently,
-        transactions::{
-            get_multiple_accounts_batched, get_vote_accounts_with_retry, submit_instructions,
-        },
+        transactions::submit_instructions,
     },
 };
 
@@ -28,21 +26,22 @@ pub struct CrankCopyVoteAccount {
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
 
-    /// Only process validators returned by get_vote_accounts RPC (active validators).
-    /// Optionally provide a separate RPC URL to fetch vote accounts from (e.g., mainnet).
-    #[arg(long, env)]
-    active_only: Option<String>,
+    /// Validator list account pubkey (for filtering to pool validators), e.g. 3R3nGZpQs2aZo5FDQvd2MUQ6R7KhAPainds6uT6uE2mn
+    /// If not provided, processes all validator history accounts.
+    #[arg(long, env, default_value = JITOSOL_VALIDATOR_LISTj)]
+    validator_list_pubkey: Option<String>,
 }
 
 pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
-    let client = RpcClient::new(rpc_url);
+    let client = RpcClient::new(rpc_url.clone());
     let client = Arc::new(client);
 
     let epoch_info = client.get_epoch_info().await?;
 
+    // Fetch validator history accounts
     let validator_histories =
         get_all_validator_history_accounts(&client, validator_history::id()).await?;
 
@@ -52,63 +51,48 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             .map(|vote_history| (vote_history.vote_account, *vote_history)),
     );
 
-    // If active_only is set, fetch active vote accounts from the specified RPC URL
-    let active_vote_accounts: Option<HashSet<Pubkey>> =
-        if let Some(ref active_rpc_url) = args.active_only {
-            let active_client = Arc::new(RpcClient::new(active_rpc_url.clone()));
-            let vote_accounts = get_vote_accounts_with_retry(&active_client, 0, None).await?;
-            let active_set: HashSet<Pubkey> = vote_accounts
+    // Optionally filter to pool validators if validator list is provided
+    let pool_vote_accounts: Option<HashSet<Pubkey>> =
+        if let Some(validator_list_pubkey_str) = &args.validator_list_pubkey {
+            let validator_list_pubkey = Pubkey::from_str(validator_list_pubkey_str)
+                .map_err(|e| anyhow!("Failed to parse validator list pubkey: {e}"))?;
+
+            let validator_list = get_validator_list_account(&client, &validator_list_pubkey)
+                .await
+                .map_err(|e| anyhow!("Failed to fetch validator list: {e}"))?;
+
+            let pool_vote_accounts: HashSet<Pubkey> = validator_list
+                .validators
                 .iter()
-                .filter_map(|va| Pubkey::from_str(&va.vote_pubkey).ok())
+                .map(|v| v.vote_account_address)
                 .collect();
-            println!(
-                "Filtering to {} active vote accounts from {}",
-                active_set.len(),
-                active_rpc_url
-            );
-            Some(active_set)
+
+            Some(pool_vote_accounts)
         } else {
             None
         };
 
-    let all_history_vote_account_pubkeys: Vec<Pubkey> =
-        validator_history_map.keys().cloned().collect();
-
-    let all_history_vote_accounts =
-        get_multiple_accounts_batched(all_history_vote_account_pubkeys.as_slice(), &client).await?;
-
-    let all_history_vote_account_map = all_history_vote_account_pubkeys
-        .into_iter()
-        .zip(all_history_vote_accounts)
-        .collect::<HashMap<Pubkey, Option<Account>>>();
-
-    let mut vote_accounts_to_update: HashSet<&Pubkey> = all_history_vote_account_map
+    // Filter to accounts that haven't been updated recently, optionally restricted to pool validators
+    let vote_accounts_to_update: Vec<&Pubkey> = validator_histories
         .iter()
-        .filter_map(|(vote_address, vote_account)| match vote_account {
-            Some(account) => {
-                if account.owner == solana_sdk::vote::program::id() {
-                    Some(vote_address)
-                } else {
-                    None
+        .filter(|vote_history| {
+            // If pool filtering is enabled, must be in the pool
+            if let Some(ref pool) = pool_vote_accounts {
+                if !pool.contains(&vote_history.vote_account) {
+                    return false;
                 }
             }
-            _ => None,
+
+            // Must not have been uploaded recently
+            !vote_account_uploaded_recently(
+                &validator_history_map,
+                &vote_history.vote_account,
+                epoch_info.epoch,
+                epoch_info.absolute_slot,
+            )
         })
+        .map(|vote_history| &vote_history.vote_account)
         .collect();
-
-    // Filter to only active vote accounts if the flag is set
-    if let Some(ref active_set) = active_vote_accounts {
-        vote_accounts_to_update.retain(|vote_account| active_set.contains(vote_account));
-    }
-
-    vote_accounts_to_update.retain(|vote_account| {
-        !vote_account_uploaded_recently(
-            &validator_history_map,
-            vote_account,
-            epoch_info.epoch,
-            epoch_info.absolute_slot,
-        )
-    });
 
     println!(
         "Found {} vote accounts to update",
