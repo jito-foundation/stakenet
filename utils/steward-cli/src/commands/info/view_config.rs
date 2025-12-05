@@ -182,8 +182,10 @@ fn _print_default_config(
         config_account.parameters.directed_stake_unstake_cap_bps
     );
     formatted_string += &format!(
-        "Undirected Stake Floor Lamports:  {:?}\n",
-        config_account.parameters.undirected_stake_floor_lamports()
+        "Undirected Stake Ceiling Lamports:  {:?}\n",
+        config_account
+            .parameters
+            .undirected_stake_ceiling_lamports()
     );
     formatted_string += "---------------------";
 
