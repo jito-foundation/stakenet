@@ -3928,11 +3928,13 @@
             }
           },
           {
-            "name": "undirected_stake_floor_lamports",
+            "name": "undirected_stake_ceiling_lamports",
             "docs": [
-              "Directed rebalance increases are allowed until stake pool TVL dips below this floor",
+              "Maximum undirected stake pool TVL. During rebalance, reserve_lamports is capped to",
+              "(ceiling - current_undirected_TVL) to ensure undirected stake never exceeds this ceiling.",
+              "When undirected TVL >= ceiling, no stake increases will occur.",
               "u64 does not agree with zero-copy alignment and we do not have the luxury of reordering",
-              "fields due to it being live on mainnet"
+              "fields due to it being live on mainnet."
             ],
             "type": {
               "array": [
