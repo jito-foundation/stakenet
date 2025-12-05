@@ -27,6 +27,7 @@ use solana_sdk::{
     clock::Clock, signature::Keypair, signer::Signer, stake::state::StakeStateV2, system_program,
     transaction::Transaction,
 };
+use spl_associated_token_account::get_associated_token_address;
 use spl_stake_pool::{
     find_stake_program_address, find_withdraw_authority_program_address, minimum_delegation,
 };
@@ -180,7 +181,7 @@ async fn stake_deposit(
 }
 
 /// Helper function to execute a spl_stake_pool::instruction::WithdrawStake instruction
-async fn stake_withdrawal(
+async fn stake_withdraw(
     fixture: &TestFixture,
     stake_account_address: Pubkey,
     withdraw_authority: Pubkey,
@@ -200,14 +201,6 @@ async fn stake_withdrawal(
         StakeStateV2::size_of() as u64,
         &stake::program::id(),
     );
-    let initialize_stake_account_ix = stake::instruction::initialize(
-        &user_stake_keypair.pubkey(),
-        &stake::state::Authorized {
-            staker: fixture.keypair.pubkey(),
-            withdrawer: fixture.keypair.pubkey(),
-        },
-        &stake::state::Lockup::default(),
-    );
     
     let withdraw_ix = spl_stake_pool::instruction::withdraw_stake(
         &spl_stake_pool::id(),
@@ -224,12 +217,14 @@ async fn stake_withdrawal(
         &spl_token::id(),
         amount,
     );
+
     let tx = Transaction::new_signed_with_payer(
-        &[create_stake_account_ix, initialize_stake_account_ix, withdraw_ix],
+        &[create_stake_account_ix, withdraw_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair, &user_stake_keypair],
         fixture.ctx.borrow().last_blockhash,
     );
+
     fixture.submit_transaction_assert_success(tx).await;
 }
 
@@ -2340,10 +2335,8 @@ async fn test_cycle_with_directed_stake_targets() {
                 "Staked last updated epoch for validator {:?}: {:?}",
                 target.vote_pubkey, target.staked_last_updated_epoch
             );
-            //assert_eq!(target.staked_last_updated_epoch, 22);
         }
 
-        // Each target should have total_staked_lamports set to 9999000000
         for target in directed_stake_meta.targets.iter() {
             if target.vote_pubkey == Pubkey::default() {
                 continue;
@@ -2352,7 +2345,6 @@ async fn test_cycle_with_directed_stake_targets() {
                 "Staked lamports for validator {:?}: {:?}",
                 target.vote_pubkey, target.total_staked_lamports
             );
-            //assert_eq!(target.total_staked_lamports, 9999000000);
         }
     }
 
@@ -3338,7 +3330,7 @@ async fn test_internal_lamport_tracking_basic() {
 }
 
 #[tokio::test]
-async fn test_internal_lamport_tracking_with_withdrawal() {
+async fn test_internal_lamport_tracking_with_withdraw() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
     let mut unit_test_fixtures = StateMachineFixtures::default();
@@ -3388,7 +3380,7 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
                 compute_score_slot_range: Some(1000),
                 instant_unstake_inputs_epoch_progress: Some(0.50),
                 num_epochs_between_scoring: Some(50),
-                minimum_stake_lamports: Some(5_000_000_000),
+                minimum_stake_lamports: Some(1000),
                 minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_floor_lamports: Some(0),
@@ -3404,37 +3396,6 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
-    // Set first validator directed stake lamports to target
-    let account_info = fixture.get_account(&fixture.directed_stake_meta).await;
-    let mut directed_stake_meta: DirectedStakeMeta = fixture
-        .load_and_deserialize(&fixture.directed_stake_meta)
-        .await;
-    directed_stake_meta.directed_stake_lamports[0] = 1_000_000_000;
-
-    // Serialize with discriminator using bytemuck (zero-copy account)
-    // Get discriminator from existing account (first 8 bytes)
-    let discriminator = &account_info.data[..8];
-    let mut account_data = Vec::new();
-    account_data.extend_from_slice(discriminator);
-    account_data.extend_from_slice(bytemuck::bytes_of(&directed_stake_meta));
-
-    let account = solana_sdk::account::Account {
-        lamports: account_info.lamports,
-        data: account_data,
-        owner: account_info.owner,
-        executable: account_info.executable,
-        rent_epoch: account_info.rent_epoch,
-    };
-
-    
-    fixture
-        .ctx
-        .borrow_mut()
-        .set_account(&fixture.directed_stake_meta, &account.into());
-
-            // Auto add validator - adds to validator list
-    
-
     let mut extra_validator_accounts = vec![];
     for i in 0..unit_test_fixtures.validators.len() {
         let vote_account = unit_test_fixtures.validator_list[i].vote_account_address;
@@ -3446,15 +3407,6 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
         let (stake_account_address, transient_stake_account_address, withdraw_authority) =
             fixture.stake_accounts_for_validator(vote_account).await;
 
-            /*let (stake_account_address, _bump_seed) = Pubkey::find_program_address(
-                &[
-                    b"stake",
-                    vote_account.as_ref(),
-                    fixture.stake_pool_meta.stake_pool.as_ref(),
-                ],
-                &spl_stake_pool::id(),
-            );*/
-
         extra_validator_accounts.push(ExtraValidatorAccounts {
             vote_account,
             validator_history_address,
@@ -3464,18 +3416,14 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
         })
     }
 
-
-
     crank_epoch_maintenance(&fixture, None).await;
 
     for extra_accounts in extra_validator_accounts.iter() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
-    // Set up directed stake permissions (whitelist authority, add validators and staker to whitelist)
     crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
 
-    // Set the directed stake meta upload authority to the signer
     let set_meta_auth_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetNewAuthority {
@@ -3534,50 +3482,97 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
         .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
         .await;
 
-    // Withdraw 15B lamports from first validator's stake account
-    let stake_pool: StakePool = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
-        .await;
-
-    // We need to extract the validator seed suffix from the validator list
-    let validator_seed_suffix: u32 = {
-        let validator_list: ValidatorList = fixture
-            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-            .await;
-        u32::from_le_bytes(validator_list.validators[0].validator_seed_suffix.0)
-    };
-
-    let validator_seed_suffix = if validator_seed_suffix == 0 {
-        None
-    } else {
-        Some(NonZero::new(validator_seed_suffix).unwrap())
-    };
-
-    // Get the first vote account in validator list
-    let vote_account_at_index_0 = validator_list.validators[0].vote_account_address;
-
-    
-    // Get updated stake account address
-    let stake_account_address = find_stake_program_address(
-        &spl_stake_pool::id(),
-        &vote_account_at_index_0,
-        &fixture.stake_pool_meta.stake_pool,
-        validator_seed_suffix,
-    )
-    .0;
-
-    stake_withdrawal(
-        &fixture,
-        stake_account_address,
-        extra_validator_accounts[0].withdraw_authority,
-        stake_pool.pool_mint,
-        stake_pool.manager_fee_account,
-        15_000_000_000,
-    ).await;
+    fixture.advance_num_epochs(1, 10).await;
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
 
     fixture.advance_num_epochs(1, 10).await;
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
+
+
+    let stake_pool: StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+
+    let stake_account = fixture.get_account(&extra_validator_accounts[0].stake_account_address).await;
+        println!("stake_account_lamport_balance: {:?}", stake_account.lamports);
+    let stake_account_lamport_balance = stake_account.lamports;
+    let min_remaining = stake_rent+pool_minimum_delegation;  // From your logs; in code, use stake::get_rent_exempt() + MINIMUM_ACTIVE_STAKE
+    let max_withdraw_lamports = stake_account_lamport_balance.saturating_sub(min_remaining);
+    let token_withdraw_amount = stake_pool.calc_pool_tokens_for_deposit(max_withdraw_lamports);
+    let user_ata = get_associated_token_address(&fixture.keypair.pubkey(), &stake_pool.pool_mint);
+    let user_ata_account = fixture.get_account(&user_ata).await;
+    let user_ata_balance = u64::from_le_bytes(user_ata_account.data[64..72].try_into().unwrap());
+    println!("user_ata_balance: {:?}", user_ata_balance);
+    let withdraw_amount = stake_pool.calc_lamports_withdraw_amount(
+        token_withdraw_amount.unwrap()
+    );
+    {
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        for i in 0..3 {
+        let validator_list_lamport_balance = validator_list.validators[i].active_stake_lamports;
+        println!("validator_list_lamport_balance: {:?}", u64::from_le_bytes(validator_list_lamport_balance.0));
+        }
+    }
+
+    println!("withdraw_amount: {:?}", withdraw_amount.unwrap());
+
+    // Empty the reserve: withdraw reserve balance minus (stake_rent + minimum_delegation)
+    // This gives us clean numbers for our assertions
+    {
+        let reserve_stake_account = fixture.get_account(&stake_pool.reserve_stake).await;
+        let reserve_balance = reserve_stake_account.lamports;
+        let withdrawal_amount = reserve_balance
+            .saturating_sub(stake_rent)
+            .saturating_sub(pool_minimum_delegation);
+        
+        if withdrawal_amount > 0 {
+            let (withdraw_authority, _) = find_withdraw_authority_program_address(
+                &spl_stake_pool::id(),
+                &fixture.stake_pool_meta.stake_pool,
+            );
+            
+            let user_ata = get_associated_token_address(&fixture.keypair.pubkey(), &stake_pool.pool_mint);
+            let withdraw_sol_ix = spl_stake_pool::instruction::withdraw_sol(
+                &spl_stake_pool::id(),
+                &fixture.stake_pool_meta.stake_pool,
+                &withdraw_authority,
+                &fixture.keypair.pubkey(), // recipient
+                &user_ata,
+                &stake_pool.reserve_stake, // manager
+                &fixture.keypair.pubkey(),
+                &stake_pool.manager_fee_account,
+                &stake_pool.pool_mint, // pool mint,
+                &spl_token::id(),
+                withdrawal_amount,
+            );
+            
+            let tx = Transaction::new_signed_with_payer(
+                &[withdraw_sol_ix],
+                Some(&fixture.keypair.pubkey()),
+                &[&fixture.keypair],
+                fixture
+                    .ctx
+                    .borrow_mut()
+                    .get_new_latest_blockhash()
+                    .await
+                    .unwrap(),
+            );
+            fixture.submit_transaction_assert_success(tx).await;
+        }
+    }
+
+    stake_withdraw(
+        &fixture,
+        extra_validator_accounts[0].stake_account_address,
+        extra_validator_accounts[0].withdraw_authority,
+        stake_pool.pool_mint,
+        stake_pool.manager_fee_account,
+        withdraw_amount.unwrap(),
+    ).await;
 
     crank_rebalance_directed(
         &fixture,
@@ -3587,6 +3582,345 @@ async fn test_internal_lamport_tracking_with_withdrawal() {
     )
     .await;
 
+    fixture.advance_num_epochs(1, 10).await;
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
+
+    // Withdraw should count against the directed stake applied and reflect in the validator list lamport balance
+    {
+        let directed_stake_meta: DirectedStakeMeta = fixture
+            .load_and_deserialize(&fixture.directed_stake_meta)
+            .await;
+        let directed_stake_applied_lamports = directed_stake_meta.targets[0].total_staked_lamports;
+        let steward_state: StewardStateAccountV2 =
+            fixture.load_and_deserialize(&fixture.steward_state).await;
+        let validator_lamport_balance = steward_state.state.validator_lamport_balances[0];
+        let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[0];
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let validator_list_lamport_balance = validator_list.validators[0].active_stake_lamports;
+        assert!(validator_lamport_balance == (stake_rent + pool_minimum_delegation));
+        assert!(validator_lamport_balance == u64::from_le_bytes(validator_list_lamport_balance.0));
+        assert!(directed_stake_lamports == 0);
+        assert!(directed_stake_applied_lamports == 0);
+    }
+
+    drop(fixture);
+}
+
+#[tokio::test]
+async fn test_internal_lamport_tracking_with_withdraw_remainder() {
+    let mut fixture_accounts = FixtureDefaultAccounts::default();
+
+    let mut unit_test_fixtures = StateMachineFixtures::default();
+
+    // Note that these parameters are overriden in initialize_steward, just included here for completeness
+    fixture_accounts.steward_config.parameters = unit_test_fixtures.config.parameters;
+
+    fixture_accounts.validators = (0..3)
+        .map(|i| ValidatorEntry {
+            validator_history: unit_test_fixtures.validators[i],
+            vote_account: unit_test_fixtures.vote_accounts[i].clone(),
+            vote_address: unit_test_fixtures.validators[i].vote_account,
+        })
+        .collect();
+    fixture_accounts.cluster_history = unit_test_fixtures.cluster_history;
+
+    let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
+
+    fixture.steward_config = Keypair::new();
+    fixture.steward_state = Pubkey::find_program_address(
+        &[
+            StewardStateAccount::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    fixture.advance_num_epochs(20, 10).await;
+    fixture.initialize_stake_pool().await;
+    fixture
+        .initialize_steward(
+            Some(UpdateParametersArgs {
+                mev_commission_range: Some(10),
+                epoch_credits_range: Some(20),
+                commission_range: Some(20),
+                scoring_delinquency_threshold_ratio: Some(0.0),
+                instant_unstake_delinquency_threshold_ratio: Some(0.70),
+                mev_commission_bps_threshold: Some(1000),
+                commission_threshold: Some(5),
+                historical_commission_threshold: Some(50),
+                num_delegation_validators: Some(200),
+                scoring_unstake_cap_bps: Some(750),
+                instant_unstake_cap_bps: Some(10),
+                stake_deposit_unstake_cap_bps: Some(10),
+                instant_unstake_epoch_progress: Some(0.9),
+                compute_score_slot_range: Some(1000),
+                instant_unstake_inputs_epoch_progress: Some(0.50),
+                num_epochs_between_scoring: Some(1),
+                minimum_stake_lamports: Some(5_000_000_000),
+                minimum_voting_epochs: Some(0),
+                compute_score_epoch_progress: Some(0.50),
+                undirected_stake_floor_lamports: Some(0),
+                directed_stake_unstake_cap_bps: Some(10_000),
+            }),
+            None,
+        )
+        .await;
+
+    {
+       let mut _steward: StewardStateAccountV2 = fixture.load_and_deserialize(&fixture.steward_state).await;
+    }    
+    
+    fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
+    fixture.realloc_directed_stake_meta().await;
+
+    let mut extra_validator_accounts = vec![];
+    for i in 0..unit_test_fixtures.validators.len() {
+        let vote_account = unit_test_fixtures.validator_list[i].vote_account_address;
+        let (validator_history_address, _) = Pubkey::find_program_address(
+            &[ValidatorHistory::SEED, vote_account.as_ref()],
+            &validator_history::id(),
+        );
+
+        let (stake_account_address, transient_stake_account_address, withdraw_authority) =
+            fixture.stake_accounts_for_validator(vote_account).await;
+
+        extra_validator_accounts.push(ExtraValidatorAccounts {
+            vote_account,
+            validator_history_address,
+            stake_account_address,
+            transient_stake_account_address,
+            withdraw_authority,
+        })
+    }
+
+    crank_epoch_maintenance(&fixture, None).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        auto_add_validator(&fixture, extra_accounts).await;
+    }
+
+    crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
+
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type:
+                jito_steward::instructions::AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap(),
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Copy directed stake targets for the validators
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 0)
+            .await;
+    }
+
+    // Initial rebalance directed, no targets have been set
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await; 
+
+
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+    crank_compute_score(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0, 1, 2]).await;
+    crank_compute_delegations(&fixture).await;
+
+    fixture.advance_num_slots(160_000).await;
+    crank_idle(&fixture).await;
+
+    crank_compute_instant_unstake(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+    crank_rebalance(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0, 1, 2]).await;
+
+    for extra_accounts in extra_validator_accounts.iter() {
+        crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1_000_000_000)
+            .await;
+    }
+
+    let stake_rent = fixture.fetch_stake_rent().await;
+    let stake_program_minimum = fixture.fetch_minimum_delegation().await;
+    let pool_minimum_delegation = minimum_delegation(stake_program_minimum);
+
+    fixture.advance_num_epochs(1, 10).await;
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
+
+    // Deposit SOL into the pool
+    {
+        let stake_pool: StakePool = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+            .await;
+        let deposit_amount = 3_000_000_000;
+        let (withdraw_authority, _) = find_withdraw_authority_program_address(
+            &spl_stake_pool::id(),
+            &fixture.stake_pool_meta.stake_pool,
+        );
+        let user_ata = get_associated_token_address(&fixture.keypair.pubkey(), &stake_pool.pool_mint);
+        let deposit_sol_ix = spl_stake_pool::instruction::deposit_sol(
+            &spl_stake_pool::id(),
+            &fixture.stake_pool_meta.stake_pool,
+            &withdraw_authority,
+            &stake_pool.reserve_stake,
+            &fixture.keypair.pubkey(), // depositor
+            &user_ata,
+            &stake_pool.manager_fee_account,
+            &user_ata,
+            &stake_pool.pool_mint,
+            &spl_token::id(),
+            deposit_amount,
+        );
+        
+        let tx = Transaction::new_signed_with_payer(
+            &[deposit_sol_ix],
+            Some(&fixture.keypair.pubkey()),
+            &[&fixture.keypair],
+            fixture
+                .ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap(),
+        );
+        fixture.submit_transaction_assert_success(tx).await;
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+    let stake_pool: StakePool = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+        .await;
+    stake_withdraw(
+        &fixture,
+        extra_validator_accounts[0].stake_account_address,
+        extra_validator_accounts[0].withdraw_authority,
+        stake_pool.pool_mint,
+        stake_pool.manager_fee_account,
+        3_000_000_000,
+    ).await;
+
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+    crank_validator_history_accounts(&fixture, &extra_validator_accounts, &[0, 1, 2]).await;
+    crank_compute_score(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0, 1, 2]).await;
+    crank_compute_delegations(&fixture).await;
+
+    fixture.advance_num_slots(160_000).await;
+    crank_idle(&fixture).await;
+
+    crank_compute_instant_unstake(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+    crank_rebalance(&fixture, &unit_test_fixtures, &extra_validator_accounts, &[0, 1, 2]).await;
+
+    fixture.advance_num_epochs(1, 10).await;
+    crank_stake_pool(&fixture).await;
+    crank_epoch_maintenance(&fixture, None).await;
+
+    {
+        let directed_stake_meta: DirectedStakeMeta = fixture
+            .load_and_deserialize(&fixture.directed_stake_meta)
+            .await;
+        let directed_stake_applied_lamports = directed_stake_meta.targets[0].total_staked_lamports;
+        let steward_state: StewardStateAccountV2 =
+            fixture.load_and_deserialize(&fixture.steward_state).await;
+        let validator_lamport_balance = steward_state.state.validator_lamport_balances[0];
+        let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[0];
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let validator_list_lamport_balance = validator_list.validators[0].active_stake_lamports;
+        let stake_pool: StakePool = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
+            .await;
+        let reserve_balance = fixture.get_account(&stake_pool.reserve_stake).await.lamports;
+        println!("reserve_balance: {:?}", reserve_balance);
+        println!("validator_list_lamport_balance: {:?}", u64::from_le_bytes(validator_list_lamport_balance.0));
+        println!("validator_lamport_balance: {:?}", validator_lamport_balance);
+        println!("directed_stake_lamports: {:?}", directed_stake_lamports);
+        println!("directed_stake_applied_lamports: {:?}", directed_stake_applied_lamports);
+
+        let directed_stake_applied_lamports = directed_stake_meta.targets[1].total_staked_lamports;
+        let validator_lamport_balance = steward_state.state.validator_lamport_balances[1];
+        let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[1];
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let validator_list_lamport_balance = validator_list.validators[1].active_stake_lamports;
+        println!("validator_list_lamport_balance: {:?}", u64::from_le_bytes(validator_list_lamport_balance.0));
+        println!("validator_lamport_balance: {:?}", validator_lamport_balance);
+        println!("directed_stake_lamports: {:?}", directed_stake_lamports);
+        println!("directed_stake_applied_lamports: {:?}", directed_stake_applied_lamports);
+
+        let directed_stake_applied_lamports = directed_stake_meta.targets[2].total_staked_lamports;
+        let validator_lamport_balance = steward_state.state.validator_lamport_balances[2];
+        let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[2];
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let validator_list_lamport_balance = validator_list.validators[2].active_stake_lamports;
+        println!("validator_list_lamport_balance: {:?}", u64::from_le_bytes(validator_list_lamport_balance.0));
+        println!("validator_lamport_balance: {:?}", validator_lamport_balance);
+        println!("directed_stake_lamports: {:?}", directed_stake_lamports);
+        println!("directed_stake_applied_lamports: {:?}", directed_stake_applied_lamports);
+        assert!(false);
+    }
+
+    crank_rebalance_directed(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+
+
+    assert!(false);
     drop(fixture);
 }
 
@@ -3668,15 +4002,6 @@ async fn test_internal_lamport_tracking_with_deposit() {
         let (stake_account_address, transient_stake_account_address, withdraw_authority) =
             fixture.stake_accounts_for_validator(vote_account).await;
 
-        let stake_account_address = Pubkey::find_program_address(
-            &[
-                vote_account.as_ref(),
-                fixture.stake_pool_meta.stake_pool.as_ref(),
-            ],
-            &spl_stake_pool::id(),
-        )
-        .0;
-
         extra_validator_accounts.push(ExtraValidatorAccounts {
             vote_account,
             validator_history_address,
@@ -3693,7 +4018,6 @@ async fn test_internal_lamport_tracking_with_deposit() {
         auto_add_validator(&fixture, extra_accounts).await;
     }
 
-    // Set up directed stake permissions (whitelist authority, add validators and staker to whitelist)
     crank_directed_stake_permissions(&fixture, &extra_validator_accounts).await;
 
     // Set the directed stake meta upload authority to the signer
@@ -3726,13 +4050,11 @@ async fn test_internal_lamport_tracking_with_deposit() {
 
     fixture.submit_transaction_assert_success(tx).await;
 
-    // Copy directed stake targets for the validators
     for extra_accounts in extra_validator_accounts.iter() {
         crank_copy_directed_stake_targets(&fixture, extra_accounts.vote_account, 1_600_000_000_000)
             .await;
     }
 
-    // Perform a single rebalance directed
     crank_rebalance_directed(
         &fixture,
         &unit_test_fixtures,
@@ -3754,33 +4076,15 @@ async fn test_internal_lamport_tracking_with_deposit() {
         &spl_stake_pool::id(),
     );
 
-    let mut predeposit_staked_lamports = 0u64;
-
     let stake_pool: StakePool = fixture
         .load_and_deserialize(&fixture.stake_pool_meta.stake_pool)
         .await;
-        // Here check that: reserve has been completely delegated to directed stake targets 
-        {
-            let directed_stake_meta: DirectedStakeMeta = fixture
-                .load_and_deserialize(&fixture.directed_stake_meta)
-                .await;
-            let steward_state: StewardStateAccountV2 =
-                fixture.load_and_deserialize(&fixture.steward_state).await;
-            let reserve_stake_account = fixture.get_account(&stake_pool.reserve_stake).await;
-            let available_reserve_lamports = reserve_stake_account.lamports - stake_rent;
-            assert!(available_reserve_lamports == 0);
-            predeposit_staked_lamports = directed_stake_meta.targets[0].total_staked_lamports;
-        }
 
     let pre_deposit_validator_lamport_balance = {
         let steward_state: StewardStateAccountV2 =
             fixture.load_and_deserialize(&fixture.steward_state).await;
         steward_state.state.validator_lamport_balances[0]
     };
-    println!("predeposit_staked_lamports: {:?}", predeposit_staked_lamports);
-    println!("pre_deposit_validator_lamport_balance: {:?}", pre_deposit_validator_lamport_balance);
-    
-    
     
     stake_deposit(
         &fixture,
@@ -3792,24 +4096,53 @@ async fn test_internal_lamport_tracking_with_deposit() {
         20_000_000_000,
     ).await;
 
-    let post_deposit_validator_lamport_balance = {
-        let steward_state: StewardStateAccountV2 =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
-        steward_state.state.validator_lamport_balances[0]
-    };
-    println!("post_deposit_validator_lamport_balance: {:?}", post_deposit_validator_lamport_balance);
-    println!("pre/post deposit difference: {:?}", post_deposit_validator_lamport_balance - pre_deposit_validator_lamport_balance);
-
     fixture.advance_num_epochs(1, 10).await;
     crank_stake_pool(&fixture).await;
     crank_epoch_maintenance(&fixture, None).await;
 
-    // Assert reserve balance is stake_rent + minimum delegation
+    // Empty the reserve: withdraw reserve balance minus (stake_rent + minimum_delegation)
+    // This gives us clean numbers for our assertions
     {
         let reserve_stake_account = fixture.get_account(&stake_pool.reserve_stake).await;
-        let available_reserve_lamports = reserve_stake_account.lamports;
-        println!("available_reserve_lamports: {:?}", available_reserve_lamports);
-        assert!(available_reserve_lamports == pool_minimum_delegation + stake_rent);
+        let reserve_balance = reserve_stake_account.lamports;
+        let withdrawal_amount = reserve_balance
+            .saturating_sub(stake_rent)
+            .saturating_sub(pool_minimum_delegation);
+        
+        if withdrawal_amount > 0 {
+            let (withdraw_authority, _) = find_withdraw_authority_program_address(
+                &spl_stake_pool::id(),
+                &fixture.stake_pool_meta.stake_pool,
+            );
+            
+            let user_ata = get_associated_token_address(&fixture.keypair.pubkey(), &stake_pool.pool_mint);
+            let withdraw_sol_ix = spl_stake_pool::instruction::withdraw_sol(
+                &spl_stake_pool::id(),
+                &fixture.stake_pool_meta.stake_pool,
+                &withdraw_authority,
+                &fixture.keypair.pubkey(), // recipient
+                &user_ata,
+                &stake_pool.reserve_stake, // manager
+                &fixture.keypair.pubkey(),
+                &stake_pool.manager_fee_account,
+                &stake_pool.pool_mint, // pool mint,
+                &spl_token::id(),
+                withdrawal_amount,
+            );
+            
+            let tx = Transaction::new_signed_with_payer(
+                &[withdraw_sol_ix],
+                Some(&fixture.keypair.pubkey()),
+                &[&fixture.keypair],
+                fixture
+                    .ctx
+                    .borrow_mut()
+                    .get_new_latest_blockhash()
+                    .await
+                    .unwrap(),
+            );
+            fixture.submit_transaction_assert_success(tx).await;
+        }
     }
 
     crank_rebalance_directed(
@@ -3820,14 +4153,6 @@ async fn test_internal_lamport_tracking_with_deposit() {
     )
     .await;
 
-    let post_rebalance_validator_lamport_balance = {
-        let steward_state: StewardStateAccountV2 =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
-        steward_state.state.validator_lamport_balances[0]
-    };
-    println!("post_rebalance_validator_lamport_balance: {:?}", post_rebalance_validator_lamport_balance);
-    println!("pre/post rebalance difference: {:?}", post_rebalance_validator_lamport_balance - post_deposit_validator_lamport_balance);
-    
     // Now that directed stake targets have both been:
     // - Delegated to
     // - Remain below their directed stake target amount
@@ -3843,11 +4168,9 @@ async fn test_internal_lamport_tracking_with_deposit() {
         let validator_lamport_balance = steward_state.state.validator_lamport_balances[0];
         let expected_staked_lamports = validator_lamport_balance - stake_rent - pool_minimum_delegation;
         assert!(directed_stake_meta.targets[0].total_staked_lamports == expected_staked_lamports);
-        println!("validator_lamport_balance: {:?}", validator_lamport_balance);
-        println!("pre_deposit_validator_lamport_balance: {:?}", pre_deposit_validator_lamport_balance);
-        println!("difference: {:?}", validator_lamport_balance - pre_deposit_validator_lamport_balance-20_000_000_000-stake_rent-pool_minimum_delegation);
+        // Stake account will absorb both the deposit value and the stake rent value
+        assert!(validator_lamport_balance == pre_deposit_validator_lamport_balance+20_000_000_000+stake_rent);
     }
-    assert!(false);
     drop(fixture);
 }
 

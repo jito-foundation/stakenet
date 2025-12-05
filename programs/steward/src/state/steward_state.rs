@@ -992,6 +992,7 @@ impl StewardStateV2 {
 
             // Skip if already processed
             if self.progress.get(index)? {
+                msg!("Already rebalanced");
                 return Ok(RebalanceType::None);
             }
 
@@ -1000,6 +1001,7 @@ impl StewardStateV2 {
                 || self.validators_for_immediate_removal.get(index)?
             {
                 self.progress.set(index, true)?;
+                msg!("Validator marked for deletion");
                 return Ok(RebalanceType::None);
             }
 
@@ -1035,13 +1037,20 @@ impl StewardStateV2 {
             let target_lamports =
                 get_target_lamports(&self.delegations[index], stake_pool_lamports)?;
 
+            msg!("index: {:?}", index);
+            msg!("stake_pool_lamports: {:?}", stake_pool_lamports);
+            msg!("self.delegations[index]: {:?}", self.delegations[index]);
+            msg!("target_lamports: {:?}", target_lamports);
+
             let (_, some_transient_lamports) =
                 stake_lamports_at_validator_list_index(validator_list, index)?;
 
-            let current_lamports =
-                stake_account_current_lamports.saturating_sub(minimum_delegation);
+            let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[index]; 
+            msg!("directed_stake_lamports: {:?}", directed_stake_lamports);
+            let current_total_lamports =
+                stake_account_current_lamports.saturating_add(base_lamport_balance);
+            let current_undirected_lamports = stake_account_current_lamports.saturating_sub(directed_stake_lamports);
 
-            if !some_transient_lamports {
                 /* This field is used to determine the amount of stake deposits this validator has gotten which push it over the target.
                 This is important with calculating withdrawals: we can calculate current_lamports - validator_lamport_balances[index]
                 to see the net stake deposits that should be unstaked.
@@ -1051,22 +1060,25 @@ impl StewardStateV2 {
                 */
 
                 if self.validator_lamport_balances[index] == LAMPORT_BALANCE_DEFAULT {
-                    self.validator_lamport_balances[index] = current_lamports;
+                    self.validator_lamport_balances[index] = current_total_lamports;
                 }
+                msg!("current_total_lamports: {:?}", current_total_lamports);
+                msg!("current_undirected_lamports: {:?}", current_undirected_lamports);
+                msg!("self.validator_lamport_balances[index]: {:?}", self.validator_lamport_balances[index]);
+                msg!("target_lamports: {:?}", target_lamports);
 
-                self.validator_lamport_balances[index] = match (
-                    current_lamports < self.validator_lamport_balances[index],
-                    current_lamports < target_lamports,
+                
+                self.validator_lamport_balances[index] = match(
+                    current_total_lamports < self.validator_lamport_balances[index],
+                    current_undirected_lamports < target_lamports,
                 ) {
-                    (true, true) => current_lamports,
-                    (true, false) => current_lamports,
-                    (false, true) => current_lamports,
-                    (false, false) => self.validator_lamport_balances[index],
-                }
-            }
+                    (true, true) => current_total_lamports,
+                    (true, false) => current_total_lamports,
+                    (false, true) => current_total_lamports,
+                    _ => self.validator_lamport_balances[index],
+                };
 
-            let rebalance = if !some_transient_lamports
-                && (target_lamports < current_lamports || self.instant_unstake.get(index)?)
+            let rebalance = if target_lamports < current_undirected_lamports || self.instant_unstake.get(index)?
             {
                 let scoring_unstake_cap: u64 = (stake_pool_lamports as u128)
                     .checked_mul(parameters.scoring_unstake_cap_bps as u128)
@@ -1101,18 +1113,19 @@ impl StewardStateV2 {
                     directed_stake_meta,
                     index,
                     unstake_state,
-                    current_lamports,
+                    current_undirected_lamports,
                     stake_pool_lamports,
                     validator_list,
                     minimum_delegation,
                     stake_rent,
                 )?
-            } else if !some_transient_lamports && current_lamports < target_lamports {
+            } else if current_undirected_lamports < target_lamports {
+                msg!("Increasing stake");
                 increase_stake_calculation(
                     self,
                     directed_stake_meta,
                     index,
-                    current_lamports,
+                    current_undirected_lamports,
                     stake_pool_lamports,
                     validator_list,
                     reserve_lamports,
@@ -1120,6 +1133,7 @@ impl StewardStateV2 {
                     stake_rent,
                 )?
             } else {
+                msg!("No rebalance needed");
                 RebalanceType::None
             };
 

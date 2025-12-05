@@ -9,6 +9,7 @@ use crate::steward::serialize_validator_list;
 use anchor_lang::error::Error;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
+    state::BitMask,
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
