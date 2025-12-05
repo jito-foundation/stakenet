@@ -178,7 +178,7 @@ fn _print_default_config(
     );
     formatted_string += "\n⚙️ Directed Stake Parameters ⚙️\n";
     formatted_string += &format!(
-        "Directed Stake Unstake CAP BPS:  {:?}\n",
+        "Directed Stake Unstake Cap BPS:  {:?}\n",
         config_account.parameters.directed_stake_unstake_cap_bps
     );
     formatted_string += &format!(
