@@ -31,7 +31,7 @@ pub struct UpdateParametersArgs {
     pub instant_unstake_cap_bps: Option<u32>,
     pub stake_deposit_unstake_cap_bps: Option<u32>,
     pub directed_stake_unstake_cap_bps: Option<u16>,
-    pub undirected_stake_floor_lamports: Option<u64>,
+    pub undirected_stake_ceiling_lamports: Option<u64>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
     pub compute_score_slot_range: Option<u64>,
@@ -264,12 +264,12 @@ pub struct Parameters {
     /// Directed rebalance increases are allowed until stake pool TVL dips below this floor
     /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
     /// fields due to it being live on mainnet
-    pub undirected_stake_floor_lamports: [u8; 8],
+    pub undirected_stake_ceiling_lamports: [u8; 8],
 }
 
 impl Parameters {
-    pub fn undirected_stake_floor_lamports(&self) -> u64 {
-        u64::from_le_bytes(self.undirected_stake_floor_lamports)
+    pub fn undirected_stake_ceiling_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.undirected_stake_ceiling_lamports)
     }
 
     /// Merges the updated parameters with the current parameters and validates them
@@ -301,7 +301,7 @@ impl Parameters {
             minimum_stake_lamports,
             minimum_voting_epochs,
             compute_score_epoch_progress,
-            undirected_stake_floor_lamports,
+            undirected_stake_ceiling_lamports,
         } = *args;
 
         let mut new_parameters = self;
@@ -391,9 +391,9 @@ impl Parameters {
             new_parameters.compute_score_epoch_progress = compute_score_epoch_progress;
         }
 
-        if let Some(undirected_stake_floor_lamports) = undirected_stake_floor_lamports {
-            new_parameters.undirected_stake_floor_lamports =
-                undirected_stake_floor_lamports.to_le_bytes();
+        if let Some(undirected_stake_ceiling_lamports) = undirected_stake_ceiling_lamports {
+            new_parameters.undirected_stake_ceiling_lamports =
+                undirected_stake_ceiling_lamports.to_le_bytes();
         }
 
         // Validation will throw an error if any of the parameters are invalid
