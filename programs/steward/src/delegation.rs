@@ -10,7 +10,7 @@ use crate::{
     StewardStateV2,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum RebalanceType {
     Increase(u64),
     Decrease(DecreaseComponents),

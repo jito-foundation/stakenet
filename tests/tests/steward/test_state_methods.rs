@@ -960,7 +960,10 @@ fn test_rebalance_undirected_stake_ceiling() {
         &fixtures.config.parameters,
     );
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), RebalanceType::None);
+    match res.unwrap() {
+        RebalanceType::None => {}
+        _ => panic!("Expected RebalanceType::None"),
+    }
 
     // Reset progress for next test
     state.progress.reset();

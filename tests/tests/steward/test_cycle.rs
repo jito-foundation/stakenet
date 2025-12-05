@@ -1537,7 +1537,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
 }
 
 #[tokio::test]
-async fn test_cycle_with_directed_stake_undirected_floor() {
+async fn test_cycle_with_directed_stake_undirected() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
     let unit_test_fixtures = StateMachineFixtures::default();
@@ -1691,8 +1691,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
             target.vote_pubkey, target.total_staked_lamports
         );
         assert_eq!(target.staked_last_updated_epoch, 20);
-        assert_eq!(target.total_staked_lamports, 0); // No directed stake increases due to high
-                                                     // undirected floor
+        assert_eq!(target.total_staked_lamports, 10_000_000_000);
     }
 
     drop(fixture);
