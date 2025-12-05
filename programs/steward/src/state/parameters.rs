@@ -261,9 +261,10 @@ pub struct Parameters {
 
     pub _padding_2: [u8; 6],
 
-    /// Directed rebalance increases are allowed until stake pool TVL dips below this floor
+    /// Maximum lamports that can be distributed from reserve to validators in a single rebalance.
+    /// Caps the reserve_lamports passed to rebalance to limit stake increases per epoch.
     /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
-    /// fields due to it being live on mainnet
+    /// fields due to it being live on mainnet.
     pub undirected_stake_ceiling_lamports: [u8; 8],
 }
 

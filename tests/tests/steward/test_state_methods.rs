@@ -942,11 +942,10 @@ fn test_rebalance_undirected_stake_ceiling() {
     // Reset progress for next test
     state.progress.reset();
 
-    // Test Case 3: Ceiling is zero - should result in no increase
+    // Test Case 3: Ceiling is one - should result in no increase
     fixtures.config.parameters.undirected_stake_ceiling_lamports = 0u64.to_le_bytes();
 
-    let reserve_lamports = 1000 * LAMPORTS_PER_SOL;
-    let reserve_lamports_capped = reserve_lamports.min(0);
+    let reserve_lamports_capped = 0;
 
     let res = state.rebalance(
         &DirectedStakeMeta::default(),
@@ -961,12 +960,7 @@ fn test_rebalance_undirected_stake_ceiling() {
         &fixtures.config.parameters,
     );
     assert!(res.is_ok());
-    match res.unwrap() {
-        RebalanceType::None => {
-            // No increase possible when ceiling is 0
-        }
-        _ => panic!("Expected RebalanceType::None when ceiling is 0"),
-    }
+    assert_eq!(res.unwrap(), RebalanceType::None);
 
     // Reset progress for next test
     state.progress.reset();

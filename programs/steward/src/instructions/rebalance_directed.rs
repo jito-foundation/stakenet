@@ -295,12 +295,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 .saturating_mul(config.parameters.directed_stake_unstake_cap_bps as u64)
                 .saturating_div(10_000);
 
-            // let undirected_tvl_lamports = stake_pool_lamports_with_fixed_cost
-            //     .saturating_sub(directed_stake_meta.total_staked_lamports());
-
-            // let undirected_floor_cap_reached =
-            //     undirected_tvl_lamports <= config.parameters.undirected_stake_floor_lamports();
-
             let target_staked_lamports =
                 directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
 
@@ -323,7 +317,6 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                     directed_stake_meta_index,
                     target_staked_lamports,
                     reserve_lamports_with_rent,
-                    // undirected_floor_cap_reached,
                     minimum_delegation,
                     stake_rent,
                 ),

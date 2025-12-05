@@ -102,30 +102,6 @@ fn test_increase_stake_calculation_basic() {
     }
 }
 
-// #[test]
-// fn test_increase_stake_undirected_cap_reached() {
-//     let state = create_mock_steward_state(3);
-//     let validator1 = Pubkey::new_unique();
-//     let validator2 = Pubkey::new_unique();
-//     let validator3 = Pubkey::new_unique();
-//
-//     let directed_stake_meta = create_mock_directed_stake_meta(vec![
-//         (validator1, 1_000_000, 500_000),   // Needs 500k more
-//         (validator2, 2_000_000, 1_000_000), // Needs 1M more
-//         (validator3, 1_500_000, 1_500_000), // Already at target
-//     ]);
-//
-//     // Test increasing stake for validator1
-//     let result =
-//         increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 2_000_000, 0, 0);
-//
-//     assert!(result.is_ok());
-//     match result.unwrap() {
-//         RebalanceType::None => {}
-//         _ => panic!("Expected None variant"),
-//     }
-// }
-
 #[test]
 fn test_increase_stake_calculation_no_increase_needed() {
     let state = create_mock_steward_state(1);
