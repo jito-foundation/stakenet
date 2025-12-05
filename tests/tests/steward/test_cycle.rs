@@ -163,7 +163,7 @@ async fn test_cycle() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0), // No undirected stake floor
+                undirected_stake_ceiling_lamports: Some(0), // No undirected stake floor
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -447,7 +447,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -716,7 +716,7 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -948,7 +948,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(100),
             }),
             None,
@@ -1178,7 +1178,7 @@ async fn test_cycle_with_directed_stake_noop_copy() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -1385,7 +1385,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -1537,7 +1537,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
 }
 
 #[tokio::test]
-async fn test_cycle_with_directed_stake_undirected_floor() {
+async fn test_cycle_with_directed_stake_undirected() {
     let mut fixture_accounts = FixtureDefaultAccounts::default();
 
     let unit_test_fixtures = StateMachineFixtures::default();
@@ -1592,7 +1592,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(u64::MAX), // Set high floor to disable undirected
+                undirected_stake_ceiling_lamports: Some(u64::MAX), // Set high floor to disable undirected
                 // stake increases
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
@@ -1691,8 +1691,7 @@ async fn test_cycle_with_directed_stake_undirected_floor() {
             target.vote_pubkey, target.total_staked_lamports
         );
         assert_eq!(target.staked_last_updated_epoch, 20);
-        assert_eq!(target.total_staked_lamports, 0); // No directed stake increases due to high
-                                                     // undirected floor
+        assert_eq!(target.total_staked_lamports, 10_000_000_000);
     }
 
     drop(fixture);
@@ -1754,7 +1753,7 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -1917,7 +1916,7 @@ async fn test_cycle_with_directed_stake_targets() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0),
+                undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -2310,7 +2309,7 @@ async fn test_remove_validator_mid_epoch() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -2611,7 +2610,7 @@ async fn test_add_validator_next_cycle() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(10_000_000 * 1_000_000_000),
+                undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
@@ -2865,7 +2864,7 @@ async fn test_directed_stake_large_target_low_reserve() {
                 minimum_stake_lamports: Some(5_000_000_000),
                 minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
                 compute_score_epoch_progress: Some(0.50),
-                undirected_stake_floor_lamports: Some(0), // No undirected stake floor
+                undirected_stake_ceiling_lamports: Some(0), // No undirected stake floor
                 directed_stake_unstake_cap_bps: Some(10_000),
             }),
             None,
