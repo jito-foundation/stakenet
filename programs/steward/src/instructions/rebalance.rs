@@ -220,25 +220,30 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
             let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
-            let stake_pool_lamports_with_fixed_cost =
+            let total_pool_lamports =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
 
-            let undirected_stake_pool_lamports_with_fixed_cost =
-                stake_pool_lamports_with_fixed_cost
-                    .saturating_sub(directed_stake_meta.total_staked_lamports());
+            let undirected_pool_lamports =
+                total_pool_lamports.saturating_sub(directed_stake_meta.total_staked_lamports());
 
-            let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+            let stake_ceiling = config.parameters.undirected_stake_ceiling_lamports();
 
-            let reserve_lamports_capped = reserve_lamports_with_rent
-                .min(config.parameters.undirected_stake_ceiling_lamports());
+            let capped_reserve = if undirected_pool_lamports >= stake_ceiling {
+                0
+            } else {
+                ctx.accounts
+                    .reserve_stake
+                    .lamports()
+                    .min(stake_ceiling.saturating_sub(undirected_pool_lamports))
+            };
 
             state_account.state.rebalance(
                 &directed_stake_meta,
                 clock.epoch,
                 validator_list_index,
                 &validator_list,
-                undirected_stake_pool_lamports_with_fixed_cost,
-                reserve_lamports_capped,
+                undirected_pool_lamports,
+                capped_reserve,
                 stake_account_active_lamports,
                 minimum_delegation,
                 stake_rent,

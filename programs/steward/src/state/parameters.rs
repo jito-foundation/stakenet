@@ -261,8 +261,9 @@ pub struct Parameters {
 
     pub _padding_2: [u8; 6],
 
-    /// Maximum lamports that can be distributed from reserve to validators in a single rebalance.
-    /// Caps the reserve_lamports passed to rebalance to limit stake increases per epoch.
+    /// Maximum undirected stake pool TVL. During rebalance, reserve_lamports is capped to
+    /// (ceiling - current_undirected_TVL) to ensure undirected stake never exceeds this ceiling.
+    /// When undirected TVL >= ceiling, no stake increases will occur.
     /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
     /// fields due to it being live on mainnet.
     pub undirected_stake_ceiling_lamports: [u8; 8],
