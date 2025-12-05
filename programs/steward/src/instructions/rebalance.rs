@@ -146,6 +146,21 @@ pub struct Rebalance<'info> {
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
+/// Rebalances stake for a validator based on computed delegations and current stake state.
+///
+/// This instruction adjusts validator stake by either increasing or decreasing stake
+/// to match target delegations. It handles three types of rebalancing:
+/// - **Increase**: Stakes additional lamports from reserve to validator
+/// - **Decrease**: Unstakes lamports from validator back to reserve
+/// - **None**: No action needed if validator is already at target
+///
+/// # Undirected Stake Ceiling
+///
+/// Reserve lamports available for stake increases are capped by `undirected_stake_ceiling_lamports` from configuration:
+/// - If current undirected stake TVL >= ceiling: no increases allowed (reserve = 0)
+/// - If current undirected stake TVL < ceiling: reserve capped to (ceiling - current undirected stake)
+///
+/// This ensures total undirected stake never exceeds the configured ceiling.
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
