@@ -853,6 +853,152 @@ fn test_rebalance_default_lamports() {
     }
 }
 
+/// Test the undirected_stake_ceiling_lamports parameter:
+/// - When reserve_lamports > ceiling, increase should be capped to ceiling
+/// - When reserve_lamports <= ceiling, increase should use full reserve_lamports
+#[test]
+fn test_rebalance_undirected_stake_ceiling() {
+    let mut fixtures = Box::<StateMachineFixtures>::default();
+    fixtures.config.parameters.scoring_unstake_cap_bps = 10000;
+    fixtures.config.parameters.instant_unstake_cap_bps = 10000;
+    fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
+
+    let state = &mut fixtures.state;
+
+    // Setup: validator needs stake increase
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    let mut serialized_data = serialize_validator_list(&fixtures.validator_list);
+    let validator_list_bigvec = BigVec {
+        data: &mut serialized_data,
+    };
+
+    // Test Case 1: Reserve lamports BELOW ceiling - should use full reserve
+    let ceiling = 500 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = ceiling.to_le_bytes();
+
+    let reserve_lamports = 200 * LAMPORTS_PER_SOL; // Below ceiling
+    let reserve_lamports_capped = reserve_lamports.min(ceiling);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        reserve_lamports_capped,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            // Should use full reserve since it's below ceiling
+            assert_eq!(lamports, reserve_lamports);
+        }
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 2: Reserve lamports ABOVE ceiling - should be capped
+    let ceiling = 100 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = ceiling.to_le_bytes();
+
+    let reserve_lamports = 1000 * LAMPORTS_PER_SOL; // Above ceiling
+    let reserve_lamports_capped = reserve_lamports.min(ceiling);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        reserve_lamports_capped,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            // Should be capped to ceiling
+            assert_eq!(lamports, ceiling);
+        }
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 3: Ceiling is zero - should result in no increase
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = 0u64.to_le_bytes();
+
+    let reserve_lamports = 1000 * LAMPORTS_PER_SOL;
+    let reserve_lamports_capped = reserve_lamports.min(0);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        reserve_lamports_capped,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {
+            // No increase possible when ceiling is 0
+        }
+        _ => panic!("Expected RebalanceType::None when ceiling is 0"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 4: Ceiling equals reserve - should use full reserve
+    let ceiling = 500 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = ceiling.to_le_bytes();
+
+    let reserve_lamports = ceiling; // Exactly equal to ceiling
+    let reserve_lamports_capped = reserve_lamports.min(ceiling);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        4000 * LAMPORTS_PER_SOL,
+        reserve_lamports_capped,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            assert_eq!(lamports, ceiling);
+        }
+        _ => panic!("Expected RebalanceType::Increase"),
+    }
+}
+
 fn _test_remove_validator_setup(fixtures: &StateMachineFixtures) -> StewardStateV2 {
     let mut state = fixtures.state;
     // Set values for all of the values that are gonna get shifted

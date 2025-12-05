@@ -229,13 +229,16 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
             let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
 
+            let reserve_lamports_capped = reserve_lamports_with_rent
+                .min(config.parameters.undirected_stake_ceiling_lamports());
+
             state_account.state.rebalance(
                 &directed_stake_meta,
                 clock.epoch,
                 validator_list_index,
                 &validator_list,
                 undirected_stake_pool_lamports_with_fixed_cost,
-                reserve_lamports_with_rent,
+                reserve_lamports_capped,
                 stake_account_active_lamports,
                 minimum_delegation,
                 stake_rent,
