@@ -2538,49 +2538,6 @@ pub async fn crank_copy_directed_stake_targets(
     fixture.submit_transaction_assert_success(tx).await;
 }
 
-/// Helper function to deserialize validator list from raw account data
-/// This is useful in tests where we don't have AccountInfo
-pub fn deserialize_validator_list_from_account_data(
-    account_data: &[u8],
-) -> Result<ValidatorList, anchor_lang::error::Error> {
-    use anchor_lang::AccountDeserialize;
-    let mut data = account_data;
-    ValidatorList::try_deserialize_unchecked(&mut data)
-}
-
-/// Helper function to find validator index by vote account in validator list
-pub async fn find_validator_index_in_list(
-    fixture: &TestFixture,
-    vote_account: &Pubkey,
-) -> Option<usize> {
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-    validator_list
-        .validators
-        .iter()
-        .position(|v| v.vote_account_address == *vote_account)
-}
-
-/// Helper function to find validator indices for multiple vote accounts
-pub async fn find_validator_indices_in_list(
-    fixture: &TestFixture,
-    vote_accounts: &[Pubkey],
-) -> Vec<usize> {
-    let validator_list: ValidatorList = fixture
-        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
-        .await;
-    vote_accounts
-        .iter()
-        .filter_map(|vote_account| {
-            validator_list
-                .validators
-                .iter()
-                .position(|v| v.vote_account_address == *vote_account)
-        })
-        .collect()
-}
-
 pub async fn crank_directed_stake_permissions(
     fixture: &TestFixture,
     extra_validator_accounts: &[ExtraValidatorAccounts],
