@@ -114,7 +114,7 @@ pub struct RebalanceDirected<'info> {
 }
 
 pub fn adjust_directed_stake_for_deposits_and_withdrawals(
-    target_total_staked_lamports: u64,
+    validator_list_staked_lamports: u64,
     validator_list_index: usize,
     directed_stake_meta_index: usize,
     directed_stake_meta: &mut DirectedStakeMeta,
@@ -126,20 +126,26 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
     let directed_stake_applied_lamports =
         directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
-    if target_total_staked_lamports < steward_state_total_lamports {
+    if validator_list_staked_lamports < steward_state_total_lamports {
         let withdrawal_lamports =
-            steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
+            steward_state_total_lamports.saturating_sub(validator_list_staked_lamports);
         // If the withdrawal lamports is greated than the applied directed stake, then we need to roll-over the remainder
         // to the undirected stake
         if withdrawal_lamports > directed_stake_applied_lamports {
-            let remainder = withdrawal_lamports.saturating_sub(directed_stake_applied_lamports);
-            // Subtract from directed stake
             directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports = 0;
             directed_stake_meta.directed_stake_lamports[validator_list_index] = 0;
-            // Implicitly subtract from undirected stake by subtracting from steward state total lamports
+            // We subtract the withdrawal lamport from the validator_lamport_balance
+            // this in tandem with setting directed stake to 0 ensures that the remainder
+            // is subtracted from the undirected stake.
+            //
+            // When we subtract more from the validator_lamport_balance than the directed stake,
+            // the remainder is subtracted from the undirected stake.
+            //
+            // Ex. 25M total lamports, 1M directed stake, 24M undirected stake, 3M Withdrawal
+            // 22M total lamports, 0 directed stake, 22M undirected stake
             state_account.state.validator_lamport_balances[validator_list_index] =
                 state_account.state.validator_lamport_balances[validator_list_index]
-                    .saturating_sub(remainder);
+                    .saturating_sub(withdrawal_lamports);
         } else {
             directed_stake_meta.subtract_from_total_staked_lamports(
                 directed_stake_meta_index,
@@ -148,20 +154,26 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
             directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
                 .directed_stake_lamports[validator_list_index]
                 .saturating_sub(withdrawal_lamports);
+            state_account.state.validator_lamport_balances[validator_list_index] =
+                state_account.state.validator_lamport_balances[validator_list_index]
+                    .saturating_sub(withdrawal_lamports);
         }
-    } else if target_total_staked_lamports > steward_state_total_lamports
+    } else if validator_list_staked_lamports > steward_state_total_lamports
         && (directed_stake_applied_lamports < directed_stake_target_lamports)
     {
         let directed_deficit_lamports =
             directed_stake_target_lamports.saturating_sub(directed_stake_applied_lamports);
         let deposit_lamports =
-            target_total_staked_lamports.saturating_sub(steward_state_total_lamports);
+            validator_list_staked_lamports.saturating_sub(steward_state_total_lamports);
         let increase_lamports = directed_deficit_lamports.min(deposit_lamports);
         directed_stake_meta
             .add_to_total_staked_lamports(directed_stake_meta_index, increase_lamports);
         directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
             .directed_stake_lamports[validator_list_index]
             .saturating_add(increase_lamports);
+        state_account.state.validator_lamport_balances[validator_list_index] =
+            state_account.state.validator_lamport_balances[validator_list_index]
+                .saturating_add(increase_lamports);
     }
     Ok(())
 }
@@ -415,18 +427,20 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             )?;
             msg!("increase_validator_stake successful");
             let mut state_account = ctx.accounts.state_account.load_mut()?;
-            directed_stake_meta.add_to_total_staked_lamports(directed_stake_meta_index, lamports);
             if state_account.state.validator_lamport_balances[validator_list_index]
-                != LAMPORT_BALANCE_DEFAULT
+                == LAMPORT_BALANCE_DEFAULT
             {
-                state_account.state.validator_lamport_balances[validator_list_index] =
-                    state_account.state.validator_lamport_balances[validator_list_index]
-                        .checked_add(lamports)
-                        .ok_or(StewardError::ArithmeticError)?;
-                directed_stake_meta.directed_stake_lamports[validator_list_index] =
-                    directed_stake_meta.directed_stake_lamports[validator_list_index]
-                        .saturating_add(lamports);
+                msg!("Validator lamport balance is default, setting to 0");
+                state_account.state.validator_lamport_balances[validator_list_index] = 0;
             }
+            directed_stake_meta.add_to_total_staked_lamports(directed_stake_meta_index, lamports);
+            state_account.state.validator_lamport_balances[validator_list_index] =
+                state_account.state.validator_lamport_balances[validator_list_index]
+                    .checked_add(lamports)
+                    .ok_or(StewardError::ArithmeticError)?;
+            directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
+                .directed_stake_lamports[validator_list_index]
+                .saturating_add(lamports);
         }
         RebalanceType::None => {
             msg!("RebalanceType::None");

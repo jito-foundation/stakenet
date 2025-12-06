@@ -1,6 +1,4 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
-
 use crate::{
     spl_stake_pool_cli,
     stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account},
@@ -43,12 +41,14 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
+    find_stake_program_address, find_transient_stake_program_address,
+    find_withdraw_authority_program_address, minimum_delegation,
     state::{
         AccountType, Fee, FutureEpoch, StakeStatus, ValidatorList as SPLValidatorList,
         ValidatorStakeInfo,
     },
 };
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
@@ -356,9 +356,9 @@ impl TestFixture {
     ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
-            mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
-            epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
-            commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
+            mev_commission_range: Some(0),
+            epoch_credits_range: Some(0),
+            commission_range: Some(0),
             scoring_delinquency_threshold_ratio: Some(0.85),
             instant_unstake_delinquency_threshold_ratio: Some(0.70),
             mev_commission_bps_threshold: Some(1000),
@@ -373,7 +373,7 @@ impl TestFixture {
             instant_unstake_inputs_epoch_progress: Some(0.50),
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
-            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            minimum_voting_epochs: Some(0),
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_ceiling_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
@@ -814,19 +814,10 @@ impl TestFixture {
         &self,
         vote_account: Pubkey,
     ) -> (Pubkey, Pubkey, Pubkey) {
-        let stake_pool: StakePool = self
-            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
-            .await;
-
-        let withdraw_authority = Pubkey::create_program_address(
-            &[
-                self.stake_pool_meta.stake_pool.as_ref(),
-                STAKE_POOL_WITHDRAW_SEED,
-                &[stake_pool.as_ref().stake_withdraw_bump_seed],
-            ],
+        let (withdraw_authority, _) = find_withdraw_authority_program_address(
             &spl_stake_pool::id(),
-        )
-        .unwrap();
+            &self.stake_pool_meta.stake_pool,
+        );
 
         // stake account
         let stake_account_address = find_stake_program_address(
@@ -1659,6 +1650,39 @@ pub async fn copy_cluster_info(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+pub async fn crank_validator_history_accounts_no_credits(
+    fixture: &TestFixture,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let clock: Clock = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .unwrap();
+    for &i in indices {
+        fixture
+            .ctx
+            .borrow_mut()
+            .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 0);
+        copy_vote_account(fixture, extra_validator_accounts, i).await;
+        // only field that's relevant to score is is_superminority
+        update_stake_history(
+            fixture,
+            extra_validator_accounts,
+            i,
+            clock.epoch,
+            1_000_000,
+            1_000,
+            false,
+        )
+        .await;
+    }
+    copy_cluster_info(fixture).await;
+}
+
 pub async fn crank_validator_history_accounts(
     fixture: &TestFixture,
     extra_validator_accounts: &[ExtraValidatorAccounts],
@@ -1941,7 +1965,7 @@ impl FixtureDefaultAccounts {
         )
         .0;
         let stake_withdraw_bump_seed = Pubkey::find_program_address(
-            &[stake_pool_address.as_ref(), b"withdrawal"],
+            &[stake_pool_address.as_ref(), STAKE_POOL_WITHDRAW_SEED],
             &spl_stake_pool::id(),
         )
         .1;
@@ -2092,7 +2116,7 @@ pub fn closed_vote_account() -> Account {
 
 pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> Account {
     let mut data = vec![];
-    stake_account.serialize(&mut data).unwrap();
+    borsh1::BorshSerialize::serialize(&stake_account, &mut data).unwrap();
     Account {
         lamports,
         data,
