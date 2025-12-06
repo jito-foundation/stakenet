@@ -254,9 +254,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 &validator_list,
                 undirected_stake_pool_lamports_with_fixed_cost,
                 reserve_lamports_with_rent,
-                stake_account_active_lamports
-                    .saturating_sub(minimum_delegation)
-                    .saturating_add(transient_stake_account_lamports),
+                stake_account_active_lamports.saturating_sub(minimum_delegation),
                 minimum_delegation,
                 stake_rent,
                 &config.parameters,
