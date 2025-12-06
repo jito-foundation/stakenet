@@ -6,7 +6,6 @@ use crate::errors::StewardError::{
     ValidatorNotInWhitelist,
 };
 use crate::utils::U8Bool;
-use crate::BitMask;
 use anchor_lang::prelude::*;
 use borsh::{BorshDeserialize, BorshSerialize};
 

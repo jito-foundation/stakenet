@@ -9,7 +9,6 @@ use crate::steward::serialize_validator_list;
 use anchor_lang::error::Error;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
-    state::BitMask,
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
     errors::StewardError,
@@ -784,7 +783,7 @@ fn test_rebalance_default_lamports() {
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
-    validator_list[0].transient_stake_lamports = 1000.into();
+    validator_list[0].transient_stake_lamports = 0.into();
 
     let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
@@ -807,9 +806,13 @@ fn test_rebalance_default_lamports() {
     assert!(res.is_ok());
     match res.unwrap() {
         RebalanceType::None => {}
-        _ => panic!("Expected RebalanceType::Increase"),
+        _ => panic!("Expected RebalanceType::None"),
     }
-    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
+    // The validator lamport balance will sync with active stake lamports when performing rebalancing ops
+    assert_eq!(
+        state.validator_lamport_balances[0],
+        u64::from(validator_list[0].active_stake_lamports)
+    );
 
     // Case 2: Lamports not default, no transient stake
     let mut state = fixtures.state;

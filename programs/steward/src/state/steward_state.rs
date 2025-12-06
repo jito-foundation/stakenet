@@ -15,7 +15,7 @@ use crate::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV4,
     },
     state::directed_stake::DirectedStakeMeta,
-    utils::{epoch_progress, get_target_lamports, stake_lamports_at_validator_list_index},
+    utils::{epoch_progress, get_target_lamports},
     Config, Parameters,
 };
 
@@ -936,16 +936,24 @@ impl StewardStateV2 {
             // If the withdrawal lamports is greated than the applied directed stake, then we need to roll-over the remainder
             // to the undirected stake
             if withdrawal_lamports > directed_stake_applied_lamports {
-                let remainder = withdrawal_lamports.saturating_sub(directed_stake_applied_lamports);
-                // Subtract from directed stake
+                // We subtract the withdrawal lamport from the validator_lamport_balance
+                // this in tandem with setting directed stake to 0 ensures that the remainder
+                // is subtracted from the undirected stake.
+                //
+                // When we subtract more from the validator_lamport_balance than the directed stake,
+                // the remainder is subtracted from the undirected stake.
+                //
+                // Ex. 25M total lamports, 1M directed stake, 24M undirected stake, 3M Withdrawal
+                // 22M total lamports, 0 directed stake, 22M undirected stake
+                new_total_stake_lamports = self.validator_lamport_balances[validator_list_index]
+                    .saturating_sub(withdrawal_lamports);
                 new_directed_stake_lamports = 0;
-                // Implicitly subtract from undirected stake by subtracting from steward state total lamports
-                new_total_stake_lamports = steward_state_total_lamports.saturating_sub(remainder);
             } else {
                 new_directed_stake_lamports = directed_stake_meta.directed_stake_lamports
                     [validator_list_index]
                     .saturating_sub(withdrawal_lamports);
-                new_total_stake_lamports = self.validator_lamport_balances[validator_list_index];
+                new_total_stake_lamports = self.validator_lamport_balances[validator_list_index]
+                    .saturating_sub(withdrawal_lamports);
             }
         } else if target_total_staked_lamports > steward_state_total_lamports
             && (directed_stake_applied_lamports < directed_stake_target_lamports)
@@ -958,7 +966,8 @@ impl StewardStateV2 {
             new_directed_stake_lamports = directed_stake_meta.directed_stake_lamports
                 [validator_list_index]
                 .saturating_add(increase_lamports);
-            new_total_stake_lamports = self.validator_lamport_balances[validator_list_index];
+            new_total_stake_lamports = self.validator_lamport_balances[validator_list_index]
+                .saturating_add(increase_lamports);
         }
         Ok((new_directed_stake_lamports, new_total_stake_lamports))
     }
@@ -992,7 +1001,6 @@ impl StewardStateV2 {
 
             // Skip if already processed
             if self.progress.get(index)? {
-                msg!("Already rebalanced");
                 return Ok(RebalanceType::None);
             }
 
@@ -1037,48 +1045,32 @@ impl StewardStateV2 {
             let target_lamports =
                 get_target_lamports(&self.delegations[index], stake_pool_lamports)?;
 
-            msg!("index: {:?}", index);
-            msg!("stake_pool_lamports: {:?}", stake_pool_lamports);
-            msg!("self.delegations[index]: {:?}", self.delegations[index]);
-            msg!("target_lamports: {:?}", target_lamports);
-
-            let (_, some_transient_lamports) =
-                stake_lamports_at_validator_list_index(validator_list, index)?;
-
-            let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[index]; 
-            msg!("directed_stake_lamports: {:?}", directed_stake_lamports);
+            let directed_stake_lamports = directed_stake_meta.directed_stake_lamports[index];
             let current_total_lamports =
                 stake_account_current_lamports.saturating_add(base_lamport_balance);
-            let current_undirected_lamports = stake_account_current_lamports.saturating_sub(directed_stake_lamports);
+            let current_undirected_lamports =
+                stake_account_current_lamports.saturating_sub(directed_stake_lamports);
 
-                /* This field is used to determine the amount of stake deposits this validator has gotten which push it over the target.
-                This is important with calculating withdrawals: we can calculate current_lamports - validator_lamport_balances[index]
-                to see the net stake deposits that should be unstaked.
+            /* This field is used to determine the amount of stake deposits this validator has gotten which push it over the target.
+            This is important with calculating withdrawals: we can calculate current_lamports - validator_lamport_balances[index]
+            to see the net stake deposits that should be unstaked.
 
-                In all cases where the current_lamports is now below the target or internal balance, we update the internal balance.
-                Otherwise, keep the internal balance the same to ensure we still see the stake deposit delta, until it can be unstaked.
-                */
+            In all cases where the current_lamports is now below the target or internal balance, we update the internal balance.
+            Otherwise, keep the internal balance the same to ensure we still see the stake deposit delta, until it can be unstaked.
+            */
 
-                if self.validator_lamport_balances[index] == LAMPORT_BALANCE_DEFAULT {
-                    self.validator_lamport_balances[index] = current_total_lamports;
-                }
-                msg!("current_total_lamports: {:?}", current_total_lamports);
-                msg!("current_undirected_lamports: {:?}", current_undirected_lamports);
-                msg!("self.validator_lamport_balances[index]: {:?}", self.validator_lamport_balances[index]);
-                msg!("target_lamports: {:?}", target_lamports);
+            self.validator_lamport_balances[index] = match (
+                current_total_lamports < self.validator_lamport_balances[index],
+                current_undirected_lamports < target_lamports,
+            ) {
+                (true, true) => current_total_lamports,
+                (true, false) => current_total_lamports,
+                (false, true) => current_total_lamports,
+                _ => self.validator_lamport_balances[index],
+            };
 
-                
-                self.validator_lamport_balances[index] = match(
-                    current_total_lamports < self.validator_lamport_balances[index],
-                    current_undirected_lamports < target_lamports,
-                ) {
-                    (true, true) => current_total_lamports,
-                    (true, false) => current_total_lamports,
-                    (false, true) => current_total_lamports,
-                    _ => self.validator_lamport_balances[index],
-                };
-
-            let rebalance = if target_lamports < current_undirected_lamports || self.instant_unstake.get(index)?
+            let rebalance = if target_lamports < current_undirected_lamports
+                || self.instant_unstake.get(index)?
             {
                 let scoring_unstake_cap: u64 = (stake_pool_lamports as u128)
                     .checked_mul(parameters.scoring_unstake_cap_bps as u128)
@@ -1120,7 +1112,6 @@ impl StewardStateV2 {
                     stake_rent,
                 )?
             } else if current_undirected_lamports < target_lamports {
-                msg!("Increasing stake");
                 increase_stake_calculation(
                     self,
                     directed_stake_meta,
@@ -1133,7 +1124,6 @@ impl StewardStateV2 {
                     stake_rent,
                 )?
             } else {
-                msg!("No rebalance needed");
                 RebalanceType::None
             };
 

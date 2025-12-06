@@ -52,7 +52,7 @@ use spl_stake_pool::{
         ValidatorStakeInfo,
     },
 };
-use std::{cell::RefCell, collections::HashMap, num::NonZeroU32, rc::Rc, str::FromStr, vec};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
@@ -561,9 +561,9 @@ impl TestFixture {
     ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
-            mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
-            epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
-            commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
+            mev_commission_range: Some(0),
+            epoch_credits_range: Some(0),
+            commission_range: Some(0),
             scoring_delinquency_threshold_ratio: Some(0.85),
             instant_unstake_delinquency_threshold_ratio: Some(0.70),
             mev_commission_bps_threshold: Some(1000),
@@ -578,7 +578,7 @@ impl TestFixture {
             instant_unstake_inputs_epoch_progress: Some(0.50),
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
-            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            minimum_voting_epochs: Some(0),
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_floor_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
@@ -1048,7 +1048,6 @@ impl TestFixture {
             withdraw_authority,
         )
     }
-
 
     pub async fn fetch_minimum_delegation(&self) -> u64 {
         let ix = solana_program::stake::instruction::get_minimum_delegation();
@@ -2017,6 +2016,39 @@ pub async fn copy_cluster_info(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+pub async fn crank_validator_history_accounts_no_credits(
+    fixture: &TestFixture,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let clock: Clock = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .unwrap();
+    for &i in indices {
+        fixture
+            .ctx
+            .borrow_mut()
+            .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 0);
+        copy_vote_account(fixture, extra_validator_accounts, i).await;
+        // only field that's relevant to score is is_superminority
+        update_stake_history(
+            fixture,
+            extra_validator_accounts,
+            i,
+            clock.epoch,
+            1_000_000,
+            1_000,
+            false,
+        )
+        .await;
+    }
+    copy_cluster_info(fixture).await;
+}
+
 pub async fn crank_validator_history_accounts(
     fixture: &TestFixture,
     extra_validator_accounts: &[ExtraValidatorAccounts],
@@ -2969,7 +3001,6 @@ pub fn deserialize_validator_list_from_account_data(
     use anchor_lang::AccountDeserialize;
     let mut data = account_data;
     ValidatorList::try_deserialize_unchecked(&mut data)
-        .map_err(|e| anchor_lang::error::Error::from(e))
 }
 
 /// Helper function to find validator index by vote account in validator list
@@ -3108,8 +3139,7 @@ pub async fn crank_directed_stake_permissions_with_real_validator_list(
         let exists = validator_list
             .validators
             .iter()
-            .enumerate()
-            .any(|(i, v)| v.vote_account_address == extra_accounts.vote_account);
+            .any(|v| v.vote_account_address == extra_accounts.vote_account);
 
         if !exists {
             panic!(
