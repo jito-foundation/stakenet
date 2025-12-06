@@ -198,7 +198,7 @@ fn test_priority_parameter_validation() {
         priority_fee_scoring_start_epoch: 0,
         directed_stake_unstake_cap_bps: 750,
         compute_score_epoch_progress: 0.5,
-        undirected_stake_floor_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
+        undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
         _padding_0: [0; 6],
         _padding_1: [0; 28],
         _padding_2: [0; 6],

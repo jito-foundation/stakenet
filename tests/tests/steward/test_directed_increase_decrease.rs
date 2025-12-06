@@ -88,16 +88,8 @@ fn test_increase_stake_calculation_basic() {
     ]);
 
     // Test increasing stake for validator1
-    let result = increase_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        500_000,
-        1_200_000,
-        false,
-        0,
-        0,
-    );
+    let result =
+        increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 1_200_000, 0, 0);
 
     let validator1_proportion_bps = 3333;
     let expected_amount = (1_200_000 * validator1_proportion_bps) / 10_000;
@@ -107,38 +99,6 @@ fn test_increase_stake_calculation_basic() {
             assert!(amount == expected_amount);
         }
         _ => panic!("Expected Increase variant"),
-    }
-}
-
-#[test]
-fn test_increase_stake_undirected_cap_reached() {
-    let state = create_mock_steward_state(3);
-    let validator1 = Pubkey::new_unique();
-    let validator2 = Pubkey::new_unique();
-    let validator3 = Pubkey::new_unique();
-
-    let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 500_000),   // Needs 500k more
-        (validator2, 2_000_000, 1_000_000), // Needs 1M more
-        (validator3, 1_500_000, 1_500_000), // Already at target
-    ]);
-
-    // Test increasing stake for validator1
-    let result = increase_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        500_000,
-        2_000_000,
-        true,
-        0,
-        0,
-    );
-
-    assert!(result.is_ok());
-    match result.unwrap() {
-        RebalanceType::None => {}
-        _ => panic!("Expected None variant"),
     }
 }
 
@@ -157,7 +117,6 @@ fn test_increase_stake_calculation_no_increase_needed() {
         0,         // validator1 index
         1_000_000, // current_lamports (already at target)
         1_000_000, // reserve_lamports
-        false,
         0,
         0,
     );
@@ -185,7 +144,6 @@ fn test_increase_stake_calculation_index_out_of_bounds() {
         5, // Should be out of bounds
         500_000,
         5_000_000,
-        false,
         0,
         0,
     );
@@ -202,8 +160,7 @@ fn test_increase_stake_calculation_zero_reserve() {
         (validator1, 1_000_000, 500_000), // Needs 500k more
     ]);
 
-    let result =
-        increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 0, false, 0, 0);
+    let result = increase_stake_calculation(&state, &directed_stake_meta, 0, 500_000, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -340,7 +297,6 @@ fn test_increase_stake_calculation_proportional_distribution() {
         0,
         500_000,
         reserve_lamports,
-        false,
         0,
         0,
     );
@@ -363,7 +319,6 @@ fn test_increase_stake_calculation_proportional_distribution() {
         1,
         1_000_000,
         reserve_lamports,
-        false,
         0,
         0,
     );
@@ -482,8 +437,7 @@ fn test_edge_case_zero_values() {
     ]);
 
     // Test increase with zero values
-    let result =
-        increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, false, 1_000_000, 0);
+    let result = increase_stake_calculation(&state, &directed_stake_meta, 0, 0, 0, 1_000_000, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {

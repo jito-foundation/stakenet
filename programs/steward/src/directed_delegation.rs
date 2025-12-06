@@ -115,18 +115,11 @@ pub fn increase_stake_calculation(
     target_index: usize,
     current_lamports: u64,
     reserve_lamports: u64,
-    undirected_cap_reached: bool,
     minimum_delegation: u64,
     stake_rent: u64,
 ) -> Result<RebalanceType> {
     if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
-    }
-
-    // If the undirected floor has been reached, no directed increases can be made
-    if undirected_cap_reached {
-        msg!("Undirected TVL floor reached, no directed increases can be made.");
-        return Ok(RebalanceType::None);
     }
 
     let target_lamports = directed_stake_meta.targets[target_index].total_target_lamports;
