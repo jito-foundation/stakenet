@@ -19,17 +19,6 @@ pub async fn command_view_config(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let validators_remove = all_steward_accounts
-        .state_account
-        .state
-        .validators_for_immediate_removal;
-
-    for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
-        if validators_remove.get(i as usize)? {
-            println!("Validator index: {i}");
-        }
-    }
-
     _print_default_config(
         &all_steward_accounts.config_address,
         &all_steward_accounts.state_address,

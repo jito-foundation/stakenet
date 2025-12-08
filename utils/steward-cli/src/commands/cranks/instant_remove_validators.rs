@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[derive(Parser)]
-#[command(about = "Crank `idle` state")]
+#[command(about = "Crank instant remove validators")]
 pub struct CrankInstantRemoveValidators {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
@@ -34,8 +34,8 @@ pub async fn command_crank_instant_remove_validators(
     let args = args.permissionless_parameters;
 
     // Creates config account
-    let payer =
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let payer = read_keypair_file(args.payer_keypair_path)
+        .map_err(|e| "Failed reading keypair file ( Payer ): {e}")?;
     let payer = Arc::new(payer);
 
     let steward_config = args.steward_config;
@@ -65,7 +65,7 @@ pub async fn command_crank_instant_remove_validators(
             }
         }
 
-        log::info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        log::info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, &program_id);

@@ -57,7 +57,7 @@ use crate::{
         },
         cranks::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
-            instant_removal_validators::command_crank_instant_remove_validators,
+            instant_remove_validators::command_crank_instant_remove_validators,
             rebalance_directed::command_crank_rebalance_directed,
         },
         info::{
