@@ -22,8 +22,8 @@ use tests::steward_fixtures::{
     auto_add_validator, crank_compute_delegations, crank_compute_instant_unstake,
     crank_compute_score, crank_copy_directed_stake_targets, crank_directed_stake_permissions,
     crank_epoch_maintenance, crank_idle, crank_rebalance, crank_rebalance_directed,
-    crank_stake_pool, crank_validator_history_accounts_no_credits, ExtraValidatorAccounts,
-    FixtureDefaultAccounts, initialize_directed_stake_meta, StateMachineFixtures, TestFixture,
+    crank_stake_pool, crank_validator_history_accounts_no_credits, initialize_directed_stake_meta,
+    ExtraValidatorAccounts, FixtureDefaultAccounts, StateMachineFixtures, TestFixture,
     ValidatorEntry,
 };
 use validator_history::ValidatorHistory;
