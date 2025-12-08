@@ -446,7 +446,8 @@ async fn test_initialize_directed_stake_ticket() {
     let fixture = setup_directed_stake_fixture().await;
     let staker = create_funded_staker(&fixture).await;
     add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
-    let ticket_update_authority = Pubkey::new_unique();
+    // Signer must be ticket_update_authority (or ticket_override_authority)
+    let ticket_update_authority = staker.pubkey();
     let ticket_holder_is_protocol = false;
 
     let ticket_account = initialize_directed_stake_ticket(
@@ -868,22 +869,14 @@ async fn test_directed_stake_ticket_allocation_calculation() {
 async fn test_ticket_pda_seeds_with_ticket_update_authority() {
     let fixture = setup_directed_stake_fixture().await;
 
-    let staker = create_funded_staker(&fixture).await;
-    add_staker_to_whitelist(&fixture, &staker.pubkey(), DirectedStakeRecordType::User).await;
-
     // Create a ticket_update_authority (different from signer)
     let ticket_update_authority = Pubkey::new_unique();
-    add_staker_to_whitelist(
-        &fixture,
-        &ticket_update_authority,
-        DirectedStakeRecordType::User,
-    )
-    .await;
 
     // The signer can be different from ticket_update_authority as long as it is the ticket_override_authority
+    // fixture.keypair is the ticket_override_authority after setup
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
-        &staker, // signer - whitelisted staker
+        &fixture.keypair,        // signer - ticket_override_authority
         ticket_update_authority, // ticket_update_authority - different from signer
         false,
     )
@@ -932,7 +925,7 @@ async fn test_ticket_update_authority_can_update_own_ticket() {
     let ticket_account = initialize_directed_stake_ticket(
         &fixture,
         &ticket_update_authority_keypair, // signer
-        ticket_update_authority,         // ticket_update_authority - same as signer
+        ticket_update_authority,          // ticket_update_authority - same as signer
         false,
     )
     .await;
@@ -943,7 +936,13 @@ async fn test_ticket_update_authority_can_update_own_ticket() {
     ];
 
     // The ticket_update_authority should be able to update their own ticket
-    update_directed_stake_ticket(&fixture, &ticket_account, &ticket_update_authority_keypair, preferences).await;
+    update_directed_stake_ticket(
+        &fixture,
+        &ticket_account,
+        &ticket_update_authority_keypair,
+        preferences,
+    )
+    .await;
 
     // Verify the ticket was updated
     let ticket: DirectedStakeTicket = fixture.load_and_deserialize(&ticket_account).await;
@@ -1125,21 +1124,11 @@ async fn test_multiple_tickets_with_different_update_authorities() {
     add_validator_to_whitelist(&fixture, &validator2).await;
 
     // Initialize tickets with different ticket_update_authorities
-    let ticket1 = initialize_directed_stake_ticket(
-        &fixture,
-        &authority1_keypair,
-        authority1,
-        false,
-    )
-    .await;
+    let ticket1 =
+        initialize_directed_stake_ticket(&fixture, &authority1_keypair, authority1, false).await;
 
-    let ticket2 = initialize_directed_stake_ticket(
-        &fixture,
-        &authority2_keypair,
-        authority2,
-        false,
-    )
-    .await;
+    let ticket2 =
+        initialize_directed_stake_ticket(&fixture, &authority2_keypair, authority2, false).await;
 
     // Verify tickets have different addresses (different PDAs)
     assert_ne!(ticket1, ticket2);
@@ -1173,11 +1162,17 @@ async fn test_multiple_tickets_with_different_update_authorities() {
     let ticket2_updated: DirectedStakeTicket = fixture.load_and_deserialize(&ticket2).await;
 
     assert_eq!(ticket1_updated.num_preferences, 1);
-    assert_eq!(ticket1_updated.staker_preferences[0].vote_pubkey, validator1);
+    assert_eq!(
+        ticket1_updated.staker_preferences[0].vote_pubkey,
+        validator1
+    );
     assert_eq!(ticket1_updated.staker_preferences[0].stake_share_bps, 10000);
 
     assert_eq!(ticket2_updated.num_preferences, 1);
-    assert_eq!(ticket2_updated.staker_preferences[0].vote_pubkey, validator2);
+    assert_eq!(
+        ticket2_updated.staker_preferences[0].vote_pubkey,
+        validator2
+    );
     assert_eq!(ticket2_updated.staker_preferences[0].stake_share_bps, 10000);
 }
 
