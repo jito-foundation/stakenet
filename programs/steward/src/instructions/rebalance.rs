@@ -287,7 +287,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
     match rebalance_type.clone() {
         RebalanceType::Decrease(decrease_components) => {
-            msg!("Decreasing stake");
             invoke_signed(
                 &spl_stake_pool::instruction::decrease_validator_stake_with_reserve(
                     &ctx.accounts.stake_pool_program.key(),
@@ -323,7 +322,6 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             )?;
         }
         RebalanceType::Increase(lamports) => {
-            msg!("Increasing stake");
             invoke_signed(
                 &spl_stake_pool::instruction::increase_validator_stake(
                     &ctx.accounts.stake_pool_program.key(),
@@ -361,9 +359,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 ]],
             )?;
         }
-        RebalanceType::None => {
-            msg!("No rebalance needed");
-        }
+        RebalanceType::None => {}
     }
 
     {

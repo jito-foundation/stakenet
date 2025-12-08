@@ -6,13 +6,11 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, stake},
     InstructionData, ToAccountMetas,
 };
-use jito_steward::instructions::AuthorityType;
 use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     stake_pool_utils::{StakePool, ValidatorList},
     StewardStateAccount, StewardStateAccountV2, UpdateParametersArgs,
 };
-use solana_program::sysvar;
 use solana_program_test::*;
 #[allow(deprecated)]
 use solana_sdk::{
@@ -25,83 +23,10 @@ use tests::steward_fixtures::{
     crank_compute_score, crank_copy_directed_stake_targets, crank_directed_stake_permissions,
     crank_epoch_maintenance, crank_idle, crank_rebalance, crank_rebalance_directed,
     crank_stake_pool, crank_validator_history_accounts_no_credits, ExtraValidatorAccounts,
-    FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
+    FixtureDefaultAccounts, initialize_directed_stake_meta, StateMachineFixtures, TestFixture,
+    ValidatorEntry,
 };
 use validator_history::ValidatorHistory;
-
-async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
-    let directed_stake_meta = Pubkey::find_program_address(
-        &[
-            DirectedStakeMeta::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    let set_whitelist_auth_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::SetNewAuthority {
-            config: fixture.steward_config.pubkey(),
-            new_authority: fixture.keypair.pubkey(),
-            admin: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::SetNewAuthority {
-            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
-        }
-        .data(),
-    };
-
-    let set_ticket_override_auth_ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: jito_steward::accounts::SetNewAuthority {
-            config: fixture.steward_config.pubkey(),
-            new_authority: fixture.keypair.pubkey(),
-            admin: fixture.keypair.pubkey(),
-        }
-        .to_account_metas(None),
-        data: jito_steward::instruction::SetNewAuthority {
-            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
-        }
-        .data(),
-    };
-
-    let ix = Instruction {
-        program_id: jito_steward::id(),
-        accounts: vec![
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                fixture.steward_config.pubkey(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(directed_stake_meta, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                sysvar::clock::id(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                anchor_lang::solana_program::system_program::id(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(
-                fixture.keypair.pubkey(),
-                true,
-            ),
-        ],
-        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
-    };
-
-    let tx = Transaction::new_signed_with_payer(
-        &[set_whitelist_auth_ix, set_ticket_override_auth_ix, ix],
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.ctx.borrow().last_blockhash,
-    );
-
-    fixture.submit_transaction_assert_success(tx).await;
-
-    directed_stake_meta
-}
 
 /// Helper function to execute a spl_stake_pool::instruction::WithdrawStake instruction
 async fn stake_deposit(
@@ -361,9 +286,6 @@ async fn test_internal_lamport_tracking_basic() {
         )
         .await;
 
-    let _steward: Box<StewardStateAccountV2> =
-        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
-
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
@@ -587,9 +509,6 @@ async fn test_internal_lamport_tracking_with_withdraw() {
         )
         .await;
 
-    let _steward: Box<StewardStateAccountV2> =
-        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
-
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
@@ -809,11 +728,6 @@ async fn test_internal_lamport_tracking_with_withdraw_remainder() {
             None,
         )
         .await;
-
-    {
-        let mut _steward: StewardStateAccountV2 =
-            fixture.load_and_deserialize(&fixture.steward_state).await;
-    }
 
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
@@ -1217,9 +1131,6 @@ async fn test_internal_lamport_tracking_with_deposit() {
         )
         .await;
 
-    let _steward: Box<StewardStateAccountV2> =
-        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
-
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
@@ -1440,9 +1351,6 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
         )
         .await;
 
-    let _steward: Box<StewardStateAccountV2> =
-        Box::new(fixture.load_and_deserialize(&fixture.steward_state).await);
-
     fixture.directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
@@ -1575,14 +1483,6 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
         let steward_state: StewardStateAccountV2 =
             fixture.load_and_deserialize(&fixture.steward_state).await;
         assert!(directed_stake_meta.targets[0].total_staked_lamports == 30000000000);
-        println!(
-            "steward_state.state.validator_lamport_balances[0]: {:?}",
-            steward_state.state.validator_lamport_balances[0]
-        );
-        println!(
-            "directed_stake_meta.targets[0].total_staked_lamports: {:?}",
-            directed_stake_meta.targets[0].total_staked_lamports
-        );
         assert!(
             steward_state.state.validator_lamport_balances[0]
                 == (directed_stake_meta.targets[0].total_staked_lamports

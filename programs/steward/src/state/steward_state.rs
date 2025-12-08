@@ -1066,7 +1066,7 @@ impl StewardStateV2 {
                 (true, true) => current_total_lamports,
                 (true, false) => current_total_lamports,
                 (false, true) => current_total_lamports,
-                _ => self.validator_lamport_balances[index],
+                (false, false) => self.validator_lamport_balances[index],
             };
 
             let rebalance = if target_lamports < current_undirected_lamports
