@@ -221,12 +221,30 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
 
         // Do not count directed stake against the pool stake delegation
         let stake_account_active_lamports = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                let lamports = directed_stake_meta.directed_stake_lamports[validator_list_index];
-                stake.delegation.stake.saturating_sub(lamports)
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
+            _ => {
+                msg!("Invalid stake state");
+                0
             }
+        };
+
+        // If and only if there is a valid StakeStateV2 for the transient stake account we should assign that balance
+        let transient_stake_account_data = &mut ctx.accounts.transient_stake_account.data.borrow();
+        let transient_stake_state =
+            try_from_slice_unchecked::<StakeStateV2>(transient_stake_account_data);
+        let transient_stake_account_lamports = match transient_stake_state {
+            Ok(StakeStateV2::Stake(_, stake, _)) => stake.delegation.stake,
             _ => 0,
         };
+
+        if transient_stake_account_lamports > 0 {
+            state_account
+                .state
+                .progress
+                .set(validator_list_index, true)?;
+            msg!("Transient stake account lamports is greater than 0, marking as rebalanced");
+            return Ok(());
+        }
 
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
@@ -259,7 +277,7 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
                 &validator_list,
                 undirected_pool_lamports,
                 capped_reserve,
-                stake_account_active_lamports,
+                stake_account_active_lamports.saturating_sub(minimum_delegation),
                 minimum_delegation,
                 stake_rent,
                 &config.parameters,

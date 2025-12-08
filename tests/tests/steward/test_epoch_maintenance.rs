@@ -100,9 +100,9 @@ async fn _epoch_maintenance_setup() -> (
     fixture
         .initialize_steward(
             Some(UpdateParametersArgs {
-                mev_commission_range: Some(10), // Set to pass validation, where epochs starts at 0
-                epoch_credits_range: Some(20),  // Set to pass validation, where epochs starts at 0
-                commission_range: Some(20),     // Set to pass validation, where epochs starts at 0
+                mev_commission_range: Some(10),
+                epoch_credits_range: Some(20),
+                commission_range: Some(20),
                 scoring_delinquency_threshold_ratio: Some(0.85),
                 instant_unstake_delinquency_threshold_ratio: Some(0.70),
                 mev_commission_bps_threshold: Some(1000),
@@ -117,7 +117,7 @@ async fn _epoch_maintenance_setup() -> (
                 instant_unstake_inputs_epoch_progress: Some(0.50),
                 num_epochs_between_scoring: Some(2), // 2 epoch cycle
                 minimum_stake_lamports: Some(5_000_000_000),
-                minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+                minimum_voting_epochs: Some(0),
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
