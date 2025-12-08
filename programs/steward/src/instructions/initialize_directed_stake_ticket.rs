@@ -7,6 +7,7 @@ use crate::{
 use std::mem::size_of;
 
 #[derive(Accounts)]
+#[instruction(ticket_update_authority: Pubkey)]
 pub struct InitializeDirectedStakeTicket<'info> {
     #[account()]
     pub config: AccountLoader<'info, Config>,
@@ -20,7 +21,9 @@ pub struct InitializeDirectedStakeTicket<'info> {
     #[account(
         init,
         payer = signer,
-        space = DirectedStakeTicket::SIZE
+        space = DirectedStakeTicket::SIZE,
+        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), ticket_update_authority.as_ref()],
+        bump
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 
@@ -69,20 +72,7 @@ pub fn handler(
         &config.directed_stake_whitelist_authority,
     )?;
 
-    // Verify the PDA: seeds should be [SEED, config.key(), ticket_update_authority]
-    let (expected_ticket_address, _bump) = Pubkey::find_program_address(
-        &[
-            DirectedStakeTicket::SEED,
-            ctx.accounts.config.key().as_ref(),
-            ticket_update_authority.as_ref(),
-        ],
-        ctx.program_id,
-    );
-    require_keys_eq!(
-        ctx.accounts.ticket_account.key(),
-        expected_ticket_address,
-        StewardError::Unauthorized
-    );
+    // PDA is verified by Anchor seeds constraint
 
     let mut ticket = ctx.accounts.ticket_account.load_init()?;
     ticket.num_preferences = 0;

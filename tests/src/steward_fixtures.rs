@@ -233,6 +233,11 @@ impl TestFixture {
         account
     }
 
+    pub async fn account_exists(&self, address: &Pubkey) -> bool {
+        let banks_client = self.ctx.borrow_mut().banks_client.clone();
+        banks_client.get_account(*address).await.unwrap().is_some()
+    }
+
     pub async fn simulate_stake_pool_update(&self) {
         let stake_pool: StakePool = self
             .load_and_deserialize(&self.stake_pool_meta.stake_pool)

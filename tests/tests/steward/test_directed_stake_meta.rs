@@ -1266,7 +1266,7 @@ async fn test_ticket_pda_verification_rejects_wrong_address() {
     );
 
     fixture
-        .submit_transaction_assert_error(tx, "InvalidAccount")
+        .submit_transaction_assert_error(tx, "ConstraintSeeds")
         .await;
 }
 
@@ -1295,8 +1295,8 @@ async fn test_ticket_override_authority_can_close_any_ticket() {
 
     close_directed_stake_ticket(&fixture, &ticket_account, &fixture.keypair).await;
 
-    let account_info = fixture.get_account(&ticket_account).await;
-    assert_eq!(account_info.lamports, 0);
+    // Account should no longer exist after closing
+    assert!(!fixture.account_exists(&ticket_account).await);
 }
 
 #[tokio::test]
@@ -1324,6 +1324,6 @@ async fn test_ticket_update_authority_can_close_own_ticket() {
 
     close_directed_stake_ticket(&fixture, &ticket_account, &ticket_update_authority_keypair).await;
 
-    let account_info = fixture.get_account(&ticket_account).await;
-    assert_eq!(account_info.lamports, 0);
+    // Account should no longer exist after closing
+    assert!(!fixture.account_exists(&ticket_account).await);
 }
