@@ -320,10 +320,14 @@ pub async fn upload_gossip_values(
         // Modified from solana-gossip::main::process_spy and discover
         let exit: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
         let mut ip_echo_client = Ipv4EchoClient::new(entrypoint.to_string());
-        let ip_echo_response = ip_echo_client
-            .fetch_ip_and_shred_version()
-            .await
-            .map_err(|_| "Failed to fetch IP and shred version from gossip entrypoint")?;
+
+        let ip_echo_response = match ip_echo_client.fetch_ip_and_shred_version().await {
+            Ok(res) => res,
+            Err(e) => {
+                error!("Failed to fetch IP and shred version from gossip entrypoint: {entrypoint}, Error: {e}");
+                continue;
+            }
+        };
 
         let gossip_ip = ip_echo_response.ip;
         let cluster_shred_version = ip_echo_response.shred_version.unwrap_or(0);

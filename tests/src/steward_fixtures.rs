@@ -1,6 +1,4 @@
 #![allow(clippy::await_holding_refcell_ref)]
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
-
 use crate::{
     spl_stake_pool_cli,
     stake_pool_utils::{serialized_stake_pool_account, serialized_validator_list_account},
@@ -43,12 +41,14 @@ use solana_sdk::{
     transaction::Transaction,
 };
 use spl_stake_pool::{
-    find_stake_program_address, find_transient_stake_program_address, minimum_delegation,
+    find_stake_program_address, find_transient_stake_program_address,
+    find_withdraw_authority_program_address, minimum_delegation,
     state::{
         AccountType, Fee, FutureEpoch, StakeStatus, ValidatorList as SPLValidatorList,
         ValidatorStakeInfo,
     },
 };
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
 use validator_history::{
     self,
     constants::{MAX_ALLOC_BYTES, TVC_MULTIPLIER},
@@ -93,6 +93,7 @@ pub struct TestFixture {
     pub cluster_history_account: Pubkey,
     pub validator_history_config: Pubkey,
     pub keypair: Keypair,
+    pub directed_stake_meta: Pubkey,
 }
 
 impl TestFixture {
@@ -105,8 +106,14 @@ impl TestFixture {
         program.add_program("spl_stake_pool", spl_stake_pool::id(), None);
         program.set_compute_max_units(1_400_000);
 
-        let stake_pool_meta = StakePoolMetadata::default();
         let steward_config = Keypair::new();
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[DirectedStakeMeta::SEED, steward_config.pubkey().as_ref()],
+            &jito_steward::id(),
+        )
+        .0;
+
+        let stake_pool_meta = StakePoolMetadata::default();
         let steward_state = Pubkey::find_program_address(
             &[StewardStateAccount::SEED, steward_config.pubkey().as_ref()],
             &jito_steward::id(),
@@ -143,6 +150,7 @@ impl TestFixture {
             validator_history_config,
             cluster_history_account,
             keypair,
+            directed_stake_meta,
         }
     }
 
@@ -174,6 +182,7 @@ impl TestFixture {
         Self {
             ctx,
             stake_pool_meta: accounts_fixture.stake_pool_meta,
+            directed_stake_meta: accounts_fixture.directed_stake_meta,
             steward_config: accounts_fixture.steward_config_keypair,
             steward_state: Pubkey::find_program_address(
                 &[StewardStateAccount::SEED, steward_config_address.as_ref()],
@@ -347,9 +356,9 @@ impl TestFixture {
     ) {
         // Default parameters from JIP
         let update_parameters_args = parameters.unwrap_or(UpdateParametersArgs {
-            mev_commission_range: Some(0), // Set to pass validation, where epochs starts at 0
-            epoch_credits_range: Some(0),  // Set to pass validation, where epochs starts at 0
-            commission_range: Some(0),     // Set to pass validation, where epochs starts at 0
+            mev_commission_range: Some(0),
+            epoch_credits_range: Some(0),
+            commission_range: Some(0),
             scoring_delinquency_threshold_ratio: Some(0.85),
             instant_unstake_delinquency_threshold_ratio: Some(0.70),
             mev_commission_bps_threshold: Some(1000),
@@ -364,9 +373,9 @@ impl TestFixture {
             instant_unstake_inputs_epoch_progress: Some(0.50),
             num_epochs_between_scoring: Some(10),
             minimum_stake_lamports: Some(5_000_000_000),
-            minimum_voting_epochs: Some(0), // Set to pass validation, where epochs starts at 0
+            minimum_voting_epochs: Some(0),
             compute_score_epoch_progress: Some(0.50),
-            undirected_stake_floor_lamports: Some(10_000_000_000 * 1_000_000_000),
+            undirected_stake_ceiling_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
         });
 
@@ -535,6 +544,165 @@ impl TestFixture {
         }
     }
 
+    pub async fn realloc_directed_stake_meta(&self) {
+        use jito_steward::constants::MAX_ALLOC_BYTES;
+        use jito_steward::state::directed_stake::DirectedStakeMeta;
+
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                self.steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+
+        // Get the validator list address from the config
+        let config: jito_steward::Config = self
+            .load_and_deserialize(&self.steward_config.pubkey())
+            .await;
+        let validator_list = config.validator_list;
+
+        // Calculate how many reallocations we need
+        let num_reallocs = (DirectedStakeMeta::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        const INSTRUCTIONS_PER_TX: usize = 10;
+
+        // Submit reallocations in batches to avoid exceeding instruction trace length
+        let mut remaining = num_reallocs;
+        while remaining > 0 {
+            let batch_size = remaining.min(INSTRUCTIONS_PER_TX);
+            let mut ixs = vec![];
+
+            for _ in 0..batch_size {
+                ixs.push(Instruction {
+                    program_id: jito_steward::id(),
+                    accounts: vec![
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            directed_stake_meta,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            self.steward_config.pubkey(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            validator_list,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            anchor_lang::solana_program::system_program::id(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.keypair.pubkey(),
+                            true,
+                        ),
+                    ],
+                    data: jito_steward::instruction::ReallocDirectedStakeMeta {}.data(),
+                });
+            }
+
+            let blockhash = self
+                .ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap();
+
+            let tx = Transaction::new_signed_with_payer(
+                &ixs,
+                Some(&self.keypair.pubkey()),
+                &[&self.keypair],
+                blockhash,
+            );
+            self.submit_transaction_assert_success(tx).await;
+
+            remaining = remaining.saturating_sub(batch_size);
+        }
+
+        // Verify that is_initialized has been set after reallocation
+        let meta: DirectedStakeMeta = self.load_and_deserialize(&directed_stake_meta).await;
+        assert!(
+            bool::from(meta.is_initialized),
+            "DirectedStakeMeta should be initialized after reallocation"
+        );
+    }
+
+    pub async fn realloc_directed_stake_whitelist(&self) {
+        use jito_steward::constants::MAX_ALLOC_BYTES;
+        use jito_steward::state::directed_stake::DirectedStakeWhitelist;
+
+        let directed_stake_whitelist = Pubkey::find_program_address(
+            &[
+                DirectedStakeWhitelist::SEED,
+                self.steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+
+        // Get the validator list address from the config
+        let config: jito_steward::Config = self
+            .load_and_deserialize(&self.steward_config.pubkey())
+            .await;
+        let validator_list = config.validator_list;
+
+        // Calculate how many reallocations we need
+        let mut num_reallocs =
+            (DirectedStakeWhitelist::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
+        let mut ixs = vec![];
+
+        while num_reallocs > 0 {
+            ixs.extend(vec![
+                Instruction {
+                    program_id: jito_steward::id(),
+                    accounts: vec![
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            directed_stake_whitelist,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            self.steward_config.pubkey(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            validator_list,
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            anchor_lang::solana_program::system_program::id(),
+                            false,
+                        ),
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.keypair.pubkey(),
+                            true,
+                        ),
+                    ],
+                    data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
+                };
+                num_reallocs.min(10)
+            ]);
+            num_reallocs = num_reallocs.saturating_sub(10);
+        }
+
+        // Submit all reallocation instructions
+        let tx = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&self.keypair.pubkey()),
+            &[&self.keypair],
+            self.ctx.borrow().last_blockhash,
+        );
+        self.submit_transaction_assert_success(tx).await;
+
+        // Verify that is_initialized has been set after reallocation
+        let whitelist: DirectedStakeWhitelist =
+            self.load_and_deserialize(&directed_stake_whitelist).await;
+        assert!(
+            bool::from(whitelist.is_initialized),
+            "DirectedStakeWhitelist should be initialized after reallocation"
+        );
+    }
+
     pub async fn initialize_validator_history_config(&self) {
         let instruction = Instruction {
             program_id: validator_history::id(),
@@ -592,6 +760,18 @@ impl TestFixture {
         );
     }
 
+    /// Get a validator from the validator list by index
+    pub async fn get_validator_from_list(&self, index: usize) -> Option<Pubkey> {
+        let validator_list: ValidatorList = self
+            .load_and_deserialize(&self.stake_pool_meta.validator_list)
+            .await;
+
+        validator_list
+            .validators
+            .get(index)
+            .map(|v| v.vote_account_address)
+    }
+
     // Turn this into a fixture creator
     pub async fn initialize_cluster_history_account(&self) -> ClusterHistory {
         todo!()
@@ -634,19 +814,10 @@ impl TestFixture {
         &self,
         vote_account: Pubkey,
     ) -> (Pubkey, Pubkey, Pubkey) {
-        let stake_pool: StakePool = self
-            .load_and_deserialize(&self.stake_pool_meta.stake_pool)
-            .await;
-
-        let withdraw_authority = Pubkey::create_program_address(
-            &[
-                self.stake_pool_meta.stake_pool.as_ref(),
-                STAKE_POOL_WITHDRAW_SEED,
-                &[stake_pool.as_ref().stake_withdraw_bump_seed],
-            ],
+        let (withdraw_authority, _) = find_withdraw_authority_program_address(
             &spl_stake_pool::id(),
-        )
-        .unwrap();
+            &self.stake_pool_meta.stake_pool,
+        );
 
         // stake account
         let stake_account_address = find_stake_program_address(
@@ -782,12 +953,88 @@ impl TestFixture {
     }
 }
 
+#[derive(Clone)]
 pub struct ExtraValidatorAccounts {
     pub vote_account: Pubkey,
     pub validator_history_address: Pubkey,
     pub stake_account_address: Pubkey,
     pub transient_stake_account_address: Pubkey,
     pub withdraw_authority: Pubkey,
+}
+
+/// Helper function to initialize directed stake meta
+pub async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    let set_whitelist_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeWhitelistAuthority,
+        }
+        .data(),
+    };
+
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        }
+        .data(),
+    };
+
+    let ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: vec![
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                fixture.steward_config.pubkey(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(directed_stake_meta, false),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                sysvar::clock::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                system_program::id(),
+                false,
+            ),
+            anchor_lang::solana_program::instruction::AccountMeta::new(
+                fixture.keypair.pubkey(),
+                true,
+            ),
+        ],
+        data: jito_steward::instruction::InitializeDirectedStakeMeta {}.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix, ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    directed_stake_meta
 }
 
 pub async fn crank_stake_pool(fixture: &TestFixture) {
@@ -842,6 +1089,35 @@ pub async fn crank_rebalance_directed(
 
     for &i in indices {
         let extra_accounts = &extra_validator_accounts[i];
+        let validator_list_index = i;
+
+        // Get the vote account at the validator list index
+        let validator_list: ValidatorList = fixture
+            .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+            .await;
+        let vote_account_at_index =
+            validator_list.validators[validator_list_index].vote_account_address;
+
+        // Find the directed_stake_meta_index by looking up the vote_pubkey in the directed_stake_meta
+        let directed_stake_meta_pubkey = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                fixture.steward_config.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
+        let directed_stake_meta: DirectedStakeMeta = fixture
+            .load_and_deserialize(&directed_stake_meta_pubkey)
+            .await;
+
+        // Skip if the vote account is not in directed_stake_meta (e.g., was removed by copy_directed_stake_targets with 0 lamports)
+        // This ensures we only process validators that exist in both the validator_list and the directed_stake_meta
+        let Some(directed_stake_meta_index) =
+            directed_stake_meta.get_target_index(&vote_account_at_index)
+        else {
+            continue;
+        };
 
         let compute_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
         let ix = Instruction {
@@ -849,14 +1125,7 @@ pub async fn crank_rebalance_directed(
             accounts: jito_steward::accounts::RebalanceDirected {
                 config: fixture.steward_config.pubkey(),
                 state_account: fixture.steward_state,
-                directed_stake_meta: Pubkey::find_program_address(
-                    &[
-                        DirectedStakeMeta::SEED,
-                        fixture.steward_config.pubkey().as_ref(),
-                    ],
-                    &jito_steward::id(),
-                )
-                .0,
+                directed_stake_meta: directed_stake_meta_pubkey,
                 stake_pool: fixture.stake_pool_meta.stake_pool,
                 stake_pool_program: spl_stake_pool::id(),
                 withdraw_authority: extra_accounts.withdraw_authority,
@@ -865,12 +1134,12 @@ pub async fn crank_rebalance_directed(
                 stake_account: extra_accounts.stake_account_address,
                 transient_stake_account: find_transient_stake_program_address(
                     &spl_stake_pool::id(),
-                    &extra_accounts.vote_account,
+                    &vote_account_at_index,
                     &fixture.stake_pool_meta.stake_pool,
                     0u64,
                 )
                 .0,
-                vote_account: extra_accounts.vote_account,
+                vote_account: vote_account_at_index,
                 clock: solana_sdk::sysvar::clock::id(),
                 rent: solana_sdk::sysvar::rent::id(),
                 stake_history: solana_sdk::sysvar::stake_history::id(),
@@ -880,8 +1149,7 @@ pub async fn crank_rebalance_directed(
             }
             .to_account_metas(None),
             data: jito_steward::instruction::RebalanceDirected {
-                directed_stake_meta_index: i as u64,
-                validator_list_index: i as u64,
+                directed_stake_meta_index: directed_stake_meta_index as u64,
             }
             .data(),
         };
@@ -898,6 +1166,14 @@ pub async fn crank_rebalance_directed(
 
 pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Option<&[usize]>) {
     let ctx = &fixture.ctx;
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
     // Epoch Maintenence
     if let Some(indices) = remove_indices {
         for i in indices {
@@ -908,6 +1184,7 @@ pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Opti
                     state_account: fixture.steward_state,
                     validator_list: fixture.stake_pool_meta.validator_list,
                     stake_pool: fixture.stake_pool_meta.stake_pool,
+                    directed_stake_meta,
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::EpochMaintenance {
@@ -932,6 +1209,7 @@ pub async fn crank_epoch_maintenance(fixture: &TestFixture, remove_indices: Opti
                 state_account: fixture.steward_state,
                 validator_list: fixture.stake_pool_meta.validator_list,
                 stake_pool: fixture.stake_pool_meta.stake_pool,
+                directed_stake_meta,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::EpochMaintenance {
@@ -1032,6 +1310,14 @@ pub async fn auto_remove_validator(
 }
 
 pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
+    let directed_stake_meta = Pubkey::find_program_address(
+        &[
+            jito_steward::state::directed_stake::DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::InstantRemoveValidator {
@@ -1039,6 +1325,7 @@ pub async fn instant_remove_validator(fixture: &TestFixture, index: usize) {
             state_account: fixture.steward_state,
             validator_list: fixture.stake_pool_meta.validator_list,
             stake_pool: fixture.stake_pool_meta.stake_pool,
+            directed_stake_meta,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::InstantRemoveValidator {
@@ -1363,6 +1650,39 @@ pub async fn copy_cluster_info(fixture: &TestFixture) {
     fixture.submit_transaction_assert_success(tx).await;
 }
 
+pub async fn crank_validator_history_accounts_no_credits(
+    fixture: &TestFixture,
+    extra_validator_accounts: &[ExtraValidatorAccounts],
+    indices: &[usize],
+) {
+    let clock: Clock = fixture
+        .ctx
+        .borrow_mut()
+        .banks_client
+        .get_sysvar()
+        .await
+        .unwrap();
+    for &i in indices {
+        fixture
+            .ctx
+            .borrow_mut()
+            .increment_vote_account_credits(&extra_validator_accounts[i].vote_account, 0);
+        copy_vote_account(fixture, extra_validator_accounts, i).await;
+        // only field that's relevant to score is is_superminority
+        update_stake_history(
+            fixture,
+            extra_validator_accounts,
+            i,
+            clock.epoch,
+            1_000_000,
+            1_000,
+            false,
+        )
+        .await;
+    }
+    copy_cluster_info(fixture).await;
+}
+
 pub async fn crank_validator_history_accounts(
     fixture: &TestFixture,
     extra_validator_accounts: &[ExtraValidatorAccounts],
@@ -1418,6 +1738,7 @@ impl Default for ValidatorEntry {
 
 pub struct FixtureDefaultAccounts {
     pub stake_pool_meta: StakePoolMetadata,
+    pub directed_stake_meta: Pubkey,
     pub stake_pool: spl_stake_pool::state::StakePool,
     pub validator_list: SPLValidatorList,
     pub steward_config_keypair: Keypair,
@@ -1455,8 +1776,18 @@ impl Default for FixtureDefaultAccounts {
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 920],
+            directed_stake_ticket_override_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
+
+        let directed_stake_meta = Pubkey::find_program_address(
+            &[
+                DirectedStakeMeta::SEED,
+                steward_config_keypair.pubkey().as_ref(),
+            ],
+            &jito_steward::id(),
+        )
+        .0;
 
         let (steward_state_address, steward_state_bump) = Pubkey::find_program_address(
             &[
@@ -1525,6 +1856,7 @@ impl Default for FixtureDefaultAccounts {
             cluster_history,
             validators: vec![],
             keypair,
+            directed_stake_meta,
         }
     }
 }
@@ -1633,7 +1965,7 @@ impl FixtureDefaultAccounts {
         )
         .0;
         let stake_withdraw_bump_seed = Pubkey::find_program_address(
-            &[stake_pool_address.as_ref(), b"withdrawal"],
+            &[stake_pool_address.as_ref(), STAKE_POOL_WITHDRAW_SEED],
             &spl_stake_pool::id(),
         )
         .1;
@@ -1784,7 +2116,7 @@ pub fn closed_vote_account() -> Account {
 
 pub fn serialized_stake_account(stake_account: StakeStateV2, lamports: u64) -> Account {
     let mut data = vec![];
-    stake_account.serialize(&mut data).unwrap();
+    borsh1::BorshSerialize::serialize(&stake_account, &mut data).unwrap();
     Account {
         lamports,
         data,
@@ -1966,12 +2298,11 @@ impl Default for StateMachineFixtures {
             priority_fee_error_margin_bps: 10,
             priority_fee_scoring_start_epoch: 0,
             directed_stake_unstake_cap_bps: 750,
-            min_epoch_progress_for_compute_directed_stake_meta: 0.50,
-            max_epoch_progress_for_directed_rebalance: 0.1,
             compute_score_epoch_progress: 0.5,
-            undirected_stake_floor_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
-            _padding_0: [0; 4],
-            _padding_1: [0; 27],
+            undirected_stake_ceiling_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
+            _padding_0: [0; 6],
+            _padding_1: [0; 28],
+            _padding_2: [0; 6],
         };
 
         // Setup Config
@@ -1988,7 +2319,8 @@ impl Default for StateMachineFixtures {
             priority_fee_parameters_authority: Pubkey::new_unique(),
             directed_stake_meta_upload_authority: Pubkey::new_unique(),
             directed_stake_whitelist_authority: Pubkey::new_unique(),
-            _padding: [0; 920],
+            directed_stake_ticket_override_authority: Pubkey::new_unique(),
+            _padding: [0; 888],
         };
 
         // Setup Sysvars: Clock, EpochSchedule
@@ -2164,6 +2496,16 @@ pub async fn crank_copy_directed_stake_targets(
     )
     .0;
 
+    // Find the validator_list_index for this vote_pubkey
+    let validator_list: ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    let validator_list_index = validator_list
+        .validators
+        .iter()
+        .position(|v| v.vote_account_address == vote_pubkey)
+        .expect("Vote account not found in validator list");
+
     let ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::CopyDirectedStakeTargets {
@@ -2171,11 +2513,13 @@ pub async fn crank_copy_directed_stake_targets(
             directed_stake_meta,
             authority: fixture.keypair.pubkey(),
             clock: solana_sdk::sysvar::clock::id(),
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::CopyDirectedStakeTargets {
             vote_pubkey,
             total_target_lamports: target_lamports,
+            validator_list_index: validator_list_index as u32,
         }
         .data(),
     };
@@ -2201,8 +2545,8 @@ pub async fn crank_directed_stake_permissions(
     use jito_steward::instructions::AuthorityType;
     use jito_steward::state::directed_stake::DirectedStakeRecordType;
 
-    // First, set the whitelist authority to the signer
-    let set_auth_ix = Instruction {
+    // First, set the whitelist authority and ticket override authority to the signer
+    let set_whitelist_auth_ix = Instruction {
         program_id: jito_steward::id(),
         accounts: jito_steward::accounts::SetNewAuthority {
             config: fixture.steward_config.pubkey(),
@@ -2216,9 +2560,23 @@ pub async fn crank_directed_stake_permissions(
         .data(),
     };
 
-    // Submit the authority change first
+    let set_ticket_override_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeTicketOverrideAuthority,
+        }
+        .data(),
+    };
+
+    // Submit the authority changes first
     let tx = Transaction::new_signed_with_payer(
-        &[set_auth_ix],
+        &[set_whitelist_auth_ix, set_ticket_override_auth_ix],
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture
@@ -2267,7 +2625,7 @@ pub async fn crank_directed_stake_permissions(
     fixture.submit_transaction_assert_success(tx).await;
 
     // Now reallocate the directed stake whitelist to proper size
-    realloc_directed_stake_whitelist(fixture).await;
+    fixture.realloc_directed_stake_whitelist().await;
 
     // Add all validators to the whitelist
     for extra_accounts in extra_validator_accounts.iter() {
@@ -2277,6 +2635,8 @@ pub async fn crank_directed_stake_permissions(
                 config: fixture.steward_config.pubkey(),
                 directed_stake_whitelist,
                 authority: fixture.keypair.pubkey(),
+                stake_pool: fixture.stake_pool_meta.stake_pool,
+                validator_list: fixture.stake_pool_meta.validator_list,
             }
             .to_account_metas(None),
             data: jito_steward::instruction::AddToDirectedStakeWhitelist {
@@ -2307,6 +2667,8 @@ pub async fn crank_directed_stake_permissions(
             config: fixture.steward_config.pubkey(),
             directed_stake_whitelist,
             authority: fixture.keypair.pubkey(),
+            stake_pool: fixture.stake_pool_meta.stake_pool,
+            validator_list: fixture.stake_pool_meta.validator_list,
         }
         .to_account_metas(None),
         data: jito_steward::instruction::AddToDirectedStakeWhitelist {
@@ -2326,72 +2688,6 @@ pub async fn crank_directed_stake_permissions(
             .get_new_latest_blockhash()
             .await
             .unwrap(),
-    );
-    fixture.submit_transaction_assert_success(tx).await;
-}
-
-async fn realloc_directed_stake_whitelist(fixture: &TestFixture) {
-    let directed_stake_whitelist = Pubkey::find_program_address(
-        &[
-            jito_steward::state::directed_stake::DirectedStakeWhitelist::SEED,
-            fixture.steward_config.pubkey().as_ref(),
-        ],
-        &jito_steward::id(),
-    )
-    .0;
-
-    // Get the validator list address from the config
-    let config: jito_steward::Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
-    let validator_list = config.validator_list;
-
-    // Calculate how many reallocs we need
-    let mut num_reallocs = (jito_steward::state::directed_stake::DirectedStakeWhitelist::SIZE
-        - jito_steward::constants::MAX_ALLOC_BYTES)
-        / jito_steward::constants::MAX_ALLOC_BYTES
-        + 1;
-    let mut ixs = vec![];
-
-    while num_reallocs > 0 {
-        ixs.extend(vec![
-            Instruction {
-                program_id: jito_steward::id(),
-                accounts: vec![
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        directed_stake_whitelist,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        fixture.steward_config.pubkey(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        validator_list,
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        anchor_lang::solana_program::system_program::id(),
-                        false,
-                    ),
-                    anchor_lang::solana_program::instruction::AccountMeta::new(
-                        fixture.keypair.pubkey(),
-                        true,
-                    ),
-                ],
-                data: jito_steward::instruction::ReallocDirectedStakeWhitelist {}.data(),
-            };
-            num_reallocs.min(10)
-        ]);
-        num_reallocs = num_reallocs.saturating_sub(10);
-    }
-
-    // Submit all reallocation instructions
-    let tx = Transaction::new_signed_with_payer(
-        &ixs,
-        Some(&fixture.keypair.pubkey()),
-        &[&fixture.keypair],
-        fixture.ctx.borrow().last_blockhash,
     );
     fixture.submit_transaction_assert_success(tx).await;
 }

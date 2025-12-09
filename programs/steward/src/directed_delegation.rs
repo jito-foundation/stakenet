@@ -23,16 +23,12 @@ pub fn decrease_stake_calculation(
     directed_unstake_cap_lamports: u64,
     directed_unstake_total_lamports: u64,
     minimum_delegation: u64,
-    stake_rent: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators as usize {
+    if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
-    let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
-    let target_lamports = directed_stake_meta
-        .get_target_lamports(&vote_pubkey)
-        .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+    let target_lamports = directed_stake_meta.targets[target_index].total_target_lamports;
 
     msg!(
         "current_lamports: {}, target_lamports: {}",
@@ -53,13 +49,16 @@ pub fn decrease_stake_calculation(
     );
 
     let mut total_excess_lamports: u64 = 0u64;
-    for target in directed_stake_meta.targets.iter() {
-        let target_lamports = directed_stake_meta
-            .get_target_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
-        let staked_lamports = directed_stake_meta
-            .get_total_staked_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+    for (index, target) in directed_stake_meta.targets
+        [..directed_stake_meta.total_stake_targets as usize]
+        .iter()
+        .enumerate()
+    {
+        if target.staked_last_updated_epoch == state.current_epoch {
+            continue;
+        }
+        let target_lamports = directed_stake_meta.targets[index].total_target_lamports;
+        let staked_lamports = directed_stake_meta.targets[index].total_staked_lamports;
         let excess = staked_lamports.saturating_sub(target_lamports);
         total_excess_lamports = total_excess_lamports.saturating_add(excess);
     }
@@ -69,7 +68,7 @@ pub fn decrease_stake_calculation(
         return Ok(RebalanceType::None);
     }
 
-    let delta_proportion_bps: u128 =
+    let target_delta_proportion_bps: u128 =
         (target_delta_lamports as u128).saturating_mul(10_000) / (total_excess_lamports as u128);
 
     // Apply the remaining directed unstake cap to the total excess lamports
@@ -78,31 +77,31 @@ pub fn decrease_stake_calculation(
         .min(total_excess_lamports);
 
     // Calculate the proportional decrease amongst the validators that still require decreases
-    let proportional_decrease_lamports: u64 =
-        ((unstake_total as u128).saturating_mul(delta_proportion_bps) / 10_000)
+    let target_proportional_decrease_lamports: u64 =
+        ((unstake_total as u128).saturating_mul(target_delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
     // Do not unstake more than the excess lamports on the target validator to prevent yield drag
-    let adjusted_proportional_decrease_lamports =
-        proportional_decrease_lamports.min(target_delta_lamports);
+    let capped_proportional_decrease_lamports =
+        target_proportional_decrease_lamports.min(target_delta_lamports);
 
-    if adjusted_proportional_decrease_lamports < (stake_rent + minimum_delegation) {
-        msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
+    if capped_proportional_decrease_lamports < (minimum_delegation) {
+        msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }
 
     msg!(
         "Decreasing stake by {} lamports",
-        adjusted_proportional_decrease_lamports
+        capped_proportional_decrease_lamports
     );
 
     Ok(RebalanceType::Decrease(DecreaseComponents {
         scoring_unstake_lamports: 0,
         instant_unstake_lamports: 0,
         stake_deposit_unstake_lamports: 0,
-        total_unstake_lamports: adjusted_proportional_decrease_lamports,
-        directed_unstake_lamports: adjusted_proportional_decrease_lamports,
+        total_unstake_lamports: capped_proportional_decrease_lamports,
+        directed_unstake_lamports: capped_proportional_decrease_lamports,
     }))
 }
 
@@ -116,24 +115,14 @@ pub fn increase_stake_calculation(
     target_index: usize,
     current_lamports: u64,
     reserve_lamports: u64,
-    undirected_cap_reached: bool,
     minimum_delegation: u64,
     stake_rent: u64,
 ) -> Result<RebalanceType> {
-    if target_index >= state.num_pool_validators as usize {
+    if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
     }
 
-    // If the undirected floor has been reached, no directed increases can be made
-    if undirected_cap_reached {
-        msg!("Undirected TVL floor reached, no directed increases can be made.");
-        return Ok(RebalanceType::None);
-    }
-
-    let vote_pubkey = directed_stake_meta.targets[target_index].vote_pubkey;
-    let target_lamports = directed_stake_meta
-        .get_target_lamports(&vote_pubkey)
-        .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+    let target_lamports = directed_stake_meta.targets[target_index].total_target_lamports;
 
     msg!(
         "current_lamports: {}, target_lamports: {}",
@@ -150,13 +139,16 @@ pub fn increase_stake_calculation(
 
     let mut total_delta_lamports: u64 = 0u64;
 
-    for target in directed_stake_meta.targets.iter() {
-        let target_lamports = directed_stake_meta
-            .get_target_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
-        let staked_lamports = directed_stake_meta
-            .get_total_staked_lamports(&target.vote_pubkey)
-            .ok_or(StewardError::ValidatorIndexOutOfBounds)?;
+    for (index, target) in directed_stake_meta.targets
+        [..directed_stake_meta.total_stake_targets as usize]
+        .iter()
+        .enumerate()
+    {
+        if target.staked_last_updated_epoch == state.current_epoch {
+            continue;
+        }
+        let target_lamports = directed_stake_meta.targets[index].total_target_lamports;
+        let staked_lamports = directed_stake_meta.targets[index].total_staked_lamports;
         let delta_lamports = target_lamports.saturating_sub(staked_lamports);
         total_delta_lamports = total_delta_lamports.saturating_add(delta_lamports);
     }
@@ -166,31 +158,34 @@ pub fn increase_stake_calculation(
         return Ok(RebalanceType::None);
     }
 
-    let delta_proportion_bps: u128 =
+    let target_delta_proportion_bps: u128 =
         (target_delta_lamports as u128).saturating_mul(10_000) / (total_delta_lamports as u128);
 
-    let proportional_increase_lamports: u64 =
-        ((reserve_lamports as u128).saturating_mul(delta_proportion_bps) / 10_000)
+    // We must preserve at least 2*stake_rent in the reserve stake account and transient stake account for rent-exemption
+    let available_lamports = reserve_lamports.saturating_sub(stake_rent.saturating_mul(2));
+
+    let target_proportional_increase_lamports: u64 =
+        ((available_lamports as u128).saturating_mul(target_delta_proportion_bps) / 10_000)
             .try_into()
             .map_err(|_| StewardError::ArithmeticError)?;
 
     // Do not over-delegate if proportional increase would exceed the target delta lamports
     // This prevents future yield drag from unstaking excess lamports
-    let adjusted_proportional_increase_lamports =
-        proportional_increase_lamports.min(target_delta_lamports);
+    let capped_proportional_increase_lamports =
+        target_proportional_increase_lamports.min(target_delta_lamports);
 
-    if adjusted_proportional_increase_lamports < (stake_rent.saturating_add(minimum_delegation)) {
-        msg!("Adjusted proportional decrease lamports is less than minimum delegation + stake rent for transient stake account. No unstake will be performed.");
+    if capped_proportional_increase_lamports < (minimum_delegation) {
+        msg!("Adjusted proportional decrease lamports is less than minimum delegation for transient stake account. No unstake will be performed.");
         return Ok(RebalanceType::None);
     }
 
     msg!(
         "Increasing stake by {} lamports",
-        adjusted_proportional_increase_lamports
+        capped_proportional_increase_lamports
     );
 
     Ok(RebalanceType::Increase(
-        adjusted_proportional_increase_lamports,
+        capped_proportional_increase_lamports,
     ))
 }
 

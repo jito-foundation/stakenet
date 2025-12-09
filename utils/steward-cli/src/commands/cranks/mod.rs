@@ -7,3 +7,4 @@ pub mod idle;
 pub mod rebalance;
 pub mod rebalance_directed;
 pub mod steward;
+pub mod update_stake_pool;

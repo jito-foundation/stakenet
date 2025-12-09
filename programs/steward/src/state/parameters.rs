@@ -31,7 +31,7 @@ pub struct UpdateParametersArgs {
     pub instant_unstake_cap_bps: Option<u32>,
     pub stake_deposit_unstake_cap_bps: Option<u32>,
     pub directed_stake_unstake_cap_bps: Option<u16>,
-    pub undirected_stake_floor_lamports: Option<u64>,
+    pub undirected_stake_ceiling_lamports: Option<u64>,
     // State machine parameters
     pub instant_unstake_epoch_progress: Option<f64>,
     pub compute_score_slot_range: Option<u64>,
@@ -238,12 +238,6 @@ pub struct Parameters {
     /// Validator history copy_vote_account and Cluster History must be updated past this epoch progress before calculating instant unstake
     pub instant_unstake_inputs_epoch_progress: f64,
 
-    /// The minimum epoch progress for computing directed stake meta
-    pub min_epoch_progress_for_compute_directed_stake_meta: f64,
-
-    /// The maximum epoch progress for directed rebalance
-    pub max_epoch_progress_for_directed_rebalance: f64,
-
     /// Number of epochs a given validator set will be delegated to before recomputing scores
     pub num_epochs_between_scoring: u64,
 
@@ -253,27 +247,31 @@ pub struct Parameters {
     /// Minimum epochs voting required to be in the pool ValidatorList and eligible for delegation
     pub minimum_voting_epochs: u64,
 
-    /// The minimum epoch progress for computing scores
-    pub compute_score_epoch_progress: f64,
-
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
+
+    pub _padding_0: [u8; 6],
+
+    pub _padding_1: [u64; 28],
+    /// The minimum epoch progress for computing scores
+    pub compute_score_epoch_progress: f64,
 
     /// Maximum percentage of the pool to be unstaked from directed stake (in basis points)
     pub directed_stake_unstake_cap_bps: u16,
 
-    /// Directed rebalance increases are allowed until stake pool TVL dips below this floor
-    /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
-    /// fields due to it being live on mainnet
-    pub undirected_stake_floor_lamports: [u8; 8],
+    pub _padding_2: [u8; 6],
 
-    pub _padding_0: [u8; 4],
-    pub _padding_1: [u64; 27],
+    /// Maximum undirected stake pool TVL. During rebalance, reserve_lamports is capped to
+    /// (ceiling - current_undirected_TVL) to ensure undirected stake never exceeds this ceiling.
+    /// When undirected TVL >= ceiling, no stake increases will occur.
+    /// u64 does not agree with zero-copy alignment and we do not have the luxury of reordering
+    /// fields due to it being live on mainnet.
+    pub undirected_stake_ceiling_lamports: [u8; 8],
 }
 
 impl Parameters {
-    pub fn undirected_stake_floor_lamports(&self) -> u64 {
-        u64::from_le_bytes(self.undirected_stake_floor_lamports)
+    pub fn undirected_stake_ceiling_lamports(&self) -> u64 {
+        u64::from_le_bytes(self.undirected_stake_ceiling_lamports)
     }
 
     /// Merges the updated parameters with the current parameters and validates them
@@ -305,7 +303,7 @@ impl Parameters {
             minimum_stake_lamports,
             minimum_voting_epochs,
             compute_score_epoch_progress,
-            undirected_stake_floor_lamports,
+            undirected_stake_ceiling_lamports,
         } = *args;
 
         let mut new_parameters = self;
@@ -395,9 +393,9 @@ impl Parameters {
             new_parameters.compute_score_epoch_progress = compute_score_epoch_progress;
         }
 
-        if let Some(undirected_stake_floor_lamports) = undirected_stake_floor_lamports {
-            new_parameters.undirected_stake_floor_lamports =
-                undirected_stake_floor_lamports.to_le_bytes();
+        if let Some(undirected_stake_ceiling_lamports) = undirected_stake_ceiling_lamports {
+            new_parameters.undirected_stake_ceiling_lamports =
+                undirected_stake_ceiling_lamports.to_le_bytes();
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -541,6 +539,10 @@ impl Parameters {
         }
 
         if self.compute_score_epoch_progress < 0.0 || self.compute_score_epoch_progress >= 1.0 {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.directed_stake_unstake_cap_bps > BASIS_POINTS_MAX {
             return Err(StewardError::InvalidParameterValue.into());
         }
 

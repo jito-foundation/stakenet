@@ -1,4 +1,5 @@
 use crate::{
+    bitmask::BitMask,
     errors::StewardError,
     events::EpochMaintenanceEvent,
     stake_pool_utils::deserialize_stake_pool,
@@ -6,9 +7,9 @@ use crate::{
         check_validator_list_has_stake_status_other_than, get_stake_pool_address,
         get_validator_list, get_validator_list_length,
     },
-    Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum, COMPUTE_INSTANT_UNSTAKES,
-    EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE, REBALANCE_DIRECTED_COMPLETE,
-    RESET_TO_IDLE,
+    Config, DirectedStakeMeta, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
+    COMPUTE_INSTANT_UNSTAKES, EPOCH_MAINTENANCE, POST_LOOP_IDLE, PRE_LOOP_IDLE, REBALANCE,
+    REBALANCE_DIRECTED_COMPLETE,
 };
 use anchor_lang::prelude::*;
 use spl_stake_pool::state::StakeStatus;
@@ -33,6 +34,13 @@ pub struct EpochMaintenance<'info> {
         address = get_stake_pool_address(&config)?
     )]
     pub stake_pool: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [DirectedStakeMeta::SEED, config.key().as_ref()],
+        bump
+    )]
+    pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
 /// Runs maintenance tasks at the start of each epoch, needs to be run multiple times
@@ -44,7 +52,7 @@ pub fn handler(
 ) -> Result<()> {
     let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
     let mut state_account = ctx.accounts.state_account.load_mut()?;
-
+    let mut directed_stake_meta = ctx.accounts.directed_stake_meta.load_mut()?;
     let clock = Clock::get()?;
 
     require!(
@@ -87,7 +95,7 @@ pub fn handler(
         if let Some(validator_index_to_remove) = validator_index_to_remove {
             state_account
                 .state
-                .remove_validator(validator_index_to_remove)?;
+                .remove_validator(validator_index_to_remove, &mut directed_stake_meta)?;
         }
     }
 
@@ -100,6 +108,11 @@ pub fn handler(
                 .is_empty();
 
         if okay_to_update {
+            // When upgrading the StewardState with additional padding we should move this total
+            // to the StewardStateAccount and clear it in the reset_state_for_new_cycle method
+            if state_account.state.current_epoch == state_account.state.next_cycle_epoch {
+                directed_stake_meta.directed_unstake_total = 0;
+            }
             state_account.state.current_epoch = clock.epoch;
 
             // We keep Compute Scores and Compute Delegations to be unset on next epoch cycle
@@ -110,11 +123,11 @@ pub fn handler(
                     | POST_LOOP_IDLE
                     | REBALANCE_DIRECTED_COMPLETE,
             );
-            state_account
-                .state
-                .set_flag(RESET_TO_IDLE | EPOCH_MAINTENANCE);
+            state_account.state.set_flag(EPOCH_MAINTENANCE);
+            state_account.state.progress = BitMask::default();
+            state_account.state.instant_unstake = BitMask::default();
+            state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
         }
-        state_account.state.state_tag = StewardStateEnum::RebalanceDirected;
         emit!(EpochMaintenanceEvent {
             validator_index_to_remove: validator_index_to_remove.map(|x| x as u64),
             validator_list_length: get_validator_list_length(&ctx.accounts.validator_list)? as u64,

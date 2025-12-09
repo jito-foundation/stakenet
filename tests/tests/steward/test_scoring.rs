@@ -36,7 +36,8 @@ fn create_config(
         priority_fee_parameters_authority: Pubkey::new_unique(),
         directed_stake_meta_upload_authority: Pubkey::new_unique(),
         directed_stake_whitelist_authority: Pubkey::new_unique(),
-        _padding: [0; 920],
+        directed_stake_ticket_override_authority: Pubkey::new_unique(),
+        _padding: [0; 888],
     }
 }
 

@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use jito_steward::DirectedStakePreference;
 use kobe_client::client::KobeClient;
+use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -18,6 +18,7 @@ use crate::{
             get_directed_stake_meta, get_directed_stake_meta_address,
             get_directed_stake_ticket_address, get_directed_stake_tickets,
             get_directed_stake_whitelist_address, get_stake_pool_account,
+            get_steward_config_account, get_validator_list_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -76,7 +77,7 @@ pub fn update_directed_stake_ticket(
     preferences: Vec<DirectedStakePreference>,
 ) -> Instruction {
     let whitelist_account = get_directed_stake_whitelist_address(steward_config, program_id);
-    let ticket_account = get_directed_stake_ticket_address(signer, program_id);
+    let ticket_account = get_directed_stake_ticket_address(steward_config, signer, program_id);
 
     Instruction {
         program_id: *program_id,
@@ -123,14 +124,14 @@ pub async fn compute_directed_stake_meta(
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let tickets = get_directed_stake_tickets(client.clone(), program_id).await?;
+    let ticket_map = get_directed_stake_tickets(client.clone(), program_id).await?;
 
     let stake_pool = get_stake_pool_account(&client.clone(), stake_pool_address).await?;
     let conversion_rate_bps =
         calculate_conversion_rate_bps(stake_pool.total_lamports, stake_pool.pool_token_supply)?;
 
     let mut jitosol_balances = HashMap::new();
-    for ticket in &tickets {
+    for ticket in ticket_map.values().copied() {
         let balance = get_token_balance(
             client.clone(),
             token_mint_address,
@@ -142,6 +143,7 @@ pub async fn compute_directed_stake_meta(
 
     let existing_directed_stake_meta =
         get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
+    let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
     let validator_targets = aggregate_validator_targets(
         &existing_directed_stake_meta,
         &tickets,
@@ -149,24 +151,41 @@ pub async fn compute_directed_stake_meta(
         conversion_rate_bps,
     )?;
 
+    // Get validator list to find indices
+    let config_account = get_steward_config_account(&client, steward_config).await?;
+    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
+    let validator_list_address = stake_pool_account.validator_list;
+    let validator_list_account =
+        get_validator_list_account(&client, &validator_list_address).await?;
+
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
     let instructions = validator_targets
         .iter()
-        .map(|(vote_pubkey, total_target_lamports)| Instruction {
-            program_id: *program_id,
-            accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                config: *steward_config,
-                directed_stake_meta: directed_stake_meta_pda,
-                authority: *authority_pubkey,
-                clock: solana_sdk::sysvar::clock::id(),
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::CopyDirectedStakeTargets {
-                vote_pubkey: *vote_pubkey,
-                total_target_lamports: *total_target_lamports,
-            }
-            .data(),
+        .filter_map(|(vote_pubkey, total_target_lamports)| {
+            // Find the index of this vote_pubkey in the validator list
+            let validator_list_index = validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address == *vote_pubkey)?;
+
+            Some(Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                    config: *steward_config,
+                    directed_stake_meta: directed_stake_meta_pda,
+                    authority: *authority_pubkey,
+                    clock: solana_sdk::sysvar::clock::id(),
+                    validator_list: validator_list_address,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::CopyDirectedStakeTargets {
+                    vote_pubkey: *vote_pubkey,
+                    total_target_lamports: *total_target_lamports,
+                    validator_list_index: validator_list_index as u32,
+                }
+                .data(),
+            })
         })
         .collect();
     Ok(instructions)

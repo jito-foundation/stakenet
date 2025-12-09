@@ -7,6 +7,7 @@
 */
 use crate::steward::serialize_validator_list;
 use anchor_lang::error::Error;
+use jito_steward::state::directed_stake::DirectedStakeMeta;
 use jito_steward::{
     constants::{LAMPORT_BALANCE_DEFAULT, MAX_VALIDATORS, SORTED_INDEX_DEFAULT},
     delegation::RebalanceType,
@@ -53,6 +54,7 @@ fn test_compute_scores() {
             validator.index as usize,
             cluster_history,
             config,
+            state.num_pool_validators,
         );
         assert!(res.is_ok());
         assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
@@ -85,6 +87,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(res, Err(Error::from(StewardError::InvalidState)));
 
@@ -104,6 +107,7 @@ fn test_compute_scores() {
         validator.index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -123,6 +127,7 @@ fn test_compute_scores() {
         validator.index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -140,6 +145,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert_eq!(
         res,
@@ -162,6 +168,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
     // validator would not have a score of 0 if it was not blacklisted
@@ -183,6 +190,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
     // assert!(state.start_computing_scores_slot == clock.slot);
@@ -224,6 +232,7 @@ fn test_compute_scores() {
         validators[0].index as usize,
         cluster_history,
         config,
+        state.num_pool_validators,
     );
     assert!(res.is_ok());
     //assert!(state.start_computing_scores_slot == clock.slot);
@@ -515,6 +524,7 @@ fn test_rebalance() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -551,6 +561,7 @@ fn test_rebalance() {
     // Validator index 2: 1000 SOL, 0 score, 0 delegation -> Decrease stake, from "regular unstake" category
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -590,6 +601,7 @@ fn test_rebalance() {
 
     // Test that rebalance will be skipped if validator has already been run
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -627,6 +639,7 @@ fn test_rebalance() {
 
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -680,6 +693,7 @@ fn test_rebalance() {
 
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -713,6 +727,7 @@ fn test_rebalance() {
     state.sorted_raw_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
     state.progress.reset();
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -732,6 +747,7 @@ fn test_rebalance() {
     // Invalid State
     state.state_tag = StewardStateEnum::Idle;
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -767,7 +783,7 @@ fn test_rebalance_default_lamports() {
     state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
     state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
 
-    validator_list[0].transient_stake_lamports = 1000.into();
+    validator_list[0].transient_stake_lamports = 0.into();
 
     let mut serialized_data = serialize_validator_list(&validator_list);
     let validator_list_bigvec = BigVec {
@@ -775,6 +791,7 @@ fn test_rebalance_default_lamports() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -789,9 +806,13 @@ fn test_rebalance_default_lamports() {
     assert!(res.is_ok());
     match res.unwrap() {
         RebalanceType::None => {}
-        _ => panic!("Expected RebalanceType::Increase"),
+        _ => panic!("Expected RebalanceType::None"),
     }
-    assert_eq!(state.validator_lamport_balances[0], LAMPORT_BALANCE_DEFAULT);
+    // The validator lamport balance will sync with active stake lamports when performing rebalancing ops
+    assert_eq!(
+        state.validator_lamport_balances[0],
+        u64::from(validator_list[0].active_stake_lamports)
+    );
 
     // Case 2: Lamports not default, no transient stake
     let mut state = fixtures.state;
@@ -813,6 +834,7 @@ fn test_rebalance_default_lamports() {
     };
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         0,
         &validator_list_bigvec,
@@ -832,6 +854,229 @@ fn test_rebalance_default_lamports() {
         );
     } else {
         panic!("Expected RebalanceType::Increase");
+    }
+}
+
+/// Test the undirected_stake_ceiling_lamports parameter:
+/// - When undirected_pool_lamports >= stake_ceiling, reserve is set to 0 (no increases)
+/// - When undirected_pool_lamports < stake_ceiling, reserve is capped to (stake_ceiling - undirected_pool_lamports)
+///   to ensure total undirected stake never exceeds the ceiling
+///
+/// ```rust:no_run
+/// let stake_ceiling = config.parameters.undirected_stake_ceiling_lamports();
+///
+/// let capped_reserve = if undirected_pool_lamports >= stake_ceiling {
+///     0
+/// } else {
+///     ctx.accounts
+///         .reserve_stake
+///         .lamports()
+///         .min(stake_ceiling.saturating_sub(undirected_pool_lamports))
+/// };
+/// ```
+#[test]
+fn test_rebalance_undirected_stake_ceiling() {
+    /*
+    Test the undirected_stake_ceiling_lamports parameter:
+    */
+    let mut fixtures = Box::<StateMachineFixtures>::default();
+    fixtures.config.parameters.scoring_unstake_cap_bps = 10000;
+    fixtures.config.parameters.instant_unstake_cap_bps = 10000;
+    fixtures.config.parameters.stake_deposit_unstake_cap_bps = 10000;
+
+    let state = &mut fixtures.state;
+
+    // Setup: validator needs stake increase
+    state.state_tag = StewardStateEnum::Rebalance;
+    state.delegations[0..3].copy_from_slice(&[
+        Delegation::new(1, 1),
+        Delegation::default(),
+        Delegation::default(),
+    ]);
+    state.scores[0..3].copy_from_slice(&[1_000_000_000, 0, 0]);
+    state.sorted_score_indices[0..3].copy_from_slice(&[0, 1, 2]);
+
+    let mut serialized_data = serialize_validator_list(&fixtures.validator_list);
+    let validator_list_bigvec = BigVec {
+        data: &mut serialized_data,
+    };
+
+    let reserve_lamports = 1000 * LAMPORTS_PER_SOL;
+
+    // Helper function to simulate the ceiling cap logic from rebalance.rs
+    fn calculate_capped_reserve(
+        reserve: u64,
+        undirected_pool_lamports: u64,
+        stake_ceiling: u64,
+    ) -> u64 {
+        if undirected_pool_lamports >= stake_ceiling {
+            0
+        } else {
+            reserve.min(stake_ceiling.saturating_sub(undirected_pool_lamports))
+        }
+    }
+
+    // Test Case 1: Undirected pool lamports well BELOW ceiling - full reserve should be used
+    let stake_ceiling = 5000 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = stake_ceiling.to_le_bytes();
+
+    let undirected_pool_lamports = 3000 * LAMPORTS_PER_SOL; // 2000 SOL headroom
+
+    let capped_reserve =
+        calculate_capped_reserve(reserve_lamports, undirected_pool_lamports, stake_ceiling);
+    // headroom = 5000 - 3000 = 2000 SOL, reserve = 1000 SOL, so min(1000, 2000) = 1000
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        undirected_pool_lamports,
+        capped_reserve,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            // Should use full reserve since headroom (2000) > reserve (1000)
+            assert_eq!(lamports, reserve_lamports);
+        }
+        _ => panic!(
+            "Expected RebalanceType::Increase when undirected pool lamports well below ceiling"
+        ),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 2: Reserve capped by ceiling headroom
+    let stake_ceiling = 4500 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = stake_ceiling.to_le_bytes();
+
+    let undirected_pool_lamports = 4000 * LAMPORTS_PER_SOL; // Only 500 SOL headroom
+
+    let capped_reserve =
+        calculate_capped_reserve(reserve_lamports, undirected_pool_lamports, stake_ceiling);
+    // headroom = 4500 - 4000 = 500 SOL, reserve = 1000 SOL, so min(1000, 500) = 500
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        undirected_pool_lamports,
+        capped_reserve,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            // Should be capped to 500 SOL (ceiling headroom)
+            assert_eq!(lamports, 500 * LAMPORTS_PER_SOL);
+        }
+        _ => panic!("Expected RebalanceType::Increase capped by headroom"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 3: Undirected pool lamports ABOVE ceiling - no stake increases should occur
+    let stake_ceiling = 3000 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = stake_ceiling.to_le_bytes();
+
+    let undirected_pool_lamports = 4000 * LAMPORTS_PER_SOL; // Above ceiling
+
+    let capped_reserve =
+        calculate_capped_reserve(reserve_lamports, undirected_pool_lamports, stake_ceiling);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        undirected_pool_lamports,
+        capped_reserve,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {
+            // No increase when undirected pool lamports >= ceiling (reserve is 0)
+        }
+        _ => panic!("Expected RebalanceType::None when undirected pool lamports >= ceiling"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 4: Undirected pool lamports EXACTLY AT ceiling - no stake increases should occur
+    let stake_ceiling = 4000 * LAMPORTS_PER_SOL;
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = stake_ceiling.to_le_bytes();
+
+    let undirected_pool_lamports = 4000 * LAMPORTS_PER_SOL; // Exactly at ceiling
+
+    let capped_reserve =
+        calculate_capped_reserve(reserve_lamports, undirected_pool_lamports, stake_ceiling);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        undirected_pool_lamports,
+        capped_reserve,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::None => {
+            // No increase when undirected pool lamports == ceiling (reserve is 0)
+        }
+        _ => panic!("Expected RebalanceType::None when undirected pool lamports == ceiling"),
+    }
+
+    // Reset progress for next test
+    state.progress.reset();
+
+    // Test Case 5: Ceiling set to u64::MAX - should always allow full reserve
+    fixtures.config.parameters.undirected_stake_ceiling_lamports = u64::MAX.to_le_bytes();
+
+    let undirected_pool_lamports = 4000 * LAMPORTS_PER_SOL;
+
+    let capped_reserve =
+        calculate_capped_reserve(reserve_lamports, undirected_pool_lamports, u64::MAX);
+
+    let res = state.rebalance(
+        &DirectedStakeMeta::default(),
+        fixtures.current_epoch,
+        0,
+        &validator_list_bigvec,
+        undirected_pool_lamports,
+        capped_reserve,
+        u64::from(fixtures.validator_list[0].active_stake_lamports),
+        0,
+        0,
+        &fixtures.config.parameters,
+    );
+    assert!(res.is_ok());
+    match res.unwrap() {
+        RebalanceType::Increase(lamports) => {
+            // Should allow full reserve since ceiling is u64::MAX
+            assert_eq!(lamports, reserve_lamports);
+        }
+        _ => panic!("Expected RebalanceType::Increase when ceiling is u64::MAX"),
     }
 }
 
@@ -862,7 +1107,7 @@ fn test_remove_validator() {
 
     // test basic case - remove validator_to_remove
     state.validators_to_remove.set(1, true).unwrap();
-    let res = state.remove_validator(1);
+    let res = state.remove_validator(1, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -874,7 +1119,7 @@ fn test_remove_validator() {
     let mut state = _test_remove_validator_setup(&fixtures);
 
     state.validators_for_immediate_removal.set(1, true).unwrap();
-    let res = state.remove_validator(1);
+    let res = state.remove_validator(1, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, 2);
     // Assert that values were shifted left
@@ -891,7 +1136,7 @@ fn test_remove_validator() {
     state.validators_for_immediate_removal.set(4, true).unwrap();
     state.validators_added = 2;
     // both validators were removed from pool and now the validator list is down to 3
-    let res = state.remove_validator(3);
+    let res = state.remove_validator(3, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
 
     assert_eq!(state.num_pool_validators, 3);
@@ -906,7 +1151,7 @@ fn test_remove_validator_fails() {
 
     // Test fails if validator not marked to remove
     state.validators_for_immediate_removal.reset();
-    let res = state.remove_validator(0);
+    let res = state.remove_validator(0, &mut DirectedStakeMeta::default());
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorNotMarkedForRemoval)));
 
@@ -915,7 +1160,10 @@ fn test_remove_validator_fails() {
         .validators_for_immediate_removal
         .set(state.num_pool_validators as usize, true)
         .unwrap();
-    let res = state.remove_validator(state.num_pool_validators as usize);
+    let res = state.remove_validator(
+        state.num_pool_validators as usize,
+        &mut DirectedStakeMeta::default(),
+    );
     assert!(res.is_err());
     assert!(res == Err(Error::from(StewardError::ValidatorIndexOutOfBounds)));
 }
@@ -938,7 +1186,7 @@ fn test_remove_validator_at_max_validators() {
     state.scores[index] = 998;
     state.scores[index + 1] = 999;
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
 
     // Verify shifting occurred - value at index should now be what was at index+1
@@ -973,7 +1221,7 @@ fn test_remove_validator_at_sum_equals_max() {
     state.scores[index] = 100;
     state.scores[index + 1] = 101;
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 11) as u64);
     assert_eq!(state.validators_added, 10); // unchanged
@@ -993,7 +1241,7 @@ fn test_remove_validator_at_sum_equals_max() {
         .set(index, true)
         .unwrap();
 
-    let res = state.remove_validator(index);
+    let res = state.remove_validator(index, &mut DirectedStakeMeta::default());
     assert!(res.is_ok());
     assert_eq!(state.num_pool_validators, (MAX_VALIDATORS - 10) as u64); // unchanged
     assert_eq!(state.validators_added, 9); // decremented
@@ -1027,6 +1275,7 @@ fn test_rebalance_max_lamports() {
     state.instant_unstake.set(1, true).unwrap();
 
     let res = state.rebalance(
+        &DirectedStakeMeta::default(),
         fixtures.current_epoch,
         1,
         &validator_list_bigvec,
@@ -1173,19 +1422,17 @@ fn test_directed_stake_get_allocations() {
 
 #[test]
 fn test_directed_stake_whitelist_operations() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Add staker successfully
@@ -1232,19 +1479,17 @@ fn test_directed_stake_whitelist_operations() {
 
 #[test]
 fn test_directed_stake_whitelist_remove_operations() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Remove staker successfully
@@ -1299,11 +1544,12 @@ fn test_directed_stake_whitelist_remove_operations() {
     let mut empty_whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
     let result = empty_whitelist.remove_user_staker(&Pubkey::new_unique());
     assert!(result.is_err());
@@ -1337,19 +1583,17 @@ fn test_directed_stake_whitelist_remove_operations() {
 
 #[test]
 fn test_directed_stake_whitelist_remove_array_shifting() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Verify array shifting for stakers
@@ -1423,19 +1667,17 @@ fn test_directed_stake_whitelist_remove_array_shifting() {
 
 #[test]
 fn test_directed_stake_whitelist_capacity_limits() {
-    use jito_steward::{
-        DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
-    };
+    use jito_steward::{DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS};
 
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test case 1: Fill staker list to capacity
@@ -1455,7 +1697,7 @@ fn test_directed_stake_whitelist_capacity_limits() {
     assert!(result.is_err());
 
     // Test case 3: Fill validator list to capacity
-    for i in 0..MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+    for i in 0..MAX_VALIDATORS {
         let validator = Pubkey::new_unique();
         let result = whitelist.add_validator(validator);
         assert!(result.is_ok());
