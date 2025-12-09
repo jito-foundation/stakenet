@@ -17,11 +17,7 @@ pub struct UpdateDirectedStakeTicket<'info> {
     )]
     pub whitelist_account: AccountLoader<'info, DirectedStakeWhitelist>,
 
-    #[account(
-        mut,
-        seeds = [DirectedStakeTicket::SEED, signer.key().as_ref()],
-        bump
-    )]
+    #[account(mut)]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 
     #[account(mut)]
@@ -34,15 +30,20 @@ impl UpdateDirectedStakeTicket<'_> {
     pub fn auth(
         ticket: &DirectedStakeTicket,
         whitelist: &DirectedStakeWhitelist,
-        authority_pubkey: &Pubkey,
+        signer_pubkey: &Pubkey,
         preferences: &[DirectedStakePreference],
+        ticket_override_authority: &Pubkey,
     ) -> Result<()> {
-        if !whitelist.is_staker_permissioned(authority_pubkey) {
+        if !whitelist.is_staker_permissioned(signer_pubkey)
+            && signer_pubkey != ticket_override_authority
+        {
             return Err(error!(StewardError::Unauthorized));
         }
 
-        if authority_pubkey != &ticket.ticket_update_authority {
-            msg!("Error: Only the ticket update authority can update ticket preferences");
+        if signer_pubkey != &ticket.ticket_update_authority
+            && signer_pubkey != ticket_override_authority
+        {
+            msg!("Error: Only a valid ticket authority can update tickets.");
             return Err(error!(StewardError::Unauthorized));
         }
 
@@ -55,7 +56,6 @@ impl UpdateDirectedStakeTicket<'_> {
                 return Err(error!(StewardError::Unauthorized));
             }
         }
-
         Ok(())
     }
 }
@@ -66,8 +66,30 @@ pub fn handler(
 ) -> Result<()> {
     let whitelist = ctx.accounts.whitelist_account.load()?;
     let mut ticket = ctx.accounts.ticket_account.load_mut()?;
+    let config = ctx.accounts.config.load()?;
 
-    UpdateDirectedStakeTicket::auth(&ticket, &whitelist, ctx.accounts.signer.key, &preferences)?;
+    // Verify the PDA: seeds should be [SEED, config.key(), ticket_update_authority]
+    let (expected_ticket_address, _bump) = Pubkey::find_program_address(
+        &[
+            DirectedStakeTicket::SEED,
+            ctx.accounts.config.key().as_ref(),
+            ticket.ticket_update_authority.as_ref(),
+        ],
+        ctx.program_id,
+    );
+    require_keys_eq!(
+        ctx.accounts.ticket_account.key(),
+        expected_ticket_address,
+        StewardError::Unauthorized
+    );
+
+    UpdateDirectedStakeTicket::auth(
+        &ticket,
+        &whitelist,
+        ctx.accounts.signer.key,
+        &preferences,
+        &config.directed_stake_ticket_override_authority,
+    )?;
 
     if preferences.len() > crate::MAX_PREFERENCES_PER_TICKET {
         msg!("Error: Too many preferences provided");

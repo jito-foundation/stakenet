@@ -1,8 +1,9 @@
 use jito_steward::{
+    constants::MAX_VALIDATORS,
     state::directed_stake::{DirectedStakePreference, DirectedStakeRecordType},
     utils::U8Bool,
     DirectedStakeTicket, DirectedStakeWhitelist, MAX_PERMISSIONED_DIRECTED_STAKERS,
-    MAX_PERMISSIONED_DIRECTED_VALIDATORS, MAX_PREFERENCES_PER_TICKET,
+    MAX_PREFERENCES_PER_TICKET,
 };
 use solana_sdk::pubkey::Pubkey;
 
@@ -110,11 +111,12 @@ fn test_directed_stake_whitelist_initialization() {
     let whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     assert_eq!(whitelist.total_permissioned_user_stakers, 0);
@@ -129,11 +131,12 @@ fn test_directed_stake_whitelist_add_operations() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker = Pubkey::new_unique();
@@ -172,11 +175,12 @@ fn test_directed_stake_whitelist_remove_operations() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker = Pubkey::new_unique();
@@ -219,11 +223,12 @@ fn test_directed_stake_whitelist_edge_cases() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let non_existent = Pubkey::new_unique();
@@ -278,11 +283,12 @@ fn test_directed_stake_whitelist_validation_logic() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();
@@ -349,11 +355,12 @@ fn test_permissioned_stakers_validation() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker1 = Pubkey::new_unique();
@@ -404,11 +411,12 @@ fn test_permissioned_validators_validation() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let validator1 = Pubkey::new_unique();
@@ -459,11 +467,12 @@ fn test_ticket_authorization_scenarios() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let permissioned_staker = Pubkey::new_unique();
@@ -523,11 +532,12 @@ fn test_whitelist_capacity_limits() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Test that we can add up to the maximum number of user stakers
@@ -538,7 +548,7 @@ fn test_whitelist_capacity_limits() {
     }
 
     // Test that we can add up to the maximum number of validators
-    for i in 0..MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+    for i in 0..MAX_VALIDATORS {
         let validator = Pubkey::new_unique();
         assert!(whitelist.add_validator(validator).is_ok());
         assert_eq!(whitelist.total_permissioned_validators, (i + 1) as u16);
@@ -557,7 +567,7 @@ fn test_whitelist_capacity_limits() {
     assert!(whitelist.add_validator(extra_validator).is_err());
     assert_eq!(
         whitelist.total_permissioned_validators,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS as u16
+        MAX_VALIDATORS as u16
     );
 
     // Test can_add methods return false when at capacity
@@ -573,11 +583,12 @@ fn test_whitelist_removal_and_readdition() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();
@@ -616,11 +627,12 @@ fn test_preferences_validation_edge_cases() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let validator1 = Pubkey::new_unique();
@@ -688,11 +700,12 @@ fn test_user_and_protocol_staker_separation() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let user_staker1 = Pubkey::new_unique();
@@ -753,11 +766,12 @@ fn test_user_and_protocol_staker_capacity_limits() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     // Fill up user stakers
@@ -806,11 +820,12 @@ fn test_cross_category_staker_operations() {
     let mut whitelist = DirectedStakeWhitelist {
         permissioned_user_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
         permissioned_protocol_stakers: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_STAKERS],
-        permissioned_validators: [Pubkey::default(); MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+        permissioned_validators: [Pubkey::default(); MAX_VALIDATORS],
         total_permissioned_user_stakers: 0,
         total_permissioned_protocol_stakers: 0,
         total_permissioned_validators: 0,
-        _padding0: [0; 250],
+        _padding0: [0; 249],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
     };
 
     let staker = Pubkey::new_unique();

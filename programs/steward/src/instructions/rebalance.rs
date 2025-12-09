@@ -146,6 +146,21 @@ pub struct Rebalance<'info> {
     pub directed_stake_meta: AccountLoader<'info, DirectedStakeMeta>,
 }
 
+/// Rebalances stake for a validator based on computed delegations and current stake state.
+///
+/// This instruction adjusts validator stake by either increasing or decreasing stake
+/// to match target delegations. It handles three types of rebalancing:
+/// - **Increase**: Stakes additional lamports from reserve to validator
+/// - **Decrease**: Unstakes lamports from validator back to reserve
+/// - **None**: No action needed if validator is already at target
+///
+/// # Undirected Stake Ceiling
+///
+/// Reserve lamports available for stake increases are capped by `undirected_stake_ceiling_lamports` from configuration:
+/// - If current undirected stake TVL >= ceiling: no increases allowed (reserve = 0)
+/// - If current undirected stake TVL < ceiling: reserve capped to (ceiling - current undirected stake)
+///
+/// This ensures total undirected stake never exceeds the configured ceiling.
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
@@ -202,23 +217,34 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             return Err(StewardError::InvalidStakeState.into());
         }
 
+        let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
+
         // Do not count directed stake against the pool stake delegation
         let stake_account_active_lamports = match stake_state {
-            StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                let directed_stake_meta = ctx.accounts.directed_stake_meta.load()?;
-                // CU expensive but permission-less method to access directed stake for a particular validator
-                // Validator list is dynamic and we cannot ensure stake meta indexes will match
-                let maybe_directed_stake_index = directed_stake_meta
-                    .get_target_index(&validator_stake_info.vote_account_address);
-                let lamports = if let Some(meta_index) = maybe_directed_stake_index {
-                    directed_stake_meta.targets[meta_index].total_staked_lamports
-                } else {
-                    0
-                };
-                stake.delegation.stake.saturating_sub(lamports)
+            StakeStateV2::Stake(_meta, stake, _stake_flags) => stake.delegation.stake,
+            _ => {
+                msg!("Invalid stake state");
+                0
             }
+        };
+
+        // If and only if there is a valid StakeStateV2 for the transient stake account we should assign that balance
+        let transient_stake_account_data = &mut ctx.accounts.transient_stake_account.data.borrow();
+        let transient_stake_state =
+            try_from_slice_unchecked::<StakeStateV2>(transient_stake_account_data);
+        let transient_stake_account_lamports = match transient_stake_state {
+            Ok(StakeStateV2::Stake(_, stake, _)) => stake.delegation.stake,
             _ => 0,
         };
+
+        if transient_stake_account_lamports > 0 {
+            state_account
+                .state
+                .progress
+                .set(validator_list_index, true)?;
+            msg!("Transient stake account lamports is greater than 0, marking as rebalanced");
+            return Ok(());
+        }
 
         let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
@@ -227,17 +253,31 @@ pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<(
             let validator_list_data = &mut ctx.accounts.validator_list.try_borrow_mut_data()?;
             let (_, validator_list) = ValidatorListHeader::deserialize_vec(validator_list_data)?;
 
-            let stake_pool_lamports_with_fixed_cost =
+            let total_pool_lamports =
                 deserialize_stake_pool(&ctx.accounts.stake_pool)?.total_lamports;
-            let reserve_lamports_with_rent = ctx.accounts.reserve_stake.lamports();
+
+            let undirected_pool_lamports =
+                total_pool_lamports.saturating_sub(directed_stake_meta.total_staked_lamports());
+
+            let stake_ceiling = config.parameters.undirected_stake_ceiling_lamports();
+
+            let capped_reserve = if undirected_pool_lamports >= stake_ceiling {
+                0
+            } else {
+                ctx.accounts
+                    .reserve_stake
+                    .lamports()
+                    .min(stake_ceiling.saturating_sub(undirected_pool_lamports))
+            };
 
             state_account.state.rebalance(
+                &directed_stake_meta,
                 clock.epoch,
                 validator_list_index,
                 &validator_list,
-                stake_pool_lamports_with_fixed_cost,
-                reserve_lamports_with_rent,
-                stake_account_active_lamports,
+                undirected_pool_lamports,
+                capped_reserve,
+                stake_account_active_lamports.saturating_sub(minimum_delegation),
                 minimum_delegation,
                 stake_rent,
                 &config.parameters,

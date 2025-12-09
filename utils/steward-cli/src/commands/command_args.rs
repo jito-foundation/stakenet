@@ -8,6 +8,7 @@ use crate::commands::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
+        copy_directed_stake_targets::CopyDirectedStakeTargets,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
@@ -147,9 +148,9 @@ pub struct ConfigParameters {
     #[arg(long, env)]
     pub compute_score_epoch_progress: Option<f64>,
 
-    /// Minimum lamports for undirected stake floor
+    /// Maximum undirected stake pool TVL
     #[arg(long, env)]
-    pub undirected_stake_floor_lamports: Option<u64>,
+    pub undirected_stake_ceiling_lamports: Option<u64>,
 
     /// Percent of total pool lamports that can be unstaked due to directed stake requests
     #[arg(long, env)]
@@ -179,7 +180,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             minimum_stake_lamports: config.minimum_stake_lamports,
             minimum_voting_epochs: config.minimum_voting_epochs,
             compute_score_epoch_progress: config.compute_score_epoch_progress,
-            undirected_stake_floor_lamports: config.undirected_stake_floor_lamports,
+            undirected_stake_ceiling_lamports: config.undirected_stake_ceiling_lamports,
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
         }
     }
@@ -346,6 +347,7 @@ pub enum Commands {
     InitDirectedStakeTicket(InitDirectedStakeTicket),
     AddToDirectedStakeWhitelist(AddToDirectedStakeWhitelist),
     UpdateDirectedStakeTicket(UpdateDirectedStakeTicket),
+    CopyDirectedStakeTargets(CopyDirectedStakeTargets),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
     RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
@@ -360,6 +362,7 @@ pub enum Commands {
     CrankComputeInstantUnstake(CrankComputeInstantUnstake),
     CrankRebalance(CrankRebalance),
     CrankRebalanceDirected(CrankRebalanceDirected),
+    CrankUpdateStakePool(CrankUpdateStakePool),
 }
 
 // ---------- VIEWS ------------
@@ -433,6 +436,28 @@ pub struct InitSteward {
 #[derive(Parser)]
 #[command(about = "Updates authority account parameters")]
 pub struct UpdateAuthority {
+    /// Create a Squads multisig proposal instead of direct execution
+    #[arg(long, env, default_value = "false")]
+    pub squads_proposal: bool,
+
+    /// Squads multisig account address.
+    /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
+    /// multisig address and will act as the signing authority for the operation.
+    #[arg(
+        long,
+        env,
+        default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c"
+    )]
+    pub squads_multisig: Pubkey,
+
+    /// Vault index for the Squads multisig (default: 0)
+    #[arg(long, env, default_value = "0")]
+    pub squads_vault_index: u8,
+
+    /// Squads program ID (defaults to mainnet Squads v4 program)
+    #[arg(long, env)]
+    pub squads_program_id: Option<Pubkey>,
+
     #[command(subcommand)]
     pub command: AuthoritySubcommand,
 }
@@ -481,7 +506,15 @@ pub enum AuthoritySubcommand {
         #[arg(long, env)]
         new_authority: Pubkey,
     },
+    /// Manages override directed stake tickets authority
+    DirectedStakeTicketOverrideAuthority {
+        #[command(flatten)]
+        permissioned_parameters: PermissionedParameters,
+        #[arg(long, env)]
+        new_authority: Pubkey,
+    },
 }
+
 #[derive(Parser)]
 #[command(about = "Updates config account parameters")]
 pub struct UpdateConfig {
@@ -565,6 +598,10 @@ pub(crate) fn parse_u16(s: &str) -> Result<u16, std::num::ParseIntError> {
 }
 
 pub(crate) fn parse_u32(s: &str) -> Result<u32, std::num::ParseIntError> {
+    s.parse()
+}
+
+pub(crate) fn parse_u64(s: &str) -> Result<u64, std::num::ParseIntError> {
     s.parse()
 }
 
@@ -766,6 +803,19 @@ pub struct CrankComputeInstantUnstake {
 pub struct CrankRebalance {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Update stake pool - runs update_validator_list_balance, update_stake_pool_balance, and cleanup_removed_validator_entries"
+)]
+pub struct CrankUpdateStakePool {
+    #[command(flatten)]
+    pub permissionless_parameters: PermissionlessParameters,
+
+    /// Skip the merge step when updating validator list balances
+    #[arg(long, env, default_value_t = false)]
+    pub no_merge: bool,
 }
 
 #[derive(Parser)]

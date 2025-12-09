@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use commands::{
     actions::{
@@ -27,6 +27,7 @@ use commands::{
         compute_score::command_crank_compute_score,
         epoch_maintenance::command_crank_epoch_maintenance, idle::command_crank_idle,
         rebalance::command_crank_rebalance, steward::command_crank_steward,
+        update_stake_pool::command_crank_update_stake_pool,
     },
     info::{
         get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
@@ -48,7 +49,9 @@ use crate::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
-            close_steward::command_close_steward, migrate_state_to_v2::command_migrate_state_to_v2,
+            close_steward::command_close_steward,
+            copy_directed_stake_targets::command_copy_directed_stake_targets,
+            migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
@@ -86,6 +89,7 @@ async fn main() -> Result<()> {
     let steward_program_id = args.steward_program_id;
     let validator_history_program_id = args.validator_history_program_id;
     let global_signer = args.signer.as_deref();
+
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, steward_program_id).await,
@@ -140,7 +144,17 @@ async fn main() -> Result<()> {
             command_update_priority_fee_config(args, &client, steward_program_id).await
         }
         Commands::UpdateAuthority(args) => {
-            command_update_authority(args, &client, steward_program_id).await
+            // Use global signer - required for this command
+            let signer_path = global_signer.ok_or_else(|| {
+                anyhow!("--signer flag is required for the 'update-authority' command")
+            })?;
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_update_authority(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::SetStaker(args) => command_set_staker(args, &client, steward_program_id).await,
         Commands::RevertStaker(args) => {
@@ -214,6 +228,9 @@ async fn main() -> Result<()> {
         Commands::UpdateDirectedStakeTicket(args) => {
             command_update_directed_stake_ticket(args, client.clone(), steward_program_id).await
         }
+        Commands::CopyDirectedStakeTargets(args) => {
+            command_copy_directed_stake_targets(args, client.clone(), steward_program_id).await
+        }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
             command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
         }
@@ -249,6 +266,9 @@ async fn main() -> Result<()> {
         }
         Commands::CrankRebalanceDirected(args) => {
             command_crank_rebalance_directed(args, &client, steward_program_id).await
+        }
+        Commands::CrankUpdateStakePool(args) => {
+            command_crank_update_stake_pool(args, &client, steward_program_id).await
         }
     };
 

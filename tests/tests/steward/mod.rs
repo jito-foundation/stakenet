@@ -7,6 +7,7 @@ mod test_directed_stake_instructions;
 mod test_directed_stake_meta;
 mod test_epoch_maintenance;
 mod test_integration;
+mod test_internal_lamport_tracking;
 mod test_migrate_state_to_v2;
 mod test_parameters;
 mod test_priority_fee_parameters;

@@ -4,6 +4,7 @@ use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStake
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
 use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
 use spl_associated_token_account::get_associated_token_address;
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::models::{
     aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
@@ -12,6 +13,26 @@ use crate::models::{
 use solana_program::borsh1::try_from_slice_unchecked;
 
 use super::accounts::get_validator_history_address;
+
+pub fn vote_account_uploaded_recently(
+    validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
+    vote_account: &Pubkey,
+    epoch: u64,
+    slot: u64,
+) -> bool {
+    if let Some(validator_history) = validator_history_map.get(vote_account) {
+        if let Some(entry) = validator_history.history.last() {
+            if entry.epoch == epoch as u16
+                && entry.vote_account_last_update_slot
+                    != ValidatorHistoryEntry::default().vote_account_last_update_slot
+                && entry.vote_account_last_update_slot > slot - 50000
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
 
 // ------------------- BALANCE --------------------------
 pub async fn get_balance_with_retry(
@@ -315,8 +336,7 @@ pub fn aggregate_validator_targets(
 #[cfg(test)]
 mod tests {
     use jito_steward::{
-        utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
-        MAX_PERMISSIONED_DIRECTED_VALIDATORS,
+        constants::MAX_VALIDATORS, utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
     };
 
     use super::*;
@@ -371,12 +391,12 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: 0,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 0,
             directed_unstake_total: 0,
-            padding0: [0; 64],
-            targets: [target; MAX_PERMISSIONED_DIRECTED_VALIDATORS],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            targets: [target; MAX_VALIDATORS],
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         }
     }
 
@@ -390,11 +410,11 @@ mod tests {
             _padding0: [0; 32],
         };
 
-        let mut targets = [empty_target; MAX_PERMISSIONED_DIRECTED_VALIDATORS];
+        let mut targets = [empty_target; MAX_VALIDATORS];
 
         // Populate the first N slots with the provided validators
         for (i, validator) in validators.iter().enumerate() {
-            if i < MAX_PERMISSIONED_DIRECTED_VALIDATORS {
+            if i < MAX_VALIDATORS {
                 targets[i] = DirectedStakeTarget {
                     vote_pubkey: *validator,
                     total_target_lamports: 1_000_000_000, // Some non-zero amount to simulate existing allocation
@@ -408,12 +428,12 @@ mod tests {
 
         DirectedStakeMeta {
             total_stake_targets: validators.len() as u64,
-            epoch_increase_total_lamports: 0,
-            epoch_decrease_total_lamports: 0,
-            epoch_last_updated: 100,
             directed_unstake_total: 0,
-            padding0: [0; 64],
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
             targets,
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
         }
     }
 
