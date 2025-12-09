@@ -272,18 +272,13 @@ async fn update_directed_stake_ticket(
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: vec![
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                fixture.steward_config.pubkey(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                directed_stake_whitelist,
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(*ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new(signer.pubkey(), true),
-        ],
+        accounts: jito_steward::accounts::UpdateDirectedStakeTicket {
+            config: fixture.steward_config.pubkey(),
+            whitelist_account: directed_stake_whitelist,
+            ticket_account: *ticket_account,
+            signer: signer.pubkey(),
+        }
+        .to_account_metas(None),
         data: jito_steward::instruction::UpdateDirectedStakeTicket {
             preferences: preferences.clone(),
         }
@@ -317,18 +312,13 @@ async fn close_directed_stake_ticket(
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: vec![
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                fixture.steward_config.pubkey(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(*ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                directed_stake_whitelist,
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(signer.pubkey(), true),
-        ],
+        accounts: jito_steward::accounts::CloseDirectedStakeTicket {
+            config: fixture.steward_config.pubkey(),
+            ticket_account: *ticket_account,
+            whitelist_account: directed_stake_whitelist,
+            authority: signer.pubkey(),
+        }
+        .to_account_metas(None),
         data: jito_steward::instruction::CloseDirectedStakeTicket {}.data(),
     };
 
@@ -593,21 +583,13 @@ async fn test_directed_stake_ticket_validation() {
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: vec![
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                fixture.steward_config.pubkey(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                directed_stake_whitelist,
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new(
-                fixture.keypair.pubkey(),
-                true,
-            ),
-        ],
+        accounts: jito_steward::accounts::UpdateDirectedStakeTicket {
+            config: fixture.steward_config.pubkey(),
+            whitelist_account: directed_stake_whitelist,
+            ticket_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
         data: jito_steward::instruction::UpdateDirectedStakeTicket {
             preferences: _invalid_preferences.clone(),
         }
@@ -1065,21 +1047,13 @@ async fn test_unauthorized_user_cannot_update_ticket() {
 
     let ix = Instruction {
         program_id: jito_steward::id(),
-        accounts: vec![
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                fixture.steward_config.pubkey(),
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                directed_stake_whitelist,
-                false,
-            ),
-            anchor_lang::solana_program::instruction::AccountMeta::new(ticket_account, false),
-            anchor_lang::solana_program::instruction::AccountMeta::new(
-                unauthorized_staker.pubkey(),
-                true,
-            ),
-        ],
+        accounts: jito_steward::accounts::UpdateDirectedStakeTicket {
+            config: fixture.steward_config.pubkey(),
+            whitelist_account: directed_stake_whitelist,
+            ticket_account,
+            signer: unauthorized_staker.pubkey(),
+        }
+        .to_account_metas(None),
         data: jito_steward::instruction::UpdateDirectedStakeTicket {
             preferences: preferences.clone(),
         }
