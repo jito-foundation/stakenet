@@ -7,6 +7,7 @@ use crate::{
 use std::mem::size_of;
 
 #[derive(Accounts)]
+#[instruction(ticket_update_authority: Pubkey)]
 pub struct InitializeDirectedStakeTicket<'info> {
     #[account()]
     pub config: AccountLoader<'info, Config>,
@@ -21,7 +22,7 @@ pub struct InitializeDirectedStakeTicket<'info> {
         init,
         payer = signer,
         space = DirectedStakeTicket::SIZE,
-        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), signer.key().as_ref()],
+        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), ticket_update_authority.as_ref()],
         bump
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
@@ -39,20 +40,19 @@ impl InitializeDirectedStakeTicket<'_> {
         whitelist: &DirectedStakeWhitelist,
         signer_pubkey: &Pubkey,
         ticket_update_authority: &Pubkey,
-        whitelist_authority: &Pubkey,
+        ticket_override_authority: &Pubkey,
     ) -> Result<()> {
-        // If the signer is the whitelist authority, we can initialize the ticket as long as the ticket update authority is whitelisted
-        if signer_pubkey == whitelist_authority {
-            if !whitelist.is_staker_permissioned(ticket_update_authority) {
-                msg!("Error: Ticket update authority must be on the directed stake whitelist to initialize a ticket as the whitelist authority");
-                return Err(error!(StewardError::Unauthorized));
-            }
-            return Ok(());
-        }
-        if !whitelist.is_staker_permissioned(signer_pubkey) {
-            msg!("Error: Signer must be on the directed stake whitelist to initialize a ticket");
+        if !whitelist.is_staker_permissioned(signer_pubkey)
+            && signer_pubkey != ticket_override_authority
+        {
             return Err(error!(StewardError::Unauthorized));
         }
+
+        if signer_pubkey != ticket_update_authority && signer_pubkey != ticket_override_authority {
+            msg!("Error: Only a valid ticket authority can initialize tickets.");
+            return Err(error!(StewardError::Unauthorized));
+        }
+
         Ok(())
     }
 }
@@ -68,8 +68,10 @@ pub fn handler(
         &whitelist,
         ctx.accounts.signer.key,
         &ticket_update_authority,
-        &config.directed_stake_whitelist_authority,
+        &config.directed_stake_ticket_override_authority,
     )?;
+
+    // PDA is verified by Anchor seeds constraint
 
     let mut ticket = ctx.accounts.ticket_account.load_init()?;
     ticket.num_preferences = 0;

@@ -13,9 +13,7 @@ pub struct CloseDirectedStakeTicket<'info> {
 
     #[account(
         mut,
-        close = authority,
-        seeds = [DirectedStakeTicket::SEED, config.key().as_ref(), authority.key().as_ref()],
-        bump
+        close = authority
     )]
     pub ticket_account: AccountLoader<'info, DirectedStakeTicket>,
 
@@ -69,6 +67,22 @@ pub fn handler(ctx: Context<CloseDirectedStakeTicket>) -> Result<()> {
     let ticket = ctx.accounts.ticket_account.load()?;
     let config = ctx.accounts.config.load()?;
     let whitelist = ctx.accounts.whitelist_account.load()?;
+
+    // Verify the PDA: seeds should be [SEED, config.key(), ticket_update_authority]
+    let (expected_ticket_address, _bump) = Pubkey::find_program_address(
+        &[
+            DirectedStakeTicket::SEED,
+            ctx.accounts.config.key().as_ref(),
+            ticket.ticket_update_authority.as_ref(),
+        ],
+        ctx.program_id,
+    );
+    require_keys_eq!(
+        ctx.accounts.ticket_account.key(),
+        expected_ticket_address,
+        StewardError::Unauthorized
+    );
+
     CloseDirectedStakeTicket::auth(
         &ticket,
         &whitelist,
