@@ -26,18 +26,6 @@ pub async fn command_view_directed_stake_meta(
         stake_meta.total_stake_targets
     );
     println!(
-        "DirectedStakeMeta Epoch Increase Total Lamports: {}",
-        stake_meta.epoch_increase_total_lamports
-    );
-    println!(
-        "DirectedStakeMeta Epoch Decrease Total Lamports: {}",
-        stake_meta.epoch_decrease_total_lamports
-    );
-    println!(
-        "DirectedStakeMeta Epoch Last Updated: {}",
-        stake_meta.epoch_last_updated
-    );
-    println!(
         "DirectedStakeMeta Directed Unstake Total: {}",
         stake_meta.directed_unstake_total
     );
