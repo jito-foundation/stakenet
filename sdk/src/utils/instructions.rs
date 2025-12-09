@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use kobe_client::client::KobeClient;
 use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
+use kobe_client::client::KobeClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -267,6 +267,11 @@ pub async fn compute_bam_targets(
     };
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let config_account = get_steward_config_account(&client, steward_config).await?;
+    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
+    let validator_list_address = stake_pool_account.validator_list;
+    let validator_list_account =
+        get_validator_list_account(&client, &validator_list_address).await?;
 
     let bam_eligible_validators: Vec<BamValidator> = bam_validators
         .into_iter()
@@ -277,6 +282,10 @@ pub async fn compute_bam_targets(
         .iter()
         .filter_map(|bv| {
             let vote_pubkey = Pubkey::from_str(&bv.vote_account).ok()?;
+            let validator_list_index = validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address == vote_pubkey)?;
             let total_target_lamports = (bv.active_stake / bam_epoch_metric.bam_stake)
                 * bam_epoch_metric.available_bam_delegation_stake;
 
@@ -287,11 +296,13 @@ pub async fn compute_bam_targets(
                     directed_stake_meta: directed_stake_meta_pda,
                     authority: *authority_pubkey,
                     clock: solana_sdk::sysvar::clock::id(),
+                    validator_list: validator_list_address,
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::CopyDirectedStakeTargets {
                     vote_pubkey,
                     total_target_lamports,
+                    validator_list_index: validator_list_index as u32,
                 }
                 .data(),
             })
