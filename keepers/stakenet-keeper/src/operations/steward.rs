@@ -166,7 +166,7 @@ pub async fn run_crank_steward(
 
                 let stats = crank_copy_directed_stake_targets(
                     keeper_config.client.clone(),
-                    keeper_config.keypair.clone(),
+                    keypair.clone(),
                     &keeper_config.steward_program_id,
                     steward_accounts,
                     &keeper_config.token_mint,
