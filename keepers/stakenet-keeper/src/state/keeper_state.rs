@@ -16,7 +16,7 @@ use stakenet_sdk::{
         aggregate_accounts::{AllStewardAccounts, AllValidatorAccounts},
         errors::JitoTransactionError,
     },
-    utils::accounts::get_validator_history_address,
+    utils::accounts::{get_directed_stake_meta, get_validator_history_address},
 };
 use validator_history::{ClusterHistory, ValidatorHistory};
 
@@ -319,13 +319,13 @@ impl KeeperState {
     ///
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
-    /// - Directed stake metadata hasn't been updated this epoch
+    /// - One of the target has not updated in this epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
-        _program_id: &Pubkey,
+        program_id: &Pubkey,
     ) -> Result<bool, JitoTransactionError> {
-        if let Some(ref _steward_state) = self.all_steward_accounts {
+        if let Some(ref steward_state) = self.all_steward_accounts {
             let current_slot = client.get_slot().await?;
             let slots_in_epoch = self.epoch_schedule.slots_per_epoch;
             let slot_index = current_slot
@@ -338,7 +338,16 @@ impl KeeperState {
                 ))?;
             let epoch_progress = slot_index as f64 / slots_in_epoch as f64;
 
-            let should_run_copy_directed_targets = epoch_progress > 0.5;
+            let meta =
+                get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
+
+            let has_stale_targets = meta
+                .targets
+                .iter()
+                .filter(|target| target.vote_pubkey.ne(&Pubkey::default()))
+                .any(|target| target.target_last_updated_epoch.ne(&self.epoch_info.epoch));
+
+            let should_run_copy_directed_targets = epoch_progress > 0.5 && has_stale_targets;
 
             return Ok(should_run_copy_directed_targets);
         }
