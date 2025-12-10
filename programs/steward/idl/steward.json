@@ -5028,7 +5028,7 @@
             }
           },
           {
-            "name": "undirected_stake_floor_lamports",
+            "name": "undirected_stake_ceiling_lamports",
             "type": {
               "option": "u64"
             }

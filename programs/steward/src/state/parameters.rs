@@ -154,7 +154,7 @@ impl IdlBuild for UpdateParametersArgs {
                         docs: Default::default(),
                     },
                     IdlField {
-                        name: "undirected_stake_floor_lamports".to_string(),
+                        name: "undirected_stake_ceiling_lamports".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
