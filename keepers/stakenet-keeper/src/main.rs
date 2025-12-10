@@ -362,7 +362,7 @@ fn main() {
     let kobe_client = match args.cluster {
         Cluster::Mainnet => KobeClient::mainnet(),
         Cluster::Testnet => KobeClient::testnet(),
-        _ => panic!("Failed to read cluster"),
+        cluster => panic!("Unsupported cluster: expected 'mainnet' or 'testnet', got '{cluster}'"),
     };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();

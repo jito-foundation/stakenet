@@ -199,9 +199,13 @@ pub async fn compute_directed_stake_meta(
 /// # Process Overview
 ///
 /// 1. Fetches all bam validators through Kobe API
-/// 2. For each eligible bam validaotr:
-///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount)
+/// 2. For each eligible bam validator:
+///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount).
 /// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
+///
+/// # Return Value
+///
+/// Returns an empty vector of instructions if `bam_epoch_metric` is `None` (i.e., if no BAM epoch metrics are available for the previous epoch).
 pub async fn compute_bam_targets(
     client: Arc<RpcClient>,
     kobe_client: &KobeClient,
@@ -240,13 +244,39 @@ pub async fn compute_bam_targets(
             bam_eligible_validators
                 .iter()
                 .filter_map(|bv| {
-                    let vote_pubkey = Pubkey::from_str(&bv.vote_account).ok()?;
-                    let validator_list_index = validator_list_account
+                    let vote_pubkey = match Pubkey::from_str(&bv.vote_account) {
+                        Ok(pubkey) => pubkey,
+                        Err(e) => {
+                            log::warn!("Failed to parse vote account: {}: {e}", bv.vote_account);
+                            return None;
+                        }
+                    };
+                    let validator_list_index = match validator_list_account
                         .validators
                         .iter()
-                        .position(|v| v.vote_account_address == vote_pubkey)?;
-                    let total_target_lamports = (bv.active_stake / metric.bam_stake)
-                        * metric.available_bam_delegation_stake;
+                        .position(|v| v.vote_account_address == vote_pubkey)
+                    {
+                        Some(index) => index,
+                        None => {
+                            log::warn!("Vote account {vote_pubkey} not found in validator list");
+                            return None;
+                        }
+                    };
+                    let total_target_lamports = match bv
+                        .active_stake
+                        .checked_mul(metric.available_bam_delegation_stake)
+                        .and_then(|result| result.checked_div(metric.bam_stake)) {
+                           Some(lamports) => lamports,
+                           None => {
+                               log::warn!(
+                                   "Arithmetic overflow calculating target lamports for {vote_pubkey}: active_stake={}, available={}, bam_stake={}",
+                                   bv.active_stake,
+                                   metric.available_bam_delegation_stake,
+                                   metric.bam_stake
+                               );
+                               return None;
+                           }
+                        };
 
                     Some(Instruction {
                         program_id: *program_id,

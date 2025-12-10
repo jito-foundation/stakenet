@@ -189,9 +189,13 @@ pub async fn command_crank_compute_directed_stake_meta(
     let kobe_client = match args.cluster_name.as_str() {
         "mainnet" => KobeClient::mainnet(),
         "testnet" => KobeClient::testnet(),
-        _ => return Err(anyhow!("Failed to read cluster")),
+        cluster => {
+            return Err(anyhow!(
+                "Unsupported cluster: expected 'mainnet' or 'testnet', got {cluster}"
+            ))
+        }
     };
-    let bam_ixs = compute_bam_targets(
+    let bam_delegation_instructions = compute_bam_targets(
         client.clone(),
         &kobe_client,
         &all_steward_accounts.config_address,
@@ -201,7 +205,7 @@ pub async fn command_crank_compute_directed_stake_meta(
     .await
     .map_err(|e| anyhow!(e.to_string()))?;
 
-    ixs.extend(bam_ixs);
+    ixs.extend(bam_delegation_instructions);
 
     let configured_ix = configure_instruction(
         &ixs,

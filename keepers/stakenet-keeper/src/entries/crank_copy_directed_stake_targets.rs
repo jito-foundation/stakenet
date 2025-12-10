@@ -38,7 +38,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    let bam_ixs = compute_bam_targets(
+    let bam_delegation_instructions = compute_bam_targets(
         client.clone(),
         kobe_client,
         &all_steward_accounts.config_address,
@@ -48,9 +48,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    ixs.extend(bam_ixs);
-
-    log::info!("Copy Directed Stake Targets");
+    ixs.extend(bam_delegation_instructions);
 
     let update_txs_to_run = package_instructions(&ixs, 8, priority_fee, Some(1_400_000), None);
     let update_stats =
