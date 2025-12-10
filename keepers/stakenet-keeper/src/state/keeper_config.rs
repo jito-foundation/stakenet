@@ -39,6 +39,11 @@ pub struct KeeperConfig {
     pub pay_for_new_accounts: bool,
     pub sqlite_connection: Arc<Mutex<Connection>>,
     pub priority_fee_oracle_authority_keypair: Option<Arc<Keypair>>,
+
+    /// The directed stake oracle authority keypair
+    ///
+    /// This keypair is used to be signer of `copy_directed_stake_target` ix
+    pub directed_stake_oracle_authority_keypair: Option<Arc<Keypair>>,
     pub redundant_rpc_urls: Option<Arc<Vec<RpcClient>>>,
     pub cluster: Cluster,
     pub cluster_name: String,
@@ -83,6 +88,11 @@ pub struct Args {
     /// priority fees and block metadata
     #[arg(long, env)]
     pub priority_fee_oracle_authority_keypair: Option<PathBuf>,
+
+    /// Path to keypair used specifically for submitting permissioned transactions related to
+    /// directed stake
+    #[arg(long, env)]
+    pub directed_stake_oracle_authority_keypair: Option<PathBuf>,
 
     /// Validator history program ID (Pubkey as base58 string)
     #[arg(
@@ -269,6 +279,7 @@ impl fmt::Display for Args {
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
             Priority Fee Oracle Authority Keypair Path: {:?}\n\
+            Directed Stake Oracle Authority Keypair Path: {:?}\n\
             Validator History Program ID: {}\n\
             Tip Distribution Program ID: {}\n\
             Priority Fee Distribution Program ID: {}\n\
@@ -310,6 +321,7 @@ impl fmt::Display for Args {
             self.keypair,
             self.oracle_authority_keypair,
             self.priority_fee_oracle_authority_keypair,
+            self.directed_stake_oracle_authority_keypair,
             self.validator_history_program_id,
             self.tip_distribution_program_id,
             self.priority_fee_distribution_program_id,

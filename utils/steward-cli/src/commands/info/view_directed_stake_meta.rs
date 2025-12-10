@@ -20,7 +20,15 @@ pub async fn command_view_directed_stake_meta(
     println!("Directed stake meta: {}", _stake_meta_address);
 
     println!("\n📊 DirectedStakeMeta Information:");
-    println!("DirectedStakeMeta Account: {stake_meta_address}");
+    println!("\nDirectedStakeMeta Account: {stake_meta_address}");
+    println!(
+        "DirectedStakeMeta Total Stake Targets: {}",
+        stake_meta.total_stake_targets
+    );
+    println!(
+        "DirectedStakeMeta Directed Unstake Total: {}",
+        stake_meta.directed_unstake_total
+    );
 
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {

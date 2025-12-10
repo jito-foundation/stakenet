@@ -406,6 +406,15 @@ fn main() {
             },
         );
 
+        let directed_stake_oracle_authority_keypair = args
+            .directed_stake_oracle_authority_keypair
+            .map(|directed_stake_oracle_authority_keypair| {
+                Arc::new(
+                    read_keypair_file(directed_stake_oracle_authority_keypair)
+                        .expect("Failed reading directed_stake_oracle_authority_keypair file"),
+                )
+            });
+
         let redundant_rpc_urls = args
             .redundant_rpc_urls
             .map(|x| Arc::new(x.into_iter().map(RpcClient::new).collect()));
@@ -438,6 +447,7 @@ fn main() {
             tx_confirmation_seconds: args.tx_confirmation_seconds,
             sqlite_connection: Arc::new(Mutex::new(connection)),
             priority_fee_oracle_authority_keypair,
+            directed_stake_oracle_authority_keypair,
             redundant_rpc_urls,
             cluster: args.cluster,
             cluster_name: args.cluster.to_string(),
