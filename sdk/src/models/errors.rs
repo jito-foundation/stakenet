@@ -1,3 +1,4 @@
+use kobe_client::error::KobeApiError;
 use log::*;
 use solana_client::client_error::ClientError;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
@@ -54,6 +55,9 @@ pub enum JitoInstructionError {
 
     #[error(transparent)]
     ClientError(#[from] ClientError),
+
+    #[error(transparent)]
+    KobeApiError(#[from] KobeApiError),
 
     #[error("An operation caused an overflow/underflow")]
     ArithmeticError,

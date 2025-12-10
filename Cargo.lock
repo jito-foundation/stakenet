@@ -3231,9 +3231,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-client"
-version = "0.1.6"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab82a219003a5eea98e5ec0cd5bdb2853a510f03622591cf56dc1dc83b93b86a"
+checksum = "5db55f51a6159ea21b09cd03fef39c61776ea66397af6164e8b7c6bb396d30a2"
 dependencies = [
  "chrono",
  "reqwest 0.12.24",
