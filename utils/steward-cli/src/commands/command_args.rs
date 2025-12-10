@@ -1,7 +1,26 @@
-use clap::{arg, command, Parser, Subcommand};
+use clap::{arg, command, Parser, Subcommand, ValueEnum};
 use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 use std::path::PathBuf;
+
+/// Commitment level for RPC queries
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum CommitmentLevel {
+    Processed,
+    #[default]
+    Confirmed,
+    Finalized,
+}
+
+impl From<CommitmentLevel> for CommitmentConfig {
+    fn from(level: CommitmentLevel) -> Self {
+        match level {
+            CommitmentLevel::Processed => CommitmentConfig::processed(),
+            CommitmentLevel::Confirmed => CommitmentConfig::confirmed(),
+            CommitmentLevel::Finalized => CommitmentConfig::finalized(),
+        }
+    }
+}
 
 use crate::commands::{
     actions::{
@@ -56,6 +75,10 @@ pub struct Args {
     /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
     #[arg(long, global = true, env)]
     pub signer: Option<String>,
+
+    /// Commitment level for RPC queries
+    #[arg(long, global = true, env, default_value = "confirmed")]
+    pub commitment: CommitmentLevel,
 
     #[command(subcommand)]
     pub commands: Commands,
