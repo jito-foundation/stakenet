@@ -5,7 +5,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 use clap::Parser;
 use dotenvy::dotenv;
-use kobe_client::client::KobeClient;
+use kobe_client::client_builder::KobeApiClientBuilder;
 use log::*;
 use rand::Rng;
 use rusqlite::Connection;
@@ -24,7 +24,6 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
-use stakenet_sdk::models::cluster::Cluster;
 use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
@@ -359,11 +358,9 @@ fn main() {
             })
             .expect("Failed to create socket addresses from gossip entrypoints");
 
-    let kobe_client = match args.cluster {
-        Cluster::Mainnet => KobeClient::mainnet(),
-        Cluster::Testnet => KobeClient::testnet(),
-        cluster => panic!("Unsupported cluster: expected 'mainnet' or 'testnet', got '{cluster}'"),
-    };
+    let kobe_client = KobeApiClientBuilder::new()
+        .base_url(args.kobe_api_base_url)
+        .build();
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {

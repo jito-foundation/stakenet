@@ -266,6 +266,9 @@ pub struct Args {
     /// Minimum activated stake threshold for creating validator history accounts (in lamports)
     #[arg(long, env, default_value = "500000000000")]
     pub validator_history_min_stake: u64,
+
+    #[arg(long, env, default_value = "https://kobe.mainnet.jito.network")]
+    pub kobe_api_base_url: String,
 }
 
 impl fmt::Display for Args {
@@ -315,6 +318,7 @@ impl fmt::Display for Args {
             Run Priority Fee Commission: {:?}\n\
             Validator History Min Stake: {:?} lamports\n\
             Run Directed Staking Operation: {:?}\n\
+            Kobe API Base URL: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoints,
@@ -357,6 +361,7 @@ impl fmt::Display for Args {
             self.run_priority_fee_commission,
             self.validator_history_min_stake,
             self.run_directed_staking,
+            self.kobe_api_base_url,
         )
     }
 }
