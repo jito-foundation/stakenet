@@ -185,21 +185,20 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     }
                 }
             }
+        }
 
-            info!("Post-fetching data for update...({})", tick);
-            match post_create_update(&keeper_config, &mut keeper_state).await {
-                Ok(_) => {
-                    keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
-                }
-                Err(e) => {
-                    error!("Failed to post create update: {:?}", e);
+        info!("Post-fetching data for update...({})", tick);
+        match post_create_update(&keeper_config, &mut keeper_state).await {
+            Ok(_) => {
+                keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
+            }
+            Err(e) => {
+                error!("Failed to post create update: {:?}", e);
 
-                    keeper_state
-                        .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
+                keeper_state.increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
 
-                    advance_tick(&mut tick);
-                    continue;
-                }
+                advance_tick(&mut tick);
+                continue;
             }
         }
 

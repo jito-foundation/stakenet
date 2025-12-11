@@ -262,10 +262,10 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                    let total_target_lamports = match bv
-                        .active_stake
-                        .checked_mul(metric.available_bam_delegation_stake)
-                        .and_then(|result| result.checked_div(metric.bam_stake)) {
+                    let total_target_lamports = match (bv.active_stake as u128)
+                        .checked_mul(metric.available_bam_delegation_stake as u128)
+                        .and_then(|result| result.checked_div(metric.bam_stake as u128))
+                        .and_then(|result| u64::try_from(result).ok()) {
                            Some(lamports) => lamports,
                            None => {
                                log::warn!(
