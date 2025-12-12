@@ -1,5 +1,7 @@
+use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
+
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use rusqlite::Connection;
@@ -14,7 +16,6 @@ use solana_sdk::{
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
-use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
