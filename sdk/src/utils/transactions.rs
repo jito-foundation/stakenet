@@ -70,7 +70,7 @@ pub async fn get_multiple_accounts_batched(
         match result {
             Ok(Ok(accounts)) => accounts_result.extend(accounts),
             Ok(Err(e)) => {
-                return Err(JitoMultipleAccountsError::ClientError(e));
+                return Err(JitoMultipleAccountsError::ClientError(Box::new(e)));
             }
             Err(e) => return Err(JitoMultipleAccountsError::JoinError(e)),
         }

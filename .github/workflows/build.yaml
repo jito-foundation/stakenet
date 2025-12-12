@@ -32,10 +32,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: rustfmt, clippy
-          toolchain: nightly-2025-02-19
       - name: Install Protobuf Compiler
         run: |
           sudo apt-get update
@@ -47,7 +43,7 @@ jobs:
           version: 1.0.9
       - run: cargo sort --workspace --check
       - run: cargo fmt --all --check
-      - run: cargo +nightly-2025-02-19 clippy --all-features --all-targets --tests -- -D warnings
+      - run: cargo clippy --all-features --all-targets --tests -- -D warnings
 
   udeps:
     name: udeps
@@ -62,13 +58,13 @@ jobs:
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2025-02-19
+          toolchain: nightly
       - name: Install cargo-udeps from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-udeps
           version: "0.1.57"
-      - run: cargo +nightly-2025-02-19 udeps --all-features --all-targets --tests
+      - run: cargo +nightly udeps --all-features --all-targets --tests
 
   build_release:
     name: build_release
