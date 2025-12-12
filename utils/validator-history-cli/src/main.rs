@@ -27,6 +27,7 @@ use validator_history_cli::{
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
             copy_vote_account::CrankCopyVoteAccount,
         },
+        info::view_bam_validators::ViewBamValidators,
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
@@ -63,6 +64,9 @@ enum Commands {
     UpdateOracleAuthority(UpdateOracleAuthority),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
+
+    // Views
+    ViewBamValidators(ViewBamValidators),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
@@ -1287,6 +1291,13 @@ async fn main() -> anyhow::Result<()> {
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
+        Commands::ViewBamValidators(command_args) => {
+            commands::info::view_bam_validators::command_view_bam_validators(
+                command_args,
+                args.json_rpc_url,
+            )
+            .await?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
