@@ -48,8 +48,7 @@ pub async fn command_add_to_blacklist(
             Err(_) => ("N/A".to_string(), false),
         };
         println!(
-            "{}\thttps://solscan.io/account/{}\t{}",
-            vote_account, history_address, vh_index
+            "{vote_account}\thttps://solscan.io/account/{history_address}\t{vh_index}"
         );
         if account_exists {
             indices.push(vh_index.parse()?);
@@ -76,17 +75,17 @@ pub async fn command_add_to_blacklist(
             .squads_program_id
             .unwrap_or(squads_multisig::squads_multisig_program::ID);
 
-        println!("  Multisig Address: {}", multisig);
-        println!("  Squads Program ID: {}", squads_program_id);
+        println!("  Multisig Address: {multisig}");
+        println!("  Squads Program ID: {squads_program_id}");
 
         // Fetch the multisig account to get the transaction index
         println!("  Fetching multisig account...");
         let multisig_account = get_multisig(client, &multisig).await.map_err(|e| {
-            eprintln!("❌ Failed to fetch multisig account: {}", e);
+            eprintln!("❌ Failed to fetch multisig account: {e}");
             e
         })?;
         let transaction_index = multisig_account.transaction_index + 1;
-        println!("  Next transaction index: {}", transaction_index);
+        println!("  Next transaction index: {transaction_index}");
 
         // Derive PDAs
         let vault_pda =
@@ -99,15 +98,13 @@ pub async fn command_add_to_blacklist(
         // Assert vault PDA is blacklist authority
         if vault_pda != blacklist_authority {
             return Err(anyhow::anyhow!(
-                "Vault PDA {} does not match configured blacklist authority {}",
-                vault_pda,
-                blacklist_authority
+                "Vault PDA {vault_pda} does not match configured blacklist authority {blacklist_authority}"
             ));
         }
 
-        println!("  Vault PDA: {}", vault_pda);
-        println!("  Transaction PDA: {}", transaction_pda);
-        println!("  Proposal PDA: {}", proposal_pda);
+        println!("  Vault PDA: {vault_pda}");
+        println!("  Transaction PDA: {transaction_pda}");
+        println!("  Proposal PDA: {proposal_pda}");
 
         // Create the transaction message for the vault transaction
         let message = TransactionMessage::try_compile(&vault_pda, &[blacklist_ix], &[])?;
@@ -174,7 +171,7 @@ pub async fn command_add_to_blacklist(
                 .await?;
 
             println!("Squads proposal created!");
-            println!("Signature: {}", signature);
+            println!("Signature: {signature}");
         }
     } else {
         // Direct execution
@@ -207,7 +204,7 @@ pub async fn command_add_to_blacklist(
                 .send_and_confirm_transaction_with_spinner(&transaction)
                 .await?;
 
-            println!("Signature: {}", signature);
+            println!("Signature: {signature}");
         }
     }
 

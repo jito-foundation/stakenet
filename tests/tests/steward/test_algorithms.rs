@@ -1645,7 +1645,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
-    println!("result: {:?}", result);
+    println!("result: {result:?}");
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 2000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -1720,7 +1720,7 @@ fn test_increase_stake_calculation() {
         0,
     );
     assert!(result.is_ok());
-    println!("result: {:?}", result);
+    println!("result: {result:?}");
     assert!(match result.unwrap() {
         RebalanceType::Increase(lamports) => lamports == 1000 * LAMPORTS_PER_SOL,
         _ => false,
@@ -2059,7 +2059,7 @@ fn test_decrease_stake_calculation() {
         0,
         0,
     );
-    println!("Should be None: {:?}", result);
+    println!("Should be None: {result:?}");
     assert!(matches!(result.unwrap(), RebalanceType::None));
 
     // Test: Stake deposit cap reached on target validator
@@ -2273,7 +2273,7 @@ fn test_decrease_stake_default_lamports() {
             .stake_deposit_unstake(&state, 0, current_lamports, target_lamports)
             .unwrap();
 
-        assert_eq!(result, 0, "Expected 0 unstake lamports, but got {}", result);
+        assert_eq!(result, 0, "Expected 0 unstake lamports, but got {result}");
     }
 
     // Test when stake_deposit_unstake_total reaches stake_deposit_unstake_cap
@@ -2283,7 +2283,6 @@ fn test_decrease_stake_default_lamports() {
         .unwrap();
     assert_eq!(
         result, 0,
-        "Expected 0 unstake lamports when cap is reached, but got {}",
-        result
+        "Expected 0 unstake lamports when cap is reached, but got {result}"
     );
 }

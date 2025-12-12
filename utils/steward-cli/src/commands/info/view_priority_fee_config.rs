@@ -32,7 +32,7 @@ fn print_priority_fee_config(steward_config: &Pubkey, config_account: &Config) {
 
     formatted_string += "------- Priority Fee Config -------\n";
     formatted_string += "📚 Accounts 📚\n";
-    formatted_string += &format!("Config:      {}\n", steward_config);
+    formatted_string += &format!("Config:      {steward_config}\n");
     formatted_string += &format!(
         "Priority Fee Parameters Authority:   {}\n",
         config_account.priority_fee_parameters_authority
@@ -60,5 +60,5 @@ fn print_priority_fee_config(steward_config: &Pubkey, config_account: &Config) {
     );
     formatted_string += "--------------------------------\n";
 
-    println!("{}", formatted_string);
+    println!("{formatted_string}");
 }

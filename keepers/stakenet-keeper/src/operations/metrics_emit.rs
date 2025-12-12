@@ -58,7 +58,7 @@ pub async fn fire(
             }
             Err(e) => {
                 errors_for_epoch += 1;
-                error!("Failed to emit metrics: {}", e);
+                error!("Failed to emit metrics: {e}");
             }
         }
     }

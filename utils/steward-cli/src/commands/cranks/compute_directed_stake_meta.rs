@@ -220,7 +220,7 @@ pub async fn command_crank_compute_directed_stake_meta(
         .await?;
 
     println!("\n=== Transaction Successful ===");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
     println!("Updated metadata:");
     println!("  - {num_tickets} tickets processed");
     println!("  - {tickets_with_balance} tickets with balance");

@@ -172,7 +172,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
-            panic!("Error: {}", e);
+            panic!("Error: {e}");
         }
 
         self.set_priority_fee_oracle_authority().await;
@@ -332,7 +332,7 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
-            panic!("Error: {}", e);
+            panic!("Error: {e}");
         }
     }
 
@@ -348,10 +348,10 @@ impl TestFixture {
             .process_transaction_with_preflight(transaction)
             .await
         {
-            println!("{} {}", e, error_message);
+            println!("{e} {error_message}");
             assert!(e.to_string().contains(error_message));
         } else {
-            panic!("Error: Transaction succeeded. Expected {}", error_message);
+            panic!("Error: Transaction succeeded. Expected {error_message}");
         }
     }
 }

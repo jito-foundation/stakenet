@@ -92,12 +92,11 @@ pub async fn command_realloc_state(
         reallocs_ran += reallocs_per_transaction;
 
         println!(
-            "{}/{}: Signature: {}",
-            reallocs_ran, reallocs_to_run, signature
+            "{reallocs_ran}/{reallocs_to_run}: Signature: {signature}"
         );
     }
 
-    println!("Steward State: {}", steward_state);
+    println!("Steward State: {steward_state}");
 
     Ok(())
 }
@@ -151,7 +150,7 @@ async fn _realloc_x_times(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(signature)

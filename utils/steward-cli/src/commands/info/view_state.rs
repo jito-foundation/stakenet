@@ -660,7 +660,7 @@ fn _print_default_state(
         formatted_string += "\n";
         formatted_string += "---------------------";
 
-        println!("{}", formatted_string)
+        println!("{formatted_string}")
     }
 }
 
@@ -902,18 +902,18 @@ fn _print_verbose_state(
                 None => "N/A",
             };
 
-            formatted_string += &format!("Vote Account: {:?}\n", vote_account);
-            formatted_string += &format!("Stake Account: {:?}\n", stake_address);
+            formatted_string += &format!("Vote Account: {vote_account:?}\n");
+            formatted_string += &format!("Stake Account: {stake_address:?}\n");
             formatted_string +=
-                &format!("Transient Stake Account: {:?}\n", transient_stake_address);
-            formatted_string += &format!("Steward List Index: {}\n", index);
+                &format!("Transient Stake Account: {transient_stake_address:?}\n");
+            formatted_string += &format!("Steward List Index: {index}\n");
 
             let overall_rank_str = match overall_ranks.get(index) {
                 Some(rank) => (rank + 1).to_string(),
                 None => "N/A".into(),
             };
 
-            formatted_string += &format!("Overall Rank: {}\n", overall_rank_str);
+            formatted_string += &format!("Overall Rank: {overall_rank_str}\n");
             formatted_string += &format!("Score: {}\n", score.unwrap_or(&0));
             if let Some(raw_score) = steward_state_account.state.raw_scores.get(index) {
                 let validator_score_components = ValidatorScoreComponents::decode(*raw_score);
@@ -921,7 +921,7 @@ fn _print_verbose_state(
             }
 
             formatted_string +=
-                &format!("Passing Eligibility Criteria: {}\n", eligibility_criteria);
+                &format!("Passing Eligibility Criteria: {eligibility_criteria}\n");
 
             formatted_string += &format!(
                 "Target Delegation Percent: {:.1}%\n",
@@ -990,7 +990,7 @@ fn _print_verbose_state(
                 StakeStatus::DeactivatingValidator => "🟥 Deactivating Validator",
                 StakeStatus::ReadyForRemoval => "🟥 Ready for Removal",
             };
-            formatted_string += &format!("Status: {}\n", status);
+            formatted_string += &format!("Status: {status}\n");
             formatted_string += &format!(
                 "Marked for removal: {}\n",
                 steward_state_account
@@ -1016,7 +1016,7 @@ fn _print_verbose_state(
                 }
             }
 
-            println!("{}", formatted_string);
+            println!("{formatted_string}");
         }
 
         if maybe_vote_account.is_none() {
@@ -1025,18 +1025,18 @@ fn _print_verbose_state(
 
             top_scores.sort_by(|a, b| b.1.cmp(&a.1));
             top_scores.iter().for_each(|(vote_account, score)| {
-                let formatted_score = format!("{}", score).chars().rev().enumerate().fold(
+                let formatted_score = format!("{score}").chars().rev().enumerate().fold(
                     String::new(),
                     |acc, (i, c)| {
                         if i > 0 && i % 3 == 0 {
-                            format!("{}_{}", c, acc)
+                            format!("{c}_{acc}")
                         } else {
-                            format!("{}{}", c, acc)
+                            format!("{c}{acc}")
                         }
                     },
                 );
-                let vote_account = format!("{:?}", vote_account);
-                println!("{:<45} : {}", vote_account, formatted_score);
+                let vote_account = format!("{vote_account:?}");
+                println!("{vote_account:<45} : {formatted_score}");
             });
         }
     }

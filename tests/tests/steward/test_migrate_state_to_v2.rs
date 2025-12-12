@@ -205,8 +205,7 @@ async fn test_migrate_state_to_v2() {
                 .instant_unstake
                 .get(i)
                 .unwrap_or(false),
-            "instant_unstake mismatch at index {}",
-            i
+            "instant_unstake mismatch at index {i}"
         );
     }
     // Progress (BitMask - compare element by element)
@@ -214,8 +213,7 @@ async fn test_migrate_state_to_v2() {
         assert_eq!(
             steward_state_v1.state.progress.get(i).unwrap_or(false),
             steward_state_v2.state.progress.get(i).unwrap_or(false),
-            "progress mismatch at index {}",
-            i
+            "progress mismatch at index {i}"
         );
     }
     // Validators for immediate removal (BitMask - compare element by element)
@@ -236,8 +234,7 @@ async fn test_migrate_state_to_v2() {
                 .validators_for_immediate_removal
                 .get(i)
                 .unwrap_or(false),
-            "validators_for_immediate_removal mismatch at index {}",
-            i
+            "validators_for_immediate_removal mismatch at index {i}"
         );
     }
     // Validators to remove (BitMask - compare element by element)
@@ -253,8 +250,7 @@ async fn test_migrate_state_to_v2() {
                 .validators_to_remove
                 .get(i)
                 .unwrap_or(false),
-            "validators_to_remove mismatch at index {}",
-            i
+            "validators_to_remove mismatch at index {i}"
         );
     }
     // Start computing scores slot
@@ -307,8 +303,7 @@ async fn test_migrate_state_to_v2() {
     for (i, &byte) in steward_state_v1.state._padding0.iter().enumerate() {
         assert_eq!(
             byte, 0,
-            "V1 padding byte at index {} should be 0, but was {}",
-            i, byte
+            "V1 padding byte at index {i} should be 0, but was {byte}"
         );
     }
 
@@ -316,8 +311,7 @@ async fn test_migrate_state_to_v2() {
     for (i, &byte) in steward_state_v2.state._padding0.iter().enumerate() {
         assert_eq!(
             byte, 0,
-            "V2 padding byte at index {} should be 0, but was {}",
-            i, byte
+            "V2 padding byte at index {i} should be 0, but was {byte}"
         );
     }
 
@@ -368,7 +362,7 @@ async fn test_migrate_state_to_v2_twice_fails() {
     match result {
         Err(e) => {
             // The migration should fail with InvalidAccountData error
-            println!("Expected error: {:?}", e);
+            println!("Expected error: {e:?}");
         }
         Ok(_) => panic!("Migration should have failed the second time"),
     }

@@ -212,17 +212,17 @@ async fn update_block_metadata(
         // Check if slot exists
         if DBSlotInfo::check_random_slot_exists_in_epoch(sqlite_connection, epoch, epoch_schedule)?
         {
-            info!("Epoch {} already exists", epoch);
+            info!("Epoch {epoch} already exists");
             continue;
         } else {
-            info!("Updating epoch {}", epoch)
+            info!("Updating epoch {epoch}")
         }
 
         let epoch_leader_schedule_result =
             get_leader_schedule_safe(client, epoch_starting_slot).await;
 
         if epoch_leader_schedule_result.is_err() {
-            info!("Could not find leader schedule for epoch {}", epoch);
+            info!("Could not find leader schedule for epoch {epoch}");
             continue;
         }
 
@@ -244,14 +244,14 @@ async fn update_block_metadata(
                     time_ms as f64 / 1000.0
                 )
             }
-            Err(err) => error!("Error writing leaders {:?}", err),
+            Err(err) => error!("Error writing leaders {err:?}"),
         }
 
         // 1.b Log out missing vote accounts
         for leader in epoch_leader_schedule.keys() {
             if !identity_to_vote_map.contains_key(leader) {
                 // TODO
-                error!("TODO Could not find Vote for {} in epoch {}", leader, epoch)
+                error!("TODO Could not find Vote for {leader} in epoch {epoch}")
             }
         }
     }
@@ -275,7 +275,7 @@ async fn update_block_metadata(
                     time_ms as f64 / 1000.0
                 )
             }
-            Err(err) => error!("Error updating identity/vote mapping {:?}", err),
+            Err(err) => error!("Error updating identity/vote mapping {err:?}"),
         }
     }
 
@@ -321,8 +321,7 @@ async fn update_block_metadata(
                         }
                         _ => {
                             info!(
-                                "Could not get block info for slot {} - skipping: {:?}",
-                                slot, err
+                                "Could not get block info for slot {slot} - skipping: {err:?}"
                             )
                         }
                     },
@@ -342,7 +341,7 @@ async fn update_block_metadata(
                         blocks_per_second
                     )
                 }
-                Err(err) => error!("Error writing blocks {:?}", err),
+                Err(err) => error!("Error writing blocks {err:?}"),
             }
         }
 
@@ -374,7 +373,7 @@ async fn update_block_metadata(
             ) {
                 Ok(map) => map,
                 Err(err) => {
-                    error!("Could not get update map - skipping... {:?}", err);
+                    error!("Could not get update map - skipping... {err:?}");
                     continue;
                 }
             };
@@ -483,7 +482,7 @@ async fn update_block_metadata(
             ixs.len(),
             time_ms as f64 / 1000.0,
         );
-        info!("Block Metadata: {}", needs_update_counter);
+        info!("Block Metadata: {needs_update_counter}");
     }
 
     // 5. Submit TXs
@@ -540,12 +539,7 @@ pub async fn get_priority_fee_distribution_account_info(
                 ),
                 Err(error) => {
                     let error_string = format!(
-                        "Could not deserialize account data {}-{}-{} = {}: {:?}",
-                        priority_fee_distribution_program_id,
-                        vote_account,
-                        epoch,
-                        priority_fee_distribution_account,
-                        error
+                        "Could not deserialize account data {priority_fee_distribution_program_id}-{vote_account}-{epoch} = {priority_fee_distribution_account}: {error:?}"
                     );
                     (
                         priority_fee_distribution_account,
@@ -558,12 +552,7 @@ pub async fn get_priority_fee_distribution_account_info(
         }
         Err(error) => {
             let error_string = format!(
-                "Could not fetch account {}-{}-{} = {}: {:?}",
-                priority_fee_distribution_program_id,
-                vote_account,
-                epoch,
-                priority_fee_distribution_account,
-                error
+                "Could not fetch account {priority_fee_distribution_program_id}-{vote_account}-{epoch} = {priority_fee_distribution_account}: {error:?}"
             );
             (
                 priority_fee_distribution_account,
@@ -582,8 +571,7 @@ pub async fn get_leader_schedule_safe(
     match rpc_client.get_leader_schedule(Some(starting_slot)).await? {
         Some(schedule) => Ok(schedule),
         None => Err(BlockMetadataKeeperError::OtherError(format!(
-            "Could not get leader schedule for starting slot {}",
-            starting_slot
+            "Could not get leader schedule for starting slot {starting_slot}"
         ))),
     }
 }

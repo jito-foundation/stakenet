@@ -27,7 +27,7 @@ pub async fn command_init_directed_stake_ticket(
     program_id: Pubkey,
 ) -> Result<()> {
     let authority_keypair = read_keypair_file(&args.authority_keypair_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {e}"))?;
     let authority_pubkey = authority_keypair.pubkey();
 
     let directed_stake_whitelist_pda =
@@ -37,7 +37,7 @@ pub async fn command_init_directed_stake_ticket(
         get_directed_stake_ticket_address(&args.steward_config, &authority_pubkey, &program_id);
 
     println!("Initializing DirectedStakeTicket...");
-    println!("  Authority: {}", authority_pubkey);
+    println!("  Authority: {authority_pubkey}");
     println!("  Steward Config: {}", args.steward_config);
     println!(
         "  Ticket Update Authority: {}",
@@ -47,7 +47,7 @@ pub async fn command_init_directed_stake_ticket(
         "  Ticket Holder Is Protocol: {}",
         args.ticket_holder_is_protocol
     );
-    println!("  DirectedStakeTicket PDA: {}", directed_stake_ticket_pda);
+    println!("  DirectedStakeTicket PDA: {directed_stake_ticket_pda}");
 
     let instruction = Instruction {
         program_id,
@@ -90,10 +90,9 @@ pub async fn command_init_directed_stake_ticket(
             .await?;
 
         println!("✅ DirectedStakeTicket initialized successfully!");
-        println!("  Transaction signature: {}", signature);
+        println!("  Transaction signature: {signature}");
         println!(
-            "  DirectedStakeTicket account: {}",
-            directed_stake_ticket_pda
+            "  DirectedStakeTicket account: {directed_stake_ticket_pda}"
         );
     }
 

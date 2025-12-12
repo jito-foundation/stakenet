@@ -102,7 +102,7 @@ pub async fn command_init_steward(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
         println!("Steward Config: {}", steward_config.pubkey());
     }
 
