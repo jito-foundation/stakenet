@@ -376,6 +376,37 @@
       ]
     },
     {
+      "name": "close_directed_stake_meta",
+      "docs": [
+        "Close DirectedStakeMeta account"
+      ],
+      "discriminator": [
+        180,
+        23,
+        253,
+        79,
+        9,
+        86,
+        107,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_directed_stake_ticket",
       "docs": [
         "Close DirectedStakeTicket account"

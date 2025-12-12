@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        close_directed_stake_meta::CloseDirectedStakeMeta,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
         copy_directed_stake_targets::CopyDirectedStakeTargets,
@@ -352,6 +353,7 @@ pub enum Commands {
     RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
+    CloseDirectedStakeMeta(CloseDirectedStakeMeta),
 
     // Cranks
     CrankSteward(CrankSteward),
