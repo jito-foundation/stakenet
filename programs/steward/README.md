@@ -46,7 +46,7 @@ The state machine represents the progress throughout a cycle (10-epoch period fo
 
 JIP-27 introduces the concept of Directed Staking. Directed Staking allows stakers to specify which validators they would like to delegate the stake underpinning their JitoSOL holdings to.
 
-The DirectedStakeWhitelist and DirectedStakeMeta accounts power this feature. These are permissioned accounts managed by Jito Labs. 
+The DirectedStakeWhitelist and DirectedStakeMeta accounts power this feature. 
 
 At 0% epoch progress after completing stake pool updates and epoch maintenance, the Steward state machine will enter the RebalanceDirected state. This state is complete when every target validator within the DirectedStakeMeta has had their directed delegation rebalanced.
 
