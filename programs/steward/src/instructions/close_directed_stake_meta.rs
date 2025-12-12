@@ -18,7 +18,7 @@ pub struct CloseDirectedStakeMeta<'info> {
 
     #[account(
         mut,
-        address = config.load()?.admin @ StewardError::Unauthorized
+        address = config.load()?.directed_stake_meta_upload_authority @ StewardError::Unauthorized
     )]
     pub authority: Signer<'info>,
 }
