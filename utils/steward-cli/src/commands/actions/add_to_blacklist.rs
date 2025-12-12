@@ -47,9 +47,7 @@ pub async fn command_add_to_blacklist(
             },
             Err(_) => ("N/A".to_string(), false),
         };
-        println!(
-            "{vote_account}\thttps://solscan.io/account/{history_address}\t{vh_index}"
-        );
+        println!("{vote_account}\thttps://solscan.io/account/{history_address}\t{vh_index}");
         if account_exists {
             indices.push(vh_index.parse()?);
         }

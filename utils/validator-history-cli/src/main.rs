@@ -1137,9 +1137,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             println!("Total stake: {total_stake} lamports");
             for (country, stake) in countries {
                 let percentage = (*stake as f64 / total_stake as f64) * 100.0;
-                println!(
-                    "Country: {country}, Lamports: {stake}, Percentage: {percentage:.2}%"
-                );
+                println!("Country: {country}, Lamports: {stake}, Percentage: {percentage:.2}%");
             }
         }
     }

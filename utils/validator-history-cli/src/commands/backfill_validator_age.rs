@@ -84,9 +84,7 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
                 Err(err) => {
                     retry_count += 1;
                     if retry_count >= max_retries {
-                        println!(
-                            "Transaction failed after {max_retries} retries: {err:?}"
-                        );
+                        println!("Transaction failed after {max_retries} retries: {err:?}");
                         break;
                     }
                     println!(
@@ -152,9 +150,7 @@ async fn validate_validator_history_accounts(
         }
     }
     println!("\nNumber of valid vote accounts: {num_valid}");
-    println!(
-        "Number of open but invalid vote accounts: {num_open_but_invalid}"
-    );
+    println!("Number of open but invalid vote accounts: {num_open_but_invalid}");
     println!("Number of closed vote accounts: {num_closed}");
     validated
 }
@@ -281,8 +277,7 @@ fn compute_validator_ages(
 
 fn read_oracle_data(path: PathBuf) -> Vec<SourceData> {
     // Open file
-    let file =
-        File::open(&path).unwrap_or_else(|e| panic!("Failed to open file {path:?}: {e}"));
+    let file = File::open(&path).unwrap_or_else(|e| panic!("Failed to open file {path:?}: {e}"));
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
     // Skip header line

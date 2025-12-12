@@ -34,9 +34,7 @@ pub async fn command_init_directed_stake_whitelist(
     println!("Initializing DirectedStakeWhitelist...");
     println!("  Authority: {authority_pubkey}");
     println!("  Steward Config: {}", args.steward_config);
-    println!(
-        "  DirectedStakeWhitelist PDA: {directed_stake_whitelist_pda}"
-    );
+    println!("  DirectedStakeWhitelist PDA: {directed_stake_whitelist_pda}");
 
     let instruction = Instruction {
         program_id,
@@ -75,9 +73,7 @@ pub async fn command_init_directed_stake_whitelist(
 
         println!("✅ DirectedStakeWhitelist initialized successfully!");
         println!("  Transaction signature: {signature}");
-        println!(
-            "  DirectedStakeWhitelist account: {directed_stake_whitelist_pda}"
-        );
+        println!("  DirectedStakeWhitelist account: {directed_stake_whitelist_pda}");
     }
 
     Ok(())

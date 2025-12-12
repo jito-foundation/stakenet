@@ -105,9 +105,7 @@ pub async fn command_realloc_directed_stake_meta(
         reallocs_left_to_run -= reallocs_per_transaction;
         reallocs_ran += reallocs_per_transaction;
 
-        println!(
-            "{reallocs_ran}/{reallocs_to_run}: Signature: {signature}"
-        );
+        println!("{reallocs_ran}/{reallocs_to_run}: Signature: {signature}");
     }
 
     Ok(())

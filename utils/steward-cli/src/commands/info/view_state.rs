@@ -904,8 +904,7 @@ fn _print_verbose_state(
 
             formatted_string += &format!("Vote Account: {vote_account:?}\n");
             formatted_string += &format!("Stake Account: {stake_address:?}\n");
-            formatted_string +=
-                &format!("Transient Stake Account: {transient_stake_address:?}\n");
+            formatted_string += &format!("Transient Stake Account: {transient_stake_address:?}\n");
             formatted_string += &format!("Steward List Index: {index}\n");
 
             let overall_rank_str = match overall_ranks.get(index) {
@@ -920,8 +919,7 @@ fn _print_verbose_state(
                 formatted_string += &validator_score_components.to_string();
             }
 
-            formatted_string +=
-                &format!("Passing Eligibility Criteria: {eligibility_criteria}\n");
+            formatted_string += &format!("Passing Eligibility Criteria: {eligibility_criteria}\n");
 
             formatted_string += &format!(
                 "Target Delegation Percent: {:.1}%\n",

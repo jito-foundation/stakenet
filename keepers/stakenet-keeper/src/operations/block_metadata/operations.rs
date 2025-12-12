@@ -320,9 +320,7 @@ async fn update_block_metadata(
                             DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
                         }
                         _ => {
-                            info!(
-                                "Could not get block info for slot {slot} - skipping: {err:?}"
-                            )
+                            info!("Could not get block info for slot {slot} - skipping: {err:?}")
                         }
                     },
                 }

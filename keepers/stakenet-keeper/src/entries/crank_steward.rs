@@ -685,9 +685,7 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        info!(
-            "State Epoch: {state_epoch} | Current Epoch: {current_epoch}"
-        );
+        info!("State Epoch: {state_epoch} | Current Epoch: {current_epoch}");
     }
 
     Ok(stats)

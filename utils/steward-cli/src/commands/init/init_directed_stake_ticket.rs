@@ -91,9 +91,7 @@ pub async fn command_init_directed_stake_ticket(
 
         println!("✅ DirectedStakeTicket initialized successfully!");
         println!("  Transaction signature: {signature}");
-        println!(
-            "  DirectedStakeTicket account: {directed_stake_ticket_pda}"
-        );
+        println!("  DirectedStakeTicket account: {directed_stake_ticket_pda}");
     }
 
     Ok(())

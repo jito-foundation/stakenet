@@ -314,9 +314,7 @@ fn check_entry_valid(
     let signer = entry.pubkey();
 
     if signer != validator_identity {
-        error!(
-            "Invalid gossip value retrieved for validator {validator_identity}"
-        );
+        error!("Invalid gossip value retrieved for validator {validator_identity}");
         return false;
     }
     true

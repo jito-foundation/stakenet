@@ -622,9 +622,7 @@ impl DBSlotInfo {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        info!(
-            "Completed Dune API fetch. Total entries written: {total_written}"
-        );
+        info!("Completed Dune API fetch. Total entries written: {total_written}");
         Ok(total_written)
     }
 
