@@ -1032,15 +1032,8 @@ async fn test_rebalance_increase() {
     initialize_directed_stake_meta(&fixture).await;
     fixture.realloc_directed_stake_meta().await;
 
-    let mut steward_config: Config = fixture
-        .load_and_deserialize(&fixture.steward_config.pubkey())
-        .await;
     let mut steward_state_account: StewardStateAccountV2 =
         fixture.load_and_deserialize(&fixture.steward_state).await;
-    steward_config.parameters.scoring_unstake_cap_bps = 0;
-    steward_config.parameters.instant_unstake_cap_bps = 0;
-    steward_config.parameters.stake_deposit_unstake_cap_bps = 0;
-    steward_config.parameters.minimum_voting_epochs = 1;
     steward_state_account.state.state_tag = StewardStateEnum::Rebalance;
     steward_state_account.state.num_pool_validators = MAX_VALIDATORS as u64 - 1;
     steward_state_account.state.next_cycle_epoch = epoch_schedule.first_normal_epoch + 10;

@@ -1,6 +1,6 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use clap::{arg, command, Parser};
+use clap::Parser;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
