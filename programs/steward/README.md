@@ -14,6 +14,7 @@ The Steward Program was created to automatically manage the Jito Stake Pool. Usi
   - [Table of Contents](#table-of-contents)
   - [Program Overview](#program-overview)
   - [State Machine](#state-machine)
+    - [Rebalance Directed](#rebalance-directed)
     - [Compute Scores](#compute-scores)
     - [Compute Delegations](#compute-delegations)
     - [Idle](#idle)
@@ -41,9 +42,25 @@ The Steward Program's main functions include:
 
 The state machine represents the progress throughout a cycle (10-epoch period for scoring and delegations).
 
+### Rebalance Directed
+
+JIP-27 introduces the concept of Directed Staking. Directed Staking allows stakers to specify which validators they would like to delegate the stake underpinning their JitoSOL holdings to.
+
+The DirectedStakeWhitelist and DirectedStakeMeta accounts power this feature. These are permissioned accounts managed by Jito Labs. 
+
+At 0% epoch progress after completing stake pool updates and epoch maintenance, the Steward state machine will enter the RebalanceDirected state. This state is complete when every target validator within the DirectedStakeMeta has had their directed delegation rebalanced.
+
+The type of rebalance performed for a particular validator depends on its current directed stake lamports versus its target directed stake lamports. An increase or decrease in directed stake lamports will trigger a delegation or undelegation respectively.
+
+Each directed stake increase is a pro-rata allocation of the reserve lamports based on the delta between the validators current stake and target.
+
+Each directed stake decrease is capped to a scoring cycle based directed unstake cap bps of total pool lamports. This helps prevent yield drag from excessive unstaking. If the total decrease delta across the validator set exceeds the cap, decreases will be performed pro-rata with respect to the remaining headroom.
+
+Progress is marked entirely in the DirectedStakeMeta with the `staked_last_updated_epoch` field for each validator. Once all validators have been processed, or the epoch progress reached 50% (compute scores threshold), the state machine will transition to the Idle state.
+
 ### Compute Scores
 
-At the start of a 10 epoch cycle ("the cycle"), all validators are scored. We save both the overall `score` (which includes binary eligibility filters) and the `raw_score` (the 4-tier hierarchical score before filters).
+At the 50% epoch progress of a 10 epoch cycle ("the cycle"), all validators are scored. We save both the overall `score` (which includes binary eligibility filters) and the `raw_score` (the 4-tier hierarchical score before filters).
 
 The `score` determines eligibility to be staked in the pool (must be non-zero). The `raw_score` determines the unstaking order (lower raw_score validators are unstaked first).
 
