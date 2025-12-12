@@ -5,6 +5,7 @@ It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is se
 */
 use clap::Parser;
 use dotenvy::dotenv;
+use kobe_client::client_builder::KobeApiClientBuilder;
 use log::*;
 use rand::Rng;
 use rusqlite::Connection;
@@ -357,6 +358,10 @@ fn main() {
             })
             .expect("Failed to create socket addresses from gossip entrypoints");
 
+    let kobe_client = KobeApiClientBuilder::new()
+        .base_url(args.kobe_api_base_url)
+        .build();
+
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(async {
         let hostname_cmd = Command::new("hostname")
@@ -446,6 +451,7 @@ fn main() {
             lookback_epochs: args.lookback_epochs,
             lookback_start_offset_epochs: args.lookback_start_offset_epochs,
             validator_history_min_stake: args.validator_history_min_stake,
+            kobe_client,
         };
 
         run_keeper(config).await;

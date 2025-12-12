@@ -319,40 +319,73 @@ impl KeeperState {
     ///
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
-    /// - One of the target has not updated in this epoch
+    /// - No directed stake targets have been updated in the current epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
         program_id: &Pubkey,
     ) -> Result<bool, JitoTransactionError> {
-        if let Some(ref steward_state) = self.all_steward_accounts {
-            let current_slot = client.get_slot().await?;
-            let slots_in_epoch = self.epoch_schedule.slots_per_epoch;
-            let slot_index = current_slot
-                .checked_sub(
-                    self.epoch_schedule
-                        .get_first_slot_in_epoch(self.epoch_info.epoch),
-                )
-                .ok_or(JitoTransactionError::Custom(
-                    "Failed to calculate".to_string(),
-                ))?;
-            let epoch_progress = slot_index as f64 / slots_in_epoch as f64;
+        let Some(ref steward_state) = self.all_steward_accounts else {
+            return Ok(false);
+        };
 
-            let meta =
-                get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
+        // Calculate epoch progress
+        let current_slot = client.get_slot().await?;
+        let first_slot_in_epoch = self
+            .epoch_schedule
+            .get_first_slot_in_epoch(self.epoch_info.epoch);
+        let slot_index = current_slot
+            .checked_sub(first_slot_in_epoch)
+            .ok_or_else(|| {
+                JitoTransactionError::Custom(format!(
+                    "Slot calculation overflow: current_slot={}, first_slot={}",
+                    current_slot, first_slot_in_epoch
+                ))
+            })?;
 
-            let has_stale_targets = meta
-                .targets
-                .iter()
-                .filter(|target| target.vote_pubkey.ne(&Pubkey::default()))
-                .any(|target| target.target_last_updated_epoch.ne(&self.epoch_info.epoch));
+        let epoch_progress = slot_index as f64 / self.epoch_schedule.slots_per_epoch as f64;
 
-            let should_run_copy_directed_targets = epoch_progress > 0.5 && has_stale_targets;
-
-            return Ok(should_run_copy_directed_targets);
+        // Early return if epoch is not yet 50% complete
+        if epoch_progress <= 0.5 {
+            log::debug!(
+                "Epoch progress {:.2}% - too early to copy targets",
+                epoch_progress * 100.0
+            );
+            return Ok(false);
         }
 
-        Ok(false)
+        // Fetch and filter valid targets
+        let meta =
+            get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
+
+        let valid_targets: Vec<_> = meta
+            .targets
+            .into_iter()
+            .filter(|target| !target.vote_pubkey.eq(&Pubkey::default()))
+            .collect();
+
+        // If no valid targets exist, we should copy
+        if valid_targets.is_empty() {
+            log::info!("No valid targets found - triggering copy");
+            return Ok(true);
+        }
+
+        // Check if any targets have been updated in current epoch
+        let any_target_updated = valid_targets
+            .iter()
+            .any(|target| target.target_last_updated_epoch == self.epoch_info.epoch);
+
+        let should_copy = !any_target_updated;
+
+        log::info!(
+            "Epoch {:.2}% complete, {} valid targets, any updated: {} - should_copy: {}",
+            epoch_progress * 100.0,
+            valid_targets.len(),
+            any_target_updated,
+            should_copy
+        );
+
+        Ok(should_copy)
     }
 }
 
