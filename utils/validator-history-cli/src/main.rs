@@ -1,5 +1,7 @@
+use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
+
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use rusqlite::Connection;
@@ -14,7 +16,6 @@ use solana_sdk::{
 };
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
-use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
     ValidatorHistoryEntry,
@@ -319,7 +320,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 }
 
 fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
@@ -350,7 +351,7 @@ fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 }
 
 fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
@@ -399,7 +400,7 @@ fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 }
 
 fn get_entry(validator_history: ValidatorHistory, epoch: u64) -> Option<ValidatorHistoryEntry> {
@@ -674,15 +675,15 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
         println!("Total Validators:\t\t{}", config.counter);
-        println!("Validators with IP:\t\t{}", ips);
-        println!("Validators with Version:\t{}", versions);
-        println!("Validators with Client Type:\t{}", types);
-        println!("Validators with MEV Commission: {}", mev_comms);
-        println!("Validators with MEV Earned: \t{}", mev_earned);
-        println!("Validators with Commission:\t{}", comms);
-        println!("Validators with Epoch Credits:\t{}", epoch_credits);
-        println!("Validators with Stake:\t\t{}", stakes);
-        println!("Validators with Rank:\t\t{}", ranks);
+        println!("Validators with IP:\t\t{ips}");
+        println!("Validators with Version:\t{versions}");
+        println!("Validators with Client Type:\t{types}");
+        println!("Validators with MEV Commission: {mev_comms}");
+        println!("Validators with MEV Earned: \t{mev_earned}");
+        println!("Validators with Commission:\t{comms}");
+        println!("Validators with Epoch Credits:\t{epoch_credits}");
+        println!("Validators with Stake:\t\t{stakes}");
+        println!("Validators with Rank:\t\t{ranks}");
     }
 }
 
@@ -777,7 +778,7 @@ fn command_history(args: History, client: RpcClient) {
                     );
                 }
                 None => {
-                    println!("Epoch {}:\tNo history", epoch);
+                    println!("Epoch {epoch}:\tNo history");
                 }
             }
         }
@@ -800,7 +801,7 @@ fn command_view_config(client: RpcClient) {
         "Tip Distribution Program: {}",
         config.tip_distribution_program
     );
-    println!("Config Account: {}\n", config_pda);
+    println!("Config Account: {config_pda}\n");
     println!("↺ State ↺");
     println!("Validator History Account Counter: {}\n", config.counter);
 }
@@ -894,7 +895,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 }
 
 fn command_update_oracle_authority(args: UpdateOracleAuthority, client: RpcClient) {
@@ -927,7 +928,7 @@ fn command_update_oracle_authority(args: UpdateOracleAuthority, client: RpcClien
     let signature = client
         .send_and_confirm_transaction_with_spinner(&transaction)
         .expect("Failed to send transaction");
-    println!("Signature: {}", signature);
+    println!("Signature: {signature}");
 }
 
 async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
@@ -1092,7 +1093,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
                             }
                             None => {
                                 // Country name not available
-                                eprintln!("No country data for IP {}", ip_address);
+                                eprintln!("No country data for IP {ip_address}");
                             }
                         }
                     }
@@ -1114,10 +1115,10 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             match country_map.get(country) {
                 Some(stake) => {
                     let percentage = (*stake as f64 / total_stake as f64) * 100.0;
-                    println!("Lamports: {stake}, Percentage: {:.2}%", percentage);
+                    println!("Lamports: {stake}, Percentage: {percentage:.2}%");
                 }
                 None => {
-                    println!("Country not found: {}", country);
+                    println!("Country not found: {country}");
                     println!(
                         "Available countries: {}",
                         country_map
@@ -1137,10 +1138,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
             println!("Total stake: {total_stake} lamports");
             for (country, stake) in countries {
                 let percentage = (*stake as f64 / total_stake as f64) * 100.0;
-                println!(
-                    "Country: {}, Lamports: {}, Percentage: {:.2}%",
-                    country, stake, percentage
-                );
+                println!("Country: {country}, Lamports: {stake}, Percentage: {percentage:.2}%");
             }
         }
     }
@@ -1153,7 +1151,7 @@ fn command_get_config(client: RpcClient) {
         Ok(account) => match Config::try_deserialize(&mut account.data.as_slice()) {
             Ok(config) => {
                 println!("Validator History Config:");
-                println!("  Pubkey: {}", config_pda);
+                println!("  Pubkey: {config_pda}");
                 println!(
                     "  Tip Distribution Program: {}",
                     config.tip_distribution_program
@@ -1204,7 +1202,7 @@ async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, clien
     .expect("Task panicked")
     .expect("Error running backfill");
 
-    println!("Total entries written: {}", entries_written);
+    println!("Total entries written: {entries_written}");
 }
 
 fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
@@ -1259,8 +1257,8 @@ fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
     println!("Successfully uploaded validator age:");
     println!("  Vote Account: {}", args.vote_account);
     println!("  Validator Age: {}", args.age);
-    println!("  Last Updated Epoch: {}", epoch);
-    println!("  Signature: {}", signature);
+    println!("  Last Updated Epoch: {epoch}");
+    println!("  Signature: {signature}");
 }
 
 #[tokio::main]

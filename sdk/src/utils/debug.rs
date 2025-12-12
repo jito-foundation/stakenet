@@ -29,11 +29,11 @@ pub async fn debug_send_single_transaction(
     if debug_print.unwrap_or(false) {
         match &result {
             Ok(signature) => {
-                println!("Signature: {}", signature);
+                println!("Signature: {signature}");
             }
             Err(e) => {
                 println!("Accounts: {:?}", &instructions.last().unwrap().accounts);
-                println!("Error: {:?}", e);
+                println!("Error: {e:?}");
             }
         }
     }

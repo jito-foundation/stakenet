@@ -121,11 +121,11 @@ pub async fn debug_send_single_transaction(
     if debug_print.unwrap_or(false) {
         match &result {
             Ok(signature) => {
-                println!("Signature: {}", signature);
+                println!("Signature: {signature}");
             }
             Err(e) => {
                 println!("Accounts: {:?}", &instructions.last().unwrap().accounts);
-                println!("Error: {:?}", e);
+                println!("Error: {e:?}");
             }
         }
     }
@@ -188,10 +188,10 @@ pub fn print_governance_ix(ixs: &[Instruction]) {
                 }
                 println!("Data: {:?}", gov_ix_data.data);
                 let base64_ix = BASE64_STANDARD.encode(buffer.into_inner());
-                println!("Base64 InstructionData: {:?}\n", base64_ix);
+                println!("Base64 InstructionData: {base64_ix:?}\n");
             }
             Err(err) => {
-                println!("Failed to serialize InstructionData: {}", err);
+                println!("Failed to serialize InstructionData: {err}");
             }
         }
     });

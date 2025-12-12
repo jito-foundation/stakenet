@@ -1,4 +1,3 @@
-use log::*;
 use solana_client::client_error::ClientError;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
 
@@ -8,13 +7,19 @@ use tokio::task::JoinError;
 #[derive(ThisError, Debug)]
 pub enum JitoTransactionError {
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    ClientError(#[from] Box<ClientError>),
     #[error(transparent)]
     TransactionExecutionError(#[from] JitoTransactionExecutionError),
     #[error(transparent)]
     MultipleAccountsError(#[from] JitoMultipleAccountsError),
     #[error("Custom: {0}")]
     Custom(String),
+}
+
+impl From<ClientError> for JitoTransactionError {
+    fn from(error: ClientError) -> Self {
+        JitoTransactionError::ClientError(Box::new(error))
+    }
 }
 
 pub type Error = Box<dyn std::error::Error>;
@@ -29,7 +34,7 @@ pub enum JitoTransactionExecutionError {
 #[derive(ThisError, Debug)]
 pub enum JitoMultipleAccountsError {
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    ClientError(#[from] Box<ClientError>),
     #[error(transparent)]
     JoinError(#[from] JoinError),
 }
@@ -51,9 +56,6 @@ pub enum JitoSendTransactionError {
 pub enum JitoInstructionError {
     #[error(transparent)]
     JitoTransactionError(#[from] JitoTransactionError),
-
-    #[error(transparent)]
-    ClientError(#[from] ClientError),
 
     #[error("An operation caused an overflow/underflow")]
     ArithmeticError,

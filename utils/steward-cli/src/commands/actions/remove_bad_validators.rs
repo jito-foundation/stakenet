@@ -78,14 +78,13 @@ pub async fn command_remove_bad_validators(
         )
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
 
-    println!("Bad history accounts: {:?}", bad_history_accounts);
+    println!("Bad history accounts: {bad_history_accounts:?}");
 
     let ixs_to_run = bad_history_accounts
         .iter()
         .map(|(validator_index, vote_account, history_account)| {
             println!(
-                "index: {}, vote_account: {}, history_account: {}\n",
-                validator_index, vote_account, history_account
+                "index: {validator_index}, vote_account: {vote_account}, history_account: {history_account}\n"
             );
 
             let (stake_address, _) = find_stake_program_address(
@@ -155,7 +154,7 @@ pub async fn command_remove_bad_validators(
 
         let submit_stats = submit_transactions(client, txs_to_run, &arc_payer, 20, 30).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

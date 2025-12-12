@@ -39,7 +39,7 @@ fn _print_default_config(
 
     formatted_string += "------- Config -------\n";
     formatted_string += "📚 Accounts 📚\n";
-    formatted_string += &format!("Config:      {}\n", steward_config);
+    formatted_string += &format!("Config:      {steward_config}\n");
     formatted_string += &format!("Admin:   {}\n", config_account.admin);
     formatted_string += &format!("Blacklist Auth:   {}\n", config_account.blacklist_authority);
     formatted_string += &format!(
@@ -58,8 +58,8 @@ fn _print_default_config(
         "Directed Stake Ticket Override Auth:   {}\n",
         config_account.directed_stake_ticket_override_authority
     );
-    formatted_string += &format!("Staker:      {}\n", staker);
-    formatted_string += &format!("State:       {}\n", steward_state);
+    formatted_string += &format!("Staker:      {staker}\n");
+    formatted_string += &format!("State:       {steward_state}\n");
     formatted_string += &format!("Stake Pool:  {}\n", config_account.stake_pool);
     formatted_string += &format!("Validator List:  {}\n", config_account.validator_list);
     formatted_string += &format!(
@@ -189,5 +189,5 @@ fn _print_default_config(
     );
     formatted_string += "---------------------";
 
-    println!("{}", formatted_string)
+    println!("{formatted_string}")
 }

@@ -70,7 +70,7 @@ pub async fn command_crank_rebalance(
     let ixs_to_run = validators_to_run
         .iter()
         .map(|(validator_index, vote_account, history_account)| {
-            println!("vote_account ({}): {}", validator_index, vote_account);
+            println!("vote_account ({validator_index}): {vote_account}");
 
             let (stake_address, _) = find_stake_program_address(
                 &spl_stake_pool::id(),
@@ -147,7 +147,7 @@ pub async fn command_crank_rebalance(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())
