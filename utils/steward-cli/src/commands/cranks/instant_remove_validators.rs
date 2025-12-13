@@ -35,7 +35,7 @@ pub async fn command_crank_instant_remove_validators(
 
     // Creates config account
     let payer = read_keypair_file(args.payer_keypair_path)
-        .map_err(|e| anyhow!("Failed reading keypair file ( Payer ): {}", e.to_string()))?;
+        .map_err(|e| anyhow!("Failed reading keypair file ( Payer ): {e}"))?;
     let payer = Arc::new(payer);
 
     let steward_config = args.steward_config;
