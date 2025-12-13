@@ -13,6 +13,7 @@ use stakenet_sdk::utils::{
     },
     helpers::check_stake_accounts,
 };
+use validator_history::constants::MIN_VOTE_EPOCHS;
 
 use crate::{
     commands::command_args::PermissionlessParameters,
@@ -45,11 +46,25 @@ pub async fn command_crank_auto_remove_validator(
         &args.permissionless_parameters.steward_config,
     )
     .await?;
-    let all_vote_accounts = client.get_vote_accounts().await?;
+    let vote_accounts = client.get_vote_accounts().await?;
+    let all_vote_accounts = vote_accounts
+        .current
+        .into_iter()
+        .chain(vote_accounts.delinquent.into_iter())
+        .filter(|vote_account| vote_account.epoch_credits.len() >= MIN_VOTE_EPOCHS)
+        .collect::<Vec<_>>();
     let all_validator_accounts =
-        get_all_validator_accounts(client, &all_vote_accounts.current, &validator_history::id())
-            .await?;
+        get_all_validator_accounts(client, &all_vote_accounts, &validator_history::id()).await?;
     let checks = check_stake_accounts(&all_validator_accounts, epoch);
+
+    println!(
+        "Validators to remove count: {}",
+        all_steward_accounts
+            .state_account
+            .state
+            .validators_to_remove
+            .count()
+    );
 
     let bad_vote_accounts = checks
         .iter()
@@ -84,12 +99,11 @@ pub async fn command_crank_auto_remove_validator(
                 validator_index,
             )?;
 
-            if all_steward_accounts
+            if let Ok(false) = all_steward_accounts
                 .state_account
                 .state
                 .validators_to_remove
                 .get(validator_index)
-                .expect("Could not find validator index in validators_to_remove")
             {
                 return None;
             }
