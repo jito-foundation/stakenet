@@ -234,19 +234,23 @@ pub async fn command_crank_compute_directed_stake_meta(
 
     let blockhash = client.get_latest_blockhash().await?;
 
-    let transaction = Transaction::new_signed_with_payer(
-        &configured_ix,
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
+    let transactions = ixs.iter().map(|ix| {
+        Transaction::new_signed_with_payer(
+            &[ix.clone()],
+            Some(&authority.pubkey()),
+            &[&authority],
+            blockhash,
+        )
+    });
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    for tx in transactions {
+        let signature = client
+            .send_and_confirm_transaction_with_spinner(&tx)
+            .await?;
+        println!("\n=== Transaction Successful ===");
+        println!("Signature: {}", signature);
+    }
 
-    println!("\n=== Transaction Successful ===");
-    println!("Signature: {}", signature);
     println!("Updated metadata:");
     println!("  - {num_tickets} tickets processed");
     println!("  - {tickets_with_balance} tickets with balance");

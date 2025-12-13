@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let client = Arc::new(RpcClient::new_with_timeout(
         args.json_rpc_url.clone(),
-        Duration::from_secs(60),
+        Duration::from_secs(120),
     ));
 
     let steward_program_id = args.steward_program_id;
