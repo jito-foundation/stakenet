@@ -7,7 +7,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
 use stakenet_sdk::{
-    models::{errors::JitoTransactionError, submit_stats::SubmitStats},
+    models::submit_stats::SubmitStats,
     utils::{
         accounts::{get_all_steward_accounts, get_directed_stake_meta_address},
         transactions::configure_instruction,
