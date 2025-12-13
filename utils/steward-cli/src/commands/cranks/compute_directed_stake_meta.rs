@@ -244,11 +244,9 @@ pub async fn command_crank_compute_directed_stake_meta(
     });
 
     for tx in transactions {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&tx)
-            .await?;
+        let signature = client.send_transaction(&tx).await?;
         println!("\n=== Transaction Successful ===");
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     println!("Updated metadata:");
