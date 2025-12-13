@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
+#[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
 use stakenet_sdk::utils::{
     accounts::{
@@ -24,7 +25,7 @@ use crate::{
 };
 
 #[derive(Parser)]
-#[command(about = "Crank `rebalance_directed` state")]
+#[command(about = "Crank `auto_remove_validator` state")]
 pub struct CrankAutoRemoveValidator {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
@@ -37,12 +38,12 @@ pub async fn command_crank_auto_remove_validator(
 ) -> Result<()> {
     let payer = Arc::new(
         read_keypair_file(args.permissionless_parameters.payer_keypair_path)
-            .expect("Failed reading keypair file ( Payer )"),
+            .map_err(|e| anyhow!("Failed reading keypair file ( Payer ): {e}"))?,
     );
     let epoch = client.get_epoch_info().await?.epoch;
     let all_steward_accounts = get_all_steward_accounts(
         client,
-        &jito_steward::id(),
+        &program_id,
         &args.permissionless_parameters.steward_config,
     )
     .await?;
@@ -109,7 +110,7 @@ pub async fn command_crank_auto_remove_validator(
             }
 
             Some(Instruction {
-                program_id: jito_steward::id(),
+                program_id,
                 accounts: jito_steward::accounts::AutoRemoveValidator {
                     config: all_steward_accounts.config_address,
                     state_account: all_steward_accounts.state_address,
@@ -144,6 +145,8 @@ pub async fn command_crank_auto_remove_validator(
     log::info!("Submitting {} transactions", txs_to_run.len());
 
     let stats = submit_packaged_transactions(client, txs_to_run, &payer, Some(50), None).await?;
+
+    println!("Stats: {stats:?}");
 
     Ok(())
 }
