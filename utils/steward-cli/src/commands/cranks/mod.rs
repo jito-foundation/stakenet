@@ -4,7 +4,7 @@ pub mod compute_instant_unstake;
 pub mod compute_score;
 pub mod epoch_maintenance;
 pub mod idle;
-pub mod instant_removal_validators;
+pub mod instant_remove_validators;
 pub mod rebalance;
 pub mod rebalance_directed;
 pub mod steward;

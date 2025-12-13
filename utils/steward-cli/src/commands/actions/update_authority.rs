@@ -216,6 +216,8 @@ pub async fn command_update_authority(
             return Ok(());
         }
 
+        println!("CLI signer: {}", cli_signer.pubkey());
+
         let transaction = Transaction::new_signed_with_payer(
             &configured_ix,
             Some(&cli_signer.pubkey()),

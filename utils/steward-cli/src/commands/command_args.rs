@@ -15,7 +15,7 @@ use crate::commands::{
     },
     cranks::{
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
-        instant_removal_validators::CrankInstantRemoveValidators,
+        instant_remove_validators::CrankInstantRemoveValidators,
         rebalance_directed::CrankRebalanceDirected,
     },
     info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},

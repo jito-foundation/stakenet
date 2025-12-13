@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
@@ -35,7 +35,7 @@ pub async fn command_crank_instant_remove_validators(
 
     // Creates config account
     let payer = read_keypair_file(args.payer_keypair_path)
-        .map_err(|e| "Failed reading keypair file ( Payer ): {e}")?;
+        .map_err(|e| anyhow!("Failed reading keypair file ( Payer ): {}", e.to_string()))?;
     let payer = Arc::new(payer);
 
     let steward_config = args.steward_config;
@@ -44,7 +44,7 @@ pub async fn command_crank_instant_remove_validators(
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
     let num_validators = all_steward_accounts.state_account.state.num_pool_validators;
-    let validators_to_remove = all_steward_accounts
+    let mut validators_to_remove = all_steward_accounts
         .state_account
         .state
         .validators_for_immediate_removal;
@@ -52,6 +52,9 @@ pub async fn command_crank_instant_remove_validators(
     let mut stats = SubmitStats::default();
 
     while validators_to_remove.count() != 0 {
+        let all_steward_accounts =
+            get_all_steward_accounts(client, &program_id, &steward_config).await?;
+
         let mut validator_index_to_remove = None;
         for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
             if validators_to_remove.get(i as usize).map_err(|e| {
@@ -93,6 +96,12 @@ pub async fn command_crank_instant_remove_validators(
             submit_packaged_transactions(client, vec![configured_ix], &payer, Some(50), None)
                 .await?;
 
+        let all_steward_accounts =
+            get_all_steward_accounts(client, &program_id, &steward_config).await?;
+        validators_to_remove = all_steward_accounts
+            .state_account
+            .state
+            .validators_for_immediate_removal;
         stats.combine(&new_stats);
     }
 
