@@ -24,22 +24,45 @@ pub async fn command_view_bam_validators(args: ViewBamValidators, rpc_url: Strin
     )
     .await?;
 
-    let mut bam_validators: Vec<Pubkey> = Vec::new();
-    for validator_history in validator_histories {
-        for entry in validator_history.history.arr {
-            if entry.epoch.eq(&(args.epoch as u16)) && entry.client_type.eq(&6) {
-                bam_validators.push(validator_history.vote_account);
-            }
-        }
-    }
+    let mut bam_validators: Vec<_> = Vec::new();
+    // for validator_history in validator_histories {
+    //     for entry in validator_history.history.arr {
+    //         if entry.epoch.eq(&(args.epoch as u16)) && entry.client_type.eq(&6) {
+    //             bam_validators.push(validator_history.vote_account);
+    //         }
+    //     }
+    // }
+
+    let vote_accounts = client.get_vote_accounts().await?;
+
+    println!(
+        "{}",
+        all_steward_accounts.validator_list_account.validators.len()
+    );
 
     for validator in all_steward_accounts
         .validator_list_account
         .validators
         .iter()
-        .take(50)
     {
-        bam_validators.push(validator.vote_account_address);
+        for vote_account in vote_accounts.current.clone() {
+            if validator
+                .vote_account_address
+                .to_string()
+                .eq(&vote_account.vote_pubkey)
+                && vote_account.activated_stake != 0
+            {
+                bam_validators.push((
+                    validator.vote_account_address,
+                    vote_account.node_pubkey,
+                    vote_account.activated_stake,
+                ));
+            }
+        }
+
+        if bam_validators.len() == 50 {
+            break;
+        }
     }
 
     // let mut join = Vec::new();
@@ -53,13 +76,13 @@ pub async fn command_view_bam_validators(args: ViewBamValidators, rpc_url: Strin
     // }
 
     for (i, v) in bam_validators.iter().enumerate() {
-        println!("{}", v);
+        println!("{:?}", v);
     }
 
-    println!(
-        "Stake pool accounts: {}",
-        all_steward_accounts.stake_pool_account.total_lamports
-    );
+    // println!(
+    //     "Stake pool accounts: {}",
+    //     all_steward_accounts.stake_pool_account.total_lamports
+    // );
 
     Ok(())
 }
