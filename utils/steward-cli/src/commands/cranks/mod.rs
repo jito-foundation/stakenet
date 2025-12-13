@@ -1,3 +1,4 @@
+pub mod auto_remove_validator;
 pub mod compute_delegations;
 pub mod compute_directed_stake_meta;
 pub mod compute_instant_unstake;
