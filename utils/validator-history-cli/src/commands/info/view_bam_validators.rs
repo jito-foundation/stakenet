@@ -1,8 +1,10 @@
+use std::{str::FromStr, sync::Arc};
+
 use anyhow::Result;
 use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use stakenet_sdk::utils::accounts::get_all_validator_history_accounts;
+use stakenet_sdk::utils::accounts::{get_all_steward_accounts, get_all_validator_history_accounts};
 
 #[derive(Parser)]
 #[command(about = "View the current blacklist")]
@@ -14,6 +16,13 @@ pub async fn command_view_bam_validators(args: ViewBamValidators, rpc_url: Strin
     let client = RpcClient::new(rpc_url);
     let validator_histories =
         get_all_validator_history_accounts(&client, validator_history::id()).await?;
+    let client = Arc::new(client);
+    let all_steward_accounts = get_all_steward_accounts(
+        &client,
+        &jito_steward::id(),
+        &Pubkey::from_str("5pZmpk3ktweGZW9xFknpEHhQoWeAKTzSGwnCUyVdiye")?,
+    )
+    .await?;
 
     let mut bam_validators: Vec<Pubkey> = Vec::new();
     for validator_history in validator_histories {
@@ -22,29 +31,35 @@ pub async fn command_view_bam_validators(args: ViewBamValidators, rpc_url: Strin
                 bam_validators.push(validator_history.vote_account);
             }
         }
-        // if let Ok(true) = all_steward_accounts
-        //     .config_account
-        //     .validator_history_blacklist
-        //     .get(validator_history.index as usize)
-        // {
-        //     blacklisted_validators.push((validator_history.index, validator_history.vote_account));
-        // }
     }
 
-    for bam_validator in bam_validators {
-        println!("Bam validators: {bam_validator}");
+    for validator in all_steward_accounts
+        .validator_list_account
+        .validators
+        .iter()
+        .take(50)
+    {
+        bam_validators.push(validator.vote_account_address);
     }
 
-    // if blacklisted_validators.is_empty() {
-    //     println!("No validators are currently blacklisted.");
-    // } else {
-    //     println!("Blacklisted Validators: {}", blacklisted_validators.len());
-    //     println!("{:<8} Vote Account", "Index");
-    //     println!("{}", "-".repeat(60));
-    //     for (index, vote_account) in blacklisted_validators {
-    //         println!("{:<8} {}", index, vote_account);
+    // let mut join = Vec::new();
+    // let accounts = client.get_vote_accounts().await?;
+    // for account in accounts.current {
+    //     for bam_validator in bam_validators.clone().into_iter() {
+    //         if bam_validator.to_string().eq(&account.vote_pubkey) {
+    //             join.push((account.node_pubkey.clone(), account.vote_pubkey.clone()));
+    //         }
     //     }
     // }
+
+    for (i, v) in bam_validators.iter().enumerate() {
+        println!("{}", v);
+    }
+
+    println!(
+        "Stake pool accounts: {}",
+        all_steward_accounts.stake_pool_account.total_lamports
+    );
 
     Ok(())
 }
