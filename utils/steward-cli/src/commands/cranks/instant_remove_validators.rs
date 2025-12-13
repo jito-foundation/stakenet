@@ -58,17 +58,14 @@ pub async fn command_crank_instant_remove_validators(
         let mut validator_index_to_remove = None;
         for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
             if validators_to_remove.get(i as usize).map_err(|e| {
-                JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
-                    i, num_validators, e
-                ))
+                anyhow!(
+                    "Error fetching bitmask index for immediate removed validator: {i}/{num_validators} - {e}",
+                )
             })? {
                 validator_index_to_remove = Some(i);
                 break;
             }
         }
-
-        log::info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, &program_id);
