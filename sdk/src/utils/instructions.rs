@@ -237,7 +237,7 @@ pub async fn compute_bam_targets(
         .filter(|bv| bv.is_eligible)
         .collect();
 
-    let mut instructions = Vec::new();
+    let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
 
     if let Some(metric) = bam_epoch_metric {
         instructions.extend(
