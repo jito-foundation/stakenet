@@ -214,6 +214,7 @@ pub async fn compute_bam_targets(
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let epoch_info = client.get_epoch_info().await?;
+    let current_epoch = epoch_info.epoch;
     let last_epoch = epoch_info.epoch - 1;
 
     let bam_epoch_metric = kobe_client
@@ -226,6 +227,14 @@ pub async fn compute_bam_targets(
         .bam_validators;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let directed_stake_meta =
+        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
+    let targets: HashMap<Pubkey, u64> = directed_stake_meta
+        .targets
+        .iter()
+        .filter(|target| target.target_last_updated_epoch == current_epoch)
+        .map(|target| (target.vote_pubkey, target.total_target_lamports))
+        .collect();
     let config_account = get_steward_config_account(&client, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
@@ -237,7 +246,7 @@ pub async fn compute_bam_targets(
         .filter(|bv| bv.is_eligible)
         .collect();
 
-    let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
+    let mut instructions = Vec::new();
 
     if let Some(metric) = bam_epoch_metric {
         instructions.extend(
@@ -262,7 +271,7 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                    let total_target_lamports = match (bv.active_stake as u128)
+                    let mut total_target_lamports = match (bv.active_stake as u128)
                         .checked_mul(metric.available_bam_delegation_stake as u128)
                         .and_then(|result| result.checked_div(metric.bam_stake as u128))
                         .and_then(|result| u64::try_from(result).ok()) {
@@ -277,6 +286,9 @@ pub async fn compute_bam_targets(
                                return None;
                            }
                         };
+                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
+                       total_target_lamports  += *meta_target_lamports;
+                    }
 
                     Some(Instruction {
                         program_id: *program_id,
