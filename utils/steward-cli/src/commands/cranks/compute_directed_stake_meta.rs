@@ -29,7 +29,7 @@ use anchor_lang::AccountDeserialize;
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use jito_steward::DirectedStakeTicket;
-use kobe_client::client::KobeClient;
+use kobe_client::client_builder::KobeApiClientBuilder;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
@@ -56,9 +56,9 @@ pub struct ComputeDirectedStakeMeta {
     #[arg(long, env)]
     pub token_mint: Pubkey,
 
-    /// Cluster name
+    /// Kobe api base url
     #[arg(long, env)]
-    pub cluster_name: String,
+    pub kobe_api_base_url: String,
 }
 
 /// Computes directed stake metadata by aggregating tickets and token balances.
@@ -73,6 +73,11 @@ pub async fn command_crank_compute_directed_stake_meta(
     program_id: Pubkey,
 ) -> Result<()> {
     let steward_config = args.permissioned_parameters.steward_config;
+    let kobe_client = KobeApiClientBuilder::new()
+        .base_url(args.kobe_api_base_url)
+        .build();
+    let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
+        .map_err(|e| anyhow!("Failed to read keypair file: {e}"))?;
 
     // Fetch directed stake tickets to show summary stats
     let ticket_map = get_directed_stake_tickets(client.clone(), &program_id).await?;
@@ -175,7 +180,8 @@ pub async fn command_crank_compute_directed_stake_meta(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let mut ixs = compute_directed_stake_meta(
+    // Normal copy directed stake target
+    let normal_ixs = compute_directed_stake_meta(
         client.clone(),
         &args.token_mint,
         &all_steward_accounts.stake_pool_address,
@@ -185,30 +191,8 @@ pub async fn command_crank_compute_directed_stake_meta(
     )
     .await
     .map_err(|e| anyhow!(e.to_string()))?;
-
-    let kobe_client = match args.cluster_name.as_str() {
-        "mainnet" => KobeClient::mainnet(),
-        "testnet" => KobeClient::testnet(),
-        cluster => {
-            return Err(anyhow!(
-                "Unsupported cluster: expected 'mainnet' or 'testnet', got {cluster}"
-            ))
-        }
-    };
-    let bam_delegation_instructions = compute_bam_targets(
-        client.clone(),
-        &kobe_client,
-        &all_steward_accounts.config_address,
-        &signer,
-        &program_id,
-    )
-    .await
-    .map_err(|e| anyhow!(e.to_string()))?;
-
-    ixs.extend(bam_delegation_instructions);
-
-    let configured_ix = configure_instruction(
-        &ixs,
+    let normal_configure_ixs = configure_instruction(
+        &normal_ixs,
         args.permissioned_parameters
             .transaction_parameters
             .priority_fee,
@@ -219,32 +203,85 @@ pub async fn command_crank_compute_directed_stake_meta(
             .transaction_parameters
             .heap_size,
     );
+    println!(
+        "Normal copy directed stake targets: {}",
+        normal_configure_ixs.len()
+    );
 
     // If we are printing, do so and return early without requiring the authority keypair
     if maybe_print_tx(
-        &configured_ix,
+        &normal_configure_ixs,
         &args.permissioned_parameters.transaction_parameters,
     ) {
         return Ok(());
     }
 
-    // Otherwise, send transaction signed by the authority
-    let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
-        .map_err(|e| anyhow!("Failed to read keypair file: {e}"))?;
-
     let blockhash = client.get_latest_blockhash().await?;
-
-    let transactions = ixs.iter().map(|ix| {
+    let normal_transactions = normal_configure_ixs.iter().map(|normal_configure_ix| {
         Transaction::new_signed_with_payer(
-            &[ix.clone()],
+            &[normal_configure_ix.clone()],
             Some(&authority.pubkey()),
             &[&authority],
             blockhash,
         )
     });
 
-    for tx in transactions {
-        let signature = client.send_transaction(&tx).await?;
+    for normal_tx in normal_transactions {
+        let signature = client.send_transaction(&normal_tx).await?;
+        println!("\n=== Transaction Successful ===");
+        println!("Signature: {signature}");
+    }
+
+    // BAM Delegation copy directed stake target
+    let bam_delegation_ixs = compute_bam_targets(
+        client.clone(),
+        &kobe_client,
+        &all_steward_accounts.config_address,
+        &signer,
+        &program_id,
+    )
+    .await
+    .map_err(|e| anyhow!(e.to_string()))?;
+    let bam_delegation_configure_ixs = configure_instruction(
+        &bam_delegation_ixs,
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size,
+    );
+    println!(
+        "BAM Delegation copy directed stake targets: {}",
+        bam_delegation_configure_ixs.len()
+    );
+
+    // If we are printing, do so and return early without requiring the authority keypair
+    if maybe_print_tx(
+        &bam_delegation_configure_ixs,
+        &args.permissioned_parameters.transaction_parameters,
+    ) {
+        return Ok(());
+    }
+
+    let blockhash = client.get_latest_blockhash().await?;
+    let bam_delegation_transactions =
+        bam_delegation_configure_ixs
+            .iter()
+            .map(|bam_delegation_configure_ix| {
+                Transaction::new_signed_with_payer(
+                    &[bam_delegation_configure_ix.clone()],
+                    Some(&authority.pubkey()),
+                    &[&authority],
+                    blockhash,
+                )
+            });
+
+    for bam_delegation_tx in bam_delegation_transactions {
+        let signature = client.send_transaction(&bam_delegation_tx).await?;
         println!("\n=== Transaction Successful ===");
         println!("Signature: {signature}");
     }

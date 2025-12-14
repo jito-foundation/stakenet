@@ -214,7 +214,7 @@ pub async fn compute_bam_targets(
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let epoch_info = client.get_epoch_info().await?;
-    let last_epoch = epoch_info.epoch;
+    let last_epoch = epoch_info.epoch - 1;
 
     let bam_epoch_metric = kobe_client
         .get_bam_epoch_metrics(last_epoch)
@@ -224,8 +224,6 @@ pub async fn compute_bam_targets(
         .get_bam_validators(last_epoch)
         .await?
         .bam_validators;
-
-    println!("bam validators acount {}", bam_validators.len());
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
     let config_account = get_steward_config_account(&client, steward_config).await?;
@@ -238,11 +236,6 @@ pub async fn compute_bam_targets(
         .into_iter()
         .filter(|bv| bv.is_eligible)
         .collect();
-
-    println!(
-        "bam eligible validators acount {}",
-        bam_eligible_validators.len()
-    );
 
     let mut instructions = Vec::new();
 
@@ -269,21 +262,21 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                     let total_target_lamports = match (bv.active_stake as u128)
-                         .checked_mul(metric.available_bam_delegation_stake as u128)
-                         .and_then(|result| result.checked_div(metric.bam_stake as u128))
-                         .and_then(|result| u64::try_from(result).ok()) {
-                            Some(lamports) => lamports,
-                            None => {
-                                log::warn!(
-                                    "Arithmetic overflow calculating target lamports for {vote_pubkey}: active_stake={}, available={}, bam_stake={}",
-                                    bv.active_stake,
-                                    metric.available_bam_delegation_stake,
-                                    metric.bam_stake
-                                );
-                                return None;
-                            }
-                         };
+                    let total_target_lamports = match (bv.active_stake as u128)
+                        .checked_mul(metric.available_bam_delegation_stake as u128)
+                        .and_then(|result| result.checked_div(metric.bam_stake as u128))
+                        .and_then(|result| u64::try_from(result).ok()) {
+                           Some(lamports) => lamports,
+                           None => {
+                               log::warn!(
+                                   "Arithmetic overflow calculating target lamports for {vote_pubkey}: active_stake={}, available={}, bam_stake={}",
+                                   bv.active_stake,
+                                   metric.available_bam_delegation_stake,
+                                   metric.bam_stake
+                               );
+                               return None;
+                           }
+                        };
 
                     Some(Instruction {
                         program_id: *program_id,
@@ -306,8 +299,6 @@ pub async fn compute_bam_targets(
                 .collect::<Vec<Instruction>>(),
         );
     }
-
-    println!("Instructions {}", instructions.len());
 
     Ok(instructions)
 }
