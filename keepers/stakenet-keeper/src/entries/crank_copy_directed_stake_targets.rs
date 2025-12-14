@@ -42,9 +42,9 @@ pub(crate) async fn crank_copy_directed_stake_targets(
 
     let normal_txs_to_run =
         package_instructions(&normal_ixs, 8, priority_fee, Some(1_400_000), None);
-    let nomal_stats =
+    let normal_stats =
         submit_packaged_transactions(&client, normal_txs_to_run, &keypair, Some(50), None).await?;
-    stats.combine(&nomal_stats);
+    stats.combine(&normal_stats);
 
     let bam_delegation_ixs = compute_bam_targets(
         client.clone(),

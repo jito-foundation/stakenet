@@ -287,7 +287,13 @@ pub async fn compute_bam_targets(
                            }
                         };
                     if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
-                       total_target_lamports  += *meta_target_lamports;
+                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
+                            Some(sum) => sum,
+                            None => {
+                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
+                                return None;
+                            }
+                        }
                     }
 
                     Some(Instruction {
