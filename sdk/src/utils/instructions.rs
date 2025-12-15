@@ -264,7 +264,7 @@ pub async fn compute_bam_targets(
     }
 
     if let Some(metric) = bam_epoch_metric {
-        let total_target_lamports = metric
+        let mut total_target_lamports = metric
             .available_bam_delegation_stake
             .checked_div(bam_eligible_validators.len() as u64)
             .ok_or(JitoInstructionError::ArithmeticError)?;
