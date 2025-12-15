@@ -200,8 +200,19 @@ pub async fn compute_directed_stake_meta(
 ///
 /// 1. Fetches all bam validators through Kobe API
 /// 2. For each eligible bam validator:
-///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount).
+///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
+///    - If eligible validators are empty, return empty instructions.
 /// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
+///
+/// # Integer Division Behavior
+///
+/// The stake distribution uses integer division, which truncates any remainder.
+/// This means `(available_bam_delegation_stake % bam_eligible_validators.len())` lamports
+/// will not be delegated. This remainder is intentionally ignored to maintain equal
+/// distribution across all BAM validators.
+///
+/// Example: With 100 lamports and 3 validators, each receives 33 lamports (99 total),
+/// leaving 1 lamport undelegated.
 ///
 /// # Return Value
 ///
@@ -239,7 +250,16 @@ pub async fn compute_bam_targets(
 
     let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
 
+    if bam_eligible_validators.is_empty() {
+        return Ok(instructions);
+    }
+
     if let Some(metric) = bam_epoch_metric {
+        let total_target_lamports = metric
+            .available_bam_delegation_stake
+            .checked_div(bam_eligible_validators.len() as u64)
+            .ok_or(JitoInstructionError::ArithmeticError)?;
+
         instructions.extend(
             bam_eligible_validators
                 .iter()
@@ -262,21 +282,6 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                    let total_target_lamports = match (bv.active_stake as u128)
-                        .checked_mul(metric.available_bam_delegation_stake as u128)
-                        .and_then(|result| result.checked_div(metric.bam_stake as u128))
-                        .and_then(|result| u64::try_from(result).ok()) {
-                           Some(lamports) => lamports,
-                           None => {
-                               log::warn!(
-                                   "Arithmetic overflow calculating target lamports for {vote_pubkey}: active_stake={}, available={}, bam_stake={}",
-                                   bv.active_stake,
-                                   metric.available_bam_delegation_stake,
-                                   metric.bam_stake
-                               );
-                               return None;
-                           }
-                        };
 
                     Some(Instruction {
                         program_id: *program_id,
