@@ -201,7 +201,18 @@ pub async fn compute_directed_stake_meta(
 /// 1. Fetches all bam validators through Kobe API
 /// 2. For each eligible bam validator:
 ///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
+///    - If eligible validators are empty, return empty instructions.
 /// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
+///
+/// # Integer Division Behavior
+///
+/// The stake distribution uses integer division, which truncates any remainder.
+/// This means `(available_bam_delegation_stake % bam_eligible_validators.len())` lamports
+/// will not be delegated. This remainder is intentionally ignored to maintain equal
+/// distribution across all BAM validators.
+///
+/// Example: With 100 lamports and 3 validators, each receives 33 lamports (99 total),
+/// leaving 1 lamport undelegated.
 ///
 /// # Return Value
 ///
@@ -238,6 +249,10 @@ pub async fn compute_bam_targets(
         .collect();
 
     let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
+
+    if bam_eligible_validators.is_empty() {
+        return Ok(instructions);
+    }
 
     if let Some(metric) = bam_epoch_metric {
         let total_target_lamports = metric
