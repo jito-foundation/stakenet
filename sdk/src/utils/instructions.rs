@@ -200,7 +200,7 @@ pub async fn compute_directed_stake_meta(
 ///
 /// 1. Fetches all bam validators through Kobe API
 /// 2. For each eligible bam validator:
-///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount).
+///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
 /// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
 ///
 /// # Return Value
@@ -240,6 +240,11 @@ pub async fn compute_bam_targets(
     let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
 
     if let Some(metric) = bam_epoch_metric {
+        let total_target_lamports = metric
+            .available_bam_delegation_stake
+            .checked_div(bam_eligible_validators.len() as u64)
+            .ok_or(JitoInstructionError::ArithmeticError)?;
+
         instructions.extend(
             bam_eligible_validators
                 .iter()
@@ -262,9 +267,6 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                    let total_target_lamports = metric
-                        .available_bam_delegation_stake
-                        .checked_div(bam_eligible_validators.len())?;
 
                     Some(Instruction {
                         program_id: *program_id,
