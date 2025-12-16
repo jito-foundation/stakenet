@@ -441,4 +441,9 @@ pub mod steward {
     pub fn close_directed_stake_whitelist(ctx: Context<CloseDirectedStakeWhitelist>) -> Result<()> {
         instructions::close_directed_stake_whitelist::handler(ctx)
     }
+
+    /// Close DirectedStakeMeta account
+    pub fn close_directed_stake_meta(ctx: Context<CloseDirectedStakeMeta>) -> Result<()> {
+        instructions::close_directed_stake_meta::handler(ctx)
+    }
 }
