@@ -10,7 +10,7 @@ use solana_metrics::datapoint_info;
 use solana_pubkey::Pubkey;
 use spl_stake_pool::state::StakeStatus;
 use stakenet_sdk::utils::{
-    accounts::get_directed_stake_meta,
+    accounts::{get_directed_stake_meta, get_directed_stake_whitelist},
     debug::{
         format_simple_steward_state_string, format_steward_state_string,
         steward_state_to_state_code,
@@ -439,6 +439,10 @@ pub fn emit_steward_stats(
     let num_epochs_between_scoring = parameters.num_epochs_between_scoring;
     let minimum_stake_lamports = parameters.minimum_stake_lamports;
     let minimum_voting_epochs = parameters.minimum_voting_epochs;
+    let directed_stake_unstake_cap_bps = parameters.directed_stake_unstake_cap_bps;
+    let undirected_stake_ceiling_lamports = parameters.undirected_stake_ceiling_lamports();
+    let implied_available_directed_stake_lamports =
+        (stake_pool_lamports as i64) - (undirected_stake_ceiling_lamports as i64);
 
     datapoint_info!(
         "steward-config",
@@ -492,6 +496,21 @@ pub fn emit_steward_stats(
         ),
         ("minimum_stake_lamports", minimum_stake_lamports, i64),
         ("minimum_voting_epochs", minimum_voting_epochs, i64),
+        (
+            "directed_stake_unstake_cap_bps",
+            directed_stake_unstake_cap_bps,
+            i64
+        ),
+        (
+            "undirected_stake_ceiling_lamports",
+            undirected_stake_ceiling_lamports,
+            i64
+        ),
+        (
+            "implied_available_directed_stake_lamports",
+            implied_available_directed_stake_lamports,
+            i64
+        ),
         "cluster" => cluster,
     );
 
@@ -505,14 +524,17 @@ pub async fn emit_directed_stake_stats(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(ref all_steward_accounts) = keeper_state.all_steward_accounts {
         let steward_state = all_steward_accounts.state_account.state;
+        let current_epoch = steward_state.current_epoch;
+        let epoch_progress = keeper_state.epoch_info.slot_index as f64
+            / keeper_state.epoch_info.slots_in_epoch as f64;
+
+        // Emit DirectedStakeMeta stats
         let meta = get_directed_stake_meta(
             keeper_config.client.clone(),
             &all_steward_accounts.config_address,
-            &keeper_config.steward_config,
+            &keeper_config.steward_program_id,
         )
         .await?;
-
-        let current_epoch = steward_state.current_epoch;
 
         let active_targets = meta
             .targets
@@ -523,17 +545,117 @@ pub async fn emit_directed_stake_stats(
             .filter(|target| target.staked_last_updated_epoch.eq(&current_epoch))
             .count();
         let target_updated_count = active_targets
+            .clone()
             .filter(|target| target.target_last_updated_epoch.eq(&current_epoch))
             .count();
 
         datapoint_info!(
-            "directed-stake-stats",
+            "directed-stake-meta-stats",
+            ("current_epoch", current_epoch, i64),
+            ("epoch_progress", epoch_progress, f64),
             ("state", steward_state.state_tag.to_string(), String),
-            ("meta-total-stake-targets", meta.total_stake_targets, i64),
-            ("stake-updated-current-epoch", stake_updated_count, i64),
-            ("target-updated-current-epoch", target_updated_count, i64),
+            ("total_stake_targets", meta.total_stake_targets, i64),
+            ("directed_unstake_total", meta.directed_unstake_total, i64),
+            ("stake_updated_count", stake_updated_count, i64),
+            ("target_updated_count", target_updated_count, i64),
             "cluster" => keeper_config.cluster_name,
         );
+
+        // Emit individual datapoint for each active target
+        for (index, target) in active_targets.enumerate() {
+            let stake_updated_this_epoch = target.staked_last_updated_epoch == current_epoch;
+            let target_updated_this_epoch = target.target_last_updated_epoch == current_epoch;
+
+            datapoint_info!(
+                "directed-stake-meta-target",
+                ("current_epoch", current_epoch, i64),
+                ("epoch_progress", epoch_progress, f64),
+                ("index", index, i64),
+                ("vote_pubkey", target.vote_pubkey.to_string(), String),
+                ("total_target_lamports", target.total_target_lamports, i64),
+                ("total_staked_lamports", target.total_staked_lamports, i64),
+                ("target_last_updated_epoch", target.target_last_updated_epoch, i64),
+                ("staked_last_updated_epoch", target.staked_last_updated_epoch, i64),
+                ("stake_updated_this_epoch", stake_updated_this_epoch, bool),
+                ("target_updated_this_epoch", target_updated_this_epoch, bool),
+                "cluster" => keeper_config.cluster_name,
+            );
+        }
+
+        // Emit DirectedStakeWhitelist stats
+        if let Ok(whitelist) = get_directed_stake_whitelist(
+            keeper_config.client.clone(),
+            &all_steward_accounts.config_address,
+            &keeper_config.steward_program_id,
+        )
+        .await
+        {
+            let total_user_stakers = whitelist.total_permissioned_user_stakers as i64;
+            let total_protocol_stakers = whitelist.total_permissioned_protocol_stakers as i64;
+            let total_validators = whitelist.total_permissioned_validators as i64;
+
+            // High-level whitelist stats
+            datapoint_info!(
+                "directed-stake-whitelist-stats",
+                ("current_epoch", current_epoch, i64),
+                ("total_user_stakers", total_user_stakers, i64),
+                ("total_protocol_stakers", total_protocol_stakers, i64),
+                ("total_validators", total_validators, i64),
+                "cluster" => keeper_config.cluster_name,
+            );
+
+            // Emit per-entry stats for user stakers
+            for (index, staker) in whitelist
+                .permissioned_user_stakers
+                .iter()
+                .take(whitelist.total_permissioned_user_stakers as usize)
+                .enumerate()
+            {
+                datapoint_info!(
+                    "directed-stake-whitelist-user-staker",
+                    ("current_epoch", current_epoch, i64),
+                    ("index", index, i64),
+                    ("pubkey", staker.to_string(), String),
+                    "cluster" => keeper_config.cluster_name,
+                );
+            }
+
+            // Emit per-entry stats for protocol stakers
+            for (index, staker) in whitelist
+                .permissioned_protocol_stakers
+                .iter()
+                .take(whitelist.total_permissioned_protocol_stakers as usize)
+                .enumerate()
+            {
+                datapoint_info!(
+                    "directed-stake-whitelist-protocol-staker",
+                    ("current_epoch", current_epoch, i64),
+                    ("index", index, i64),
+                    ("pubkey", staker.to_string(), String),
+                    "cluster" => keeper_config.cluster_name,
+                );
+            }
+
+            // Emit per-entry stats for validators
+            for (index, validator) in whitelist
+                .permissioned_validators
+                .iter()
+                .take(whitelist.total_permissioned_validators as usize)
+                .enumerate()
+            {
+                datapoint_info!(
+                    "directed-stake-whitelist-validator",
+                    ("current_epoch", current_epoch, i64),
+                    ("index", index, i64),
+                    ("pubkey", validator.to_string(), String),
+                    "cluster" => keeper_config.cluster_name,
+                );
+            }
+        } else {
+            log::warn!("Failed to fetch directed stake whitelist");
+        }
+    } else {
+        log::error!("No steward accounts found");
     }
 
     Ok(())
