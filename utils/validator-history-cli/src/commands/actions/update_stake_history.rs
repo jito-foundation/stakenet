@@ -32,7 +32,7 @@ pub async fn run(args: UpdateStakeHistory, rpc_url: String) -> anyhow::Result<()
     let client = Arc::new(client);
 
     let vote_accounts = client.get_vote_accounts().await?;
-    let vote_accounts: Vec<&RpcVoteAccountInfo> = vote_accounts.current.iter().map(|v| v).collect();
+    let vote_accounts: Vec<&RpcVoteAccountInfo> = vote_accounts.current.iter().collect();
     let epoch_info = client.get_epoch_info().await?;
 
     let (stake_rank_map, superminority_threshold) =
