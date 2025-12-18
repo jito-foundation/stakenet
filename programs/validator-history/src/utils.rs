@@ -11,8 +11,7 @@ pub fn cast_epoch(epoch: u64) -> Result<u16> {
         epoch < (u16::MAX as u64),
         ValidatorHistoryError::EpochTooLarge
     );
-    let epoch_u16: u16 = (epoch % u16::MAX as u64).try_into().unwrap();
-    Ok(epoch_u16)
+    Ok(epoch as u16)
 }
 
 pub fn get_min_epoch(
