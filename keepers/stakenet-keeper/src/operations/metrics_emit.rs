@@ -441,8 +441,7 @@ pub fn emit_steward_stats(
     let minimum_voting_epochs = parameters.minimum_voting_epochs;
     let directed_stake_unstake_cap_bps = parameters.directed_stake_unstake_cap_bps;
     let undirected_stake_ceiling_lamports = parameters.undirected_stake_ceiling_lamports();
-    let implied_available_directed_stake_lamports =
-        (stake_pool_lamports as i64) - (undirected_stake_ceiling_lamports as i64);
+    let implied_available_directed_stake_lamports = stake_pool_lamports.saturating_sub(undirected_stake_ceiling_lamports as u64);
 
     datapoint_info!(
         "steward-config",
