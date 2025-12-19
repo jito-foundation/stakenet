@@ -61,7 +61,7 @@ pub async fn command_update_validator_list_balance(
         )
         .await?;
 
-    println!("Transaction signature: {}", signature);
+    println!("Transaction signature: {signature}");
 
     Ok(())
 }

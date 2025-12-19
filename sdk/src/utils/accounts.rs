@@ -318,7 +318,7 @@ pub async fn get_steward_config_account(
 
     StewardConfig::try_deserialize(&mut config_raw_account.data.as_slice())
         .map(Box::new)
-        .map_err(|e| JitoTransactionError::Custom(format!("Failed to deserialize config: {}", e)))
+        .map_err(|e| JitoTransactionError::Custom(format!("Failed to deserialize config: {e}")))
 }
 
 pub async fn get_steward_state_account(
@@ -333,8 +333,7 @@ pub async fn get_steward_state_account(
     StewardStateAccountV2::try_deserialize(&mut state_raw_account.data.as_slice())
         .map_err(|e| {
             JitoTransactionError::Custom(format!(
-                "Failed to deserialize steward state account: {}",
-                e
+                "Failed to deserialize steward state account: {e}"
             ))
         })
         .map(Box::new)
@@ -348,7 +347,7 @@ pub async fn get_stake_pool_account(
 
     StakePool::try_deserialize(&mut stake_pool_account_raw.data.as_slice())
         .map_err(|e| {
-            JitoTransactionError::Custom(format!("Failed to deserialize stake pool account: {}", e))
+            JitoTransactionError::Custom(format!("Failed to deserialize stake pool account: {e}"))
         })
         .map(Box::new)
 }
@@ -397,8 +396,7 @@ pub async fn get_validator_list_account(
     ValidatorList::try_deserialize(&mut validator_list_account_raw.data.as_slice())
         .map_err(|e| {
             JitoTransactionError::Custom(format!(
-                "Failed to deserialize validator list account: {}",
-                e
+                "Failed to deserialize validator list account: {e}"
             ))
         })
         .map(Box::new)
@@ -423,8 +421,7 @@ pub async fn get_directed_stake_whitelist(
     let whitelist = DirectedStakeWhitelist::try_deserialize(&mut whitelist_account_data.as_slice())
         .map_err(|e| {
             JitoTransactionError::Custom(format!(
-                "Failed to deserialize directed stake whitelist account: {}",
-                e
+                "Failed to deserialize directed stake whitelist account: {e}"
             ))
         })?;
 
@@ -443,7 +440,7 @@ pub async fn get_directed_stake_meta(
     let directed_stake_meta_pda =
         get_directed_stake_meta_address(steward_config_address, program_id);
 
-    log::info!("Directed stake meta PDA: {:?}", directed_stake_meta_pda);
+    log::info!("Directed stake meta PDA: {directed_stake_meta_pda}");
 
     let directed_stake_meta_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;
@@ -452,8 +449,7 @@ pub async fn get_directed_stake_meta(
         DirectedStakeMeta::try_deserialize(&mut directed_stake_meta_account_data.as_slice())
             .map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Failed to deserialize directed stake meta account: {}",
-                    e
+                    "Failed to deserialize directed stake meta account: {e}"
                 ))
             })?,
     );
@@ -481,8 +477,7 @@ pub async fn get_directed_stake_ticket(
         DirectedStakeTicket::try_deserialize(&mut directed_stake_ticket_account_data.as_slice())
             .map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Failed to deserialize directed stake ticket account: {}",
-                    e
+                    "Failed to deserialize directed stake ticket account: {e}"
                 ))
             })?;
 

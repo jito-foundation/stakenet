@@ -57,7 +57,7 @@ pub async fn command_migrate_state_to_v2(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

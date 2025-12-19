@@ -23,7 +23,7 @@ pub async fn command_init_directed_stake_whitelist(
     program_id: Pubkey,
 ) -> Result<()> {
     let authority_keypair = read_keypair_file(&args.authority_keypair_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {e}"))?;
     let authority_pubkey = authority_keypair.pubkey();
 
     let (directed_stake_whitelist_pda, _bump) = Pubkey::find_program_address(
@@ -32,12 +32,9 @@ pub async fn command_init_directed_stake_whitelist(
     );
 
     println!("Initializing DirectedStakeWhitelist...");
-    println!("  Authority: {}", authority_pubkey);
+    println!("  Authority: {authority_pubkey}");
     println!("  Steward Config: {}", args.steward_config);
-    println!(
-        "  DirectedStakeWhitelist PDA: {}",
-        directed_stake_whitelist_pda
-    );
+    println!("  DirectedStakeWhitelist PDA: {directed_stake_whitelist_pda}");
 
     let instruction = Instruction {
         program_id,
@@ -75,11 +72,8 @@ pub async fn command_init_directed_stake_whitelist(
             .await?;
 
         println!("✅ DirectedStakeWhitelist initialized successfully!");
-        println!("  Transaction signature: {}", signature);
-        println!(
-            "  DirectedStakeWhitelist account: {}",
-            directed_stake_whitelist_pda
-        );
+        println!("  Transaction signature: {signature}");
+        println!("  DirectedStakeWhitelist account: {directed_stake_whitelist_pda}");
     }
 
     Ok(())

@@ -193,7 +193,7 @@ fn stake_entry_uploaded(
 ) -> bool {
     let vote_account = Pubkey::from_str(&vote_account.vote_pubkey)
         .inspect_err(|e| {
-            error!("Invalid vote account pubkey: {}", e);
+            error!("Invalid vote account pubkey: {e}");
         })
         .expect("Invalid vote account pubkey");
     if let Some(validator_history) = validator_history_map.get(&vote_account) {

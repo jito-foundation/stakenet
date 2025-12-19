@@ -118,7 +118,7 @@ pub async fn command_crank_compute_instant_unstake(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

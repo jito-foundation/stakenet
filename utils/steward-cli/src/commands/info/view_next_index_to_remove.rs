@@ -31,7 +31,7 @@ fn _print_next_index_to_remove(state_account: &StewardStateAccountV2) {
             .get_unsafe(i as usize);
 
         if value {
-            println!("Validator {} is marked for removal", i);
+            println!("Validator {i} is marked for removal");
             return;
         }
     }

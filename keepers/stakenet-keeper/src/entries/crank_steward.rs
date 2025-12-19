@@ -146,9 +146,7 @@ pub fn _get_update_stake_pool_ixs(
 
                 if vote_account.epoch_credits.iter().last().is_none() {
                     error!(
-                        "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{:?}\nVote Account\n{:?}\n",
-                        stake_account,
-                        vote_account
+                        "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{stake_account:?}\nVote Account\n{vote_account:?}\n"
                     );
                     false
                 } else {
@@ -290,8 +288,7 @@ async fn _handle_instant_removal_validators(
         for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
-                    i, num_validators, e
+                    "Error fetching bitmask index for immediate removed validator: {i}/{num_validators} - {e}"
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -299,7 +296,7 @@ async fn _handle_instant_removal_validators(
             }
         }
 
-        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -451,7 +448,7 @@ async fn _handle_adding_validators(
                                 return None;
                             }
                         } else {
-                            info!("Validator {} below liveness minimum", vote_address);
+                            info!("Validator {vote_address} below liveness minimum");
                             return None;
                         }
                     }
@@ -632,8 +629,7 @@ async fn _handle_epoch_maintenance(
         for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for removed validator: {}/{} - {}",
-                    i, num_validators, e
+                    "Error fetching bitmask index for removed validator: {i}/{num_validators} - {e}"
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -641,7 +637,7 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -689,10 +685,7 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        info!(
-            "State Epoch: {} | Current Epoch: {}",
-            state_epoch, current_epoch
-        );
+        info!("State Epoch: {state_epoch} | Current Epoch: {current_epoch}");
     }
 
     Ok(stats)
@@ -1304,18 +1297,18 @@ pub async fn crank_steward(
                 match error {
                     JitoSendTransactionError::ExceededRetries => {
                         // Continue
-                        error!("Exceeded Retries: {:?}", error);
+                        error!("Exceeded Retries: {error:?}");
                     }
                     JitoSendTransactionError::TransactionError(e) => {
                         // Flag
-                        error!("Transaction: {:?}", e);
+                        error!("Transaction: {e:?}");
                     }
                     JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
                         // Recover
                         error!("\n\nERROR: ");
                         e.logs.iter().for_each(|log| {
                             log.iter().enumerate().for_each(|(i, log)| {
-                                error!("{}: {:?}", i, log);
+                                error!("{i}: {log:?}");
                             });
                         });
                     }

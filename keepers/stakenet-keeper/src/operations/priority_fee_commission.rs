@@ -92,7 +92,7 @@ pub async fn fire(
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
-                        log_error!("ERROR: {}", e);
+                        log_error!("ERROR: {e}");
                         datapoint_error!(
                             "priority-fee-commission-error",
                             ("error", e.to_string(), String),

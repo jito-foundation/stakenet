@@ -1,5 +1,5 @@
 use anchor_lang::{InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser};
+use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::instruction::Instruction;
@@ -78,21 +78,17 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
         loop {
             match build_and_submit_transaction(&client, instructions.as_slice(), &keypair).await {
                 Ok(sig) => {
-                    println!("Transaction successful: {:?}", sig);
+                    println!("Transaction successful: {sig:?}");
                     break;
                 }
                 Err(err) => {
                     retry_count += 1;
                     if retry_count >= max_retries {
-                        println!(
-                            "Transaction failed after {} retries: {:?}",
-                            max_retries, err
-                        );
+                        println!("Transaction failed after {max_retries} retries: {err:?}");
                         break;
                     }
                     println!(
-                        "Transaction failed (attempt {}/{}): {:?}. Retrying...",
-                        retry_count, max_retries, err
+                        "Transaction failed (attempt {retry_count}/{max_retries}): {err:?}. Retrying..."
                     );
                     time::sleep(Duration::from_secs(2)).await;
                 }
@@ -153,12 +149,9 @@ async fn validate_validator_history_accounts(
             num_closed += 1;
         }
     }
-    println!("\nNumber of valid vote accounts: {}", num_valid);
-    println!(
-        "Number of open but invalid vote accounts: {}",
-        num_open_but_invalid
-    );
-    println!("Number of closed vote accounts: {}", num_closed);
+    println!("\nNumber of valid vote accounts: {num_valid}");
+    println!("Number of open but invalid vote accounts: {num_open_but_invalid}");
+    println!("Number of closed vote accounts: {num_closed}");
     validated
 }
 
@@ -284,8 +277,7 @@ fn compute_validator_ages(
 
 fn read_oracle_data(path: PathBuf) -> Vec<SourceData> {
     // Open file
-    let file =
-        File::open(&path).unwrap_or_else(|e| panic!("Failed to open file {:?}: {}", path, e));
+    let file = File::open(&path).unwrap_or_else(|e| panic!("Failed to open file {path:?}: {e}"));
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
     // Skip header line
@@ -299,7 +291,7 @@ fn read_oracle_data(path: PathBuf) -> Vec<SourceData> {
         let parts: Vec<&str> = line.split(',').collect();
         // Assert three fields
         if parts.len() != 3 {
-            panic!("Skipping invalid line: {}", line);
+            panic!("Skipping invalid line: {line}");
         }
         // Parse vote pubkey
         let vote_account = Pubkey::from_str(parts[0])

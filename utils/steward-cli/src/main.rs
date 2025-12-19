@@ -277,7 +277,7 @@ async fn main() -> Result<()> {
     };
 
     if let Err(e) = result {
-        eprintln!("\n❌ Error: \n\n{:?}\n", e);
+        eprintln!("\n❌ Error: \n\n{e:?}\n");
         std::process::exit(1);
     }
 

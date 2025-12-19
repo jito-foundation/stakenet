@@ -94,7 +94,7 @@ pub async fn command_view_directed_stake_tickets(
 
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else {
-        println!("Found {} DirectedStakeTicket accounts:\n", tickets_count);
+        println!("Found {tickets_count} DirectedStakeTicket accounts:\n");
 
         for (pda, ticket) in ticket_map {
             println!("Ticket: {pda}");

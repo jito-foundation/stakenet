@@ -106,7 +106,7 @@ pub async fn command_auto_add_validator_from_pool(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

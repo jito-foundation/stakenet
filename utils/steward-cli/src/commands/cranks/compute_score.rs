@@ -59,8 +59,7 @@ pub async fn command_crank_compute_score(
         .iter()
         .map(|(validator_index, vote_account, history_account)| {
             println!(
-                "index: {}, vote_account: {}, history_account: {}\n",
-                validator_index, vote_account, history_account
+                "index: {validator_index}, vote_account: {vote_account}, history_account: {history_account}\n"
             );
 
             Instruction {
@@ -112,7 +111,7 @@ pub async fn command_crank_compute_score(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

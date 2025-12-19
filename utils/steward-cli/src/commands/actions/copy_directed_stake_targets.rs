@@ -107,7 +107,7 @@ pub(crate) async fn command_copy_directed_stake_targets(
             .validators
             .iter()
             .position(|v| v.vote_account_address == *vote_pubkey)
-            .ok_or_else(|| anyhow!("Vote pubkey {} not found in validator list", vote_pubkey))?;
+            .ok_or_else(|| anyhow!("Vote pubkey {vote_pubkey} not found in validator list"))?;
 
         let ix = solana_sdk::instruction::Instruction {
             program_id,

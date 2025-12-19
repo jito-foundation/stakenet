@@ -1,7 +1,8 @@
-use clap::{arg, command, Parser, Subcommand};
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
 use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
-use std::path::PathBuf;
 
 use crate::commands::{
     actions::{

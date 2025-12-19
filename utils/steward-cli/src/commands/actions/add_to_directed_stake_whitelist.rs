@@ -45,7 +45,7 @@ pub async fn command_add_to_directed_stake_whitelist(
     program_id: Pubkey,
 ) -> Result<()> {
     let authority_keypair = read_keypair_file(&args.authority_keypair_path)
-        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to read keypair: {e}"))?;
     let authority_pubkey = authority_keypair.pubkey();
 
     let directed_stake_whitelist =

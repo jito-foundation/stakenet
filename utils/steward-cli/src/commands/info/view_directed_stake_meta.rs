@@ -17,7 +17,7 @@ pub async fn command_view_directed_stake_meta(
         get_directed_stake_meta(client.clone(), &args.steward_config, &program_id).await?;
     let _stake_meta_address = get_directed_stake_meta_address(&args.steward_config, &program_id);
 
-    println!("Directed stake meta: {}", _stake_meta_address);
+    println!("Directed stake meta: {_stake_meta_address}");
 
     println!("\n📊 DirectedStakeMeta Information:");
     println!("\nDirectedStakeMeta Account: {stake_meta_address}");
