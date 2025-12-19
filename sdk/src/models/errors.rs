@@ -60,7 +60,7 @@ pub enum JitoInstructionError {
     JitoTransactionError(#[from] JitoTransactionError),
 
     #[error(transparent)]
-    ClientError(#[from] ClientError),
+    ClientError(#[from] Box<ClientError>),
 
     #[error(transparent)]
     KobeApiError(#[from] KobeApiError),

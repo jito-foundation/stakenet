@@ -224,7 +224,7 @@ pub async fn compute_bam_targets(
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let epoch_info = client.get_epoch_info().await?;
+    let epoch_info = client.get_epoch_info().await.map_err(Box::new)?;
     let current_epoch = epoch_info.epoch;
     let last_epoch = epoch_info.epoch - 1;
 

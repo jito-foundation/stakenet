@@ -440,7 +440,7 @@ pub async fn get_directed_stake_meta(
     let directed_stake_meta_pda =
         get_directed_stake_meta_address(steward_config_address, program_id);
 
-    log::info!("Directed stake meta PDA: {:?}", directed_stake_meta_pda);
+    log::info!("Directed stake meta PDA: {directed_stake_meta_pda}");
 
     let directed_stake_meta_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;
