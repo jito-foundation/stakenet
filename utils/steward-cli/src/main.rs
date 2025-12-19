@@ -47,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
             close_steward::command_close_steward,
@@ -239,6 +240,9 @@ async fn main() -> Result<()> {
         }
         Commands::CloseDirectedStakeWhitelist(args) => {
             command_close_directed_stake_whitelist(args, &client, steward_program_id).await
+        }
+        Commands::CloseDirectedStakeMeta(args) => {
+            command_close_directed_stake_meta(args, &client, steward_program_id).await
         }
 
         // --- Cranks ---

@@ -171,6 +171,7 @@ pub async fn run_crank_steward(
                     steward_accounts,
                     &keeper_config.token_mint,
                     Some(keeper_config.priority_fee_in_microlamports),
+                    &keeper_config.kobe_client,
                 )
                 .await?;
 
