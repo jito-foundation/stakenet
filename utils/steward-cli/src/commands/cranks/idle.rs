@@ -38,15 +38,15 @@ pub async fn command_crank_idle(
     let steward_accounts =
         get_all_steward_accounts(rpc_client, &program_id, &steward_config).await?;
 
-    match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::Idle => { /* Continue */ }
-        _ => {
-            println!(
-                "State account is not in Idle state: {}",
-                steward_accounts.state_account.state.state_tag
-            );
-            return Ok(());
-        }
+    if !matches!(
+        steward_accounts.state_account.state.state_tag,
+        StewardStateEnum::Idle
+    ) {
+        println!(
+            "State account is not in Idle state: {}",
+            steward_accounts.state_account.state.state_tag
+        );
+        return Ok(());
     }
 
     let ix = Instruction {
@@ -92,20 +92,17 @@ pub async fn command_crank_idle(
         )
         .await?;
 
-        let signature = transaction.signatures[0];
         let errors = tpu_client
             .send_and_confirm_messages_with_spinner(&[transaction.message], &[&payer])
             .await?;
 
         let mut has_error = false;
-        for error in errors {
-            if let Some(error) = error {
-                println!("Error: {error:?}");
-                has_error = true;
-            }
+        for error in errors.into_iter().flatten() {
+            println!("Error: {error:?}");
+            has_error = true;
         }
         if !has_error {
-            println!("Transaction confirmed!: {signature}");
+            println!("Transaction confirmed!");
         }
     }
 
