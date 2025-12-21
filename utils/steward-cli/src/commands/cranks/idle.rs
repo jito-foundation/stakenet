@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::{anyhow, Result};
@@ -93,33 +93,19 @@ pub async fn command_crank_idle(
         .await?;
 
         let signature = transaction.signatures[0];
-        let result = tpu_client.send_transaction(&transaction).await;
+        let errors = tpu_client
+            .send_and_confirm_messages_with_spinner(&[transaction.message], &[&payer])
+            .await?;
 
-        match result {
-            true => println!("Transaction sent successfully to TPU leaders!"),
-            false => println!("Failed to send transaction to TPU"),
-        }
-
-        println!("\nWaiting for confirmation...");
-        for i in 0..10 {
-            tokio::time::sleep(Duration::from_millis(500)).await;
-
-            match rpc_client.get_signature_status(&signature).await? {
-                Some(Ok(_)) => {
-                    println!("Transaction confirmed!");
-                    return Ok(());
-                }
-                Some(Err(e)) => {
-                    println!("Transaction failed: {:?}", e);
-                    return Ok(());
-                }
-                None => {
-                    if i < 9 {
-                        print!(".");
-                        std::io::Write::flush(&mut std::io::stdout())?;
-                    }
-                }
+        let mut has_error = false;
+        for error in errors {
+            if let Some(error) = error {
+                println!("Error: {error:?}");
+                has_error = true;
             }
+        }
+        if !has_error {
+            println!("Transaction confirmed!: {signature}");
         }
     }
 
