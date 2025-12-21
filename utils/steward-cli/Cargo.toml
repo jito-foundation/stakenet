@@ -27,10 +27,10 @@ solana-connection-cache = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
 solana-quic-client = { workspace = true }
-solana-tpu-client = { workspace = true }
 solana-remote-wallet = { workspace = true }
 solana-sdk = { workspace = true }
 solana-system-interface = { workspace = true }
+solana-tpu-client = { workspace = true }
 spl-pod = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 squads-multisig = { workspace = true }
