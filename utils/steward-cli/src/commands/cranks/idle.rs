@@ -23,7 +23,6 @@ type QuicTpuClient = TpuClient<QuicPool, QuicConnectionManager, QuicConfig>;
 
 pub async fn command_crank_idle(
     args: CrankIdle,
-    rpc_url: &str,
     rpc_client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
