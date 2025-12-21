@@ -23,8 +23,11 @@ serde_json = { workspace = true }
 sha2 = "0.10.8"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
+solana-connection-cache = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
+solana-quic-client = { workspace = true }
+solana-tpu-client = { workspace = true }
 solana-remote-wallet = { workspace = true }
 solana-sdk = { workspace = true }
 solana-system-interface = { workspace = true }
