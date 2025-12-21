@@ -24,10 +24,10 @@ type QuicTpuClient = TpuClient<QuicPool, QuicConnectionManager, QuicConfig>;
 pub async fn command_crank_idle(
     args: CrankIdle,
     rpc_client: &Arc<RpcClient>,
+    ws_url: &str,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
-    let ws_url = "wss://api.testnet.solana.com";
 
     // Creates config account
     let payer = read_keypair_file(args.payer_keypair_path)

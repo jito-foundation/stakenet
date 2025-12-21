@@ -37,6 +37,10 @@ pub struct Args {
     )]
     pub json_rpc_url: String,
 
+    /// WebSocket URL for the cluster
+    #[arg(short, long, env, default_value = "wss://api.mainnet-beta.solana.com")]
+    pub ws_url: String,
+
     /// Steward program ID
     #[arg(
         long,
