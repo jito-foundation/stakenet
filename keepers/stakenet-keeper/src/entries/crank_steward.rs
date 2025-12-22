@@ -41,6 +41,7 @@ use stakenet_sdk::{
         helpers::{
             check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
         },
+        instructions::epoch_maintenance,
         transactions::{
             configure_instruction, package_instructions, print_errors_if_any,
             submit_packaged_transactions,
@@ -624,16 +625,19 @@ async fn _handle_epoch_maintenance(
         .state_account
         .state
         .validators_to_remove;
+    let mut validators_for_immediate_removal = all_steward_accounts
+        .state_account
+        .state
+        .validators_for_immediate_removal;
 
     let mut stats = SubmitStats::default();
 
-    while state_epoch != current_epoch {
+    while !validators_to_remove.is_empty() {
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for removed validator: {}/{} - {}",
-                    i, num_validators, e
+                    "Error fetching bitmask index for removed validator: {i}/{num_validators} - {e}",
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -641,26 +645,85 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
-        let directed_stake_meta =
-            get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
+        let ix = epoch_maintenance(program_id, all_steward_accounts, validator_index_to_remove);
 
-        let ix = Instruction {
-            program_id: *program_id,
-            accounts: jito_steward::accounts::EpochMaintenance {
-                config: all_steward_accounts.config_address,
-                state_account: all_steward_accounts.state_address,
-                validator_list: all_steward_accounts.validator_list_address,
-                stake_pool: all_steward_accounts.stake_pool_address,
-                directed_stake_meta,
+        let cu = validator_index_to_remove.map(|_| 1_400_000);
+        let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
+
+        info!("Submitting Epoch Maintenance");
+        let new_stats =
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
+                .await?;
+
+        stats.combine(&new_stats);
+        print_errors_if_any(&stats);
+
+        if stats.errors > 0 {
+            return Ok(stats);
+        }
+
+        // NOTE: This is the only time an account is fetched
+        // in any of these cranking functions
+        let updated_state_account =
+            get_steward_state_account(client, program_id, &all_steward_accounts.config_address)
+                .await
+                .unwrap();
+
+        num_validators = updated_state_account.state.num_pool_validators;
+        validators_to_remove = updated_state_account.state.validators_to_remove;
+    }
+
+    while !validators_for_immediate_removal.is_empty() {
+        let mut validator_index_for_immediate_removal = None;
+        for i in 0..num_validators {
+            if validators_for_immediate_removal
+                .get(i as usize)
+                .map_err(|e| {
+                    JitoTransactionError::Custom(format!(
+                        "Error fetching bitmask index for removed validator: {i}/{num_validators} - {e}",
+                    ))
+                })?
+            {
+                validator_index_for_immediate_removal = Some(i);
+                break;
             }
-            .to_account_metas(None),
-            data: jito_steward::instruction::EpochMaintenance {
-                validator_index_to_remove,
-            }
-            .data(),
-        };
+        }
+
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
+
+        let ix = epoch_maintenance(program_id, all_steward_accounts, validator_index_to_remove);
+
+        let cu = validator_index_to_remove.map(|_| 1_400_000);
+        let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
+
+        info!("Submitting Epoch Maintenance");
+        let new_stats =
+            submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
+                .await?;
+
+        stats.combine(&new_stats);
+        print_errors_if_any(&stats);
+
+        if stats.errors > 0 {
+            return Ok(stats);
+        }
+
+        // NOTE: This is the only time an account is fetched
+        // in any of these cranking functions
+        let updated_state_account =
+            get_steward_state_account(client, program_id, &all_steward_accounts.config_address)
+                .await
+                .unwrap();
+
+        num_validators = updated_state_account.state.num_pool_validators;
+        validators_for_immediate_removal =
+            updated_state_account.state.validators_for_immediate_removal;
+    }
+
+    while state_epoch != current_epoch {
+        let ix = epoch_maintenance(program_id, all_steward_accounts, None);
 
         let cu = validator_index_to_remove.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
@@ -689,10 +752,7 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        info!(
-            "State Epoch: {} | Current Epoch: {}",
-            state_epoch, current_epoch
-        );
+        info!("State Epoch: {state_epoch} | Current Epoch: {current_epoch}",);
     }
 
     Ok(stats)
