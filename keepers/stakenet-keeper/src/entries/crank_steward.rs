@@ -647,7 +647,7 @@ async fn _handle_epoch_maintenance(
 
         info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
-        let ix = epoch_maintenance(program_id, all_steward_accounts, validator_index_to_remove);
+        let ix = epoch_maintenance(*program_id, all_steward_accounts, validator_index_to_remove);
 
         let cu = validator_index_to_remove.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
@@ -691,11 +691,15 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        info!("Validator Index to Remove: {validator_index_to_remove:?}");
+        info!("Validator Index to Remove: {validator_index_for_immediate_removal:?}");
 
-        let ix = epoch_maintenance(program_id, all_steward_accounts, validator_index_to_remove);
+        let ix = epoch_maintenance(
+            *program_id,
+            all_steward_accounts,
+            validator_index_for_immediate_removal,
+        );
 
-        let cu = validator_index_to_remove.map(|_| 1_400_000);
+        let cu = validator_index_for_immediate_removal.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
 
         info!("Submitting Epoch Maintenance");
@@ -723,10 +727,8 @@ async fn _handle_epoch_maintenance(
     }
 
     while state_epoch != current_epoch {
-        let ix = epoch_maintenance(program_id, all_steward_accounts, None);
-
-        let cu = validator_index_to_remove.map(|_| 1_400_000);
-        let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
+        let ix = epoch_maintenance(*program_id, all_steward_accounts, None);
+        let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
 
         info!("Submitting Epoch Maintenance");
         let new_stats =
@@ -747,8 +749,6 @@ async fn _handle_epoch_maintenance(
                 .await
                 .unwrap();
 
-        num_validators = updated_state_account.state.num_pool_validators;
-        validators_to_remove = updated_state_account.state.validators_to_remove;
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
