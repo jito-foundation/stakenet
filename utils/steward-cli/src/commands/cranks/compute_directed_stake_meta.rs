@@ -9,6 +9,7 @@
 //! The directed stake metadata computation is an operation that:
 //! - Aggregates all directed stake tickets from validators
 //! - Computes JitoSOL token balances for relevant accounts
+//! - Compute BAM Delegation targets
 //! - Updates the DirectedStakeMeta account with aggregated information
 //! - Ensures stake distribution reflects current preferences and holdings
 //!
@@ -47,7 +48,9 @@ use crate::{
 };
 
 #[derive(Parser)]
-#[command(about = "Compute directed stake metadata including tickets and JitoSOL balances")]
+#[command(
+    about = "Compute directed stake metadata including tickets and JitoSOL balances and BAM Delegation"
+)]
 pub struct ComputeDirectedStakeMeta {
     #[command(flatten)]
     permissioned_parameters: PermissionedParameters,
@@ -56,7 +59,10 @@ pub struct ComputeDirectedStakeMeta {
     #[arg(long, env)]
     pub token_mint: Pubkey,
 
-    /// Kobe api base url
+    /// Kobe API base url
+    ///
+    /// - Testnet: https://kobe.testnet.jito.network
+    /// - Mainet: https://kobe.mainnet.jito.network
     #[arg(long, env)]
     pub kobe_api_base_url: String,
 }
