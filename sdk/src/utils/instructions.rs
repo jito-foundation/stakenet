@@ -266,7 +266,7 @@ pub async fn compute_bam_targets(
     if let Some(metric) = bam_epoch_metric {
         let mut total_target_lamports = metric
             .available_bam_delegation_stake
-            .checked_div(bam_eligible_validators.len() as u64)
+            .checked_div(metric.eligible_bam_validator_count)
             .ok_or(JitoInstructionError::ArithmeticError)?;
 
         instructions.extend(
@@ -292,15 +292,15 @@ pub async fn compute_bam_targets(
                         }
                     };
 
-                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
-                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
-                            Some(sum) => sum,
-                            None => {
-                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
-                                return None;
-                            }
-                        }
-                    }
+                     if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
+                         total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
+                             Some(sum) => sum,
+                             None => {
+                                 log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
+                                 return None;
+                             }
+                         }
+                     }
 
                     Some(Instruction {
                         program_id: *program_id,
