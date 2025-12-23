@@ -203,7 +203,15 @@ async fn main() -> Result<()> {
             command_add_to_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::RemoveFromBlacklist(args) => {
-            command_remove_from_blacklist(args, &client, steward_program_id).await
+            // Use global signer - required for this command
+            let signer_path = global_signer.expect("--signer flag is required for this command");
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_remove_from_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
