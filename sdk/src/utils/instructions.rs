@@ -200,8 +200,19 @@ pub async fn compute_directed_stake_meta(
 ///
 /// 1. Fetches all bam validators through Kobe API
 /// 2. For each eligible bam validator:
-///    - Calculate total targets ((Current BAM active stake / Total stake amount of Eligible validators) * BAM available bam delegation stake amount).
+///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
+///    - If eligible validators are empty, return empty instructions.
 /// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
+///
+/// # Integer Division Behavior
+///
+/// The stake distribution uses integer division, which truncates any remainder.
+/// This means `(available_bam_delegation_stake % bam_eligible_validators.len())` lamports
+/// will not be delegated. This remainder is intentionally ignored to maintain equal
+/// distribution across all BAM validators.
+///
+/// Example: With 100 lamports and 3 validators, each receives 33 lamports (99 total),
+/// leaving 1 lamport undelegated.
 ///
 /// # Return Value
 ///
@@ -214,6 +225,7 @@ pub async fn compute_bam_targets(
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let epoch_info = client.get_epoch_info().await?;
+    let current_epoch = epoch_info.epoch;
     let last_epoch = epoch_info.epoch - 1;
 
     let bam_epoch_metric = kobe_client
@@ -226,6 +238,14 @@ pub async fn compute_bam_targets(
         .bam_validators;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let directed_stake_meta =
+        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
+    let targets: HashMap<Pubkey, u64> = directed_stake_meta
+        .targets
+        .iter()
+        .filter(|target| target.target_last_updated_epoch == current_epoch)
+        .map(|target| (target.vote_pubkey, target.total_target_lamports))
+        .collect();
     let config_account = get_steward_config_account(&client, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
@@ -237,9 +257,18 @@ pub async fn compute_bam_targets(
         .filter(|bv| bv.is_eligible)
         .collect();
 
-    let mut instructions = Vec::with_capacity(bam_eligible_validators.len());
+    let mut instructions = Vec::new();
+
+    if bam_eligible_validators.is_empty() {
+        return Ok(instructions);
+    }
 
     if let Some(metric) = bam_epoch_metric {
+        let mut total_target_lamports = metric
+            .available_bam_delegation_stake
+            .checked_div(bam_eligible_validators.len() as u64)
+            .ok_or(JitoInstructionError::ArithmeticError)?;
+
         instructions.extend(
             bam_eligible_validators
                 .iter()
@@ -262,21 +291,16 @@ pub async fn compute_bam_targets(
                             return None;
                         }
                     };
-                    let total_target_lamports = match (bv.active_stake as u128)
-                        .checked_mul(metric.available_bam_delegation_stake as u128)
-                        .and_then(|result| result.checked_div(metric.bam_stake as u128))
-                        .and_then(|result| u64::try_from(result).ok()) {
-                           Some(lamports) => lamports,
-                           None => {
-                               log::warn!(
-                                   "Arithmetic overflow calculating target lamports for {vote_pubkey}: active_stake={}, available={}, bam_stake={}",
-                                   bv.active_stake,
-                                   metric.available_bam_delegation_stake,
-                                   metric.bam_stake
-                               );
-                               return None;
-                           }
-                        };
+
+                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
+                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
+                            Some(sum) => sum,
+                            None => {
+                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
+                                return None;
+                            }
+                        }
+                    }
 
                     Some(Instruction {
                         program_id: *program_id,

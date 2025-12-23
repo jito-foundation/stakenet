@@ -4,7 +4,7 @@ use anchor_lang::AccountDeserialize;
 use anyhow::Result;
 use jito_steward::{
     constants::LAMPORT_BALANCE_DEFAULT, score::ValidatorScoreComponents,
-    stake_pool_utils::ValidatorList, Config, Delegation, StewardStateAccountV2,
+    stake_pool_utils::ValidatorList, Config, Delegation, DirectedStakeMeta, StewardStateAccountV2,
 };
 use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -13,7 +13,7 @@ use spl_stake_pool::{
     find_stake_program_address, find_transient_stake_program_address, state::StakeStatus,
 };
 use stakenet_sdk::utils::{
-    accounts::{get_all_steward_accounts, get_validator_history_address},
+    accounts::{get_all_steward_accounts, get_directed_stake_meta, get_validator_history_address},
     debug::{format_simple_steward_state_string, format_steward_state_string},
 };
 use validator_history::ValidatorHistory;
@@ -60,6 +60,19 @@ struct StateProgress {
 
     /// Remaining
     remaining: u64,
+}
+
+/// Tracks progress for directed stake rebalancing
+#[derive(Serialize, Deserialize, Debug)]
+struct DirectedStakeProgress {
+    /// Number of targets rebalanced this epoch (staked_last_updated_epoch == current_epoch)
+    rebalanced: usize,
+
+    /// Total number of active targets in DirectedStakeMeta
+    total_targets: usize,
+
+    /// Remaining targets to rebalance
+    remaining: usize,
 }
 
 /// Steward's current state and configuration
@@ -147,6 +160,9 @@ pub struct StateInfo {
     /// Count of validators with non-zero performance scores
     /// Indicates how many validators are currently eligible for delegation
     non_zero_scores: u32,
+
+    /// Progress for directed stake rebalancing
+    directed_stake_progress: Option<DirectedStakeProgress>,
 }
 
 /// Summary of all lamport balances in the stake pool
@@ -377,6 +393,12 @@ pub async fn command_view_state(
     let steward_config = args.view_parameters.steward_config;
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &steward_config).await?;
+
+    // Fetch DirectedStakeMeta for progress tracking
+    let directed_stake_meta = get_directed_stake_meta(client.clone(), &steward_config, &program_id)
+        .await
+        .ok();
+
     if args.verbose || args.vote_account.is_some() {
         let vote_accounts: Vec<Pubkey> = all_steward_accounts
             .validator_list_account
@@ -424,6 +446,7 @@ pub async fn command_view_state(
             &all_steward_accounts.state_account,
             &all_steward_accounts.validator_list_account,
             &all_steward_accounts.reserve_stake_account,
+            directed_stake_meta.as_deref(),
             args.view_parameters.print_json,
         );
     }
@@ -442,6 +465,7 @@ fn build_default_state_output(
     state_account: &StewardStateAccountV2,
     validator_list_account: &ValidatorList,
     reserve_stake_account: &Account,
+    directed_stake_meta: Option<&DirectedStakeMeta>,
 ) -> DefaultStateOutput {
     let state = &state_account.state;
 
@@ -476,6 +500,32 @@ fn build_default_state_output(
         .filter(|&&score| score != 0)
         .count() as u32;
 
+    // Calculate directed stake rebalance progress
+    let directed_stake_progress = directed_stake_meta.map(|meta| {
+        let current_epoch = state.current_epoch;
+
+        // Count active targets (non-default vote pubkeys)
+        let active_targets: Vec<_> = meta
+            .targets
+            .iter()
+            .filter(|target| target.vote_pubkey != Pubkey::default())
+            .collect();
+
+        let total_targets = active_targets.len();
+
+        // Count targets that have been rebalanced this epoch
+        let rebalanced = active_targets
+            .iter()
+            .filter(|target| target.staked_last_updated_epoch == current_epoch)
+            .count();
+
+        DirectedStakeProgress {
+            rebalanced,
+            total_targets,
+            remaining: total_targets.saturating_sub(rebalanced),
+        }
+    });
+
     DefaultStateOutput {
         accounts: AccountAddresses {
             config: steward_config.to_string(),
@@ -506,6 +556,7 @@ fn build_default_state_output(
             validators_for_immediate_removal_count: state.validators_for_immediate_removal.count(),
             validators_added: state.validators_added,
             non_zero_scores: non_zero_score_count,
+            directed_stake_progress,
         },
         lamports: LamportSummary {
             total_staked: LamportBalance::new(total_staked_lamports),
@@ -527,6 +578,7 @@ fn _print_default_state(
     state_account: &StewardStateAccountV2,
     validator_list_account: &ValidatorList,
     reserve_stake_account: &Account,
+    directed_stake_meta: Option<&DirectedStakeMeta>,
     print_json: bool,
 ) {
     if print_json {
@@ -536,6 +588,7 @@ fn _print_default_state(
             state_account,
             validator_list_account,
             reserve_stake_account,
+            directed_stake_meta,
         );
         println!("{}", serde_json::to_string_pretty(&output).unwrap());
     } else {
@@ -547,6 +600,7 @@ fn _print_default_state(
             state_account,
             validator_list_account,
             reserve_stake_account,
+            directed_stake_meta,
         );
 
         let mut formatted_string = String::new();
@@ -558,12 +612,25 @@ fn _print_default_state(
         formatted_string += "\n";
         formatted_string += "↺ State ↺\n";
         formatted_string += &format!("State Tag: {}\n", output.state.state_tag);
-        formatted_string += &format!(
-            "Progress: {} / {} ({} remaining)\n",
-            output.state.progress.completed,
-            output.state.progress.total,
-            output.state.progress.remaining
-        );
+
+        // Show directed stake progress when in RebalanceDirected state, otherwise show normal progress
+        if output.state.state_tag == "RebalanceDirected" {
+            if let Some(ref progress) = output.state.directed_stake_progress {
+                formatted_string += &format!(
+                    "Progress: {} / {} ({} remaining)\n",
+                    progress.rebalanced, progress.total_targets, progress.remaining
+                );
+            } else {
+                formatted_string += "Progress: N/A (DirectedStakeMeta not available)\n";
+            }
+        } else {
+            formatted_string += &format!(
+                "Progress: {} / {} ({} remaining)\n",
+                output.state.progress.completed,
+                output.state.progress.total,
+                output.state.progress.remaining
+            );
+        }
         formatted_string += &format!(
             "Validator Lamport Balances Count: {}\n",
             output.state.validator_lamport_balances_count
