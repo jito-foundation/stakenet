@@ -15,6 +15,7 @@ use crate::commands::{
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
     },
     cranks::{
+        auto_remove_validator::CrankAutoRemoveValidator,
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
         rebalance_directed::CrankRebalanceDirected,
     },
@@ -365,6 +366,7 @@ pub enum Commands {
     CrankRebalance(CrankRebalance),
     CrankRebalanceDirected(CrankRebalanceDirected),
     CrankUpdateStakePool(CrankUpdateStakePool),
+    CrankAutoRemoveValidator(CrankAutoRemoveValidator),
 }
 
 // ---------- VIEWS ------------
