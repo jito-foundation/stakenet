@@ -793,7 +793,6 @@ fn command_view_config(client: RpcClient) {
     let config = Config::try_deserialize(&mut config_account.data.as_slice())
         .expect("Failed to deserialize validator history account");
     println!("------- Config -------\n");
-    println!("Config PDA: {config_pda}");
     println!("📚 Accounts 📚");
     println!("Admin: {}", config.admin);
     println!("Oracle Authority: {}", config.oracle_authority);

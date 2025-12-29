@@ -25,15 +25,19 @@ pub struct AdminMarkForRemoval {
     #[command(flatten)]
     pub permissioned_parameters: PermissionedParameters,
 
+    /// Set to true to mark the validator for removal, false to unmark
     #[arg(long)]
     pub mark_for_removal: bool,
 
+    /// If true, remove the validator immediately
     #[arg(long)]
     pub immediate: bool,
 
+    /// The vote account address of the validator to mark for removal
     #[arg(long)]
     pub validator_vote_account: Pubkey,
 
+    /// If true, submit the transaction to the network. If false, only print the details
     #[arg(long, default_value = "false")]
     pub submit_ix: bool,
 }
