@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
@@ -33,8 +33,15 @@ pub async fn command_manually_remove_validator(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    let validator_to_remove =
-        steward_accounts.validator_list_account.validators[index_to_remove as usize];
+    let validator_to_remove = steward_accounts
+        .validator_list_account
+        .validators
+        .iter()
+        .find(|v| {
+            v.vote_account_address
+                == Pubkey::from_str("Htb4sd3szKxKt1KZzX9ydGnGRi2TTcSku4qswt48P2hv").unwrap()
+        })
+        .unwrap();
     let vote_account = validator_to_remove.vote_account_address;
 
     let (stake_address, _) = find_stake_program_address(
