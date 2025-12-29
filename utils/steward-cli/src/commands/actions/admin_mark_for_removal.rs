@@ -8,15 +8,11 @@ use solana_program::instruction::Instruction;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
 use crate::{
     commands::command_args::PermissionedParameters,
-    utils::{
-        accounts::{
-            get_steward_config_account, get_steward_state_address, get_validator_list_account,
-        },
-        transactions::configure_instruction,
-    },
+    utils::{accounts::get_steward_state_address, transactions::configure_instruction},
 };
 
 #[derive(Parser)]
@@ -68,14 +64,13 @@ pub async fn command_admin_mark_for_removal(
     let steward_config_address = args.permissioned_parameters.steward_config;
     let steward_state_address = get_steward_state_address(&program_id, &steward_config_address);
 
-    let steward_config_account =
-        get_steward_config_account(client, &steward_config_address).await?;
-    let validator_list_account =
-        get_validator_list_account(client, &steward_config_account.validator_list).await?;
+    let all_steward_accounts =
+        get_all_steward_accounts(client, &program_id, &steward_config_address).await?;
 
     println!("Submit: {}", args.submit_ix);
 
-    let validator_list_index = validator_list_account
+    let validator_list_index = all_steward_accounts
+        .validator_list_account
         .validators
         .iter()
         .position(|v| v.vote_account_address == args.validator_vote_account)
