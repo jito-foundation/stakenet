@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
@@ -24,7 +24,7 @@ pub async fn command_auto_remove_validator_from_pool(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let mut validator_index = args.validator_index_to_remove;
+    let validator_index = args.validator_index_to_remove;
     let args = args.permissionless_parameters;
 
     // Creates config account
@@ -37,33 +37,8 @@ pub async fn command_auto_remove_validator_from_pool(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
-    // let vote_account = steward_accounts
-    //     .validator_list_account
-    //     .validators
-    //     .iter()
-    //     .enumerate()
-    //     .find(|(index, v)| {
-    //         v.vote_account_address
-    //             == Pubkey::from_str("Htb4sd3szKxKt1KZzX9ydGnGRi2TTcSku4qswt48P2hv").unwrap()
-    //     })
-    //     .unwrap();
-    let mut vote_account = None;
-    for (index, validator) in steward_accounts
-        .validator_list_account
-        .validators
-        .iter()
-        .enumerate()
-    {
-        if validator.vote_account_address
-            == Pubkey::from_str("Htb4sd3szKxKt1KZzX9ydGnGRi2TTcSku4qswt48P2hv").unwrap()
-        {
-            vote_account = Some(validator.vote_account_address);
-            validator_index = index as u64;
-        }
-    }
-    let vote_account = vote_account.unwrap();
-    // validators[validator_index as usize]
-    // .vote_account_address;
+    let vote_account = steward_accounts.validator_list_account.validators[validator_index as usize]
+        .vote_account_address;
     let history_account =
         get_validator_history_address(&vote_account, &validator_history_program_id);
 

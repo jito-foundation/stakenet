@@ -43,7 +43,6 @@ pub async fn command_admin_mark_for_removal(
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    // let validator_list_index: u64 = args.validator_list_index as u64;
     let mark_for_removal: u8 = {
         if args.mark_for_removal {
             0xFF // TRUE
