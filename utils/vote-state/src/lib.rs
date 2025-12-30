@@ -11,8 +11,8 @@ use std::{
 
 #[allow(deprecated)]
 use anchor_lang::{error::ErrorCode::ConstraintOwner, prelude::*, solana_program::vote};
-
 use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 #[error_code]
 pub enum ErrorCode {
@@ -68,6 +68,7 @@ pub struct LandedVote {
 pub enum VoteStateVersions {
     V0_23_5(Box<VoteState0_23_5>),
     V1_14_11(Box<VoteState1_14_11>),
+    V1_16_0(Box<VoteState1_16_0>),
     Current(Box<VoteState>),
 }
 
@@ -135,9 +136,8 @@ pub struct VoteState1_14_11 {
     pub last_timestamp: BlockTimestamp,
 }
 
-// Newest version as of 1.16.0
 #[derive(Serialize)]
-pub struct VoteState {
+pub struct VoteState1_16_0 {
     /// the node that votes in this account
     pub node_pubkey: Pubkey,
 
@@ -169,9 +169,35 @@ pub struct VoteState {
     pub last_timestamp: BlockTimestamp,
 }
 
+// Newest version as of 3.10.0
+#[derive(Serialize)]
+pub struct VoteState {
+    pub node_pubkey: Pubkey,
+    pub authorized_withdrawer: Pubkey,
+    pub inflation_rewards_collector: Pubkey,
+    pub block_revenue_collector: Pubkey,
+    pub inflation_rewards_commission_bps: u16,
+    pub block_revenue_commission_bps: u16,
+    pub pending_delegator_rewards: u64,
+    pub bls_pubkey_compressed: Option<BLSPubkey>,
+    pub votes: VecDeque<LandedVote>,
+    pub root_slot: Option<u64>,
+    authorized_voters: AuthorizedVoters,
+    pub(crate) epoch_credits: Vec<(u64, u64, u64)>,
+    pub last_timestamp: BlockTimestamp,
+}
+
+#[derive(Serialize)]
+pub struct BLSPubkey {
+    #[serde(with = "BigArray")]
+    pub bytes: [u8; 48],
+}
+
 impl VoteStateVersions {
+    // Enum index + (4*Pubkey)
+    const VOTE_STATE_COMMISSION_INDEX: usize = 132;
     // Enum index + Pubkey + Pubkey
-    const VOTE_STATE_COMMISSION_INDEX: usize = 68;
+    const VOTE_STATE_1_16_0_COMMISSION_INDEX: usize = 68;
     const VOTE_STATE_1_14_1_COMMISSION_INDEX: usize = 68;
     // Enum index + Pubkey + Pubkey + Epoch + (CircBuf: 32 * (Pubkey + 2 * Epoch + Slot) + usize + bool) + Pubkey
     const VOTE_STATE_0_23_5_COMMISSION_INDEX: usize = 1909;
@@ -205,10 +231,17 @@ impl VoteStateVersions {
                 if data.len() < Self::VOTE_STATE_1_14_1_COMMISSION_INDEX {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
-                bincode::deserialize::<u8>(&data[Self::VOTE_STATE_COMMISSION_INDEX..])
+                bincode::deserialize::<u8>(&data[Self::VOTE_STATE_1_14_1_COMMISSION_INDEX..])
                     .map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
             }
             2 => {
+                if data.len() < Self::VOTE_STATE_1_16_0_COMMISSION_INDEX {
+                    return Err(ErrorCode::VoteAccountDataNotValid.into());
+                }
+                bincode::deserialize::<u8>(&data[Self::VOTE_STATE_1_16_0_COMMISSION_INDEX..])
+                    .map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
+            }
+            3 => {
                 if data.len() < Self::VOTE_STATE_COMMISSION_INDEX {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
@@ -326,6 +359,54 @@ impl VoteStateVersions {
 
                 return Self::deserialize_epoch_credits_at_index(&data, epoch_credits_idx);
             }
+            3 => {
+                let bls_key_option_variant_idx: usize =
+                    Self::ENUM_LEN_BYTES + (4 * Self::PUBKEY_BYTES) + 2 + 2 + 8;
+                let votes_idx = match data[bls_key_option_variant_idx] {
+                    0 => bls_key_option_variant_idx + 1,
+                    1 => bls_key_option_variant_idx + 1 + 48,
+                    _ => {
+                        return Err(ErrorCode::VoteAccountDataNotValid.into());
+                    }
+                };
+
+                let votes_len = Self::collection_length_at_index(&data, votes_idx)?;
+
+                println!("data: {:?}", data);
+                println!("votes_idx: {}", votes_idx);
+                println!("votes_len: {}", votes_len);
+
+                let root_slot_idx = votes_idx
+                    + Self::COLLECTION_LEN_BYTES
+                    + (votes_len * (1 + Self::SLOT_BYTES + 4));
+                let root_slot_option_variant: u8 = data[root_slot_idx];
+
+                let authorized_voters_idx = match root_slot_option_variant {
+                    0 => root_slot_idx + 1,
+                    1 => root_slot_idx + 1 + Self::SLOT_BYTES,
+                    _ => {
+                        return Err(ErrorCode::VoteAccountDataNotValid.into());
+                    }
+                };
+                println!("authorized_voters_idx: {}", authorized_voters_idx);
+                println!(
+                    "data: {:?}",
+                    &data[authorized_voters_idx..authorized_voters_idx + 8]
+                );
+                let authorized_voters_len =
+                    Self::collection_length_at_index(&data, authorized_voters_idx)?;
+
+                println!(
+                    "authorized_voters_len: {:?}",
+                    &data[authorized_voters_idx..authorized_voters_idx + authorized_voters_len]
+                );
+
+                let epoch_credits_idx: usize = authorized_voters_idx
+                    + Self::COLLECTION_LEN_BYTES
+                    + authorized_voters_len * (Self::EPOCH_BYTES + Self::PUBKEY_BYTES);
+
+                return Self::deserialize_epoch_credits_at_index(&data, epoch_credits_idx);
+            }
             _ => {}
         }
 
@@ -374,8 +455,8 @@ impl VoteStateVersions {
 #[cfg(test)]
 mod tests {
     use crate::{
-        AuthorizedVoters, BlockTimestamp, CircBuf, Lockout, VoteState0_23_5, VoteStateVersions,
-        MAX_LOCKOUT_HISTORY,
+        AuthorizedVoters, BLSPubkey, BlockTimestamp, CircBuf, Lockout, VoteState0_23_5,
+        VoteStateVersions, MAX_LOCKOUT_HISTORY,
     };
     #[allow(deprecated)]
     use anchor_lang::{
@@ -458,9 +539,8 @@ mod tests {
             VoteStateVersions::deserialize_epoch_credits(&account_info).unwrap();
         assert!(epoch_credits_result == vec![(70, 6, 9), (321, 4, 20)]);
 
-        // Test Current
         let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
-        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+        let vote_state_1_16_0 = VoteStateVersions::V1_16_0(Box::new(crate::VoteState1_16_0 {
             node_pubkey: Pubkey::new_unique(),
             authorized_withdrawer: Pubkey::new_unique(),
             commission: 99,
@@ -471,8 +551,41 @@ mod tests {
             epoch_credits: test_epoch_credits,
             last_timestamp: BlockTimestamp::default(),
         }));
-        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let mut ser_1_16_0 = bincode::serialize(&vote_state_1_16_0).unwrap();
         let account_info = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_1_16_0.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let epoch_credits_result =
+            VoteStateVersions::deserialize_epoch_credits(&account_info).unwrap();
+        assert!(epoch_credits_result == vec![(70, 9, 6), (321, 20, 4)]);
+
+        // Test empty and non-empty variants of variable length fields
+
+        let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: Some(BLSPubkey { bytes: [0; 48] }),
+            votes: VecDeque::new(),
+            root_slot: Some(1),
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: test_epoch_credits.clone(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
             &key,
             false,
             false,
@@ -483,8 +596,135 @@ mod tests {
             0,
         );
         let epoch_credits_result =
-            VoteStateVersions::deserialize_epoch_credits(&account_info).unwrap();
-        assert!(epoch_credits_result == vec![(70, 9, 6), (321, 20, 4)]);
+            VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
+        assert!(epoch_credits_result == test_epoch_credits);
+
+        let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: Some(BLSPubkey { bytes: [0; 48] }),
+            votes: VecDeque::new(),
+            root_slot: None, // Empty root slot
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: test_epoch_credits.clone(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_current.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let epoch_credits_result =
+            VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
+        assert!(epoch_credits_result == test_epoch_credits);
+
+        let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None, // Empty BLS pubkey
+            votes: VecDeque::new(),
+            root_slot: Some(1),
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: test_epoch_credits.clone(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_current.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let epoch_credits_result =
+            VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
+        assert!(epoch_credits_result == test_epoch_credits);
+
+        let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None, // Empty BLS pubkey
+            votes: VecDeque::new(),
+            root_slot: None, // Empty root slot
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: test_epoch_credits.clone(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_current.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let epoch_credits_result =
+            VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
+        assert!(epoch_credits_result == test_epoch_credits);
+
+        let non_empty_authorized_voters = AuthorizedVoters {
+            authorized_voters: std::collections::BTreeMap::from([(0, Pubkey::new_unique())]),
+        };
+        let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: Some(BLSPubkey { bytes: [0; 48] }),
+            votes: VecDeque::new(),
+            root_slot: Some(1),
+            authorized_voters: non_empty_authorized_voters,
+            epoch_credits: test_epoch_credits.clone(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_current.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let epoch_credits_result =
+            VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
+        assert!(epoch_credits_result == test_epoch_credits);
     }
 
     #[test]
@@ -558,7 +798,7 @@ mod tests {
             69
         );
 
-        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+        let vote_state_current = VoteStateVersions::V1_16_0(Box::new(crate::VoteState1_16_0 {
             node_pubkey: Pubkey::new_unique(),
             authorized_withdrawer: Pubkey::new_unique(),
             commission: 99,
@@ -584,5 +824,132 @@ mod tests {
             VoteStateVersions::deserialize_commission(&account_current).unwrap(),
             99
         );
+    }
+
+    #[test]
+    fn test_deserialize_node_pubkey() {
+        let node_pubkey = Pubkey::new_unique();
+        let vote_state_0_23_5 = VoteStateVersions::V0_23_5(Box::new(VoteState0_23_5 {
+            node_pubkey,
+            authorized_voter: Pubkey::new_unique(),
+            authorized_voter_epoch: 0,
+            prior_voters: CircBuf::default(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            commission: 69,
+            votes: VecDeque::new(),
+            root_slot: None,
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+
+        let mut ser = bincode::serialize(&vote_state_0_23_5).unwrap();
+
+        let mut lamports: u64 = 0;
+        let key = Pubkey::new_unique();
+        let owner = vote::program::ID.key();
+
+        let account = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+
+        let node_pubkey_result = VoteStateVersions::deserialize_node_pubkey(&account).unwrap();
+        assert_eq!(node_pubkey_result, node_pubkey);
+
+        let vote_state = VoteStateVersions::V1_14_11(Box::new(crate::VoteState1_14_11 {
+            node_pubkey,
+            authorized_withdrawer: Pubkey::new_unique(),
+            commission: 96,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            prior_voters: CircBuf::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+
+        let mut ser = bincode::serialize(&vote_state).unwrap();
+
+        let mut lamports: u64 = 0;
+        let key = Pubkey::new_unique();
+        let owner = vote::program::ID.key();
+
+        let account = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+
+        let node_pubkey_result = VoteStateVersions::deserialize_node_pubkey(&account).unwrap();
+        assert_eq!(node_pubkey_result, node_pubkey);
+
+        let vote_state_1_16_0 = VoteStateVersions::V1_16_0(Box::new(crate::VoteState1_16_0 {
+            node_pubkey,
+            authorized_withdrawer: Pubkey::new_unique(),
+            commission: 99,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            prior_voters: CircBuf::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+
+        let mut ser_1_16_0 = bincode::serialize(&vote_state_1_16_0).unwrap();
+        let account_1_16_0 = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_1_16_0.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let node_pubkey_result =
+            VoteStateVersions::deserialize_node_pubkey(&account_1_16_0).unwrap();
+        assert_eq!(node_pubkey_result, node_pubkey);
+
+        let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey,
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 99,
+            block_revenue_commission_bps: 99,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+
+        let mut ser_current = bincode::serialize(&vote_state_current).unwrap();
+        let account_current = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_current.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        let node_pubkey_result =
+            VoteStateVersions::deserialize_node_pubkey(&account_current).unwrap();
+        assert_eq!(node_pubkey_result, node_pubkey);
     }
 }
