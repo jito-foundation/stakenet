@@ -372,9 +372,6 @@ impl VoteStateVersions {
 
                 let votes_len = Self::collection_length_at_index(&data, votes_idx)?;
 
-                println!("data: {:?}", data);
-                println!("votes_idx: {}", votes_idx);
-                println!("votes_len: {}", votes_len);
 
                 let root_slot_idx = votes_idx
                     + Self::COLLECTION_LEN_BYTES
@@ -388,18 +385,6 @@ impl VoteStateVersions {
                         return Err(ErrorCode::VoteAccountDataNotValid.into());
                     }
                 };
-                println!("authorized_voters_idx: {}", authorized_voters_idx);
-                println!(
-                    "data: {:?}",
-                    &data[authorized_voters_idx..authorized_voters_idx + 8]
-                );
-                let authorized_voters_len =
-                    Self::collection_length_at_index(&data, authorized_voters_idx)?;
-
-                println!(
-                    "authorized_voters_len: {:?}",
-                    &data[authorized_voters_idx..authorized_voters_idx + authorized_voters_len]
-                );
 
                 let epoch_credits_idx: usize = authorized_voters_idx
                     + Self::COLLECTION_LEN_BYTES
