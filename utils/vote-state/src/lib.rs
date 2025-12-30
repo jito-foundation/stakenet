@@ -372,7 +372,6 @@ impl VoteStateVersions {
 
                 let votes_len = Self::collection_length_at_index(&data, votes_idx)?;
 
-
                 let root_slot_idx = votes_idx
                     + Self::COLLECTION_LEN_BYTES
                     + (votes_len * (1 + Self::SLOT_BYTES + 4));
@@ -385,6 +384,8 @@ impl VoteStateVersions {
                         return Err(ErrorCode::VoteAccountDataNotValid.into());
                     }
                 };
+                let authorized_voters_len =
+                    Self::collection_length_at_index(&data, authorized_voters_idx)?;
 
                 let epoch_credits_idx: usize = authorized_voters_idx
                     + Self::COLLECTION_LEN_BYTES
