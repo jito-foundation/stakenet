@@ -583,7 +583,7 @@ mod tests {
         );
         let epoch_credits_result =
             VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
-        assert!(epoch_credits_result == test_epoch_credits);
+        assert_eq!(epoch_credits_result, test_epoch_credits);
 
         let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![(70, 9, 6), (321, 20, 4)];
         let vote_state_current = VoteStateVersions::Current(Box::new(crate::VoteState {
