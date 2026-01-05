@@ -365,8 +365,6 @@ impl VoteStateVersions {
             3 => {
                 let bls_key_option_variant_idx: usize = Self::ENUM_LEN_BYTES
                     + (4 * Self::PUBKEY_BYTES)
-                    + Self::ENUM_LEN_BYTES
-                    + (4 * Self::PUBKEY_BYTES)
                     + Self::INFLATION_REWARDS_COMMISSION_BPS_BYTES
                     + Self::BLOCK_REVENUE_COMMISSION_BPS_BYTES
                     + Self::PENDING_DELEGATOR_REWARDS_BYTES;
