@@ -178,7 +178,7 @@ jobs:
         shell: bash
 
       - name: cargo test
-        run: cargo test --package tests --package stakenet-sdk --package validator-history-vote-state --all-features --color auto
+        run: RUST_MIN_STACK=20000000 cargo test --package tests --package stakenet-sdk --package validator-history-vote-state --all-features --color auto
         shell: bash
         env:
           RUST_LOG: trace
