@@ -183,7 +183,7 @@ pub struct VoteState {
     pub votes: VecDeque<LandedVote>,
     pub root_slot: Option<u64>,
     authorized_voters: AuthorizedVoters,
-    pub(crate) epoch_credits: Vec<(u64, u64, u64)>,
+    pub(crate) epoch_credits: Vec<(Epoch, u64, u64)>,
     pub last_timestamp: BlockTimestamp,
 }
 
@@ -201,6 +201,9 @@ impl VoteStateVersions {
     const VOTE_STATE_1_14_1_COMMISSION_INDEX: usize = 68;
     // Enum index + Pubkey + Pubkey + Epoch + (CircBuf: 32 * (Pubkey + 2 * Epoch + Slot) + usize + bool) + Pubkey
     const VOTE_STATE_0_23_5_COMMISSION_INDEX: usize = 1909;
+    const INFLATION_REWARDS_COMMISSION_BPS_BYTES: usize = 2;
+    const BLOCK_REVENUE_COMMISSION_BPS_BYTES: usize = 2;
+    const PENDING_DELEGATOR_REWARDS_BYTES: usize = 8;
     const COLLECTION_LEN_BYTES: usize = 8;
     const ENUM_LEN_BYTES: usize = 4;
     const SLOT_BYTES: usize = 8;
@@ -360,8 +363,13 @@ impl VoteStateVersions {
                 return Self::deserialize_epoch_credits_at_index(&data, epoch_credits_idx);
             }
             3 => {
-                let bls_key_option_variant_idx: usize =
-                    Self::ENUM_LEN_BYTES + (4 * Self::PUBKEY_BYTES) + 2 + 2 + 8;
+                let bls_key_option_variant_idx: usize = Self::ENUM_LEN_BYTES
+                    + (4 * Self::PUBKEY_BYTES)
+                    + Self::ENUM_LEN_BYTES
+                    + (4 * Self::PUBKEY_BYTES)
+                    + Self::INFLATION_REWARDS_COMMISSION_BPS_BYTES
+                    + Self::BLOCK_REVENUE_COMMISSION_BPS_BYTES
+                    + Self::PENDING_DELEGATOR_REWARDS_BYTES;
                 let votes_idx = match data[bls_key_option_variant_idx] {
                     0 => bls_key_option_variant_idx + 1,
                     1 => bls_key_option_variant_idx + 1 + 48,
