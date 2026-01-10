@@ -952,8 +952,8 @@ async fn _handle_rebalance(
             }
             .data(),
         })
-    }
-    });
+      }
+    }));
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
