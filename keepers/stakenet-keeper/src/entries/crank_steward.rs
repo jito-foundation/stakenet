@@ -870,6 +870,10 @@ async fn _handle_rebalance(
     let directed_stake_meta =
         get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
 
+    let directed_stake_validators = validators_to_run.iter().map(|validator_info| {
+        &validator_info.vote_account
+    }).collect::<Vec<_>>();
+
     let mut ixs_to_run = Vec::new();
     if reserve_stake_acc
         .lamports
@@ -916,6 +920,10 @@ async fn _handle_rebalance(
             validator_index,
         )?;
 
+        if directed_stake_validators.contains(&vote_account) {
+            info!("Validator {} is a directed stake validator, skipping rebalance during ongoing incident...", vote_account);
+            None
+        } else {
         Some(Instruction {
             program_id: *program_id,
             accounts: jito_steward::accounts::Rebalance {
@@ -944,7 +952,8 @@ async fn _handle_rebalance(
             }
             .data(),
         })
-    }));
+    }
+    });
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
@@ -1280,16 +1289,17 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::RebalanceDirected => {
-                    info!("Cranking Rebalance Directed...");
-
-                    _handle_directed_rebalance(
+                    info!("Directed Staking is temporarily disabled through the duration of an ongoing incident.");
+                    info!("Skipping Rebalance Directed...");
+                    /*_handle_directed_rebalance(
                         payer,
                         client,
                         program_id,
                         all_steward_accounts,
                         priority_fee,
                     )
-                    .await?
+                    .await?*/
+                    SubmitStats::default()
                 }
             };
             return_stats.combine(&stats);

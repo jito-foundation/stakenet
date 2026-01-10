@@ -31,11 +31,14 @@ use commands::{
     },
     info::{
         get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
+        view_directed_stake_lamports::command_view_directed_stake_lamports,
+        view_directed_stake_lamports_with_vote::command_view_directed_stake_lamports_with_vote,
         view_directed_stake_meta::command_view_directed_stake_meta,
         view_directed_stake_tickets::command_view_directed_stake_tickets,
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
+        view_validator_by_vote::command_view_validator_by_vote,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
@@ -121,6 +124,15 @@ async fn main() -> Result<()> {
         }
         Commands::ViewDirectedStakeMeta(args) => {
             command_view_directed_stake_meta(args, &client, steward_program_id).await
+        }
+        Commands::ViewDirectedStakeLamports(args) => {
+            command_view_directed_stake_lamports(args, &client, steward_program_id).await
+        }
+        Commands::ViewDirectedStakeLamportsWithVote(args) => {
+            command_view_directed_stake_lamports_with_vote(args, &client, steward_program_id).await
+        }
+        Commands::ViewValidatorByVote(args) => {
+            command_view_validator_by_vote(args, &client, steward_program_id).await
         }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, steward_program_id).await

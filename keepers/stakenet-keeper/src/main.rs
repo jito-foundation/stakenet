@@ -62,7 +62,8 @@ fn set_run_flags(args: &Args) -> u32 {
         run_flags = set_flag(run_flags, KeeperOperations::PriorityFeeCommission);
     }
     if args.run_directed_staking {
-        run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
+        info!("Directed Staking is temporarily disabled through the duration of an ongoing incident.");
+        //run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
     }
 
     run_flags

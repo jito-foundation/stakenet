@@ -309,6 +309,9 @@ pub enum Commands {
     ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    ViewDirectedStakeLamports(ViewDirectedStakeLamports),
+    ViewDirectedStakeLamportsWithVote(ViewDirectedStakeLamportsWithVote),
+    ViewValidatorByVote(ViewValidatorByVote),
     GetJitosolBalance(GetJitosolBalance),
 
     // Actions
@@ -880,6 +883,66 @@ pub struct ViewDirectedStakeMeta {
     /// Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View the entire directed_stake_lamports array with index and balance")]
+pub struct ViewDirectedStakeLamports {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Show all entries including zeros (default: only show non-zero entries)
+    #[arg(long, env, default_value = "false")]
+    pub show_all: bool,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View the entire directed_stake_lamports array with vote pubkey for each validator")]
+pub struct ViewDirectedStakeLamportsWithVote {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Show all entries including zeros (default: only show non-zero entries)
+    #[arg(long, env, default_value = "false")]
+    pub show_all: bool,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View validator information by vote pubkey (validator_lamport_balance, validator list index, and directed stake meta entry)")]
+pub struct ViewValidatorByVote {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Vote account pubkey to look up
+    #[arg(long, env)]
+    pub vote_pubkey: Pubkey,
 
     /// Print account information in JSON format
     #[arg(
