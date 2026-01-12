@@ -58,7 +58,6 @@ pub fn sync_directed_stake_lamports(stake_meta: &mut DirectedStakeMeta, validato
 
         let target_total_staked_lamports = stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
         stake_meta.directed_stake_lamports[validator_list_index] = target_total_staked_lamports;
-        num_targets_synced += 1;
     }
     Ok(())
 }
