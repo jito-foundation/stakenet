@@ -446,4 +446,9 @@ pub mod steward {
     pub fn close_directed_stake_meta(ctx: Context<CloseDirectedStakeMeta>) -> Result<()> {
         instructions::close_directed_stake_meta::handler(ctx)
     }
+
+    /// Syncs directed_stake_lamports array from targets[].total_staked_lamports
+    pub fn sync_directed_stake_lamports(ctx: Context<SyncDirectedStakeLamports>) -> Result<()> {
+        instructions::sync_directed_stake_lamports::handler(ctx)
+    }
 }

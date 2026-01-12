@@ -12,6 +12,7 @@ use crate::commands::{
         copy_directed_stake_targets::CopyDirectedStakeTargets,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
+        sync_directed_stake_lamports::SyncDirectedStakeLamports,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
     },
     cranks::{
@@ -351,6 +352,7 @@ pub enum Commands {
     CopyDirectedStakeTargets(CopyDirectedStakeTargets),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
     RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
+    SyncDirectedStakeLamports(SyncDirectedStakeLamports),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
     CloseDirectedStakeMeta(CloseDirectedStakeMeta),

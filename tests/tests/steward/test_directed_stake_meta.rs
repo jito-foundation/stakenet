@@ -518,6 +518,75 @@ async fn test_initialize_directed_stake_meta() {
     let _: DirectedStakeMeta = fixture.load_and_deserialize(&directed_stake_meta).await;
 }
 
+/// Helper function to set the directed stake meta upload authority
+async fn set_directed_stake_meta_upload_authority(fixture: &TestFixture) {
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+#[tokio::test]
+async fn test_copy_directed_stake_targets_initialization() {
+    let fixture = setup_directed_stake_fixture().await;
+    
+    // Initialize directed stake meta
+    let directed_stake_meta_address = initialize_directed_stake_meta(&fixture).await;
+    
+    // Set the upload authority so we can copy targets
+    set_directed_stake_meta_upload_authority(&fixture).await;
+    
+    // Get validators from the validator list
+    let validator1 = fixture
+        .get_validator_from_list(0)
+        .await
+        .expect("Validator list should have at least one validator");
+    let validator2 = fixture
+        .get_validator_from_list(1)
+        .await
+        .expect("Validator list should have at least two validators");
+    let validator3 = fixture
+        .get_validator_from_list(2)
+        .await
+        .expect("Validator list should have at least three validators");
+    
+    // Copy 3 targets
+    tests::steward_fixtures::crank_copy_directed_stake_targets(&fixture, validator1, 10_000_000_000).await;
+    tests::steward_fixtures::crank_copy_directed_stake_targets(&fixture, validator2, 20_000_000_000).await;
+    tests::steward_fixtures::crank_copy_directed_stake_targets(&fixture, validator3, 30_000_000_000).await;
+    
+    // Load and verify the directed stake meta
+    let directed_stake_meta: DirectedStakeMeta = fixture.load_and_deserialize(&directed_stake_meta_address).await;
+    
+    // Assert that directed_stake_lamports for all entries is either u64::MAX or 0
+    for (index, &lamports) in directed_stake_meta.directed_stake_lamports.iter().enumerate() {
+        assert!(
+            lamports == 0 || lamports == u64::MAX,
+            "directed_stake_lamports[{}] = {} should be either 0 or u64::MAX",
+            index,
+            lamports
+        );
+    }
+}
+
 #[tokio::test]
 async fn test_directed_stake_ticket_validation() {
     let fixture = setup_directed_stake_fixture().await;

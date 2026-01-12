@@ -1271,6 +1271,7 @@ async fn test_internal_lamport_tracking_with_deposit() {
     // We expect that:
     // - The stake deposit will be applied to the directed stake amount
     // - Validator lamport balance (total staked lamports) includes the same deposited amount
+    // - The directed stake lamports and target directed stake should be equal
     {
         let directed_stake_meta: DirectedStakeMeta = fixture
             .load_and_deserialize(&fixture.directed_stake_meta)
@@ -1286,6 +1287,7 @@ async fn test_internal_lamport_tracking_with_deposit() {
             validator_lamport_balance
                 == pre_deposit_validator_lamport_balance + 20_000_000_000 + stake_rent
         );
+        assert!(directed_stake_meta.directed_stake_lamports[0] == expected_staked_lamports);
     }
     drop(fixture);
 }
@@ -1476,6 +1478,7 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
     // - The stake deposit will be applied to the directed stake amount
     // - Validator lamport balance (total staked lamports) includes the same deposited amount
     // - Although the deposit was greater than the directed stake target, the directed stake is not to exceed the target amount
+    // - The directed stake lamports and target directed stake should be equal
     {
         let directed_stake_meta: DirectedStakeMeta = fixture
             .load_and_deserialize(&fixture.directed_stake_meta)
@@ -1489,6 +1492,7 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
                     + stake_rent
                     + pool_minimum_delegation)
         );
+        assert!(directed_stake_meta.directed_stake_lamports[0] == directed_stake_meta.targets[0].total_staked_lamports);
     }
 
     drop(fixture);
