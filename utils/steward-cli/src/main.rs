@@ -31,6 +31,7 @@ use commands::{
     },
     info::{
         get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
+        view_directed_stake_differences::command_view_directed_stake_differences,
         view_directed_stake_meta::command_view_directed_stake_meta,
         view_directed_stake_tickets::command_view_directed_stake_tickets,
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
@@ -122,6 +123,9 @@ async fn main() -> Result<()> {
         }
         Commands::ViewDirectedStakeMeta(args) => {
             command_view_directed_stake_meta(args, &client, steward_program_id).await
+        }
+        Commands::ViewDirectedStakeDifferences(args) => {
+            command_view_directed_stake_differences(args, &client, steward_program_id).await
         }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, steward_program_id).await

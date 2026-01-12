@@ -310,6 +310,7 @@ pub enum Commands {
     ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    ViewDirectedStakeDifferences(ViewDirectedStakeDifferences),
     GetJitosolBalance(GetJitosolBalance),
 
     // Actions
@@ -882,6 +883,26 @@ pub struct ViewDirectedStakeMeta {
     /// Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,
+
+    /// Print account information in JSON format
+    #[arg(
+        long,
+        default_value = "false",
+        help = "This will print out account information in JSON format"
+    )]
+    pub print_json: bool,
+}
+
+#[derive(Parser)]
+#[command(about = "View differences between directed_stake_lamports and target total_staked_lamports for each target")]
+pub struct ViewDirectedStakeDifferences {
+    /// Steward config account
+    #[arg(long, env)]
+    pub steward_config: Pubkey,
+
+    /// Show all entries including zero differences (default: only show non-zero differences)
+    #[arg(long, env, default_value = "false")]
+    pub show_all: bool,
 
     /// Print account information in JSON format
     #[arg(
