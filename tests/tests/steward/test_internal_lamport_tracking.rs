@@ -1492,7 +1492,10 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
                     + stake_rent
                     + pool_minimum_delegation)
         );
-        assert!(directed_stake_meta.directed_stake_lamports[0] == directed_stake_meta.targets[0].total_staked_lamports);
+        assert!(
+            directed_stake_meta.directed_stake_lamports[0]
+                == directed_stake_meta.targets[0].total_staked_lamports
+        );
     }
 
     drop(fixture);

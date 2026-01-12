@@ -1,12 +1,12 @@
 use anchor_lang::prelude::*;
 
-use crate::state::directed_stake::{DirectedStakeMeta};
+use crate::state::directed_stake::DirectedStakeMeta;
 use crate::utils::get_validator_list;
 use crate::utils::vote_pubkey_at_validator_list_index;
 use crate::{errors::StewardError, Config};
+use spl_stake_pool::big_vec::BigVec;
 use spl_stake_pool::state::ValidatorListHeader;
 use std::mem::size_of;
-use spl_stake_pool::big_vec::BigVec;
 
 #[derive(Accounts)]
 pub struct SyncDirectedStakeLamports<'info> {
@@ -40,23 +40,29 @@ impl SyncDirectedStakeLamports<'_> {
     pub const SIZE: usize = 8 + size_of::<Self>();
 }
 
-pub fn sync_directed_stake_lamports(stake_meta: &mut DirectedStakeMeta, validator_list: &BigVec<'_>) -> Result<()> {
+pub fn sync_directed_stake_lamports(
+    stake_meta: &mut DirectedStakeMeta,
+    validator_list: &BigVec<'_>,
+) -> Result<()> {
     for validator_list_index in 0..validator_list.len() as usize {
         let validator_list_vote_pubkey =
-            vote_pubkey_at_validator_list_index(&validator_list, validator_list_index as usize)?;
-        
+            vote_pubkey_at_validator_list_index(validator_list, validator_list_index)?;
+
         if stake_meta.directed_stake_meta_indices[validator_list_index] == u64::MAX {
             continue;
         }
-        let directed_stake_meta_index = stake_meta.directed_stake_meta_indices[validator_list_index] as usize;
-        let directed_stake_meta_vote_pubkey = stake_meta.targets[directed_stake_meta_index].vote_pubkey;
-        
+        let directed_stake_meta_index =
+            stake_meta.directed_stake_meta_indices[validator_list_index] as usize;
+        let directed_stake_meta_vote_pubkey =
+            stake_meta.targets[directed_stake_meta_index].vote_pubkey;
+
         if directed_stake_meta_vote_pubkey != validator_list_vote_pubkey {
             msg!("Warning: Vote pubkey does not match for validator list index: {}, validator list vote pubkey: {}, directed stake meta vote pubkey: {}", validator_list_index, validator_list_vote_pubkey, directed_stake_meta_vote_pubkey);
             continue;
         }
 
-        let target_total_staked_lamports = stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+        let target_total_staked_lamports =
+            stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
         stake_meta.directed_stake_lamports[validator_list_index] = target_total_staked_lamports;
     }
     Ok(())
