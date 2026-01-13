@@ -7,13 +7,17 @@
 /// 1. Export the instruction data structures from the Anchor program
 /// 2. Use the generated IDL to construct instruction data
 /// 3. Manually construct the instruction data using Borsh serialization
+use anchor_lang::Discriminator;
 use anchor_lang::{
     solana_program::{instruction::Instruction, pubkey::Pubkey, sysvar},
     InstructionData, ToAccountMetas,
 };
 use jito_steward::{
+    constants::MAX_VALIDATORS,
     instructions::AuthorityType,
-    state::directed_stake::{DirectedStakePreference, DirectedStakeRecordType},
+    state::directed_stake::{
+        DirectedStakePreference, DirectedStakeRecordType, DirectedStakeTarget,
+    },
     DirectedStakeMeta, DirectedStakeTicket, DirectedStakeWhitelist,
 };
 use solana_program_test::*;
@@ -516,6 +520,96 @@ async fn test_initialize_directed_stake_meta() {
     let fixture = setup_directed_stake_fixture().await;
     let directed_stake_meta = initialize_directed_stake_meta(&fixture).await;
     let _: DirectedStakeMeta = fixture.load_and_deserialize(&directed_stake_meta).await;
+}
+
+/// Helper function to set the directed stake meta upload authority
+async fn set_directed_stake_meta_upload_authority(fixture: &TestFixture) {
+    let set_meta_auth_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SetNewAuthority {
+            config: fixture.steward_config.pubkey(),
+            new_authority: fixture.keypair.pubkey(),
+            admin: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SetNewAuthority {
+            authority_type: AuthorityType::SetDirectedStakeMetaUploadAuthority,
+        }
+        .data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[set_meta_auth_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+}
+
+#[tokio::test]
+async fn test_copy_directed_stake_targets_initialization() {
+    let fixture = setup_directed_stake_fixture().await;
+
+    // Initialize directed stake meta
+    let directed_stake_meta_address = initialize_directed_stake_meta(&fixture).await;
+
+    // Set the upload authority so we can copy targets
+    set_directed_stake_meta_upload_authority(&fixture).await;
+
+    // Get validators from the validator list
+    let validator1 = fixture
+        .get_validator_from_list(0)
+        .await
+        .expect("Validator list should have at least one validator");
+    let validator2 = fixture
+        .get_validator_from_list(1)
+        .await
+        .expect("Validator list should have at least two validators");
+    let validator3 = fixture
+        .get_validator_from_list(2)
+        .await
+        .expect("Validator list should have at least three validators");
+
+    // Copy 3 targets
+    tests::steward_fixtures::crank_copy_directed_stake_targets(
+        &fixture,
+        validator1,
+        10_000_000_000,
+    )
+    .await;
+    tests::steward_fixtures::crank_copy_directed_stake_targets(
+        &fixture,
+        validator2,
+        20_000_000_000,
+    )
+    .await;
+    tests::steward_fixtures::crank_copy_directed_stake_targets(
+        &fixture,
+        validator3,
+        30_000_000_000,
+    )
+    .await;
+
+    // Load and verify the directed stake meta
+    let directed_stake_meta: DirectedStakeMeta = fixture
+        .load_and_deserialize(&directed_stake_meta_address)
+        .await;
+
+    // Assert that directed_stake_lamports for all entries is either u64::MAX or 0
+    for (index, &lamports) in directed_stake_meta
+        .directed_stake_lamports
+        .iter()
+        .enumerate()
+    {
+        assert!(
+            lamports == 0 || lamports == u64::MAX,
+            "directed_stake_lamports[{}] = {} should be either 0 or u64::MAX",
+            index,
+            lamports
+        );
+    }
 }
 
 #[tokio::test]
@@ -1295,4 +1389,175 @@ async fn test_ticket_update_authority_can_close_own_ticket() {
 
     // Account should no longer exist after closing
     assert!(!fixture.account_exists(&ticket_account).await);
+}
+
+#[tokio::test]
+async fn test_sync_lamports() {
+    let fixture = setup_directed_stake_fixture().await;
+
+    // Get validators from the validator list
+    let validator1 = fixture
+        .get_validator_from_list(0)
+        .await
+        .expect("Validator list should have at least one validator");
+    let validator2 = fixture
+        .get_validator_from_list(1)
+        .await
+        .expect("Validator list should have at least two validators");
+    let validator3 = fixture
+        .get_validator_from_list(2)
+        .await
+        .expect("Validator list should have at least three validators");
+
+    // Derive the directed stake meta address
+    let directed_stake_meta_address = Pubkey::find_program_address(
+        &[
+            DirectedStakeMeta::SEED,
+            fixture.steward_config.pubkey().as_ref(),
+        ],
+        &jito_steward::id(),
+    )
+    .0;
+
+    // Find validator list indices for each validator
+    let validator_list: jito_steward::stake_pool_utils::ValidatorList = fixture
+        .load_and_deserialize(&fixture.stake_pool_meta.validator_list)
+        .await;
+    let validator1_index = validator_list
+        .validators
+        .iter()
+        .position(|v| v.vote_account_address == validator1)
+        .expect("Validator 1 not found in validator list");
+    let validator2_index = validator_list
+        .validators
+        .iter()
+        .position(|v| v.vote_account_address == validator2)
+        .expect("Validator 2 not found in validator list");
+    let validator3_index = validator_list
+        .validators
+        .iter()
+        .position(|v| v.vote_account_address == validator3)
+        .expect("Validator 3 not found in validator list");
+
+    // Create the DirectedStakeMeta struct manually
+    let mut meta = DirectedStakeMeta {
+        total_stake_targets: 3,
+        directed_unstake_total: 0,
+        padding0: [0; 63],
+        is_initialized: jito_steward::utils::U8Bool::from(true),
+        targets: {
+            let mut targets = [DirectedStakeTarget {
+                vote_pubkey: Pubkey::default(),
+                total_target_lamports: 0,
+                total_staked_lamports: 0,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            }; MAX_VALIDATORS];
+
+            // Set the three targets with total_staked_lamports set (sync copies from this field)
+            targets[0] = DirectedStakeTarget {
+                vote_pubkey: validator1,
+                total_target_lamports: 10_000_000_000,
+                total_staked_lamports: 10_000_000_000,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            };
+            targets[1] = DirectedStakeTarget {
+                vote_pubkey: validator2,
+                total_target_lamports: 20_000_000_000,
+                total_staked_lamports: 20_000_000_000,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            };
+            targets[2] = DirectedStakeTarget {
+                vote_pubkey: validator3,
+                total_target_lamports: 30_000_000_000,
+                total_staked_lamports: 30_000_000_000,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            };
+
+            targets
+        },
+        directed_stake_lamports: [0; MAX_VALIDATORS],
+        directed_stake_meta_indices: {
+            let mut indices = [u64::MAX; MAX_VALIDATORS];
+            indices[validator1_index] = 0;
+            indices[validator2_index] = 1;
+            indices[validator3_index] = 2;
+            indices
+        },
+    };
+
+    // Overallocate targets with non-zero values to simulate the existing allocation
+    meta.directed_stake_lamports[validator1_index] = 1_000_000_000_000;
+    meta.directed_stake_lamports[validator2_index] = 2_000_000_000_000;
+    meta.directed_stake_lamports[validator3_index] = 3_000_000_000_000;
+
+    // Serialize with discriminator
+    let mut account_data = Vec::new();
+    account_data.extend_from_slice(DirectedStakeMeta::DISCRIMINATOR);
+    account_data.extend_from_slice(&borsh::to_vec(&meta).unwrap());
+
+    // Create account with proper data
+    let account = solana_sdk::account::Account {
+        lamports: 1_000_000_000,
+        data: account_data,
+        owner: jito_steward::id(),
+        executable: false,
+        rent_epoch: 0,
+    };
+
+    // Set the account directly
+    fixture
+        .ctx
+        .borrow_mut()
+        .set_account(&directed_stake_meta_address, &account.into());
+
+    // Set the upload authority so we can sync lamports
+    set_directed_stake_meta_upload_authority(&fixture).await;
+
+    // Load the directed stake meta to verify setup
+    let directed_stake_meta: DirectedStakeMeta = fixture
+        .load_and_deserialize(&directed_stake_meta_address)
+        .await;
+
+    assert!(directed_stake_meta.directed_stake_lamports[validator1_index] == 1_000_000_000_000);
+    assert!(directed_stake_meta.directed_stake_lamports[validator2_index] == 2_000_000_000_000);
+    assert!(directed_stake_meta.directed_stake_lamports[validator3_index] == 3_000_000_000_000);
+
+    // Invoke sync_directed_stake_lamports instruction
+    let sync_ix = Instruction {
+        program_id: jito_steward::id(),
+        accounts: jito_steward::accounts::SyncDirectedStakeLamports {
+            config: fixture.steward_config.pubkey(),
+            directed_stake_meta: directed_stake_meta_address,
+            clock: sysvar::clock::id(),
+            validator_list: fixture.stake_pool_meta.validator_list,
+            authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::SyncDirectedStakeLamports {}.data(),
+    };
+
+    let tx = Transaction::new_signed_with_payer(
+        &[sync_ix],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(tx).await;
+
+    // Assert balances are synced
+    let directed_stake_meta: DirectedStakeMeta = fixture
+        .load_and_deserialize(&directed_stake_meta_address)
+        .await;
+    assert!(directed_stake_meta.directed_stake_lamports[validator1_index] == 10_000_000_000);
+    assert!(directed_stake_meta.directed_stake_lamports[validator2_index] == 20_000_000_000);
+    assert!(directed_stake_meta.directed_stake_lamports[validator3_index] == 30_000_000_000);
 }

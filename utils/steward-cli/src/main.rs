@@ -54,6 +54,7 @@ use crate::{
             copy_directed_stake_targets::command_copy_directed_stake_targets,
             migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
+            sync_directed_stake_lamports::command_sync_directed_stake_lamports,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         cranks::{
@@ -242,6 +243,9 @@ async fn main() -> Result<()> {
         }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
             command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
+        }
+        Commands::SyncDirectedStakeLamports(args) => {
+            command_sync_directed_stake_lamports(args, &client, steward_program_id).await
         }
         Commands::CloseDirectedStakeTicket(args) => {
             command_close_directed_stake_ticket(args, &client, steward_program_id).await
