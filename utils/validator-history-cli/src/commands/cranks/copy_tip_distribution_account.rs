@@ -74,14 +74,21 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
         })
         .collect();
 
-    // Fetch tip distribution accounts to see which ones exist
+    // Fetch tip distribution accounts to see which ones exist and are owned by the TDA program.
+    // Uninitialized or closed TDAs are owned by System Program.
     let tip_distribution_accounts =
         get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
 
     let tip_distribution_map: HashMap<Pubkey, bool> = vote_accounts
         .iter()
         .zip(tip_distribution_accounts)
-        .map(|(vote_pubkey, account)| (*vote_pubkey, account.is_some()))
+        .map(|(vote_pubkey, account)| {
+            let is_valid_tda = account
+                .as_ref()
+                .map(|acc| acc.owner == args.tip_distribution_program_id)
+                .unwrap_or(false);
+            (*vote_pubkey, is_valid_tda)
+        })
         .collect();
 
     // Filter to validators that have tip distribution accounts but haven't been updated
@@ -104,7 +111,12 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
     );
 
     for vote_account in &vote_accounts_to_update {
-        println!("  - {}", vote_account);
+        let (tda_address, _) = derive_tip_distribution_account_address(
+            &args.tip_distribution_program_id,
+            vote_account,
+            epoch,
+        );
+        println!("  - {} (TDA: {})", vote_account, tda_address);
     }
 
     if vote_accounts_to_update.is_empty() {
