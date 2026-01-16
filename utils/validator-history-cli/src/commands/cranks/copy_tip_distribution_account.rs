@@ -103,6 +103,10 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
         vote_accounts_to_update.len()
     );
 
+    for vote_account in &vote_accounts_to_update {
+        println!("  - {}", vote_account);
+    }
+
     if vote_accounts_to_update.is_empty() {
         println!("No accounts need updating");
         return Ok(());
