@@ -25,6 +25,7 @@ use validator_history_cli::{
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
         },
     },
@@ -67,6 +68,7 @@ enum Commands {
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
     CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
+    CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
@@ -1298,6 +1300,10 @@ async fn main() -> anyhow::Result<()> {
             );
             let client = Arc::new(client);
             commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
+        }
+        Commands::CrankCopyTipDistributionAccount(command_args) => {
+            commands::cranks::copy_tip_distribution_account::run(command_args, args.json_rpc_url)
+                .await?
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?

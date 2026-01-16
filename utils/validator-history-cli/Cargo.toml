@@ -8,6 +8,7 @@ description = "CLI to manage validator history program"
 anchor-lang = "0.31.1"
 anyhow = { workspace = true }
 borsh = { package = "borsh", version = "1.5.7" }
+jito-tip-distribution-sdk = { workspace = true }
 bytemuck = { workspace = true }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = { workspace = true }
