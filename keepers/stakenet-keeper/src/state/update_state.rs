@@ -308,7 +308,12 @@ async fn get_tip_distribution_accounts(
     let result = vote_accounts
         .into_iter()
         .zip(tip_distribution_accounts)
-        .map(|(vote_pubkey, account)| (*vote_pubkey, account)) // Dereference vote_pubkey here
+        .map(|(vote_pubkey, account)| {
+            // Only include accounts owned by the tip distribution program.
+            // Uninitialized or closed TDAs are owned by System Program.
+            let valid_account = account.filter(|acc| acc.owner == *tip_distribution_program_id);
+            (*vote_pubkey, valid_account)
+        })
         .collect::<HashMap<Pubkey, Option<Account>>>();
 
     Ok(result)
