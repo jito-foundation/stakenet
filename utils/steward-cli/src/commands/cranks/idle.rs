@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use jito_steward::StewardStateEnum;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::{nonblocking::rpc_client::RpcClient, tpu_client::TpuClientConfig};
+use solana_connection_cache::connection_cache::NewConnectionConfig;
 use solana_program::instruction::Instruction;
 
+use solana_quic_client::{QuicConfig, QuicConnectionManager, QuicPool};
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
+use solana_tpu_client::nonblocking::tpu_client::TpuClient;
 
 use crate::commands::command_args::CrankIdle;
 use stakenet_sdk::utils::{
@@ -16,30 +19,34 @@ use stakenet_sdk::utils::{
     transactions::{configure_instruction, print_base58_tx},
 };
 
+type QuicTpuClient = TpuClient<QuicPool, QuicConnectionManager, QuicConfig>;
+
 pub async fn command_crank_idle(
     args: CrankIdle,
-    client: &Arc<RpcClient>,
+    rpc_client: &Arc<RpcClient>,
+    ws_url: &str,
     program_id: Pubkey,
 ) -> Result<()> {
     let args = args.permissionless_parameters;
 
     // Creates config account
-    let payer =
-        read_keypair_file(args.payer_keypair_path).expect("Failed reading keypair file ( Payer )");
+    let payer = read_keypair_file(args.payer_keypair_path)
+        .map_err(|e| anyhow!("Failed reading keypair file ( Payer ): {e}"))?;
 
     let steward_config = args.steward_config;
 
-    let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
+    let steward_accounts =
+        get_all_steward_accounts(rpc_client, &program_id, &steward_config).await?;
 
-    match steward_accounts.state_account.state.state_tag {
-        StewardStateEnum::Idle => { /* Continue */ }
-        _ => {
-            println!(
-                "State account is not in Idle state: {}",
-                steward_accounts.state_account.state.state_tag
-            );
-            return Ok(());
-        }
+    if !matches!(
+        steward_accounts.state_account.state.state_tag,
+        StewardStateEnum::Idle
+    ) {
+        println!(
+            "State account is not in Idle state: {}",
+            steward_accounts.state_account.state.state_tag
+        );
+        return Ok(());
     }
 
     let ix = Instruction {
@@ -53,7 +60,7 @@ pub async fn command_crank_idle(
         data: jito_steward::instruction::Idle {}.data(),
     };
 
-    let blockhash = client.get_latest_blockhash().await?;
+    let blockhash = rpc_client.get_latest_blockhash().await?;
 
     let configured_ix = configure_instruction(
         &[ix],
@@ -72,11 +79,31 @@ pub async fn command_crank_idle(
     if args.transaction_parameters.print_tx {
         print_base58_tx(&configured_ix)
     } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
+        let quic_config = QuicConfig::new()?;
+        let connection_manager = QuicConnectionManager::new_with_connection_config(quic_config);
+        let tpu_config = TpuClientConfig::default();
+
+        let tpu_client: QuicTpuClient = TpuClient::new(
+            "tpu-client",
+            rpc_client.clone(),
+            ws_url,
+            tpu_config,
+            connection_manager,
+        )
+        .await?;
+
+        let errors = tpu_client
+            .send_and_confirm_messages_with_spinner(&[transaction.message], &[&payer])
             .await?;
 
-        println!("Signature: {}", signature);
+        let mut has_error = false;
+        for error in errors.into_iter().flatten() {
+            println!("Error: {error:?}");
+            has_error = true;
+        }
+        if !has_error {
+            println!("Transaction confirmed!");
+        }
     }
 
     Ok(())

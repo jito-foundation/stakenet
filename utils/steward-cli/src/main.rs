@@ -273,7 +273,9 @@ async fn main() -> Result<()> {
         Commands::ComputeDirectedStakeMeta(args) => {
             command_crank_compute_directed_stake_meta(args, &client, steward_program_id).await
         }
-        Commands::CrankIdle(args) => command_crank_idle(args, &client, steward_program_id).await,
+        Commands::CrankIdle(command_args) => {
+            command_crank_idle(command_args, &client, &args.ws_url, steward_program_id).await
+        }
         Commands::CrankComputeInstantUnstake(args) => {
             command_crank_compute_instant_unstake(args, &client, steward_program_id).await
         }
