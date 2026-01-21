@@ -59,6 +59,7 @@ use crate::{
         },
         cranks::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
+            instant_remove_validators::command_crank_instant_remove_validators,
             rebalance_directed::command_crank_rebalance_directed,
         },
         info::{
@@ -285,6 +286,9 @@ async fn main() -> Result<()> {
         }
         Commands::CrankUpdateStakePool(args) => {
             command_crank_update_stake_pool(args, &client, steward_program_id).await
+        }
+        Commands::CrankInstantRemoveValidators(args) => {
+            command_crank_instant_remove_validators(args, &client, steward_program_id).await
         }
     };
 
