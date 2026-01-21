@@ -12,7 +12,7 @@ use solana_sdk::{
 use validator_history::{constants::MAX_ALLOC_BYTES, ValidatorHistory};
 
 use crate::{
-    models::errors::JitoInstructionError,
+    models::{aggregate_accounts::AllStewardAccounts, errors::JitoInstructionError},
     utils::{
         accounts::{
             get_directed_stake_meta, get_directed_stake_meta_address,
@@ -64,6 +64,31 @@ pub fn get_create_validator_history_instructions(
     ]);
 
     ixs
+}
+
+pub fn epoch_maintenance(
+    program_id: Pubkey,
+    all_steward_accounts: &AllStewardAccounts,
+    validator_index_to_remove: Option<u64>,
+) -> Instruction {
+    let directed_stake_meta =
+        get_directed_stake_meta_address(&all_steward_accounts.config_address, &program_id);
+
+    Instruction {
+        program_id,
+        accounts: jito_steward::accounts::EpochMaintenance {
+            config: all_steward_accounts.config_address,
+            state_account: all_steward_accounts.state_address,
+            validator_list: all_steward_accounts.validator_list_address,
+            stake_pool: all_steward_accounts.stake_pool_address,
+            directed_stake_meta,
+        }
+        .to_account_metas(None),
+        data: jito_steward::instruction::EpochMaintenance {
+            validator_index_to_remove,
+        }
+        .data(),
+    }
 }
 
 /// Creates an instruction to update a directed stake ticket.
