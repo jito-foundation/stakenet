@@ -83,9 +83,11 @@ pub mod utils;
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
     let args = Args::parse();
-    let client = Arc::new(RpcClient::new_with_timeout(
+    let commitment_config = args.commitment.into();
+    let client = Arc::new(RpcClient::new_with_timeout_and_commitment(
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
+        commitment_config,
     ));
 
     let steward_program_id = args.steward_program_id;
