@@ -47,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            admin_mark_for_removal::command_admin_mark_for_removal,
             close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
@@ -216,6 +217,9 @@ async fn main() -> Result<()> {
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
+        }
+        Commands::AdminMarkForRemoval(command_args) => {
+            command_admin_mark_for_removal(command_args, &client, steward_program_id).await
         }
         Commands::InitDirectedStakeMeta(args) => {
             command_init_directed_stake_meta(args, &client, steward_program_id).await
