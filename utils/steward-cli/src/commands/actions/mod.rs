@@ -1,5 +1,6 @@
 pub mod add_to_blacklist;
 pub mod add_to_directed_stake_whitelist;
+pub mod add_validator_to_pool;
 pub mod auto_add_validator_from_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_directed_stake_meta;

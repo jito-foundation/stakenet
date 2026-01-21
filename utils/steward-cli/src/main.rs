@@ -47,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            add_validator_to_pool::command_add_validator_to_pool,
             close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
@@ -173,6 +174,9 @@ async fn main() -> Result<()> {
         Commands::ResetState(args) => command_reset_state(args, &client, steward_program_id).await,
         Commands::ResetValidatorLamportBalances(args) => {
             command_reset_validator_lamport_balances(args, &client, steward_program_id).await
+        }
+        Commands::AddValidatorToPool(args) => {
+            command_add_validator_to_pool(args, &client, steward_program_id).await
         }
         Commands::ManuallyRemoveValidator(args) => {
             command_manually_remove_validator(args, &client, steward_program_id).await

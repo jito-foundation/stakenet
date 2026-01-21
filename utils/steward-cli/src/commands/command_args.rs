@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        add_validator_to_pool::AddValidatorToPool,
         close_directed_stake_meta::CloseDirectedStakeMeta,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
@@ -336,6 +337,7 @@ pub enum Commands {
     RemoveBadValidators(RemoveBadValidators),
     ManuallyCopyVoteAccount(ManuallyCopyVoteAccount),
     ManuallyCopyAllVoteAccounts(ManuallyCopyAllVoteAccounts),
+    AddValidatorToPool(AddValidatorToPool),
     ManuallyRemoveValidator(ManuallyRemoveValidator),
     AutoRemoveValidatorFromPool(AutoRemoveValidatorFromPool),
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
