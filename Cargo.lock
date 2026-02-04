@@ -12212,6 +12212,7 @@ dependencies = [
  "anchor-lang",
  "bincode",
  "serde",
+ "serde-big-array",
  "solana-program",
 ]
 
