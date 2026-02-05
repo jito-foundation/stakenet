@@ -8,7 +8,11 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, stake, system_program};
-use spl_stake_pool::{find_stake_program_address, find_transient_stake_program_address};
+use solana_sdk::{signer::Signer, stake::state::StakeStateV2};
+use spl_associated_token_account::get_associated_token_address;
+use spl_stake_pool::{
+    find_stake_program_address, find_transient_stake_program_address, instruction::deposit_sol,
+};
 use stakenet_sdk::utils::{
     accounts::{
         get_all_steward_accounts, get_directed_stake_meta_address, get_validator_history_address,
@@ -67,9 +71,32 @@ pub async fn command_crank_rebalance(
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
 
-    let ixs_to_run = validators_to_run
+    let stake_rent = client
+        .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
+        .await?;
+
+    let acc_token_address = get_associated_token_address(
+        &payer.pubkey(),
+        &steward_accounts.stake_pool_account.pool_mint,
+    );
+
+    let deposit_sol_ix = deposit_sol(
+        &spl_stake_pool::id(),
+        &steward_accounts.stake_pool_address,
+        &steward_accounts.stake_pool_withdraw_authority,
+        &steward_accounts.stake_pool_account.reserve_stake,
+        &payer.pubkey(),
+        &acc_token_address,
+        &steward_accounts.stake_pool_account.manager_fee_account,
+        &acc_token_address,
+        &steward_accounts.stake_pool_account.pool_mint,
+        &spl_token::id(),
+        stake_rent,
+    );
+
+    let ixs_to_run: Vec<Instruction> = validators_to_run
         .iter()
-        .map(|(validator_index, vote_account, history_account)| {
+        .flat_map(|(validator_index, vote_account, history_account)| {
             println!("vote_account ({}): {}", validator_index, vote_account);
 
             let (stake_address, _) = find_stake_program_address(
@@ -87,7 +114,8 @@ pub async fn command_crank_rebalance(
                     .transient_seed_suffix
                     .into(),
             );
-            Instruction {
+
+            let rebalance_ix = Instruction {
                 program_id,
                 accounts: jito_steward::accounts::Rebalance {
                     config: steward_config,
@@ -114,16 +142,18 @@ pub async fn command_crank_rebalance(
                     validator_list_index: *validator_index as u64,
                 }
                 .data(),
-            }
+            };
+
+            vec![deposit_sol_ix.clone(), rebalance_ix]
         })
-        .collect::<Vec<Instruction>>();
+        .collect();
 
     let txs_to_run = package_instructions(
         &ixs_to_run,
         args.permissionless_parameters
             .transaction_parameters
             .chunk_size
-            .unwrap_or(1),
+            .unwrap_or(2),
         args.permissionless_parameters
             .transaction_parameters
             .priority_fee,
