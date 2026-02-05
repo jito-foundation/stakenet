@@ -870,16 +870,17 @@ async fn _handle_rebalance(
     let directed_stake_meta =
         get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
 
-    let ixs_to_run: Vec<Instruction> = if reserve_stake_acc
+    let needs_deposit = reserve_stake_acc
         .lamports
-        .lt(&stake_rent.mul(validators_to_run.len() as u64))
-    {
+        .lt(&stake_rent.mul(validators_to_run.len() as u64));
+
+    let deposit_sol_ix = if needs_deposit {
         let acc_token_address = get_associated_token_address(
             &payer.pubkey(),
             &all_steward_accounts.stake_pool_account.pool_mint,
         );
 
-        let deposit_sol_ix = deposit_sol(
+        Some(deposit_sol(
             &spl_stake_pool::id(),
             &all_steward_accounts.stake_pool_address,
             &all_steward_accounts.stake_pool_withdraw_authority,
@@ -891,112 +892,68 @@ async fn _handle_rebalance(
             &all_steward_accounts.stake_pool_account.pool_mint,
             &spl_token::id(),
             stake_rent,
-        );
-
-        validators_to_run
-            .iter()
-            .flat_map(|validator_info| {
-                let validator_index = validator_info.index;
-                let vote_account = &validator_info.vote_account;
-                let history_account = validator_info.history_account;
-
-                let stake_address =
-                    get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
-
-                let (transient_stake_address, _) = find_transient_stake_program_address(
-                    &spl_stake_pool::id(),
-                    vote_account,
-                    &all_steward_accounts.stake_pool_address,
-                    all_steward_accounts.validator_list_account.validators[validator_index]
-                        .transient_seed_suffix
-                        .into(),
-                );
-
-                let rebalance_ix = Instruction {
-                    program_id: *program_id,
-                    accounts: jito_steward::accounts::Rebalance {
-                        config: all_steward_accounts.config_address,
-                        state_account: all_steward_accounts.state_address,
-                        validator_history: history_account,
-                        stake_pool_program: spl_stake_pool::id(),
-                        stake_pool: all_steward_accounts.stake_pool_address,
-                        withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
-                        validator_list: all_steward_accounts.validator_list_address,
-                        reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
-                        stake_account: stake_address,
-                        transient_stake_account: transient_stake_address,
-                        vote_account: *vote_account,
-                        system_program: system_program::id(),
-                        stake_program: stake::program::id(),
-                        rent: solana_sdk::sysvar::rent::id(),
-                        clock: solana_sdk::sysvar::clock::id(),
-                        stake_history: solana_sdk::sysvar::stake_history::id(),
-                        stake_config: stake::config::ID,
-                        directed_stake_meta,
-                    }
-                    .to_account_metas(None),
-                    data: jito_steward::instruction::Rebalance {
-                        validator_list_index: validator_index as u64,
-                    }
-                    .data(),
-                };
-
-                vec![deposit_sol_ix.clone(), rebalance_ix]
-            })
-            .collect()
+        ))
     } else {
-        validators_to_run
-            .iter()
-            .map(|validator_info| {
-                let validator_index = validator_info.index;
-                let vote_account = &validator_info.vote_account;
-                let history_account = validator_info.history_account;
-
-                let stake_address =
-                    get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
-
-                let (transient_stake_address, _) = find_transient_stake_program_address(
-                    &spl_stake_pool::id(),
-                    vote_account,
-                    &all_steward_accounts.stake_pool_address,
-                    all_steward_accounts.validator_list_account.validators[validator_index]
-                        .transient_seed_suffix
-                        .into(),
-                );
-
-                Instruction {
-                    program_id: *program_id,
-                    accounts: jito_steward::accounts::Rebalance {
-                        config: all_steward_accounts.config_address,
-                        state_account: all_steward_accounts.state_address,
-                        validator_history: history_account,
-                        stake_pool_program: spl_stake_pool::id(),
-                        stake_pool: all_steward_accounts.stake_pool_address,
-                        withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
-                        validator_list: all_steward_accounts.validator_list_address,
-                        reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
-                        stake_account: stake_address,
-                        transient_stake_account: transient_stake_address,
-                        vote_account: *vote_account,
-                        system_program: system_program::id(),
-                        stake_program: stake::program::id(),
-                        rent: solana_sdk::sysvar::rent::id(),
-                        clock: solana_sdk::sysvar::clock::id(),
-                        stake_history: solana_sdk::sysvar::stake_history::id(),
-                        stake_config: stake::config::ID,
-                        directed_stake_meta,
-                    }
-                    .to_account_metas(None),
-                    data: jito_steward::instruction::Rebalance {
-                        validator_list_index: validator_index as u64,
-                    }
-                    .data(),
-                }
-            })
-            .collect()
+        None
     };
 
-    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+    let ixs_to_run: Vec<Instruction> = validators_to_run
+        .iter()
+        .flat_map(|validator_info| {
+            let validator_index = validator_info.index;
+            let vote_account = &validator_info.vote_account;
+            let history_account = validator_info.history_account;
+
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+
+            let (transient_stake_address, _) = find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                vote_account,
+                &all_steward_accounts.stake_pool_address,
+                all_steward_accounts.validator_list_account.validators[validator_index]
+                    .transient_seed_suffix
+                    .into(),
+            );
+
+            let rebalance_ix = Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::Rebalance {
+                    config: all_steward_accounts.config_address,
+                    state_account: all_steward_accounts.state_address,
+                    validator_history: history_account,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: all_steward_accounts.stake_pool_address,
+                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: all_steward_accounts.validator_list_address,
+                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    transient_stake_account: transient_stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::ID,
+                    directed_stake_meta,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::Rebalance {
+                    validator_list_index: validator_index as u64,
+                }
+                .data(),
+            };
+
+            deposit_sol_ix
+                .iter()
+                .cloned()
+                .chain(std::iter::once(rebalance_ix))
+                .collect::<Vec<Instruction>>()
+        })
+        .collect();
+
+    let txs_to_run = package_instructions(&ixs_to_run, 2, priority_fee, Some(1_400_000), None);
 
     info!("Submitting {} instructions", ixs_to_run.len());
     info!("Submitting {} transactions", txs_to_run.len());
