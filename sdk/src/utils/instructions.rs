@@ -225,7 +225,6 @@ pub async fn compute_bam_targets(
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
     let epoch_info = client.get_epoch_info().await?;
-    let current_epoch = epoch_info.epoch;
     let last_epoch = epoch_info.epoch - 1;
 
     let bam_epoch_metric = kobe_client
@@ -238,14 +237,6 @@ pub async fn compute_bam_targets(
         .bam_validators;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
-    let directed_stake_meta =
-        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
-    let targets: HashMap<Pubkey, u64> = directed_stake_meta
-        .targets
-        .iter()
-        .filter(|target| target.target_last_updated_epoch == current_epoch)
-        .map(|target| (target.vote_pubkey, target.total_target_lamports))
-        .collect();
     let config_account = get_steward_config_account(&client, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
@@ -264,7 +255,7 @@ pub async fn compute_bam_targets(
     }
 
     if let Some(metric) = bam_epoch_metric {
-        let mut total_target_lamports = metric
+        let base_target_lamports = metric
             .available_bam_delegation_stake
             .checked_div(bam_eligible_validators.len() as u64)
             .ok_or(JitoInstructionError::ArithmeticError)?;
@@ -292,16 +283,6 @@ pub async fn compute_bam_targets(
                         }
                     };
 
-                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
-                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
-                            Some(sum) => sum,
-                            None => {
-                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
-                                return None;
-                            }
-                        }
-                    }
-
                     Some(Instruction {
                         program_id: *program_id,
                         accounts: jito_steward::accounts::CopyDirectedStakeTargets {
@@ -314,7 +295,7 @@ pub async fn compute_bam_targets(
                         .to_account_metas(None),
                         data: jito_steward::instruction::CopyDirectedStakeTargets {
                             vote_pubkey,
-                            total_target_lamports,
+                            total_target_lamports: base_target_lamports,
                             validator_list_index: validator_list_index as u32,
                         }
                         .data(),
