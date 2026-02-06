@@ -13,8 +13,11 @@ pub struct ViewDirectedStakeMeta {
     #[arg(long, env)]
     pub steward_config: Pubkey,
 
-    /// Print account information in JSON format
-    #[arg(long)]
+    /// Filter displayed stake targets by this vote account pubkey
+    #[arg(
+        long,
+        help = "Only show stake target information for the given vote account pubkey"
+    )]
     pub vote_pubkey: Option<Pubkey>,
 }
 
