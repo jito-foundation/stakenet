@@ -7,12 +7,14 @@ use solana_program::instruction::Instruction;
 use validator_history::id as validator_history_id;
 
 use crate::commands::command_args::CrankComputeScore;
-use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file};
+use solana_sdk::{
+    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+};
 use stakenet_sdk::utils::{
     accounts::{
         get_all_steward_accounts, get_cluster_history_address, get_validator_history_address,
     },
-    transactions::{package_instructions, print_base58_tx, submit_packaged_transactions},
+    transactions::{configure_instruction, print_base58_tx},
 };
 
 pub async fn command_crank_compute_score(
@@ -81,38 +83,42 @@ pub async fn command_crank_compute_score(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = package_instructions(
-        &ixs_to_run,
-        args.permissionless_parameters
-            .transaction_parameters
-            .chunk_size
-            .unwrap_or(2),
-        args.permissionless_parameters
-            .transaction_parameters
-            .priority_fee,
-        args.permissionless_parameters
-            .transaction_parameters
-            .compute_limit
-            .or(Some(1_400_000)),
-        args.permissionless_parameters
-            .transaction_parameters
-            .heap_size,
-    );
+    for ix in ixs_to_run {
+        let configured_ix = configure_instruction(
+            &[ix],
+            args.permissionless_parameters
+                .transaction_parameters
+                .priority_fee,
+            args.permissionless_parameters
+                .transaction_parameters
+                .compute_limit
+                .or(Some(1_400_000)),
+            args.permissionless_parameters
+                .transaction_parameters
+                .heap_size,
+        );
 
-    if args
-        .permissionless_parameters
-        .transaction_parameters
-        .print_tx
-    {
-        txs_to_run.iter().for_each(|tx| print_base58_tx(tx));
-    } else {
-        println!("Submitting {} instructions", ixs_to_run.len());
-        println!("Submitting {} transactions", txs_to_run.len());
+        let blockhash = client.get_latest_blockhash().await?;
+        let transaction = Transaction::new_signed_with_payer(
+            &configured_ix,
+            Some(&payer.pubkey()),
+            &[&payer],
+            blockhash,
+        );
 
-        let submit_stats =
-            submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
+        if args
+            .permissionless_parameters
+            .transaction_parameters
+            .print_tx
+        {
+            print_base58_tx(&configured_ix);
+        } else {
+            let signature = client
+                .send_and_confirm_transaction_with_spinner(&transaction)
+                .await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+            println!("Signature: {}", signature);
+        }
     }
 
     Ok(())
