@@ -44,7 +44,7 @@ pub async fn command_view_directed_stake_meta(
     println!("\n🎯 Stake Targets:");
     for i in 0..stake_meta.total_stake_targets as usize {
         let validator = &stake_meta.targets[i];
-        if validator.vote_pubkey != Pubkey::default() {
+        if validator.vote_pubkey == Pubkey::default() {
             continue;
         }
 
