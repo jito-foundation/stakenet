@@ -4,6 +4,25 @@ use clap::{Parser, Subcommand};
 use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::pubkey::Pubkey;
 
+/// Commitment level for RPC queries
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum CommitmentLevel {
+    Processed,
+    #[default]
+    Confirmed,
+    Finalized,
+}
+
+impl From<CommitmentLevel> for CommitmentConfig {
+    fn from(level: CommitmentLevel) -> Self {
+        match level {
+            CommitmentLevel::Processed => CommitmentConfig::processed(),
+            CommitmentLevel::Confirmed => CommitmentConfig::confirmed(),
+            CommitmentLevel::Finalized => CommitmentConfig::finalized(),
+        }
+    }
+}
+
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
@@ -13,6 +32,7 @@ use crate::commands::{
         copy_directed_stake_targets::CopyDirectedStakeTargets,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
+        sync_directed_stake_lamports::SyncDirectedStakeLamports,
         update_directed_stake_ticket::UpdateDirectedStakeTicket,
     },
     cranks::{
@@ -58,6 +78,10 @@ pub struct Args {
     /// Filepath to a keypair, or "ledger" for Ledger hardware wallet
     #[arg(long, global = true, env)]
     pub signer: Option<String>,
+
+    /// Commitment level for RPC queries
+    #[arg(long, global = true, env, default_value = "confirmed")]
+    pub commitment: CommitmentLevel,
 
     #[command(subcommand)]
     pub commands: Commands,
@@ -352,6 +376,7 @@ pub enum Commands {
     CopyDirectedStakeTargets(CopyDirectedStakeTargets),
     ComputeDirectedStakeMeta(ComputeDirectedStakeMeta),
     RemoveFromDirectedStakeWhitelist(RemoveFromDirectedStakeWhitelist),
+    SyncDirectedStakeLamports(SyncDirectedStakeLamports),
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
     CloseDirectedStakeMeta(CloseDirectedStakeMeta),
@@ -623,6 +648,32 @@ pub struct RemoveFromBlacklist {
     /// Validator indices of validator list to remove (comma separated)
     #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_u32)]
     pub validator_history_indices_to_deblacklist: Vec<u32>,
+
+    /// Vote accounts of validators to remove from blacklist (comma separated)
+    #[arg(long, env, value_delimiter = ',', num_args = 1.., value_parser = parse_pubkey)]
+    pub vote_accounts_to_deblacklist: Vec<Pubkey>,
+
+    /// Create a Squads multisig proposal instead of direct execution
+    #[arg(long, env, default_value = "false")]
+    pub squads_proposal: bool,
+
+    /// Squads multisig account address.
+    /// Note: This is the Squads multisig account, NOT the vault PDA. The vault PDA will be derived from this
+    /// multisig address and will act as the signing authority for the blacklist operation.
+    #[arg(
+        long,
+        env,
+        default_value = "87zx3xqcWzP9DpGgbrNGnVsU6Dzci3XvaQvuTkgfWF5c"
+    )]
+    pub squads_multisig: Pubkey,
+
+    /// Vault index for the Squads multisig (default: 0)
+    #[arg(long, env, default_value = "0")]
+    pub squads_vault_index: u8,
+
+    /// Squads program ID (defaults to mainnet Squads v4 program)
+    #[arg(long, env)]
+    pub squads_program_id: Option<Pubkey>,
 }
 
 #[derive(Parser)]

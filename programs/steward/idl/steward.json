@@ -2038,6 +2038,44 @@
       "args": []
     },
     {
+      "name": "sync_directed_stake_lamports",
+      "docs": [
+        "Syncs directed_stake_lamports array from targets[].total_staked_lamports"
+      ],
+      "discriminator": [
+        198,
+        193,
+        250,
+        185,
+        228,
+        202,
+        164,
+        62
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "clock"
+        },
+        {
+          "name": "validator_list",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "update_directed_stake_ticket",
       "docs": [
         "Update DirectedStakeTicket preferences"

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
-use clap::{Parser, Subcommand};
+use clap::{arg, command, Parser, Subcommand, ValueEnum};
 use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use rusqlite::Connection;
@@ -12,8 +12,28 @@ use solana_client::{
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
-    pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
+    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
+
+/// Commitment level for RPC queries
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum CommitmentLevel {
+    Processed,
+    #[default]
+    Confirmed,
+    Finalized,
+}
+
+impl From<CommitmentLevel> for CommitmentConfig {
+    fn from(level: CommitmentLevel) -> Self {
+        match level {
+            CommitmentLevel::Processed => CommitmentConfig::processed(),
+            CommitmentLevel::Confirmed => CommitmentConfig::confirmed(),
+            CommitmentLevel::Finalized => CommitmentConfig::finalized(),
+        }
+    }
+}
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
 use validator_history::{
@@ -26,6 +46,7 @@ use validator_history_cli::{
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
         },
     },
@@ -43,6 +64,10 @@ struct Args {
         default_value = "https://api.mainnet-beta.solana.com"
     )]
     json_rpc_url: String,
+
+    /// Commitment level for RPC queries
+    #[arg(long, global = true, env, default_value = "confirmed")]
+    commitment: CommitmentLevel,
 
     #[command(subcommand)]
     commands: Commands,
@@ -68,6 +93,7 @@ enum Commands {
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
     CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
+    CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
 }
 
@@ -1266,7 +1292,12 @@ async fn main() -> anyhow::Result<()> {
     dotenv().ok();
     env_logger::init();
     let args = Args::parse();
-    let client = RpcClient::new_with_timeout(args.json_rpc_url.clone(), Duration::from_secs(60));
+    let commitment_config = args.commitment.into();
+    let client = RpcClient::new_with_timeout_and_commitment(
+        args.json_rpc_url.clone(),
+        Duration::from_secs(60),
+        commitment_config,
+    );
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
         Commands::ReallocConfig(args) => command_realloc_config(args, client),
@@ -1296,6 +1327,10 @@ async fn main() -> anyhow::Result<()> {
             );
             let client = Arc::new(client);
             commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
+        }
+        Commands::CrankCopyTipDistributionAccount(command_args) => {
+            commands::cranks::copy_tip_distribution_account::run(command_args, args.json_rpc_url)
+                .await?
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?

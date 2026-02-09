@@ -54,6 +54,7 @@ use crate::{
             copy_directed_stake_targets::command_copy_directed_stake_targets,
             migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
+            sync_directed_stake_lamports::command_sync_directed_stake_lamports,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         cranks::{
@@ -82,9 +83,11 @@ pub mod utils;
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
     let args = Args::parse();
-    let client = Arc::new(RpcClient::new_with_timeout(
+    let commitment_config = args.commitment.into();
+    let client = Arc::new(RpcClient::new_with_timeout_and_commitment(
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
+        commitment_config,
     ));
 
     let steward_program_id = args.steward_program_id;
@@ -203,7 +206,15 @@ async fn main() -> Result<()> {
             command_add_to_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::RemoveFromBlacklist(args) => {
-            command_remove_from_blacklist(args, &client, steward_program_id).await
+            // Use global signer - required for this command
+            let signer_path = global_signer.expect("--signer flag is required for this command");
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_remove_from_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
@@ -234,6 +245,9 @@ async fn main() -> Result<()> {
         }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
             command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
+        }
+        Commands::SyncDirectedStakeLamports(args) => {
+            command_sync_directed_stake_lamports(args, &client, steward_program_id).await
         }
         Commands::CloseDirectedStakeTicket(args) => {
             command_close_directed_stake_ticket(args, &client, steward_program_id).await

@@ -21,6 +21,7 @@ pub mod reset_validator_lamport_balances;
 pub mod resume;
 pub mod revert_staker;
 pub mod set_staker;
+pub mod sync_directed_stake_lamports;
 pub mod update_authority;
 pub mod update_config;
 pub mod update_directed_stake_ticket;
