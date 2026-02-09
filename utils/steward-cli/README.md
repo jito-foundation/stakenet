@@ -643,6 +643,16 @@ Displays the current state of the metadata account.
     --steward-config F4bBBC1am1PTow5TJYy6cbbLbPoEEN7peAbxRWqHKaNP
 ```
 
+Displays the current state of the metadata account by specific vote pubkey.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url  https://api.mainnet-beta.solana.com \
+    view-directed-stake-meta \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --vote-pubkey DHoZJqvvMGvAXw85Lmsob7YwQzFVisYg8HY4rt5BAj6M
+```
+
 #### Initialize DirectedStakeTicket
 
 Creates a ticket for a whitelisted entity to express stake preferences. Run by or on behalf of each whitelisted entity.
