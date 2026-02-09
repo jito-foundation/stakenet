@@ -939,7 +939,7 @@ async fn test_idle() {
         fixture.get_latest_blockhash().await,
     );
 
-    println!("Submitting Idle tx: {:?}", tx);
+    println!("Submitting Idle tx: {tx:?}");
     fixture.submit_transaction_assert_success(tx).await;
 
     let mut steward_state_account: StewardStateAccountV2 =

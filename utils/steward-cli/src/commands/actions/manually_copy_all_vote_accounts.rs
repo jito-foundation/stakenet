@@ -93,7 +93,7 @@ pub async fn command_manually_copy_all_vote_accounts(
         let submit_stats =
             submit_packaged_transactions(client, txs_to_run, &payer, None, None).await?;
 
-        println!("Submit stats: {:?}", submit_stats);
+        println!("Submit stats: {submit_stats:?}");
     }
 
     Ok(())

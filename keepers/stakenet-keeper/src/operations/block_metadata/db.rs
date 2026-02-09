@@ -68,8 +68,7 @@ impl DBSlotInfoState {
         }
 
         Err(BlockMetadataKeeperError::OtherError(format!(
-            "Could not map state {}",
-            state
+            "Could not map state {state}"
         )))
     }
 }
@@ -217,7 +216,7 @@ impl DBSlotInfo {
             }
             transaction.commit()?;
             transaction = connection.transaction()?;
-            info!("Wrote {} Mappings", write_counter);
+            info!("Wrote {write_counter} Mappings");
         }
 
         Ok(write_counter)
@@ -536,19 +535,19 @@ impl DBSlotInfo {
         starting_offset: usize,
     ) -> Result<u64, BlockMetadataKeeperError> {
         let client = reqwest::blocking::Client::new();
-        let base_url = format!("https://api.dune.com/api/v1/query/{}/results", query_id);
+        let base_url = format!("https://api.dune.com/api/v1/query/{query_id}/results");
 
         let mut total_written = 0u64;
         let mut offset = starting_offset;
         let mut has_more = true;
 
-        info!("Starting Dune API fetch for query {}", query_id);
+        info!("Starting Dune API fetch for query {query_id}");
 
         while has_more {
             // Build URL with pagination
-            let url = format!("{}?limit={}&offset={}", base_url, batch_size, offset);
+            let url = format!("{base_url}?limit={batch_size}&offset={offset}");
 
-            info!("Fetching batch from Dune API, offset: {}", offset);
+            info!("Fetching batch from Dune API, offset: {offset}");
 
             // Make API request
             let response = client
@@ -556,7 +555,7 @@ impl DBSlotInfo {
                 .header("X-Dune-API-Key", api_key)
                 .send()
                 .map_err(|e| {
-                    BlockMetadataKeeperError::OtherError(format!("API request failed: {}", e))
+                    BlockMetadataKeeperError::OtherError(format!("API request failed: {e}"))
                 })?;
 
             if !response.status().is_success() {
@@ -567,7 +566,7 @@ impl DBSlotInfo {
             }
 
             let api_response: DuneApiResponse = response.json().map_err(|e| {
-                BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {}", e))
+                BlockMetadataKeeperError::OtherError(format!("Failed to parse JSON: {e}"))
             })?;
 
             let rows = api_response.result.rows;
@@ -624,8 +623,7 @@ impl DBSlotInfo {
         }
 
         info!(
-            "Completed Dune API fetch. Total entries written: {}",
-            total_written
+            "Completed Dune API fetch. Total entries written: {total_written}"
         );
         Ok(total_written)
     }

@@ -254,8 +254,7 @@ fn check_entry_valid(
 
     if signer != validator_identity {
         error!(
-            "Invalid gossip value retrieved for validator {}",
-            validator_identity
+            "Invalid gossip value retrieved for validator {validator_identity}"
         );
         return false;
     }
@@ -278,7 +277,7 @@ fn build_gossip_entry(
     // are fully deprecated and will not be transmitted on the gossip network.
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
-            println!("Invalid entry for validator {}", validator_vote_pubkey);
+            println!("Invalid entry for validator {validator_vote_pubkey}");
             return None;
         }
         return Some(vec![GossipEntry::new(

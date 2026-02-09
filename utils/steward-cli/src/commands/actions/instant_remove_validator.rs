@@ -83,7 +83,7 @@ pub async fn command_instant_remove_validator(
             )
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

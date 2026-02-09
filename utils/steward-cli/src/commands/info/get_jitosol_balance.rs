@@ -40,7 +40,7 @@ pub async fn command_get_jitosol_balance(
     } else {
         let ui_amount = token_balance.ui_amount.unwrap_or(0.0);
         println!("JitoSOL Balance for {}:", args.token_account);
-        println!("  Amount: {} JitoSOL", ui_amount);
+        println!("  Amount: {ui_amount} JitoSOL");
         println!("  Raw Amount: {}", token_balance.amount);
         println!("  Decimals: {}", token_balance.decimals);
     }
