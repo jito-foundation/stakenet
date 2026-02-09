@@ -443,7 +443,7 @@ pub async fn get_directed_stake_meta(
     let directed_stake_meta_pda =
         get_directed_stake_meta_address(steward_config_address, program_id);
 
-    log::info!("Directed stake meta PDA: {:?}", directed_stake_meta_pda);
+    log::info!("Directed stake meta PDA: {directed_stake_meta_pda:?}");
 
     let directed_stake_meta_account_data =
         client.get_account_data(&directed_stake_meta_pda).await?;
@@ -452,8 +452,7 @@ pub async fn get_directed_stake_meta(
         DirectedStakeMeta::try_deserialize(&mut directed_stake_meta_account_data.as_slice())
             .map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Failed to deserialize directed stake meta account: {}",
-                    e
+                    "Failed to deserialize directed stake meta account: {e}",
                 ))
             })?,
     );
@@ -481,8 +480,7 @@ pub async fn get_directed_stake_ticket(
         DirectedStakeTicket::try_deserialize(&mut directed_stake_ticket_account_data.as_slice())
             .map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Failed to deserialize directed stake ticket account: {}",
-                    e
+                    "Failed to deserialize directed stake ticket account: {e}",
                 ))
             })?;
 
