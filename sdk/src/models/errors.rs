@@ -1,5 +1,4 @@
 use kobe_client::error::KobeApiError;
-use log::*;
 use solana_client::client_error::ClientError;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
 
