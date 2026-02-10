@@ -1,5 +1,5 @@
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
-use clap::{arg, command, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
 use rusqlite::Connection;
