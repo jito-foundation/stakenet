@@ -99,7 +99,7 @@ async fn random_cooldown(range: u8) {
     let mut rng = rand::thread_rng();
     let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
-    info!("\n\n⏰ Cooldown for {} seconds\n", sleep_duration);
+    info!("\n\n⏰ Cooldown for {sleep_duration} seconds\n");
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
@@ -133,13 +133,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...({})", tick);
+            info!("Pre-fetching data for update...({tick})");
             match pre_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
                 }
                 Err(e) => {
-                    error!("Failed to pre create update: {:?}", e);
+                    error!("Failed to pre create update: {e:?}");
 
                     keeper_state
                         .increment_update_error_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -150,7 +150,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...({})", tick);
+                info!("Creating missing accounts...({tick})");
                 match create_missing_accounts(&keeper_config, &keeper_state).await {
                     Ok(new_accounts_created) => {
                         keeper_state.increment_update_run_for_epoch(
@@ -174,7 +174,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                             });
                     }
                     Err(e) => {
-                        error!("Failed to create missing accounts: {:?}", e);
+                        error!("Failed to create missing accounts: {e:?}");
 
                         keeper_state.increment_update_error_for_epoch(
                             KeeperOperations::CreateMissingAccounts,
@@ -186,13 +186,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Post-fetching data for update...({})", tick);
+            info!("Post-fetching data for update...({tick})");
             match post_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
                 }
                 Err(e) => {
-                    error!("Failed to post create update: {:?}", e);
+                    error!("Failed to post create update: {e:?}");
 
                     keeper_state
                         .increment_update_error_for_epoch(KeeperOperations::PostCreateUpdate);
@@ -329,7 +329,7 @@ fn main() {
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{}\n\n", args);
+    info!("{args}\n\n");
 
     let gossip_entrypoints =
         args.gossip_entrypoints

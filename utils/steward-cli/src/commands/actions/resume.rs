@@ -71,7 +71,7 @@ pub async fn command_resume(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

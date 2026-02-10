@@ -1,5 +1,4 @@
 use kobe_client::error::KobeApiError;
-use log::*;
 use solana_client::client_error::ClientError;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
 
@@ -27,6 +26,7 @@ pub enum JitoTransactionExecutionError {
     TransactionClientError(String, Vec<Result<(), JitoSendTransactionError>>),
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(ThisError, Debug)]
 pub enum JitoMultipleAccountsError {
     #[error(transparent)]

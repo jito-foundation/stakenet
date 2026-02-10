@@ -605,9 +605,7 @@ async fn test_copy_directed_stake_targets_initialization() {
     {
         assert!(
             lamports == 0 || lamports == u64::MAX,
-            "directed_stake_lamports[{}] = {} should be either 0 or u64::MAX",
-            index,
-            lamports
+            "directed_stake_lamports[{index}] = {lamports} should be either 0 or u64::MAX"
         );
     }
 }

@@ -116,7 +116,7 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
             vote_account,
             epoch,
         );
-        println!("  - {} (TDA: {})", vote_account, tda_address);
+        println!("  - {vote_account} (TDA: {tda_address})");
     }
 
     if vote_accounts_to_update.is_empty() {

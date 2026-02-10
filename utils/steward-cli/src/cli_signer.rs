@@ -35,7 +35,7 @@ impl CliSigner {
     pub fn new_keypair_from_path(keypair_path: &str) -> anyhow::Result<Self> {
         match read_keypair_file(keypair_path) {
             Ok(keypair) => Ok(Self::new(Some(keypair), None)),
-            Err(e) => Err(anyhow!("{}", e)),
+            Err(e) => Err(anyhow!("{e}")),
         }
     }
 
@@ -53,7 +53,7 @@ impl CliSigner {
         let device_count = wallet_manager
             .update_devices()
             .expect("Could not fetch devices");
-        println!("Wallet found with {} device(s) connected", device_count);
+        println!("Wallet found with {device_count} device(s) connected");
 
         let devices = wallet_manager.list_devices();
         let device = devices.first().expect("No devices found");

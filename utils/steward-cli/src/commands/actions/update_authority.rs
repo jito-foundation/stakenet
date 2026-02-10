@@ -109,14 +109,14 @@ pub async fn command_update_authority(
             .squads_program_id
             .unwrap_or(squads_multisig::squads_multisig_program::ID);
 
-        println!("  Multisig Address: {}", multisig);
-        println!("  Squads Program ID: {}", squads_program_id);
+        println!("  Multisig Address: {multisig}");
+        println!("  Squads Program ID: {squads_program_id}");
 
         // Fetch the multisig account to get the transaction index
         println!("  Fetching multisig account...");
         let multisig_account = get_multisig(client, &multisig).await?;
         let transaction_index = multisig_account.transaction_index + 1;
-        println!("  Next transaction index: {}", transaction_index);
+        println!("  Next transaction index: {transaction_index}");
 
         // Derive PDAs
         let vault_pda =
@@ -128,15 +128,13 @@ pub async fn command_update_authority(
 
         if vault_pda != admin {
             return Err(anyhow::anyhow!(
-                "Vault PDA {} does not match configured admin {}",
-                vault_pda,
-                admin
+                "Vault PDA {vault_pda} does not match configured admin {admin}"
             ));
         }
 
-        println!("  Vault PDA: {}", vault_pda);
-        println!("  Transaction PDA: {}", transaction_pda);
-        println!("  Proposal PDA: {}", proposal_pda);
+        println!("  Vault PDA: {vault_pda}");
+        println!("  Transaction PDA: {transaction_pda}");
+        println!("  Proposal PDA: {proposal_pda}");
 
         // Create the transaction message for the vault transaction
         let message = TransactionMessage::try_compile(&vault_pda, &[ix], &[])?;
@@ -197,7 +195,7 @@ pub async fn command_update_authority(
                 .await?;
 
             println!("Squads proposal created!");
-            println!("Signature: {}", signature);
+            println!("Signature: {signature}");
         }
     } else {
         let blockhash = client.get_latest_blockhash().await?;
@@ -230,7 +228,7 @@ pub async fn command_update_authority(
                 .send_and_confirm_transaction_with_spinner(&transaction)
                 .await?;
 
-            println!("Signature: {}", signature);
+            println!("Signature: {signature}");
         }
     }
 
