@@ -65,7 +65,7 @@ pub async fn command_pause(args: Pause, client: &Arc<RpcClient>, program_id: Pub
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

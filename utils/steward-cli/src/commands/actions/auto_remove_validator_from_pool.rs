@@ -119,7 +119,7 @@ pub async fn command_auto_remove_validator_from_pool(
             )
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

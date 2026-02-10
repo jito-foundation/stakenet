@@ -35,7 +35,7 @@ pub async fn command_crank_epoch_maintenance(
     let epoch = client.get_epoch_info().await?.epoch;
 
     if epoch == all_steward_accounts.state_account.state.current_epoch {
-        println!("Epoch is the same as the current epoch: {}", epoch);
+        println!("Epoch is the same as the current epoch: {epoch}");
         return Ok(());
     }
 
@@ -80,7 +80,7 @@ pub async fn command_crank_epoch_maintenance(
             .send_and_confirm_transaction_with_spinner(&transaction)
             .await?;
 
-        println!("Signature: {}", signature);
+        println!("Signature: {signature}");
     }
 
     Ok(())

@@ -27,6 +27,7 @@ pub enum JitoTransactionExecutionError {
     TransactionClientError(String, Vec<Result<(), JitoSendTransactionError>>),
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(ThisError, Debug)]
 pub enum JitoMultipleAccountsError {
     #[error(transparent)]

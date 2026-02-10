@@ -878,9 +878,7 @@ async fn test_steward_state_account_sizes() {
     assert_eq!(
         v1_size,
         v2_size,
-        "StewardStateAccount ({} bytes) and StewardStateAccountV2 ({} bytes) must have the same size",
-        v1_size,
-        v2_size
+        "StewardStateAccount ({v1_size} bytes) and StewardStateAccountV2 ({v2_size} bytes) must have the same size"
     );
 }
 
