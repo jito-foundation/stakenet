@@ -1,4 +1,4 @@
-use clap::{arg, command, Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use jito_steward::{UpdateParametersArgs, UpdatePriorityFeeParametersArgs};
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 use std::path::PathBuf;
