@@ -57,19 +57,21 @@ pub async fn command_view_directed_stake_meta(
             }
         }
 
-        println!("  Target {}:", i + 1);
-        println!("    Vote Pubkey: {}", validator.vote_pubkey);
-        println!("    Target Lamports: {}", validator.total_target_lamports);
-        println!(
-            "    Target Last Updated Epoch: {}",
-            validator.target_last_updated_epoch
-        );
-        println!("    Staked Lamports: {}", validator.total_staked_lamports);
-        println!(
-            "    Staked Last Updated Epoch: {}",
-            validator.staked_last_updated_epoch
-        );
-        println!();
+        if validator.total_staked_lamports == 0 {
+            println!("  Target {}:", i + 1);
+            println!("    Vote Pubkey: {}", validator.vote_pubkey);
+            println!("    Target Lamports: {}", validator.total_target_lamports);
+            println!(
+                "    Target Last Updated Epoch: {}",
+                validator.target_last_updated_epoch
+            );
+            println!("    Staked Lamports: {}", validator.total_staked_lamports);
+            println!(
+                "    Staked Last Updated Epoch: {}",
+                validator.staked_last_updated_epoch
+            );
+            println!();
+        }
 
         if args.vote_pubkey.is_some() {
             break;
