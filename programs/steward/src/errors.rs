@@ -87,4 +87,7 @@ pub enum StewardError {
     DirectedStakeVoteAccountMismatch,
     #[msg("This validator has already been rebalanced for this epoch for this stake category.")]
     ValidatorAlreadyRebalanced,
+
+    #[msg("WrongStakeStake.")]
+    WrongStakeStake,
 }

@@ -193,6 +193,7 @@ fn test_decrease_stake_calculation_basic() {
         1_000_000_000_000,
         0,
         0,
+        0,
     );
 
     assert!(result.is_ok());
@@ -221,7 +222,8 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         1_000_000, // at target
         1_000_000_000_000,
         0,
-        1_000_000,
+        1_000_000, // current_stake_minimum_lamports
+        0,
     );
 
     assert!(result.is_ok());
@@ -231,6 +233,30 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         }
         _ => panic!("Expected None variant"),
     }
+}
+
+#[test]
+fn test_decrease_stake_calculation_no_decrease_needed_excess_required_lamports() {
+    let state = create_mock_steward_state(1);
+    let validator1 = Pubkey::new_unique();
+
+    let directed_stake_meta = create_mock_directed_stake_meta(vec![
+        (validator1, 1_000_000, 1_000_000), // At target
+    ]);
+
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        1_000_000, // at target
+        1_000_000_000_000,
+        0,
+        0,
+        1_000_000, // required_lamports
+    );
+
+    assert!(result.is_ok());
+    assert!(matches!(result.unwrap(), RebalanceType::None));
 }
 
 #[test]
@@ -249,6 +275,7 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         1_000_000_000_000,
         0,
         0,
+        0,
     );
 
     assert!(result.is_err());
@@ -264,7 +291,7 @@ fn test_decrease_stake_calculation_zero_cap() {
     ]);
 
     let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0);
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -358,6 +385,7 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1_000_000_000_000,
         0,
         0,
+        0,
     );
 
     assert!(result.is_ok());
@@ -374,6 +402,7 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1,
         2_000_000,
         1_000_000_000_000,
+        0,
         0,
         0,
     );
@@ -404,8 +433,16 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         (validator5, 1_500_000, 1_500_000), // At target
     ]);
 
-    let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000, 1_000_000, 0, 0);
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,
+        1_000_000,
+        1_000_000,
+        0,
+        0,
+        0,
+    );
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -415,8 +452,16 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         _ => panic!("Expected Decrease variant"),
     }
 
-    let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 1, 2_000_000, 1_000_000, 0, 0);
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        1,
+        2_000_000,
+        1_000_000,
+        0,
+        0,
+        0,
+    );
 
     assert!(result.is_ok());
     match result.unwrap() {

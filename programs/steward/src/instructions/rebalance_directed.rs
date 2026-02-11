@@ -17,12 +17,15 @@ use crate::{
 use anchor_lang::{
     prelude::*,
     solana_program::{
+        borsh1::try_from_slice_unchecked,
         program::invoke_signed,
         stake::{self, state::StakeStateV2, tools::get_minimum_delegation},
         system_program, sysvar,
     },
 };
+use spl_stake_pool::minimum_stake_lamports;
 use spl_stake_pool::{minimum_delegation, state::ValidatorListHeader};
+
 #[derive(Accounts)]
 pub struct RebalanceDirected<'info> {
     pub config: AccountLoader<'info, Config>,
@@ -291,7 +294,8 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             return Err(StewardError::ValidatorAlreadyRebalanced.into());
         }
 
-        let minimum_delegation = minimum_delegation(get_minimum_delegation()?);
+        let stake_minimum_delegation = get_minimum_delegation()?;
+        let current_minimum_lamports = minimum_delegation(stake_minimum_delegation);
         let stake_rent = Rent::get()?.minimum_balance(StakeStateV2::size_of());
 
         rebalance_type = {
@@ -310,6 +314,16 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             let target_staked_lamports =
                 directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
 
+            let stake_state = try_from_slice_unchecked::<StakeStateV2>(
+                &ctx.accounts.stake_account.data.borrow(),
+            )?;
+            let meta = match stake_state {
+                StakeStateV2::Stake(meta, _stake, _) => meta,
+                _ => return Err(StewardError::WrongStakeStake.into()),
+            };
+
+            let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
+
             // Try decrease first, then increase (if undirected floor cap does not apply)
             let decrease_result = decrease_stake_calculation(
                 &state_account.state,
@@ -318,7 +332,8 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 target_staked_lamports,
                 directed_unstake_cap_lamports,
                 unstake_state.directed_unstake_total,
-                minimum_delegation,
+                current_minimum_lamports,
+                required_lamports,
             );
 
             match decrease_result {
@@ -329,7 +344,7 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                     directed_stake_meta_index,
                     target_staked_lamports,
                     reserve_lamports_with_rent,
-                    minimum_delegation,
+                    current_minimum_lamports,
                     stake_rent,
                 ),
             }?
