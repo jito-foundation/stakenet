@@ -23,8 +23,7 @@ use anchor_lang::{
         system_program, sysvar,
     },
 };
-use spl_stake_pool::minimum_stake_lamports;
-use spl_stake_pool::{minimum_delegation, state::ValidatorListHeader};
+use spl_stake_pool::{minimum_delegation, minimum_stake_lamports, state::ValidatorListHeader};
 
 #[derive(Accounts)]
 pub struct RebalanceDirected<'info> {
@@ -314,18 +313,8 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
             let target_staked_lamports =
                 directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
 
-            let stake_state = try_from_slice_unchecked::<StakeStateV2>(
-                &ctx.accounts.stake_account.data.borrow(),
-            )?;
-            let meta = match stake_state {
-                StakeStateV2::Stake(meta, _stake, _) => meta,
-                _ => return Err(StewardError::WrongStakeStake.into()),
-            };
-
-            let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
-
             // Try decrease first, then increase (if undirected floor cap does not apply)
-            let decrease_result = decrease_stake_calculation(
+            let mut decrease_result = decrease_stake_calculation(
                 &state_account.state,
                 &directed_stake_meta,
                 directed_stake_meta_index,
@@ -333,11 +322,32 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                 directed_unstake_cap_lamports,
                 unstake_state.directed_unstake_total,
                 current_minimum_lamports,
-                required_lamports,
             );
 
             match decrease_result {
-                Ok(RebalanceType::Decrease(_)) => decrease_result,
+                Ok(RebalanceType::Decrease(ref components)) => {
+                    let stake_state = try_from_slice_unchecked::<StakeStateV2>(
+                        &ctx.accounts.stake_account.data.borrow(),
+                    )?;
+                    let meta = match stake_state {
+                        StakeStateV2::Stake(meta, _stake, _) => meta,
+                        _ => return Err(StewardError::WrongStakeStake.into()),
+                    };
+
+                    let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
+
+                    if components.total_unstake_lamports < required_lamports {
+                        msg!(
+                            "Proportional decrease lamports ({}) is less than minimum stake lamports including rent ({}). No unstake will be performed.",
+                            components.total_unstake_lamports,
+                            required_lamports
+                        );
+
+                        decrease_result = Ok(RebalanceType::None);
+                    }
+
+                    decrease_result
+                }
                 _ => increase_stake_calculation(
                     &state_account.state,
                     &directed_stake_meta,

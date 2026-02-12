@@ -5,7 +5,11 @@ use jito_steward::{
     state::directed_stake::{DirectedStakeMeta, DirectedStakeTarget},
     Delegation, StewardStateEnum, StewardStateV2 as StewardState,
 };
-use solana_sdk::pubkey::Pubkey;
+use solana_sdk::{
+    pubkey::Pubkey,
+    stake::state::{Authorized, Lockup, Meta},
+};
+use spl_stake_pool::minimum_stake_lamports;
 
 /// Helper function to create a mock StewardState for testing
 fn create_mock_steward_state(num_pool_validators: u16) -> StewardState {
@@ -193,7 +197,6 @@ fn test_decrease_stake_calculation_basic() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_ok());
@@ -223,7 +226,6 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         1_000_000_000_000,
         0,
         1_000_000, // current_stake_minimum_lamports
-        0,
     );
 
     assert!(result.is_ok());
@@ -233,30 +235,6 @@ fn test_decrease_stake_calculation_no_decrease_needed() {
         }
         _ => panic!("Expected None variant"),
     }
-}
-
-#[test]
-fn test_decrease_stake_calculation_no_decrease_needed_excess_required_lamports() {
-    let state = create_mock_steward_state(1);
-    let validator1 = Pubkey::new_unique();
-
-    let directed_stake_meta = create_mock_directed_stake_meta(vec![
-        (validator1, 1_000_000, 1_000_000), // At target
-    ]);
-
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        1_000_000, // at target
-        1_000_000_000_000,
-        0,
-        0,
-        1_000_000, // required_lamports
-    );
-
-    assert!(result.is_ok());
-    assert!(matches!(result.unwrap(), RebalanceType::None));
 }
 
 #[test]
@@ -275,7 +253,6 @@ fn test_decrease_stake_calculation_index_out_of_bounds() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_err());
@@ -291,7 +268,7 @@ fn test_decrease_stake_calculation_zero_cap() {
     ]);
 
     let result =
-        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0, 0);
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000_000, 0, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -385,7 +362,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1_000_000_000_000,
         0,
         0,
-        0,
     );
 
     assert!(result.is_ok());
@@ -402,7 +378,6 @@ fn test_decrease_stake_directed_stake_lamports_tracking() {
         1,
         2_000_000,
         1_000_000_000_000,
-        0,
         0,
         0,
     );
@@ -433,16 +408,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         (validator5, 1_500_000, 1_500_000), // At target
     ]);
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        0,
-        1_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 0, 1_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -452,16 +419,8 @@ fn test_decrease_stake_directed_stake_lamports_with_cap() {
         _ => panic!("Expected Decrease variant"),
     }
 
-    let result = decrease_stake_calculation(
-        &state,
-        &directed_stake_meta,
-        1,
-        2_000_000,
-        1_000_000,
-        0,
-        0,
-        0,
-    );
+    let result =
+        decrease_stake_calculation(&state, &directed_stake_meta, 1, 2_000_000, 1_000_000, 0, 0);
 
     assert!(result.is_ok());
     match result.unwrap() {
@@ -491,4 +450,143 @@ fn test_edge_case_zero_values() {
         }
         _ => panic!("Expected None variant"),
     }
+}
+
+/// Tests the handler-level guard that converts a Decrease to None when
+/// total_unstake_lamports < minimum_stake_lamports (rent + minimum delegation).
+/// This mirrors the check in rebalance_directed.rs handler (lines 328-350).
+#[test]
+fn test_decrease_below_minimum_stake_lamports_becomes_none() {
+    let state = create_mock_steward_state(2);
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+
+    // Set up so that the proportional decrease for validator1 is small (100 lamports).
+    // validator1 has a tiny excess relative to a large cap.
+    let directed_stake_meta = create_mock_directed_stake_meta(vec![
+        (validator1, 999_900, 1_000_000),   // Has 100 lamports excess
+        (validator2, 1_000_000, 1_000_000), // At target
+    ]);
+
+    // current_minimum_lamports = 0 so the calculation itself won't filter it out
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,                 // target_index
+        1_000_000,         // current_lamports
+        1_000_000_000_000, // directed_unstake_cap_lamports (large cap)
+        0,                 // directed_unstake_total_lamports
+        0,                 // current_minimum_lamports (no filter at calculation level)
+    );
+
+    assert!(result.is_ok());
+    let rebalance_type = result.unwrap();
+
+    // decrease_stake_calculation should return a Decrease with 100 lamports
+    match &rebalance_type {
+        RebalanceType::Decrease(components) => {
+            assert_eq!(components.total_unstake_lamports, 100);
+        }
+        _ => panic!("Expected Decrease variant"),
+    }
+
+    // Now simulate the handler-level guard:
+    // Create a Meta with rent_exempt_reserve that makes minimum_stake_lamports > 100
+    let stake_minimum_delegation = 1_000_000; // 1M lamports (1 SOL minimum delegation on mainnet)
+    let meta = Meta {
+        rent_exempt_reserve: 2_282_880, // typical stake account rent
+        authorized: Authorized {
+            staker: Pubkey::default(),
+            withdrawer: Pubkey::default(),
+        },
+        lockup: Lockup::default(),
+    };
+
+    let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
+    // required_lamports = 2_282_880 + max(1_000_000, 1_000_000) = 3_282_880
+
+    // Apply the same guard as the handler
+    let final_rebalance_type = match rebalance_type {
+        RebalanceType::Decrease(ref components) => {
+            if components.total_unstake_lamports < required_lamports {
+                RebalanceType::None
+            } else {
+                rebalance_type
+            }
+        }
+        other => other,
+    };
+
+    // The 100 lamport decrease should be overridden to None
+    assert!(
+        matches!(final_rebalance_type, RebalanceType::None),
+        "Expected None because total_unstake_lamports ({}) < required_lamports ({})",
+        100,
+        required_lamports
+    );
+}
+
+/// Tests that a sufficiently large decrease passes the minimum_stake_lamports guard.
+#[test]
+fn test_decrease_above_minimum_stake_lamports_passes() {
+    let state = create_mock_steward_state(2);
+    let validator1 = Pubkey::new_unique();
+    let validator2 = Pubkey::new_unique();
+
+    // validator1 has 10M excess lamports — well above any minimum
+    let directed_stake_meta = create_mock_directed_stake_meta(vec![
+        (validator1, 0, 10_000_000),        // Has 10M excess
+        (validator2, 1_000_000, 1_000_000), // At target
+    ]);
+
+    let result = decrease_stake_calculation(
+        &state,
+        &directed_stake_meta,
+        0,                 // target_index
+        10_000_000,        // current_lamports
+        1_000_000_000_000, // directed_unstake_cap_lamports (large cap)
+        0,                 // directed_unstake_total_lamports
+        0,                 // current_minimum_lamports
+    );
+
+    assert!(result.is_ok());
+    let rebalance_type = result.unwrap();
+
+    match &rebalance_type {
+        RebalanceType::Decrease(components) => {
+            assert_eq!(components.total_unstake_lamports, 10_000_000);
+        }
+        _ => panic!("Expected Decrease variant"),
+    }
+
+    // Simulate the handler-level guard with typical mainnet values
+    let stake_minimum_delegation = 1_000_000;
+    let meta = Meta {
+        rent_exempt_reserve: 2_282_880,
+        authorized: Authorized {
+            staker: Pubkey::default(),
+            withdrawer: Pubkey::default(),
+        },
+        lockup: Lockup::default(),
+    };
+
+    let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
+
+    let final_rebalance_type = match rebalance_type {
+        RebalanceType::Decrease(ref components) => {
+            if components.total_unstake_lamports < required_lamports {
+                RebalanceType::None
+            } else {
+                rebalance_type
+            }
+        }
+        other => other,
+    };
+
+    // 10M > required_lamports, so the Decrease should pass through
+    assert!(
+        matches!(final_rebalance_type, RebalanceType::Decrease(_)),
+        "Expected Decrease to pass through because total_unstake_lamports (10_000_000) >= required_lamports ({})",
+        required_lamports
+    );
 }

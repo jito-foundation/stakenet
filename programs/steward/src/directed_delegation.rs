@@ -23,7 +23,6 @@ pub fn decrease_stake_calculation(
     directed_unstake_cap_lamports: u64,
     directed_unstake_total_lamports: u64,
     current_minimum_lamports: u64,
-    required_lamports: u64,
 ) -> Result<RebalanceType> {
     if target_index >= directed_stake_meta.total_stake_targets as usize {
         return Err(StewardError::ValidatorIndexOutOfBounds.into());
@@ -89,11 +88,6 @@ pub fn decrease_stake_calculation(
 
     if capped_proportional_decrease_lamports < current_minimum_lamports {
         msg!("Proportional decrease lamports ({}) is less than minimum delegation ({}). No unstake will be performed.", capped_proportional_decrease_lamports, current_minimum_lamports);
-        return Ok(RebalanceType::None);
-    }
-
-    if capped_proportional_decrease_lamports < required_lamports {
-        msg!("Proportional decrease lamports ({}) is less than minimum stake lamports including rent ({}). No unstake will be performed.", capped_proportional_decrease_lamports, required_lamports);
         return Ok(RebalanceType::None);
     }
 
