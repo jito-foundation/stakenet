@@ -453,7 +453,7 @@ fn test_edge_case_zero_values() {
 }
 
 /// Tests the handler-level guard that converts a Decrease to None when
-/// total_unstake_lamports < minimum_stake_lamports (rent + minimum delegation).
+/// remaining_lamports (stake_account.lamports - total_unstake_lamports) < required_lamports.
 /// This mirrors the check in rebalance_directed.rs handler (lines 328-350).
 #[test]
 fn test_decrease_below_minimum_stake_lamports_becomes_none() {
@@ -469,14 +469,15 @@ fn test_decrease_below_minimum_stake_lamports_becomes_none() {
     ]);
 
     // current_minimum_lamports = 0 so the calculation itself won't filter it out
+    let stake_account_lamports: u64 = 1_000_000;
     let result = decrease_stake_calculation(
         &state,
         &directed_stake_meta,
-        0,                 // target_index
-        1_000_000,         // current_lamports
-        1_000_000_000_000, // directed_unstake_cap_lamports (large cap)
-        0,                 // directed_unstake_total_lamports
-        0,                 // current_minimum_lamports (no filter at calculation level)
+        0,                      // target_index
+        stake_account_lamports, // current_lamports
+        1_000_000_000_000,      // directed_unstake_cap_lamports (large cap)
+        0,                      // directed_unstake_total_lamports
+        0,                      // current_minimum_lamports (no filter at calculation level)
     );
 
     assert!(result.is_ok());
@@ -491,7 +492,7 @@ fn test_decrease_below_minimum_stake_lamports_becomes_none() {
     }
 
     // Now simulate the handler-level guard:
-    // Create a Meta with rent_exempt_reserve that makes minimum_stake_lamports > 100
+    // Create a Meta with rent_exempt_reserve that makes minimum_stake_lamports > remaining
     let stake_minimum_delegation = 1_000_000; // 1M lamports (1 SOL minimum delegation on mainnet)
     let meta = Meta {
         rent_exempt_reserve: 2_282_880, // typical stake account rent
@@ -505,10 +506,13 @@ fn test_decrease_below_minimum_stake_lamports_becomes_none() {
     let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
     // required_lamports = 2_282_880 + max(1_000_000, 1_000_000) = 3_282_880
 
-    // Apply the same guard as the handler
+    // Apply the same guard as the handler:
+    // remaining_lamports = stake_account.lamports().saturating_sub(total_unstake_lamports)
     let final_rebalance_type = match rebalance_type {
         RebalanceType::Decrease(ref components) => {
-            if components.total_unstake_lamports < required_lamports {
+            let remaining_lamports =
+                stake_account_lamports.saturating_sub(components.total_unstake_lamports);
+            if remaining_lamports < required_lamports {
                 RebalanceType::None
             } else {
                 rebalance_type
@@ -517,16 +521,18 @@ fn test_decrease_below_minimum_stake_lamports_becomes_none() {
         other => other,
     };
 
-    // The 100 lamport decrease should be overridden to None
+    // remaining_lamports = 1_000_000 - 100 = 999_900, which is < required_lamports (3_282_880)
+    // So the decrease should be overridden to None
     assert!(
         matches!(final_rebalance_type, RebalanceType::None),
-        "Expected None because total_unstake_lamports ({}) < required_lamports ({})",
-        100,
+        "Expected None because remaining_lamports ({}) < required_lamports ({})",
+        stake_account_lamports.saturating_sub(100),
         required_lamports
     );
 }
 
-/// Tests that a sufficiently large decrease passes the minimum_stake_lamports guard.
+/// Tests that a decrease passes the minimum_stake_lamports guard when
+/// remaining_lamports (stake_account.lamports - total_unstake_lamports) >= required_lamports.
 #[test]
 fn test_decrease_above_minimum_stake_lamports_passes() {
     let state = create_mock_steward_state(2);
@@ -539,6 +545,8 @@ fn test_decrease_above_minimum_stake_lamports_passes() {
         (validator2, 1_000_000, 1_000_000), // At target
     ]);
 
+    // stake_account has 20M lamports total, so after unstaking 10M, 10M remains
+    let stake_account_lamports: u64 = 20_000_000;
     let result = decrease_stake_calculation(
         &state,
         &directed_stake_meta,
@@ -572,9 +580,13 @@ fn test_decrease_above_minimum_stake_lamports_passes() {
 
     let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
 
+    // Apply the same guard as the handler:
+    // remaining_lamports = stake_account.lamports().saturating_sub(total_unstake_lamports)
     let final_rebalance_type = match rebalance_type {
         RebalanceType::Decrease(ref components) => {
-            if components.total_unstake_lamports < required_lamports {
+            let remaining_lamports =
+                stake_account_lamports.saturating_sub(components.total_unstake_lamports);
+            if remaining_lamports < required_lamports {
                 RebalanceType::None
             } else {
                 rebalance_type
@@ -583,10 +595,12 @@ fn test_decrease_above_minimum_stake_lamports_passes() {
         other => other,
     };
 
-    // 10M > required_lamports, so the Decrease should pass through
+    // remaining_lamports = 20_000_000 - 10_000_000 = 10_000_000, which is >= required_lamports (3_282_880)
+    // So the Decrease should pass through
     assert!(
         matches!(final_rebalance_type, RebalanceType::Decrease(_)),
-        "Expected Decrease to pass through because total_unstake_lamports (10_000_000) >= required_lamports ({})",
+        "Expected Decrease to pass through because remaining_lamports ({}) >= required_lamports ({})",
+        stake_account_lamports.saturating_sub(10_000_000),
         required_lamports
     );
 }

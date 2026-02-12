@@ -334,9 +334,14 @@ pub fn handler(ctx: Context<RebalanceDirected>, directed_stake_meta_index: usize
                         _ => return Err(StewardError::WrongStakeStake.into()),
                     };
 
+                    let remaining_lamports = ctx
+                        .accounts
+                        .stake_account
+                        .lamports()
+                        .saturating_sub(components.total_unstake_lamports);
                     let required_lamports = minimum_stake_lamports(&meta, stake_minimum_delegation);
 
-                    if components.total_unstake_lamports < required_lamports {
+                    if remaining_lamports < required_lamports {
                         msg!(
                             "Proportional decrease lamports ({}) is less than minimum stake lamports including rent ({}). No unstake will be performed.",
                             components.total_unstake_lamports,
