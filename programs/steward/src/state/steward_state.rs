@@ -29,8 +29,6 @@ use bytemuck::{Pod, Zeroable};
 use spl_stake_pool::big_vec::BigVec;
 use validator_history::{ClusterHistory, ValidatorHistory};
 
-const SLOTS_PER_EPOCH: u64 = 432_000;
-
 pub fn maybe_transition(
     steward_state: &mut StewardStateV2,
     clock: &Clock,
@@ -367,14 +365,13 @@ impl StewardStateV2 {
         params: &Parameters,
         epoch_schedule: &EpochSchedule,
     ) -> Result<()> {
-        let current_slot = clock.slot;
+        let current_epoch = clock.epoch;
         let epoch_progress = epoch_progress(clock, epoch_schedule)?;
         match self.state_tag {
             StewardStateEnum::ComputeScores => self.transition_compute_scores(),
             StewardStateEnum::ComputeDelegations => self.transition_compute_delegations(),
             StewardStateEnum::Idle => self.transition_idle(
-                current_slot,
-                params.num_epochs_between_scoring,
+                current_epoch,
                 epoch_progress,
                 params.instant_unstake_epoch_progress,
                 params.compute_score_epoch_progress,
@@ -408,20 +405,12 @@ impl StewardStateV2 {
     #[inline]
     fn transition_idle(
         &mut self,
-        current_slot: u64,
-        num_epochs_between_scoring: u64,
+        current_epoch: u64,
         epoch_progress: f64,
         min_epoch_progress_for_instant_unstake: f64,
         min_epoch_progress_for_compute_scores: f64,
     ) -> Result<()> {
-        let slots_since_scoring_started = current_slot
-            .checked_sub(self.start_computing_scores_slot)
-            .ok_or(StewardError::ArithmeticError)?;
-
-        // Unblock the transition to ComputeScores the number of slots between scoring cycles has passed
-        if slots_since_scoring_started
-            >= (SLOTS_PER_EPOCH.saturating_mul(num_epochs_between_scoring))
-        {
+        if current_epoch >= self.next_cycle_epoch {
             self.unset_flag(COMPUTE_SCORE);
             self.unset_flag(COMPUTE_DELEGATIONS);
             self.instant_unstake = BitMask::default();
@@ -1248,4 +1237,180 @@ pub fn select_validators_to_delegate(
     );
 
     validators_to_delegate
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::constants::SORTED_INDEX_DEFAULT;
+
+    use super::*;
+
+    fn default_state() -> StewardStateV2 {
+        StewardStateV2 {
+            state_tag: StewardStateEnum::Idle,
+            validator_lamport_balances: [0; MAX_VALIDATORS],
+            scores: [0; MAX_VALIDATORS],
+            sorted_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            raw_scores: [0; MAX_VALIDATORS],
+            sorted_raw_score_indices: [SORTED_INDEX_DEFAULT; MAX_VALIDATORS],
+            delegations: [Delegation::default(); MAX_VALIDATORS],
+            instant_unstake: BitMask::default(),
+            progress: BitMask::default(),
+            validators_for_immediate_removal: BitMask::default(),
+            validators_to_remove: BitMask::default(),
+            start_computing_scores_slot: 0,
+            current_epoch: 20,
+            next_cycle_epoch: 30,
+            num_pool_validators: 3,
+            scoring_unstake_total: 0,
+            instant_unstake_total: 0,
+            stake_deposit_unstake_total: 0,
+            status_flags: 0,
+            validators_added: 0,
+            _padding0: [0; 2],
+        }
+    }
+
+    /// When current_epoch reaches next_cycle_epoch, COMPUTE_SCORE and COMPUTE_DELEGATIONS
+    /// flags should be cleared, allowing a new scoring cycle to begin.
+    #[test]
+    fn test_transition_idle_clears_flags_at_next_cycle_epoch() {
+        let mut state = default_state();
+        state.set_flag(COMPUTE_SCORE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.next_cycle_epoch = 30;
+
+        // Before next_cycle_epoch: flags should remain
+        state.transition_idle(29, 0.6, 0.9, 0.5).unwrap();
+        assert!(state.has_flag(COMPUTE_SCORE));
+        assert!(state.has_flag(COMPUTE_DELEGATIONS));
+
+        // At next_cycle_epoch: flags should be cleared
+        state.transition_idle(30, 0.6, 0.9, 0.5).unwrap();
+        assert!(!state.has_flag(COMPUTE_SCORE));
+        assert!(!state.has_flag(COMPUTE_DELEGATIONS));
+    }
+
+    /// Idle -> ComputeScores when:
+    /// - REBALANCE_DIRECTED_COMPLETE is set
+    /// - COMPUTE_DELEGATIONS is NOT set
+    /// - epoch_progress >= compute_score_epoch_progress
+    #[test]
+    fn test_transition_idle_to_compute_scores() {
+        let mut state = default_state();
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        // No COMPUTE_DELEGATIONS flag
+
+        // Below compute_score_epoch_progress (0.5): stays Idle
+        state.transition_idle(20, 0.4, 0.9, 0.5).unwrap();
+        assert!(matches!(state.state_tag, StewardStateEnum::Idle));
+
+        // At compute_score_epoch_progress: transitions to ComputeScores
+        state.transition_idle(20, 0.5, 0.9, 0.5).unwrap();
+        assert!(matches!(state.state_tag, StewardStateEnum::ComputeScores));
+        assert!(state.progress.is_empty());
+        assert!(state.instant_unstake.is_empty());
+    }
+
+    /// Idle -> ComputeInstantUnstake when:
+    /// - REBALANCE flag is NOT set (loop not completed)
+    /// - epoch_progress >= instant_unstake_epoch_progress
+    /// - Does NOT qualify for ComputeScores branch
+    #[test]
+    fn test_transition_idle_to_compute_instant_unstake() {
+        let mut state = default_state();
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+        // REBALANCE not set -> !completed_loop
+
+        // Below instant_unstake_epoch_progress: stays Idle
+        state.transition_idle(20, 0.8, 0.9, 0.5).unwrap();
+        assert!(matches!(state.state_tag, StewardStateEnum::Idle));
+        assert!(state.has_flag(PRE_LOOP_IDLE));
+
+        // At instant_unstake_epoch_progress: transitions
+        state.transition_idle(20, 0.9, 0.9, 0.5).unwrap();
+        assert!(matches!(
+            state.state_tag,
+            StewardStateEnum::ComputeInstantUnstake
+        ));
+        assert!(state.progress.is_empty());
+        assert!(state.instant_unstake.is_empty());
+    }
+
+    /// When the loop is completed (REBALANCE set), Idle should set POST_LOOP_IDLE
+    /// and NOT transition to ComputeInstantUnstake.
+    #[test]
+    fn test_transition_idle_post_loop() {
+        let mut state = default_state();
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+        state.set_flag(REBALANCE);
+
+        state.transition_idle(20, 0.95, 0.9, 0.5).unwrap();
+        assert!(matches!(state.state_tag, StewardStateEnum::Idle));
+        assert!(state.has_flag(POST_LOOP_IDLE));
+    }
+
+    /// Reproduces the reported bug scenario:
+    /// - Previous cycle's ComputeScores started very late (>90% epoch mark)
+    /// - COMPUTE_SCORE and COMPUTE_DELEGATIONS flags are still set from previous cycle
+    /// - At the next_cycle_epoch, the epoch-based check clears the flags
+    /// - This allows ComputeScores to start instead of falling through to ComputeInstantUnstake
+    #[test]
+    fn test_transition_idle_late_scoring_does_not_skip_compute_scores() {
+        let mut state = default_state();
+        // Simulate previous cycle completed: both flags set
+        state.set_flag(COMPUTE_SCORE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.next_cycle_epoch = 30;
+
+        // We are now at epoch 30 (next_cycle_epoch), past the 50% mark
+        // The epoch-based check should clear COMPUTE_DELEGATIONS,
+        // enabling the ComputeScores branch
+        state.transition_idle(30, 0.6, 0.9, 0.5).unwrap();
+
+        assert!(
+            matches!(state.state_tag, StewardStateEnum::ComputeScores),
+            "Expected ComputeScores but got {:?}. \
+             Flags were not cleared at next_cycle_epoch, causing the scoring cycle to be skipped.",
+            state.state_tag
+        );
+    }
+
+    /// Verifies that if we are before next_cycle_epoch AND COMPUTE_DELEGATIONS is still set,
+    /// the ComputeScores branch is NOT taken — instead we fall through to
+    /// ComputeInstantUnstake at the 90% mark.
+    #[test]
+    fn test_transition_idle_before_next_cycle_epoch_skips_compute_scores() {
+        let mut state = default_state();
+        state.set_flag(COMPUTE_SCORE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.next_cycle_epoch = 30;
+
+        // Epoch 29: flags NOT cleared, COMPUTE_DELEGATIONS blocks ComputeScores branch
+        // At 95% epoch progress, should go to ComputeInstantUnstake
+        state.transition_idle(29, 0.95, 0.9, 0.5).unwrap();
+        assert!(matches!(
+            state.state_tag,
+            StewardStateEnum::ComputeInstantUnstake
+        ));
+    }
+
+    /// Idle stays idle when nothing qualifies for a transition:
+    /// - epoch_progress below both thresholds
+    /// - no completed loop
+    #[test]
+    fn test_transition_idle_noop() {
+        let mut state = default_state();
+        state.set_flag(REBALANCE_DIRECTED_COMPLETE);
+        state.set_flag(COMPUTE_DELEGATIONS);
+
+        state.transition_idle(20, 0.3, 0.9, 0.5).unwrap();
+        assert!(matches!(state.state_tag, StewardStateEnum::Idle));
+        assert!(state.has_flag(PRE_LOOP_IDLE));
+    }
 }
