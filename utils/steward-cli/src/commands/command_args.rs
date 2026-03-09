@@ -78,6 +78,14 @@ pub struct Args {
     #[arg(long, global = true, env)]
     pub signer: Option<String>,
 
+    /// Specific Ledger signer pubkey to resolve when `--signer ledger` is used
+    #[arg(long, global = true, env)]
+    pub ledger_wallet: Option<Pubkey>,
+
+    /// Ledger derivation path when `--signer ledger` is used, for example `0` or `0/0`
+    #[arg(long, global = true, env)]
+    pub ledger_key: Option<String>,
+
     /// Commitment level for RPC queries
     #[arg(long, global = true, env, default_value = "confirmed")]
     pub commitment: CommitmentLevel,
