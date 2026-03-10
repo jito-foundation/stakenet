@@ -1,5 +1,5 @@
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
-use solana_program_test::*;
+use solana_program_test::tokio;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
     transaction::Transaction,
