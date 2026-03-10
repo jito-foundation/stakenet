@@ -2,7 +2,7 @@
   "address": "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa",
   "metadata": {
     "name": "validator_history",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "spec": "0.1.0",
     "description": "Program for tracking validator metrics on chain"
   },
@@ -131,7 +131,6 @@
         },
         {
           "name": "oracle_authority",
-          "writable": true,
           "signer": true
         }
       ],
@@ -842,6 +841,11 @@
       "code": 6015,
       "name": "PriorityFeeDistributionAccountNotFinalized",
       "msg": "Priority Fee Distribution Account cannot be copied during its own epoch"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidBamClientValue",
+      "msg": "Invalid BAM client value, must be 0 or 1"
     }
   ],
   "types": [
