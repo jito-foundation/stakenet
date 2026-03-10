@@ -5335,11 +5335,19 @@
             }
           },
           {
+            "name": "is_jito_bam_client",
+            "docs": [
+              "Whether this validator is running the Jito BAM client.",
+              "1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                47
+                46
               ]
             }
           }

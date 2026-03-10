@@ -107,6 +107,42 @@
       "args": []
     },
     {
+      "name": "copy_is_jito_bam_client",
+      "discriminator": [
+        127,
+        99,
+        103,
+        134,
+        207,
+        41,
+        83,
+        204
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "oracle_authority",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "is_jito_bam_client",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "copy_priority_fee_distribution",
       "discriminator": [
         152,
@@ -1278,11 +1314,19 @@
             }
           },
           {
+            "name": "is_jito_bam_client",
+            "docs": [
+              "Whether this validator is running the Jito BAM client.",
+              "1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                47
+                46
               ]
             }
           }
