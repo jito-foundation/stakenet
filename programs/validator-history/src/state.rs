@@ -189,9 +189,11 @@ pub struct ValidatorHistoryEntry {
     pub block_data_updated_at_slot: u64,
     /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
     pub priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority,
+
     /// Whether this validator is running the Jito BAM client.
     /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
     pub is_jito_bam_client: u8,
+
     pub padding1: [u8; 46],
 }
 
@@ -1269,11 +1271,7 @@ impl ValidatorHistory {
 
     /// Sets whether the validator is running the Jito BAM client for the given epoch.
     /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
-    pub fn set_is_jito_bam_client(
-        &mut self,
-        epoch: u16,
-        is_jito_bam_client: u8,
-    ) -> Result<()> {
+    pub fn set_is_jito_bam_client(&mut self, epoch: u16, is_jito_bam_client: u8) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
