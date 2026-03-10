@@ -172,4 +172,11 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_set_new_priority_fee_oracle_authority(ctx)
     }
+
+    pub fn copy_is_jito_bam_client(
+        ctx: Context<CopyIsJitoBamClient>,
+        is_jito_bam_client: u8,
+    ) -> Result<()> {
+        handle_copy_is_jito_bam_client(ctx, is_jito_bam_client)
+    }
 }

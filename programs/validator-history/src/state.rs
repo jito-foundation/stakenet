@@ -189,7 +189,10 @@ pub struct ValidatorHistoryEntry {
     pub block_data_updated_at_slot: u64,
     /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
     pub priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority,
-    pub padding1: [u8; 47],
+    /// Whether this validator is running the Jito BAM client.
+    /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
+    pub is_jito_bam_client: u8,
+    pub padding1: [u8; 46],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -219,10 +222,11 @@ impl Default for ValidatorHistoryEntry {
             priority_fee_commission: u16::MAX,
             total_leader_slots: u32::MAX,
             blocks_produced: u32::MAX,
-            padding0: [u8::MAX, 2],
+            padding0: [u8::MAX; 2],
             block_data_updated_at_slot: u64::MAX,
             priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
-            padding1: [u8::MAX; 47],
+            is_jito_bam_client: u8::MAX,
+            padding1: [u8::MAX; 46],
         }
     }
 }
@@ -1260,6 +1264,40 @@ impl ValidatorHistory {
         // This provides idempotency
         self.validator_age_last_updated_epoch = end_epoch;
 
+        Ok(())
+    }
+
+    /// Sets whether the validator is running the Jito BAM client for the given epoch.
+    /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
+    pub fn set_is_jito_bam_client(
+        &mut self,
+        epoch: u16,
+        is_jito_bam_client: u8,
+    ) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.is_jito_bam_client = is_jito_bam_client;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    for entry in self.history.arr_mut().iter_mut() {
+                        if entry.epoch == epoch {
+                            entry.is_jito_bam_client = is_jito_bam_client;
+                            return Ok(());
+                        }
+                    }
+                    return Err(ValidatorHistoryError::EpochOutOfRange.into());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            is_jito_bam_client,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
         Ok(())
     }
 }
