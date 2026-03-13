@@ -252,9 +252,9 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             );
 
             info!("Copying is jito bam client...");
-            keeper_state.set_runs_errors_and_txs_for_epoch(
-                CopyIsJitoBamClientOperation::fire(&keeper_config, &keeper_state).await,
-            );
+            let copy_is_jito_bam_client_op =
+                CopyIsJitoBamClientOperation::new(&keeper_config, &keeper_state);
+            keeper_state.set_runs_errors_and_txs_for_epoch(copy_is_jito_bam_client_op.fire().await);
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;

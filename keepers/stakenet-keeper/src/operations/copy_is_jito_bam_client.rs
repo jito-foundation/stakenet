@@ -1,19 +1,26 @@
-//! This program starts several threads to manage the creation of validator history accounts,
-//! and the updating of the various data feeds within the accounts.
-//! It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+//! Copies the Jito BAM client status for each validator
+//! into their respective [`ValidatorHistory`] accounts.
+//!
+//! This operation queries the Kobe API to determine which validators are registered
+//! BAM clients, then writes a boolean flag (`is_jito_bam_client`) to each validator's
+//! on-chain history entry for the current epoch.
+//!
+//! The operation runs at 90%, 95%, and 99% epoch completion to ensure BAM participation
+//! data is captured, with retries in case earlier attempts fail.
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
+    epoch_info::EpochInfo,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
-use stakenet_sdk::models::{
-    entries::UpdateInstruction, errors::JitoTransactionError, submit_stats::SubmitStats,
+use stakenet_sdk::{
+    models::{entries::UpdateInstruction, errors::JitoTransactionError, submit_stats::SubmitStats},
+    utils::transactions::submit_instructions,
 };
-use stakenet_sdk::utils::transactions::submit_instructions;
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::{
@@ -23,6 +30,11 @@ use crate::{
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
+/// Manages the copying of Jito BAM client status into validator history accounts.
+///
+/// Constructed from [`KeeperConfig`] and [`KeeperState`], this struct holds all
+/// the context needed to fetch BAM validator data from the Kobe API and submit
+/// on-chain transactions that record each validator's BAM participation status.
 pub struct CopyIsJitoBamClientOperation<'a> {
     /// RPC Client
     client: Arc<RpcClient>,
@@ -53,6 +65,7 @@ pub struct CopyIsJitoBamClientOperation<'a> {
 }
 
 impl<'a> CopyIsJitoBamClientOperation<'a> {
+    /// Creates a new operation from the keeper's config and current state.
     pub fn new(keeper_config: &'a KeeperConfig, keeper_state: &'a KeeperState) -> Self {
         Self {
             client: keeper_config.client.clone(),
@@ -67,14 +80,23 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
         }
     }
 
+    /// Returns the [`KeeperOperations`] variant for this operation.
     fn operation() -> KeeperOperations {
         KeeperOperations::CopyIsJitoBamClient
     }
 
-    fn should_run() -> bool {
-        true
+    /// Returns `true` when the operation should execute.
+    ///
+    /// Runs up to 3 times per epoch at 90%, 95%, and 99% slot completion.
+    /// Retries ensure data is written even if earlier attempts fail.
+    fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
+        (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 1)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 95 / 100 && runs_for_epoch < 2)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 99 / 100 && runs_for_epoch < 3)
     }
 
+    /// Checks whether the `is_jito_bam_client` field has already been written
+    /// for the given vote account in the specified epoch.
     fn is_uploaded(
         validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
         vote_account: &Pubkey,
@@ -90,18 +112,20 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
         false
     }
 
-    pub async fn fire(
-        keeper_config: &'a KeeperConfig,
-        keeper_state: &'a KeeperState,
-    ) -> (KeeperOperations, u64, u64, u64) {
-        let op = Self::new(keeper_config, keeper_state);
+    /// Entry point for the operation. Checks whether the operation should run,
+    /// executes it, and returns updated run/error/transaction counts for the epoch.
+    pub async fn fire(&self) -> (KeeperOperations, u64, u64, u64) {
         let operation = Self::operation();
 
-        let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) =
-            keeper_state.copy_runs_errors_and_txs_for_epoch(operation);
+        let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) = self
+            .keeper_state
+            .copy_runs_errors_and_txs_for_epoch(operation);
 
-        if Self::should_run() && check_flag(keeper_config.run_flags, operation) {
-            match op.process().await {
+        let should_run = Self::should_run(&self.keeper_state.epoch_info, runs_for_epoch)
+            && check_flag(self.keeper_config.run_flags, operation);
+
+        if should_run {
+            match self.process().await {
                 Ok(stats) => {
                     for message in stats.results.iter() {
                         if let Err(e) = message {
@@ -128,21 +152,17 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
         (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
     }
 
+    /// Fetches BAM validator data from the Kobe API, determines each validator's
+    /// BAM client status, and submits `CopyIsJitoBamClient` instructions on-chain
+    /// for all validators that haven't been updated this epoch.
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
         let validator_history_map = &self.keeper_state.validator_history_map;
-        let current_epoch_tip_distribution_map =
-            &self.keeper_state.current_epoch_tip_distribution_map;
-
-        let existing_entries = current_epoch_tip_distribution_map
-            .iter()
-            .filter_map(|(pubkey, account)| account.as_ref().map(|_| *pubkey))
-            .collect::<Vec<_>>();
-
-        let entries_to_update = existing_entries
-            .into_iter()
+        let entries_to_update: Vec<Pubkey> = validator_history_map
+            .keys()
             .filter(|entry| !Self::is_uploaded(validator_history_map, entry, epoch_info.epoch))
-            .collect::<Vec<Pubkey>>();
+            .copied()
+            .collect();
 
         let bam_validators = self
             .keeper_config

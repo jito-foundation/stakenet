@@ -1,3 +1,9 @@
+//! Entry type for the `CopyIsJitoBamClient` instruction.
+//!
+//! Represents a single validator's BAM client status to be written on-chain.
+//! Implements [`UpdateInstruction`] to generate the Anchor instruction that
+//! copies the BAM participation flag into the validator's history account.
+
 use anchor_lang::{InstructionData, ToAccountMetas};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
 use stakenet_sdk::{
@@ -5,6 +11,7 @@ use stakenet_sdk::{
     utils::accounts::{get_validator_history_address, get_validator_history_config_address},
 };
 
+/// Holds all data needed to build a `CopyIsJitoBamClient` instruction for one validator.
 pub struct IsJitoBamClientEntry {
     /// Is Jito BAM Client
     pub is_jito_bam_client: bool,
@@ -29,6 +36,8 @@ pub struct IsJitoBamClientEntry {
 }
 
 impl IsJitoBamClientEntry {
+    /// Creates a new entry, deriving the validator history and config PDAs from
+    /// the vote account and program ID.
     pub fn new(
         vote_account: Pubkey,
         program_id: &Pubkey,
@@ -58,6 +67,8 @@ impl Address for IsJitoBamClientEntry {
 }
 
 impl UpdateInstruction for IsJitoBamClientEntry {
+    /// Builds the `CopyIsJitoBamClient` instruction, converting the boolean
+    /// `is_jito_bam_client` flag to a `u8` for the on-chain program.
     fn update_instruction(&self) -> Instruction {
         Instruction {
             program_id: self.program_id,

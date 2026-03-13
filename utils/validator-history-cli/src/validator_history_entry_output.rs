@@ -153,7 +153,7 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
             is_jito_bam_client: (!value
                 .is_jito_bam_client
                 .eq(&default_entry.is_jito_bam_client))
-            .then_some((value.is_jito_bam_client as u8).to_string()),
+            .then_some((value.is_jito_bam_client).to_string()),
         }
     }
 }
