@@ -519,6 +519,10 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
             "Priority Fee Merkle Root Upload Authority: {}",
             format_option(entry_output.priority_fee_merkle_root_upload_authority)
         ));
+        field_descriptions.push(format!(
+            "Is Jito BAM Client: {}",
+            format_option(entry_output.is_jito_bam_client)
+        ));
 
         field_descriptions.join(" | ")
     }

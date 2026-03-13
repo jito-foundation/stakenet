@@ -16,6 +16,7 @@ use stakenet_keeper::{
     operations::{
         self,
         block_metadata::db::create_sqlite_tables,
+        copy_is_jito_bam_client::CopyIsJitoBamClientOperation,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
@@ -248,6 +249,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             info!("Updating priority fee commission...");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
+            );
+
+            info!("Copying is jito bam client...");
+            keeper_state.set_runs_errors_and_txs_for_epoch(
+                CopyIsJitoBamClientOperation::fire(&keeper_config, &keeper_state).await,
             );
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {

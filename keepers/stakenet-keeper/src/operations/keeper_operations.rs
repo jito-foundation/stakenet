@@ -42,6 +42,7 @@ pub enum KeeperOperations {
     BlockMetadataKeeper,
     PriorityFeeCommission,
     DirectedStaking,
+    CopyIsJitoBamClient,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
