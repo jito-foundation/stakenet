@@ -12187,6 +12187,7 @@ dependencies = [
  "env_logger 0.10.2",
  "ipinfo",
  "jito-tip-distribution-sdk",
+ "kobe-client",
  "log",
  "rusqlite",
  "serde",

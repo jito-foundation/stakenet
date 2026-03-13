@@ -45,6 +45,7 @@ use validator_history_cli::{
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_is_jito_bam_client::CrankCopyIsJitoBamClient,
             copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
         },
@@ -94,6 +95,7 @@ enum Commands {
     CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
     CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
+    CrankCopyIsJitoBamClient(CrankCopyIsJitoBamClient),
 }
 
 #[derive(Parser)]
@@ -1337,6 +1339,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
+        }
+        Commands::CrankCopyIsJitoBamClient(command_args) => {
+            commands::cranks::copy_is_jito_bam_client::run(command_args, args.json_rpc_url).await?
         }
     };
 
