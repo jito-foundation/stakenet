@@ -207,6 +207,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             compute_score_epoch_progress: config.compute_score_epoch_progress,
             undirected_stake_ceiling_lamports: config.undirected_stake_ceiling_lamports,
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
+            jito_bam_minimum_epochs: todo!(),
         }
     }
 }

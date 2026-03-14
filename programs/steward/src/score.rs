@@ -202,7 +202,7 @@ pub fn calculate_avg_mev_commission(
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV4 {
+pub struct ScoreComponentsV5 {
     /// Final score with binary filters applied to raw_score (0 if any filter fails, raw_score otherwise)
     pub score: u64,
 
@@ -233,8 +233,9 @@ pub struct ScoreComponentsV4 {
     /// If delinquency is not > threshold in any epoch, score is 1, else 0
     pub delinquency_score: u8,
 
-    /// If validator has a mev commission in the last 10 epochs, score is 1, else 0
-    pub running_jito_score: u8,
+    /// Score is 1 if the validator has been a Jito BAM client for all of the last
+    /// `jito_bam_minimum_epochs` epochs, otherwise 0.
+    pub running_jito_bam_score: u8,
 
     /// If max commission in commission_range epochs is less than commission_threshold, score is 1, else 0
     pub commission_score: u8,
@@ -302,7 +303,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV4> {
+) -> Result<ScoreComponentsV5> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -337,7 +338,7 @@ pub fn validator_score(
     );
 
     /////// Binary filter calculations ///////
-    let (mev_commission_score, max_mev_commission, max_mev_commission_epoch, running_jito_score) =
+    let (mev_commission_score, max_mev_commission, max_mev_commission_epoch) =
         calculate_max_mev_commission(
             &mev_commission_window,
             current_epoch,
@@ -398,6 +399,15 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
+    let is_jito_bam_client_window = validator.history.is_jito_bam_client_range(
+        current_epoch
+            .checked_sub(params.jito_bam_minimum_epochs as u16)
+            .ok_or(ArithmeticError)?,
+        current_epoch,
+    );
+
+    let running_jito_bam_score = calculate_running_jito_bam_score(&is_jito_bam_client_window);
+
     /////// Apply binary filters to raw score ///////
     // Binary filters are 0 or 1, multiply them with the raw_score
     let score = raw_score
@@ -407,12 +417,12 @@ pub fn validator_score(
         * blacklisted_score as u64
         * superminority_score as u64
         * delinquency_score as u64
-        * running_jito_score as u64
+        * running_jito_bam_score as u64
         * merkle_root_upload_authority_score as u64
         * priority_fee_commission_score as u64
         * priority_fee_merkle_root_upload_authority_score as u64;
 
-    Ok(ScoreComponentsV4 {
+    Ok(ScoreComponentsV5 {
         score,
         raw_score,
         commission_max: max_commission,
@@ -423,7 +433,7 @@ pub fn validator_score(
         blacklisted_score,
         superminority_score,
         delinquency_score,
-        running_jito_score,
+        running_jito_bam_score,
         commission_score,
         historical_commission_score,
         merkle_root_upload_authority_score,
@@ -453,7 +463,7 @@ pub fn calculate_max_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
-) -> Result<(u8, u16, u16, u8)> {
+) -> Result<(u8, u16, u16)> {
     let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
         .rev()
@@ -470,19 +480,24 @@ pub fn calculate_max_mev_commission(
         0
     };
 
-    /////// Running Jito ///////
-    let running_jito_score = if mev_commission_window.iter().any(|i| i.is_some()) {
-        1
-    } else {
-        0
-    };
-
     Ok((
         mev_commission_score,
         max_mev_commission,
         max_mev_commission_epoch,
-        running_jito_score,
     ))
+}
+
+/// Returns 1 if the validator has been a Jito BAM client for every epoch in the window,
+/// otherwise returns 0. The window size is determined by `jito_bam_minimum_epochs`.
+pub fn calculate_running_jito_bam_score(is_jito_bam_client_window: &[Option<u8>]) -> u8 {
+    if is_jito_bam_client_window
+        .iter()
+        .all(|entry| matches!(entry, Some(1)))
+    {
+        1
+    } else {
+        0
+    }
 }
 
 /// Calculates the vote credits ratio and delinquency score for the validator

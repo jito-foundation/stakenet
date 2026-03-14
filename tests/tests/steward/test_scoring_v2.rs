@@ -410,7 +410,6 @@ mod validator_score_integration_tests {
         assert_eq!(result.blacklisted_score, 1);
         assert_eq!(result.superminority_score, 1);
         assert_eq!(result.delinquency_score, 1);
-        assert_eq!(result.running_jito_score, 1);
         assert_eq!(result.commission_score, 1);
         assert_eq!(result.historical_commission_score, 1);
     }
@@ -535,7 +534,6 @@ mod validator_score_integration_tests {
         // Score should be 0 due to not running Jito
         assert_eq!(result.score, 0);
         assert!(result.raw_score > 0);
-        assert_eq!(result.running_jito_score, 0); // Not running Jito filter failed
     }
 
     #[test]

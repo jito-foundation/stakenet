@@ -40,6 +40,10 @@ pub struct UpdateParametersArgs {
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
     pub compute_score_epoch_progress: Option<f64>,
+
+    /// Minimum number of consecutive epochs a validator must have been a Jito BAM client
+    /// to qualify for delegation. `None` means do not update the current value.
+    pub jito_bam_minimum_epochs: Option<u8>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -250,7 +254,12 @@ pub struct Parameters {
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
-    pub _padding_0: [u8; 6],
+    /// Minimum number of consecutive epochs a validator must have been a Jito BAM client
+    /// to qualify for delegation. Validators must run BAM continuously for at least this
+    /// many epochs before becoming eligible.
+    pub jito_bam_minimum_epochs: u8,
+
+    pub _padding_0: [u8; 5],
 
     pub _padding_1: [u64; 28],
     /// The minimum epoch progress for computing scores
@@ -304,6 +313,7 @@ impl Parameters {
             minimum_voting_epochs,
             compute_score_epoch_progress,
             undirected_stake_ceiling_lamports,
+            jito_bam_minimum_epochs,
         } = *args;
 
         let mut new_parameters = self;
@@ -396,6 +406,10 @@ impl Parameters {
         if let Some(undirected_stake_ceiling_lamports) = undirected_stake_ceiling_lamports {
             new_parameters.undirected_stake_ceiling_lamports =
                 undirected_stake_ceiling_lamports.to_le_bytes();
+        }
+
+        if let Some(jito_bam_minimum_epochs) = jito_bam_minimum_epochs {
+            new_parameters.jito_bam_minimum_epochs = jito_bam_minimum_epochs;
         }
 
         // Validation will throw an error if any of the parameters are invalid

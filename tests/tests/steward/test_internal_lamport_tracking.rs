@@ -281,6 +281,7 @@ async fn test_internal_lamport_tracking_basic() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(10),
             }),
             None,
         )
@@ -504,6 +505,7 @@ async fn test_internal_lamport_tracking_with_withdraw() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(10),
             }),
             None,
         )
@@ -724,6 +726,7 @@ async fn test_internal_lamport_tracking_with_withdraw_remainder() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(u64::MAX),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(10),
             }),
             None,
         )
@@ -1126,6 +1129,7 @@ async fn test_internal_lamport_tracking_with_deposit() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(10),
             }),
             None,
         )
@@ -1348,6 +1352,7 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(10),
             }),
             None,
         )

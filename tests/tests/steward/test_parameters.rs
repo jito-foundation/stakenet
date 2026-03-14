@@ -215,6 +215,7 @@ async fn test_update_parameters() {
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
+            jito_bam_minimum_epochs: Some(10),
         },
         &fixture.keypair,
     )
@@ -256,7 +257,8 @@ fn _test_parameter(
         directed_stake_unstake_cap_bps: 750,
         compute_score_epoch_progress: 0.5,
         undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
-        _padding_0: [0; 6],
+        jito_bam_minimum_epochs: 10,
+        _padding_0: [0; 5],
         _padding_1: [0; 28],
         _padding_2: [0; 6],
     });
