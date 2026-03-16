@@ -2420,16 +2420,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV5",
       "discriminator": [
-        117,
-        201,
-        193,
-        88,
-        0,
-        129,
-        58,
-        215
+        30,
+        160,
+        15,
+        120,
+        139,
+        215,
+        205,
+        130
       ]
     },
     {
@@ -3956,11 +3956,20 @@
             "type": "u16"
           },
           {
+            "name": "jito_bam_minimum_epochs",
+            "docs": [
+              "Minimum number of consecutive epochs a validator must have been a Jito BAM client",
+              "to qualify for delegation. Validators must run BAM continuously for at least this",
+              "many epochs before becoming eligible."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -4144,7 +4153,7 @@
       }
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV5",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4219,9 +4228,10 @@
             "type": "u8"
           },
           {
-            "name": "running_jito_score",
+            "name": "running_jito_bam_score",
             "docs": [
-              "If validator has a mev commission in the last 10 epochs, score is 1, else 0"
+              "Score is 1 if the validator has been a Jito BAM client for all of the last",
+              "`jito_bam_minimum_epochs` epochs, otherwise 0."
             ],
             "type": "u8"
           },
