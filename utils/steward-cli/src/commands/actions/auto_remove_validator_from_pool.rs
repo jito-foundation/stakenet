@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
@@ -46,7 +47,10 @@ pub async fn command_auto_remove_validator_from_pool(
         &spl_stake_pool::id(),
         &vote_account,
         &steward_accounts.stake_pool_address,
-        None,
+        NonZeroU32::new(u32::from(
+            steward_accounts.validator_list_account.validators[validator_index as usize]
+                .validator_seed_suffix,
+        )),
     );
 
     let (transient_stake_address, _) = find_transient_stake_program_address(

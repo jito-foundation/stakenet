@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{num::NonZeroU32, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
@@ -66,12 +66,28 @@ pub async fn command_crank_rebalance_directed(
 
     let ixs_to_run: Vec<Instruction> = validators_to_run
         .iter()
+        .filter(|validator_info| {
+            if validator_info.validator_list_index == usize::MAX {
+                println!(
+                    "Skipping validator {} — not found in validator list",
+                    validator_info.vote_account
+                );
+                return false;
+            }
+            true
+        })
         .map(|validator_info| {
             let validator_index = validator_info.validator_list_index;
             let vote_account = &validator_info.vote_account;
 
-            let stake_address =
-                get_stake_address(vote_account, &steward_accounts.stake_pool_address);
+            let stake_address = get_stake_address(
+                vote_account,
+                &steward_accounts.stake_pool_address,
+                NonZeroU32::new(u32::from(
+                    steward_accounts.validator_list_account.validators[validator_index]
+                        .validator_seed_suffix,
+                )),
+            );
 
             let transient_stake_address = get_transient_stake_address(
                 vote_account,
