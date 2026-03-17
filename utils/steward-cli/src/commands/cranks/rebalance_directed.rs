@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
@@ -80,14 +80,8 @@ pub async fn command_crank_rebalance_directed(
             let validator_index = validator_info.validator_list_index;
             let vote_account = &validator_info.vote_account;
 
-            let stake_address = get_stake_address(
-                vote_account,
-                &steward_accounts.stake_pool_address,
-                NonZeroU32::new(u32::from(
-                    steward_accounts.validator_list_account.validators[validator_index]
-                        .validator_seed_suffix,
-                )),
-            );
+            let stake_address =
+                get_stake_address(vote_account, &steward_accounts.stake_pool_address);
 
             let transient_stake_address = get_transient_stake_address(
                 vote_account,

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, num::NonZeroU32, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::AccountDeserialize;
 use anyhow::Result;
@@ -792,7 +792,7 @@ fn build_verbose_state_output(
             &spl_stake_pool::id(),
             &vote_account,
             &config_account.stake_pool,
-            NonZeroU32::new(u32::from(validator.validator_seed_suffix)),
+            None,
         );
 
         let (transient_stake_address, _) = find_transient_stake_program_address(
@@ -951,7 +951,7 @@ fn _print_verbose_state(
                 &spl_stake_pool::id(),
                 &vote_account,
                 &config_account.stake_pool,
-                NonZeroU32::new(u32::from(validator.validator_seed_suffix)),
+                None,
             );
 
             let (transient_stake_address, _) = find_transient_stake_program_address(

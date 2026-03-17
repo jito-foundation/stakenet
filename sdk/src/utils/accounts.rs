@@ -8,7 +8,7 @@ use solana_client::{
     rpc_response::RpcVoteAccountInfo,
 };
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
-use std::{collections::HashMap, num::NonZeroU32, str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use validator_history::{ClusterHistory, Config as ValidatorHistoryConfig, ValidatorHistory};
 
@@ -43,7 +43,7 @@ pub async fn get_all_validator_accounts(
     let accounts_to_fetch = all_vote_accounts.iter().map(|vote_account| {
         let vote_account =
             Pubkey::from_str(&vote_account.vote_pubkey).expect("Could not parse vote account");
-        let stake_account = get_stake_address(&vote_account, &vote_account, None);
+        let stake_account = get_stake_address(&vote_account, &vote_account);
         let history_account =
             get_validator_history_address(&vote_account, validator_history_program_id);
 
@@ -105,11 +105,8 @@ pub async fn get_all_steward_validator_accounts(
         .iter()
         .map(|validator| {
             let vote_account = validator.vote_account_address;
-            let stake_account = get_stake_address(
-                &vote_account,
-                &all_steward_accounts.stake_pool_address,
-                NonZeroU32::new(u32::from(validator.validator_seed_suffix)),
-            );
+            let stake_account =
+                get_stake_address(&vote_account, &all_steward_accounts.stake_pool_address);
             let history_account =
                 get_validator_history_address(&vote_account, validator_history_program_id);
 
@@ -505,16 +502,12 @@ pub fn get_withdraw_authority_address(stake_pool_address: &Pubkey) -> Pubkey {
     withdraw_authority
 }
 
-pub fn get_stake_address(
-    vote_account_address: &Pubkey,
-    stake_pool_address: &Pubkey,
-    validator_seed_suffix: Option<NonZeroU32>,
-) -> Pubkey {
+pub fn get_stake_address(vote_account_address: &Pubkey, stake_pool_address: &Pubkey) -> Pubkey {
     let (stake_address, _) = find_stake_program_address(
         &spl_stake_pool::id(),
         vote_account_address,
         stake_pool_address,
-        validator_seed_suffix,
+        None,
     );
 
     stake_address

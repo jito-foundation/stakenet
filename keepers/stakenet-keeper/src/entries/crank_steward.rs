@@ -1,5 +1,4 @@
 use std::{
-    num::NonZeroU32,
     ops::{Mul, Sub},
     sync::Arc,
 };
@@ -172,11 +171,8 @@ pub fn _get_update_stake_pool_ixs(
         };
 
         if should_deactivate && reference_vote_account.is_some() {
-            let stake_account = get_stake_address(
-                &validator_info.vote_account_address,
-                stake_pool_address,
-                NonZeroU32::new(u32::from(validator_info.validator_seed_suffix)),
-            );
+            let stake_account =
+                get_stake_address(&validator_info.vote_account_address, stake_pool_address);
 
             let ix = deactivate_delinquent_stake(
                 &stake_account,
@@ -474,11 +470,8 @@ async fn _handle_adding_validators(
             let history_account =
                 get_validator_history_address(vote_account, &validator_history::id());
 
-            let stake_address = get_stake_address(
-                vote_account,
-                &all_steward_accounts.stake_pool_address,
-                None,
-            );
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
             Instruction {
                 program_id: *program_id,
@@ -552,14 +545,8 @@ async fn _handle_delinquent_validators(
             let history_account =
                 get_validator_history_address(vote_account, &validator_history::id());
 
-            let stake_address = get_stake_address(
-                vote_account,
-                &all_steward_accounts.stake_pool_address,
-                NonZeroU32::new(u32::from(
-                    all_steward_accounts.validator_list_account.validators[validator_index]
-                        .validator_seed_suffix,
-                )),
-            );
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
             let transient_stake_address = get_transient_stake_address(
                 vote_account,
@@ -910,14 +897,8 @@ async fn _handle_rebalance(
             let vote_account = &validator_info.vote_account;
             let history_account = validator_info.history_account;
 
-            let stake_address = get_stake_address(
-                vote_account,
-                &all_steward_accounts.stake_pool_address,
-                NonZeroU32::new(u32::from(
-                    all_steward_accounts.validator_list_account.validators[validator_index]
-                        .validator_seed_suffix,
-                )),
-            );
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
             let (transient_stake_address, _) = find_transient_stake_program_address(
                 &spl_stake_pool::id(),
@@ -1067,14 +1048,8 @@ async fn _handle_directed_rebalance(
         }
         let vote_account = &validator_info.vote_account;
 
-        let stake_address = get_stake_address(
-            vote_account,
-            &all_steward_accounts.stake_pool_address,
-            NonZeroU32::new(u32::from(
-                all_steward_accounts.validator_list_account.validators[validator_index]
-                    .validator_seed_suffix,
-            )),
-        );
+        let stake_address =
+            get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
         let transient_stake_address = get_transient_stake_address(
             vote_account,
