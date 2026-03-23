@@ -338,8 +338,7 @@ impl KeeperState {
             .checked_sub(first_slot_in_epoch)
             .ok_or_else(|| {
                 JitoTransactionError::Custom(format!(
-                    "Slot calculation overflow: current_slot={}, first_slot={}",
-                    current_slot, first_slot_in_epoch
+                    "Slot calculation overflow: current_slot={current_slot}, first_slot={first_slot_in_epoch}"
                 ))
             })?;
 

@@ -290,7 +290,7 @@ async fn parallel_confirm_transactions(
                     .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
                     .collect::<Vec<_>>(),
                 Err(e) => {
-                    info!("Failed getting signature statuses: {:?}", e);
+                    info!("Failed getting signature statuses: {e:?}");
                     vec![]
                 }
             }
@@ -433,7 +433,7 @@ pub async fn _parallel_execute_transactions_surfpool(
                                 }
                                 _ => {
                                     results[idx] = Err(JitoSendTransactionError::TransactionError(
-                                        format!("TX Error: {:?}", tx_err),
+                                        format!("TX Error: {tx_err:?}"),
                                     ));
                                 }
                             }
@@ -498,12 +498,12 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
-                    debug!("🟨 Submitted: {:?}", signature);
-                    println!("🟨 Submitted: {:?}", signature);
+                    debug!("🟨 Submitted: {signature:?}");
+                    println!("🟨 Submitted: {signature:?}");
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => {
-                    debug!("Transaction error: {:?}", e);
+                    debug!("Transaction error: {e:?}");
                     match e.get_transaction_error() {
                         Some(TransactionError::BlockhashNotFound) => {
                             debug!("🟧 Blockhash not found");
@@ -519,22 +519,19 @@ pub async fn parallel_execute_transactions(
                             match e.kind {
                                 solana_client::client_error::ClientErrorKind::Io(e) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Io Error: {:?}",
-                                                                    e
+                                                                    "TX - Io Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::Reqwest(e) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Reqwest Error: {:?}",
-                                                                    e
+                                                                    "TX - Reqwest Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::RpcError(e) => match e
                                                             {
                                                                 solana_client::rpc_request::RpcError::RpcRequestError(e) => {
                                                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                        "TX - RPC Error (Request): {:?}",
-                                                                        e
+                                                                        "TX - RPC Error (Request): {e:?}"
                                                                     )))
                                                                 }
                                                                 solana_client::rpc_request::RpcError::RpcResponseError {
@@ -547,70 +544,61 @@ pub async fn parallel_execute_transactions(
                                                                             results[idx] = Err(JitoSendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                                                         },
                                                                         solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
-                                                                            println!("🟥 Preflight Error: \n{:?}\n\n", e);
+                                                                            println!("🟥 Preflight Error: \n{e:?}\n\n");
 
                                                                             results[idx] = Err(JitoSendTransactionError::RpcSimulateTransactionResult(e))
                                                                         },
                                                                         solana_client::rpc_request::RpcResponseErrorData::NodeUnhealthy { num_slots_behind } => {
                                                                             results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                                "TX - RPC Error (Request - Unhealthy):  slots behind: {:?}",
-                                                                                num_slots_behind
+                                                                                "TX - RPC Error (Request - Unhealthy):  slots behind: {num_slots_behind:?}"
                                                                             )))
                                                                         },
                                                                     }
                                                                 }
                                                                 solana_client::rpc_request::RpcError::ParseError(e) => {
                                                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                        "TX - RPC Error (Parse): {:?}",
-                                                                        e
+                                                                        "TX - RPC Error (Parse): {e:?}"
                                                                     )))
                                                                 }
                                                                 solana_client::rpc_request::RpcError::ForUser(e) => {
                                                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                        "TX - RPC Error (For User): {:?}",
-                                                                        e
+                                                                        "TX - RPC Error (For User): {e:?}"
                                                                     )))
                                                                 }
                                                             },
                                 solana_client::client_error::ClientErrorKind::SerdeJson(e) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Serde Json Error: {:?}",
-                                                                    e
+                                                                    "TX - Serde Json Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::SigningError(e) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Signing Error: {:?}",
-                                                                    e
+                                                                    "TX - Signing Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::TransactionError(
                                                                 e,
                                                             ) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Transaction Error: {:?}",
-                                                                    e
+                                                                    "TX - Transaction Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::Custom(e) => {
                                                                 results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                                                    "TX - Custom Error: {:?}",
-                                                                    e
+                                                                    "TX - Custom Error: {e:?}"
                                                                 )))
                                                             }
                                 solana_client::client_error::ClientErrorKind::Middleware(e) => {
                                     results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                        "TX - Middleware Error: {:?}",
-                                        e
+                                        "TX - Middleware Error: {e:?}"
                                     )))
                                 },
                             }
                         }
                         None => {
-                            warn!("None Transaction error: {:?}", e);
+                            warn!("None Transaction error: {e:?}");
                             results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
-                                "None transaction error {:?}",
-                                e
+                                "None transaction error {e:?}"
                             )))
                         }
                     }
@@ -641,8 +629,8 @@ pub async fn parallel_execute_transactions(
 
         for signature in signatures {
             results[submitted_signatures[&signature]] = Ok(());
-            debug!("🟩 Completed: {:?}", signature);
-            println!("🟩 Completed: {:?}", signature);
+            debug!("🟩 Completed: {signature:?}");
+            println!("🟩 Completed: {signature:?}");
         }
 
         if results.iter().all(|r| r.is_ok()) {
@@ -699,7 +687,7 @@ pub async fn pack_instructions(
                 instructions_with_grouping.push((instruction, ix_per_tx));
             }
             Err(e) => {
-                error!("Could not simulate instruction: {:?}", e);
+                error!("Could not simulate instruction: {e:?}");
                 // Skip this instruction if there is an error
                 continue;
             }
@@ -1021,14 +1009,14 @@ pub fn format_steward_error_log(error: &JitoSendTransactionError) -> String {
             error_logs.push_str("Exceeded Retries");
         }
         JitoSendTransactionError::TransactionError(e) => {
-            error_logs.push_str(format!("Transaction: {:?}", e).as_str());
+            error_logs.push_str(format!("Transaction: {e:?}").as_str());
         }
         JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
             error_logs.push_str("Preflight Error:");
 
             e.logs.iter().for_each(|log| {
                 log.iter().enumerate().for_each(|(i, log)| {
-                    error_logs.push_str(format!("{}: {:?}", i, log).as_str());
+                    error_logs.push_str(format!("{i}: {log:?}").as_str());
                 });
             });
         }
@@ -1056,12 +1044,12 @@ pub fn print_base58_tx(ixs: &[Instruction]) {
             let writable = if account.is_writable { "W" } else { "" };
             let signer = if account.is_signer { "S" } else { "" };
 
-            println!("{:<44} {:>2} {:>1}", pubkey, writable, signer);
+            println!("{pubkey:<44} {writable:>2} {signer:>1}");
         });
 
         println!("\n");
 
         let base58_string = bs58::encode(&ix.data).into_string();
-        println!("{}\n", base58_string);
+        println!("{base58_string}\n");
     });
 }

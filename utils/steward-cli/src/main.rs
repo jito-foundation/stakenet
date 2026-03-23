@@ -47,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            admin_mark_for_removal::command_admin_mark_for_removal,
             close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
@@ -54,10 +55,12 @@ use crate::{
             copy_directed_stake_targets::command_copy_directed_stake_targets,
             migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
+            sync_directed_stake_lamports::command_sync_directed_stake_lamports,
             update_directed_stake_ticket::command_update_directed_stake_ticket,
         },
         cranks::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
+            instant_remove_validators::command_crank_instant_remove_validators,
             rebalance_directed::command_crank_rebalance_directed,
         },
         info::{
@@ -82,9 +85,11 @@ pub mod utils;
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
     let args = Args::parse();
-    let client = Arc::new(RpcClient::new_with_timeout(
+    let commitment_config = args.commitment.into();
+    let client = Arc::new(RpcClient::new_with_timeout_and_commitment(
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
+        commitment_config,
     ));
 
     let steward_program_id = args.steward_program_id;
@@ -203,10 +208,21 @@ async fn main() -> Result<()> {
             command_add_to_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::RemoveFromBlacklist(args) => {
-            command_remove_from_blacklist(args, &client, steward_program_id).await
+            // Use global signer - required for this command
+            let signer_path = global_signer.expect("--signer flag is required for this command");
+            // Create the appropriate signer based on the path
+            let cli_signer = if signer_path == "ledger" {
+                CliSigner::new_ledger()
+            } else {
+                CliSigner::new_keypair_from_path(signer_path)?
+            };
+            command_remove_from_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
+        }
+        Commands::AdminMarkForRemoval(command_args) => {
+            command_admin_mark_for_removal(command_args, &client, steward_program_id).await
         }
         Commands::InitDirectedStakeMeta(args) => {
             command_init_directed_stake_meta(args, &client, steward_program_id).await
@@ -234,6 +250,9 @@ async fn main() -> Result<()> {
         }
         Commands::RemoveFromDirectedStakeWhitelist(args) => {
             command_remove_from_directed_stake_whitelist(args, &client, steward_program_id).await
+        }
+        Commands::SyncDirectedStakeLamports(args) => {
+            command_sync_directed_stake_lamports(args, &client, steward_program_id).await
         }
         Commands::CloseDirectedStakeTicket(args) => {
             command_close_directed_stake_ticket(args, &client, steward_program_id).await
@@ -274,10 +293,13 @@ async fn main() -> Result<()> {
         Commands::CrankUpdateStakePool(args) => {
             command_crank_update_stake_pool(args, &client, steward_program_id).await
         }
+        Commands::CrankInstantRemoveValidators(args) => {
+            command_crank_instant_remove_validators(args, &client, steward_program_id).await
+        }
     };
 
     if let Err(e) = result {
-        eprintln!("\n❌ Error: \n\n{:?}\n", e);
+        eprintln!("\n❌ Error: \n\n{e:?}\n");
         std::process::exit(1);
     }
 

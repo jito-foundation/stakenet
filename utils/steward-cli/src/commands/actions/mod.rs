@@ -1,5 +1,6 @@
 pub mod add_to_blacklist;
 pub mod add_to_directed_stake_whitelist;
+pub mod admin_mark_for_removal;
 pub mod auto_add_validator_from_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_directed_stake_meta;
@@ -21,6 +22,7 @@ pub mod reset_validator_lamport_balances;
 pub mod resume;
 pub mod revert_staker;
 pub mod set_staker;
+pub mod sync_directed_stake_lamports;
 pub mod update_authority;
 pub mod update_config;
 pub mod update_directed_stake_ticket;

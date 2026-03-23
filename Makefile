@@ -1,5 +1,5 @@
 # Makefile for Stakenet
-.PHONY: check build build-release idl-build test
+.PHONY: check build build-release build-sbf idl-build test
 
 # Check the project
 check:
@@ -12,6 +12,10 @@ build:
 # Build the project
 build-release:
 	cargo build --release --features idl-build
+
+build-sbf:
+	cargo-build-sbf --manifest-path programs/steward/Cargo.toml
+	cargo-build-sbf --manifest-path programs/validator-history/Cargo.toml
 
 # IDL Build
 idl-build:

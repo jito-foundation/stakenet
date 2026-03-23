@@ -21,7 +21,7 @@ use spl_stake_pool::instruction::{
     cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
 };
 use spl_stake_pool::{
-    find_withdraw_authority_program_address,
+    find_transient_stake_program_address, find_withdraw_authority_program_address,
     instruction::deposit_sol,
     state::{StakeStatus, ValidatorStakeInfo},
     MAX_VALIDATORS_TO_UPDATE,
@@ -146,9 +146,7 @@ pub fn _get_update_stake_pool_ixs(
 
                 if vote_account.epoch_credits.iter().last().is_none() {
                     error!(
-                        "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{:?}\nVote Account\n{:?}\n",
-                        stake_account,
-                        vote_account
+                        "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{stake_account:?}\nVote Account\n{vote_account:?}\n"
                     );
                     false
                 } else {
@@ -290,8 +288,7 @@ async fn _handle_instant_removal_validators(
         for i in 0..all_steward_accounts.validator_list_account.validators.len() as u64 {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for immediate removed validator: {}/{} - {}",
-                    i, num_validators, e
+                    "Error fetching bitmask index for immediate removed validator: {i}/{num_validators} - {e}"
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -299,7 +296,7 @@ async fn _handle_instant_removal_validators(
             }
         }
 
-        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -451,7 +448,7 @@ async fn _handle_adding_validators(
                                 return None;
                             }
                         } else {
-                            info!("Validator {} below liveness minimum", vote_address);
+                            info!("Validator {vote_address} below liveness minimum");
                             return None;
                         }
                     }
@@ -632,8 +629,7 @@ async fn _handle_epoch_maintenance(
         for i in 0..num_validators {
             if validators_to_remove.get(i as usize).map_err(|e| {
                 JitoTransactionError::Custom(format!(
-                    "Error fetching bitmask index for removed validator: {}/{} - {}",
-                    i, num_validators, e
+                    "Error fetching bitmask index for removed validator: {i}/{num_validators} - {e}"
                 ))
             })? {
                 validator_index_to_remove = Some(i);
@@ -641,7 +637,7 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        info!("Validator Index to Remove: {:?}", validator_index_to_remove);
+        info!("Validator Index to Remove: {validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -689,10 +685,7 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        info!(
-            "State Epoch: {} | Current Epoch: {}",
-            state_epoch, current_epoch
-        );
+        info!("State Epoch: {state_epoch} | Current Epoch: {current_epoch}");
     }
 
     Ok(stats)
@@ -870,21 +863,17 @@ async fn _handle_rebalance(
     let directed_stake_meta =
         get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
 
-    let mut ixs_to_run = Vec::new();
-    if reserve_stake_acc
+    let needs_deposit = reserve_stake_acc
         .lamports
-        .lt(&stake_rent.mul(validators_to_run.len() as u64))
-    {
-        let amount: u64 = stake_rent
-            .mul(validators_to_run.len() as u64)
-            .sub(reserve_stake_acc.lamports);
+        .lt(&stake_rent.mul(validators_to_run.len() as u64));
 
+    let deposit_sol_ix = if needs_deposit {
         let acc_token_address = get_associated_token_address(
             &payer.pubkey(),
             &all_steward_accounts.stake_pool_account.pool_mint,
         );
 
-        let instruction = deposit_sol(
+        Some(deposit_sol(
             &spl_stake_pool::id(),
             &all_steward_accounts.stake_pool_address,
             &all_steward_accounts.stake_pool_withdraw_authority,
@@ -895,58 +884,69 @@ async fn _handle_rebalance(
             &acc_token_address,
             &all_steward_accounts.stake_pool_account.pool_mint,
             &spl_token::id(),
-            amount,
-        );
+            stake_rent,
+        ))
+    } else {
+        None
+    };
 
-        ixs_to_run.push(instruction);
-    }
+    let ixs_to_run: Vec<Instruction> = validators_to_run
+        .iter()
+        .flat_map(|validator_info| {
+            let validator_index = validator_info.index;
+            let vote_account = &validator_info.vote_account;
+            let history_account = validator_info.history_account;
 
-    ixs_to_run.extend(validators_to_run.iter().filter_map(|validator_info| {
-        let validator_index = validator_info.index;
-        let vote_account = &validator_info.vote_account;
-        let history_account = validator_info.history_account;
+            let stake_address =
+                get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
-        let stake_address =
-            get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
+            let (transient_stake_address, _) = find_transient_stake_program_address(
+                &spl_stake_pool::id(),
+                vote_account,
+                &all_steward_accounts.stake_pool_address,
+                all_steward_accounts.validator_list_account.validators[validator_index]
+                    .transient_seed_suffix
+                    .into(),
+            );
 
-        let transient_stake_address = get_transient_stake_address(
-            vote_account,
-            &all_steward_accounts.stake_pool_address,
-            &all_steward_accounts.validator_list_account,
-            validator_index,
-        )?;
+            let rebalance_ix = Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::Rebalance {
+                    config: all_steward_accounts.config_address,
+                    state_account: all_steward_accounts.state_address,
+                    validator_history: history_account,
+                    stake_pool_program: spl_stake_pool::id(),
+                    stake_pool: all_steward_accounts.stake_pool_address,
+                    withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
+                    validator_list: all_steward_accounts.validator_list_address,
+                    reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
+                    stake_account: stake_address,
+                    transient_stake_account: transient_stake_address,
+                    vote_account: *vote_account,
+                    system_program: system_program::id(),
+                    stake_program: stake::program::id(),
+                    rent: solana_sdk::sysvar::rent::id(),
+                    clock: solana_sdk::sysvar::clock::id(),
+                    stake_history: solana_sdk::sysvar::stake_history::id(),
+                    stake_config: stake::config::ID,
+                    directed_stake_meta,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::Rebalance {
+                    validator_list_index: validator_index as u64,
+                }
+                .data(),
+            };
 
-        Some(Instruction {
-            program_id: *program_id,
-            accounts: jito_steward::accounts::Rebalance {
-                config: all_steward_accounts.config_address,
-                state_account: all_steward_accounts.state_address,
-                validator_history: history_account,
-                stake_pool_program: spl_stake_pool::id(),
-                stake_pool: all_steward_accounts.stake_pool_address,
-                withdraw_authority: all_steward_accounts.stake_pool_withdraw_authority,
-                validator_list: all_steward_accounts.validator_list_address,
-                reserve_stake: all_steward_accounts.stake_pool_account.reserve_stake,
-                stake_account: stake_address,
-                transient_stake_account: transient_stake_address,
-                vote_account: *vote_account,
-                system_program: system_program::id(),
-                stake_program: stake::program::id(),
-                rent: solana_sdk::sysvar::rent::id(),
-                clock: solana_sdk::sysvar::clock::id(),
-                stake_history: solana_sdk::sysvar::stake_history::id(),
-                stake_config: stake::config::ID,
-                directed_stake_meta,
-            }
-            .to_account_metas(None),
-            data: jito_steward::instruction::Rebalance {
-                validator_list_index: validator_index as u64,
-            }
-            .data(),
+            deposit_sol_ix
+                .iter()
+                .cloned()
+                .chain(std::iter::once(rebalance_ix))
+                .collect::<Vec<Instruction>>()
         })
-    }));
+        .collect();
 
-    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+    let txs_to_run = package_instructions(&ixs_to_run, 2, priority_fee, Some(1_400_000), None);
 
     info!("Submitting {} instructions", ixs_to_run.len());
     info!("Submitting {} transactions", txs_to_run.len());
@@ -1304,18 +1304,18 @@ pub async fn crank_steward(
                 match error {
                     JitoSendTransactionError::ExceededRetries => {
                         // Continue
-                        error!("Exceeded Retries: {:?}", error);
+                        error!("Exceeded Retries: {error:?}");
                     }
                     JitoSendTransactionError::TransactionError(e) => {
                         // Flag
-                        error!("Transaction: {:?}", e);
+                        error!("Transaction: {e:?}");
                     }
                     JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
                         // Recover
                         error!("\n\nERROR: ");
                         e.logs.iter().for_each(|log| {
                             log.iter().enumerate().for_each(|(i, log)| {
-                                error!("{}: {:?}", i, log);
+                                error!("{i}: {log:?}");
                             });
                         });
                     }
