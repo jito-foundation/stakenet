@@ -2,13 +2,17 @@
 //! into their respective [`ValidatorHistory`] accounts.
 //!
 //! This operation queries the Kobe API to determine which validators are registered
-//! BAM clients, then writes a boolean flag (`is_jito_bam_client`) to each validator's
+//! BAM clients, then writes a boolean flag (`is_bam_connected`) to each validator's
 //! on-chain history entry for the current epoch.
 //!
 //! The operation runs at 30%, 60%, and 90% epoch completion to ensure BAM connection
 //! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
 
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+    sync::Arc,
+};
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
@@ -24,7 +28,7 @@ use stakenet_sdk::{
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::{
-    entries::is_jito_bam_client_entry::IsJitoBamClientEntry,
+    entries::is_bam_connected_entry::IsBamConnectedEntry,
     state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
 };
 
@@ -35,7 +39,7 @@ use super::keeper_operations::{check_flag, KeeperOperations};
 /// Constructed from [`KeeperConfig`] and [`KeeperState`], this struct holds all
 /// the context needed to fetch BAM validator data from the Kobe API and submit
 /// on-chain transactions that record each validator's BAM participation status.
-pub struct CopyIsJitoBamClientOperation<'a> {
+pub struct CopyIsBamConnectedOperation<'a> {
     /// RPC Client
     client: Arc<RpcClient>,
 
@@ -64,7 +68,7 @@ pub struct CopyIsJitoBamClientOperation<'a> {
     no_pack: bool,
 }
 
-impl<'a> CopyIsJitoBamClientOperation<'a> {
+impl<'a> CopyIsBamConnectedOperation<'a> {
     /// Creates a new operation from the keeper's config and current state.
     pub fn new(keeper_config: &'a KeeperConfig, keeper_state: &'a KeeperState) -> Self {
         Self {
@@ -82,7 +86,7 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
 
     /// Returns the [`KeeperOperations`] variant for this operation.
     fn operation() -> KeeperOperations {
-        KeeperOperations::CopyIsJitoBamClient
+        KeeperOperations::CopyIsBamConnected
     }
 
     /// Returns `true` when the operation should execute.
@@ -105,8 +109,8 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
         if let Some(validator_history) = validator_history_map.get(vote_account) {
             if let Some(latest_entry) = validator_history.history.last() {
                 return latest_entry.epoch == epoch as u16
-                    && latest_entry.is_jito_bam_client
-                        != ValidatorHistoryEntry::default().is_jito_bam_client;
+                    && latest_entry.is_bam_connected
+                        != ValidatorHistoryEntry::default().is_bam_connected;
             }
         }
         false
@@ -172,21 +176,22 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
             .map_err(|e| JitoTransactionError::Custom(e.to_string()))?
             .bam_validators;
 
+        let bam_vote_accounts: HashSet<Pubkey> = bam_validators
+            .iter()
+            .filter_map(|bam_v| Pubkey::from_str(&bam_v.vote_account).ok())
+            .collect();
+
         let update_instructions = entries_to_update
             .iter()
             .map(|vote_account| {
-                let is_jito_bam_client = bam_validators.iter().any(|bam_v| {
-                    Pubkey::from_str(&bam_v.vote_account)
-                        .map(|pubkey| pubkey == *vote_account)
-                        .unwrap_or(false)
-                });
+                let is_bam_connected = bam_vote_accounts.contains(vote_account);
 
-                IsJitoBamClientEntry::new(
+                IsBamConnectedEntry::new(
                     *vote_account,
                     &self.program_id,
                     &self.keypair.pubkey(),
                     epoch_info.epoch,
-                    is_jito_bam_client,
+                    is_bam_connected,
                 )
                 .update_instruction()
             })

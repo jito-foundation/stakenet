@@ -1,4 +1,4 @@
-//! Entry type for the `CopyIsJitoBamClient` instruction.
+//! Entry type for the `CopyIsBamConnected` instruction.
 //!
 //! Represents a single validator's BAM client status to be written on-chain.
 //! Implements [`UpdateInstruction`] to generate the Anchor instruction that
@@ -12,9 +12,9 @@ use stakenet_sdk::{
 };
 
 /// Holds all data needed to build a `CopyIsJitoBamClient` instruction for one validator.
-pub struct IsJitoBamClientEntry {
-    /// Is Jito BAM Client
-    pub is_jito_bam_client: bool,
+pub struct IsBamConnectedEntry {
+    /// Is BAM Connected
+    pub is_bam_connected: bool,
 
     /// Vote account
     pub vote_account: Pubkey,
@@ -35,7 +35,7 @@ pub struct IsJitoBamClientEntry {
     pub epoch: u64,
 }
 
-impl IsJitoBamClientEntry {
+impl IsBamConnectedEntry {
     /// Creates a new entry, deriving the validator history and config PDAs from
     /// the vote account and program ID.
     pub fn new(
@@ -43,13 +43,13 @@ impl IsJitoBamClientEntry {
         program_id: &Pubkey,
         signer: &Pubkey,
         epoch: u64,
-        is_jito_bam_client: bool,
+        is_bam_connected: bool,
     ) -> Self {
         let address = get_validator_history_address(&vote_account, program_id);
         let config = get_validator_history_config_address(program_id);
 
         Self {
-            is_jito_bam_client,
+            is_bam_connected,
             vote_account,
             address,
             config,
@@ -60,27 +60,28 @@ impl IsJitoBamClientEntry {
     }
 }
 
-impl Address for IsJitoBamClientEntry {
+impl Address for IsBamConnectedEntry {
     fn address(&self) -> Pubkey {
         self.address
     }
 }
 
-impl UpdateInstruction for IsJitoBamClientEntry {
+impl UpdateInstruction for IsBamConnectedEntry {
     /// Builds the `CopyIsJitoBamClient` instruction, converting the boolean
     /// `is_jito_bam_client` flag to a `u8` for the on-chain program.
     fn update_instruction(&self) -> Instruction {
         Instruction {
             program_id: self.program_id,
-            accounts: validator_history::accounts::CopyIsJitoBamClient {
+            accounts: validator_history::accounts::CopyIsBamConnected {
                 config: self.config,
                 validator_history_account: self.address,
                 vote_account: self.vote_account,
                 oracle_authority: self.signer,
             }
             .to_account_metas(None),
-            data: validator_history::instruction::CopyIsJitoBamClient {
-                is_jito_bam_client: self.is_jito_bam_client as u8,
+            data: validator_history::instruction::CopyIsBamConnected {
+                epoch: self.epoch,
+                is_bam_connected: self.is_bam_connected as u8,
             }
             .data(),
         }

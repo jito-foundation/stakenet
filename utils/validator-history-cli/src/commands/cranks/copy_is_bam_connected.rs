@@ -7,7 +7,7 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
-use stakenet_keeper::entries::is_jito_bam_client_entry::IsJitoBamClientEntry;
+use stakenet_keeper::entries::is_bam_connected_entry::IsBamConnectedEntry;
 use stakenet_sdk::{
     models::entries::UpdateInstruction, utils::accounts::get_all_validator_history_accounts,
 };
@@ -61,8 +61,8 @@ pub async fn run(args: CrankCopyIsJitoBamClient, rpc_url: String) -> anyhow::Res
         .filter(|vh| {
             if let Some(latest_entry) = vh.history.last() {
                 !(latest_entry.epoch == epoch_info.epoch as u16
-                    && latest_entry.is_jito_bam_client
-                        != ValidatorHistoryEntry::default().is_jito_bam_client)
+                    && latest_entry.is_bam_connected
+                        != ValidatorHistoryEntry::default().is_bam_connected)
             } else {
                 true
             }
@@ -130,14 +130,14 @@ pub async fn run(args: CrankCopyIsJitoBamClient, rpc_url: String) -> anyhow::Res
     let instructions: Vec<_> = vote_accounts_to_update
         .iter()
         .map(|vote_account| {
-            let is_jito_bam_client = bam_pubkeys.contains(vote_account);
+            let is_bam_connected = bam_pubkeys.contains(vote_account);
 
-            IsJitoBamClientEntry::new(
+            IsBamConnectedEntry::new(
                 *vote_account,
                 &program_id,
                 &keypair.pubkey(),
                 epoch_info.epoch,
-                is_jito_bam_client,
+                is_bam_connected,
             )
             .update_instruction()
         })

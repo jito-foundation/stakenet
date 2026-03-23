@@ -42,7 +42,7 @@ pub enum KeeperOperations {
     BlockMetadataKeeper,
     PriorityFeeCommission,
     DirectedStaking,
-    CopyIsJitoBamClient,
+    CopyIsBamConnected,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -58,7 +58,7 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 13;
+    pub const LEN: usize = 15;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
