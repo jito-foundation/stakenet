@@ -403,6 +403,19 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 ad
 cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 remove-from-blacklist --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-deblacklist 2168
 ```
 
+### Admin Mark For Removal
+
+```bash
+./target/release/steward-cli \
+    --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    admin-mark-for-removal \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --authority-keypair-path ../../credentials/stakenet_test.json \
+    --mark-for-removal \
+    --immediate \
+    --validator-vote-account ""
+```
+
 ## Close Steward
 
 ```bash

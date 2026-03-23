@@ -47,6 +47,7 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            admin_mark_for_removal::command_admin_mark_for_removal,
             close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
@@ -59,6 +60,7 @@ use crate::{
         },
         cranks::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
+            instant_remove_validators::command_crank_instant_remove_validators,
             rebalance_directed::command_crank_rebalance_directed,
         },
         info::{
@@ -219,6 +221,9 @@ async fn main() -> Result<()> {
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
         }
+        Commands::AdminMarkForRemoval(command_args) => {
+            command_admin_mark_for_removal(command_args, &client, steward_program_id).await
+        }
         Commands::InitDirectedStakeMeta(args) => {
             command_init_directed_stake_meta(args, &client, steward_program_id).await
         }
@@ -287,6 +292,9 @@ async fn main() -> Result<()> {
         }
         Commands::CrankUpdateStakePool(args) => {
             command_crank_update_stake_pool(args, &client, steward_program_id).await
+        }
+        Commands::CrankInstantRemoveValidators(args) => {
+            command_crank_instant_remove_validators(args, &client, steward_program_id).await
         }
     };
 

@@ -25,6 +25,7 @@ impl From<CommitmentLevel> for CommitmentConfig {
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        admin_mark_for_removal::AdminMarkForRemoval,
         close_directed_stake_meta::CloseDirectedStakeMeta,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
@@ -36,6 +37,7 @@ use crate::commands::{
     },
     cranks::{
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        instant_remove_validators::CrankInstantRemoveValidators,
         rebalance_directed::CrankRebalanceDirected,
     },
     info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
@@ -364,6 +366,7 @@ pub enum Commands {
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
+    AdminMarkForRemoval(AdminMarkForRemoval),
 
     InitDirectedStakeMeta(InitDirectedStakeMeta),
     ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
@@ -390,6 +393,7 @@ pub enum Commands {
     CrankRebalance(CrankRebalance),
     CrankRebalanceDirected(CrankRebalanceDirected),
     CrankUpdateStakePool(CrankUpdateStakePool),
+    CrankInstantRemoveValidators(CrankInstantRemoveValidators),
 }
 
 // ---------- VIEWS ------------
