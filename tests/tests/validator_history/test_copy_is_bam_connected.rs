@@ -1,7 +1,7 @@
 use anchor_lang::{solana_program::instruction::Instruction, InstructionData, ToAccountMetas};
 use solana_program_test::tokio;
 use solana_sdk::{
-    clock::Clock, compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
+    compute_budget::ComputeBudgetInstruction, signature::Keypair, signer::Signer,
     transaction::Transaction,
 };
 use tests::validator_history_fixtures::TestFixture;
@@ -45,13 +45,7 @@ async fn test_copy_is_bam_connected_success() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let clock: Clock = fixture
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar()
-        .await
-        .expect("Failed getting clock");
+    let clock = fixture.get_clock().await;
 
     let is_bam_connected = 1;
 
@@ -77,13 +71,7 @@ async fn test_copy_is_bam_connected_invalid_oracle_authority_fails() {
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
-    let clock: Clock = fixture
-        .ctx
-        .borrow_mut()
-        .banks_client
-        .get_sysvar()
-        .await
-        .expect("Failed getting clock");
+    let clock = fixture.get_clock().await;
 
     let is_bam_connected = 1;
 

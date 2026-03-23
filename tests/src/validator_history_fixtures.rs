@@ -277,6 +277,15 @@ impl TestFixture {
         self.submit_transaction_assert_success(transaction).await;
     }
 
+    pub async fn get_clock(&self) -> Clock {
+        self.ctx
+            .borrow_mut()
+            .banks_client
+            .get_sysvar()
+            .await
+            .expect("Failed getting clock")
+    }
+
     pub async fn advance_num_epochs(&self, num_epochs: u64) {
         let clock: Clock = self
             .ctx
