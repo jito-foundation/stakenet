@@ -16,7 +16,7 @@ use stakenet_keeper::{
     operations::{
         self,
         block_metadata::db::create_sqlite_tables,
-        copy_is_jito_bam_client::CopyIsJitoBamClientOperation,
+        copy_is_jito_bam_connected::CopyIsJitoBamClientOperation,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{

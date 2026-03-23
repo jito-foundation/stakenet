@@ -1,6 +1,6 @@
 pub mod block_metadata;
 pub mod cluster_history;
-pub mod copy_is_jito_bam_client;
+pub mod copy_is_jito_bam_connected;
 pub mod gossip_upload;
 pub mod keeper_operations;
 pub mod metrics_emit;

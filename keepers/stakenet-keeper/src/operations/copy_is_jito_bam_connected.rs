@@ -5,8 +5,8 @@
 //! BAM clients, then writes a boolean flag (`is_jito_bam_client`) to each validator's
 //! on-chain history entry for the current epoch.
 //!
-//! The operation runs at 90%, 95%, and 99% epoch completion to ensure BAM participation
-//! data is captured, with retries in case earlier attempts fail.
+//! The operation runs at 30%, 60%, and 90% epoch completion to ensure BAM connection
+//! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
@@ -87,12 +87,12 @@ impl<'a> CopyIsJitoBamClientOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs up to 3 times per epoch at 90%, 95%, and 99% slot completion.
-    /// Retries ensure data is written even if earlier attempts fail.
+    /// Runs up to 3 times per epoch at 30%, 60%, and 90% slot completion.
+    /// Spaced out to avoid missing all runs if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
-        (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 95 / 100 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 99 / 100 && runs_for_epoch < 3)
+        (epoch_info.slot_index > epoch_info.slots_in_epoch * 30 / 100 && runs_for_epoch < 1)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 60 / 100 && runs_for_epoch < 2)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 3)
     }
 
     /// Checks whether the `is_jito_bam_client` field has already been written
