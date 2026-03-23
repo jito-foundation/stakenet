@@ -42,6 +42,7 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
+        actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
@@ -86,6 +87,7 @@ enum Commands {
     StakeByCountry(StakeByCountry),
     GetConfig,
     UpdateOracleAuthority(UpdateOracleAuthority),
+    SetNewTipDistributionProgram(SetNewTipDistributionProgram),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
 
@@ -1307,6 +1309,9 @@ async fn main() -> anyhow::Result<()> {
         Commands::History(args) => command_history(args, client),
         Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
         Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
+        Commands::SetNewTipDistributionProgram(args) => {
+            commands::actions::set_new_tip_distribution_program::run(args, client)
+        }
         Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
         Commands::GetConfig => command_get_config(client),
         Commands::DunePriorityFeeBackfill(args) => {
