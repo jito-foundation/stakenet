@@ -42,8 +42,8 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
-        actions::update_stake_history::UpdateStakeHistory,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
+        actions::update_stake_history::UpdateStakeHistory,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
