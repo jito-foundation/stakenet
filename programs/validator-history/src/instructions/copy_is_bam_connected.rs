@@ -1,12 +1,11 @@
-use anchor_lang::{
-    prelude::*,
-    solana_program::{clock::Clock, vote},
-};
+use anchor_lang::{prelude::*, solana_program::vote};
 
 use crate::{errors::ValidatorHistoryError, state::ValidatorHistory, utils::cast_epoch, Config};
 
+/// Records whether a validator is connected to BAM for a given epoch.
+/// Only callable by the oracle authority.
 #[derive(Accounts)]
-pub struct CopyIsJitoBamClient<'info> {
+pub struct CopyIsBamConnected<'info> {
     #[account(
         seeds = [Config::SEED],
         bump = config.bump,
@@ -29,20 +28,22 @@ pub struct CopyIsJitoBamClient<'info> {
     pub oracle_authority: Signer<'info>,
 }
 
-pub fn handle_copy_is_jito_bam_client(
-    ctx: Context<CopyIsJitoBamClient>,
-    is_jito_bam_client: u8,
+/// Sets the BAM connection status for a validator at the specified epoch.
+/// Accepts only `0` (not connected) or `1` (connected); any other value is rejected.
+pub fn handle_copy_is_bam_connected(
+    ctx: Context<CopyIsBamConnected>,
+    epoch: u64,
+    is_bam_connected: u8,
 ) -> Result<()> {
     require!(
-        is_jito_bam_client == 0 || is_jito_bam_client == 1,
+        is_bam_connected == 0 || is_bam_connected == 1,
         ValidatorHistoryError::InvalidBamClientValue
     );
 
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
-    let clock = Clock::get()?;
-    let epoch = cast_epoch(clock.epoch)?;
+    let epoch = cast_epoch(epoch)?;
 
-    validator_history_account.set_is_jito_bam_client(epoch, is_jito_bam_client)?;
+    validator_history_account.set_is_bam_connected(epoch, is_bam_connected)?;
 
     Ok(())
 }

@@ -7,15 +7,20 @@ use solana_sdk::{
 use tests::validator_history_fixtures::TestFixture;
 use validator_history::ValidatorHistory;
 
-fn create_copy_is_bam_client_transaction(
+fn create_copy_is_bam_connected_transaction(
     fixture: &TestFixture,
     oracle_authority: &Keypair,
-    is_jito_bam_client: u8,
+    epoch: u64,
+    is_bam_connected: u8,
 ) -> Transaction {
     let instruction = Instruction {
         program_id: validator_history::id(),
-        data: validator_history::instruction::CopyIsJitoBamClient { is_jito_bam_client }.data(),
-        accounts: validator_history::accounts::CopyIsJitoBamClient {
+        data: validator_history::instruction::CopyIsBamConnected {
+            epoch,
+            is_bam_connected,
+        }
+        .data(),
+        accounts: validator_history::accounts::CopyIsBamConnected {
             config: fixture.validator_history_config,
             validator_history_account: fixture.validator_history_account,
             vote_account: fixture.vote_account,
@@ -35,40 +40,50 @@ fn create_copy_is_bam_client_transaction(
 }
 
 #[tokio::test]
-async fn test_copy_is_bam_client_success() {
+async fn test_copy_is_bam_connected_success() {
     // Initialize
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
+    let clock = fixture.get_clock().await;
 
-    let is_bam_client = 1;
+    let is_bam_connected = 1;
 
     // Submit instruction
-    let transaction =
-        create_copy_is_bam_client_transaction(&fixture, &fixture.keypair, is_bam_client);
+    let transaction = create_copy_is_bam_connected_transaction(
+        &fixture,
+        &fixture.keypair,
+        clock.epoch,
+        is_bam_connected,
+    );
 
     fixture.submit_transaction_assert_success(transaction).await;
 
     let account: ValidatorHistory = fixture
         .load_and_deserialize(&fixture.validator_history_account)
         .await;
-    assert_eq!(account.history.arr[0].is_jito_bam_client, is_bam_client);
+    assert_eq!(account.history.arr[0].is_bam_connected, is_bam_connected);
 }
 
 #[tokio::test]
-async fn test_copy_is_bam_client_invalid_oracle_authority_fails() {
+async fn test_copy_is_bam_connected_invalid_oracle_authority_fails() {
     // Initialize
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
+    let clock = fixture.get_clock().await;
 
-    let is_bam_client = 1;
+    let is_bam_connected = 1;
 
     let invalid_oracle_authority = Keypair::new();
 
     // Submit instruction
-    let transaction =
-        create_copy_is_bam_client_transaction(&fixture, &invalid_oracle_authority, is_bam_client);
+    let transaction = create_copy_is_bam_connected_transaction(
+        &fixture,
+        &invalid_oracle_authority,
+        clock.epoch,
+        is_bam_connected,
+    );
 
     fixture
         .submit_transaction_assert_error(transaction, "ConstraintHasOne")

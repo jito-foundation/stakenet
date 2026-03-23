@@ -5335,10 +5335,10 @@
             }
           },
           {
-            "name": "is_jito_bam_client",
+            "name": "is_bam_connected",
             "docs": [
-              "Whether this validator is running the Jito BAM client.",
-              "1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown."
+              "Whether this validator is connected to BAM",
+              "1 = connected, 0 = not connected, u8::MAX = unset/unknown."
             ],
             "type": "u8"
           },
