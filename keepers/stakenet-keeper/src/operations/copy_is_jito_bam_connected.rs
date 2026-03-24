@@ -134,7 +134,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                     for message in stats.results.iter() {
                         if let Err(e) = message {
                             datapoint_error!(
-                                "is-jito-bam-client-error",
+                                "is-bam-connected-error",
                                 ("error", e.to_string(), String),
                             );
                             errors_for_epoch += 1;
@@ -162,10 +162,30 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
         let validator_history_map = &self.keeper_state.validator_history_map;
-        let entries_to_update: Vec<Pubkey> = validator_history_map
+        let candidates: Vec<Pubkey> = validator_history_map
             .keys()
             .filter(|entry| !Self::is_uploaded(validator_history_map, entry, epoch_info.epoch))
             .copied()
+            .collect();
+
+        // Filter out closed/reassigned vote accounts
+        let mut live_vote_accounts: HashSet<Pubkey> = HashSet::new();
+        for chunk in candidates.chunks(100) {
+            let accounts = self
+                .client
+                .get_multiple_accounts(chunk)
+                .await
+                .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
+            for (pubkey, account) in chunk.iter().zip(accounts.iter()) {
+                if account.is_some() {
+                    live_vote_accounts.insert(*pubkey);
+                }
+            }
+        }
+
+        let entries_to_update: Vec<Pubkey> = candidates
+            .into_iter()
+            .filter(|pubkey| live_vote_accounts.contains(pubkey))
             .collect();
 
         let bam_validators = self
