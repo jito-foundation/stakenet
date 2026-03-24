@@ -44,7 +44,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     let epoch = args.epoch.unwrap_or(epoch_info.epoch);
     let program_id = validator_history::id();
 
-    println!("Target epoch: {}", epoch);
+    println!("Target epoch: {epoch}");
 
     // Fetch validator history accounts
     let validator_histories = get_all_validator_history_accounts(&client, program_id).await?;
