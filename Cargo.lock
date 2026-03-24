@@ -11058,7 +11058,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "stakenet-keeper"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "bincode",
@@ -12155,7 +12155,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "validator-history"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anchor-lang",
  "bincode",
@@ -12185,8 +12185,10 @@ dependencies = [
  "clap 4.5.51",
  "dotenvy",
  "env_logger 0.10.2",
+ "futures-util",
  "ipinfo",
  "jito-tip-distribution-sdk",
+ "kobe-client",
  "log",
  "rusqlite",
  "serde",
