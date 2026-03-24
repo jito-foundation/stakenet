@@ -12,6 +12,7 @@ bytemuck = { workspace = true }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 dotenvy = { workspace = true }
 env_logger = "0.10.0"
+futures-util = "0.3"
 ipinfo = { workspace = true }
 jito-tip-distribution-sdk = { workspace = true }
 kobe-client = { workspace = true }

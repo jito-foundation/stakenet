@@ -4,7 +4,7 @@ This CLI tool provides various commands to interact with the validator history p
 
 ### Commands
 
-#### Crank Copy Is Jito BAM Client
+#### Crank Copy Is BAM Connected
 
 Copies the Jito BAM client status for each validator into their validator history accounts on-chain.
 
@@ -15,14 +15,15 @@ make build-release
 # Run
 ./target/release/validator-history-cli \
   --json-rpc-url <JSON_RPC_URL> \
-  crank-copy-is-jito-bam-client \
+  crank-copy-is-bam-connected \
   --keypair-path ~/.config/solana/id.json \
-  --kobe-api-base-url "https://kobe.testnet.jito.network"
+  --kobe-api-base-url "https://kobe.testnet.jito.network" \
+  --epoch 931
 ```
 
 ##### Description
 
-This command fetches all validator history accounts, determines which ones have not yet had their `is_jito_bam_client` field set for the current epoch, queries the Kobe API to identify BAM-participating validators, and submits on-chain transactions to record each validator's BAM status.
+This command fetches all validator history accounts, determines which ones have not yet had their `is_bam_connected` field set for the current epoch, queries the Kobe API to identify BAM-participating validators, and submits on-chain transactions to record each validator's BAM status.
 
 Vote accounts that no longer exist on-chain are automatically filtered out to avoid `ConstraintOwner` errors.
 
