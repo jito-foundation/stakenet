@@ -41,7 +41,7 @@ pub struct UpdateParametersArgs {
     pub minimum_voting_epochs: Option<u64>,
     pub compute_score_epoch_progress: Option<f64>,
 
-    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// Minimum number of epochs a validator must have been connected to BAM
     /// within the window to qualify for delegation. `None` means do not update the current value.
     pub jito_bam_minimum_epochs: Option<u8>,
 
