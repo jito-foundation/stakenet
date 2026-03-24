@@ -55,8 +55,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
         .filter(|vh| {
             !vh.history.arr.iter().any(|entry| {
                 entry.epoch == epoch as u16
-                    && entry.is_bam_connected
-                        != ValidatorHistoryEntry::default().is_bam_connected
+                    && entry.is_bam_connected != ValidatorHistoryEntry::default().is_bam_connected
             })
         })
         .map(|vh| vh.vote_account)
@@ -138,7 +137,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     // Batch instructions into transactions (multiple ixs per tx)
     let recent_blockhash = client.get_latest_blockhash().await?;
     let txs: Vec<Transaction> = instructions
-        .chunks(5)
+        .chunks(1)
         .map(|ix_batch| {
             Transaction::new_signed_with_payer(
                 ix_batch,
