@@ -122,6 +122,7 @@ async fn _epoch_maintenance_setup() -> (
                 undirected_stake_ceiling_lamports: Some(1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(10),
+                jito_bam_window_epochs: Some(10),
             }),
             None,
         )

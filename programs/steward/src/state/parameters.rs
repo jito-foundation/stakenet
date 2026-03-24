@@ -41,9 +41,14 @@ pub struct UpdateParametersArgs {
     pub minimum_voting_epochs: Option<u64>,
     pub compute_score_epoch_progress: Option<f64>,
 
-    /// Minimum number of consecutive epochs a validator must have been a Jito BAM client
-    /// to qualify for delegation. `None` means do not update the current value.
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation. `None` means do not update the current value.
     pub jito_bam_minimum_epochs: Option<u8>,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
+    /// out of the last `jito_bam_window_epochs` epochs. `None` means do not update the current value.
+    pub jito_bam_window_epochs: Option<u8>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -254,12 +259,16 @@ pub struct Parameters {
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
-    /// Minimum number of consecutive epochs a validator must have been a Jito BAM client
-    /// to qualify for delegation. Validators must run BAM continuously for at least this
-    /// many epochs before becoming eligible.
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation.
     pub jito_bam_minimum_epochs: u8,
 
-    pub _padding_0: [u8; 5],
+    /// Window size (in epochs) over which to check BAM connectivity.
+    /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
+    /// out of the last `jito_bam_window_epochs` epochs.
+    pub jito_bam_window_epochs: u8,
+
+    pub _padding_0: [u8; 4],
 
     pub _padding_1: [u64; 28],
     /// The minimum epoch progress for computing scores
@@ -314,6 +323,7 @@ impl Parameters {
             compute_score_epoch_progress,
             undirected_stake_ceiling_lamports,
             jito_bam_minimum_epochs,
+            jito_bam_window_epochs,
         } = *args;
 
         let mut new_parameters = self;
@@ -410,6 +420,10 @@ impl Parameters {
 
         if let Some(jito_bam_minimum_epochs) = jito_bam_minimum_epochs {
             new_parameters.jito_bam_minimum_epochs = jito_bam_minimum_epochs;
+        }
+
+        if let Some(jito_bam_window_epochs) = jito_bam_window_epochs {
+            new_parameters.jito_bam_window_epochs = jito_bam_window_epochs;
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -557,6 +571,10 @@ impl Parameters {
         }
 
         if self.directed_stake_unstake_cap_bps > BASIS_POINTS_MAX {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.jito_bam_minimum_epochs > self.jito_bam_window_epochs {
             return Err(StewardError::InvalidParameterValue.into());
         }
 

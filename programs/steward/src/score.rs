@@ -15,8 +15,11 @@ use crate::{
         VOTE_CREDITS_RATIO_MAX,
     },
     errors::StewardError::{self, ArithmeticError},
+    score::running_bam::calculate_running_bam_score,
     Config,
 };
+
+pub mod running_bam;
 
 /// Components of a validator score, organized by priority tiers.
 ///
@@ -233,9 +236,9 @@ pub struct ScoreComponentsV5 {
     /// If delinquency is not > threshold in any epoch, score is 1, else 0
     pub delinquency_score: u8,
 
-    /// Score is 1 if the validator has been a Jito BAM client for all of the last
-    /// `jito_bam_minimum_epochs` epochs, otherwise 0.
-    pub running_jito_bam_score: u8,
+    /// Score is 1 if the validator has been connected to BAM for at least
+    /// `jito_bam_minimum_epochs` out of the last `jito_bam_window_epochs` epochs, otherwise 0.
+    pub running_bam_score: u8,
 
     /// If max commission in commission_range epochs is less than commission_threshold, score is 1, else 0
     pub commission_score: u8,
@@ -399,14 +402,15 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
-    let is_jito_bam_client_window = validator.history.is_jito_bam_client_range(
+    let is_bam_connected_window = validator.history.is_bam_connected_range(
         current_epoch
-            .checked_sub(params.jito_bam_minimum_epochs as u16)
+            .checked_sub(params.jito_bam_window_epochs as u16)
             .ok_or(ArithmeticError)?,
         current_epoch,
     );
 
-    let running_jito_bam_score = calculate_running_jito_bam_score(&is_jito_bam_client_window);
+    let running_bam_score =
+        calculate_running_bam_score(&is_bam_connected_window, params.jito_bam_minimum_epochs);
 
     /////// Apply binary filters to raw score ///////
     // Binary filters are 0 or 1, multiply them with the raw_score
@@ -417,7 +421,7 @@ pub fn validator_score(
         * blacklisted_score as u64
         * superminority_score as u64
         * delinquency_score as u64
-        * running_jito_bam_score as u64
+        * running_bam_score as u64
         * merkle_root_upload_authority_score as u64
         * priority_fee_commission_score as u64
         * priority_fee_merkle_root_upload_authority_score as u64;
@@ -433,7 +437,7 @@ pub fn validator_score(
         blacklisted_score,
         superminority_score,
         delinquency_score,
-        running_jito_bam_score,
+        running_bam_score,
         commission_score,
         historical_commission_score,
         merkle_root_upload_authority_score,
@@ -485,19 +489,6 @@ pub fn calculate_max_mev_commission(
         max_mev_commission,
         max_mev_commission_epoch,
     ))
-}
-
-/// Returns 1 if the validator has been a Jito BAM client for every epoch in the window,
-/// otherwise returns 0. The window size is determined by `jito_bam_minimum_epochs`.
-pub fn calculate_running_jito_bam_score(is_jito_bam_client_window: &[Option<u8>]) -> u8 {
-    if is_jito_bam_client_window
-        .iter()
-        .all(|entry| matches!(entry, Some(1)))
-    {
-        1
-    } else {
-        0
-    }
 }
 
 /// Calculates the vote credits ratio and delinquency score for the validator

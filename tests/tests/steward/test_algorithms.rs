@@ -396,8 +396,8 @@ fn test_compute_score() {
     // running jito bam client score
     let mut validator = good_validator;
     for i in 10..=20 {
-        validator.history.arr_mut()[i].is_jito_bam_client =
-            ValidatorHistoryEntry::default().is_jito_bam_client;
+        validator.history.arr_mut()[i].is_bam_connected =
+            ValidatorHistoryEntry::default().is_bam_connected;
     }
     let components = validator_score(
         &validator,

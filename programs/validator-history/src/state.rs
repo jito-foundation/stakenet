@@ -652,8 +652,8 @@ impl CircBuf {
         )
     }
 
-    pub fn is_jito_bam_client_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u8>> {
-        field_range!(self, start_epoch, end_epoch, is_jito_bam_client, u8)
+    pub fn is_bam_connected_range(&self, start_epoch: u16, end_epoch: u16) -> Vec<Option<u8>> {
+        field_range!(self, start_epoch, end_epoch, is_bam_connected, u8)
     }
 }
 

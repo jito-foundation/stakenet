@@ -3958,9 +3958,17 @@
           {
             "name": "jito_bam_minimum_epochs",
             "docs": [
-              "Minimum number of consecutive epochs a validator must have been a Jito BAM client",
-              "to qualify for delegation. Validators must run BAM continuously for at least this",
-              "many epochs before becoming eligible."
+              "Minimum number of epochs a validator must have been a Jito BAM client",
+              "within the window to qualify for delegation."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "jito_bam_window_epochs",
+            "docs": [
+              "Window size (in epochs) over which to check BAM connectivity.",
+              "Validators must be BAM connected for at least `jito_bam_minimum_epochs`",
+              "out of the last `jito_bam_window_epochs` epochs."
             ],
             "type": "u8"
           },
@@ -3969,7 +3977,7 @@
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -4230,8 +4238,8 @@
           {
             "name": "running_jito_bam_score",
             "docs": [
-              "Score is 1 if the validator has been a Jito BAM client for all of the last",
-              "`jito_bam_minimum_epochs` epochs, otherwise 0."
+              "Score is 1 if the validator has been a Jito BAM client for at least",
+              "`jito_bam_minimum_epochs` out of the last `jito_bam_window_epochs` epochs, otherwise 0."
             ],
             "type": "u8"
           },
@@ -5110,6 +5118,18 @@
             "name": "undirected_stake_ceiling_lamports",
             "type": {
               "option": "u64"
+            }
+          },
+          {
+            "name": "jito_bam_minimum_epochs",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "jito_bam_window_epochs",
+            "type": {
+              "option": "u8"
             }
           }
         ]
