@@ -37,4 +37,4 @@ spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 static_assertions = "1.1.0"
 thiserror = "1.0.37"
 type-layout = "0.2"
-validator-history = { features = ["no-entrypoint"], path = "../validator-history" }
+validator-history.workspace = true

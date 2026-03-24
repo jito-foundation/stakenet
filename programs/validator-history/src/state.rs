@@ -190,9 +190,9 @@ pub struct ValidatorHistoryEntry {
     /// The enum mapping of the Validator's Tip Distribution Account's merkle root upload authority
     pub priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority,
 
-    /// Whether this validator is running the Jito BAM client.
-    /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
-    pub is_jito_bam_client: u8,
+    /// Whether this validator is connected to BAM
+    /// 1 = connected, 0 = not connected, u8::MAX = unset/unknown.
+    pub is_bam_connected: u8,
 
     pub padding1: [u8; 46],
 }
@@ -227,7 +227,7 @@ impl Default for ValidatorHistoryEntry {
             padding0: [u8::MAX; 2],
             block_data_updated_at_slot: u64::MAX,
             priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
-            is_jito_bam_client: u8::MAX,
+            is_bam_connected: u8::MAX,
             padding1: [u8::MAX; 46],
         }
     }
@@ -1273,19 +1273,19 @@ impl ValidatorHistory {
         Ok(())
     }
 
-    /// Sets whether the validator is running the Jito BAM client for the given epoch.
-    /// 1 = running BAM client, 0 = not running BAM client, u8::MAX = unset/unknown.
-    pub fn set_is_jito_bam_client(&mut self, epoch: u16, is_jito_bam_client: u8) -> Result<()> {
+    /// Sets whether the validator is connected to BAM for the given epoch.
+    /// 1 = connected, 0 = not connected, u8::MAX = unset/unknown.
+    pub fn set_is_bam_connected(&mut self, epoch: u16, is_bam_connected: u8) -> Result<()> {
         if let Some(entry) = self.history.last_mut() {
             match entry.epoch.cmp(&epoch) {
                 Ordering::Equal => {
-                    entry.is_jito_bam_client = is_jito_bam_client;
+                    entry.is_bam_connected = is_bam_connected;
                     return Ok(());
                 }
                 Ordering::Greater => {
                     for entry in self.history.arr_mut().iter_mut() {
                         if entry.epoch == epoch {
-                            entry.is_jito_bam_client = is_jito_bam_client;
+                            entry.is_bam_connected = is_bam_connected;
                             return Ok(());
                         }
                     }
@@ -1296,7 +1296,7 @@ impl ValidatorHistory {
         }
         let entry = ValidatorHistoryEntry {
             epoch,
-            is_jito_bam_client,
+            is_bam_connected,
             ..ValidatorHistoryEntry::default()
         };
         self.history.push(entry);
