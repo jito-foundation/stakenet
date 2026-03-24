@@ -536,7 +536,7 @@ mod validator_score_integration_tests {
         let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
 
         // All epochs connected, so BAM filter should pass
-        assert_eq!(result.running_jito_bam_score, 1);
+        assert_eq!(result.running_bam_score, 1);
         assert!(result.score > 0);
     }
 
@@ -571,7 +571,7 @@ mod validator_score_integration_tests {
         let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
 
         // 7 of 11 epochs connected — exactly meets threshold
-        assert_eq!(result.running_jito_bam_score, 1);
+        assert_eq!(result.running_bam_score, 1);
         assert!(result.score > 0);
     }
 
@@ -606,7 +606,7 @@ mod validator_score_integration_tests {
         let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
 
         // Only 6 of 11 epochs connected — below threshold of 7
-        assert_eq!(result.running_jito_bam_score, 0);
+        assert_eq!(result.running_bam_score, 0);
         assert_eq!(result.score, 0);
         assert!(result.raw_score > 0);
     }
@@ -638,7 +638,7 @@ mod validator_score_integration_tests {
         let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
 
         // No epochs connected — fails BAM filter
-        assert_eq!(result.running_jito_bam_score, 0);
+        assert_eq!(result.running_bam_score, 0);
         assert_eq!(result.score, 0);
         assert!(result.raw_score > 0);
     }
