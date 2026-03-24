@@ -38,4 +38,7 @@ pub enum ValidatorHistoryError {
     PriorityFeeDistributionAccountAlreadyCopied,
     #[msg("Priority Fee Distribution Account cannot be copied during its own epoch")]
     PriorityFeeDistributionAccountNotFinalized,
+
+    #[msg("Invalid BAM client value, must be 0 or 1")]
+    InvalidBamClientValue,
 }

@@ -5335,11 +5335,19 @@
             }
           },
           {
+            "name": "is_bam_connected",
+            "docs": [
+              "Whether this validator is connected to BAM",
+              "1 = connected, 0 = not connected, u8::MAX = unset/unknown."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                47
+                46
               ]
             }
           }
