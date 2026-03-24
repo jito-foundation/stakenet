@@ -2,7 +2,7 @@
   "address": "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa",
   "metadata": {
     "name": "validator_history",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "spec": "0.1.0",
     "description": "Program for tracking validator metrics on chain"
   },
@@ -105,6 +105,45 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "copy_is_bam_connected",
+      "discriminator": [
+        214,
+        208,
+        197,
+        190,
+        161,
+        113,
+        245,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "oracle_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "is_bam_connected",
+          "type": "u8"
+        }
+      ]
     },
     {
       "name": "copy_priority_fee_distribution",
@@ -806,6 +845,11 @@
       "code": 6015,
       "name": "PriorityFeeDistributionAccountNotFinalized",
       "msg": "Priority Fee Distribution Account cannot be copied during its own epoch"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidBamClientValue",
+      "msg": "Invalid BAM client value, must be 0 or 1"
     }
   ],
   "types": [
@@ -1278,11 +1322,19 @@
             }
           },
           {
+            "name": "is_bam_connected",
+            "docs": [
+              "Whether this validator is connected to BAM",
+              "1 = connected, 0 = not connected, u8::MAX = unset/unknown."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                47
+                46
               ]
             }
           }
