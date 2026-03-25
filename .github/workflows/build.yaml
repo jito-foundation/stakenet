@@ -23,7 +23,7 @@ jobs:
         with:
           crate: cargo-audit
           version: "0.22.0"
-      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2024-0421 --ignore RUSTSEC-2025-0022 --ignore RUSTSEC-2025-0009 --ignore RUSTSEC-2025-0004 --ignore RUSTSEC-2024-0357 --ignore RUSTSEC-2024-0336 --ignore RUSTSEC-2025-0055
+      - run: cargo audit --ignore RUSTSEC-2022-0093 --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2024-0421 --ignore RUSTSEC-2025-0022 --ignore RUSTSEC-2025-0009 --ignore RUSTSEC-2025-0004 --ignore RUSTSEC-2024-0357 --ignore RUSTSEC-2024-0336 --ignore RUSTSEC-2025-0055 --ignore RUSTSEC-2026-0049
 
   lint:
     name: lint
@@ -176,11 +176,16 @@ jobs:
       - name: cargo unit tests
         run: cargo test --package stakenet-sdk --package jito-steward --package validator-history-vote-state --all-features --color auto
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: cargo integration tests
-        run: RUST_MIN_STACK=20000000 cargo test --package tests --all-features --color auto
+        run: RUST_MIN_STACK=20000000 cargo nextest run --package tests --all-features --color auto
         shell: bash
         env:
-          RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
           RUST_MIN_STACK: 20000000
           RUSTFLAGS: --cfg anchor_debug
