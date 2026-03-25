@@ -16,6 +16,7 @@ use stakenet_keeper::{
     operations::{
         self,
         block_metadata::db::create_sqlite_tables,
+        copy_is_jito_bam_connected::CopyIsBamConnectedOperation,
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
@@ -63,6 +64,9 @@ fn set_run_flags(args: &Args) -> u32 {
     }
     if args.run_directed_staking {
         run_flags = set_flag(run_flags, KeeperOperations::DirectedStaking);
+    }
+    if args.run_copy_is_bam_connected {
+        run_flags = set_flag(run_flags, KeeperOperations::CopyIsBamConnected);
     }
 
     run_flags
@@ -249,6 +253,11 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
             );
+
+            info!("Copying is jito bam client...");
+            let copy_is_bam_connected_op =
+                CopyIsBamConnectedOperation::new(&keeper_config, &keeper_state);
+            keeper_state.set_runs_errors_and_txs_for_epoch(copy_is_bam_connected_op.fire().await);
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
                 random_cooldown(keeper_config.cool_down_range).await;
