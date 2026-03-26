@@ -8,11 +8,7 @@
 //! The operation runs at 30%, 60%, and 90% epoch completion to ensure BAM connection
 //! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
 
-use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
@@ -25,7 +21,6 @@ use stakenet_sdk::{
     models::{entries::UpdateInstruction, errors::JitoTransactionError, submit_stats::SubmitStats},
     utils::transactions::submit_instructions,
 };
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
 use crate::{
     entries::is_bam_connected_entry::IsBamConnectedEntry,
@@ -97,23 +92,6 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
         (epoch_info.slot_index > epoch_info.slots_in_epoch * 30 / 100 && runs_for_epoch < 1)
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 60 / 100 && runs_for_epoch < 2)
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 3)
-    }
-
-    /// Checks whether the `is_jito_bam_client` field has already been written
-    /// for the given vote account in the specified epoch.
-    fn is_uploaded(
-        validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
-        vote_account: &Pubkey,
-        epoch: u64,
-    ) -> bool {
-        if let Some(validator_history) = validator_history_map.get(vote_account) {
-            if let Some(latest_entry) = validator_history.history.last() {
-                return latest_entry.epoch == epoch as u16
-                    && latest_entry.is_bam_connected
-                        != ValidatorHistoryEntry::default().is_bam_connected;
-            }
-        }
-        false
     }
 
     /// Entry point for the operation. Checks whether the operation should run,
