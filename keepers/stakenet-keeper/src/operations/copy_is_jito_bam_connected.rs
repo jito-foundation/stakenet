@@ -162,11 +162,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
         let validator_history_map = &self.keeper_state.validator_history_map;
-        let candidates: Vec<Pubkey> = validator_history_map
-            .keys()
-            .filter(|entry| !Self::is_uploaded(validator_history_map, entry, epoch_info.epoch))
-            .copied()
-            .collect();
+        let candidates: Vec<Pubkey> = validator_history_map.keys().copied().collect();
 
         // Filter out closed/reassigned vote accounts
         let mut live_vote_accounts: HashSet<Pubkey> = HashSet::new();
