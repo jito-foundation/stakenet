@@ -112,7 +112,10 @@ impl DirectedRebalanceProgressionInfo {
             .validator_list_account
             .validators
             .iter()
-            .take(all_steward_accounts.state_account.state.num_pool_validators as usize)
+            .take(
+                all_steward_accounts.state_account.state.num_pool_validators as usize
+                    + all_steward_accounts.state_account.state.validators_added as usize,
+            )
             .enumerate()
             .map(|(idx, v)| (v.vote_account_address, idx))
             .collect();

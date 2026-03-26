@@ -66,6 +66,16 @@ pub async fn command_crank_rebalance_directed(
 
     let ixs_to_run: Vec<Instruction> = validators_to_run
         .iter()
+        .filter(|validator_info| {
+            if validator_info.validator_list_index == usize::MAX {
+                println!(
+                    "Skipping validator {} — not found in validator list",
+                    validator_info.vote_account
+                );
+                return false;
+            }
+            true
+        })
         .map(|validator_info| {
             let validator_index = validator_info.validator_list_index;
             let vote_account = &validator_info.vote_account;
