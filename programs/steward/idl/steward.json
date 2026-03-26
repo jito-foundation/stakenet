@@ -2,7 +2,7 @@
   "address": "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8",
   "metadata": {
     "name": "steward",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "spec": "0.1.0",
     "description": "Program for permissionlessly managing an SPL Stake Pool"
   },

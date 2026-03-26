@@ -1,6 +1,6 @@
 [package]
 name = "jito-steward"
-version = "0.1.0"
+version = "0.2.0"
 description = "Program for permissionlessly managing an SPL Stake Pool"
 edition = "2021"
 license = "Apache-2.0"

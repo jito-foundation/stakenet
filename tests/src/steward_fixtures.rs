@@ -382,8 +382,8 @@ impl TestFixture {
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_ceiling_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
-            jito_bam_minimum_epochs: Some(10),
-            jito_bam_window_epochs: Some(10),
+            jito_bam_minimum_epochs: Some(0),
+            jito_bam_window_epochs: Some(0),
         });
 
         let update_priority_fee_parameters_args =
