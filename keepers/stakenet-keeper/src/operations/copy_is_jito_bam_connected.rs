@@ -1,5 +1,5 @@
 //! Copies the Jito BAM client status for each validator
-//! into their respective [`ValidatorHistory`] accounts.
+//! into their respective ValidatorHistory accounts.
 //!
 //! This operation queries the Kobe API to determine which validators are registered
 //! BAM clients, then writes a boolean flag (`is_bam_connected`) to each validator's
@@ -136,7 +136,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Fetches BAM validator data from the Kobe API, determines each validator's
     /// BAM client status, and submits `CopyIsJitoBamClient` instructions on-chain
-    /// for all validators that haven't been updated this epoch.
+    /// for all validators
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
         let validator_history_map = &self.keeper_state.validator_history_map;
