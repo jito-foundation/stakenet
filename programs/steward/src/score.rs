@@ -402,11 +402,14 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
+    // Exclude the current epoch from the BAM window so the cranker has time
+    // to upload BAM eligibility for this epoch (it's a permissioned field).
+    let bam_window_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
     let is_bam_connected_window = validator.history.is_bam_connected_range(
-        current_epoch
+        bam_window_end
             .checked_sub(params.jito_bam_window_epochs as u16)
             .ok_or(ArithmeticError)?,
-        current_epoch,
+        bam_window_end,
     );
 
     let running_bam_score =
