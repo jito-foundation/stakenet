@@ -46,8 +46,11 @@ pub struct UpdateParametersArgs {
     pub jito_bam_minimum_epochs: Option<u8>,
 
     /// Window size (in epochs) over which to check BAM connectivity.
+    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
     /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
-    /// out of the last `jito_bam_window_epochs` epochs. `None` means do not update the current value.
+    /// out of those epochs to qualify for delegation.
+    /// `None` means do not update the current value.
     pub jito_bam_window_epochs: Option<u8>,
 }
 
@@ -167,6 +170,16 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
+                    IdlField {
+                        name: "jito_bam_minimum_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "jito_bam_window_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
                 ])),
             },
             docs: Default::default(),
@@ -264,8 +277,10 @@ pub struct Parameters {
     pub jito_bam_minimum_epochs: u8,
 
     /// Window size (in epochs) over which to check BAM connectivity.
+    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
     /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
-    /// out of the last `jito_bam_window_epochs` epochs.
+    /// out of those epochs to qualify for delegation.
     pub jito_bam_window_epochs: u8,
 
     pub _padding_0: [u8; 4],

@@ -394,6 +394,8 @@ fn test_compute_score() {
     );
 
     // running jito bam client score
+    config.parameters.jito_bam_minimum_epochs = 10;
+    config.parameters.jito_bam_window_epochs = 10;
     let mut validator = good_validator;
     for i in 10..=20 {
         validator.history.arr_mut()[i].is_bam_connected =
@@ -443,6 +445,10 @@ fn test_compute_score() {
             }
         }
     );
+
+    // Reset BAM params for subsequent tests
+    config.parameters.jito_bam_minimum_epochs = 0;
+    config.parameters.jito_bam_window_epochs = 0;
 
     // commission
     let mut validator = good_validator;

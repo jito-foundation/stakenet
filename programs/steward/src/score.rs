@@ -465,7 +465,6 @@ pub fn validator_score(
 }
 
 /// Finds max MEV commission in the last `mev_commission_range` epochs and determines if it is above a threshold.
-/// Also determines if validator has had a MEV commission in the last 10 epochs to ensure they are running jito-solana
 pub fn calculate_max_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,

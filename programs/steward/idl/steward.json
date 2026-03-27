@@ -5119,6 +5119,18 @@
             "type": {
               "option": "u64"
             }
+          },
+          {
+            "name": "jito_bam_minimum_epochs",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "jito_bam_window_epochs",
+            "type": {
+              "option": "u8"
+            }
           }
         ]
       }
