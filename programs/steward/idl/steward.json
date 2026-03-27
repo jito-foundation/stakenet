@@ -3967,8 +3967,10 @@
             "name": "jito_bam_window_epochs",
             "docs": [
               "Window size (in epochs) over which to check BAM connectivity.",
+              "The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`",
+              "(inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.",
               "Validators must be BAM connected for at least `jito_bam_minimum_epochs`",
-              "out of the last `jito_bam_window_epochs` epochs."
+              "out of those epochs to qualify for delegation."
             ],
             "type": "u8"
           },
