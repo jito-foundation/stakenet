@@ -10,14 +10,15 @@ use solana_sdk::{
 };
 use stakenet_keeper::entries::is_bam_connected_entry::IsBamConnectedEntry;
 use stakenet_sdk::{
-    models::entries::UpdateInstruction, utils::accounts::get_all_validator_history_accounts,
+    models::entries::UpdateInstruction,
+    utils::{accounts::get_all_validator_history_accounts, helpers::is_live_vote_account},
 };
 use validator_history::ValidatorHistoryEntry;
 
 #[derive(Parser)]
 #[command(about = "Crank to copy is_bam_connected data to validator history accounts")]
 pub struct CrankCopyIsBamConnected {
-    /// Path to keypair for transaction signing
+    /// Path to the oracle authority keypair for transaction signing
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
 
@@ -74,7 +75,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     for chunk in candidates.chunks(GET_MULTIPLE_ACCOUNTS_BATCH_SIZE) {
         let accounts = client.get_multiple_accounts(chunk).await?;
         for (pubkey, account) in chunk.iter().zip(accounts.iter()) {
-            if account.is_some() {
+            if is_live_vote_account(account.as_ref()) {
                 live_vote_accounts.insert(*pubkey);
             }
         }
@@ -134,7 +135,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
         })
         .collect();
 
-    // Batch instructions into transactions (multiple ixs per tx)
+    // Use one BAM update per transaction so individual failures stay isolated.
     let recent_blockhash = client.get_latest_blockhash().await?;
     let txs: Vec<Transaction> = instructions
         .chunks(1)
