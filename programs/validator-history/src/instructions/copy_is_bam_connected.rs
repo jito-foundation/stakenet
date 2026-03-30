@@ -35,12 +35,17 @@ pub fn handle_copy_is_bam_connected(
     epoch: u64,
     is_bam_connected: u8,
 ) -> Result<()> {
+    let clock = Clock::get()?;
+
+    require!(epoch <= clock.epoch, ValidatorHistoryError::EpochOutOfRange);
+
     require!(
         is_bam_connected == 0 || is_bam_connected == 1,
         ValidatorHistoryError::InvalidBamClientValue
     );
 
     let mut validator_history_account = ctx.accounts.validator_history_account.load_mut()?;
+
     let epoch = cast_epoch(epoch)?;
 
     validator_history_account.set_is_bam_connected(epoch, is_bam_connected)?;
