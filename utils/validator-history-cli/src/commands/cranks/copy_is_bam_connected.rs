@@ -13,7 +13,6 @@ use stakenet_sdk::{
     models::entries::UpdateInstruction,
     utils::{accounts::get_all_validator_history_accounts, helpers::is_live_vote_account},
 };
-use validator_history::ValidatorHistoryEntry;
 
 #[derive(Parser)]
 #[command(about = "Crank to copy is_bam_connected data to validator history accounts")]
@@ -53,12 +52,6 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     // Filter to accounts that haven't had is_bam_connected set for the target epoch
     let candidates: Vec<Pubkey> = validator_histories
         .iter()
-        .filter(|vh| {
-            !vh.history.arr.iter().any(|entry| {
-                entry.epoch == epoch as u16
-                    && entry.is_bam_connected != ValidatorHistoryEntry::default().is_bam_connected
-            })
-        })
         .map(|vh| vh.vote_account)
         .collect();
 
