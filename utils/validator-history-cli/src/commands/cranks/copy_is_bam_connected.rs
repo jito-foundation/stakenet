@@ -129,35 +129,30 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
         .collect();
 
     // Use one BAM update per transaction so individual failures stay isolated.
-    let recent_blockhash = client.get_latest_blockhash().await?;
-    let txs: Vec<Transaction> = instructions
-        .chunks(1)
-        .map(|ix_batch| {
-            Transaction::new_signed_with_payer(
-                ix_batch,
-                Some(&keypair.pubkey()),
-                &[&*keypair],
-                recent_blockhash,
-            )
-        })
-        .collect();
-
-    let total_txs = txs.len();
+    let total_txs = instructions.len();
     println!("Sending {total_txs} transactions concurrently...");
 
-    // Send all transactions concurrently in batches of 20
+    // Send all transactions concurrently in batches of 20,
+    // refreshing the blockhash each batch to avoid expiration.
     let mut success_count = 0u64;
     let mut error_count = 0u64;
     let concurrent_batch_size = 20;
 
-    for (batch_idx, tx_batch) in txs.chunks(concurrent_batch_size).enumerate() {
-        let futures: Vec<_> = tx_batch
+    for (batch_idx, ix_batch) in instructions.chunks(concurrent_batch_size).enumerate() {
+        let recent_blockhash = client.get_latest_blockhash().await?;
+
+        let futures: Vec<_> = ix_batch
             .iter()
             .enumerate()
-            .map(|(i, tx)| {
+            .map(|(i, ix)| {
                 let tx_idx = batch_idx * concurrent_batch_size + i + 1;
                 let client = client.clone();
-                let tx = tx.clone();
+                let tx = Transaction::new_signed_with_payer(
+                    std::slice::from_ref(ix),
+                    Some(&keypair.pubkey()),
+                    &[&*keypair],
+                    recent_blockhash,
+                );
                 async move {
                     match client.send_transaction(&tx).await {
                         Ok(sig) => {
