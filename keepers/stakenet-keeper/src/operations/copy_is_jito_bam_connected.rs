@@ -19,7 +19,7 @@ use solana_sdk::{
 };
 use stakenet_sdk::{
     models::{entries::UpdateInstruction, errors::JitoTransactionError, submit_stats::SubmitStats},
-    utils::transactions::submit_instructions,
+    utils::{helpers::is_live_vote_account, transactions::submit_instructions},
 };
 
 use crate::{
@@ -38,8 +38,8 @@ pub struct CopyIsBamConnectedOperation<'a> {
     /// RPC Client
     client: Arc<RpcClient>,
 
-    /// Keypair
-    keypair: Arc<Keypair>,
+    /// Oracle authority keypair
+    oracle_authority_keypair: Arc<Keypair>,
 
     /// Validator History Program ID
     program_id: Pubkey,
@@ -68,7 +68,10 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
     pub fn new(keeper_config: &'a KeeperConfig, keeper_state: &'a KeeperState) -> Self {
         Self {
             client: keeper_config.client.clone(),
-            keypair: keeper_config.keypair.clone(),
+            oracle_authority_keypair: keeper_config
+                .oracle_authority_keypair
+                .clone()
+                .expect("CopyIsBamConnectedOperation requires oracle_authority_keypair"),
             program_id: keeper_config.validator_history_program_id,
             keeper_config,
             keeper_state,
@@ -125,7 +128,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                     }
                 }
                 Err(e) => {
-                    datapoint_error!("is-jito-bam-client-error", ("error", e.to_string(), String),);
+                    datapoint_error!("is-bam-connected-error", ("error", e.to_string(), String),);
                     errors_for_epoch += 1;
                 }
             }
@@ -151,7 +154,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                 .await
                 .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
             for (pubkey, account) in chunk.iter().zip(accounts.iter()) {
-                if account.is_some() {
+                if is_live_vote_account(account.as_ref()) {
                     live_vote_accounts.insert(*pubkey);
                 }
             }
@@ -183,7 +186,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                 IsBamConnectedEntry::new(
                     *vote_account,
                     &self.program_id,
-                    &self.keypair.pubkey(),
+                    &self.oracle_authority_keypair.pubkey(),
                     epoch_info.epoch,
                     is_bam_connected,
                 )
@@ -194,7 +197,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
         submit_instructions(
             &self.client,
             update_instructions,
-            &self.keypair,
+            &self.oracle_authority_keypair,
             self.priority_fee_in_microlamports,
             self.retry_count,
             self.confirmation_time,

@@ -25,11 +25,11 @@ make build-release
 
 This command fetches all validator history accounts, determines which ones have not yet had their `is_bam_connected` field set for the current epoch, queries the Kobe API to identify BAM-participating validators, and submits on-chain transactions to record each validator's BAM status.
 
-Vote accounts that no longer exist on-chain are automatically filtered out to avoid `ConstraintOwner` errors.
+Vote accounts that are missing or no longer owned by the vote program are automatically filtered out to avoid `ConstraintOwner` errors.
 
 ##### Parameters
 
-- `--keypair-path` (`-k`): Path to the keypair used for signing transactions (default: `~/.config/solana/id.json`)
+- `--keypair-path` (`-k`): Path to the oracle authority keypair used for signing transactions (default: `~/.config/solana/id.json`)
 - `--kobe-api-base-url`: Base URL for the Kobe API (e.g., `https://kobe.testnet.jito.network` for testnet, `https://kobe.mainnet.jito.network` for mainnet)
 
 #### History
