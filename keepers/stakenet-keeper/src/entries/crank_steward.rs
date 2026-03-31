@@ -4,25 +4,31 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
-use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
-use jito_steward::StewardStateEnum;
+use jito_steward::{
+    stake_pool_utils::{StakePool, ValidatorList},
+    StewardStateEnum,
+};
 use log::{error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use solana_sdk::signer::Signer;
-use solana_sdk::stake::instruction::deactivate_delinquent_stake;
-use solana_sdk::stake::state::StakeStateV2;
 #[allow(deprecated)]
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::Keypair,
+    signer::Signer,
+    stake,
+    stake::{instruction::deactivate_delinquent_stake, state::StakeStateV2},
+    system_program,
+};
 use solana_vote_interface::state::VoteStateV3;
 use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
-use spl_stake_pool::instruction::{
-    cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
-};
 use spl_stake_pool::{
     find_transient_stake_program_address, find_withdraw_authority_program_address,
     instruction::deposit_sol,
+    instruction::{
+        cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
+    },
     state::{StakeStatus, ValidatorStakeInfo},
     MAX_VALIDATORS_TO_UPDATE,
 };
