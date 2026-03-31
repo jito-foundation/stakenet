@@ -37,6 +37,7 @@ solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
 solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
+solana-vote-interface = { workspace = true }
 spl-associated-token-account = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 spl-token = { workspace = true }

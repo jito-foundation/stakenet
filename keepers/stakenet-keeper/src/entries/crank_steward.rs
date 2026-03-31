@@ -12,9 +12,9 @@ use solana_program::instruction::Instruction;
 use solana_sdk::signer::Signer;
 use solana_sdk::stake::instruction::deactivate_delinquent_stake;
 use solana_sdk::stake::state::StakeStateV2;
-use solana_sdk::vote::state::VoteState;
 #[allow(deprecated)]
 use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
+use solana_vote_interface::state::VoteStateV3;
 use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
 use spl_stake_pool::instruction::{
@@ -115,7 +115,7 @@ pub fn _get_update_stake_pool_ixs(
             return false;
         }
 
-        let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
+        let vote_account = VoteStateV3::deserialize(&raw_vote_account.clone().unwrap().data)
             .expect("Could not deserialize vote account");
 
         let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
@@ -141,7 +141,7 @@ pub fn _get_update_stake_pool_ixs(
                     StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
                         .expect("Could not deserialize stake account");
 
-                let vote_account = VoteState::deserialize(&raw_vote_account.data)
+                let vote_account = VoteStateV3::deserialize(&raw_vote_account.data)
                     .expect("Could not deserialize vote account");
 
                 if vote_account.epoch_credits.iter().last().is_none() {

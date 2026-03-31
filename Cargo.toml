@@ -48,6 +48,7 @@ solana-streamer = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3
 solana-system-interface = "1.0.0"
 solana-transaction-status = "=2.3.3"
 solana-version = "=2.3.3"
+solana-vote-interface = { version = "3.0.0", features = ["bincode"] }
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
