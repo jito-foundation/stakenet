@@ -855,7 +855,11 @@ impl TestFixture {
             &[ix],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
-            self.ctx.borrow_mut().last_blockhash,
+            self.ctx
+                .borrow_mut()
+                .get_new_latest_blockhash()
+                .await
+                .unwrap(),
         );
 
         let process_tx_result = {
