@@ -11236,6 +11236,7 @@ name = "stakenet-keeper"
 version = "0.2.0"
 dependencies = [
  "anchor-lang",
+ "base64 0.22.1",
  "bincode",
  "bytemuck",
  "clap 4.5.51",
