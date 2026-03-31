@@ -151,7 +151,9 @@ pub fn _get_update_stake_pool_ixs(
                     StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
                         .expect("Could not deserialize stake account");
 
-                let vote_account: VoteStateV4 = bincode::deserialize(&raw_vote_account.data)
+                let vote_pubkey =
+                    SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
+                let vote_account = VoteStateV4::deserialize(&raw_vote_account.data, &vote_pubkey)
                     .expect("Could not deserialize vote account");
 
                 if vote_account.epoch_credits.iter().last().is_none() {

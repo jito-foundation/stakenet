@@ -31,7 +31,7 @@ fn main() {
             }
         }
         Err(e) => {
-            println!("VoteStateV3::deserialize FAILED: {:?}", e);
+            println!("VoteStateV3::deserialize FAILED: {e:?}");
         }
     }
 
@@ -57,7 +57,7 @@ fn main() {
             }
         }
         Err(e) => {
-            println!("VoteStateV4::deserialize FAILED: {:?}", e);
+            println!("VoteStateV4::deserialize FAILED: {e:?}");
         }
     }
 }
