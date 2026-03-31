@@ -55,29 +55,15 @@ pub struct Rebalance<'info> {
     #[account(address = get_stake_pool_address(&config)?)]
     pub stake_pool: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(
-        seeds = [
-            stake_pool.key().as_ref(),
-            STAKE_POOL_WITHDRAW_SEED
-        ],
-        seeds::program = spl_stake_pool::ID,
-        bump = deserialize_stake_pool(&stake_pool)?.stake_withdraw_bump_seed
-    )]
+    /// CHECK: Validated in handler against deserialized stake pool
     pub withdraw_authority: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(
-        mut,
-        address = deserialize_stake_pool(&stake_pool)?.validator_list
-    )]
+    /// CHECK: Validated in handler against deserialized stake pool
+    #[account(mut)]
     pub validator_list: AccountInfo<'info>,
 
-    /// CHECK: passing through, checks are done by spl-stake-pool
-    #[account(
-        mut,
-        address = deserialize_stake_pool(&stake_pool)?.reserve_stake
-    )]
+    /// CHECK: Validated in handler against deserialized stake pool
+    #[account(mut)]
     pub reserve_stake: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
@@ -162,8 +148,45 @@ pub struct Rebalance<'info> {
 ///
 /// This ensures total undirected stake never exceeds the configured ceiling.
 pub fn handler(ctx: Context<Rebalance>, validator_list_index: usize) -> Result<()> {
+    // Deserialize stake pool once and validate accounts that were previously
+    // checked in constraints. This avoids 3 separate deserializations in
+    // Anchor's try_accounts which caused a BPF stack overflow.
+    {
+        let stake_pool = deserialize_stake_pool(&ctx.accounts.stake_pool)?;
+
+        // Validate withdraw_authority PDA
+        let (expected_withdraw_authority, expected_bump) = Pubkey::find_program_address(
+            &[
+                ctx.accounts.stake_pool.key().as_ref(),
+                STAKE_POOL_WITHDRAW_SEED,
+            ],
+            &spl_stake_pool::ID,
+        );
+        require!(
+            ctx.accounts.withdraw_authority.key() == expected_withdraw_authority,
+            StewardError::InvalidState
+        );
+        require!(
+            expected_bump == stake_pool.stake_withdraw_bump_seed,
+            StewardError::InvalidState
+        );
+
+        // Validate validator_list matches stake pool
+        require!(
+            ctx.accounts.validator_list.key() == stake_pool.validator_list,
+            StewardError::InvalidState
+        );
+
+        // Validate reserve_stake matches stake pool
+        require!(
+            ctx.accounts.reserve_stake.key() == stake_pool.reserve_stake,
+            StewardError::InvalidState
+        );
+    }
+
     let validator_history = ctx.accounts.validator_history.load()?;
     let validator_list = &ctx.accounts.validator_list;
+
     let clock = Clock::get()?;
     let epoch_schedule = EpochSchedule::get()?;
     let config = ctx.accounts.config.load()?;
