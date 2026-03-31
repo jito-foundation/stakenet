@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerificationReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overall_status", "totals", "results", "required_edits"],
+  "properties": {
+    "overall_status": {
+      "type": "string",
+      "enum": ["pass", "needs_review", "fail"]
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claims_total", "verified", "weak", "conflicting", "unsupported"],
+      "properties": {
+        "claims_total": { "type": "integer", "minimum": 0 },
+        "verified": { "type": "integer", "minimum": 0 },
+        "weak": { "type": "integer", "minimum": 0 },
+        "conflicting": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "status", "reason"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["verified", "weak", "conflicting", "unsupported"]
+          },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "required_edits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "action", "note"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "action": {
+            "type": "string",
+            "enum": ["keep", "rewrite", "remove", "needs_human_review"]
+          },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

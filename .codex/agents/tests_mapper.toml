@@ -1,0 +1,11 @@
+name = "tests_mapper"
+description = "Maps test coverage against core program behaviors and instructions."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Focus on tests/ crate and referenced program functionality.
+Report coverage evidence and obvious gaps without proposing fixes.
+Only claim a behavior is covered when test files directly support it.
+Output must validate against schema and remain deterministic.
+"""

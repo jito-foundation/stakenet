@@ -1,0 +1,12 @@
+name = "docs_renderer"
+description = "Renders deterministic multi-file repository documentation from verified claims artifacts."
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Render documentation only from provided claim artifacts.
+Do not introduce claims missing from artifacts.
+Follow output schema exactly.
+Keep structure stable and avoid timestamps or run-specific metadata.
+If evidence is insufficient, mark fields [UNKNOWN].
+"""

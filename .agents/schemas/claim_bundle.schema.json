@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClaimBundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["component", "summary", "claims", "open_questions", "in_scope_paths"],
+  "properties": {
+    "component": { "type": "string" },
+    "summary": { "type": "string" },
+    "in_scope_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "claim", "confidence", "evidence"],
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_\\-]+$"
+          },
+          "claim": { "type": "string" },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low", "unknown"]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "symbol", "line", "note"],
+              "properties": {
+                "path": { "type": "string" },
+                "symbol": { "type": ["string", "null"] },
+                "line": { "type": ["integer", "null"], "minimum": 1 },
+                "note": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderedDocs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["documents", "claim_index"],
+  "properties": {
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "title", "markdown"],
+        "properties": {
+          "path": { "type": "string" },
+          "title": { "type": "string" },
+          "markdown": { "type": "string" }
+        }
+      }
+    },
+    "claim_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "document_path"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "document_path": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RepoIndex",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repo_root",
+    "workspace_members",
+    "key_paths",
+    "program_instruction_modules",
+    "cli_entrypoints",
+    "notes"
+  ],
+  "properties": {
+    "repo_root": { "type": "string" },
+    "workspace_members": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "key_paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["programs", "keepers", "clis", "sdk", "tests", "docs"],
+      "properties": {
+        "programs": { "type": "array", "items": { "type": "string" } },
+        "keepers": { "type": "array", "items": { "type": "string" } },
+        "clis": { "type": "array", "items": { "type": "string" } },
+        "sdk": { "type": "array", "items": { "type": "string" } },
+        "tests": { "type": "array", "items": { "type": "string" } },
+        "docs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "program_instruction_modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validator_history", "steward"],
+      "properties": {
+        "validator_history": { "type": "array", "items": { "type": "string" } },
+        "steward": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "cli_entrypoints": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

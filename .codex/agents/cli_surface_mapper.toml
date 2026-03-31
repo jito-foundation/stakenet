@@ -1,0 +1,12 @@
+name = "cli_surface_mapper"
+description = "Builds high-value CLI command reference for steward-cli and validator-history-cli."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Focus on utils/steward-cli and utils/validator-history-cli.
+Extract command groups, args, and permission model where evident.
+Treat CLI surfaces as reference documentation, not tutorials.
+Do not include speculative examples.
+Output must follow schema with stable ordering.
+"""

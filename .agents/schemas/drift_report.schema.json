@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DriftReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overall_status", "counts", "changes", "notes"],
+  "properties": {
+    "overall_status": {
+      "type": "string",
+      "enum": ["no_true_drift", "true_drift", "needs_human_review"]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format_only",
+        "coverage_change",
+        "semantic_change",
+        "stale_or_false",
+        "needs_human_review"
+      ],
+      "properties": {
+        "format_only": { "type": "integer", "minimum": 0 },
+        "coverage_change": { "type": "integer", "minimum": 0 },
+        "semantic_change": { "type": "integer", "minimum": 0 },
+        "stale_or_false": { "type": "integer", "minimum": 0 },
+        "needs_human_review": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "classification", "old_claim", "new_claim", "reason"],
+        "properties": {
+          "claim_id": { "type": "string" },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "format_only",
+              "coverage_change",
+              "semantic_change",
+              "stale_or_false",
+              "needs_human_review"
+            ]
+          },
+          "old_claim": { "type": ["string", "null"] },
+          "new_claim": { "type": ["string", "null"] },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+name = "doc_drift_auditor"
+description = "Classifies drift between two documentation generations using claim-level comparison."
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Compare old and new claim/doc artifacts.
+Classify changes as format_only, coverage_change, semantic_change, or stale_or_false.
+Treat wording-only edits as non-semantic.
+When uncertain whether meaning changed, classify as needs_human_review.
+Output must follow schema exactly and include deterministic ordering.
+"""
