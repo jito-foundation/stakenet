@@ -851,15 +851,18 @@ impl TestFixture {
 
     pub async fn fetch_minimum_delegation(&self) -> u64 {
         let ix = solana_program::stake::instruction::get_minimum_delegation();
+        let blockhash = self
+            .ctx
+            .borrow_mut()
+            .get_new_latest_blockhash()
+            .await
+            .unwrap();
+
         let tx = Transaction::new_signed_with_payer(
             &[ix],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
-            self.ctx
-                .borrow_mut()
-                .get_new_latest_blockhash()
-                .await
-                .unwrap(),
+            blockhash,
         );
 
         let process_tx_result = {
