@@ -66,14 +66,6 @@ pub async fn command_crank_rebalance_directed(
 
     let ixs_to_run: Vec<Instruction> = validators_to_run
         .iter()
-        .filter(|validator_info| {
-            if validator_info.vote_account
-                == Pubkey::from_str("CSBiJLi8fo5R3oJ3CAhBi4zcFLWkiv2wbjBgWS9e4ueD").unwrap()
-            {
-                return true;
-            }
-            false
-        })
         .map(|validator_info| {
             let validator_index = validator_info.validator_list_index;
             let vote_account = &validator_info.vote_account;
