@@ -1,6 +1,5 @@
 [workspace]
 members = ["keepers/*", "programs/*", "sdk", "tests", "utils/*"]
-
 resolver = "2"
 
 [workspace.dependencies]
