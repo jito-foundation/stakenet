@@ -12390,10 +12390,15 @@ name = "validator-history-vote-state"
 version = "0.1.2"
 dependencies = [
  "anchor-lang",
+ "anyhow",
  "bincode",
  "serde",
  "serde-big-array",
+ "serde_json",
  "solana-program",
+ "solana-rpc-client 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-rpc-client-api 2.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "solana-sdk",
 ]
 
 [[package]]
