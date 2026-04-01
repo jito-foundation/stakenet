@@ -195,7 +195,7 @@ pub struct BLSPubkey {
 
 impl VoteStateVersions {
     // Enum index + (4*Pubkey)
-    const VOTE_STATE_INFLATION_REWARDS_COMMISSION_BPS_INDEX: usize = 132;
+    const VOTE_STATE_COMMISSION_INDEX: usize = 132;
     // Enum index + Pubkey + Pubkey
     const VOTE_STATE_1_16_0_COMMISSION_INDEX: usize = 68;
     const VOTE_STATE_1_14_1_COMMISSION_INDEX: usize = 68;
@@ -248,16 +248,15 @@ impl VoteStateVersions {
             }
             3 => {
                 if data.len()
-                    < Self::VOTE_STATE_INFLATION_REWARDS_COMMISSION_BPS_INDEX
+                    < Self::VOTE_STATE_COMMISSION_INDEX
                         + Self::INFLATION_REWARDS_COMMISSION_BPS_BYTES
                 {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
-                let inflation_rewards_commission_bps = bincode::deserialize::<u16>(
-                    &data[Self::VOTE_STATE_INFLATION_REWARDS_COMMISSION_BPS_INDEX..],
-                )
-                .map_err(|_| ErrorCode::VoteAccountDataNotValid)
-                .map_err(anchor_lang::error::Error::from)?;
+                let inflation_rewards_commission_bps =
+                    bincode::deserialize::<u16>(&data[Self::VOTE_STATE_COMMISSION_INDEX..])
+                        .map_err(|_| ErrorCode::VoteAccountDataNotValid)
+                        .map_err(anchor_lang::error::Error::from)?;
                 if inflation_rewards_commission_bps > Self::MAX_COMMISSION_BPS {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
