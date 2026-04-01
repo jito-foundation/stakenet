@@ -1,6 +1,5 @@
 [workspace]
 members = ["keepers/*", "programs/*", "sdk", "tests", "utils/*"]
-
 resolver = "2"
 
 [workspace.dependencies]
@@ -39,7 +38,7 @@ solana-net-utils = "=2.3.3"
 solana-packet = "=2.2.1"
 solana-program = "=2.3.0"
 solana-program-test = "=2.3.3"
-solana-pubkey = "=2.4.0"
+solana-pubkey = "4.1.0"
 solana-remote-wallet = "=2.3.3"
 solana-rpc-client = "=2.3.3"
 solana-rpc-client-api = "=2.3.3"
@@ -48,6 +47,7 @@ solana-streamer = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3
 solana-system-interface = "1.0.0"
 solana-transaction-status = "=2.3.3"
 solana-version = "=2.3.3"
+solana-vote-interface = { version = "5.1.1", features = ["bincode"] }
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
@@ -62,7 +62,7 @@ tracing = { version = "0.1.37" }
 tracing-core = "0.1.32"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 uriparse = "0.6.4"
-validator-history = { path = "programs/validator-history", version = "0.2.0", features = ["no-entrypoint"] }
+validator-history = { path = "programs/validator-history", version = "0.2.1", features = ["no-entrypoint"] }
 
 [patch.crates-io]
 home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }

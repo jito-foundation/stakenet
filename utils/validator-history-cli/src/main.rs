@@ -47,6 +47,7 @@ use validator_history_cli::{
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
+            copy_is_bam_connected::CrankCopyIsBamConnected,
             copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
         },
@@ -100,6 +101,7 @@ enum Commands {
     CrankCopyGossipContactInfo(CrankCopyGossipContactInfo),
     CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
+    CrankCopyIsBamConnected(CrankCopyIsBamConnected),
 }
 
 #[derive(Parser)]
@@ -524,6 +526,10 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
         field_descriptions.push(format!(
             "Priority Fee Merkle Root Upload Authority: {}",
             format_option(entry_output.priority_fee_merkle_root_upload_authority)
+        ));
+        field_descriptions.push(format!(
+            "Is Jito BAM Connected: {}",
+            format_option(entry_output.is_bam_connected)
         ));
 
         field_descriptions.join(" | ")
@@ -1345,6 +1351,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::CrankCopyVoteAccount(command_args) => {
             commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
+        }
+        Commands::CrankCopyIsBamConnected(command_args) => {
+            commands::cranks::copy_is_bam_connected::run(command_args, args.json_rpc_url).await?
         }
     };
 

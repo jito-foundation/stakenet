@@ -4,25 +4,32 @@ use std::{
 };
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, InstructionData, ToAccountMetas};
-use jito_steward::stake_pool_utils::{StakePool, ValidatorList};
-use jito_steward::StewardStateEnum;
+use jito_steward::{
+    stake_pool_utils::{StakePool, ValidatorList},
+    StewardStateEnum,
+};
 use log::{error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
-use solana_sdk::signer::Signer;
-use solana_sdk::stake::instruction::deactivate_delinquent_stake;
-use solana_sdk::stake::state::StakeStateV2;
-use solana_sdk::vote::state::VoteState;
+use solana_pubkey::Pubkey as SolanaPubkey;
 #[allow(deprecated)]
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, stake, system_program};
+use solana_sdk::{
+    pubkey::Pubkey,
+    signature::Keypair,
+    signer::Signer,
+    stake,
+    stake::{instruction::deactivate_delinquent_stake, state::StakeStateV2},
+    system_program,
+};
+use solana_vote_interface::state::VoteStateV4;
 use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
-use spl_stake_pool::instruction::{
-    cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
-};
 use spl_stake_pool::{
     find_transient_stake_program_address, find_withdraw_authority_program_address,
     instruction::deposit_sol,
+    instruction::{
+        cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
+    },
     state::{StakeStatus, ValidatorStakeInfo},
     MAX_VALIDATORS_TO_UPDATE,
 };
@@ -115,8 +122,11 @@ pub fn _get_update_stake_pool_ixs(
             return false;
         }
 
-        let vote_account = VoteState::deserialize(&raw_vote_account.clone().unwrap().data)
-            .expect("Could not deserialize vote account");
+        let vote_pubkey =
+            SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
+        let vote_account =
+            VoteStateV4::deserialize(&raw_vote_account.clone().unwrap().data, &vote_pubkey)
+                .expect("Could not deserialize vote account");
 
         let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
 
@@ -141,7 +151,9 @@ pub fn _get_update_stake_pool_ixs(
                     StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
                         .expect("Could not deserialize stake account");
 
-                let vote_account = VoteState::deserialize(&raw_vote_account.data)
+                let vote_pubkey =
+                    SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
+                let vote_account = VoteStateV4::deserialize(&raw_vote_account.data, &vote_pubkey)
                     .expect("Could not deserialize vote account");
 
                 if vote_account.epoch_credits.iter().last().is_none() {
@@ -1039,6 +1051,13 @@ async fn _handle_directed_rebalance(
     let mut ixs_to_run = Vec::new();
     for validator_info in validators_to_run.iter() {
         let validator_index = validator_info.validator_list_index;
+        if validator_index == usize::MAX {
+            info!(
+                "Skipping validator {} — not found in validator list",
+                validator_info.vote_account
+            );
+            continue;
+        }
         let vote_account = &validator_info.vote_account;
 
         let stake_address =

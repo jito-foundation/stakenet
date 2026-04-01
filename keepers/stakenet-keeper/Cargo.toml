@@ -1,6 +1,6 @@
 [package]
 name = "stakenet-keeper"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
@@ -37,12 +37,11 @@ solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
 solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
+solana-vote-interface = { workspace = true }
 spl-associated-token-account = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 spl-token = { workspace = true }
 stakenet-sdk = { path = "../../sdk" }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
-validator-history = { features = [
-    "no-entrypoint",
-], path = "../../programs/validator-history" }
+validator-history.workspace = true

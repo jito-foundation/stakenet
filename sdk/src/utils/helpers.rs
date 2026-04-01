@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStakeTicket};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
-use solana_sdk::{pubkey::Pubkey, stake::state::StakeStateV2};
+use solana_sdk::{account::Account, pubkey::Pubkey, stake::state::StakeStateV2};
 use spl_associated_token_account::get_associated_token_address;
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
@@ -11,6 +11,7 @@ use crate::models::{
     errors::JitoInstructionError,
 };
 use solana_program::borsh1::try_from_slice_unchecked;
+use solana_program::vote::program::ID as VOTE_PROGRAM_ID;
 
 use super::accounts::get_validator_history_address;
 
@@ -32,6 +33,10 @@ pub fn vote_account_uploaded_recently(
         }
     }
     false
+}
+
+pub fn is_live_vote_account(account: Option<&Account>) -> bool {
+    matches!(account, Some(account) if account.owner == VOTE_PROGRAM_ID)
 }
 
 // ------------------- BALANCE --------------------------
@@ -112,7 +117,10 @@ impl DirectedRebalanceProgressionInfo {
             .validator_list_account
             .validators
             .iter()
-            .take(all_steward_accounts.state_account.state.num_pool_validators as usize)
+            .take(
+                all_steward_accounts.state_account.state.num_pool_validators as usize
+                    + all_steward_accounts.state_account.state.validators_added as usize,
+            )
             .enumerate()
             .map(|(idx, v)| (v.vote_account_address, idx))
             .collect();
@@ -335,11 +343,35 @@ pub fn aggregate_validator_targets(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use jito_steward::{
         constants::MAX_VALIDATORS, utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
     };
 
-    use super::*;
+    #[test]
+    fn test_is_live_vote_account_true_for_vote_owned_account() {
+        let account = Account {
+            owner: VOTE_PROGRAM_ID,
+            ..Account::default()
+        };
+
+        assert!(is_live_vote_account(Some(&account)));
+    }
+
+    #[test]
+    fn test_is_live_vote_account_false_for_non_vote_account() {
+        let account = Account {
+            owner: Pubkey::new_unique(),
+            ..Account::default()
+        };
+
+        assert!(!is_live_vote_account(Some(&account)));
+    }
+
+    #[test]
+    fn test_is_live_vote_account_false_for_missing_account() {
+        assert!(!is_live_vote_account(None));
+    }
 
     fn create_ticket(authority: Pubkey, preferences: Vec<(Pubkey, u16)>) -> DirectedStakeTicket {
         let mut staker_preferences = [DirectedStakePreference {

@@ -186,7 +186,6 @@ jobs:
         run: RUST_MIN_STACK=20000000 cargo nextest run --package tests --all-features --color auto
         shell: bash
         env:
-          RUST_LOG: trace
           SBF_OUT_DIR: ${{ github.workspace }}/target/deploy
           RUST_MIN_STACK: 20000000
           RUSTFLAGS: --cfg anchor_debug

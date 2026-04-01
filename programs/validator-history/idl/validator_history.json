@@ -2,7 +2,7 @@
   "address": "HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa",
   "metadata": {
     "name": "validator_history",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "spec": "0.1.0",
     "description": "Program for tracking validator metrics on chain"
   },

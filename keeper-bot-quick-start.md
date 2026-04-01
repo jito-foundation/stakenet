@@ -83,6 +83,7 @@ METRICS_INTERVAL=60
 # For Oracle Authority Only
 RUN_STAKE_UPLOAD=false
 RUN_GOSSIP_UPLOAD=false
+RUN_COPY_IS_BAM_CONNECTED=false
 
 # Run with the startup flag set to true
 FULL_STARTUP=true
