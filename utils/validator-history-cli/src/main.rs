@@ -43,6 +43,7 @@ use validator_history_cli::{
     commands::{
         self,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
+        actions::update_stake_history::UpdateStakeHistory,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
@@ -91,6 +92,9 @@ enum Commands {
     SetNewTipDistributionProgram(SetNewTipDistributionProgram),
     DunePriorityFeeBackfill(DunePriorityFeeBackfill),
     UploadValidatorAge(UploadValidatorAge),
+
+    // Actions
+    UpdateStakeHistory(UpdateStakeHistory),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
@@ -1326,6 +1330,9 @@ async fn main() -> anyhow::Result<()> {
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+        }
+        Commands::UpdateStakeHistory(command_args) => {
+            commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
