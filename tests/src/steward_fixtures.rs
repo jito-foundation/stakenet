@@ -860,17 +860,18 @@ impl TestFixture {
             blockhash,
         );
 
-        let process_tx_result = {
+        let result = {
             let banks_client = self.ctx.borrow_mut().banks_client.clone();
-            banks_client.process_transaction_with_metadata(tx).await
+            banks_client.simulate_transaction(tx).await.unwrap()
         };
 
-        let result = process_tx_result.unwrap();
-
-        assert!(result.result.is_ok());
-        let metadata = result.metadata.unwrap();
+        if let Some(Err(ref e)) = result.result {
+            panic!("fetch_minimum_delegation failed: {e:?}");
+        }
+        let simulation_details = result.simulation_details.unwrap();
+        let return_data = simulation_details.return_data.unwrap();
         let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(&metadata.return_data.clone().unwrap().data[..8]);
+        bytes.copy_from_slice(&return_data.data[..8]);
         u64::from_le_bytes(bytes)
     }
 

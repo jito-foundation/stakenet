@@ -49,7 +49,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     // Fetch validator history accounts
     let validator_histories = get_all_validator_history_accounts(&client, program_id).await?;
 
-    // Filter to accounts that haven't had is_bam_connected set for the target epoch
+    // Collect all vote accounts from validator history
     let candidates: Vec<Pubkey> = validator_histories
         .iter()
         .map(|vh| vh.vote_account)
