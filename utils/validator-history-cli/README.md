@@ -14,7 +14,7 @@ make build-release
 
 # Run
 ./target/release/validator-history-cli \
-  --json-rpc-url <JSON_RPC_URL> \
+  --json-rpc-url https://api.testnet.solana.com \
   crank-copy-is-bam-connected \
   --keypair-path ~/.config/solana/id.json \
   --kobe-api-base-url "https://kobe.testnet.jito.network" \
