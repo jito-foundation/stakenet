@@ -112,6 +112,9 @@ pub struct StateInfo {
     /// Each entry represents target share of pool as a proportion
     delegations_count: usize,
 
+    /// Count of validators with active stake above 4_000_000
+    active_delegation_count: usize,
+
     /// Count of validators marked for instant unstaking
     /// Each bit in the BitMask represents a validator flagged for immediate unstake
     instant_unstake_count: usize,
@@ -478,6 +481,7 @@ fn build_default_state_output(
         deactivating: 0,
         ready_for_removal: 0,
     };
+    let mut active_delegation_count = 0;
 
     validator_list_account
         .validators
@@ -485,6 +489,9 @@ fn build_default_state_output(
         .for_each(|validator| {
             total_staked_lamports += u64::from(validator.active_stake_lamports);
             total_transient_lamports += u64::from(validator.transient_stake_lamports);
+            if u64::from(validator.active_stake_lamports) > 4_000_000 {
+                active_delegation_count += 1;
+            }
 
             match StakeStatus::try_from(validator.status).unwrap() {
                 StakeStatus::Active => validator_counts.active += 1,
@@ -544,6 +551,7 @@ fn build_default_state_output(
             raw_scores_count: state.raw_scores.len(),
             sorted_raw_score_indices_count: state.sorted_raw_score_indices.len(),
             delegations_count: state.delegations.len(),
+            active_delegation_count,
             instant_unstake_count: state.instant_unstake.count(),
             start_computing_scores_slot: state.start_computing_scores_slot,
             current_epoch: state.current_epoch,
@@ -646,6 +654,10 @@ fn _print_default_state(
             output.state.sorted_raw_score_indices_count
         );
         formatted_string += &format!("Delegations Count: {}\n", output.state.delegations_count);
+        formatted_string += &format!(
+            "Active Delegations Count: {}\n",
+            output.state.active_delegation_count
+        );
         formatted_string += &format!("Instant Unstake: {}\n", output.state.instant_unstake_count);
         formatted_string += &format!(
             "Start Computing Scores Slot: {}\n",
