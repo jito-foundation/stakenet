@@ -34,19 +34,21 @@ pub async fn command_view_directed_stake_meta(
     for i in 0..stake_meta.total_stake_targets as usize {
         let validator = &stake_meta.targets[i];
         if validator.vote_pubkey != Pubkey::default() {
-            println!("  Target {}:", i + 1);
-            println!("    Vote Pubkey: {}", validator.vote_pubkey);
-            println!("    Target Lamports: {}", validator.total_target_lamports);
-            println!(
-                "    Target Last Updated Epoch: {}",
-                validator.target_last_updated_epoch
-            );
-            println!("    Staked Lamports: {}", validator.total_staked_lamports);
-            println!(
-                "    Staked Last Updated Epoch: {}",
-                validator.staked_last_updated_epoch
-            );
-            println!();
+            if validator.staked_last_updated_epoch != 953 {
+                println!("  Target {}:", i + 1);
+                println!("    Vote Pubkey: {}", validator.vote_pubkey);
+                println!("    Target Lamports: {}", validator.total_target_lamports);
+                println!(
+                    "    Target Last Updated Epoch: {}",
+                    validator.target_last_updated_epoch
+                );
+                println!("    Staked Lamports: {}", validator.total_staked_lamports);
+                println!(
+                    "    Staked Last Updated Epoch: {}",
+                    validator.staked_last_updated_epoch
+                );
+                println!();
+            }
         }
     }
 
