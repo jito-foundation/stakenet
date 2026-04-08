@@ -1051,13 +1051,6 @@ async fn _handle_directed_rebalance(
     let mut ixs_to_run = Vec::new();
     for validator_info in validators_to_run.iter() {
         let validator_index = validator_info.validator_list_index;
-        if validator_index == usize::MAX {
-            info!(
-                "Skipping validator {} — not found in validator list",
-                validator_info.vote_account
-            );
-            continue;
-        }
         let vote_account = &validator_info.vote_account;
 
         let stake_address =
