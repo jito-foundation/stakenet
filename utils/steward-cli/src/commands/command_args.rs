@@ -182,6 +182,15 @@ pub struct ConfigParameters {
     /// Percent of total pool lamports that can be unstaked due to directed stake requests
     #[arg(long, env)]
     pub directed_stake_unstake_cap_bps: Option<u16>,
+
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation.
+    #[arg(long, env)]
+    pub jito_bam_minimum_epochs: Option<u8>,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    #[arg(long, env)]
+    pub jito_bam_window_epochs: Option<u8>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -209,6 +218,8 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             compute_score_epoch_progress: config.compute_score_epoch_progress,
             undirected_stake_ceiling_lamports: config.undirected_stake_ceiling_lamports,
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
+            jito_bam_minimum_epochs: config.jito_bam_minimum_epochs,
+            jito_bam_window_epochs: config.jito_bam_window_epochs,
         }
     }
 }

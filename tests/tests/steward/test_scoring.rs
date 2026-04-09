@@ -104,43 +104,39 @@ mod test_calculate_max_mev_commission {
         let current_epoch = 4;
         let threshold = 300;
 
-        let (score, max_commission, max_epoch, running_jito) =
+        let (score, max_commission, max_epoch) =
             calculate_max_mev_commission(&window, current_epoch, threshold).unwrap();
 
         assert_eq!(score, 0);
         assert_eq!(max_commission, 500);
         assert_eq!(max_epoch, 4);
-        assert_eq!(running_jito, 1);
 
         // All commissions below threshold, and epoch is first instance of max commission
         let window = [Some(100), Some(200), Some(250), Some(250)];
-        let (score, max_commission, max_epoch, running_jito) =
+        let (score, max_commission, max_epoch) =
             calculate_max_mev_commission(&window, 3, 300).unwrap();
         assert_eq!(score, 1);
         assert_eq!(max_commission, 250);
         assert_eq!(max_epoch, 2);
-        assert_eq!(running_jito, 1);
 
         // Window with Nones
         let window = [None, None, None];
-        let (score, max_commission, max_epoch, running_jito) =
+        let (score, max_commission, max_epoch) =
             calculate_max_mev_commission(&window, 2, 300).unwrap();
         assert_eq!(score, 0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 2);
-        assert_eq!(running_jito, 0);
     }
 
     #[test]
     fn test_edge_cases() {
         // Empty window
         let window: [Option<u16>; 0] = [];
-        let (score, max_commission, max_epoch, running_jito) =
+        let (score, max_commission, max_epoch) =
             calculate_max_mev_commission(&window, 0, 300).unwrap();
         assert_eq!(score, 0);
         assert_eq!(max_commission, 10000);
         assert_eq!(max_epoch, 0);
-        assert_eq!(running_jito, 0);
 
         // Test Arithmetic error
         let window = [Some(0), Some(0), Some(0)];

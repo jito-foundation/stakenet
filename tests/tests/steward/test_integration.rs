@@ -650,6 +650,8 @@ async fn test_compute_instant_unstake() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )

@@ -2,7 +2,7 @@
   "address": "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8",
   "metadata": {
     "name": "steward",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "spec": "0.1.0",
     "description": "Program for permissionlessly managing an SPL Stake Pool"
   },
@@ -2420,16 +2420,16 @@
       ]
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV5",
       "discriminator": [
-        117,
-        201,
-        193,
-        88,
-        0,
-        129,
-        58,
-        215
+        30,
+        160,
+        15,
+        120,
+        139,
+        215,
+        205,
+        130
       ]
     },
     {
@@ -3956,11 +3956,30 @@
             "type": "u16"
           },
           {
+            "name": "jito_bam_minimum_epochs",
+            "docs": [
+              "Minimum number of epochs a validator must have been a Jito BAM client",
+              "within the window to qualify for delegation."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "jito_bam_window_epochs",
+            "docs": [
+              "Window size (in epochs) over which to check BAM connectivity.",
+              "The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`",
+              "(inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.",
+              "Validators must be BAM connected for at least `jito_bam_minimum_epochs`",
+              "out of those epochs to qualify for delegation."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                6
+                4
               ]
             }
           },
@@ -4144,7 +4163,7 @@
       }
     },
     {
-      "name": "ScoreComponentsV4",
+      "name": "ScoreComponentsV5",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4219,9 +4238,10 @@
             "type": "u8"
           },
           {
-            "name": "running_jito_score",
+            "name": "running_bam_score",
             "docs": [
-              "If validator has a mev commission in the last 10 epochs, score is 1, else 0"
+              "Score is 1 if the validator has been connected to BAM for at least",
+              "`jito_bam_minimum_epochs` out of the last `jito_bam_window_epochs` epochs, otherwise 0."
             ],
             "type": "u8"
           },
@@ -5100,6 +5120,18 @@
             "name": "undirected_stake_ceiling_lamports",
             "type": {
               "option": "u64"
+            }
+          },
+          {
+            "name": "jito_bam_minimum_epochs",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "jito_bam_window_epochs",
+            "type": {
+              "option": "u8"
             }
           }
         ]
