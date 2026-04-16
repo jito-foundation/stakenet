@@ -4,9 +4,7 @@ use anyhow::Result;
 use jito_steward::stake_pool_utils::ValidatorList;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
-use stakenet_sdk::{
-    models::aggregate_accounts::AllStewardAccounts, utils::accounts::get_all_steward_accounts,
-};
+use stakenet_sdk::utils::accounts::get_all_steward_accounts;
 
 use crate::commands::command_args::ViewNextIndexToRemove;
 
@@ -18,8 +16,8 @@ pub async fn command_view_next_index_to_remove(
     let all_steward_accounts =
         get_all_steward_accounts(client, &program_id, &args.view_parameters.steward_config).await?;
 
-    let state = &accounts.state_account.state;
-    let validator_list = &accounts.validator_list_account;
+    let state = &all_steward_accounts.state_account.state;
+    let validator_list = &all_steward_accounts.validator_list_account;
 
     let mut found = false;
     for i in 0..state.num_pool_validators {
