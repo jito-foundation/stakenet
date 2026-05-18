@@ -385,7 +385,7 @@ pub async fn compute_coinbase_targets(
             .iter()
             .position(|v| v.vote_account_address.eq(coinbase_vote_pubkey))
         {
-            if let Some(meta_target_lamports) = targets.get(&coinbase_vote_pubkey) {
+            if let Some(meta_target_lamports) = targets.get(coinbase_vote_pubkey) {
                 cb_balance_lamports = cb_balance_lamports.saturating_add(*meta_target_lamports);
             }
 
