@@ -172,6 +172,7 @@ pub async fn run_crank_steward(
                     &keeper_config.token_mint,
                     Some(keeper_config.priority_fee_in_microlamports),
                     &keeper_config.kobe_client,
+                    &keeper_config.coinbase_vote_pubkey,
                 )
                 .await?;
 
