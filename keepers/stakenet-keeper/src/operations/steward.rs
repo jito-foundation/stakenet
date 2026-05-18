@@ -165,14 +165,9 @@ pub async fn run_crank_steward(
                 log::info!("Cranking Copy Directed Targets...");
 
                 let stats = crank_copy_directed_stake_targets(
-                    keeper_config.client.clone(),
+                    keeper_config,
                     keypair.clone(),
-                    &keeper_config.steward_program_id,
                     steward_accounts,
-                    &keeper_config.token_mint,
-                    Some(keeper_config.priority_fee_in_microlamports),
-                    &keeper_config.kobe_client,
-                    &keeper_config.coinbase_vote_pubkey,
                 )
                 .await?;
 
