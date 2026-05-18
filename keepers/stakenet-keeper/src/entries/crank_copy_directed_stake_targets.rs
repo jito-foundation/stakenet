@@ -49,7 +49,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     let normal_txs_to_run =
         package_instructions(&normal_ixs, 8, Some(*priority_fee), Some(1_400_000), None);
     let normal_stats =
-        submit_packaged_transactions(&client, normal_txs_to_run, &keypair, Some(50), None).await?;
+        submit_packaged_transactions(client, normal_txs_to_run, &keypair, Some(50), None).await?;
     stats.combine(&normal_stats);
 
     let bam_delegation_ixs = compute_bam_targets(
@@ -75,7 +75,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
         None,
     );
     let bam_delegation_stats =
-        submit_packaged_transactions(&client, bam_delegation_txs_to_run, &keypair, Some(50), None)
+        submit_packaged_transactions(client, bam_delegation_txs_to_run, &keypair, Some(50), None)
             .await?;
     stats.combine(&bam_delegation_stats);
 
@@ -103,7 +103,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
         None,
     );
     let coinbase_delegation_stats = submit_packaged_transactions(
-        &client,
+        client,
         coinbase_delegation_txs_to_run,
         &keypair,
         Some(50),
