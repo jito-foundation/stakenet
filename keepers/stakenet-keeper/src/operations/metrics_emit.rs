@@ -7,7 +7,7 @@ use std::str::FromStr;
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperState};
 use log::*;
 use solana_metrics::datapoint_info;
-use solana_pubkey::Pubkey;
+use solana_sdk::pubkey::Pubkey;
 use spl_stake_pool::state::StakeStatus;
 use stakenet_sdk::utils::{
     accounts::{get_directed_stake_meta, get_directed_stake_whitelist},
