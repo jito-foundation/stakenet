@@ -51,7 +51,6 @@ use validator_history_cli::{
             copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
         },
-        info::validator_history_count::InfoValidatorHistoryCount,
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
 };
@@ -96,9 +95,6 @@ enum Commands {
 
     // Actions
     UpdateStakeHistory(UpdateStakeHistory),
-
-    // Info
-    InfoValidatorHistoryCount(InfoValidatorHistoryCount),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
@@ -1337,9 +1333,6 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::UpdateStakeHistory(command_args) => {
             commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
-        }
-        Commands::InfoValidatorHistoryCount(command_args) => {
-            commands::info::validator_history_count::run(command_args, args.json_rpc_url).await?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
