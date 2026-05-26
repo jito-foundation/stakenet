@@ -97,7 +97,7 @@ pub async fn fire(
 /// - `num_commissions`: Validators with non-default commissions
 /// - `num_epoch_credits`: Validators with non-default epoch credits
 /// - `num_stakes`: Validators with non-default stake amounts
-/// - `num_is_bam_connected`: Validators connected to BAM in current epoch
+/// - `num_bam_status_reported`: Validators with a known BAM connection status (connected or not) in current epoch
 ///
 /// ## Cluster State
 /// - `cluster_history_blocks`: Whether cluster history is updated for current epoch (0 or 1)
