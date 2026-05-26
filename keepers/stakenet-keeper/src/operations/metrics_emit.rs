@@ -129,6 +129,7 @@ pub fn emit_validator_history_metrics(
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
+    let mut count_is_bam_connected: i64 = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
 
@@ -162,6 +163,9 @@ pub fn emit_validator_history_metrics(
             }
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
+            }
+            if entry.is_bam_connected.ne(&default.is_bam_connected) {
+                count_is_bam_connected += 1;
             }
         }
         // Check previous epoch for state
@@ -231,6 +235,7 @@ pub fn emit_validator_history_metrics(
             get_vote_accounts_voting,
             i64
         ),
+        ("num_is_bam_connected", count_is_bam_connected, i64),
         "cluster" => cluster,
     );
 
