@@ -26,10 +26,13 @@ use tests::steward_fixtures::{
     crank_compute_instant_unstake, crank_compute_score, crank_copy_directed_stake_targets,
     crank_directed_stake_permissions, crank_epoch_maintenance, crank_idle, crank_rebalance,
     crank_rebalance_directed, crank_stake_pool, crank_validator_history_accounts,
-    instant_remove_validator, serialized_cluster_history_account, ExtraValidatorAccounts,
-    FixtureDefaultAccounts, StateMachineFixtures, TestFixture, ValidatorEntry,
+    instant_remove_validator, serialized_cluster_history_account,
+    serialized_validator_history_account, ExtraValidatorAccounts, FixtureDefaultAccounts,
+    StateMachineFixtures, TestFixture, ValidatorEntry,
 };
-use validator_history::{ClusterHistory, ValidatorHistory};
+use validator_history::{
+    ClusterHistory, ClusterHistoryEntry, ValidatorHistory, ValidatorHistoryEntry,
+};
 
 /// Helper function to initialize directed stake meta
 async fn initialize_directed_stake_meta(fixture: &TestFixture) -> Pubkey {
@@ -542,10 +545,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
             if target.vote_pubkey == Pubkey::default() {
                 continue;
             }
-            println!(
-                "Staked lamports for validator {:?}: {:?}",
-                target.vote_pubkey, target.total_staked_lamports
-            );
             assert_eq!(target.total_staked_lamports, 10_000_000_000);
         }
     }
@@ -632,6 +631,37 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     .await;
 
     // Advance next_cycle_epoch to 22 so epoch 22 maintenance triggers the reset.
+    // Inject epoch 21 entries so compute_score passes its recency checks.
+    {
+        let epoch_schedule = solana_sdk::epoch_schedule::EpochSchedule::default();
+        let epoch_21_last_slot = epoch_schedule.get_last_slot_in_epoch(21);
+
+        for (i, extra_accounts) in extra_validator_accounts.iter().enumerate() {
+            let mut vh = unit_test_fixtures.validators[i];
+            vh.history.push(ValidatorHistoryEntry {
+                epoch: 21,
+                vote_account_last_update_slot: epoch_21_last_slot,
+                ..ValidatorHistoryEntry::default()
+            });
+            fixture.ctx.borrow_mut().set_account(
+                &extra_accounts.validator_history_address,
+                &serialized_validator_history_account(vh).into(),
+            );
+        }
+
+        let mut ch = unit_test_fixtures.cluster_history;
+        ch.cluster_history_last_update_slot = epoch_21_last_slot;
+        ch.history.push(ClusterHistoryEntry {
+            epoch: 21,
+            total_blocks: 1000,
+            ..ClusterHistoryEntry::default()
+        });
+        fixture.ctx.borrow_mut().set_account(
+            &fixture.cluster_history_account,
+            &serialized_cluster_history_account(ch).into(),
+        );
+    }
+
     fixture.advance_num_slots(250_000).await;
     crank_idle(&fixture).await;
     crank_compute_score(
@@ -657,7 +687,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         );
 
         // Total is reset at epoch maintenance
-        assert!(directed_stake_meta.directed_unstake_total == 0);
+        assert_eq!(directed_stake_meta.directed_unstake_total, 0);
     }
     drop(fixture);
 }
