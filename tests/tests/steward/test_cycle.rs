@@ -411,7 +411,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
     // Modify validator history account with desired values
 
     let mut fixture = TestFixture::new_from_accounts(fixture_accounts, HashMap::new()).await;
-    let ctx = &fixture.ctx;
 
     fixture.steward_config = Keypair::new();
     fixture.steward_state = Pubkey::find_program_address(
@@ -563,8 +562,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
 
     crank_compute_delegations(&fixture).await;
 
-    let clock: Clock = ctx.borrow_mut().banks_client.get_sysvar().await.unwrap();
-
     fixture.advance_num_slots(160_000).await;
 
     crank_idle(&fixture).await;
@@ -584,8 +581,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         &[0, 1, 2],
     )
     .await;
-
-    println!("Advancing epoch from {} (expected 20)", clock.epoch);
 
     fixture.advance_num_epochs(1, 10).await;
 
@@ -609,10 +604,6 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         let directed_stake_meta: DirectedStakeMeta = fixture
             .load_and_deserialize(&fixture.directed_stake_meta)
             .await;
-        println!(
-            "Directed unstake total: {}",
-            directed_stake_meta.directed_unstake_total
-        );
         assert!(directed_stake_meta.directed_unstake_total > 9_000_000_000);
     }
 
@@ -639,6 +630,18 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
         &[2],
     )
     .await;
+
+    // Advance next_cycle_epoch to 22 so epoch 22 maintenance triggers the reset.
+    fixture.advance_num_slots(250_000).await;
+    crank_idle(&fixture).await;
+    crank_compute_score(
+        &fixture,
+        &unit_test_fixtures,
+        &extra_validator_accounts,
+        &[0, 1, 2],
+    )
+    .await;
+    crank_compute_delegations(&fixture).await;
 
     fixture.advance_num_epochs(1, 10).await;
 
