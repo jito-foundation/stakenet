@@ -81,6 +81,17 @@ pub mod cli_signer;
 pub mod commands;
 pub mod utils;
 
+fn load_cli_signer(
+    signer_path: Option<&str>,
+    ledger_wallet: Option<solana_sdk::pubkey::Pubkey>,
+    ledger_key: Option<&str>,
+    command_name: &str,
+) -> Result<CliSigner> {
+    let signer_path = signer_path
+        .ok_or_else(|| anyhow!("--signer flag is required for the '{command_name}' command"))?;
+    CliSigner::from_path(signer_path, ledger_wallet, ledger_key)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
@@ -95,6 +106,8 @@ async fn main() -> Result<()> {
     let steward_program_id = args.steward_program_id;
     let validator_history_program_id = args.validator_history_program_id;
     let global_signer = args.signer.as_deref();
+    let ledger_wallet = args.ledger_wallet;
+    let ledger_key = args.ledger_key.as_deref();
 
     let result = match args.commands {
         // ---- Views ----
@@ -150,16 +163,8 @@ async fn main() -> Result<()> {
             command_update_priority_fee_config(args, &client, steward_program_id).await
         }
         Commands::UpdateAuthority(args) => {
-            // Use global signer - required for this command
-            let signer_path = global_signer.ok_or_else(|| {
-                anyhow!("--signer flag is required for the 'update-authority' command")
-            })?;
-            // Create the appropriate signer based on the path
-            let cli_signer = if signer_path == "ledger" {
-                CliSigner::new_ledger()
-            } else {
-                CliSigner::new_keypair_from_path(signer_path)?
-            };
+            let cli_signer =
+                load_cli_signer(global_signer, ledger_wallet, ledger_key, "update-authority")?;
             command_update_authority(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::SetStaker(args) => command_set_staker(args, &client, steward_program_id).await,
@@ -197,25 +202,17 @@ async fn main() -> Result<()> {
             command_remove_bad_validators(args, &client, steward_program_id).await
         }
         Commands::AddToBlacklist(args) => {
-            // Use global signer - required for this command
-            let signer_path = global_signer.expect("--signer flag is required for this command");
-            // Create the appropriate signer based on the path
-            let cli_signer = if signer_path == "ledger" {
-                CliSigner::new_ledger()
-            } else {
-                CliSigner::new_keypair_from_path(signer_path)?
-            };
+            let cli_signer =
+                load_cli_signer(global_signer, ledger_wallet, ledger_key, "add-to-blacklist")?;
             command_add_to_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::RemoveFromBlacklist(args) => {
-            // Use global signer - required for this command
-            let signer_path = global_signer.expect("--signer flag is required for this command");
-            // Create the appropriate signer based on the path
-            let cli_signer = if signer_path == "ledger" {
-                CliSigner::new_ledger()
-            } else {
-                CliSigner::new_keypair_from_path(signer_path)?
-            };
+            let cli_signer = load_cli_signer(
+                global_signer,
+                ledger_wallet,
+                ledger_key,
+                "remove-from-blacklist",
+            )?;
             command_remove_from_blacklist(args, &client, steward_program_id, &cli_signer).await
         }
         Commands::UpdateValidatorListBalance(args) => {
