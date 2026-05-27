@@ -3231,9 +3231,9 @@ dependencies = [
 
 [[package]]
 name = "kobe-client"
-version = "0.1.9"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5db55f51a6159ea21b09cd03fef39c61776ea66397af6164e8b7c6bb396d30a2"
+checksum = "b9299da4a4d7523db4664b164178c64f9ca822978e7ffdb0be9b226decee04c7"
 dependencies = [
  "chrono",
  "reqwest 0.12.24",
@@ -11233,7 +11233,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "stakenet-keeper"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anchor-lang",
  "bincode",
