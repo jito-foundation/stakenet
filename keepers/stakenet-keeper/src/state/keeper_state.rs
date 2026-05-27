@@ -337,9 +337,7 @@ impl KeeperState {
 
         // Always require epoch to be more than 50% complete
         let current_slot = client.get_slot().await?;
-        let first_slot_in_epoch = self
-            .epoch_schedule
-            .get_first_slot_in_epoch(current_epoch);
+        let first_slot_in_epoch = self.epoch_schedule.get_first_slot_in_epoch(current_epoch);
         let slot_index = current_slot
             .checked_sub(first_slot_in_epoch)
             .ok_or_else(|| {
