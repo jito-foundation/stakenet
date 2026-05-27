@@ -18,7 +18,7 @@ use crate::{
             get_directed_stake_meta, get_directed_stake_meta_address,
             get_directed_stake_ticket_address, get_directed_stake_tickets,
             get_directed_stake_whitelist_address, get_stake_pool_account,
-            get_steward_config_account, get_validator_list_account,
+            get_steward_config_account, get_steward_state_account, get_validator_list_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -106,7 +106,9 @@ pub fn update_directed_stake_ticket(
 ///    - Converts JitoSOL to lamports using the stake pool's conversion rate
 ///    - Applies their allocation preferences across validators
 /// 3. Aggregates total target delegations per validator
-/// 4. Generates `CopyDirectedStakeTargets` instructions for each validator
+/// 4. For each validator, looks up its steward score; if the score is `0`, the target
+///    delegation is forced to `0` regardless of ticket allocations
+/// 5. Generates `CopyDirectedStakeTargets` instructions for each validator
 ///
 /// # Conversion Details
 ///
@@ -116,6 +118,12 @@ pub fn update_directed_stake_ticket(
 /// conversion_rate_bps = (stake_pool.total_lamports * 10,000) / pool_token_supply
 /// allocation_lamports = (allocation_jitosol * conversion_rate_bps) / 10,000
 /// ```
+///
+/// # Score-Based Filtering (After 100% BAM stake)
+///
+/// Validators whose steward score is `0` are excluded from delegation by zeroing their
+/// target lamports. Validators with no score entry yet (i.e., `compute_score` has not
+/// run for them) are left unchanged and retain their computed target.
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
     token_mint_address: &Pubkey,
@@ -144,7 +152,7 @@ pub async fn compute_directed_stake_meta(
     let existing_directed_stake_meta =
         get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
     let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
-    let validator_targets = aggregate_validator_targets(
+    let mut validator_targets = aggregate_validator_targets(
         &existing_directed_stake_meta,
         &tickets,
         &jitosol_balances,
@@ -153,6 +161,7 @@ pub async fn compute_directed_stake_meta(
 
     // Get validator list to find indices
     let config_account = get_steward_config_account(&client, steward_config).await?;
+    let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
@@ -161,13 +170,22 @@ pub async fn compute_directed_stake_meta(
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
     let instructions = validator_targets
-        .iter()
+        .iter_mut()
         .filter_map(|(vote_pubkey, total_target_lamports)| {
             // Find the index of this vote_pubkey in the validator list
             let validator_list_index = validator_list_account
                 .validators
                 .iter()
                 .position(|v| v.vote_account_address == *vote_pubkey)?;
+
+            if steward_account
+                .state
+                .scores
+                .get(validator_list_index)
+                .is_some_and(|&s| s == 0)
+            {
+                *total_target_lamports = 0;
+            }
 
             Some(Instruction {
                 program_id: *program_id,
