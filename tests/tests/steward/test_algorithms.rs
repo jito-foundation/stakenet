@@ -398,8 +398,7 @@ fn test_compute_score() {
     config.parameters.jito_bam_window_epochs = 10;
     let mut validator = good_validator;
     for i in 10..=20 {
-        validator.history.arr_mut()[i].is_bam_connected =
-            ValidatorHistoryEntry::default().is_bam_connected;
+        validator.history.arr_mut()[i].is_bam_connected = 0;
     }
     let components = validator_score(
         &validator,
