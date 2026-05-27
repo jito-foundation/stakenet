@@ -356,22 +356,13 @@ impl KeeperState {
             return Ok(false);
         }
 
-        // In the scoring epoch, additionally wait until scoring and delegation have completed
-        // so that score-based zeroing uses fresh scores.
-        if is_scoring_epoch {
-            let past_delegation = !matches!(
+        if is_scoring_epoch && !steward_inner.has_flag(jito_steward::COMPUTE_DELEGATIONS) {
+            log::debug!(
+                "Scoring epoch {}: COMPUTE_DELEGATIONS flag not set (state: {:?}) - waiting for delegation to finish before copying targets",
+                current_epoch,
                 steward_inner.state_tag,
-                jito_steward::StewardStateEnum::ComputeScores
-                    | jito_steward::StewardStateEnum::ComputeDelegations
             );
-            if !past_delegation {
-                log::debug!(
-                    "Scoring epoch {}: steward still in {:?} - waiting for delegation to finish before copying targets",
-                    current_epoch,
-                    steward_inner.state_tag,
-                );
-                return Ok(false);
-            }
+            return Ok(false);
         }
 
         // Fetch and filter valid targets
