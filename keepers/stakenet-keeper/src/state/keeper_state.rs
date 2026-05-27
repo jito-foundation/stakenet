@@ -319,6 +319,8 @@ impl KeeperState {
     ///
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
+    /// - In the scoring epoch (`current_epoch == next_cycle_epoch`), scoring and delegation
+    ///   have also completed (steward state is past `ComputeDelegations`)
     /// - No directed stake targets have been updated in the current epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
@@ -329,11 +331,15 @@ impl KeeperState {
             return Ok(false);
         };
 
-        // Calculate epoch progress
+        let current_epoch = self.epoch_info.epoch;
+        let steward_inner = &steward_state.state_account.state;
+        let is_scoring_epoch = current_epoch == steward_inner.next_cycle_epoch;
+
+        // Always require epoch to be more than 50% complete
         let current_slot = client.get_slot().await?;
         let first_slot_in_epoch = self
             .epoch_schedule
-            .get_first_slot_in_epoch(self.epoch_info.epoch);
+            .get_first_slot_in_epoch(current_epoch);
         let slot_index = current_slot
             .checked_sub(first_slot_in_epoch)
             .ok_or_else(|| {
@@ -344,13 +350,30 @@ impl KeeperState {
 
         let epoch_progress = slot_index as f64 / self.epoch_schedule.slots_per_epoch as f64;
 
-        // Early return if epoch is not yet 50% complete
         if epoch_progress <= 0.5 {
             log::debug!(
                 "Epoch progress {:.2}% - too early to copy targets",
-                epoch_progress * 100.0
+                epoch_progress * 100.0,
             );
             return Ok(false);
+        }
+
+        // In the scoring epoch, additionally wait until scoring and delegation have completed
+        // so that score-based zeroing uses fresh scores.
+        if is_scoring_epoch {
+            let past_delegation = !matches!(
+                steward_inner.state_tag,
+                jito_steward::StewardStateEnum::ComputeScores
+                    | jito_steward::StewardStateEnum::ComputeDelegations
+            );
+            if !past_delegation {
+                log::debug!(
+                    "Scoring epoch {}: steward still in {:?} - waiting for delegation to finish before copying targets",
+                    current_epoch,
+                    steward_inner.state_tag,
+                );
+                return Ok(false);
+            }
         }
 
         // Fetch and filter valid targets
@@ -372,16 +395,18 @@ impl KeeperState {
         // Check if any targets have been updated in current epoch
         let any_target_updated = valid_targets
             .iter()
-            .any(|target| target.target_last_updated_epoch == self.epoch_info.epoch);
+            .any(|target| target.target_last_updated_epoch == current_epoch);
 
         let should_copy = !any_target_updated;
 
         log::info!(
-            "Epoch {:.2}% complete, {} valid targets, any updated: {} - should_copy: {}",
-            epoch_progress * 100.0,
+            "Epoch {} (scoring: {}), steward state {:?}, {} valid targets, any updated: {} - should_copy: {}",
+            current_epoch,
+            is_scoring_epoch,
+            steward_inner.state_tag,
             valid_targets.len(),
             any_target_updated,
-            should_copy
+            should_copy,
         );
 
         Ok(should_copy)

@@ -121,9 +121,8 @@ pub fn update_directed_stake_ticket(
 ///
 /// # Score-Based Filtering (After 100% BAM stake)
 ///
-/// Validators whose steward score is `0` are excluded from delegation by zeroing their
-/// target lamports. Validators with no score entry yet (i.e., `compute_score` has not
-/// run for them) are left unchanged and retain their computed target.
+/// Validators whose steward score resolves to `0` are excluded from delegation by
+/// zeroing their target lamports, regardless of ticket allocations.
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
     token_mint_address: &Pubkey,
