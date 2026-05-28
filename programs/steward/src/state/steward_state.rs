@@ -903,6 +903,27 @@ impl StewardStateV2 {
         Err(StewardError::InvalidState.into())
     }
 
+    /// Simulates the on-chain reconciliation performed by
+    /// `adjust_directed_stake_for_deposits_and_withdrawals` in `rebalance_directed.rs`,
+    /// returning the post-state `(new_directed_stake_lamports, new_total_stake_lamports)`
+    /// for a single validator without mutating any account. Used by scoring and rebalance
+    /// calculations (see `delegation.rs::{increase,decrease}_stake_calculation`) so they
+    /// see the same totals the on-chain instruction would write — keeping their branches
+    /// in sync is required for scoring/rebalance correctness.
+    ///
+    /// Returns `(0, target_total_staked_lamports)` when no directed-stake target is wired
+    /// up for this validator (`directed_stake_meta_indices[i] == u64::MAX`).
+    ///
+    /// Otherwise handles three cases mirroring the on-chain instruction:
+    /// - **Withdrawal** (`target_total < steward_state`): subtract the withdrawal from
+    ///   directed accounting, rolling any remainder over to undirected stake.
+    /// - **Deposit** (`target_total > steward_state` and applied < target): credit up to
+    ///   the directed deficit against the deposit.
+    /// - **Stale `total_staked_lamports`** (`applied > target_total`): an undirected
+    ///   rebalance has already synced `validator_lamport_balances` to the validator list,
+    ///   but the directed accounting wasn't updated. Cap `directed_stake_lamports[i]` to
+    ///   the validator list stake; `new_total_stake_lamports` is left at the current
+    ///   `validator_lamport_balances[i]` because it is already correct.
     pub fn simulate_adjust_directed_stake_for_deposits_and_withdrawals(
         &self,
         target_total_staked_lamports: u64,
@@ -913,12 +934,14 @@ impl StewardStateV2 {
         if directed_stake_meta.directed_stake_meta_indices[validator_list_index] == u64::MAX {
             return Ok((0, target_total_staked_lamports));
         }
+
         let (mut new_directed_stake_lamports, mut new_total_stake_lamports) = (0u64, 0u64);
         let steward_state_total_lamports = self.validator_lamport_balances[validator_list_index];
         let directed_stake_target_lamports =
             directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
         let directed_stake_applied_lamports =
             directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+
         if target_total_staked_lamports < steward_state_total_lamports {
             let withdrawal_lamports =
                 steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
@@ -957,7 +980,15 @@ impl StewardStateV2 {
                 .saturating_add(increase_lamports);
             new_total_stake_lamports = self.validator_lamport_balances[validator_list_index]
                 .saturating_add(increase_lamports);
+        } else if directed_stake_applied_lamports > target_total_staked_lamports {
+            let excess =
+                directed_stake_applied_lamports.saturating_sub(target_total_staked_lamports);
+            new_directed_stake_lamports = directed_stake_meta.directed_stake_lamports
+                [validator_list_index]
+                .saturating_sub(excess);
+            new_total_stake_lamports = steward_state_total_lamports;
         }
+
         Ok((new_directed_stake_lamports, new_total_stake_lamports))
     }
 
@@ -1241,7 +1272,7 @@ pub fn select_validators_to_delegate(
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::SORTED_INDEX_DEFAULT;
+    use crate::{constants::SORTED_INDEX_DEFAULT, utils::U8Bool, DirectedStakeTarget};
 
     use super::*;
 
@@ -1412,5 +1443,178 @@ mod tests {
         state.transition_idle(20, 0.3, 0.9, 0.5).unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::Idle));
         assert!(state.has_flag(PRE_LOOP_IDLE));
+    }
+
+    /// Builds a `DirectedStakeMeta` with the given targets. All
+    /// `directed_stake_meta_indices` start as `u64::MAX` (i.e. unlinked); use
+    /// [`link_directed_target`] to wire a validator-list index to a target.
+    fn make_directed_stake_meta(targets: &[(Pubkey, u64, u64)]) -> DirectedStakeMeta {
+        let mut meta = DirectedStakeMeta {
+            total_stake_targets: 0,
+            directed_unstake_total: 0,
+            padding0: [0; 63],
+            is_initialized: U8Bool::from(true),
+            directed_stake_lamports: [0; MAX_VALIDATORS],
+            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
+            targets: [DirectedStakeTarget {
+                vote_pubkey: Pubkey::default(),
+                total_target_lamports: 0,
+                total_staked_lamports: 0,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            }; MAX_VALIDATORS],
+        };
+        for (i, (vote_pubkey, target_lamports, staked_lamports)) in targets.iter().enumerate() {
+            meta.targets[i] = DirectedStakeTarget {
+                vote_pubkey: *vote_pubkey,
+                total_target_lamports: *target_lamports,
+                total_staked_lamports: *staked_lamports,
+                target_last_updated_epoch: 0,
+                staked_last_updated_epoch: 0,
+                _padding0: [0; 32],
+            };
+        }
+        meta.total_stake_targets = targets.len() as u64;
+        meta
+    }
+
+    /// Wires a directed-stake target at `validator_list_index` so the simulator runs
+    /// past its `u64::MAX` early-return. Sets `directed_stake_meta_indices` and the
+    /// per-validator `directed_stake_lamports` mirror that the on-chain instruction
+    /// keeps in sync with `targets[..].total_staked_lamports`.
+    fn link_directed_target(
+        meta: &mut DirectedStakeMeta,
+        validator_list_index: usize,
+        target_index: usize,
+        directed_stake_lamports: u64,
+    ) {
+        meta.directed_stake_meta_indices[validator_list_index] = target_index as u64;
+        meta.directed_stake_lamports[validator_list_index] = directed_stake_lamports;
+    }
+
+    #[test]
+    fn no_meta_entry_returns_validator_list_stake() {
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 7_000_000;
+        let meta = make_directed_stake_meta(&[]);
+
+        // `directed_stake_meta_indices[0]` is u64::MAX, so the simulator should
+        // short-circuit and report no directed stake with the validator list's total.
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(10_000_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 0);
+        assert_eq!(new_total, 10_000_000);
+    }
+
+    #[test]
+    fn withdrawal_exceeds_directed_rolls_over_to_undirected() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 25_000_000;
+        let mut meta = make_directed_stake_meta(&[(validator1, 1_000_000, 1_000_000)]);
+        link_directed_target(&mut meta, 0, 0, 1_000_000);
+
+        // 3M withdrawal, directed_applied (1M) < withdrawal (3M): directed drops
+        // to 0, remainder is absorbed by undirected via the full subtraction on
+        // total.
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(22_000_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 0);
+        assert_eq!(new_total, 22_000_000);
+    }
+
+    #[test]
+    fn withdrawal_within_directed() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 25_000_000;
+        let mut meta = make_directed_stake_meta(&[(validator1, 5_000_000, 5_000_000)]);
+        link_directed_target(&mut meta, 0, 0, 5_000_000);
+
+        // 3M withdrawal, directed_applied (5M) >= withdrawal (3M): both directed
+        // and total drop by the withdrawal amount.
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(22_000_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 2_000_000);
+        assert_eq!(new_total, 22_000_000);
+    }
+
+    #[test]
+    fn deposit_credits_directed_deficit() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 20_000_000;
+        // target_lamports = 3M, applied = 1M => directed deficit = 2M
+        let mut meta = make_directed_stake_meta(&[(validator1, 3_000_000, 1_000_000)]);
+        link_directed_target(&mut meta, 0, 0, 1_000_000);
+
+        // 5M deposit, capped to the 2M deficit.
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(25_000_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 3_000_000);
+        assert_eq!(new_total, 22_000_000);
+    }
+
+    #[test]
+    fn deposit_smaller_than_deficit() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 20_000_000;
+        // directed deficit = 10M
+        let mut meta = make_directed_stake_meta(&[(validator1, 11_000_000, 1_000_000)]);
+        link_directed_target(&mut meta, 0, 0, 1_000_000);
+
+        // Only 500k deposit, less than the deficit; full deposit goes to directed.
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(20_500_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 1_500_000);
+        assert_eq!(new_total, 20_500_000);
+    }
+
+    /// Mirrors the stale-`total_staked_lamports` branch added in
+    /// rebalance_directed.rs: an earlier undirected rebalance already synced
+    /// `validator_lamport_balances` to the current on-chain validator list,
+    /// but directed accounting wasn't updated.
+    #[test]
+    fn stale_case_caps_directed_to_validator_list() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        // steward_state_total_lamports == validator list reports == 5M
+        state.validator_lamport_balances[0] = 5_000_000;
+        // directed_applied = 6M (stale; exceeds the validator list).
+        let mut meta = make_directed_stake_meta(&[(validator1, 6_000_000, 6_000_000)]);
+        link_directed_target(&mut meta, 0, 0, 6_000_000);
+
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(5_000_000, 0, 0, &meta)
+            .unwrap();
+        // Excess of 1M is removed from directed; total left unchanged.
+        assert_eq!(new_directed, 5_000_000);
+        assert_eq!(new_total, 5_000_000);
+    }
+
+    /// Defensive: if directed_stake_lamports has drifted below
+    /// targets.total_staked_lamports for some reason, the saturating_sub
+    /// must not underflow.
+    #[test]
+    fn stale_case_saturates_when_excess_exceeds_directed_lamports() {
+        let validator1 = Pubkey::new_unique();
+        let mut state = default_state();
+        state.validator_lamport_balances[0] = 1_000_000;
+        let mut meta = make_directed_stake_meta(&[(validator1, 6_000_000, 6_000_000)]);
+        // Set the per-validator mirror below the excess (5M) to trigger saturation.
+        link_directed_target(&mut meta, 0, 0, 3_000_000);
+
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(1_000_000, 0, 0, &meta)
+            .unwrap();
+        assert_eq!(new_directed, 0);
+        assert_eq!(new_total, 1_000_000);
     }
 }
