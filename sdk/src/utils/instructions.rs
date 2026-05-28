@@ -206,41 +206,12 @@ pub async fn compute_directed_stake_meta(
     Ok(instructions)
 }
 
-/// Computes BAM stake delegation targets and generates instructions to zero out stake targets
-/// for eligible BAM validators with a steward score of `0`.
-///
-/// This function queries the Kobe API for BAM epoch metrics and eligible validators, then
-/// combines that data with existing directed stake metadata to determine per-validator targets.
-/// Instructions are only emitted for validators whose steward score is `0`, forcing their
-/// `total_target_lamports` to `0` on-chain.
-///
-/// # Process Overview
-///
-/// 1. Fetches BAM epoch metrics and BAM validator list from the Kobe API (using the previous epoch)
-/// 2. Loads existing directed stake metadata to retrieve targets last updated in the current epoch
-/// 3. Filters the BAM validator list to eligible validators (`is_eligible == true`)
-/// 4. For each eligible BAM validator:
-///    - Computes a per-validator base: `available_bam_delegation_stake / eligible_validator_count`
-///    - Adds any existing directed stake meta target for that validator (current epoch only)
-///    - Checks the validator's steward score — only validators with score `== 0` emit an instruction
-/// 5. Generates `CopyDirectedStakeTargets` instructions with `total_target_lamports = 0`
-///    for each qualifying validator
-///
-/// # Integer Division Behavior
-///
-/// The base stake per validator uses integer division, which truncates any remainder.
-/// This means `(available_bam_delegation_stake % eligible_validator_count)` lamports
-/// will not be delegated. This remainder is intentionally ignored to maintain equal
-/// distribution across all BAM validators.
-///
-/// Example: With 100 lamports and 3 validators, each receives 33 lamports (99 total),
-/// leaving 1 lamport undelegated.
+/// Generates instructions to zero out stake targets for eligible BAM validators
+/// with a steward score of `0`.
 ///
 /// # Return Value
 ///
-/// Returns an empty vector of instructions if:
-/// - `bam_eligible_validators` is empty, or
-/// - `bam_epoch_metric` is `None` (no BAM epoch metrics available for the previous epoch)
+/// Returns an empty vector if `bam_eligible_validators` is empty.
 pub async fn compute_bam_targets(
     client: Arc<RpcClient>,
     kobe_client: &KobeClient,
@@ -248,28 +219,14 @@ pub async fn compute_bam_targets(
     authority_pubkey: &Pubkey,
     program_id: &Pubkey,
 ) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let epoch_info = client.get_epoch_info().await?;
-    let current_epoch = epoch_info.epoch;
-    let last_epoch = epoch_info.epoch - 1;
+    let last_epoch = client.get_epoch_info().await?.epoch - 1;
 
-    let bam_epoch_metric = kobe_client
-        .get_bam_epoch_metrics(last_epoch)
-        .await?
-        .bam_epoch_metrics;
     let bam_validators = kobe_client
         .get_bam_validators(last_epoch)
         .await?
         .bam_validators;
 
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
-    let directed_stake_meta =
-        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
-    let targets: HashMap<Pubkey, u64> = directed_stake_meta
-        .targets
-        .iter()
-        .filter(|target| target.target_last_updated_epoch == current_epoch)
-        .map(|target| (target.vote_pubkey, target.total_target_lamports))
-        .collect();
     let config_account = get_steward_config_account(&client, steward_config).await?;
     let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
@@ -282,76 +239,56 @@ pub async fn compute_bam_targets(
         .filter(|bv| bv.is_eligible)
         .collect();
 
-    let mut instructions = Vec::new();
-
-    if bam_eligible_validators.is_empty() {
-        return Ok(instructions);
-    }
-
-    if let Some(metric) = bam_epoch_metric {
-        let mut total_target_lamports = metric
-            .available_bam_delegation_stake
-            .checked_div(bam_eligible_validators.len() as u64)
-            .ok_or(JitoInstructionError::ArithmeticError)?;
-
-        instructions.extend(
-            bam_eligible_validators
+    let instructions = bam_eligible_validators
+        .iter()
+        .filter_map(|bv| {
+            let vote_pubkey = match Pubkey::from_str(&bv.vote_account) {
+                Ok(pubkey) => pubkey,
+                Err(e) => {
+                    log::warn!("Failed to parse vote account: {}: {e}", bv.vote_account);
+                    return None;
+                }
+            };
+            let validator_list_index = match validator_list_account
+                .validators
                 .iter()
-                .filter_map(|bv| {
-                    let vote_pubkey = match Pubkey::from_str(&bv.vote_account) {
-                        Ok(pubkey) => pubkey,
-                        Err(e) => {
-                            log::warn!("Failed to parse vote account: {}: {e}", bv.vote_account);
-                            return None;
-                        }
-                    };
-                    let validator_list_index = match validator_list_account
-                        .validators
-                        .iter()
-                        .position(|v| v.vote_account_address == vote_pubkey)
-                    {
-                        Some(index) => index,
-                        None => {
-                            log::warn!("Vote account {vote_pubkey} not found in validator list");
-                            return None;
-                        }
-                    };
+                .position(|v| v.vote_account_address == vote_pubkey)
+            {
+                Some(index) => index,
+                None => {
+                    log::warn!("Vote account {vote_pubkey} not found in validator list");
+                    return None;
+                }
+            };
 
-                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
-                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
-                            Some(sum) => sum,
-                            None => {
-                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
-                                return None;
-                            }
-                        }
+            if steward_account
+                .state
+                .scores
+                .get(validator_list_index)
+                .is_some_and(|&s| s == 0)
+            {
+                Some(Instruction {
+                    program_id: *program_id,
+                    accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                        config: *steward_config,
+                        directed_stake_meta: directed_stake_meta_pda,
+                        authority: *authority_pubkey,
+                        clock: solana_sdk::sysvar::clock::id(),
+                        validator_list: validator_list_address,
                     }
-
-                    if steward_account.state.scores.get(validator_list_index).is_some_and(|&s| s==0) {
-                        Some(Instruction {
-                            program_id: *program_id,
-                            accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                                config: *steward_config,
-                                directed_stake_meta: directed_stake_meta_pda,
-                                authority: *authority_pubkey,
-                                clock: solana_sdk::sysvar::clock::id(),
-                                validator_list: validator_list_address,
-                            }
-                            .to_account_metas(None),
-                            data: jito_steward::instruction::CopyDirectedStakeTargets {
-                                vote_pubkey,
-                                total_target_lamports: 0,
-                                validator_list_index: validator_list_index as u32,
-                            }
-                            .data(),
-                        })
-                    } else {
-                        None
+                    .to_account_metas(None),
+                    data: jito_steward::instruction::CopyDirectedStakeTargets {
+                        vote_pubkey,
+                        total_target_lamports: 0,
+                        validator_list_index: validator_list_index as u32,
                     }
+                    .data(),
                 })
-                .collect::<Vec<Instruction>>(),
-        );
-    }
+            } else {
+                None
+            }
+        })
+        .collect();
 
     Ok(instructions)
 }

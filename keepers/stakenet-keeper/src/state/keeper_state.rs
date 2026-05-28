@@ -320,6 +320,10 @@ impl KeeperState {
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
     /// - Steward is not actively scoring or computing delegations
+    /// - At least one directed-stake-enrolled validator has score == 0 (both cranks
+    ///   only emit `CopyDirectedStakeTargets` for score-0 validators; without this
+    ///   gate the keeper would busy-loop for the rest of the epoch when no score-0
+    ///   validator exists, since `target_last_updated_epoch` would never advance)
     /// - No directed stake targets have been updated in the current epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
@@ -388,14 +392,25 @@ impl KeeperState {
             .iter()
             .any(|target| target.target_last_updated_epoch == current_epoch);
 
-        let should_copy = !any_target_updated;
+        let has_score_zero_in_meta = valid_targets.iter().any(|target| {
+            steward_state
+                .validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address == target.vote_pubkey)
+                .and_then(|i| steward_inner.scores.get(i))
+                .is_some_and(|&s| s == 0)
+        });
+
+        let should_copy = !any_target_updated && has_score_zero_in_meta;
 
         log::info!(
-            "Epoch {}, steward state {:?}, {} valid targets, any updated: {} - should_copy: {}",
+            "Epoch {}, steward state {:?}, {} valid targets, any updated: {}, score-0 in meta: {} - should_copy: {}",
             current_epoch,
             steward_inner.state_tag,
             valid_targets.len(),
             any_target_updated,
+            has_score_zero_in_meta,
             should_copy,
         );
 
