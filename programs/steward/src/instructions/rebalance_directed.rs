@@ -140,6 +140,7 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
     let directed_stake_applied_lamports =
         directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+
     if validator_list_staked_lamports < steward_state_total_lamports {
         let withdrawal_lamports =
             steward_state_total_lamports.saturating_sub(validator_list_staked_lamports);
@@ -195,6 +196,7 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
             .directed_stake_lamports[validator_list_index]
             .saturating_sub(excess);
     }
+
     Ok(())
 }
 
