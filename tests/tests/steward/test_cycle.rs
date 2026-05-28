@@ -168,6 +168,8 @@ async fn test_cycle() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0), // No undirected stake floor
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -451,6 +453,8 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -751,6 +755,8 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -983,6 +989,8 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(100),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -1213,6 +1221,8 @@ async fn test_cycle_with_directed_stake_noop_copy() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -1420,6 +1430,8 @@ async fn test_cycle_with_directed_stake_partial_copy() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -1628,6 +1640,8 @@ async fn test_cycle_with_directed_stake_undirected() {
                 undirected_stake_ceiling_lamports: Some(u64::MAX), // Set high floor to disable undirected
                 // stake increases
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -1788,6 +1802,8 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -1951,6 +1967,8 @@ async fn test_cycle_with_directed_stake_targets() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -2341,6 +2359,8 @@ async fn test_remove_validator_mid_epoch() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -2640,6 +2660,8 @@ async fn test_add_validator_next_cycle() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(10_000_000 * 1_000_000_000),
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
@@ -2892,6 +2914,8 @@ async fn test_directed_stake_large_target_low_reserve() {
                 compute_score_epoch_progress: Some(0.50),
                 undirected_stake_ceiling_lamports: Some(0), // No undirected stake floor
                 directed_stake_unstake_cap_bps: Some(10_000),
+                jito_bam_minimum_epochs: Some(0),
+                jito_bam_window_epochs: Some(0),
             }),
             None,
         )
