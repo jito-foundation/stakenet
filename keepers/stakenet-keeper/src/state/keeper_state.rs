@@ -319,8 +319,7 @@ impl KeeperState {
     ///
     /// Returns `true` if:
     /// - Epoch is more than 50% complete
-    /// - In the scoring epoch (`current_epoch == next_cycle_epoch`), scoring and delegation
-    ///   have also completed (steward state is past `ComputeDelegations`)
+    /// - Steward is not actively scoring or computing delegations
     /// - No directed stake targets have been updated in the current epoch
     pub async fn should_copy_directed_stake_targets(
         &self,
@@ -333,7 +332,6 @@ impl KeeperState {
 
         let current_epoch = self.epoch_info.epoch;
         let steward_inner = &steward_state.state_account.state;
-        let is_scoring_epoch = current_epoch == steward_inner.next_cycle_epoch;
 
         // Always require epoch to be more than 50% complete
         let current_slot = client.get_slot().await?;
@@ -356,11 +354,15 @@ impl KeeperState {
             return Ok(false);
         }
 
-        if is_scoring_epoch && !steward_inner.has_flag(jito_steward::COMPUTE_DELEGATIONS) {
+        if matches!(
+            steward_inner.state_tag,
+            jito_steward::StewardStateEnum::ComputeScores
+                | jito_steward::StewardStateEnum::ComputeDelegations
+        ) {
             log::debug!(
-                "Scoring epoch {}: COMPUTE_DELEGATIONS flag not set (state: {:?}) - waiting for delegation to finish before copying targets",
-                current_epoch,
+                "Steward in {:?} (epoch {}) - waiting for delegation to finish before copying targets",
                 steward_inner.state_tag,
+                current_epoch,
             );
             return Ok(false);
         }
@@ -389,9 +391,8 @@ impl KeeperState {
         let should_copy = !any_target_updated;
 
         log::info!(
-            "Epoch {} (scoring: {}), steward state {:?}, {} valid targets, any updated: {} - should_copy: {}",
+            "Epoch {}, steward state {:?}, {} valid targets, any updated: {} - should_copy: {}",
             current_epoch,
-            is_scoring_epoch,
             steward_inner.state_tag,
             valid_targets.len(),
             any_target_updated,
