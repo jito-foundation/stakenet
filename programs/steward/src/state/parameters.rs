@@ -40,6 +40,18 @@ pub struct UpdateParametersArgs {
     pub minimum_stake_lamports: Option<u64>,
     pub minimum_voting_epochs: Option<u64>,
     pub compute_score_epoch_progress: Option<f64>,
+
+    /// Minimum number of epochs a validator must have been connected to BAM
+    /// within the window to qualify for delegation. `None` means do not update the current value.
+    pub jito_bam_minimum_epochs: Option<u8>,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
+    /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
+    /// out of those epochs to qualify for delegation.
+    /// `None` means do not update the current value.
+    pub jito_bam_window_epochs: Option<u8>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -158,6 +170,16 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
+                    IdlField {
+                        name: "jito_bam_minimum_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
+                        name: "jito_bam_window_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        docs: Default::default(),
+                    },
                 ])),
             },
             docs: Default::default(),
@@ -250,7 +272,18 @@ pub struct Parameters {
     /// The epoch when priority fee scoring starts. Scores default to 1 for all prior epochs
     pub priority_fee_scoring_start_epoch: u16,
 
-    pub _padding_0: [u8; 6],
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation.
+    pub jito_bam_minimum_epochs: u8,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
+    /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
+    /// out of those epochs to qualify for delegation.
+    pub jito_bam_window_epochs: u8,
+
+    pub _padding_0: [u8; 4],
 
     pub _padding_1: [u64; 28],
     /// The minimum epoch progress for computing scores
@@ -304,6 +337,8 @@ impl Parameters {
             minimum_voting_epochs,
             compute_score_epoch_progress,
             undirected_stake_ceiling_lamports,
+            jito_bam_minimum_epochs,
+            jito_bam_window_epochs,
         } = *args;
 
         let mut new_parameters = self;
@@ -396,6 +431,14 @@ impl Parameters {
         if let Some(undirected_stake_ceiling_lamports) = undirected_stake_ceiling_lamports {
             new_parameters.undirected_stake_ceiling_lamports =
                 undirected_stake_ceiling_lamports.to_le_bytes();
+        }
+
+        if let Some(jito_bam_minimum_epochs) = jito_bam_minimum_epochs {
+            new_parameters.jito_bam_minimum_epochs = jito_bam_minimum_epochs;
+        }
+
+        if let Some(jito_bam_window_epochs) = jito_bam_window_epochs {
+            new_parameters.jito_bam_window_epochs = jito_bam_window_epochs;
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -546,6 +589,14 @@ impl Parameters {
             return Err(StewardError::InvalidParameterValue.into());
         }
 
+        if self.jito_bam_window_epochs as u16 > window_max {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
+        if self.jito_bam_minimum_epochs > self.jito_bam_window_epochs {
+            return Err(StewardError::InvalidParameterValue.into());
+        }
+
         Ok(())
     }
 }
@@ -606,4 +657,98 @@ impl IdlBuild for UpdatePriorityFeeParametersArgs {
     }
 
     fn insert_types(_types: &mut std::collections::BTreeMap<String, IdlTypeDef>) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CURRENT_EPOCH: u64 = 1000;
+    const SLOTS_PER_EPOCH: u64 = 432_000;
+
+    fn valid_parameters() -> Parameters {
+        Parameters {
+            mev_commission_range: 10,
+            epoch_credits_range: 30,
+            commission_range: 30,
+            scoring_delinquency_threshold_ratio: 0.85,
+            instant_unstake_delinquency_threshold_ratio: 0.7,
+            mev_commission_bps_threshold: 1000,
+            commission_threshold: 5,
+            historical_commission_threshold: 50,
+            num_delegation_validators: 200,
+            scoring_unstake_cap_bps: 10,
+            instant_unstake_cap_bps: 10,
+            stake_deposit_unstake_cap_bps: 10,
+            instant_unstake_epoch_progress: 0.9,
+            compute_score_slot_range: 1000,
+            instant_unstake_inputs_epoch_progress: 0.5,
+            num_epochs_between_scoring: 10,
+            minimum_stake_lamports: 5_000_000_000_000,
+            minimum_voting_epochs: 5,
+            priority_fee_lookback_epochs: 10,
+            priority_fee_lookback_offset: 2,
+            priority_fee_max_commission_bps: 5_000,
+            priority_fee_error_margin_bps: 10,
+            priority_fee_scoring_start_epoch: 0,
+            directed_stake_unstake_cap_bps: 750,
+            compute_score_epoch_progress: 0.5,
+            undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
+            jito_bam_minimum_epochs: 10,
+            jito_bam_window_epochs: 10,
+            _padding_0: [0; 4],
+            _padding_1: [0; 28],
+            _padding_2: [0; 6],
+        }
+    }
+
+    #[test]
+    fn test_jito_bam_window_exceeds_window_max() {
+        {
+            // Window exceeds window_max — should fail
+            // With CURRENT_EPOCH=1000, window_max = min(1000 - 520, 511) = 480
+            // Since jito_bam_window_epochs is u8 (max 255), we need a low current_epoch
+            // so that window_max < 255
+            let low_epoch = 540; // window_max = min(540 - 520, 511) = 20
+            let mut params = valid_parameters();
+            params.jito_bam_window_epochs = 25;
+            params.jito_bam_minimum_epochs = 10;
+            assert!(params.validate(low_epoch, SLOTS_PER_EPOCH).is_err());
+        }
+
+        {
+            // Window within window_max — should succeed
+            let mut params = valid_parameters();
+            params.jito_bam_window_epochs = 10;
+            params.jito_bam_minimum_epochs = 5;
+            assert!(params.validate(CURRENT_EPOCH, SLOTS_PER_EPOCH).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_jito_bam_minimum_exceeds_window() {
+        {
+            // minimum_epochs > window_epochs — should fail
+            let mut params = valid_parameters();
+            params.jito_bam_window_epochs = 5;
+            params.jito_bam_minimum_epochs = 10;
+            assert!(params.validate(CURRENT_EPOCH, SLOTS_PER_EPOCH).is_err());
+        }
+
+        {
+            // minimum_epochs == window_epochs — should succeed
+            let mut params = valid_parameters();
+            params.jito_bam_window_epochs = 10;
+            params.jito_bam_minimum_epochs = 10;
+            assert!(params.validate(CURRENT_EPOCH, SLOTS_PER_EPOCH).is_ok());
+        }
+
+        {
+            // minimum_epochs < window_epochs — should succeed
+            let mut params = valid_parameters();
+            params.jito_bam_window_epochs = 10;
+            params.jito_bam_minimum_epochs = 3;
+            assert!(params.validate(CURRENT_EPOCH, SLOTS_PER_EPOCH).is_ok());
+        }
+    }
 }

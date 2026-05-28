@@ -15,8 +15,11 @@ use crate::{
         VOTE_CREDITS_RATIO_MAX,
     },
     errors::StewardError::{self, ArithmeticError},
+    score::running_bam::calculate_running_bam_score,
     Config,
 };
+
+pub mod running_bam;
 
 /// Components of a validator score, organized by priority tiers.
 ///
@@ -202,7 +205,7 @@ pub fn calculate_avg_mev_commission(
 
 #[event]
 #[derive(Debug, PartialEq)]
-pub struct ScoreComponentsV4 {
+pub struct ScoreComponentsV5 {
     /// Final score with binary filters applied to raw_score (0 if any filter fails, raw_score otherwise)
     pub score: u64,
 
@@ -233,8 +236,9 @@ pub struct ScoreComponentsV4 {
     /// If delinquency is not > threshold in any epoch, score is 1, else 0
     pub delinquency_score: u8,
 
-    /// If validator has a mev commission in the last 10 epochs, score is 1, else 0
-    pub running_jito_score: u8,
+    /// Score is 1 if the validator has been connected to BAM for at least
+    /// `jito_bam_minimum_epochs` out of the last `jito_bam_window_epochs` epochs, otherwise 0.
+    pub running_bam_score: u8,
 
     /// If max commission in commission_range epochs is less than commission_threshold, score is 1, else 0
     pub commission_score: u8,
@@ -302,7 +306,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
-) -> Result<ScoreComponentsV4> {
+) -> Result<ScoreComponentsV5> {
     let params = &config.parameters;
 
     /////// Shared windows ///////
@@ -337,7 +341,7 @@ pub fn validator_score(
     );
 
     /////// Binary filter calculations ///////
-    let (mev_commission_score, max_mev_commission, max_mev_commission_epoch, running_jito_score) =
+    let (mev_commission_score, max_mev_commission, max_mev_commission_epoch) =
         calculate_max_mev_commission(
             &mev_commission_window,
             current_epoch,
@@ -398,6 +402,19 @@ pub fn validator_score(
         max_priority_fee_commission_epoch,
     ) = calculate_priority_fee_commission(config, validator, current_epoch)?;
 
+    // Exclude the current epoch from the BAM window so the cranker has time
+    // to upload BAM eligibility for this epoch (it's a permissioned field).
+    let bam_window_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
+    let is_bam_connected_window = validator.history.is_bam_connected_range(
+        bam_window_end
+            .checked_sub(params.jito_bam_window_epochs as u16)
+            .ok_or(ArithmeticError)?,
+        bam_window_end,
+    );
+
+    let running_bam_score =
+        calculate_running_bam_score(&is_bam_connected_window, params.jito_bam_minimum_epochs);
+
     /////// Apply binary filters to raw score ///////
     // Binary filters are 0 or 1, multiply them with the raw_score
     let score = raw_score
@@ -407,12 +424,12 @@ pub fn validator_score(
         * blacklisted_score as u64
         * superminority_score as u64
         * delinquency_score as u64
-        * running_jito_score as u64
+        * running_bam_score as u64
         * merkle_root_upload_authority_score as u64
         * priority_fee_commission_score as u64
         * priority_fee_merkle_root_upload_authority_score as u64;
 
-    Ok(ScoreComponentsV4 {
+    Ok(ScoreComponentsV5 {
         score,
         raw_score,
         commission_max: max_commission,
@@ -423,7 +440,7 @@ pub fn validator_score(
         blacklisted_score,
         superminority_score,
         delinquency_score,
-        running_jito_score,
+        running_bam_score,
         commission_score,
         historical_commission_score,
         merkle_root_upload_authority_score,
@@ -448,12 +465,11 @@ pub fn validator_score(
 }
 
 /// Finds max MEV commission in the last `mev_commission_range` epochs and determines if it is above a threshold.
-/// Also determines if validator has had a MEV commission in the last 10 epochs to ensure they are running jito-solana
 pub fn calculate_max_mev_commission(
     mev_commission_window: &[Option<u16>],
     current_epoch: u16,
     mev_commission_bps_threshold: u16,
-) -> Result<(u8, u16, u16, u8)> {
+) -> Result<(u8, u16, u16)> {
     let (max_mev_commission, max_mev_commission_epoch) = mev_commission_window
         .iter()
         .rev()
@@ -470,18 +486,10 @@ pub fn calculate_max_mev_commission(
         0
     };
 
-    /////// Running Jito ///////
-    let running_jito_score = if mev_commission_window.iter().any(|i| i.is_some()) {
-        1
-    } else {
-        0
-    };
-
     Ok((
         mev_commission_score,
         max_mev_commission,
         max_mev_commission_epoch,
-        running_jito_score,
     ))
 }
 
