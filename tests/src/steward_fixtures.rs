@@ -382,6 +382,8 @@ impl TestFixture {
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_ceiling_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
+            jito_bam_minimum_epochs: Some(0),
+            jito_bam_window_epochs: Some(0),
         });
 
         let update_priority_fee_parameters_args =
@@ -2308,7 +2310,9 @@ impl Default for StateMachineFixtures {
             directed_stake_unstake_cap_bps: 750,
             compute_score_epoch_progress: 0.5,
             undirected_stake_ceiling_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
-            _padding_0: [0; 6],
+            jito_bam_minimum_epochs: 0,
+            jito_bam_window_epochs: 0,
+            _padding_0: [0; 4],
             _padding_1: [0; 28],
             _padding_2: [0; 6],
         };
@@ -2360,6 +2364,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -2382,6 +2387,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -2404,6 +2410,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }

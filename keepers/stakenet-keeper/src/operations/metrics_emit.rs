@@ -97,6 +97,7 @@ pub async fn fire(
 /// - `num_commissions`: Validators with non-default commissions
 /// - `num_epoch_credits`: Validators with non-default epoch credits
 /// - `num_stakes`: Validators with non-default stake amounts
+/// - `num_bam_status_reported`: Validators with a known BAM connection status (connected or not) in current epoch
 ///
 /// ## Cluster State
 /// - `cluster_history_blocks`: Whether cluster history is updated for current epoch (0 or 1)
@@ -129,6 +130,7 @@ pub fn emit_validator_history_metrics(
     let mut comms = 0;
     let mut epoch_credits = 0;
     let mut stakes = 0;
+    let mut num_bam_status_reported: i64 = 0;
     let num_validators = validator_histories.len();
     let default = ValidatorHistoryEntry::default();
 
@@ -162,6 +164,9 @@ pub fn emit_validator_history_metrics(
             }
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
+            }
+            if entry.is_bam_connected.ne(&default.is_bam_connected) {
+                num_bam_status_reported += 1;
             }
         }
         // Check previous epoch for state
@@ -231,6 +236,7 @@ pub fn emit_validator_history_metrics(
             get_vote_accounts_voting,
             i64
         ),
+        ("num_bam_status_reported", num_bam_status_reported, i64),
         "cluster" => cluster,
     );
 
