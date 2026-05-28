@@ -97,8 +97,8 @@ pub fn update_directed_stake_ticket(
 ///
 /// This function aggregates directed stake ticket holders' preferences, converts JitoSOL balances
 /// to lamports, and emits `CopyDirectedStakeTargets` instructions **only** for validators whose
-/// steward score is `0`, forcing their target delegation to `0`. Validators with a score greater
-/// than `0` are not updated by this function.
+/// steward score is `0`, forcing their `total_target_lamports` to `0`. Validators with a score
+/// greater than `0` are skipped.
 ///
 /// # Process Overview
 ///
@@ -108,7 +108,7 @@ pub fn update_directed_stake_ticket(
 ///    - Converts JitoSOL to lamports using the stake pool's conversion rate
 ///    - Applies their allocation preferences across validators
 /// 3. Aggregates total target delegations per validator
-/// 4. For each validator, looks up its steward score:
+/// 4. For each validator, checks its steward score:
 ///    - Score `== 0`: emits a `CopyDirectedStakeTargets` instruction with `total_target_lamports = 0`
 ///    - Score `> 0`: skipped — no instruction is generated
 ///
@@ -120,11 +120,6 @@ pub fn update_directed_stake_ticket(
 /// conversion_rate_bps = (stake_pool.total_lamports * 10,000) / pool_token_supply
 /// allocation_lamports = (allocation_jitosol * conversion_rate_bps) / 10,000
 /// ```
-///
-/// # Score-Based Filtering (After 100% BAM stake)
-///
-/// Only validators with a steward score of `0` receive an instruction; their target lamports are
-/// forced to `0` regardless of ticket allocations. Validators scoring above `0` are left unchanged.
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
     token_mint_address: &Pubkey,
@@ -211,23 +206,30 @@ pub async fn compute_directed_stake_meta(
     Ok(instructions)
 }
 
-/// Computes directed stake for bam delegation
+/// Computes BAM stake delegation targets and generates instructions to zero out stake targets
+/// for eligible BAM validators with a steward score of `0`.
 ///
-/// This function performs a calculation of stake delegation targets across all BAM validators
-/// based on response from Kobe API.
+/// This function queries the Kobe API for BAM epoch metrics and eligible validators, then
+/// combines that data with existing directed stake metadata to determine per-validator targets.
+/// Instructions are only emitted for validators whose steward score is `0`, forcing their
+/// `total_target_lamports` to `0` on-chain.
 ///
 /// # Process Overview
 ///
-/// 1. Fetches all bam validators through Kobe API
-/// 2. For each eligible bam validator:
-///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
-///    - If eligible validators are empty, return empty instructions.
-/// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
+/// 1. Fetches BAM epoch metrics and BAM validator list from the Kobe API (using the previous epoch)
+/// 2. Loads existing directed stake metadata to retrieve targets last updated in the current epoch
+/// 3. Filters the BAM validator list to eligible validators (`is_eligible == true`)
+/// 4. For each eligible BAM validator:
+///    - Computes a per-validator base: `available_bam_delegation_stake / eligible_validator_count`
+///    - Adds any existing directed stake meta target for that validator (current epoch only)
+///    - Checks the validator's steward score — only validators with score `== 0` emit an instruction
+/// 5. Generates `CopyDirectedStakeTargets` instructions with `total_target_lamports = 0`
+///    for each qualifying validator
 ///
 /// # Integer Division Behavior
 ///
-/// The stake distribution uses integer division, which truncates any remainder.
-/// This means `(available_bam_delegation_stake % bam_eligible_validators.len())` lamports
+/// The base stake per validator uses integer division, which truncates any remainder.
+/// This means `(available_bam_delegation_stake % eligible_validator_count)` lamports
 /// will not be delegated. This remainder is intentionally ignored to maintain equal
 /// distribution across all BAM validators.
 ///
@@ -236,7 +238,9 @@ pub async fn compute_directed_stake_meta(
 ///
 /// # Return Value
 ///
-/// Returns an empty vector of instructions if `bam_epoch_metric` is `None` (i.e., if no BAM epoch metrics are available for the previous epoch).
+/// Returns an empty vector of instructions if:
+/// - `bam_eligible_validators` is empty, or
+/// - `bam_epoch_metric` is `None` (no BAM epoch metrics available for the previous epoch)
 pub async fn compute_bam_targets(
     client: Arc<RpcClient>,
     kobe_client: &KobeClient,
@@ -267,6 +271,7 @@ pub async fn compute_bam_targets(
         .map(|target| (target.vote_pubkey, target.total_target_lamports))
         .collect();
     let config_account = get_steward_config_account(&client, steward_config).await?;
+    let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
@@ -322,23 +327,27 @@ pub async fn compute_bam_targets(
                         }
                     }
 
-                    Some(Instruction {
-                        program_id: *program_id,
-                        accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                            config: *steward_config,
-                            directed_stake_meta: directed_stake_meta_pda,
-                            authority: *authority_pubkey,
-                            clock: solana_sdk::sysvar::clock::id(),
-                            validator_list: validator_list_address,
-                        }
-                        .to_account_metas(None),
-                        data: jito_steward::instruction::CopyDirectedStakeTargets {
-                            vote_pubkey,
-                            total_target_lamports,
-                            validator_list_index: validator_list_index as u32,
-                        }
-                        .data(),
-                    })
+                    if steward_account.state.scores.get(validator_list_index).is_some_and(|&s| s==0) {
+                        Some(Instruction {
+                            program_id: *program_id,
+                            accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                                config: *steward_config,
+                                directed_stake_meta: directed_stake_meta_pda,
+                                authority: *authority_pubkey,
+                                clock: solana_sdk::sysvar::clock::id(),
+                                validator_list: validator_list_address,
+                            }
+                            .to_account_metas(None),
+                            data: jito_steward::instruction::CopyDirectedStakeTargets {
+                                vote_pubkey,
+                                total_target_lamports: 0,
+                                validator_list_index: validator_list_index as u32,
+                            }
+                            .data(),
+                        })
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<Instruction>>(),
         );
