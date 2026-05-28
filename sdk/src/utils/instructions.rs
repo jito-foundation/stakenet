@@ -92,11 +92,13 @@ pub fn update_directed_stake_ticket(
     }
 }
 
-/// Computes directed stake metadata and generates instructions to copy stake targets to the chain.
+/// Computes directed stake metadata and generates instructions to zero out stake targets for
+/// validators with a steward score of `0`.
 ///
-/// This function performs a comprehensive calculation of stake delegation targets across all validators
-/// based on directed stake tickets. It aggregates all ticket holders' preferences, converts JitoSOL
-/// balances to lamports, and generates the necessary instructions to update on-chain metadata.
+/// This function aggregates directed stake ticket holders' preferences, converts JitoSOL balances
+/// to lamports, and emits `CopyDirectedStakeTargets` instructions **only** for validators whose
+/// steward score is `0`, forcing their target delegation to `0`. Validators with a score greater
+/// than `0` are not updated by this function.
 ///
 /// # Process Overview
 ///
@@ -106,9 +108,9 @@ pub fn update_directed_stake_ticket(
 ///    - Converts JitoSOL to lamports using the stake pool's conversion rate
 ///    - Applies their allocation preferences across validators
 /// 3. Aggregates total target delegations per validator
-/// 4. For each validator, looks up its steward score; if the score is `0`, the target
-///    delegation is forced to `0` regardless of ticket allocations
-/// 5. Generates `CopyDirectedStakeTargets` instructions for each validator
+/// 4. For each validator, looks up its steward score:
+///    - Score `== 0`: emits a `CopyDirectedStakeTargets` instruction with `total_target_lamports = 0`
+///    - Score `> 0`: skipped — no instruction is generated
 ///
 /// # Conversion Details
 ///
@@ -121,8 +123,8 @@ pub fn update_directed_stake_ticket(
 ///
 /// # Score-Based Filtering (After 100% BAM stake)
 ///
-/// Validators whose steward score resolves to `0` are excluded from delegation by
-/// zeroing their target lamports, regardless of ticket allocations.
+/// Only validators with a steward score of `0` receive an instruction; their target lamports are
+/// forced to `0` regardless of ticket allocations. Validators scoring above `0` are left unchanged.
 pub async fn compute_directed_stake_meta(
     client: Arc<RpcClient>,
     token_mint_address: &Pubkey,
@@ -151,7 +153,7 @@ pub async fn compute_directed_stake_meta(
     let existing_directed_stake_meta =
         get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
     let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
-    let mut validator_targets = aggregate_validator_targets(
+    let validator_targets = aggregate_validator_targets(
         &existing_directed_stake_meta,
         &tickets,
         &jitosol_balances,
@@ -169,8 +171,8 @@ pub async fn compute_directed_stake_meta(
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
     let instructions = validator_targets
-        .iter_mut()
-        .filter_map(|(vote_pubkey, total_target_lamports)| {
+        .iter()
+        .filter_map(|(vote_pubkey, _total_target_lamports)| {
             // Find the index of this vote_pubkey in the validator list
             let validator_list_index = validator_list_account
                 .validators
@@ -183,28 +185,29 @@ pub async fn compute_directed_stake_meta(
                 .get(validator_list_index)
                 .is_some_and(|&s| s == 0)
             {
-                *total_target_lamports = 0;
+                Some(Instruction {
+                    program_id: *program_id,
+                    accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                        config: *steward_config,
+                        directed_stake_meta: directed_stake_meta_pda,
+                        authority: *authority_pubkey,
+                        clock: solana_sdk::sysvar::clock::id(),
+                        validator_list: validator_list_address,
+                    }
+                    .to_account_metas(None),
+                    data: jito_steward::instruction::CopyDirectedStakeTargets {
+                        vote_pubkey: *vote_pubkey,
+                        total_target_lamports: 0,
+                        validator_list_index: validator_list_index as u32,
+                    }
+                    .data(),
+                })
+            } else {
+                None
             }
-
-            Some(Instruction {
-                program_id: *program_id,
-                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                    config: *steward_config,
-                    directed_stake_meta: directed_stake_meta_pda,
-                    authority: *authority_pubkey,
-                    clock: solana_sdk::sysvar::clock::id(),
-                    validator_list: validator_list_address,
-                }
-                .to_account_metas(None),
-                data: jito_steward::instruction::CopyDirectedStakeTargets {
-                    vote_pubkey: *vote_pubkey,
-                    total_target_lamports: *total_target_lamports,
-                    validator_list_index: validator_list_index as u32,
-                }
-                .data(),
-            })
         })
         .collect();
+
     Ok(instructions)
 }
 
