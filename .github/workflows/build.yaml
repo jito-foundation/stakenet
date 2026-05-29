@@ -6,6 +6,7 @@ on:
 
     tags:
       - "v*"
+      - "*@*"
   pull_request:
     branches:
       - master
@@ -219,6 +220,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: validator_history.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: jito_steward.so
+      - uses: actions/download-artifact@v4
+        with:
+          name: jito_steward.json
       - name: release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
@@ -226,3 +233,5 @@ jobs:
           files: |
             validator_history.so
             validator_history.json
+            jito_steward.so
+            jito_steward.json
