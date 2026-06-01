@@ -18,13 +18,13 @@ use crate::commands::command_args::PermissionedParameters;
 
 #[derive(Parser)]
 #[command(about = "Migrate directed stake to algorithmic stake")]
-pub struct MigrateDirectedToAlgorithm {
+pub struct MigrateDirectedToAlgorithmic {
     #[command(flatten)]
-    pub permissioned_parameters: PermissionedParameters,
+    permissioned_parameters: PermissionedParameters,
 }
 
-pub async fn command_migrate_directed_to_algorithm(
-    args: MigrateDirectedToAlgorithm,
+pub async fn command_migrate_directed_to_algorithmic(
+    args: MigrateDirectedToAlgorithmic,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
