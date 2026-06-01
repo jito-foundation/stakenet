@@ -1,8 +1,7 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
-use kobe_client::{client::KobeClient, types::bam_validators::BamValidator};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -192,93 +191,6 @@ pub async fn compute_directed_stake_meta(
                     .to_account_metas(None),
                     data: jito_steward::instruction::CopyDirectedStakeTargets {
                         vote_pubkey: *vote_pubkey,
-                        total_target_lamports: 0,
-                        validator_list_index: validator_list_index as u32,
-                    }
-                    .data(),
-                })
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(instructions)
-}
-
-/// Generates instructions to zero out stake targets for eligible BAM validators
-/// with a steward score of `0`.
-///
-/// # Return Value
-///
-/// Returns an empty vector if `bam_eligible_validators` is empty.
-pub async fn compute_bam_targets(
-    client: Arc<RpcClient>,
-    kobe_client: &KobeClient,
-    steward_config: &Pubkey,
-    authority_pubkey: &Pubkey,
-    program_id: &Pubkey,
-) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let last_epoch = client.get_epoch_info().await?.epoch - 1;
-
-    let bam_validators = kobe_client
-        .get_bam_validators(last_epoch)
-        .await?
-        .bam_validators;
-
-    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
-    let config_account = get_steward_config_account(&client, steward_config).await?;
-    let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
-    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
-    let validator_list_address = stake_pool_account.validator_list;
-    let validator_list_account =
-        get_validator_list_account(&client, &validator_list_address).await?;
-
-    let bam_eligible_validators: Vec<BamValidator> = bam_validators
-        .into_iter()
-        .filter(|bv| bv.is_eligible)
-        .collect();
-
-    let instructions = bam_eligible_validators
-        .iter()
-        .filter_map(|bv| {
-            let vote_pubkey = match Pubkey::from_str(&bv.vote_account) {
-                Ok(pubkey) => pubkey,
-                Err(e) => {
-                    log::warn!("Failed to parse vote account: {}: {e}", bv.vote_account);
-                    return None;
-                }
-            };
-            let validator_list_index = match validator_list_account
-                .validators
-                .iter()
-                .position(|v| v.vote_account_address == vote_pubkey)
-            {
-                Some(index) => index,
-                None => {
-                    log::warn!("Vote account {vote_pubkey} not found in validator list");
-                    return None;
-                }
-            };
-
-            if steward_account
-                .state
-                .scores
-                .get(validator_list_index)
-                .is_some_and(|&s| s == 0)
-            {
-                Some(Instruction {
-                    program_id: *program_id,
-                    accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                        config: *steward_config,
-                        directed_stake_meta: directed_stake_meta_pda,
-                        authority: *authority_pubkey,
-                        clock: solana_sdk::sysvar::clock::id(),
-                        validator_list: validator_list_address,
-                    }
-                    .to_account_metas(None),
-                    data: jito_steward::instruction::CopyDirectedStakeTargets {
-                        vote_pubkey,
                         total_target_lamports: 0,
                         validator_list_index: validator_list_index as u32,
                     }
