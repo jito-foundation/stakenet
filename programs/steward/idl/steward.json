@@ -1318,6 +1318,37 @@
       ]
     },
     {
+      "name": "migrate_directed_to_algorithmic",
+      "docs": [
+        "One-time migration: zeroes all directed stake targets and applied lamports so that",
+        "existing on-chain stake is reclassified as algorithmic without requiring an unstake."
+      ],
+      "discriminator": [
+        172,
+        101,
+        206,
+        174,
+        188,
+        157,
+        249,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "migrate_state_to_v2",
       "docs": [
         "Migrates the state account from V1 (u32 scores) to V2 (u64 scores with 4-tier encoding)"
