@@ -54,10 +54,6 @@ pub struct ComputeDirectedStakeMeta {
     /// Jito SOL Token mint address
     #[arg(long, env)]
     pub token_mint: Pubkey,
-
-    /// Cluster name
-    #[arg(long, env)]
-    pub cluster_name: String,
 }
 
 /// Computes directed stake metadata by aggregating tickets and token balances.
