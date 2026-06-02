@@ -317,14 +317,11 @@ impl KeeperState {
 
     /// Determines if directed stake targets should be copied this epoch.
     ///
-    /// Returns `true` if:
-    /// - Epoch is more than 50% complete
-    /// - Steward is not actively scoring or computing delegations
-    /// - At least one directed-stake-enrolled validator has score == 0 (both cranks
-    ///   only emit `CopyDirectedStakeTargets` for score-0 validators; without this
-    ///   gate the keeper would busy-loop for the rest of the epoch when no score-0
-    ///   validator exists, since `target_last_updated_epoch` would never advance)
-    /// - No directed stake targets have been updated in the current epoch
+    /// Returns `true` when all of the following hold:
+    /// - Steward accounts are loaded
+    /// - The epoch is more than 50% complete
+    /// - Either no valid targets exist, or none of them have had
+    ///   `target_last_updated_epoch` set to the current epoch yet
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
@@ -358,19 +355,6 @@ impl KeeperState {
             return Ok(false);
         }
 
-        if matches!(
-            steward_inner.state_tag,
-            jito_steward::StewardStateEnum::ComputeScores
-                | jito_steward::StewardStateEnum::ComputeDelegations
-        ) {
-            log::debug!(
-                "Steward in {:?} (epoch {}) - waiting for delegation to finish before copying targets",
-                steward_inner.state_tag,
-                current_epoch,
-            );
-            return Ok(false);
-        }
-
         // Fetch and filter valid targets
         let meta =
             get_directed_stake_meta(client, &steward_state.config_address, program_id).await?;
@@ -387,11 +371,6 @@ impl KeeperState {
             return Ok(true);
         }
 
-        // Check if any targets have been updated in current epoch
-        let any_target_updated = valid_targets
-            .iter()
-            .any(|target| target.target_last_updated_epoch == current_epoch);
-
         let has_score_zero_in_meta = valid_targets.iter().any(|target| {
             steward_state
                 .validator_list_account
@@ -402,12 +381,16 @@ impl KeeperState {
                 .is_some_and(|&s| s == 0)
         });
 
+        // Check if any targets have been updated in current epoch
+        let any_target_updated = valid_targets
+            .iter()
+            .any(|target| target.target_last_updated_epoch == current_epoch);
+
         let should_copy = !any_target_updated && has_score_zero_in_meta;
 
         log::info!(
-            "Epoch {}, steward state {:?}, {} valid targets, any updated: {}, score-0 in meta: {} - should_copy: {}",
+            "Epoch {}, {} valid targets, any updated: {}, score-0 in meta: {} - should_copy: {}",
             current_epoch,
-            steward_inner.state_tag,
             valid_targets.len(),
             any_target_updated,
             has_score_zero_in_meta,
