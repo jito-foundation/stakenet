@@ -5106,6 +5106,12 @@
             }
           },
           {
+            "name": "undirected_stake_ceiling_lamports",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
             "name": "instant_unstake_epoch_progress",
             "type": {
               "option": "f64"
@@ -5145,12 +5151,6 @@
             "name": "compute_score_epoch_progress",
             "type": {
               "option": "f64"
-            }
-          },
-          {
-            "name": "undirected_stake_ceiling_lamports",
-            "type": {
-              "option": "u64"
             }
           },
           {
