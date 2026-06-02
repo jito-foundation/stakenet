@@ -131,6 +131,11 @@ impl IdlBuild for UpdateParametersArgs {
                         docs: Default::default(),
                     },
                     IdlField {
+                        name: "undirected_stake_ceiling_lamports".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U64)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
                         name: "instant_unstake_epoch_progress".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::F64)),
                         docs: Default::default(),
@@ -163,11 +168,6 @@ impl IdlBuild for UpdateParametersArgs {
                     IdlField {
                         name: "compute_score_epoch_progress".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::F64)),
-                        docs: Default::default(),
-                    },
-                    IdlField {
-                        name: "undirected_stake_ceiling_lamports".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U64)),
                         docs: Default::default(),
                     },
                     IdlField {
