@@ -153,31 +153,31 @@ pub async fn run_crank_steward(
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut submit_stats = SubmitStats::default();
 
-    if keeper_state
-        .should_copy_directed_stake_targets(
-            keeper_config.client.clone(),
-            &keeper_config.steward_program_id,
-        )
-        .await?
-    {
-        if let Some(steward_accounts) = &keeper_state.all_steward_accounts {
-            if let Some(keypair) = &keeper_config.directed_stake_oracle_authority_keypair {
-                log::info!("Cranking Copy Directed Targets...");
+    // if keeper_state
+    //     .should_copy_directed_stake_targets(
+    //         keeper_config.client.clone(),
+    //         &keeper_config.steward_program_id,
+    //     )
+    //     .await?
+    // {
+    //     if let Some(steward_accounts) = &keeper_state.all_steward_accounts {
+    //         if let Some(keypair) = &keeper_config.directed_stake_oracle_authority_keypair {
+    //             log::info!("Cranking Copy Directed Targets...");
 
-                let stats = crank_copy_directed_stake_targets(
-                    keeper_config.client.clone(),
-                    keypair.clone(),
-                    &keeper_config.steward_program_id,
-                    steward_accounts,
-                    &keeper_config.token_mint,
-                    Some(keeper_config.priority_fee_in_microlamports),
-                )
-                .await?;
+    //             let stats = crank_copy_directed_stake_targets(
+    //                 keeper_config.client.clone(),
+    //                 keypair.clone(),
+    //                 &keeper_config.steward_program_id,
+    //                 steward_accounts,
+    //                 &keeper_config.token_mint,
+    //                 Some(keeper_config.priority_fee_in_microlamports),
+    //             )
+    //             .await?;
 
-                submit_stats.combine(&stats);
-            }
-        }
-    }
+    //             submit_stats.combine(&stats);
+    //         }
+    //     }
+    // }
 
     let stats = crank_steward(
         &keeper_config.client,
