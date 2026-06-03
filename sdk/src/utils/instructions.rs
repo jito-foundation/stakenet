@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
+use kobe_client::client::KobeClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
