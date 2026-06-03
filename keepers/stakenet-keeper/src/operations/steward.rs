@@ -1,10 +1,7 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
+//* This program starts several threads to manage the creation of validator history accounts,
+//* and the updating of the various data feeds within the accounts.
+//* It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 
-use crate::entries::crank_copy_directed_stake_targets::crank_copy_directed_stake_targets;
 use crate::entries::crank_steward::crank_steward;
 use crate::state::keeper_state::{KeeperFlags, KeeperState};
 use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag};

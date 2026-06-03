@@ -14,7 +14,7 @@ use stakenet_sdk::{
 };
 
 /// Copy directed stake targets to [`DirectedStakeMeta`] account
-pub(crate) async fn crank_copy_directed_stake_targets(
+pub async fn crank_copy_directed_stake_targets(
     client: Arc<RpcClient>,
     keypair: Arc<Keypair>,
     program_id: &Pubkey,
