@@ -317,9 +317,11 @@ impl KeeperState {
 
     /// Determines if directed stake targets should be copied this epoch.
     ///
-    /// Returns `true` if:
-    /// - Epoch is more than 50% complete
-    /// - No directed stake targets have been updated in the current epoch
+    /// Returns `true` when all of the following hold:
+    /// - Steward accounts are loaded
+    /// - The epoch is more than 50% complete
+    /// - Either no valid targets exist, or none of them have had
+    ///   `target_last_updated_epoch` set to the current epoch yet
     pub async fn should_copy_directed_stake_targets(
         &self,
         client: Arc<RpcClient>,
@@ -329,11 +331,12 @@ impl KeeperState {
             return Ok(false);
         };
 
-        // Calculate epoch progress
+        let current_epoch = self.epoch_info.epoch;
+        let steward_inner = &steward_state.state_account.state;
+
+        // Always require epoch to be more than 50% complete
         let current_slot = client.get_slot().await?;
-        let first_slot_in_epoch = self
-            .epoch_schedule
-            .get_first_slot_in_epoch(self.epoch_info.epoch);
+        let first_slot_in_epoch = self.epoch_schedule.get_first_slot_in_epoch(current_epoch);
         let slot_index = current_slot
             .checked_sub(first_slot_in_epoch)
             .ok_or_else(|| {
@@ -344,11 +347,10 @@ impl KeeperState {
 
         let epoch_progress = slot_index as f64 / self.epoch_schedule.slots_per_epoch as f64;
 
-        // Early return if epoch is not yet 50% complete
         if epoch_progress <= 0.5 {
             log::debug!(
                 "Epoch progress {:.2}% - too early to copy targets",
-                epoch_progress * 100.0
+                epoch_progress * 100.0,
             );
             return Ok(false);
         }
@@ -369,19 +371,30 @@ impl KeeperState {
             return Ok(true);
         }
 
+        let has_score_zero_in_meta = valid_targets.iter().any(|target| {
+            steward_state
+                .validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address == target.vote_pubkey)
+                .and_then(|i| steward_inner.scores.get(i))
+                .is_some_and(|&s| s == 0)
+        });
+
         // Check if any targets have been updated in current epoch
         let any_target_updated = valid_targets
             .iter()
-            .any(|target| target.target_last_updated_epoch == self.epoch_info.epoch);
+            .any(|target| target.target_last_updated_epoch == current_epoch);
 
-        let should_copy = !any_target_updated;
+        let should_copy = !any_target_updated && has_score_zero_in_meta;
 
         log::info!(
-            "Epoch {:.2}% complete, {} valid targets, any updated: {} - should_copy: {}",
-            epoch_progress * 100.0,
+            "Epoch {}, {} valid targets, any updated: {}, score-0 in meta: {} - should_copy: {}",
+            current_epoch,
             valid_targets.len(),
             any_target_updated,
-            should_copy
+            has_score_zero_in_meta,
+            should_copy,
         );
 
         Ok(should_copy)

@@ -108,12 +108,13 @@ pub fn handler(
                 .is_empty();
 
         if okay_to_update {
+            state_account.state.current_epoch = clock.epoch;
+
             // When upgrading the StewardState with additional padding we should move this total
             // to the StewardStateAccount and clear it in the reset_state_for_new_cycle method
             if state_account.state.current_epoch == state_account.state.next_cycle_epoch {
                 directed_stake_meta.directed_unstake_total = 0;
             }
-            state_account.state.current_epoch = clock.epoch;
 
             // We keep Compute Scores and Compute Delegations to be unset on next epoch cycle
             state_account.state.unset_flag(

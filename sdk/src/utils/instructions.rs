@@ -1,8 +1,7 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
-use kobe_client::{client::KobeClient, types::bam_validators::BamValidator};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -18,7 +17,7 @@ use crate::{
             get_directed_stake_meta, get_directed_stake_meta_address,
             get_directed_stake_ticket_address, get_directed_stake_tickets,
             get_directed_stake_whitelist_address, get_stake_pool_account,
-            get_steward_config_account, get_validator_list_account,
+            get_steward_config_account, get_steward_state_account, get_validator_list_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -92,11 +91,13 @@ pub fn update_directed_stake_ticket(
     }
 }
 
-/// Computes directed stake metadata and generates instructions to copy stake targets to the chain.
+/// Computes directed stake metadata and generates instructions to zero out stake targets for
+/// validators with a steward score of `0`.
 ///
-/// This function performs a comprehensive calculation of stake delegation targets across all validators
-/// based on directed stake tickets. It aggregates all ticket holders' preferences, converts JitoSOL
-/// balances to lamports, and generates the necessary instructions to update on-chain metadata.
+/// This function aggregates directed stake ticket holders' preferences, converts JitoSOL balances
+/// to lamports, and emits `CopyDirectedStakeTargets` instructions **only** for validators whose
+/// steward score is `0`, forcing their `total_target_lamports` to `0`. Validators with a score
+/// greater than `0` are skipped.
 ///
 /// # Process Overview
 ///
@@ -106,7 +107,9 @@ pub fn update_directed_stake_ticket(
 ///    - Converts JitoSOL to lamports using the stake pool's conversion rate
 ///    - Applies their allocation preferences across validators
 /// 3. Aggregates total target delegations per validator
-/// 4. Generates `CopyDirectedStakeTargets` instructions for each validator
+/// 4. For each validator, checks its steward score:
+///    - Score `== 0`: emits a `CopyDirectedStakeTargets` instruction with `total_target_lamports = 0`
+///    - Score `> 0`: skipped — no instruction is generated
 ///
 /// # Conversion Details
 ///
@@ -153,6 +156,7 @@ pub async fn compute_directed_stake_meta(
 
     // Get validator list to find indices
     let config_account = get_steward_config_account(&client, steward_config).await?;
+    let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
@@ -162,167 +166,41 @@ pub async fn compute_directed_stake_meta(
 
     let instructions = validator_targets
         .iter()
-        .filter_map(|(vote_pubkey, total_target_lamports)| {
+        .filter_map(|(vote_pubkey, _total_target_lamports)| {
             // Find the index of this vote_pubkey in the validator list
             let validator_list_index = validator_list_account
                 .validators
                 .iter()
                 .position(|v| v.vote_account_address == *vote_pubkey)?;
 
-            Some(Instruction {
-                program_id: *program_id,
-                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                    config: *steward_config,
-                    directed_stake_meta: directed_stake_meta_pda,
-                    authority: *authority_pubkey,
-                    clock: solana_sdk::sysvar::clock::id(),
-                    validator_list: validator_list_address,
-                }
-                .to_account_metas(None),
-                data: jito_steward::instruction::CopyDirectedStakeTargets {
-                    vote_pubkey: *vote_pubkey,
-                    total_target_lamports: *total_target_lamports,
-                    validator_list_index: validator_list_index as u32,
-                }
-                .data(),
-            })
+            if steward_account
+                .state
+                .scores
+                .get(validator_list_index)
+                .is_some_and(|&s| s == 0)
+            {
+                Some(Instruction {
+                    program_id: *program_id,
+                    accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                        config: *steward_config,
+                        directed_stake_meta: directed_stake_meta_pda,
+                        authority: *authority_pubkey,
+                        clock: solana_sdk::sysvar::clock::id(),
+                        validator_list: validator_list_address,
+                    }
+                    .to_account_metas(None),
+                    data: jito_steward::instruction::CopyDirectedStakeTargets {
+                        vote_pubkey: *vote_pubkey,
+                        total_target_lamports: 0,
+                        validator_list_index: validator_list_index as u32,
+                    }
+                    .data(),
+                })
+            } else {
+                None
+            }
         })
         .collect();
-    Ok(instructions)
-}
-
-/// Computes directed stake for bam delegation
-///
-/// This function performs a calculation of stake delegation targets across all BAM validators
-/// based on response from Kobe API.
-///
-/// # Process Overview
-///
-/// 1. Fetches all bam validators through Kobe API
-/// 2. For each eligible bam validator:
-///    - Calculate total targets (BAM available bam delegation stake amount / BAM eligible validators).
-///    - If eligible validators are empty, return empty instructions.
-/// 3. Generates `CopyDirectedStakeTargets` instructions for each eligible BAM validator
-///
-/// # Integer Division Behavior
-///
-/// The stake distribution uses integer division, which truncates any remainder.
-/// This means `(available_bam_delegation_stake % bam_eligible_validators.len())` lamports
-/// will not be delegated. This remainder is intentionally ignored to maintain equal
-/// distribution across all BAM validators.
-///
-/// Example: With 100 lamports and 3 validators, each receives 33 lamports (99 total),
-/// leaving 1 lamport undelegated.
-///
-/// # Return Value
-///
-/// Returns an empty vector of instructions if `bam_epoch_metric` is `None` (i.e., if no BAM epoch metrics are available for the previous epoch).
-pub async fn compute_bam_targets(
-    client: Arc<RpcClient>,
-    kobe_client: &KobeClient,
-    steward_config: &Pubkey,
-    authority_pubkey: &Pubkey,
-    program_id: &Pubkey,
-) -> Result<Vec<Instruction>, JitoInstructionError> {
-    let epoch_info = client.get_epoch_info().await?;
-    let current_epoch = epoch_info.epoch;
-    let last_epoch = epoch_info.epoch - 1;
-
-    let bam_epoch_metric = kobe_client
-        .get_bam_epoch_metrics(last_epoch)
-        .await?
-        .bam_epoch_metrics;
-    let bam_validators = kobe_client
-        .get_bam_validators(last_epoch)
-        .await?
-        .bam_validators;
-
-    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
-    let directed_stake_meta =
-        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
-    let targets: HashMap<Pubkey, u64> = directed_stake_meta
-        .targets
-        .iter()
-        .filter(|target| target.target_last_updated_epoch == current_epoch)
-        .map(|target| (target.vote_pubkey, target.total_target_lamports))
-        .collect();
-    let config_account = get_steward_config_account(&client, steward_config).await?;
-    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
-    let validator_list_address = stake_pool_account.validator_list;
-    let validator_list_account =
-        get_validator_list_account(&client, &validator_list_address).await?;
-
-    let bam_eligible_validators: Vec<BamValidator> = bam_validators
-        .into_iter()
-        .filter(|bv| bv.is_eligible)
-        .collect();
-
-    let mut instructions = Vec::new();
-
-    if bam_eligible_validators.is_empty() {
-        return Ok(instructions);
-    }
-
-    if let Some(metric) = bam_epoch_metric {
-        let mut total_target_lamports = metric
-            .available_bam_delegation_stake
-            .checked_div(bam_eligible_validators.len() as u64)
-            .ok_or(JitoInstructionError::ArithmeticError)?;
-
-        instructions.extend(
-            bam_eligible_validators
-                .iter()
-                .filter_map(|bv| {
-                    let vote_pubkey = match Pubkey::from_str(&bv.vote_account) {
-                        Ok(pubkey) => pubkey,
-                        Err(e) => {
-                            log::warn!("Failed to parse vote account: {}: {e}", bv.vote_account);
-                            return None;
-                        }
-                    };
-                    let validator_list_index = match validator_list_account
-                        .validators
-                        .iter()
-                        .position(|v| v.vote_account_address == vote_pubkey)
-                    {
-                        Some(index) => index,
-                        None => {
-                            log::warn!("Vote account {vote_pubkey} not found in validator list");
-                            return None;
-                        }
-                    };
-
-                    if let Some(meta_target_lamports) = targets.get(&vote_pubkey) {
-                        total_target_lamports = match total_target_lamports.checked_add(*meta_target_lamports) {
-                            Some(sum) => sum,
-                            None => {
-                                log::warn!("Arithmetic overflow adding meta_target_lamports for {vote_pubkey}: total_target_lamports={total_target_lamports}, meta_target_lamports={meta_target_lamports}");
-                                return None;
-                            }
-                        }
-                    }
-
-                    Some(Instruction {
-                        program_id: *program_id,
-                        accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                            config: *steward_config,
-                            directed_stake_meta: directed_stake_meta_pda,
-                            authority: *authority_pubkey,
-                            clock: solana_sdk::sysvar::clock::id(),
-                            validator_list: validator_list_address,
-                        }
-                        .to_account_metas(None),
-                        data: jito_steward::instruction::CopyDirectedStakeTargets {
-                            vote_pubkey,
-                            total_target_lamports,
-                            validator_list_index: validator_list_index as u32,
-                        }
-                        .data(),
-                    })
-                })
-                .collect::<Vec<Instruction>>(),
-        );
-    }
 
     Ok(instructions)
 }

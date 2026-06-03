@@ -244,6 +244,14 @@ pub mod steward {
         instructions::migrate_state_to_v2::handler(ctx)
     }
 
+    /// One-time migration: zeroes all directed stake targets and applied lamports so that
+    /// existing on-chain stake is reclassified as algorithmic without requiring an unstake.
+    pub fn migrate_directed_to_algorithmic(
+        ctx: Context<MigrateDirectedToAlgorithmic>,
+    ) -> Result<()> {
+        instructions::migrate_directed_to_algorithmic::handler(ctx)
+    }
+
     /* Passthrough instructions */
     /* passthrough to spl-stake-pool, where the signer is Staker. Must be invoked by `config.authority` */
 

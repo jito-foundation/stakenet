@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use solana_sdk::{signature::Keypair, signer::Signer};
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
 use stakenet_sdk::{
     models::{
         aggregate_accounts::AllStewardAccounts, errors::JitoTransactionError,
         submit_stats::SubmitStats,
     },
     utils::{
-        instructions::{
-            compute_bam_targets, compute_coinbase_targets, compute_directed_stake_meta,
-        },
+        instructions::compute_directed_stake_meta,
         transactions::{package_instructions, submit_packaged_transactions},
     },
 };
@@ -21,6 +20,8 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     keeper_config: &KeeperConfig,
     keypair: Arc<Keypair>,
     all_steward_accounts: &AllStewardAccounts,
+    token_mint_address: &Pubkey,
+    priority_fee: Option<u64>,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let KeeperConfig {
         client,
@@ -51,66 +52,6 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     let normal_stats =
         submit_packaged_transactions(client, normal_txs_to_run, &keypair, Some(50), None).await?;
     stats.combine(&normal_stats);
-
-    let bam_delegation_ixs = compute_bam_targets(
-        client.clone(),
-        kobe_client,
-        &all_steward_accounts.config_address,
-        &keypair.pubkey(),
-        program_id,
-    )
-    .await
-    .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
-
-    log::info!(
-        "Bam delegation copy directed stake targets: {}",
-        bam_delegation_ixs.len()
-    );
-
-    let bam_delegation_txs_to_run = package_instructions(
-        &bam_delegation_ixs,
-        8,
-        Some(*priority_fee),
-        Some(1_400_000),
-        None,
-    );
-    let bam_delegation_stats =
-        submit_packaged_transactions(client, bam_delegation_txs_to_run, &keypair, Some(50), None)
-            .await?;
-    stats.combine(&bam_delegation_stats);
-
-    let coinbase_delegation_ixs = compute_coinbase_targets(
-        client.clone(),
-        kobe_client,
-        &all_steward_accounts.config_address,
-        &keypair.pubkey(),
-        program_id,
-        coinbase_vote_pubkey,
-    )
-    .await
-    .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
-
-    log::info!(
-        "Coinbase delegation copy directed stake targets: {}",
-        coinbase_delegation_ixs.len()
-    );
-
-    let coinbase_delegation_txs_to_run = package_instructions(
-        &coinbase_delegation_ixs,
-        8,
-        Some(*priority_fee),
-        Some(1_400_000),
-        None,
-    );
-    let coinbase_delegation_stats = submit_packaged_transactions(
-        client,
-        coinbase_delegation_txs_to_run,
-        &keypair,
-        Some(50),
-        None,
-    )
-    .await?;
-    stats.combine(&coinbase_delegation_stats);
 
     Ok(stats)
 }

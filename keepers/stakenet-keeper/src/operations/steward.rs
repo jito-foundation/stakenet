@@ -168,6 +168,8 @@ pub async fn run_crank_steward(
                     keeper_config,
                     keypair.clone(),
                     steward_accounts,
+                    &keeper_config.token_mint,
+                    Some(keeper_config.priority_fee_in_microlamports),
                 )
                 .await?;
 
