@@ -7,7 +7,7 @@ use stakenet_sdk::{
         submit_stats::SubmitStats,
     },
     utils::{
-        instructions::{compute_coinbase_targets, compute_directed_stake_meta},
+        instructions::compute_coinbase_targets,
         transactions::{package_instructions, submit_packaged_transactions},
     },
 };
@@ -26,7 +26,7 @@ pub(crate) async fn crank_copy_directed_stake_targets(
     let KeeperConfig {
         client,
         steward_program_id: program_id,
-        token_mint: token_mint_address,
+        token_mint: _token_mint_address,
         priority_fee_in_microlamports: priority_fee,
         kobe_client,
         coinbase_vote_pubkey,
