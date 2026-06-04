@@ -15,10 +15,7 @@ use stakenet_sdk::{
 use crate::state::keeper_config::KeeperConfig;
 
 /// Copy directed stake targets to [`DirectedStakeMeta`] account
-///
-/// NOTE: The normal (ticketing system) directed-stake path via `compute_directed_stake_meta` is not
-/// used here.
-pub(crate) async fn crank_copy_directed_stake_targets(
+pub async fn crank_copy_directed_stake_targets(
     keeper_config: &KeeperConfig,
     keypair: Arc<Keypair>,
     all_steward_accounts: &AllStewardAccounts,
