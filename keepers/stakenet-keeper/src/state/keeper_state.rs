@@ -128,6 +128,7 @@ pub struct KeeperState {
     pub steward_progress_flags: StewardProgressFlags,
     pub cluster_name: String,
 }
+
 impl KeeperState {
     pub fn update_identity_to_vote_map(&mut self) {
         self.identity_to_vote_map = self
@@ -332,7 +333,6 @@ impl KeeperState {
         };
 
         let current_epoch = self.epoch_info.epoch;
-        let steward_inner = &steward_state.state_account.state;
 
         // Always require epoch to be more than 50% complete
         let current_slot = client.get_slot().await?;
@@ -371,29 +371,18 @@ impl KeeperState {
             return Ok(true);
         }
 
-        let has_score_zero_in_meta = valid_targets.iter().any(|target| {
-            steward_state
-                .validator_list_account
-                .validators
-                .iter()
-                .position(|v| v.vote_account_address == target.vote_pubkey)
-                .and_then(|i| steward_inner.scores.get(i))
-                .is_some_and(|&s| s == 0)
-        });
-
         // Check if any targets have been updated in current epoch
         let any_target_updated = valid_targets
             .iter()
             .any(|target| target.target_last_updated_epoch == current_epoch);
 
-        let should_copy = !any_target_updated && has_score_zero_in_meta;
+        let should_copy = !any_target_updated;
 
         log::info!(
-            "Epoch {}, {} valid targets, any updated: {}, score-0 in meta: {} - should_copy: {}",
+            "Epoch {}, {} valid targets, any updated: {} - should_copy: {}",
             current_epoch,
             valid_targets.len(),
             any_target_updated,
-            has_score_zero_in_meta,
             should_copy,
         );
 

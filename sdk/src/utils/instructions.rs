@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use jito_steward::{DirectedStakePreference, DirectedStakeTicket};
+use kobe_client::client::KobeClient;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction,
@@ -201,6 +202,79 @@ pub async fn compute_directed_stake_meta(
             }
         })
         .collect();
+
+    Ok(instructions)
+}
+
+/// Computes the directed stake target for the Coinbase validator.
+///
+/// Fetches the Coinbase balance for the previous epoch from the Kobe API and builds a
+/// `CopyDirectedStakeTargets` instruction to set the stake target for `coinbase_vote_pubkey`.
+///
+/// # Process Overview
+///
+/// 1. Fetches the Coinbase balance for the previous epoch via the Kobe API.
+/// 2. Loads the on-chain `DirectedStakeMeta` account and collects any existing targets that
+///    were last updated in the current epoch.
+/// 3. Locates `coinbase_vote_pubkey` in the validator list.
+/// 4. Computes `total_target_lamports` as the Coinbase balance plus any existing target for
+///    this validator in the current epoch (saturating addition).
+/// 5. Emits one `CopyDirectedStakeTargets` instruction for the validator.
+///
+/// # Return Value
+///
+/// Returns an empty vector if:
+/// - The Kobe API returns no Coinbase balance (`coinbase_balance` is `None`), or
+/// - `coinbase_vote_pubkey` is not present in the on-chain validator list.
+pub async fn compute_coinbase_targets(
+    client: Arc<RpcClient>,
+    kobe_client: &KobeClient,
+    steward_config: &Pubkey,
+    authority_pubkey: &Pubkey,
+    program_id: &Pubkey,
+    coinbase_vote_pubkey: &Pubkey,
+) -> Result<Vec<Instruction>, JitoInstructionError> {
+    let epoch_info = client.get_epoch_info().await?;
+    let last_epoch = epoch_info.epoch - 1;
+
+    let coinbase_balance = kobe_client.get_coinbase_balance(last_epoch).await?;
+
+    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let config_account = get_steward_config_account(&client, steward_config).await?;
+    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
+    let validator_list_address = stake_pool_account.validator_list;
+    let validator_list_account =
+        get_validator_list_account(&client, &validator_list_address).await?;
+
+    let mut instructions = Vec::new();
+
+    if let Some(cb_balance) = coinbase_balance.coinbase_balance {
+        if let Some(validator_list_index) = validator_list_account
+            .validators
+            .iter()
+            .position(|v| v.vote_account_address.eq(coinbase_vote_pubkey))
+        {
+            let ix = Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                    config: *steward_config,
+                    directed_stake_meta: directed_stake_meta_pda,
+                    authority: *authority_pubkey,
+                    clock: solana_sdk::sysvar::clock::id(),
+                    validator_list: validator_list_address,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::CopyDirectedStakeTargets {
+                    vote_pubkey: *coinbase_vote_pubkey,
+                    total_target_lamports: cb_balance.cb_balance_lamports,
+                    validator_list_index: validator_list_index as u32,
+                }
+                .data(),
+            };
+
+            instructions.push(ix);
+        }
+    }
 
     Ok(instructions)
 }

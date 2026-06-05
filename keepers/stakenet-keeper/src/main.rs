@@ -464,6 +464,7 @@ fn main() {
             lookback_start_offset_epochs: args.lookback_start_offset_epochs,
             validator_history_min_stake: args.validator_history_min_stake,
             kobe_client,
+            coinbase_vote_pubkey: args.coinbase_vote_pubkey,
         };
 
         run_keeper(config).await;
