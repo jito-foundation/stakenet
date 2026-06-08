@@ -55,6 +55,9 @@ pub struct KeeperConfig {
 
     /// A client for interacting with kobe api
     pub kobe_client: KobeClient,
+
+    /// A coinbase vote pubkey
+    pub coinbase_vote_pubkey: Pubkey,
 }
 
 impl KeeperConfig {
@@ -273,6 +276,13 @@ pub struct Args {
 
     #[arg(long, env, default_value = "https://kobe.mainnet.jito.network")]
     pub kobe_api_base_url: String,
+
+    #[arg(
+        long,
+        env,
+        default_value = "DyjoG2US2XiVvL1MVzL2wjS5jCTmvo6aNwvqJfaPNx9u"
+    )]
+    pub coinbase_vote_pubkey: Pubkey,
 }
 
 impl fmt::Display for Args {
@@ -324,6 +334,7 @@ impl fmt::Display for Args {
             Run Directed Staking Operation: {:?}\n\
             Run Copy Is BAM Connected Operation: {:?}\n\
             Kobe API Base URL: {:?}\n\
+            Coinbase Vote Pubkey: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoints,
@@ -368,6 +379,7 @@ impl fmt::Display for Args {
             self.run_directed_staking,
             self.run_copy_is_bam_connected,
             self.kobe_api_base_url,
+            self.coinbase_vote_pubkey
         )
     }
 }

@@ -30,6 +30,7 @@ use crate::commands::{
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
         copy_directed_stake_targets::CopyDirectedStakeTargets,
+        migrate_directed_to_algorithmic::MigrateDirectedToAlgorithmic,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         sync_directed_stake_lamports::SyncDirectedStakeLamports,
@@ -40,7 +41,10 @@ use crate::commands::{
         instant_remove_validators::CrankInstantRemoveValidators,
         rebalance_directed::CrankRebalanceDirected,
     },
-    info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
+    info::{
+        view_blacklist::ViewBlacklist, view_directed_stake_meta::ViewDirectedStakeMeta,
+        view_directed_stake_ticket::ViewDirectedStakeTicket,
+    },
     init::{
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
@@ -393,6 +397,7 @@ pub enum Commands {
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
     CloseDirectedStakeMeta(CloseDirectedStakeMeta),
+    MigrateDirectedToAlgorithmic(MigrateDirectedToAlgorithmic),
 
     // Cranks
     CrankSteward(CrankSteward),
@@ -901,22 +906,6 @@ pub struct ViewDirectedStakeTickets {
 #[derive(Parser)]
 #[command(about = "View DirectedStakeWhitelist account contents")]
 pub struct ViewDirectedStakeWhitelist {
-    /// Steward config account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// Print account information in JSON format
-    #[arg(
-        long,
-        default_value = "false",
-        help = "This will print out account information in JSON format"
-    )]
-    pub print_json: bool,
-}
-
-#[derive(Parser)]
-#[command(about = "View DirectedStakeMeta account contents")]
-pub struct ViewDirectedStakeMeta {
     /// Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,

@@ -2,7 +2,7 @@
   "address": "Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8",
   "metadata": {
     "name": "steward",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "spec": "0.1.0",
     "description": "Program for permissionlessly managing an SPL Stake Pool"
   },
@@ -1316,6 +1316,37 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "migrate_directed_to_algorithmic",
+      "docs": [
+        "One-time migration: zeroes all directed stake targets and applied lamports so that",
+        "existing on-chain stake is reclassified as algorithmic without requiring an unstake."
+      ],
+      "discriminator": [
+        172,
+        101,
+        206,
+        174,
+        188,
+        157,
+        249,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "directed_stake_meta",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "migrate_state_to_v2",
@@ -5075,6 +5106,12 @@
             }
           },
           {
+            "name": "undirected_stake_ceiling_lamports",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
             "name": "instant_unstake_epoch_progress",
             "type": {
               "option": "f64"
@@ -5114,12 +5151,6 @@
             "name": "compute_score_epoch_progress",
             "type": {
               "option": "f64"
-            }
-          },
-          {
-            "name": "undirected_stake_ceiling_lamports",
-            "type": {
-              "option": "u64"
             }
           },
           {
