@@ -123,13 +123,16 @@ pub struct RebalanceDirected<'info> {
 ///   `total_staked_lamports` and `directed_stake_lamports` accordingly.
 /// - **Deposit** (`validator_list > steward_state` and applied < target): stake arrived externally;
 ///   credit up to the directed deficit against the deposit.
-/// - **Stale `total_staked_lamports`** (`applied > validator_list` while the two totals are equal):
-///   an undirected rebalance already synced `validator_lamport_balances` to the current on-chain
-///   value, but `total_staked_lamports` was not updated. This occurs when an external withdrawal
-///   (e.g. a JitoSOL redemption via `decrease_validator_stake_with_reserve`) is absorbed by the
-///   undirected rebalance before directed rebalance runs, making the withdrawal invisible to the
-///   normal withdrawal branch. Cap `total_staked_lamports` and `directed_stake_lamports` to the
-///   actual validator stake; `validator_lamport_balances` is left unchanged as it is already correct.
+/// - **Stale `total_staked_lamports`** : an undirected
+///   rebalance already synced `validator_lamport_balances` to the current on-chain value, but
+///   `total_staked_lamports` was not updated. This occurs when an external withdrawal (e.g. a
+///   JitoSOL redemption via `decrease_validator_stake_with_reserve`) is absorbed by the undirected
+///   rebalance before directed rebalance runs, leaving directed accounting stale and far too high.
+///   The deposit/withdrawal branches above are keyed on the delta and do not fire in that case, so
+///   this clamp is keyed directly on `applied > on-chain stake` and fires regardless of which
+///   branch ran — including the equal-totals case the bug exhibits.
+///   Cap `total_staked_lamports` and `directed_stake_lamports` to the actual validator stake;
+///   `validator_lamport_balances` is left unchanged as it is already correct.
 pub fn adjust_directed_stake_for_deposits_and_withdrawals(
     validator_list_staked_lamports: u64,
     validator_list_index: usize,
@@ -192,7 +195,12 @@ pub fn adjust_directed_stake_for_deposits_and_withdrawals(
         state_account.state.validator_lamport_balances[validator_list_index] =
             state_account.state.validator_lamport_balances[validator_list_index]
                 .saturating_add(increase_lamports);
-    } else if directed_stake_applied_lamports > validator_list_staked_lamports {
+    }
+
+    // Stale directed accounting clamp
+    let directed_stake_applied_lamports =
+        directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+    if directed_stake_applied_lamports > validator_list_staked_lamports {
         let excess = directed_stake_applied_lamports.saturating_sub(validator_list_staked_lamports);
         directed_stake_meta.subtract_from_total_staked_lamports(directed_stake_meta_index, excess);
         directed_stake_meta.directed_stake_lamports[validator_list_index] = directed_stake_meta
@@ -816,16 +824,8 @@ mod tests {
         );
     }
 
-    /// test_adjust_directed_stake_stale_total_staked_after_undirected_rebalance
-    ///
-    /// Reproduces the LEVMA epoch 956 scenario:
-    ///
-    /// 1. External withdrawal drops validator stake from ~49,785 → ~5,166 SOL.
-    /// 2. Undirected rebalance syncs validator_lamport_balances to 5,166 SOL
-    ///    but does NOT update total_staked_lamports (49,612 SOL).
-    /// 3. Directed rebalance runs: validator_list == steward_state (both 5,166),
-    ///    so neither the withdrawal nor the deposit branch fires.
-    ///    Without the fix, total_staked_lamports would stay at 49,612 SOL.
+    /// The stale-accounting clamp must cap total_staked_lamports to the actual
+    /// validator stake while leaving validator_lamport_balances unchanged.
     #[test]
     fn test_adjust_directed_stake_stale_total_staked_after_undirected_rebalance() {
         let mut directed_stake_meta = create_default_directed_stake_meta();
@@ -861,7 +861,6 @@ mod tests {
         );
 
         assert!(result.is_ok());
-        // total_staked_lamports must be capped to the actual validator stake
         assert_eq!(
             directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports,
             validator_list_staked_lamports,
