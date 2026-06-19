@@ -1,8 +1,7 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
+//* This program starts several threads to manage the creation of validator history accounts,
+//* and the updating of the various data feeds within the accounts.
+//* It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+
 use clap::Parser;
 use dotenvy::dotenv;
 use kobe_client::client_builder::KobeApiClientBuilder;
@@ -465,6 +464,7 @@ fn main() {
             validator_history_min_stake: args.validator_history_min_stake,
             kobe_client,
             coinbase_vote_pubkey: args.coinbase_vote_pubkey,
+            min_bam_connection_rate: args.min_bam_connection_rate,
         };
 
         run_keeper(config).await;

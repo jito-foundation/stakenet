@@ -5,7 +5,7 @@
 //! BAM clients, then writes a boolean flag (`is_bam_connected`) to each validator's
 //! on-chain history entry for the current epoch.
 //!
-//! The operation runs at 30%, 60%, and 90% epoch completion to ensure BAM connection
+//! The operation runs at 50% epoch completion to ensure BAM connection
 //! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
 
 use std::{collections::HashSet, str::FromStr, sync::Arc};
@@ -89,12 +89,10 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs up to 3 times per epoch at 70%, 80%, and 90% slot completion.
+    /// Runs up to 1 time per epoch at 50% slot completion.
     /// Spaced out to avoid missing all runs if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
-        (epoch_info.slot_index > epoch_info.slots_in_epoch * 70 / 100 && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 80 / 100 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 3)
+        epoch_info.slot_index > epoch_info.slots_in_epoch * 50 / 100 && runs_for_epoch < 1
     }
 
     /// Entry point for the operation. Checks whether the operation should run,
@@ -142,6 +140,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
     /// for all validators
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
+        let last_epoch = epoch_info.epoch.saturating_sub(1);
         let validator_history_map = &self.keeper_state.validator_history_map;
         let candidates: Vec<Pubkey> = validator_history_map.keys().copied().collect();
 
@@ -168,7 +167,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
         let validators = self
             .keeper_config
             .kobe_client
-            .get_validators(Some(epoch_info.epoch))
+            .get_validators(Some(last_epoch))
             .await
             .map_err(|e| JitoTransactionError::Custom(e.to_string()))?
             .validators;
@@ -179,7 +178,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                 let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
                 let connection_rate = bam_v.bam_connection_rate?;
 
-                if connection_rate > 0.95 {
+                if connection_rate > self.keeper_config.min_bam_connection_rate {
                     return Some(vote_account);
                 }
 
@@ -196,7 +195,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                     *vote_account,
                     &self.program_id,
                     &self.oracle_authority_keypair.pubkey(),
-                    epoch_info.epoch,
+                    last_epoch,
                     is_bam_connected,
                 )
                 .update_instruction()
