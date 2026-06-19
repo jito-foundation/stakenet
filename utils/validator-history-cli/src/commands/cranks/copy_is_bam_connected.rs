@@ -31,7 +31,7 @@ pub struct CrankCopyIsBamConnected {
 
     /// Minimum BAM connection rate for a validator to be considered BAM-connected
     #[arg(long, value_parser = parse_connection_rate)]
-    pub min_bam_connection_rate: f64,
+    min_bam_connection_rate: f64,
 }
 
 /// Parses a connection rate, validating it falls within the inclusive range `0.0..=1.0`.
@@ -116,7 +116,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     let validators = kobe_client
         .get_validators(Some(last_epoch))
         .await
-        .map_err(|e| anyhow!("Failed to fetch BAM validators: {e}"))?
+        .map_err(|e| anyhow!("Failed to fetch validators: {e}"))?
         .validators;
 
     println!("Fetched {} Validators from Kobe API", validators.len());

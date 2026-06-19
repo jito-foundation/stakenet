@@ -1,12 +1,13 @@
 //! Copies the Jito BAM client status for each validator
 //! into their respective ValidatorHistory accounts.
 //!
-//! This operation queries the Kobe API to determine which validators are registered
-//! BAM clients, then writes a boolean flag (`is_bam_connected`) to each validator's
-//! on-chain history entry for the current epoch.
+//! This operation queries the Kobe API for validator stats from the previous epoch and
+//! marks a validator as BAM-connected when its reported `bam_connection_rate` meets the
+//! configured `min_bam_connection_rate` threshold, then writes a boolean flag
+//! (`is_bam_connected`) to each validator's on-chain history entry for that epoch.
 //!
-//! The operation runs at 50% epoch completion to ensure BAM connection
-//! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
+//! The operation runs once at 50% epoch completion, timed to avoid missing the run
+//! entirely if the keeper is down late in the epoch.
 
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 

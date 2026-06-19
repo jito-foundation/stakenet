@@ -1,6 +1,6 @@
 //* This program starts several threads to manage the creation of validator history accounts,
 //* and the updating of the various data feeds within the accounts.
-//* It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+//* It will emit metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 //*
 //* The main loop fires operations on fixed tick intervals (see `should_fire`/`should_update`), but
 //* WHEN within an epoch each operation actually does work is decided by per-operation gating, NOT by
