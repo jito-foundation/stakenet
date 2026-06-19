@@ -89,11 +89,11 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs up to 3 times per epoch at 30%, 60%, and 90% slot completion.
+    /// Runs up to 3 times per epoch at 70%, 80%, and 90% slot completion.
     /// Spaced out to avoid missing all runs if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
-        (epoch_info.slot_index > epoch_info.slots_in_epoch * 30 / 100 && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 60 / 100 && runs_for_epoch < 2)
+        (epoch_info.slot_index > epoch_info.slots_in_epoch * 70 / 100 && runs_for_epoch < 1)
+            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 80 / 100 && runs_for_epoch < 2)
             || (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 3)
     }
 
@@ -165,17 +165,26 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
             .filter(|pubkey| live_vote_accounts.contains(pubkey))
             .collect();
 
-        let bam_validators = self
+        let validators = self
             .keeper_config
             .kobe_client
-            .get_bam_validators(epoch_info.epoch)
+            .get_validators(Some(epoch_info.epoch))
             .await
             .map_err(|e| JitoTransactionError::Custom(e.to_string()))?
-            .bam_validators;
+            .validators;
 
-        let bam_vote_accounts: HashSet<Pubkey> = bam_validators
+        let bam_vote_accounts: HashSet<Pubkey> = validators
             .iter()
-            .filter_map(|bam_v| Pubkey::from_str(&bam_v.vote_account).ok())
+            .filter_map(|bam_v| {
+                let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
+                let connection_rate = bam_v.bam_connection_rate?;
+
+                if connection_rate > 0.95 {
+                    return Some(vote_account);
+                }
+
+                None
+            })
             .collect();
 
         let update_instructions = entries_to_update
