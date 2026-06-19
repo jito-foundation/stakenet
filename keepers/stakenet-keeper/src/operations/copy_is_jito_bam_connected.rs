@@ -6,7 +6,7 @@
 //! configured `min_bam_connection_rate` threshold, then writes a boolean flag
 //! (`is_bam_connected`) to each validator's on-chain history entry for that epoch.
 //!
-//! The operation runs once at 50% epoch completion, timed to avoid missing the run
+//! The operation runs once at 10% epoch completion, timed to avoid missing the run
 //! entirely if the keeper is down late in the epoch.
 
 use std::{collections::HashSet, str::FromStr, sync::Arc};
@@ -90,10 +90,10 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs once per epoch after 50% slot completion.
+    /// Runs once per epoch after 10% slot completion.
     /// Timed to avoid missing the run entirely if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
-        epoch_info.slot_index > epoch_info.slots_in_epoch * 50 / 100 && runs_for_epoch < 1
+        epoch_info.slot_index > epoch_info.slots_in_epoch * 10 / 100 && runs_for_epoch < 1
     }
 
     /// Entry point for the operation. Checks whether the operation should run,

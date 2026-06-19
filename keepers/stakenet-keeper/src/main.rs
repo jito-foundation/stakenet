@@ -8,7 +8,7 @@
 //*
 //*  1. Epoch-progress gated in the keeper (each op's `_should_run` checks epoch_info.slot_index):
 //*       ~0% / 50% / 90%  vote_account, cluster_history, stake_upload, gossip_upload (3 runs/epoch)
-//*       50%              copy_is_bam_connected (1 run/epoch)
+//*       10%              copy_is_bam_connected (1 run/epoch)
 //*
 //*  2. Steward — the keeper is purely reactive and just cranks whatever state the on-chain state
 //*     machine is currently in. The epoch-progress timeline is governed by the steward `Parameters`
