@@ -89,8 +89,8 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs up to 1 time per epoch at 50% slot completion.
-    /// Spaced out to avoid missing all runs if the keeper is down late in the epoch.
+    /// Runs once per epoch after 50% slot completion.
+    /// Timed to avoid missing the run entirely if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
         epoch_info.slot_index > epoch_info.slots_in_epoch * 50 / 100 && runs_for_epoch < 1
     }
@@ -178,7 +178,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                 let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
                 let connection_rate = bam_v.bam_connection_rate?;
 
-                if connection_rate > self.keeper_config.min_bam_connection_rate {
+                if connection_rate >= self.keeper_config.min_bam_connection_rate {
                     return Some(vote_account);
                 }
 

@@ -288,8 +288,22 @@ pub struct Args {
     pub coinbase_vote_pubkey: Pubkey,
 
     /// Minimum BAM connection rate for a validator to be considered BAM-connected
-    #[arg(long, env, default_value_t = 0.95)]
+    #[arg(long, env, value_parser = parse_connection_rate)]
     pub min_bam_connection_rate: f64,
+}
+
+/// Parses a connection rate, validating it falls within the inclusive range `0.0..=1.0`.
+fn parse_connection_rate(s: &str) -> Result<f64, String> {
+    let v: f64 = s
+        .parse()
+        .map_err(|_| format!("`{s}` is not a valid number"))?;
+    if (0.0..=1.0).contains(&v) {
+        Ok(v)
+    } else {
+        Err(format!(
+            "connection rate must be between 0.0 and 1.0, got {v}"
+        ))
+    }
 }
 
 impl fmt::Display for Args {

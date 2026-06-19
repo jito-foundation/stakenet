@@ -1,6 +1,27 @@
 //* This program starts several threads to manage the creation of validator history accounts,
 //* and the updating of the various data feeds within the accounts.
 //* It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+//*
+//* The main loop fires operations on fixed tick intervals (see `should_fire`/`should_update`), but
+//* WHEN within an epoch each operation actually does work is decided by per-operation gating, NOT by
+//* this loop. There are three patterns:
+//*
+//*  1. Epoch-progress gated in the keeper (each op's `_should_run` checks epoch_info.slot_index):
+//*       ~0% / 50% / 90%  vote_account, cluster_history, stake_upload, gossip_upload (3 runs/epoch)
+//*       50%              copy_is_bam_connected (1 run/epoch)
+//*
+//*  2. Steward — the keeper is purely reactive and just cranks whatever state the on-chain state
+//*     machine is currently in. The epoch-progress timeline is governed by the steward `Parameters`
+//*     (config-driven; defaults shown), not by this loop:
+//*       0% ──────────────► 50% ──────────────────► 90% ────────────────► 100%
+//*       RebalanceDirected   ComputeScores            ComputeInstantUnstake
+//*       (until ~50%, then   → ComputeDelegations      → Rebalance
+//*        forced to Idle at  (compute_score_           (instant_unstake_
+//*        compute_score_      epoch_progress = 0.5)     epoch_progress = 0.9)
+//*        epoch_progress)
+//*
+//*  3. No epoch gate — run on every tick their interval fires (`_should_run` returns `true`):
+//*       mev_commission, mev_earned, priority_fee_commission, block_metadata, metrics_emit
 
 use clap::Parser;
 use dotenvy::dotenv;

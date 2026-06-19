@@ -28,6 +28,24 @@ pub struct CrankCopyIsBamConnected {
     /// Epoch number
     #[arg(long)]
     epoch: Option<u64>,
+
+    /// Minimum BAM connection rate for a validator to be considered BAM-connected
+    #[arg(long, value_parser = parse_connection_rate)]
+    pub min_bam_connection_rate: f64,
+}
+
+/// Parses a connection rate, validating it falls within the inclusive range `0.0..=1.0`.
+fn parse_connection_rate(s: &str) -> Result<f64, String> {
+    let v: f64 = s
+        .parse()
+        .map_err(|_| format!("`{s}` is not a valid number"))?;
+    if (0.0..=1.0).contains(&v) {
+        Ok(v)
+    } else {
+        Err(format!(
+            "connection rate must be between 0.0 and 1.0, got {v}"
+        ))
+    }
 }
 
 /// Maximum number of accounts per `get_multiple_accounts` RPC call.
@@ -42,6 +60,7 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
 
     let epoch_info = client.get_epoch_info().await?;
     let epoch = args.epoch.unwrap_or(epoch_info.epoch);
+    let last_epoch = epoch.saturating_sub(1);
     let program_id = validator_history::id();
 
     println!("Target epoch: {epoch}");
@@ -94,28 +113,34 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     let kobe_client = KobeApiClientBuilder::new()
         .base_url(args.kobe_api_base_url)
         .build();
-    let bam_validators = kobe_client
-        .get_bam_validators(epoch)
+    let validators = kobe_client
+        .get_validators(Some(last_epoch))
         .await
         .map_err(|e| anyhow!("Failed to fetch BAM validators: {e}"))?
-        .bam_validators;
+        .validators;
 
-    println!(
-        "Fetched {} BAM validators from Kobe API",
-        bam_validators.len()
-    );
+    println!("Fetched {} Validators from Kobe API", validators.len());
 
     // Pre-compute BAM pubkeys into a HashSet for O(1) lookup
-    let bam_pubkeys: HashSet<Pubkey> = bam_validators
+    let bam_vote_accounts: HashSet<Pubkey> = validators
         .iter()
-        .filter_map(|bam_v| Pubkey::from_str(&bam_v.vote_account).ok())
+        .filter_map(|bam_v| {
+            let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
+            let connection_rate = bam_v.bam_connection_rate?;
+
+            if connection_rate >= args.min_bam_connection_rate {
+                return Some(vote_account);
+            }
+
+            None
+        })
         .collect();
 
     // Build instructions for each validator
     let instructions: Vec<_> = vote_accounts_to_update
         .iter()
         .map(|vote_account| {
-            let is_bam_connected = bam_pubkeys.contains(vote_account);
+            let is_bam_connected = bam_vote_accounts.contains(vote_account);
 
             IsBamConnectedEntry::new(
                 *vote_account,
