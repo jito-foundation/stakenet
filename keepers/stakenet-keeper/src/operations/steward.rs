@@ -1,17 +1,24 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
+//* This program starts several threads to manage the creation of validator history accounts,
+//* and the updating of the various data feeds within the accounts.
+//* It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 
-use crate::entries::crank_copy_directed_stake_targets::crank_copy_directed_stake_targets;
-use crate::entries::crank_steward::crank_steward;
-use crate::state::keeper_state::{KeeperFlags, KeeperState};
-use crate::state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag};
 use solana_metrics::datapoint_error;
-use stakenet_sdk::models::errors::{JitoSendTransactionError, JitoTransactionError};
-use stakenet_sdk::models::submit_stats::SubmitStats;
-use stakenet_sdk::utils::transactions::format_steward_error_log;
+use stakenet_sdk::{
+    models::{
+        errors::{JitoSendTransactionError, JitoTransactionError},
+        submit_stats::SubmitStats,
+    },
+    utils::transactions::format_steward_error_log,
+};
+
+use crate::{
+    entries::{
+        crank_copy_directed_stake_targets::crank_copy_directed_stake_targets,
+        crank_steward::crank_steward,
+    },
+    state::keeper_state::{KeeperFlags, KeeperState},
+    state::{keeper_config::KeeperConfig, keeper_state::KeeperFlag},
+};
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
@@ -165,13 +172,9 @@ pub async fn run_crank_steward(
                 log::info!("Cranking Copy Directed Targets...");
 
                 let stats = crank_copy_directed_stake_targets(
-                    keeper_config.client.clone(),
+                    keeper_config,
                     keypair.clone(),
-                    &keeper_config.steward_program_id,
                     steward_accounts,
-                    &keeper_config.token_mint,
-                    Some(keeper_config.priority_fee_in_microlamports),
-                    &keeper_config.kobe_client,
                 )
                 .await?;
 

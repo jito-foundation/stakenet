@@ -30,6 +30,7 @@ use crate::commands::{
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
         copy_directed_stake_targets::CopyDirectedStakeTargets,
+        migrate_directed_to_algorithmic::MigrateDirectedToAlgorithmic,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         sync_directed_stake_lamports::SyncDirectedStakeLamports,
@@ -40,7 +41,10 @@ use crate::commands::{
         instant_remove_validators::CrankInstantRemoveValidators,
         rebalance_directed::CrankRebalanceDirected,
     },
-    info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
+    info::{
+        view_blacklist::ViewBlacklist, view_directed_stake_meta::ViewDirectedStakeMeta,
+        view_directed_stake_ticket::ViewDirectedStakeTicket,
+    },
     init::{
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
@@ -182,6 +186,15 @@ pub struct ConfigParameters {
     /// Percent of total pool lamports that can be unstaked due to directed stake requests
     #[arg(long, env)]
     pub directed_stake_unstake_cap_bps: Option<u16>,
+
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation.
+    #[arg(long, env)]
+    pub jito_bam_minimum_epochs: Option<u8>,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    #[arg(long, env)]
+    pub jito_bam_window_epochs: Option<u8>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -209,6 +222,8 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             compute_score_epoch_progress: config.compute_score_epoch_progress,
             undirected_stake_ceiling_lamports: config.undirected_stake_ceiling_lamports,
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
+            jito_bam_minimum_epochs: config.jito_bam_minimum_epochs,
+            jito_bam_window_epochs: config.jito_bam_window_epochs,
         }
     }
 }
@@ -382,6 +397,7 @@ pub enum Commands {
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
     CloseDirectedStakeMeta(CloseDirectedStakeMeta),
+    MigrateDirectedToAlgorithmic(MigrateDirectedToAlgorithmic),
 
     // Cranks
     CrankSteward(CrankSteward),
@@ -890,22 +906,6 @@ pub struct ViewDirectedStakeTickets {
 #[derive(Parser)]
 #[command(about = "View DirectedStakeWhitelist account contents")]
 pub struct ViewDirectedStakeWhitelist {
-    /// Steward config account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// Print account information in JSON format
-    #[arg(
-        long,
-        default_value = "false",
-        help = "This will print out account information in JSON format"
-    )]
-    pub print_json: bool,
-}
-
-#[derive(Parser)]
-#[command(about = "View DirectedStakeMeta account contents")]
-pub struct ViewDirectedStakeMeta {
     /// Steward config account
     #[arg(long, env)]
     pub steward_config: Pubkey,

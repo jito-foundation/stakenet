@@ -27,7 +27,7 @@ use jito_steward::{
     insert_sorted_index,
     score::{
         instant_unstake_validator, validator_score, InstantUnstakeComponentsV3,
-        InstantUnstakeDetails, ScoreComponentsV4, ScoreDetails,
+        InstantUnstakeDetails, ScoreComponentsV5, ScoreDetails,
     },
     select_validators_to_delegate, Delegation,
 };
@@ -65,7 +65,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -76,7 +76,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -114,7 +114,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249339646681323136,
             commission_max: 0,
@@ -125,7 +125,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -161,7 +161,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249339646681323136,
             commission_max: 0,
@@ -172,7 +172,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -208,7 +208,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -219,7 +219,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -259,7 +259,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -270,7 +270,7 @@ fn test_compute_score() {
             blacklisted_score: 0,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -308,7 +308,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -319,7 +319,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 0,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -358,7 +358,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -369,7 +369,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -393,11 +393,12 @@ fn test_compute_score() {
         }
     );
 
-    // running jito score
+    // running jito bam client score
+    config.parameters.jito_bam_minimum_epochs = 10;
+    config.parameters.jito_bam_window_epochs = 10;
     let mut validator = good_validator;
     for i in 10..=20 {
-        validator.history.arr_mut()[i].mev_commission =
-            ValidatorHistoryEntry::default().mev_commission;
+        validator.history.arr_mut()[i].is_bam_connected = 0;
     }
     let components = validator_score(
         &validator,
@@ -409,18 +410,18 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
-            raw_score: 7205759403802793600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
-            mev_commission_avg: 10000,
+            mev_commission_avg: 0,
             validator_age: 0,
             vote_credits_avg: VOTE_CREDITS_RATIO_MAX,
-            mev_commission_score: 0,
+            mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 0,
+            running_bam_score: 0,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -429,8 +430,8 @@ fn test_compute_score() {
             vote_account: validator.vote_account,
             epoch: current_epoch as u16,
             details: ScoreDetails {
-                max_mev_commission: 10000,
-                max_mev_commission_epoch: 20,
+                max_mev_commission: 0,
+                max_mev_commission_epoch: 10,
                 superminority_epoch: EPOCH_DEFAULT,
                 delinquency_ratio: 1.0,
                 delinquency_epoch: EPOCH_DEFAULT,
@@ -443,6 +444,10 @@ fn test_compute_score() {
             }
         }
     );
+
+    // Reset BAM params for subsequent tests
+    config.parameters.jito_bam_minimum_epochs = 0;
+    config.parameters.jito_bam_window_epochs = 0;
 
     // commission
     let mut validator = good_validator;
@@ -457,7 +462,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 6457106334496626304,
             commission_max: 11,
@@ -468,7 +473,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 0,
             historical_commission_score: 0,
             merkle_root_upload_authority_score: 1,
@@ -513,7 +518,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -524,7 +529,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -559,7 +564,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -570,7 +575,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 0,
             merkle_root_upload_authority_score: 1,
@@ -612,7 +617,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868912633600,
             raw_score: 7249739868912633600,
             commission_max: 0,
@@ -623,7 +628,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -660,7 +665,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913333600,
             commission_max: 0,
@@ -671,7 +676,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 0,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -713,7 +718,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868912833600,
             raw_score: 7249739868912833600,
             commission_max: 0,
@@ -724,7 +729,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -764,7 +769,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -775,7 +780,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -852,7 +857,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -863,7 +868,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 0,
@@ -904,7 +909,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -915,7 +920,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -956,7 +961,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -967,7 +972,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -1010,7 +1015,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 7249739868913833600,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -1021,7 +1026,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
@@ -1064,7 +1069,7 @@ fn test_compute_score() {
     .unwrap();
     assert_eq!(
         components,
-        ScoreComponentsV4 {
+        ScoreComponentsV5 {
             score: 0,
             raw_score: 7249739868913833600,
             commission_max: 0,
@@ -1075,7 +1080,7 @@ fn test_compute_score() {
             blacklisted_score: 1,
             superminority_score: 1,
             delinquency_score: 1,
-            running_jito_score: 1,
+            running_bam_score: 1,
             commission_score: 1,
             historical_commission_score: 1,
             merkle_root_upload_authority_score: 1,
