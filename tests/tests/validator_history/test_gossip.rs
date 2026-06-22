@@ -84,19 +84,10 @@ async fn test_copy_contact_info() {
 
 #[tokio::test]
 async fn test_copy_contact_info_version_4_0_0_rc_1() {
-    // Regression test for the agave 4.x PackedMinor wire format: a node running
-    // 4.0.0-rc.1 broadcasts its Version with the prerelease tag packed into bits
-    // 14-15 of the `minor` field and the rc number carried in `patch`. The program
-    // must decode that back to 4.0.0 (NOT 4.0.1).
     let fixture = TestFixture::new().await;
     fixture.initialize_config().await;
     fixture.initialize_validator_history_account().await;
 
-    // Build a real gossip ContactInfo to get a valid wire envelope (pubkey,
-    // wallclock, outset, shred_version, addrs, sockets), then splice in a
-    // 4.0.0-rc.1 Version encoded exactly as an agave 4.x node broadcasts it. The
-    // agave crate pinned for tests predates the v4 format, so it can't produce
-    // these bytes on its own.
     let wallclock = 0;
     let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
