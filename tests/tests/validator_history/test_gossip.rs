@@ -83,6 +83,95 @@ async fn test_copy_contact_info() {
 }
 
 #[tokio::test]
+async fn test_copy_contact_info_version_4_0_0_rc_1() {
+    // Regression test for the agave 4.x PackedMinor wire format: a node running
+    // 4.0.0-rc.1 broadcasts its Version with the prerelease tag packed into bits
+    // 14-15 of the `minor` field and the rc number carried in `patch`. The program
+    // must decode that back to 4.0.0 (NOT 4.0.1).
+    let fixture = TestFixture::new().await;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    // Build a real gossip ContactInfo to get a valid wire envelope (pubkey,
+    // wallclock, outset, shred_version, addrs, sockets), then splice in a
+    // 4.0.0-rc.1 Version encoded exactly as an agave 4.x node broadcasts it. The
+    // agave crate pinned for tests predates the v4 format, so it can't produce
+    // these bytes on its own.
+    let wallclock = 0;
+    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
+    let ip = IpAddr::V4(ipv4);
+    contact_info
+        .set_socket(0, SocketAddr::new(ip, 1234))
+        .expect("could not set socket");
+
+    let blob = serialize(&CrdsData::ContactInfo(contact_info)).unwrap();
+
+    // CrdsData::ContactInfo wire bytes that precede the inline Version field:
+    //   enum discriminant (u32)     = 4
+    //   pubkey (Pubkey)             = 32
+    //   wallclock (varint, value 0) = 1
+    //   outset (u64)                = 8
+    //   shred_version (u16)         = 2
+    const VERSION_OFFSET: usize = 4 + 32 + 1 + 8 + 2;
+    // The default Version occupies exactly this many bytes inline; replace that slice.
+    let agave_version_len =
+        bincode::serialized_size(&solana_version::Version::default()).unwrap() as usize;
+
+    // 4.0.0-rc.1 as broadcast by agave 4.x (solana-version/src/v4.rs PackedMinor):
+    //   major        = 4      -> [0x04]
+    //   packed minor = 0x4000 -> [0x80, 0x80, 0x01]  (rc tag in bits 14-15, minor=0)
+    //   wire patch   = 1      -> [0x01]               (the rc number)
+    //   commit / feature_set / client = 0
+    let version_4_0_0_rc_1: [u8; 14] = [
+        0x04, 0x80, 0x80, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    let mut message = Vec::with_capacity(blob.len());
+    message.extend_from_slice(&blob[..VERSION_OFFSET]);
+    message.extend_from_slice(&version_4_0_0_rc_1);
+    message.extend_from_slice(&blob[VERSION_OFFSET + agave_version_len..]);
+
+    // Sign + submit through CopyGossipContactInfo, exactly like a gossip upload.
+    let dalek_keypair =
+        ed25519_dalek::Keypair::from_bytes(&fixture.identity_keypair.to_bytes()).unwrap();
+    #[allow(deprecated)]
+    let ed25519_ix = new_ed25519_instruction(&dalek_keypair, &message);
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::CopyGossipContactInfo {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            instructions: anchor_lang::solana_program::sysvar::instructions::id(),
+            config: fixture.validator_history_config,
+            oracle_authority: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::CopyGossipContactInfo {}.data(),
+    };
+    let transaction = Transaction::new_signed_with_payer(
+        &[ed25519_ix, instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        fixture.ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    // PackedMinor decode: minor = low 14 bits of 0x4000 = 0, patch = 0 (prerelease).
+    assert_eq!(account.history.arr[0].version.major, 4);
+    assert_eq!(account.history.arr[0].version.minor, 0);
+    assert_eq!(account.history.arr[0].version.patch, 0);
+    assert_eq!(account.history.arr[0].client_type, 0);
+    assert_eq!(account.history.arr[0].ip, ipv4.octets());
+    assert_eq!(account.history.arr[0].epoch, 0);
+}
+
+#[tokio::test]
 async fn test_gossip_wrong_signer() {
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
