@@ -552,6 +552,6 @@ mod tests {
         assert_eq!(targets.len(), 2);
         assert_eq!(*targets.get(&validator1).unwrap(), 60_000_000);
         assert_eq!(*targets.get(&validator2).unwrap(), 40_000_000);
-        assert!(targets.get(&validator3).is_none());
+        assert!(!targets.contains_key(&validator3));
     }
 }
