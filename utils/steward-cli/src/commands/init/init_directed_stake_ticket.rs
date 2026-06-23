@@ -94,8 +94,6 @@ pub async fn command_init_directed_stake_ticket(
         .data(),
     };
 
-    let blockhash = client.get_latest_blockhash().await?;
-
     let configured_ix = configure_instruction(
         &[instruction],
         args.permissioned_parameters
@@ -109,6 +107,13 @@ pub async fn command_init_directed_stake_ticket(
             .heap_size,
     );
 
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix);
+        return Ok(());
+    }
+
+    let blockhash = client.get_latest_blockhash().await?;
+
     let transaction = Transaction::new_signed_with_payer(
         &configured_ix,
         Some(&authority_pubkey),
@@ -116,17 +121,13 @@ pub async fn command_init_directed_stake_ticket(
         blockhash,
     );
 
-    if args.permissioned_parameters.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .await?;
 
-        println!("✅ DirectedStakeTicket initialized successfully!");
-        println!("  Transaction signature: {signature}");
-        println!("  DirectedStakeTicket account: {directed_stake_ticket_pda}");
-    }
+    println!("✅ DirectedStakeTicket initialized successfully!");
+    println!("  Transaction signature: {signature}");
+    println!("  DirectedStakeTicket account: {directed_stake_ticket_pda}");
 
     Ok(())
 }
