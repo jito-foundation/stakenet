@@ -431,8 +431,7 @@ mod tests {
         jitosol_balances.insert(authority1, 100_000_000);
 
         let tickets = create_tickets(authority1, authority2, validator1, validator2);
-        let targets =
-            aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 2);
         assert_eq!(*targets.get(&validator1).unwrap(), 60_000_000);
@@ -450,8 +449,7 @@ mod tests {
         jitosol_balances.insert(authority2, 50_000_000);
 
         let tickets = create_tickets(authority1, authority2, validator1, validator1);
-        let targets =
-            aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 1);
         assert_eq!(*targets.get(&validator1).unwrap(), 150_000_000);
@@ -469,8 +467,7 @@ mod tests {
         let mut jitosol_balances = HashMap::new();
         jitosol_balances.insert(authority1, 100_000_000);
 
-        let targets =
-            aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 0);
     }

@@ -16,9 +16,8 @@ use crate::{
     utils::{
         accounts::{
             get_directed_stake_meta_address, get_directed_stake_ticket_address,
-            get_directed_stake_tickets,
-            get_directed_stake_whitelist_address, get_stake_pool_account,
-            get_steward_config_account, get_validator_list_account,
+            get_directed_stake_tickets, get_directed_stake_whitelist_address,
+            get_stake_pool_account, get_steward_config_account, get_validator_list_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
