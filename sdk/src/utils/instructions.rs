@@ -15,10 +15,10 @@ use crate::{
     models::errors::JitoInstructionError,
     utils::{
         accounts::{
-            get_directed_stake_meta, get_directed_stake_meta_address,
-            get_directed_stake_ticket_address, get_directed_stake_tickets,
+            get_directed_stake_meta_address, get_directed_stake_ticket_address,
+            get_directed_stake_tickets,
             get_directed_stake_whitelist_address, get_stake_pool_account,
-            get_steward_config_account, get_steward_state_account, get_validator_list_account,
+            get_steward_config_account, get_validator_list_account,
         },
         helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
     },
@@ -94,13 +94,13 @@ pub fn update_directed_stake_ticket(
     }
 }
 
-/// Computes directed stake metadata and generates instructions to zero out stake targets for
-/// validators with a steward score of `0`.
+/// Computes directed stake metadata and generates instructions to update stake targets for
+/// validators that are currently directed by a ticket with a JitoSOL balance.
 ///
 /// This function aggregates directed stake ticket holders' preferences, converts JitoSOL balances
-/// to lamports, and emits `CopyDirectedStakeTargets` instructions **only** for validators whose
-/// steward score is `0`, forcing their `total_target_lamports` to `0`. Validators with a score
-/// greater than `0` are skipped.
+/// to lamports, and emits one `CopyDirectedStakeTargets` instruction per validator that appears in
+/// a current ticket. Validators that are no longer referenced by any ticket are left untouched —
+/// they are **not** reset to `0`.
 ///
 /// # Process Overview
 ///
@@ -109,10 +109,9 @@ pub fn update_directed_stake_ticket(
 ///    - Retrieves their JitoSOL token balance
 ///    - Converts JitoSOL to lamports using the stake pool's conversion rate
 ///    - Applies their allocation preferences across validators
-/// 3. Aggregates total target delegations per validator
-/// 4. For each validator, checks its steward score:
-///    - Score `== 0`: emits a `CopyDirectedStakeTargets` instruction with `total_target_lamports = 0`
-///    - Score `> 0`: skipped — no instruction is generated
+/// 3. Aggregates total target delegations per validator (only from tickets with a balance)
+/// 4. Emits a `CopyDirectedStakeTargets` instruction for each aggregated validator found in the
+///    validator list
 ///
 /// # Conversion Details
 ///
@@ -147,19 +146,12 @@ pub async fn compute_directed_stake_meta(
         jitosol_balances.insert(ticket.ticket_update_authority, balance);
     }
 
-    let existing_directed_stake_meta =
-        get_directed_stake_meta(client.clone(), steward_config, program_id).await?;
     let tickets: Vec<DirectedStakeTicket> = ticket_map.values().copied().collect();
-    let validator_targets = aggregate_validator_targets(
-        &existing_directed_stake_meta,
-        &tickets,
-        &jitosol_balances,
-        conversion_rate_bps,
-    )?;
+    let validator_targets =
+        aggregate_validator_targets(&tickets, &jitosol_balances, conversion_rate_bps)?;
 
     // Get validator list to find indices
     let config_account = get_steward_config_account(&client, steward_config).await?;
-    let steward_account = get_steward_state_account(&client, program_id, steward_config).await?;
     let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
     let validator_list_address = stake_pool_account.validator_list;
     let validator_list_account =
@@ -168,40 +160,31 @@ pub async fn compute_directed_stake_meta(
     let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
 
     let instructions = validator_targets
-        .iter()
-        .filter_map(|(vote_pubkey, _total_target_lamports)| {
+        .into_iter()
+        .filter_map(|(vote_pubkey, total_target_lamports)| {
             // Find the index of this vote_pubkey in the validator list
             let validator_list_index = validator_list_account
                 .validators
                 .iter()
-                .position(|v| v.vote_account_address == *vote_pubkey)?;
+                .position(|v| v.vote_account_address == vote_pubkey)?;
 
-            if steward_account
-                .state
-                .scores
-                .get(validator_list_index)
-                .is_some_and(|&s| s == 0)
-            {
-                Some(Instruction {
-                    program_id: *program_id,
-                    accounts: jito_steward::accounts::CopyDirectedStakeTargets {
-                        config: *steward_config,
-                        directed_stake_meta: directed_stake_meta_pda,
-                        authority: *authority_pubkey,
-                        clock: solana_sdk::sysvar::clock::id(),
-                        validator_list: validator_list_address,
-                    }
-                    .to_account_metas(None),
-                    data: jito_steward::instruction::CopyDirectedStakeTargets {
-                        vote_pubkey: *vote_pubkey,
-                        total_target_lamports: 0,
-                        validator_list_index: validator_list_index as u32,
-                    }
-                    .data(),
-                })
-            } else {
-                None
-            }
+            Some(Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                    config: *steward_config,
+                    directed_stake_meta: directed_stake_meta_pda,
+                    authority: *authority_pubkey,
+                    clock: solana_sdk::sysvar::clock::id(),
+                    validator_list: validator_list_address,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::CopyDirectedStakeTargets {
+                    vote_pubkey,
+                    total_target_lamports,
+                    validator_list_index: validator_list_index as u32,
+                }
+                .data(),
+            })
         })
         .collect();
 
