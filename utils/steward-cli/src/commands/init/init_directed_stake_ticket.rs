@@ -66,7 +66,7 @@ pub async fn command_init_directed_stake_ticket(
 
     println!("Initializing DirectedStakeTicket...");
     println!("  Authority: {authority_pubkey}");
-    println!("  Steward Config: {}", steward_config_pubkey);
+    println!("  Steward Config: {steward_config_pubkey}");
     println!(
         "  Ticket Update Authority: {}",
         args.ticket_update_authority
