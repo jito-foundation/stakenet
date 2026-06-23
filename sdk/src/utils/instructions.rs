@@ -73,11 +73,13 @@ pub fn get_create_validator_history_instructions(
 pub fn update_directed_stake_ticket(
     program_id: &Pubkey,
     steward_config: &Pubkey,
+    ticket_update_authority: &Pubkey,
     signer: &Pubkey,
     preferences: Vec<DirectedStakePreference>,
 ) -> Instruction {
     let whitelist_account = get_directed_stake_whitelist_address(steward_config, program_id);
-    let ticket_account = get_directed_stake_ticket_address(steward_config, signer, program_id);
+    let ticket_account =
+        get_directed_stake_ticket_address(steward_config, ticket_update_authority, program_id);
 
     Instruction {
         program_id: *program_id,

@@ -6,7 +6,6 @@
 
 use std::sync::Arc;
 
-use anchor_lang::AccountDeserialize;
 use anyhow::anyhow;
 use clap::Parser;
 use jito_steward::DirectedStakePreference;
@@ -18,7 +17,10 @@ use stakenet_sdk::utils::instructions::update_directed_stake_ticket;
 
 use crate::{
     commands::command_args::{parse_pubkey, parse_u16, PermissionedParameters},
-    utils::transactions::{configure_instruction, maybe_print_tx},
+    utils::{
+        accounts::get_steward_config_account,
+        transactions::{configure_instruction, maybe_print_tx},
+    },
 };
 
 #[derive(Parser)]
@@ -31,7 +33,7 @@ pub struct UpdateDirectedStakeTicket {
     ///
     /// Example: `--vote-pubkey Vote1111...,Vote2222...,Vote3333...`
     #[arg(long, value_delimiter = ',', value_parser = parse_pubkey)]
-    pub vote_pubkey: Vec<Pubkey>,
+    vote_pubkey: Vec<Pubkey>,
 
     /// Stake share allocations of JitoSOL in basis points for each validator (comma-separated)
     ///
@@ -39,8 +41,12 @@ pub struct UpdateDirectedStakeTicket {
     /// desired stake allocation for the corresponding validator.
     ///
     /// Example: `--stake-share-bps 5000,3000,2000` (50%, 30%, 20%)
-    #[arg(long, env, value_delimiter = ',', value_parser = parse_u16)]
-    pub stake_share_bps: Vec<u16>,
+    #[arg(long, value_delimiter = ',', value_parser = parse_u16)]
+    stake_share_bps: Vec<u16>,
+
+    /// Ticket update authority pubkey
+    #[arg(long, env)]
+    ticket_update_authority: Pubkey,
 }
 
 /// Updates the directed stake ticket with new validator stake preferences.
@@ -62,15 +68,8 @@ pub(crate) async fn command_update_directed_stake_ticket(
             .transaction_parameters
             .print_gov_tx
     {
-        if let Some(pubkey) = args.permissioned_parameters.authority_pubkey {
-            pubkey
-        } else {
-            // Fallback to reading on-chain config to get parameters_authority
-            let config_account = client.get_account(&steward_config).await?;
-            let config =
-                jito_steward::Config::try_deserialize(&mut config_account.data.as_slice())?;
-            config.parameters_authority
-        }
+        let config = get_steward_config_account(&client.clone(), &steward_config).await?;
+        config.directed_stake_ticket_override_authority
     } else {
         read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
             .expect("Failed reading keypair file ( Authority )")
@@ -92,7 +91,13 @@ pub(crate) async fn command_update_directed_stake_ticket(
         })
         .collect();
 
-    let ix = update_directed_stake_ticket(&program_id, &steward_config, &signer, preferences);
+    let ix = update_directed_stake_ticket(
+        &program_id,
+        &steward_config,
+        &args.ticket_update_authority,
+        &signer,
+        preferences,
+    );
 
     let configured_ix = configure_instruction(
         &[ix],
