@@ -33,8 +33,11 @@ pub async fn command_init_directed_stake_ticket(
     let directed_stake_whitelist_pda =
         get_directed_stake_whitelist_address(&args.steward_config, &program_id);
 
-    let directed_stake_ticket_pda =
-        get_directed_stake_ticket_address(&args.steward_config, &authority_pubkey, &program_id);
+    let directed_stake_ticket_pda = get_directed_stake_ticket_address(
+        &args.steward_config,
+        &args.ticket_update_authority,
+        &program_id,
+    );
 
     println!("Initializing DirectedStakeTicket...");
     println!("  Authority: {authority_pubkey}");
