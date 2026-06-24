@@ -300,9 +300,6 @@ pub fn aggregate_validator_targets(
     jitosol_balances: &HashMap<Pubkey, u64>,
     conversion_rate_bps: u64,
 ) -> Result<HashMap<Pubkey, u64>, JitoInstructionError> {
-    // Only aggregate targets that come from current tickets with a balance. We intentionally do
-    // not seed this map from the existing on-chain meta, so validators that no longer have a
-    // directing ticket are left untouched rather than reset to 0.
     let mut validator_target_delegations: HashMap<Pubkey, u64> = HashMap::new();
 
     for ticket in tickets {
