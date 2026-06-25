@@ -58,6 +58,9 @@ pub struct KeeperConfig {
 
     /// A coinbase vote pubkey
     pub coinbase_vote_pubkey: Pubkey,
+
+    /// Minimum BAM connection rate for a validator to be considered BAM-connected
+    pub min_bam_connection_rate: f64,
 }
 
 impl KeeperConfig {
@@ -283,6 +286,24 @@ pub struct Args {
         default_value = "DyjoG2US2XiVvL1MVzL2wjS5jCTmvo6aNwvqJfaPNx9u"
     )]
     pub coinbase_vote_pubkey: Pubkey,
+
+    /// Minimum BAM connection rate for a validator to be considered BAM-connected
+    #[arg(long, env, value_parser = parse_connection_rate)]
+    pub min_bam_connection_rate: f64,
+}
+
+/// Parses a connection rate, validating it falls within the inclusive range `0.0..=1.0`.
+fn parse_connection_rate(s: &str) -> Result<f64, String> {
+    let v: f64 = s
+        .parse()
+        .map_err(|_| format!("`{s}` is not a valid number"))?;
+    if (0.0..=1.0).contains(&v) {
+        Ok(v)
+    } else {
+        Err(format!(
+            "connection rate must be between 0.0 and 1.0, got {v}"
+        ))
+    }
 }
 
 impl fmt::Display for Args {
@@ -335,6 +356,7 @@ impl fmt::Display for Args {
             Run Copy Is BAM Connected Operation: {:?}\n\
             Kobe API Base URL: {:?}\n\
             Coinbase Vote Pubkey: {:?}\n\
+            Min BAM Connection Rate: {:?}\n\
             -------------------------------",
             self.json_rpc_url,
             self.gossip_entrypoints,
@@ -379,7 +401,8 @@ impl fmt::Display for Args {
             self.run_directed_staking,
             self.run_copy_is_bam_connected,
             self.kobe_api_base_url,
-            self.coinbase_vote_pubkey
+            self.coinbase_vote_pubkey,
+            self.min_bam_connection_rate,
         )
     }
 }
