@@ -296,17 +296,11 @@ pub fn calculate_conversion_rate_bps(
 /// the metadata to 0 before aggregation to ensure validators no longer receiving
 /// delegations are properly reset.
 pub fn aggregate_validator_targets(
-    existing_meta: &DirectedStakeMeta,
     tickets: &[DirectedStakeTicket],
     jitosol_balances: &HashMap<Pubkey, u64>,
     conversion_rate_bps: u64,
 ) -> Result<HashMap<Pubkey, u64>, JitoInstructionError> {
-    let mut validator_target_delegations: HashMap<Pubkey, u64> = existing_meta
-        .targets
-        .iter()
-        .filter(|target| target.vote_pubkey.ne(&Pubkey::default()))
-        .map(|target| (target.vote_pubkey, 0u64))
-        .collect();
+    let mut validator_target_delegations: HashMap<Pubkey, u64> = HashMap::new();
 
     for ticket in tickets {
         let jitosol_balance = jitosol_balances
@@ -344,9 +338,7 @@ pub fn aggregate_validator_targets(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jito_steward::{
-        constants::MAX_VALIDATORS, utils::U8Bool, DirectedStakePreference, DirectedStakeTarget,
-    };
+    use jito_steward::{utils::U8Bool, DirectedStakePreference};
 
     #[test]
     fn test_is_live_vote_account_true_for_vote_owned_account() {
@@ -411,64 +403,6 @@ mod tests {
         ]
     }
 
-    fn create_empty_meta() -> DirectedStakeMeta {
-        let target = DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 32],
-        };
-
-        DirectedStakeMeta {
-            total_stake_targets: 0,
-            directed_unstake_total: 0,
-            padding0: [0; 63],
-            is_initialized: U8Bool::from(true),
-            targets: [target; MAX_VALIDATORS],
-            directed_stake_lamports: [0; MAX_VALIDATORS],
-            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
-        }
-    }
-
-    fn create_meta_with_validators(validators: Vec<Pubkey>) -> DirectedStakeMeta {
-        let empty_target = DirectedStakeTarget {
-            vote_pubkey: Pubkey::default(),
-            total_target_lamports: 0,
-            total_staked_lamports: 0,
-            target_last_updated_epoch: 0,
-            staked_last_updated_epoch: 0,
-            _padding0: [0; 32],
-        };
-
-        let mut targets = [empty_target; MAX_VALIDATORS];
-
-        // Populate the first N slots with the provided validators
-        for (i, validator) in validators.iter().enumerate() {
-            if i < MAX_VALIDATORS {
-                targets[i] = DirectedStakeTarget {
-                    vote_pubkey: *validator,
-                    total_target_lamports: 1_000_000_000, // Some non-zero amount to simulate existing allocation
-                    total_staked_lamports: 1_000_000_000,
-                    target_last_updated_epoch: 100,
-                    staked_last_updated_epoch: 100,
-                    _padding0: [0; 32],
-                };
-            }
-        }
-
-        DirectedStakeMeta {
-            total_stake_targets: validators.len() as u64,
-            directed_unstake_total: 0,
-            padding0: [0; 63],
-            is_initialized: U8Bool::from(true),
-            targets,
-            directed_stake_lamports: [0; MAX_VALIDATORS],
-            directed_stake_meta_indices: [u64::MAX; MAX_VALIDATORS],
-        }
-    }
-
     #[test]
     fn test_calculate_conversion_rate_bps() {
         // Test basic conversion
@@ -493,10 +427,8 @@ mod tests {
         let mut jitosol_balances = HashMap::new();
         jitosol_balances.insert(authority1, 100_000_000);
 
-        let meta = create_empty_meta();
         let tickets = create_tickets(authority1, authority2, validator1, validator2);
-        let targets =
-            aggregate_validator_targets(&meta, &tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 2);
         assert_eq!(*targets.get(&validator1).unwrap(), 60_000_000);
@@ -513,10 +445,8 @@ mod tests {
         jitosol_balances.insert(authority1, 100_000_000);
         jitosol_balances.insert(authority2, 50_000_000);
 
-        let meta = create_empty_meta();
         let tickets = create_tickets(authority1, authority2, validator1, validator1);
-        let targets =
-            aggregate_validator_targets(&meta, &tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 1);
         assert_eq!(*targets.get(&validator1).unwrap(), 150_000_000);
@@ -529,14 +459,12 @@ mod tests {
         let validator1 = Pubkey::default();
         let validator2 = Pubkey::default();
 
-        let meta = create_empty_meta();
         let tickets = create_tickets(authority1, authority2, validator1, validator2);
 
         let mut jitosol_balances = HashMap::new();
         jitosol_balances.insert(authority1, 100_000_000);
 
-        let targets =
-            aggregate_validator_targets(&meta, &tickets, &jitosol_balances, 10_000).unwrap();
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
         assert_eq!(targets.len(), 0);
     }
@@ -549,8 +477,6 @@ mod tests {
         let authority1 = Pubkey::new_unique();
         let authority2 = Pubkey::new_unique();
         let authority3 = Pubkey::new_unique();
-
-        let meta = create_empty_meta();
 
         // Set up JitoSOL balances for multiple authorities with realistic amounts
         let mut jitosol_balances = HashMap::new();
@@ -573,8 +499,7 @@ mod tests {
         assert_eq!(conversion_rate_bps, 12410);
 
         let targets =
-            aggregate_validator_targets(&meta, &tickets, &jitosol_balances, conversion_rate_bps)
-                .unwrap();
+            aggregate_validator_targets(&tickets, &jitosol_balances, conversion_rate_bps).unwrap();
 
         // Expected calculations:
         // authority1 (50 JitoSOL = 62.05 SOL):
@@ -602,7 +527,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggregate_resets_old_validator_targets() {
+    fn test_aggregate_only_includes_validators_with_tickets() {
         let validator1 = Pubkey::new_unique();
         let validator2 = Pubkey::new_unique();
         let validator3 = Pubkey::new_unique(); // Old validator that's no longer in any ticket
@@ -617,16 +542,13 @@ mod tests {
             vec![(validator1, 6000), (validator2, 4000)],
         )];
 
-        // But existing meta has validator3 from a previous allocation
-        let meta = create_meta_with_validators(vec![validator1, validator2, validator3]);
+        let targets = aggregate_validator_targets(&tickets, &jitosol_balances, 10_000).unwrap();
 
-        let targets =
-            aggregate_validator_targets(&meta, &tickets, &jitosol_balances, 10_000).unwrap();
-
-        // validator3 should be reset to 0 since it's not in any current tickets
-        assert_eq!(targets.len(), 3);
+        // Only validators referenced by current tickets are aggregated. validator3 has no ticket,
+        // so it is left untouched (no entry, not reset to 0).
+        assert_eq!(targets.len(), 2);
         assert_eq!(*targets.get(&validator1).unwrap(), 60_000_000);
         assert_eq!(*targets.get(&validator2).unwrap(), 40_000_000);
-        assert_eq!(*targets.get(&validator3).unwrap(), 0); // Reset to 0!
+        assert!(!targets.contains_key(&validator3));
     }
 }
