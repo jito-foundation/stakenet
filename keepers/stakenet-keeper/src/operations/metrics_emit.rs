@@ -97,7 +97,7 @@ pub async fn fire(
 /// - `num_commissions`: Validators with non-default commissions
 /// - `num_epoch_credits`: Validators with non-default epoch credits
 /// - `num_stakes`: Validators with non-default stake amounts
-/// - `num_bam_status_reported`: Validators with a known BAM connection status (connected or not) in current epoch
+/// - `num_bam_status_reported`: Validators with a known BAM connection status (connected or not) in previous epoch
 ///
 /// ## Cluster State
 /// - `cluster_history_blocks`: Whether cluster history is updated for current epoch (0 or 1)
@@ -165,10 +165,8 @@ pub fn emit_validator_history_metrics(
             if entry.activated_stake_lamports != default.activated_stake_lamports {
                 stakes += 1;
             }
-            if entry.is_bam_connected.ne(&default.is_bam_connected) {
-                num_bam_status_reported += 1;
-            }
         }
+
         // Check previous epoch for state
         let previous_epoch = (epoch_info.epoch - 1) as u16;
         if let Some(entry) = validator_history
@@ -179,6 +177,10 @@ pub fn emit_validator_history_metrics(
         {
             if entry.mev_earned != default.mev_earned {
                 mev_earns += 1;
+            }
+
+            if entry.is_bam_connected.ne(&default.is_bam_connected) {
+                num_bam_status_reported += 1;
             }
         }
 
