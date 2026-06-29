@@ -89,7 +89,7 @@ pub async fn fire(
 /// - `num_get_vote_accounts_responses`: Vote accounts that have validator history entries
 /// - `num_get_vote_accounts_voting`: Subset of above that are actively voting in current epoch
 ///
-/// ## Validator Properties (for current epoch)
+/// ## Validator Properties (for current epoch, unless otherwise noted)
 /// - `num_ips`: Validators with non-default IP addresses
 /// - `num_versions`: Validators with non-default client versions
 /// - `num_client_types`: Validators with non-default client types
