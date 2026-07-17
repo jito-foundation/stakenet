@@ -98,11 +98,15 @@ fn should_clear_startup_flag(tick: u64, intervals: &[u64]) -> bool {
 }
 
 fn should_emit(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick.is_multiple_of(interval + 1))
+    intervals
+        .iter()
+        .any(|interval| tick.is_multiple_of(interval + 1))
 }
 
 fn should_update(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick.is_multiple_of(*interval))
+    intervals
+        .iter()
+        .any(|interval| tick.is_multiple_of(*interval))
 }
 
 fn should_fire(tick: u64, interval: u64) -> bool {
