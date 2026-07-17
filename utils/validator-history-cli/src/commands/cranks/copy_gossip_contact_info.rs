@@ -291,7 +291,6 @@ impl Ipv4EchoClient {
 /// Check entry is valid
 ///
 /// Filters out invalid gossip entries that would fail transaction submission. Checks for:
-/// 0. Entry belongs to one of the expected types
 /// 1. Entry timestamp is not too old
 /// 2. Entry is for the correct validator
 fn check_entry_valid(

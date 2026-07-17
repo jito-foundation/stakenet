@@ -1,6 +1,6 @@
 //! This program starts several threads to manage the creation of validator history accounts,
 //! and the updating of the various data feeds within the accounts.
-//! It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+//! It will emit metrics for each data feed if the env var SOLANA_METRICS_CONFIG is set to a valid influx server.
 
 use std::{
     collections::HashMap,
@@ -14,7 +14,7 @@ use std::{
 };
 
 use bytemuck::{bytes_of, Pod, Zeroable};
-use log::*;
+use log::{error, info};
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_gossip::{
     contact_info::ContactInfo,
@@ -277,7 +277,7 @@ fn build_gossip_entry(
     let contact_info = crds.get::<&ContactInfo>(gossip_identity)?;
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(contact_info, validator_history, &gossip_identity) {
-            println!("Invalid entry for validator {validator_vote_pubkey}");
+            error!("Invalid entry for validator {validator_vote_pubkey}");
             return None;
         }
         let signature = Signature::try_from(entry.get_signature().as_ref()).ok()?;
