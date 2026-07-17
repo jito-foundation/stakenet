@@ -9,7 +9,7 @@ fn test_extract_transient_seed_from_validator_list() {
     let mut spl_validator_list = spl_stake_pool::state::ValidatorList::new(3);
 
     // Create validators with specific transient seeds
-    let validators = vec![
+    let validators = [
         ValidatorStakeInfo {
             vote_account_address: Pubkey::new_unique(),
             active_stake_lamports: PodU64::from(1_000_000_000),

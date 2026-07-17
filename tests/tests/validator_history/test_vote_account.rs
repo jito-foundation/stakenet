@@ -459,7 +459,7 @@ async fn test_validator_age_progression() {
     };
 
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
@@ -489,7 +489,7 @@ async fn test_validator_age_progression() {
     );
 
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
@@ -572,7 +572,7 @@ async fn test_validator_age_with_zero_credit_gaps() {
     };
 
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,

@@ -330,7 +330,7 @@ fn test_directed_stake_whitelist_validation_logic() {
     }
 
     // Test invalid preferences with non-whitelisted validator
-    let invalid_preferences = vec![
+    let invalid_preferences = [
         DirectedStakePreference {
             vote_pubkey: validator1,
             stake_share_bps: 5000,
@@ -645,7 +645,7 @@ fn test_preferences_validation_edge_cases() {
     // validator3 is not added to whitelist
 
     // Test mixed valid/invalid preferences
-    let mixed_preferences = vec![
+    let mixed_preferences = [
         DirectedStakePreference {
             vote_pubkey: validator1, // Valid - whitelisted
             stake_share_bps: 5000,
@@ -675,7 +675,7 @@ fn test_preferences_validation_edge_cases() {
     assert!(has_invalid);
 
     // Test all valid preferences
-    let all_valid_preferences = vec![
+    let all_valid_preferences = [
         DirectedStakePreference {
             vote_pubkey: validator1,
             stake_share_bps: 6000,
