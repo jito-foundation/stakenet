@@ -222,7 +222,7 @@ pub fn get_stake_rank_map_and_superminority_count(
         .collect::<Vec<_>>();
 
     let total_stake = stake_vec.iter().map(|(_, stake)| *stake).sum::<u64>();
-    stake_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    stake_vec.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let mut cumulative_stake = 0;
     let mut superminority_threshold = 0;
