@@ -17,19 +17,20 @@ use clap::Parser;
 use log::{error, info};
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_gossip::{
+    contact_info::ContactInfo,
     crds::Crds,
-    crds_data::CrdsData,
     crds_value::{CrdsValue, CrdsValueLabel},
-    gossip_service::make_gossip_node,
+    gossip_service::make_node,
 };
+use solana_keypair::signable::Signable;
+use solana_net_utils::SocketAddrSpace;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     instruction::Instruction,
     pubkey::Pubkey,
     signature::Signature,
-    signature::{read_keypair_file, Keypair, Signable, Signer},
+    signature::{read_keypair_file, Keypair, Signer},
 };
-use solana_streamer::socket::SocketAddrSpace;
 use stakenet_sdk::{
     models::entries::Address,
     utils::{
@@ -294,26 +295,17 @@ impl Ipv4EchoClient {
 /// 1. Entry timestamp is not too old
 /// 2. Entry is for the correct validator
 fn check_entry_valid(
-    entry: &CrdsValue,
+    contact_info: &ContactInfo,
     validator_history: &ValidatorHistory,
-    validator_identity: Pubkey,
+    validator_identity: &solana_pubkey::Pubkey,
 ) -> bool {
-    match &entry.data {
-        CrdsData::ContactInfo(contact_info) => {
-            if contact_info.wallclock() < validator_history.last_ip_timestamp
-                || contact_info.wallclock() < validator_history.last_version_timestamp
-            {
-                return false;
-            }
-        }
-        _ => {
-            return false;
-        }
-    };
+    if contact_info.wallclock() < validator_history.last_ip_timestamp
+        || contact_info.wallclock() < validator_history.last_version_timestamp
+    {
+        return false;
+    }
 
-    let signer = entry.pubkey();
-
-    if signer != validator_identity {
+    if contact_info.pubkey() != validator_identity {
         error!("Invalid gossip value retrieved for validator {validator_identity}");
         return false;
     }
@@ -330,21 +322,25 @@ fn build_gossip_entry(
     let validator_identity = Pubkey::from_str(&vote_account.node_pubkey).ok()?;
     let validator_vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
 
-    let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(validator_identity);
+    // solana-gossip rides a newer solana-pubkey major than solana-sdk; bridge via raw bytes
+    let gossip_identity = solana_pubkey::Pubkey::from(validator_identity.to_bytes());
+    let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(gossip_identity);
 
     // ContactInfo is the only gossip message we are interested in. Legacy* and Version
     // are fully deprecated and will not be transmitted on the gossip network.
+    let contact_info = crds.get::<&ContactInfo>(gossip_identity)?;
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
-        if !check_entry_valid(entry, validator_history, validator_identity) {
+        if !check_entry_valid(contact_info, validator_history, &gossip_identity) {
             error!("Invalid entry for validator {validator_vote_pubkey}");
             return None;
         }
+        let signature = Signature::try_from(entry.get_signature().as_ref()).ok()?;
         return Some(vec![GossipEntry::new(
             &validator_vote_pubkey,
-            &entry.get_signature(),
+            &signature,
             &entry.signable_data(),
             &program_id,
-            &entry.pubkey(),
+            &validator_identity,
             &keypair.pubkey(),
         )]);
     }
@@ -404,9 +400,9 @@ pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> an
             .map_err(|e| anyhow!("Unable to find an available gossip port: {e}"))?;
     let gossip_addr = SocketAddr::new(gossip_ip, port);
 
-    let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
-        Keypair::from_base58_string(keypair.to_base58_string().as_str()),
-        Some(&entrypoint),
+    let (_gossip_service, _ip_echo, cluster_info) = make_node(
+        solana_keypair::Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+        std::slice::from_ref(&entrypoint),
         exit.clone(),
         Some(&gossip_addr),
         cluster_shred_version,

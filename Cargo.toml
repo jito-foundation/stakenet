@@ -31,11 +31,11 @@ solana-account-decoder = "=2.3.3"
 solana-bincode = "=2.2.1"
 solana-clap-utils = "=1.8.26"
 solana-client = "=2.3.3"
-solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3.3" }
+solana-gossip = { version = "=4.1.2", features = ["agave-unstable-api"] }
+solana-keypair = "=3.1.2"
 solana-metrics = "=2.3.3"
 solana-native-token = "=2.2.2"
-solana-net-utils = "=2.3.3"
-solana-packet = "=2.2.1"
+solana-net-utils = { version = "=4.1.2", features = ["agave-unstable-api"] }
 solana-program = "=2.3.0"
 solana-program-test = "=2.3.3"
 solana-pubkey = "4.1.0"
@@ -43,10 +43,9 @@ solana-remote-wallet = "=2.3.3"
 solana-rpc-client = "=2.3.3"
 solana-rpc-client-api = "=2.3.3"
 solana-sdk = "=2.3.1"
-solana-streamer = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3.3" }
 solana-system-interface = "1.0.0"
 solana-transaction-status = "=2.3.3"
-solana-version = "=2.3.3"
+solana-version = "=4.1.2"
 solana-vote-interface = { version = "5.1.1", features = ["bincode"] }
 spl-associated-token-account = { version = "7.0.0", features = ["no-entrypoint"] }
 spl-pod = "0.5.1"

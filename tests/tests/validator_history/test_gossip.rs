@@ -14,13 +14,17 @@ use solana_sdk::{
     ed25519_instruction::{
         new_ed25519_instruction, DATA_START, PUBKEY_SERIALIZED_SIZE, SIGNATURE_SERIALIZED_SIZE,
     },
-    hash::Hash,
     signer::Signer,
     slot_history::Slot,
     transaction::Transaction,
 };
 use tests::validator_history_fixtures::TestFixture;
 use validator_history::{Ed25519SignatureOffsets, ValidatorHistory};
+
+// solana-gossip rides a newer solana-pubkey major than solana-sdk; bridge via raw bytes
+fn gossip_pubkey(pubkey: Pubkey) -> solana_pubkey::Pubkey {
+    solana_pubkey::Pubkey::from(pubkey.to_bytes())
+}
 
 fn create_gossip_tx(fixture: &TestFixture, crds_data: &CrdsData) -> Transaction {
     let ctx = &fixture.ctx;
@@ -59,7 +63,7 @@ async fn test_copy_contact_info() {
     fixture.initialize_validator_history_account().await;
 
     let wallclock = 0;
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -75,9 +79,9 @@ async fn test_copy_contact_info() {
         .await;
 
     let version = solana_version::Version::default();
-    assert!(account.history.arr[0].version.major == version.major as u8);
-    assert!(account.history.arr[0].version.minor == version.minor as u8);
-    assert!(account.history.arr[0].version.patch == version.patch);
+    assert!(account.history.arr[0].version.major == version.major() as u8);
+    assert!(account.history.arr[0].version.minor == version.minor() as u8);
+    assert!(account.history.arr[0].version.patch == version.patch());
     assert!(account.history.arr[0].ip == ipv4.octets());
     assert!(account.history.arr[0].epoch == 0);
 }
@@ -90,7 +94,7 @@ async fn test_gossip_wrong_signer() {
     fixture.initialize_validator_history_account().await;
 
     let wallclock = 0;
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -138,7 +142,7 @@ async fn test_gossip_wrong_node_pubkey() {
 
     // vote account instead of identity account
     let wallclock = 0;
-    let mut contact_info = ContactInfo::new(fixture.vote_account, wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.vote_account), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -197,9 +201,9 @@ async fn test_gossip_wrong_message() {
     fixture.initialize_validator_history_account().await;
 
     let snapshot_hashes = SnapshotHashes {
-        from: Pubkey::new_unique(),
-        full: (Slot::default(), Hash::default()),
-        incremental: vec![(Slot::default(), Hash::default()); 42],
+        from: gossip_pubkey(Pubkey::new_unique()),
+        full: (Slot::default(), Default::default()),
+        incremental: vec![(Slot::default(), Default::default()); 42],
         wallclock: 100000u64,
     };
     let crds_data = CrdsData::SnapshotHashes(snapshot_hashes);
@@ -223,7 +227,7 @@ async fn test_gossip_timestamps() {
 
     let clock: Clock = banks_client.get_sysvar().await.unwrap();
     let wallclock = clock.unix_timestamp as u64 * 1000;
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -252,7 +256,7 @@ async fn test_gossip_timestamps() {
     assert!(account.last_ip_timestamp == wallclock + 1);
     assert!(account.last_version_timestamp == wallclock + 1);
 
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -265,7 +269,7 @@ async fn test_gossip_timestamps() {
         .submit_transaction_assert_error(transaction, "GossipDataTooOld")
         .await;
 
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -306,7 +310,7 @@ async fn test_fake_offsets() {
 
     let clock: Clock = banks_client.get_sysvar().await.unwrap();
     let wallclock = clock.unix_timestamp as u64 * 1000;
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     let ipv4 = Ipv4Addr::new(1, 2, 3, 4);
     let ip = IpAddr::V4(ipv4);
     contact_info
@@ -319,7 +323,7 @@ async fn test_fake_offsets() {
     // Invalid instruction
     let fake_ipv4 = Ipv4Addr::new(5, 5, 5, 5);
     let fake_ip = IpAddr::V4(fake_ipv4);
-    let mut contact_info = ContactInfo::new(fixture.identity_keypair.pubkey(), wallclock, 0);
+    let mut contact_info = ContactInfo::new(gossip_pubkey(fixture.identity_keypair.pubkey()), wallclock, 0);
     contact_info
         .set_socket(0, SocketAddr::new(fake_ip, 1234))
         .unwrap();

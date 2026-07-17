@@ -1,6 +1,6 @@
 [package]
 name = "stakenet-keeper"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
@@ -29,13 +29,12 @@ solana-account-decoder = { workspace = true }
 solana-bincode = { workspace = true }
 solana-client = { workspace = true }
 solana-gossip = { workspace = true }
+solana-keypair = { workspace = true }
 solana-metrics = { workspace = true }
 solana-net-utils = { workspace = true }
-solana-packet = { workspace = true }
 solana-program = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
-solana-streamer = { workspace = true }
 solana-transaction-status = { workspace = true }
 solana-vote-interface = { workspace = true }
 spl-associated-token-account = { workspace = true }

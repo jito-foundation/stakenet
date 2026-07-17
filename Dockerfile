@@ -1,4 +1,4 @@
-FROM rust:1.86 as builder
+FROM rust:1.95 as builder
 
 RUN apt-get update && apt-get install -y libudev-dev libclang-dev clang pkg-config libssl-dev build-essential cmake protobuf-compiler
 
