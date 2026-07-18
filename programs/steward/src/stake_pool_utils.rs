@@ -130,6 +130,21 @@ pub fn deserialize_stake_pool(
     )?)
 }
 
+#[inline(never)]
+pub fn stake_pool_withdraw_bump_seed(account_info: &AccountInfo) -> Result<u8> {
+    Ok(deserialize_stake_pool(account_info)?.stake_withdraw_bump_seed)
+}
+
+#[inline(never)]
+pub fn stake_pool_validator_list(account_info: &AccountInfo) -> Result<Pubkey> {
+    Ok(deserialize_stake_pool(account_info)?.validator_list)
+}
+
+#[inline(never)]
+pub fn stake_pool_reserve_stake(account_info: &AccountInfo) -> Result<Pubkey> {
+    Ok(deserialize_stake_pool(account_info)?.reserve_stake)
+}
+
 pub fn deserialize_validator_list(
     account_info: &AccountInfo,
 ) -> Result<spl_stake_pool::state::ValidatorList> {
