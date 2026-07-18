@@ -309,7 +309,7 @@ impl KeeperState {
                 i64
             ),
             ("cluster", &self.cluster_name, String),
-        )
+        );
     }
 
     pub fn set_cluster_name(&mut self, cluster_name: &str) {

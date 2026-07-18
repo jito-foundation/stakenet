@@ -53,7 +53,7 @@ async fn test_mev_commission() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -174,7 +174,7 @@ async fn test_mev_commission_fail() {
         .to_account_metas(None),
     };
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
@@ -344,7 +344,7 @@ async fn test_old_jito_merkle_root_upload_authority(
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,

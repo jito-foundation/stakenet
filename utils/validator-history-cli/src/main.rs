@@ -585,7 +585,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         "Number of validator history accounts does not match config counter"
     );
 
-    validator_histories.sort_by(|a, b| a.index.cmp(&b.index));
+    validator_histories.sort_by_key(|a| a.index);
 
     // For each validator history account, print out the status
     let default = ValidatorHistoryEntry::default();

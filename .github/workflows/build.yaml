@@ -96,18 +96,18 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: solana-verify
-          version: "0.4.11"
+          version: "0.5.1"
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
           version: "0.32.1"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.0.8/install)"
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.9/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
-      - run: RUSTUP_TOOLCHAIN=nightly-2025-08-01 anchor build --idl idl
+      - run: anchor build --idl idl
       - name: Check for diff on IDL
         run: git diff --exit-code programs/validator-history/idl/validator_history.json programs/steward/idl/steward.json
 
