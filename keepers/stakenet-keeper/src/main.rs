@@ -94,19 +94,23 @@ fn set_run_flags(args: &Args) -> u32 {
 
 fn should_clear_startup_flag(tick: u64, intervals: &[u64]) -> bool {
     let max_interval = intervals.iter().max().unwrap();
-    tick % (max_interval + 1) == 0
+    tick.is_multiple_of(max_interval + 1)
 }
 
 fn should_emit(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick % (interval + 1) == 0)
+    intervals
+        .iter()
+        .any(|interval| tick.is_multiple_of(interval + 1))
 }
 
 fn should_update(tick: u64, intervals: &[u64]) -> bool {
-    intervals.iter().any(|interval| tick % interval == 0)
+    intervals
+        .iter()
+        .any(|interval| tick.is_multiple_of(*interval))
 }
 
 fn should_fire(tick: u64, interval: u64) -> bool {
-    tick % interval == 0
+    tick.is_multiple_of(interval)
 }
 
 fn advance_tick(tick: &mut u64) {

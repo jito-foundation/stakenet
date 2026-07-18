@@ -890,7 +890,7 @@ fn build_verbose_state_output(
     }
 
     // Sort top scores by score (descending)
-    top_scores.sort_by(|a, b| b.score.cmp(&a.score));
+    top_scores.sort_by_key(|b| std::cmp::Reverse(b.score));
 
     let ranked_validators = if maybe_vote_account.is_none() {
         Some(RankedValidatorsSummary {
@@ -1088,7 +1088,7 @@ fn _print_verbose_state(
             println!("\nAll Ranked Validators ( {} ): \n", top_scores.len());
             println!("{:<45} : Score\n", "Vote Account");
 
-            top_scores.sort_by(|a, b| b.1.cmp(&a.1));
+            top_scores.sort_by_key(|b| std::cmp::Reverse(b.1));
             top_scores.iter().for_each(|(vote_account, score)| {
                 let formatted_score = format!("{score}").chars().rev().enumerate().fold(
                     String::new(),

@@ -79,7 +79,7 @@ async fn test_realloc_with_actual_current_config() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&random_payer.pubkey()),
         &[&random_payer],
         blockhash,
@@ -179,7 +179,7 @@ async fn test_realloc_config_happy_path() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&random_payer.pubkey()),
         &[&random_payer],
         blockhash,
@@ -243,7 +243,7 @@ async fn test_realloc_fails_when_size_doesnt_change() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,

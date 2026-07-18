@@ -23,7 +23,10 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, RebalanceEvent, RebalanceTypeTag},
     maybe_transition,
-    stake_pool_utils::deserialize_stake_pool,
+    stake_pool_utils::{
+        deserialize_stake_pool, stake_pool_reserve_stake, stake_pool_validator_list,
+        stake_pool_withdraw_bump_seed,
+    },
     utils::{get_stake_pool_address, get_validator_stake_info_at_index, state_checks},
     Config, StewardStateAccount, StewardStateAccountV2, StewardStateEnum,
 };
@@ -62,21 +65,21 @@ pub struct Rebalance<'info> {
             STAKE_POOL_WITHDRAW_SEED
         ],
         seeds::program = spl_stake_pool::ID,
-        bump = deserialize_stake_pool(&stake_pool)?.stake_withdraw_bump_seed
+        bump = stake_pool_withdraw_bump_seed(&stake_pool)?
     )]
     pub withdraw_authority: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = deserialize_stake_pool(&stake_pool)?.validator_list
+        address = stake_pool_validator_list(&stake_pool)?
     )]
     pub validator_list: AccountInfo<'info>,
 
     /// CHECK: passing through, checks are done by spl-stake-pool
     #[account(
         mut,
-        address = deserialize_stake_pool(&stake_pool)?.reserve_stake
+        address = stake_pool_reserve_stake(&stake_pool)?
     )]
     pub reserve_stake: AccountInfo<'info>,
 

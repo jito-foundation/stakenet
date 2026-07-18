@@ -103,19 +103,19 @@ jobs:
           crate: anchor-cli
           version: "0.32.1"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.0.8/install)"
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.9/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
-      - run: RUSTUP_TOOLCHAIN=nightly-2025-08-01 anchor build --idl idl
+      - run: anchor build --idl idl
       - name: Check for diff on IDL
         run: git diff --exit-code programs/validator-history/idl/validator_history.json programs/steward/idl/steward.json
 
       # run verified build
       - run: git checkout $(git rev-parse --abbrev-ref HEAD) -- Cargo.lock
-      - run: solana-verify build --library-name validator_history
+      - run: solana-verify build --library-name validator_history --base-image solanafoundation/solana-verifiable-build:3.1.9
 
-      - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
+      - run: solana-verify build --library-name jito_steward --base-image solanafoundation/solana-verifiable-build:3.1.9 -- --features mainnet-beta
 
       # create build for tests
       - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test
