@@ -96,7 +96,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: solana-verify
-          version: "0.4.11"
+          version: "0.5.1"
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
@@ -113,9 +113,9 @@ jobs:
 
       # run verified build
       - run: git checkout $(git rev-parse --abbrev-ref HEAD) -- Cargo.lock
-      - run: solana-verify build --library-name validator_history --base-image solanafoundation/solana-verifiable-build:3.1.9
+      - run: solana-verify build --library-name validator_history
 
-      - run: solana-verify build --library-name jito_steward --base-image solanafoundation/solana-verifiable-build:3.1.9 -- --features mainnet-beta
+      - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
 
       # create build for tests
       - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test
