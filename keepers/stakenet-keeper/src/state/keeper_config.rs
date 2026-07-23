@@ -306,6 +306,18 @@ fn parse_connection_rate(s: &str) -> Result<f64, String> {
     }
 }
 
+/// Strips the path and query from an RPC URL so API keys embedded in it never
+/// reach the logs
+fn redact_url(url: &str) -> String {
+    match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let host = rest.split(['/', '?']).next().unwrap_or("");
+            format!("{scheme}://{host}/<redacted>")
+        }
+        None => "<redacted>".to_string(),
+    }
+}
+
 impl fmt::Display for Args {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -358,7 +370,7 @@ impl fmt::Display for Args {
             Coinbase Vote Pubkey: {:?}\n\
             Min BAM Connection Rate: {:?}\n\
             -------------------------------",
-            self.json_rpc_url,
+            redact_url(&self.json_rpc_url),
             self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,
@@ -395,7 +407,9 @@ impl fmt::Display for Args {
             self.lookback_start_offset_epochs,
             self.sqlite_path,
             self.region,
-            self.redundant_rpc_urls,
+            self.redundant_rpc_urls
+                .as_ref()
+                .map(|urls| urls.iter().map(|url| redact_url(url)).collect::<Vec<_>>()),
             self.run_priority_fee_commission,
             self.validator_history_min_stake,
             self.run_directed_staking,

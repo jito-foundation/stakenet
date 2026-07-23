@@ -85,6 +85,10 @@ pub mod utils;
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok(); // Loads in .env file
+
+    // Show transaction progress from stakenet-sdk by default; override with RUST_LOG
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
     let args = Args::parse();
     let commitment_config = args.commitment.into();
     let client = Arc::new(RpcClient::new_with_timeout_and_commitment(

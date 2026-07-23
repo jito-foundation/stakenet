@@ -42,7 +42,10 @@ pub async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    log::info!("Normal copy directed stake targets: {}", normal_ixs.len());
+    log::info!(
+        "Copying directed stake targets kind=normal instructions={}",
+        normal_ixs.len()
+    );
 
     let normal_txs_to_run =
         package_instructions(&normal_ixs, 8, Some(*priority_fee), Some(1_400_000), None);
@@ -62,7 +65,7 @@ pub async fn crank_copy_directed_stake_targets(
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
     log::info!(
-        "Coinbase delegation copy directed stake targets: {}",
+        "Copying directed stake targets kind=coinbase_delegation instructions={}",
         coinbase_delegation_ixs.len()
     );
 

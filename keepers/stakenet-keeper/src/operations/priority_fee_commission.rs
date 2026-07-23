@@ -4,7 +4,7 @@ use crate::{
     entries::priority_fee_commission_entry::ValidatorPriorityFeeCommissionEntry,
     state::keeper_state::KeeperState,
 };
-use log::error as log_error;
+use log::error;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::instruction::Instruction;
@@ -92,7 +92,7 @@ pub async fn fire(
             Ok(stats) => {
                 for message in stats.results.iter().chain(stats.results.iter()) {
                     if let Err(e) = message {
-                        log_error!("ERROR: {e}");
+                        error!("Priority fee commission transaction failed: {e}");
                         datapoint_error!(
                             "priority-fee-commission-error",
                             ("error", e.to_string(), String),

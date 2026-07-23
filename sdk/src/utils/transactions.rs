@@ -239,7 +239,10 @@ async fn find_ix_per_tx(
     )
     .await?;
     if let Some(err) = response.value.clone().err {
-        error!("Simulation error: {} {:?}", max_cu_per_tx, response.value);
+        error!(
+            "Instruction simulation failed max_cu_per_tx={} response={:?}",
+            max_cu_per_tx, response.value
+        );
 
         datapoint_error!(
             "simulation-error",
@@ -290,7 +293,7 @@ async fn parallel_confirm_transactions(
                     .map(|(i, sig_status)| (sig_batch[i], sig_status.clone()))
                     .collect::<Vec<_>>(),
                 Err(e) => {
-                    info!("Failed getting signature statuses: {e:?}");
+                    warn!("Failed to get signature statuses: {e:?}");
                     vec![]
                 }
             }
@@ -314,7 +317,7 @@ async fn parallel_confirm_transactions(
     }
 
     info!(
-        "{} transactions submitted, {} confirmed",
+        "Confirmed transactions submitted={} confirmed={}",
         num_transactions_submitted,
         confirmed_signatures.len()
     );
@@ -474,10 +477,6 @@ pub async fn parallel_execute_transactions(
         .map_err(|e| JitoTransactionExecutionError::ClientError(e.to_string()))?;
     let mut signed_txs = sign_txs(transactions, signer, blockhash);
 
-    //      for signed_tx in signed_txs.iter() {
-    //          info!("Signed tx: {:?}", signed_tx.message);
-    //      }
-
     while retries < retry_count {
         let mut submitted_signatures = HashMap::new();
         let mut is_blockhash_not_found = false;
@@ -498,21 +497,21 @@ pub async fn parallel_execute_transactions(
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
             match client.send_transaction(tx).await {
                 Ok(signature) => {
-                    debug!("🟨 Submitted: {signature:?}");
-                    println!("🟨 Submitted: {signature:?}");
+                    debug!("Submitted transaction signature={signature}");
                     submitted_signatures.insert(signature, idx);
                 }
                 Err(e) => {
                     debug!("Transaction error: {e:?}");
                     match e.get_transaction_error() {
                         Some(TransactionError::BlockhashNotFound) => {
-                            debug!("🟧 Blockhash not found");
-                            println!("🟧 Blockhash not found");
+                            debug!("Blockhash not found, will retry");
                             is_blockhash_not_found = true;
                         }
                         Some(TransactionError::AlreadyProcessed) => {
-                            debug!("🟪 Already Processed");
-                            println!("🟪 Already Processed");
+                            debug!(
+                                "Transaction already processed signature={}",
+                                tx.signatures[0]
+                            );
                             submitted_signatures.insert(tx.signatures[0], idx);
                         }
                         Some(_) => {
@@ -544,7 +543,7 @@ pub async fn parallel_execute_transactions(
                                                                             results[idx] = Err(JitoSendTransactionError::TransactionError("TX - RPC Error (Request - Empty)".to_string()))
                                                                         },
                                                                         solana_client::rpc_request::RpcResponseErrorData::SendTransactionPreflightFailure(e) => {
-                                                                            println!("🟥 Preflight Error: \n{e:?}\n\n");
+                                                                            debug!("Transaction preflight failure: {e:?}");
 
                                                                             results[idx] = Err(JitoSendTransactionError::RpcSimulateTransactionResult(e))
                                                                         },
@@ -596,7 +595,7 @@ pub async fn parallel_execute_transactions(
                             }
                         }
                         None => {
-                            warn!("None Transaction error: {e:?}");
+                            warn!("Unhandled transaction error: {e:?}");
                             results[idx] = Err(JitoSendTransactionError::TransactionError(format!(
                                 "None transaction error {e:?}"
                             )))
@@ -629,8 +628,7 @@ pub async fn parallel_execute_transactions(
 
         for signature in signatures {
             results[submitted_signatures[&signature]] = Ok(());
-            debug!("🟩 Completed: {signature:?}");
-            println!("🟩 Completed: {signature:?}");
+            debug!("Transaction confirmed signature={signature}");
         }
 
         if results.iter().all(|r| r.is_ok()) {
@@ -687,7 +685,7 @@ pub async fn pack_instructions(
                 instructions_with_grouping.push((instruction, ix_per_tx));
             }
             Err(e) => {
-                error!("Could not simulate instruction: {e:?}");
+                error!("Failed to simulate instruction: {e:?}");
                 // Skip this instruction if there is an error
                 continue;
             }

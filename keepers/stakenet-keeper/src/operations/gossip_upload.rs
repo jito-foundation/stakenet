@@ -253,7 +253,7 @@ fn check_entry_valid(
     let signer = entry.pubkey();
 
     if signer != validator_identity {
-        error!("Invalid gossip value retrieved for validator {validator_identity}");
+        warn!("Gossip entry signer mismatch validator_identity={validator_identity}");
         return false;
     }
     true
@@ -275,7 +275,7 @@ fn build_gossip_entry(
     // are fully deprecated and will not be transmitted on the gossip network.
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(entry, validator_history, validator_identity) {
-            println!("Invalid entry for validator {validator_vote_pubkey}");
+            debug!("Skipping gossip entry vote_account={validator_vote_pubkey}");
             return None;
         }
         return Some(vec![GossipEntry::new(
@@ -321,7 +321,7 @@ pub async fn upload_gossip_values(
         let ip_echo_response = match ip_echo_client.fetch_ip_and_shred_version().await {
             Ok(res) => res,
             Err(e) => {
-                error!("Failed to fetch IP and shred version from gossip entrypoint: {entrypoint}, Error: {e}");
+                error!("Failed to fetch IP and shred version entrypoint={entrypoint}: {e}");
                 continue;
             }
         };
@@ -348,7 +348,9 @@ pub async fn upload_gossip_values(
             SocketAddrSpace::Global,
         );
 
-        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...");
+        info!(
+            "Gossip service started, waiting for validator discovery gossip_addr={gossip_addr} entrypoint={entrypoint}"
+        );
 
         // Wait for all active validators to be received
         sleep(Duration::from_secs(150)).await;

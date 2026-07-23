@@ -48,10 +48,7 @@ use stakenet_sdk::{
         helpers::{
             check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
         },
-        transactions::{
-            configure_instruction, package_instructions, print_errors_if_any,
-            submit_packaged_transactions,
-        },
+        transactions::{configure_instruction, package_instructions, submit_packaged_transactions},
     },
 };
 use validator_history::ValidatorHistory;
@@ -153,18 +150,23 @@ pub fn _get_update_stake_pool_ixs(
 
                 let vote_pubkey =
                     SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
-                let vote_account =
-                    match VoteStateV4::deserialize(&raw_vote_account.data, &vote_pubkey) {
-                        Ok(v) => v,
-                        Err(e) => {
-                            error!("Could not deserialize vote account {vote_pubkey}: {e:?}");
-                            continue;
-                        }
-                    };
+                let vote_account = match VoteStateV4::deserialize(
+                    &raw_vote_account.data,
+                    &vote_pubkey,
+                ) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!(
+                            "Failed to deserialize vote account vote_account={vote_pubkey}: {e:?}"
+                        );
+                        continue;
+                    }
+                };
 
                 if vote_account.epoch_credits.iter().last().is_none() {
                     error!(
-                        "🆘 ⁉️ Error: Epoch credits has no entries? \nStake Account\n{stake_account:?}\nVote Account\n{vote_account:?}\n"
+                        "Vote account has no epoch credits entries vote_account={}",
+                        validator_info.vote_account_address
                     );
                     false
                 } else {
@@ -179,7 +181,10 @@ pub fn _get_update_stake_pool_ixs(
                             }
                         }
                         _ => {
-                            error!("🔶 Error: Stake account is not StakeStateV2::Stake");
+                            error!(
+                                "Stake account is not in Stake state vote_account={}",
+                                validator_info.vote_account_address
+                            );
                             false
                         }
                     }
@@ -246,7 +251,7 @@ async fn _update_pool(
         epoch,
     );
 
-    info!("Updating Pool");
+    info!("Updating stake pool balances");
     let update_txs_to_run =
         package_instructions(&update_ixs, 1, priority_fee, Some(1_400_000), None);
     let update_stats =
@@ -255,7 +260,7 @@ async fn _update_pool(
     stats.combine(&update_stats);
 
     // TODO fix
-    info!("Deactivating Delinquent");
+    info!("Deactivating delinquent validators");
     // for ix in deactivate_delinquent_ixs {
     //     let tx = Transaction::new_signed_with_payer(&[ix], Some(&payer.pubkey()), &[&payer]);
     //     let tx = client
@@ -275,7 +280,7 @@ async fn _update_pool(
 
     stats.combine(&update_stats);
 
-    info!("Cleaning Pool");
+    info!("Cleaning up removed validator entries");
     let cleanup_txs_to_run =
         package_instructions(&cleanup_ixs, 1, priority_fee, Some(1_400_000), None);
     let cleanup_stats =
@@ -314,7 +319,7 @@ async fn _handle_instant_removal_validators(
             }
         }
 
-        info!("Validator Index to Remove: {validator_index_to_remove:?}");
+        info!("Submitting instant removal validator_list_index={validator_index_to_remove:?}");
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -337,13 +342,11 @@ async fn _handle_instant_removal_validators(
 
         let configured_ix = configure_instruction(&[ix], priority_fee, Some(1_400_000), None);
 
-        info!("Submitting Instant Removal");
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
 
         stats.combine(&new_stats);
-        print_errors_if_any(&stats);
 
         if stats.errors > 0 {
             return Ok(stats);
@@ -466,7 +469,9 @@ async fn _handle_adding_validators(
                                 return None;
                             }
                         } else {
-                            info!("Validator {vote_address} below liveness minimum");
+                            info!(
+                                "Skipping validator below liveness minimum vote_account={vote_address}"
+                            );
                             return None;
                         }
                     }
@@ -519,8 +524,11 @@ async fn _handle_adding_validators(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=auto_add_validators instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
@@ -615,8 +623,11 @@ async fn _handle_delinquent_validators(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=auto_remove_validators instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
     // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
@@ -655,7 +666,9 @@ async fn _handle_epoch_maintenance(
             }
         }
 
-        info!("Validator Index to Remove: {validator_index_to_remove:?}");
+        info!(
+            "Running epoch maintenance state_epoch={state_epoch} current_epoch={current_epoch} validator_index_to_remove={validator_index_to_remove:?}"
+        );
 
         let directed_stake_meta =
             get_directed_stake_meta_address(&all_steward_accounts.config_address, program_id);
@@ -679,13 +692,11 @@ async fn _handle_epoch_maintenance(
         let cu = validator_index_to_remove.map(|_| 1_400_000);
         let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
 
-        info!("Submitting Epoch Maintenance");
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
                 .await?;
 
         stats.combine(&new_stats);
-        print_errors_if_any(&stats);
 
         if stats.errors > 0 {
             return Ok(stats);
@@ -703,7 +714,9 @@ async fn _handle_epoch_maintenance(
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
-        info!("State Epoch: {state_epoch} | Current Epoch: {current_epoch}");
+        info!(
+            "Epoch maintenance progressed state_epoch={state_epoch} current_epoch={current_epoch}"
+        );
     }
 
     Ok(stats)
@@ -743,8 +756,11 @@ async fn _handle_compute_score(
 
     let txs_to_run = package_instructions(&ixs_to_run, 5, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=compute_score instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
@@ -837,8 +853,11 @@ async fn _handle_compute_instant_unstake(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=compute_instant_unstake instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
 
@@ -966,8 +985,11 @@ async fn _handle_rebalance(
 
     let txs_to_run = package_instructions(&ixs_to_run, 2, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=rebalance instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
 
@@ -1102,8 +1124,11 @@ async fn _handle_directed_rebalance(
 
     let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
 
-    info!("Submitting {} instructions", ixs_to_run.len());
-    info!("Submitting {} transactions", txs_to_run.len());
+    info!(
+        "Submitting transactions step=rebalance_directed instructions={} transactions={}",
+        ixs_to_run.len(),
+        txs_to_run.len()
+    );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(30), None).await?;
     submit_stats.combine(&stats);
@@ -1139,8 +1164,6 @@ pub async fn crank_steward(
 
     {
         // --------- UPDATE STAKE POOL -----------
-        info!("Update Stake Pool");
-
         let stats = _update_pool(
             payer,
             client,
@@ -1158,7 +1181,7 @@ pub async fn crank_steward(
         // --------- CHECK AND HANDLE EPOCH BOUNDARY -----------
 
         if should_run_epoch_maintenance {
-            info!("Cranking Epoch Maintenance...");
+            info!("Cranking steward step=epoch_maintenance");
 
             let stats = _handle_epoch_maintenance(
                 payer,
@@ -1176,7 +1199,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK AND HANDLE INSTANT REMOVAL -----------
-        info!("Checking and Handling Instant Removal...");
+        info!("Cranking steward step=instant_removal");
 
         let stats = _handle_instant_removal_validators(
             payer,
@@ -1192,7 +1215,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK VALIDATORS TO REMOVE -----------
-        info!("Finding and Removing Bad Validators...");
+        info!("Cranking steward step=remove_delinquent_validators");
 
         let stats = _handle_delinquent_validators(
             payer,
@@ -1214,7 +1237,7 @@ pub async fn crank_steward(
 
     {
         // --------- CHECK VALIDATORS TO ADD -----------
-        info!("Adding good validators...");
+        info!("Cranking steward step=add_validators");
         // Any validator that has new history account
         // Anything that would pass the benchmark
         // Find any validators that that are not in pool
@@ -1238,7 +1261,7 @@ pub async fn crank_steward(
         if should_crank_state {
             let stats = match all_steward_accounts.state_account.state.state_tag {
                 StewardStateEnum::ComputeScores => {
-                    info!("Cranking Compute Score...");
+                    info!("Cranking steward state=compute_scores");
 
                     _handle_compute_score(
                         payer,
@@ -1250,7 +1273,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::ComputeDelegations => {
-                    info!("Cranking Compute Delegations...");
+                    info!("Cranking steward state=compute_delegations");
 
                     _handle_compute_delegations(
                         payer,
@@ -1262,7 +1285,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::Idle => {
-                    info!("Cranking Idle...");
+                    info!("Cranking steward state=idle");
 
                     _handle_idle(
                         payer,
@@ -1274,7 +1297,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::ComputeInstantUnstake => {
-                    info!("Cranking Compute Instant Unstake...");
+                    info!("Cranking steward state=compute_instant_unstake");
 
                     _handle_compute_instant_unstake(
                         payer,
@@ -1286,7 +1309,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::Rebalance => {
-                    info!("Cranking Rebalance...");
+                    info!("Cranking steward state=rebalance");
 
                     _handle_rebalance(
                         payer,
@@ -1298,7 +1321,7 @@ pub async fn crank_steward(
                     .await?
                 }
                 StewardStateEnum::RebalanceDirected => {
-                    info!("Cranking Rebalance Directed...");
+                    info!("Cranking steward state=rebalance_directed");
 
                     _handle_directed_rebalance(
                         payer,
@@ -1322,20 +1345,18 @@ pub async fn crank_steward(
                 match error {
                     JitoSendTransactionError::ExceededRetries => {
                         // Continue
-                        error!("Exceeded Retries: {error:?}");
+                        error!("Transaction exceeded retries: {error:?}");
                     }
                     JitoSendTransactionError::TransactionError(e) => {
                         // Flag
-                        error!("Transaction: {e:?}");
+                        error!("Transaction failed: {e:?}");
                     }
                     JitoSendTransactionError::RpcSimulateTransactionResult(e) => {
                         // Recover
-                        error!("\n\nERROR: ");
-                        e.logs.iter().for_each(|log| {
-                            log.iter().enumerate().for_each(|(i, log)| {
-                                error!("{i}: {log:?}");
-                            });
-                        });
+                        error!(
+                            "Transaction simulation failed err={:?} logs={:?}",
+                            e.err, e.logs
+                        );
                     }
                 }
             }
