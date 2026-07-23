@@ -84,10 +84,13 @@ pub mod utils;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv().ok(); // Loads in .env file
+    dotenv().ok();
 
-    // Show transaction progress from stakenet-sdk by default; override with RUST_LOG
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    env_logger::Builder::from_env(
+        env_logger::Env::default()
+            .default_filter_or("info,stakenet_sdk::utils::transactions=debug"),
+    )
+    .init();
 
     let args = Args::parse();
     let commitment_config = args.commitment.into();

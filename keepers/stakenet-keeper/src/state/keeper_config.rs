@@ -306,12 +306,14 @@ fn parse_connection_rate(s: &str) -> Result<f64, String> {
     }
 }
 
-/// Strips the path and query from an RPC URL so API keys embedded in it never
-/// reach the logs
+/// Strips the path, query, and userinfo from an RPC URL so API keys embedded
+/// in it (`?api-key=...`, `https://KEY@host`, `user:pass@host`) never reach
+/// the logs
 fn redact_url(url: &str) -> String {
     match url.split_once("://") {
         Some((scheme, rest)) => {
-            let host = rest.split(['/', '?']).next().unwrap_or("");
+            let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+            let host = authority.rsplit('@').next().unwrap_or("");
             format!("{scheme}://{host}/<redacted>")
         }
         None => "<redacted>".to_string(),
@@ -418,5 +420,51 @@ impl fmt::Display for Args {
             self.coinbase_vote_pubkey,
             self.min_bam_connection_rate,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_url;
+
+    #[test]
+    fn test_redact_url_strips_path_and_query() {
+        assert_eq!(
+            redact_url("https://mainnet.helius-rpc.com/?api-key=SECRET"),
+            "https://mainnet.helius-rpc.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://example.com/rpc/SECRET"),
+            "https://example.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://example.com#SECRET"),
+            "https://example.com/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_strips_userinfo() {
+        assert_eq!(
+            redact_url("https://SECRET@example.com/rpc"),
+            "https://example.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://user:SECRET@example.com:8899"),
+            "https://example.com:8899/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_keeps_host_and_port() {
+        assert_eq!(
+            redact_url("http://127.0.0.1:8899"),
+            "http://127.0.0.1:8899/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_without_scheme() {
+        assert_eq!(redact_url("not a url"), "<redacted>");
     }
 }

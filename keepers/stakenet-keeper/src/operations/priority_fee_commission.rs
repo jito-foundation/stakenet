@@ -90,7 +90,7 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                for message in stats.results.iter().chain(stats.results.iter()) {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         error!("Priority fee commission transaction failed: {e}");
                         datapoint_error!(
