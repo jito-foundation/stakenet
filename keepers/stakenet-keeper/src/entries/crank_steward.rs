@@ -150,18 +150,16 @@ pub fn _get_update_stake_pool_ixs(
 
                 let vote_pubkey =
                     SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
-                let vote_account = match VoteStateV4::deserialize(
-                    &raw_vote_account.data,
-                    &vote_pubkey,
-                ) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!(
+                let vote_account =
+                    match VoteStateV4::deserialize(&raw_vote_account.data, &vote_pubkey) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!(
                             "Failed to deserialize vote account vote_account={vote_pubkey}: {e:?}"
                         );
-                        continue;
-                    }
-                };
+                            continue;
+                        }
+                    };
 
                 if vote_account.epoch_credits.iter().last().is_none() {
                     error!(
