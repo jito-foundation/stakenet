@@ -30,7 +30,8 @@ use commands::{
         update_stake_pool::command_crank_update_stake_pool,
     },
     info::{
-        get_jitosol_balance::command_get_jitosol_balance, view_config::command_view_config,
+        dry_run::command_dry_run, get_jitosol_balance::command_get_jitosol_balance,
+        view_config::command_view_config,
         view_directed_stake_meta::command_view_directed_stake_meta,
         view_directed_stake_tickets::command_view_directed_stake_tickets,
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
@@ -137,6 +138,15 @@ async fn main() -> Result<()> {
         }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, steward_program_id).await
+        }
+        Commands::DryRun(args) => {
+            command_dry_run(
+                args,
+                &client,
+                steward_program_id,
+                validator_history_program_id,
+            )
+            .await
         }
 
         // --- Helpers ---

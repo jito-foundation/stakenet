@@ -352,6 +352,7 @@ pub enum Commands {
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
     GetJitosolBalance(GetJitosolBalance),
+    DryRun(DryRun),
 
     // Actions
     InitSteward(InitSteward),
@@ -427,6 +428,28 @@ pub struct ViewState {
     /// Optional vote account to view the state of
     #[arg(long)]
     pub vote_account: Option<Pubkey>,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Dry-run the scoring cycle off-chain: predict which validators get stake (and roughly when), without sending any transaction"
+)]
+pub struct DryRun {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+
+    /// Focus on a single vote account: print its full score + per-filter breakdown and eligibility verdict
+    #[arg(long)]
+    pub vote_account: Option<Pubkey>,
+
+    /// Epoch to score as-of. Defaults to the current on-chain epoch.
+    /// Values greater than the current epoch are a projection (future history does not exist yet) and will warn.
+    #[arg(long)]
+    pub epoch: Option<u64>,
+
+    /// Max number of ranked validators to print in the table (default: num_delegation_validators + 10)
+    #[arg(long)]
+    pub limit: Option<usize>,
 }
 
 #[derive(Parser)]
