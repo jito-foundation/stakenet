@@ -96,11 +96,6 @@ async fn simulate_instruction(
         Hash::default(),
     );
 
-    // This simulation only exists to measure compute usage, so the blockhash is
-    // irrelevant. Ask the RPC to substitute its own recent blockhash instead of
-    // validating ours (`replace_recent_blockhash`), otherwise a simulating node
-    // that lags behind the node which served our blockhash rejects the tx with
-    // `BlockhashNotFound`.
     client
         .simulate_transaction_with_config(
             &test_tx,
