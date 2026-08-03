@@ -4,7 +4,7 @@ use std::vec;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use log::*;
-use solana_client::rpc_config::RpcSendTransactionConfig;
+use solana_client::rpc_config::{RpcSendTransactionConfig, RpcSimulateTransactionConfig};
 use solana_client::rpc_response::{
     Response, RpcResult, RpcSimulateTransactionResult, RpcVoteAccountInfo,
 };
@@ -85,8 +85,6 @@ async fn simulate_instruction(
     priority_fee_in_microlamports: u64,
     max_cu_per_tx: u32,
 ) -> Result<Response<RpcSimulateTransactionResult>, ClientError> {
-    let latest_blockhash = get_latest_blockhash_with_retry(client).await?;
-
     let test_tx = Transaction::new_signed_with_payer(
         &[
             ComputeBudgetInstruction::set_compute_unit_limit(max_cu_per_tx),
@@ -95,10 +93,19 @@ async fn simulate_instruction(
         ],
         Some(&signer.pubkey()),
         &[signer],
-        latest_blockhash,
+        Hash::default(),
     );
 
-    client.simulate_transaction(&test_tx).await
+    client
+        .simulate_transaction_with_config(
+            &test_tx,
+            RpcSimulateTransactionConfig {
+                sig_verify: false,
+                replace_recent_blockhash: true,
+                ..RpcSimulateTransactionConfig::default()
+            },
+        )
+        .await
 }
 
 async fn simulate_instruction_with_retry(
