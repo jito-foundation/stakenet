@@ -105,7 +105,12 @@ cargo run -p steward-cli -- \
     --min-change-sol 5000
 ```
 
-The projection prints per-epoch movements, a per-validator rollup, and per-epoch totals.
+The projection prints per-epoch movements, a per-validator rollup, and per-epoch totals. The
+rollup separates **undirected** from **directed** balance, and that distinction matters when
+reading it: targets are measured against undirected stake only, so a validator holding directed
+stake shows a near-zero undirected figure and a full-target shortfall while actually holding
+several times the target. Those rows are flagged inline with the real total, so they are not
+mistaken for the pool's most underfunded validators.
 Because the unstake budget is cycle-scoped rather than rate-limited per epoch, the projection
 spends it as soon as a cycle opens; treat the per-cycle totals as reliable and the exact epoch
 within a cycle as indicative, since real timing depends on when cranks run.

@@ -404,7 +404,14 @@ pub struct ScheduleSummaryRow {
     pub rank: Option<usize>,
     pub in_delegation_set: bool,
     pub direction: String,
+    /// Undirected balance — what the target is measured against.
     pub current_sol: f64,
+    /// Directed stake, excluded from `current_sol` and from the target calculation. A validator
+    /// can therefore show a large shortfall while holding far more than target in total, so this
+    /// must be surfaced alongside `current_sol` or the row reads as misleadingly underfunded.
+    pub directed_sol: f64,
+    /// Everything the validator actually holds, directed included.
+    pub total_stake_sol: f64,
     pub target_sol: f64,
     /// Total movement still due to reach target, regardless of horizon
     pub total_due_sol: f64,
@@ -664,6 +671,8 @@ fn project_schedule(
                     "decrease".to_string()
                 },
                 current_sol: lamports_to_sol(rows[i].current),
+                directed_sol: lamports_to_sol(rows[i].directed),
+                total_stake_sol: lamports_to_sol(rows[i].active),
                 target_sol: lamports_to_sol(s.target),
                 total_due_sol: total_due[i] as f64 / 1e9,
                 projected_sol: projected[i] as f64 / 1e9,
@@ -1205,8 +1214,16 @@ fn print_schedule(s: &Schedule) {
 
     println!("\n━━━ Per-validator rollup ━━━");
     println!(
-        "  {:<44} {:>5} {:>11} {:>11} {:>11} {:>11} {:>7} {:>6}",
-        "vote account", "rank", "current", "target", "total due", "projected", "epochs", "done"
+        "  {:<44} {:>5} {:>11} {:>11} {:>11} {:>11} {:>11} {:>7} {:>6}",
+        "vote account",
+        "rank",
+        "undirected",
+        "directed",
+        "target",
+        "total due",
+        "projected",
+        "epochs",
+        "done"
     );
     for r in &s.per_validator {
         let epochs = match (r.first_epoch, r.last_epoch) {
@@ -1215,10 +1232,11 @@ fn print_schedule(s: &Schedule) {
             _ => "none".to_string(),
         };
         println!(
-            "  {:<44} {:>5} {:>11.0} {:>11.0} {:>+11.0} {:>+11.0} {:>7} {:>6}{}",
+            "  {:<44} {:>5} {:>11.0} {:>11.0} {:>11.0} {:>+11.0} {:>+11.0} {:>7} {:>6}{}{}",
             r.vote_account,
             r.rank.map(|x| x.to_string()).unwrap_or("—".to_string()),
             r.current_sol,
+            r.directed_sol,
             r.target_sol,
             r.total_due_sol,
             r.projected_sol,
@@ -1228,6 +1246,12 @@ fn print_schedule(s: &Schedule) {
                 ""
             } else {
                 "  [not in set]"
+            },
+            // Without this a directed-heavy validator reads as the most underfunded in the pool.
+            if r.directed_sol > 0. {
+                format!("  [holds {:.0} SOL in total]", r.total_stake_sol)
+            } else {
+                String::new()
             },
         );
     }
