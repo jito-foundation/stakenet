@@ -13,6 +13,28 @@ use stakenet_sdk::utils::accounts::{get_all_steward_accounts, get_directed_stake
 
 use crate::commands::command_args::ViewStakeEta;
 
+/// Standing caveat attached to every result, in both the human and JSON output.
+///
+/// The deterministic inputs — eligibility, target, rank, queue position, remaining budget — are
+/// only half of what decides when stake arrives. The other half is not predictable: deposit and
+/// withdrawal flow, changes in this and other validators' performance and commissions,
+/// instant-unstake events elsewhere, and the re-scoring that happens at every cycle boundary.
+/// Anyone sharing this output needs the caveat travelling with it, or a projection gets read as
+/// a promise.
+const DISCLAIMER: &[&str] = &[
+    "This is NOT a guarantee of stake and NOT a commitment from Jito. It is a projection of \
+     today's conditions, and conditions move.",
+    "Firm — read directly from on-chain state: whether you are eligible, your 1/N target, your \
+     rank, the SOL queued ahead of you, and how much churn budget is left this cycle.",
+    "Reasonable — what you would receive next epoch given the reserve exactly as it stands now.",
+    "Speculative — anything past the next cycle boundary. The set is re-scored, N changes, and \
+     every target moves with pool TVL.",
+    "Not modelled at all — the rate of deposits and withdrawals to the pool, changes in your own \
+     or other validators' performance and commissions, and instant-unstake events elsewhere.",
+    "A projection 10 or 20 epochs out can differ substantially from what actually happens. Do \
+     not present it to a validator as an expectation.",
+];
+
 /// Why a validator is not yet at its target share. Mirrors the enum in the
 /// validator-facing spec so the UI can map each variant to plain language.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
@@ -172,6 +194,12 @@ pub struct StakeEtaOutput {
     /// Populated when --schedule-epochs is set
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub schedule: Option<Schedule>,
+    /// Always populated. Serialized so a consumer that renders this output cannot silently drop
+    /// the caveat — a projection presented without it reads as a promise.
+    pub disclaimer: Vec<String>,
+    /// Epoch past which the projection is illustrative rather than meaningful, because the
+    /// delegation set is re-scored at that boundary.
+    pub speculative_beyond_epoch: u64,
 }
 
 /// One validator's position relative to its target
@@ -1127,6 +1155,8 @@ pub async fn command_view_stake_eta(
         most_over_target,
         largest_directed_holders,
         schedule,
+        disclaimer: DISCLAIMER.iter().map(|s| s.to_string()).collect(),
+        speculative_beyond_epoch: state.next_cycle_epoch,
     };
 
     if print_json {
@@ -1178,11 +1208,15 @@ fn print_lines(title: &str, lines: &[ValidatorLine]) {
     }
 }
 
-fn print_schedule(s: &Schedule) {
+fn print_schedule(s: &Schedule, speculative_beyond_epoch: u64) {
     println!(
         "\n━━━ Expected stake change by epoch — next {} epochs, changes ≥ {:.0} SOL ━━━",
         s.horizon_epochs, s.min_change_sol
     );
+    println!(
+        "  Rows at or past epoch {speculative_beyond_epoch} are marked (?): the set is re-scored there,"
+    );
+    println!("  so treat them as illustrative of the mechanism, not as a forecast.");
     if s.per_validator.is_empty() {
         println!("  No validator has a change of that size due.");
         return;
@@ -1201,7 +1235,7 @@ fn print_schedule(s: &Schedule) {
             last_epoch = c.epoch;
         }
         println!(
-            "  {:<8} {:>5} {:<44} {:>+12.0} {:>13.0} {:>12.0}  {}",
+            "  {:<8} {:>5} {:<44} {:>+12.0} {:>13.0} {:>12.0}  {}{}",
             c.epoch,
             c.rank.map(|r| r.to_string()).unwrap_or("—".to_string()),
             c.vote_account,
@@ -1209,6 +1243,11 @@ fn print_schedule(s: &Schedule) {
             c.balance_after_sol,
             c.target_sol,
             c.direction,
+            if c.epoch >= speculative_beyond_epoch {
+                " (?)"
+            } else {
+                ""
+            },
         );
     }
 
@@ -1273,6 +1312,8 @@ fn print_schedule(s: &Schedule) {
             e.scoring_budget_remaining_sol,
             if e.cycle_boundary {
                 "   ← new cycle, budgets reset & set re-scored"
+            } else if e.epoch >= speculative_beyond_epoch {
+                "   (?)"
             } else {
                 ""
             },
@@ -1285,7 +1326,33 @@ fn print_schedule(s: &Schedule) {
     }
 }
 
+/// Printed at both the top and the bottom of the output: a long schedule scrolls the top away,
+/// and this is the one part that must not be missed.
+fn print_disclaimer(o: &StakeEtaOutput, heading: &str) {
+    println!("\n┏━━ {heading} ━━");
+    for line in &o.disclaimer {
+        // Wrap by hand so the banner stays readable in an 80-column terminal.
+        let mut col = 0;
+        print!("┃ ");
+        for word in line.split_whitespace() {
+            if col + word.len() + 1 > 92 {
+                print!("\n┃   ");
+                col = 2;
+            }
+            print!("{word} ");
+            col += word.len() + 1;
+        }
+        println!();
+    }
+    println!(
+        "┃ Projection is illustrative only beyond epoch {}, when the set is re-scored.",
+        o.speculative_beyond_epoch
+    );
+    println!("┗━━");
+}
+
 fn print_human(o: &StakeEtaOutput) {
+    print_disclaimer(o, "READ THIS FIRST — this does not guarantee stake");
     println!("\n━━━ Pool (epoch {}) ━━━", o.as_of_epoch);
     println!("  TVL:                    {:>14.0} SOL", o.pool.tvl_sol);
     println!(
@@ -1374,7 +1441,7 @@ fn print_human(o: &StakeEtaOutput) {
     }
 
     if let Some(sched) = &o.schedule {
-        print_schedule(sched);
+        print_schedule(sched, o.speculative_beyond_epoch);
     }
 
     if let (Some(p), Some(e)) = (&o.position, &o.eta) {
@@ -1418,6 +1485,8 @@ fn print_human(o: &StakeEtaOutput) {
         );
         println!("  re-derived at each cycle boundary.");
     }
+
+    print_disclaimer(o, "REMINDER — this does not guarantee stake");
     println!();
 }
 

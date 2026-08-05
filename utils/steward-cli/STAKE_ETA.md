@@ -6,6 +6,27 @@ from mainnet at epoch 1012.*
 
 ---
 
+## 0. What this can and cannot tell a validator
+
+**It cannot promise stake.** The distinction to hold onto, and the one that has to survive into
+any validator-facing wording:
+
+| Confidence | What |
+| :- | :- |
+| **Firm** | Eligibility, the 1/N target, rank, SOL queued ahead, remaining churn budget and its reset epoch. Read directly from on-chain state. |
+| **Reasonable** | What a validator would receive next epoch given the reserve exactly as it stands. |
+| **Speculative** | Anything past the next cycle boundary. The set is re-scored, N changes, every target moves with TVL. |
+| **Not modelled** | Deposit and withdrawal rate, changes in this or other validators' performance and commissions, instant-unstake events elsewhere. |
+
+A projection 10 or 20 epochs out can differ substantially from what actually happens. The
+implementation emits this caveat on every invocation — as a banner at the top *and* bottom of the
+human output, and as a `disclaimer` array plus `speculative_beyond_epoch` in the JSON, so a
+consumer cannot render the numbers without it. Schedule rows at or past the re-scoring boundary
+are marked `(?)`.
+
+The intended default answer to "when do I get stake" is therefore *"here is what is certain, here
+is what it depends on, and here is why no one can give you a date"* — not a number.
+
 ## 1. Purpose and scope
 
 Validators can already see **whether** they are eligible on the StakeNet steward page. The

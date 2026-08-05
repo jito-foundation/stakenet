@@ -45,6 +45,14 @@ cargo run -p steward-cli -- \
 Estimates how many epochs until a validator receives stake, given current pool conditions.
 Answers "when should I expect stake?" for a validator that is already eligible.
 
+> **This does not guarantee stake.** The command reports what is firm (eligibility, target, rank,
+> queue position, remaining budget — all read from chain) alongside what is a projection of
+> current conditions. Deposit and withdrawal flow, validator performance, other operators'
+> commission changes, and the re-scoring at every cycle boundary are not predictable and are not
+> modelled. A figure 10 or 20 epochs out can differ substantially from what happens. The output
+> carries this caveat in both the human banner and the JSON `disclaimer` field — **if you share
+> this with validators, the caveat has to travel with it**, or a projection gets read as a promise.
+
 **[STAKE_ETA.md](./STAKE_ETA.md) documents the model this implements** — why arrival is a queue
 rather than a schedule, the exact inputs, the output schema, and the known limitations. Read it
 before changing the estimator.
@@ -111,9 +119,11 @@ reading it: targets are measured against undirected stake only, so a validator h
 stake shows a near-zero undirected figure and a full-target shortfall while actually holding
 several times the target. Those rows are flagged inline with the real total, so they are not
 mistaken for the pool's most underfunded validators.
+
 Because the unstake budget is cycle-scoped rather than rate-limited per epoch, the projection
 spends it as soon as a cycle opens; treat the per-cycle totals as reliable and the exact epoch
-within a cycle as indicative, since real timing depends on when cranks run.
+within a cycle as indicative, since real timing depends on when cranks run. Rows at or past the
+next cycle boundary are marked `(?)`, since the set is re-scored there.
 
 ### View State of Single Validator
 
