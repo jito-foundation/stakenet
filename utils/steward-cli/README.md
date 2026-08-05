@@ -40,6 +40,76 @@ cargo run -p steward-cli -- \
     --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 ```
 
+### View Stake ETA
+
+Estimates how many epochs until a validator receives stake, given current pool conditions.
+Answers "when should I expect stake?" for a validator that is already eligible.
+
+**[STAKE_ETA.md](./STAKE_ETA.md) documents the model this implements** — why arrival is a queue
+rather than a schedule, the exact inputs, the output schema, and the known limitations. Read it
+before changing the estimator.
+
+Omit `--vote-account` to print only the pool-level summary (TVL, delegation set size, target
+stake per validator, remaining churn budget, and the aggregate shortfall/supply picture).
+
+```bash
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-stake-eta \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --vote-account J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv
+```
+
+Increases are funded from the reserve in descending score order, so a validator's wait is
+driven by the cumulative shortfall of everyone ranked above it, and by how much rotation
+budget is left in the cycle (`scoring_unstake_cap_bps`, reset every
+`num_epochs_between_scoring` epochs).
+
+Net new deposits are the one input that is not on-chain. By default the estimate assumes
+none, which gives the pessimistic bound. Supply an optimistic per-epoch rate to widen the
+band:
+
+```bash
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-stake-eta \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --vote-account J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv \
+    --deposit-rate-sol 20000 \
+    --print-json
+```
+
+`limiting_factor` in the output names the actual blocker — `at_target`, `not_in_set`,
+`awaiting_cooldown`, `scoring_churn_budget_exhausted`, `queue_position`, `next_rebalance`,
+or `reserve_empty` — and is more actionable than the epoch count alone.
+
+Estimates have cycle granularity, and any estimate crossing a cycle boundary assumes the
+delegation set and its size are unchanged; both are re-derived at each boundary.
+
+`--top N` additionally lists the N validators furthest over target and the N largest holders
+of directed stake. Directed stake is excluded from algorithmic targets, so it is not
+reducible by the scoring-unstake path — this shows how much of the pool's apparent excess is
+actually directed.
+
+`--schedule-epochs N` projects stake movement forward N epochs, replaying the program's
+ordering rules: decreases lowest-raw-score first against the cycle unstake budgets, increases
+highest-score first out of the reserve, with a one-epoch cooldown between the two. Use
+`--min-change-sol X` to drop the long tail of trivial adjustments (default 1000 SOL).
+
+```bash
+cargo run -p steward-cli -- \
+    --json-rpc-url $(solana config get | grep "RPC URL" | awk '{print $3}') \
+    view-stake-eta \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --schedule-epochs 24 \
+    --min-change-sol 5000
+```
+
+The projection prints per-epoch movements, a per-validator rollup, and per-epoch totals.
+Because the unstake budget is cycle-scoped rather than rate-limited per epoch, the projection
+spends it as soon as a cycle opens; treat the per-cycle totals as reliable and the exact epoch
+within a cycle as indicative, since real timing depends on when cranks run.
+
 ### View State of Single Validator
 
 Displays state of a single Validator.

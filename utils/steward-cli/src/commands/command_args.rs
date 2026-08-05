@@ -346,6 +346,7 @@ pub enum Commands {
     ViewConfig(ViewConfig),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
+    ViewStakeEta(ViewStakeEta),
     ViewBlacklist(ViewBlacklist),
     ViewDirectedStakeTickets(ViewDirectedStakeTickets),
     ViewDirectedStakeTicket(ViewDirectedStakeTicket),
@@ -441,6 +442,46 @@ pub struct ViewConfig {
 pub struct ViewPriorityFeeConfig {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Estimate how many epochs until a validator receives stake, given current pool conditions"
+)]
+pub struct ViewStakeEta {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+
+    /// Vote account to estimate for. Omit to print only the pool-level summary.
+    #[arg(long)]
+    pub vote_account: Option<Pubkey>,
+
+    /// Optimistic assumption for net new deposits per epoch, in SOL, used for the
+    /// low end of the ETA band. Defaults to 0, i.e. rotation-only.
+    #[arg(long, default_value = "0")]
+    pub deposit_rate_sol: f64,
+
+    /// Also list the N validators furthest over target, and the N largest holders of
+    /// directed stake, to show how much of the pool's excess is directed rather than
+    /// algorithmically reducible. 0 disables the listing.
+    #[arg(long, default_value = "0")]
+    pub top: usize,
+
+    /// Project stake movement forward this many epochs, producing a per-epoch schedule of
+    /// expected increases and decreases. 0 disables the projection.
+    #[arg(long, default_value = "0")]
+    pub schedule_epochs: u64,
+
+    /// Ignore validators whose total stake change due is below this many SOL, to filter out
+    /// the long tail of trivial adjustments.
+    #[arg(long, default_value = "1000")]
+    pub min_change_sol: f64,
+
+    /// Proceed even if the DirectedStakeMeta account cannot be read, assuming zero directed
+    /// stake. Only correct for a deployment that genuinely has no directed staking — otherwise
+    /// every target comes out overstated.
+    #[arg(long, default_value = "false")]
+    pub assume_no_directed_stake: bool,
 }
 
 #[derive(Parser)]

@@ -35,7 +35,8 @@ use commands::{
         view_directed_stake_tickets::command_view_directed_stake_tickets,
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
         view_next_index_to_remove::command_view_next_index_to_remove,
-        view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
+        view_priority_fee_config::command_view_priority_fee_config,
+        view_stake_eta::command_view_stake_eta, view_state::command_view_state,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
@@ -113,6 +114,9 @@ async fn main() -> Result<()> {
         Commands::ViewState(args) => command_view_state(args, &client, steward_program_id).await,
         Commands::ViewNextIndexToRemove(args) => {
             command_view_next_index_to_remove(args, &client, steward_program_id).await
+        }
+        Commands::ViewStakeEta(args) => {
+            command_view_stake_eta(args, &client, steward_program_id).await
         }
         Commands::ViewBlacklist(args) => {
             command_view_blacklist(
