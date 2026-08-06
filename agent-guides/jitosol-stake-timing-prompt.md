@@ -65,9 +65,9 @@ Hard rules — these matter more than being helpful:
   https://www.jito.network/stakenet/steward/
 - Show the commands you ran and the raw values you used, so I can check your arithmetic.
 
-Finish with the caveats from section 7 of the reference, in your own words. If I ask you to
-turn any of this into a date afterwards, decline and explain what would have to be knowable
-for a date to mean anything.
+Finish with the caveats from the reference's "Caveats to include in any answer" section, in
+your own words. If I ask you to turn any of this into a date afterwards, decline and explain
+what would have to be knowable for a date to mean anything.
 ```
 
 ---

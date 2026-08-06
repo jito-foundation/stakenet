@@ -39,14 +39,15 @@ refuse to give a date and must explain why.
 The preferred data path is the released `steward-cli` in this repository (`view-config`,
 `view-state`, `view-directed-stake-meta`). A raw-RPC fallback with account layouts is included for
 agents without a Rust toolchain, along with a mandatory self-check the agent must pass before
-reporting any decoded figure — see section 4a of the reference.
+reporting any decoded figure — see "MANDATORY self-check before reporting anything" in the
+reference.
 
 ## Two traps these documents exist to prevent
 
 **Dividing gross TVL by the set size.** Targets divide the pool *net of directed stake*. Using gross
 TVL overstates every target by `directed_total / N` and invents a pool-wide shortfall equal to the
-entire directed balance. It looks exactly like a real structural finding. The reconciliation
-invariant in section 4a catches it.
+entire directed balance. The reconciliation invariant in the reference's self-check section
+catches it.
 
 **Calling a directed-stake holder underfunded.** Progress toward target is measured on undirected
 balance only, so a validator holding directed stake can show a full-target shortfall while holding

@@ -123,7 +123,7 @@ From [github.com/jito-foundation/stakenet](https://github.com/jito-foundation/st
 `cargo build --release -p steward-cli`. These commands exist in the released tool:
 
 ```bash
-# Parameters and thresholds — every value referenced in section 1
+# Parameters and thresholds — every value referenced under "How delegation works"
 steward-cli --json-rpc-url <RPC> view-config \
   --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv
 
