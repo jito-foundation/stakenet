@@ -23,11 +23,26 @@ Produce instead:
 3. **A next-epoch statement** — what would arrive next epoch given the reserve as it stands.
 4. **An explicit refusal** to extrapolate past the next scoring event, with the reason.
 
+### Every number in this document is illustrative
+
+Thresholds, window lengths, cycle length, set size, epoch-progress triggers and caps are all
+DAO-settable parameters held in the Steward config. Where this document shows a value it is marked
+"currently" and is there to make the prose readable — it is **not** a constant and may already be
+stale by the time you read it.
+
+**Backtick names are authoritative; bare numbers are not.** Read every parameter you rely on from
+the live config, and if a figure you compute depends on one, say which value you read rather than
+quoting this document.
+
 ## 1. How delegation works
 
 - StakeNet redelegates on a **cycle** of `num_epochs_between_scoring` epochs (currently 10).
-- At ~50% epoch progress in the epoch that opens a cycle, every validator is scored and the
-  delegation set is chosen. **The set is then fixed for the rest of the cycle.**
+- Once `compute_score_epoch_progress` through the epoch that opens a cycle (currently 0.50, i.e.
+  about halfway), every validator is scored and the delegation set is chosen. **The set is then
+  fixed for the rest of the cycle.**
+- Later in each epoch, once `instant_unstake_epoch_progress` through it (currently 0.90),
+  emergency-unstake criteria are evaluated. A validator marked for instant unstake has its target
+  dropped to zero for the remainder of the cycle.
 - The set holds up to `num_delegation_validators` (currently 400). Every member gets an **equal
   share**: 1/N of the undirected pool, where N is the set size.
 - Rank decides *whether* you are in the set and *what order* stake reaches you. It does not decide
@@ -366,7 +381,7 @@ than an estimate.
 > There is no date, and anyone who gives you one is guessing. Here is why, and what you can know
 > instead.
 >
-> JitoSOL delegation is decided on a 10-epoch cycle. At the start of a cycle every validator is
+> JitoSOL delegation is decided on a fixed cycle — currently 10 epochs. At the start of a cycle every validator is
 > scored, the delegation set is chosen, and each member is assigned an equal share of the pool.
 > That set is then fixed until the next cycle.
 >
@@ -377,8 +392,8 @@ than an estimate.
 >
 > When stake actually *arrives* is a queue, not a schedule. Increases are funded from the pool's
 > reserve in descending score order, so your wait depends on how much is queued ahead of you and how
-> much supply exists. Rotation is capped at 7.5% of the pool per cycle to limit the yield lost to
-> moving stake, and when that budget is spent nothing moves until the cycle resets.
+> much supply exists. Rotation is capped — currently at 7.5% of the pool per cycle — to limit the
+> yield lost to moving stake, and when that budget is spent nothing moves until the cycle resets.
 >
 > What nobody can predict: the rate of deposits into and withdrawals out of JitoSOL, other
 > validators' commission and performance changes, and the re-scoring that reshuffles the set every
@@ -396,8 +411,10 @@ Compact enough to paste into a system prompt:
 When asked when a validator will receive JitoSOL stake:
 - Never give a date, an epoch, or a countdown to reaching target. It is not derivable.
 - Do say: eligibility is pass/fail and checkable; the delegation set is fixed for the cycle;
-  arrival is a reserve-funded queue served in descending score order; rotation is capped at
-  7.5% of the pool per cycle.
+  arrival is a reserve-funded queue served in descending score order; rotation is capped per
+  cycle (currently 7.5% of the pool).
+- Any figure you quote from memory is a current DAO-set value, not a constant. Say so, or
+  omit the number.
 - Do say what is unpredictable and why it dominates: deposit/withdrawal flow, other
   validators' behaviour, and per-cycle re-scoring.
 - Redirect to what is answerable exactly: which filter is failing, and the epoch the
