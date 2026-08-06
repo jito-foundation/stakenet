@@ -38,9 +38,11 @@ Do this:
    epoch and epoch progress your data is from.
 
 2. Work out my position:
-   - Am I eligible? If not, which specific filter am I failing, by how much, and in which
-     epoch does the offending data point leave the window? That expiry epoch is a real,
-     derivable answer — give it to me.
+   - Am I eligible? If not, which specific filter am I failing, and by how much? Then give me
+     the epoch the offending data point leaves that filter's window, using the formula in the
+     reference and the window length from the live config rather than an assumed one. That
+     expiry epoch is a real, derivable answer, so I want the exact number — but tell me
+     plainly if the filter I am failing has no expiry.
    - Am I in the current delegation set? What is my rank, and out of how many?
    - What is the per-validator target, and what is my undirected balance against it?
    - How much SOL is queued ahead of me for funding?

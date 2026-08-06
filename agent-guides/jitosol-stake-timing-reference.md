@@ -50,6 +50,41 @@ means no delegation for the whole cycle — not a reduced amount:
 Running the BAM client is therefore a binary requirement for the pool: not connected means score
 zero means no stake.
 
+**The lookback windows are configuration, not constants.** `commission_range`,
+`mev_commission_range` and `epoch_credits_range` are three *separate* DAO-settable parameters. They
+happen to hold the same value at the time of writing, which makes it tempting to talk about "the
+30-epoch window" — there is no such single window. Read each from the live config.
+
+### Computing when a failure expires
+
+This is the one genuinely exact forward-looking answer available, so get it right. The history
+windows are inclusive of both endpoints, so an offending data point in epoch `E` stops counting at:
+
+```
+first_clear_epoch = E + <that filter's range parameter> + 1
+```
+
+Use the range that belongs to the filter that actually failed:
+
+| Failing filter | Range parameter | Window the program reads |
+| :- | :- | :- |
+| Inflation commission | `commission_range` | `[current - commission_range, current]` |
+| MEV commission | `mev_commission_range` | `[current - mev_commission_range, current]` |
+| Vote credits / delinquency | `epoch_credits_range` | `[current - epoch_credits_range, current - 1]` |
+| Historical commission | **none — see below** | first reliable epoch … `current` |
+
+Worked example, using whatever `commission_range` actually is rather than an assumed value: if it
+reads 30 and the validator ran commission above the threshold in epoch 995, then at epoch 1025 the
+window is `[995, 1025]` and still contains the offence. At epoch 1026 it is `[996, 1026]` and does
+not. So `first_clear_epoch = 995 + 30 + 1 = 1026`. Off-by-one errors here are easy — check that the
+epoch you report would actually exclude the offending epoch.
+
+**A historical-commission failure does not expire.** That filter takes the maximum over all tracked
+history rather than a rolling window, so once a validator has exceeded
+`historical_commission_threshold` in any epoch after the first reliable epoch, it fails
+permanently under the current parameters. Do not offer a clear-by epoch for it. Say plainly that
+there is none, and that only a governance change to the threshold would alter it.
+
 Two further filters exist in the program but are currently disabled by parameter values
 (`priority_fee_scoring_start_epoch = 65535` and `priority_fee_max_commission_bps = 10000`). Check
 the live config rather than assuming.
@@ -366,7 +401,8 @@ When asked when a validator will receive JitoSOL stake:
 - Do say what is unpredictable and why it dominates: deposit/withdrawal flow, other
   validators' behaviour, and per-cycle re-scoring.
 - Redirect to what is answerable exactly: which filter is failing, and the epoch the
-  offending data leaves the 30-epoch window.
+  offending data leaves that filter's lookback window. Read the window length from the
+  config; do not assume a value.
 - Never state that a validator holding directed stake is underfunded based on its
   undirected balance alone.
 - Never present a projection as an expectation or as a commitment from Jito.
