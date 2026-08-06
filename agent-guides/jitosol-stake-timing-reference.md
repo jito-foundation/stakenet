@@ -38,8 +38,8 @@ quoting this document.
 
 - StakeNet redelegates on a **cycle** of `num_epochs_between_scoring` epochs (currently 10).
 - Once `compute_score_epoch_progress` through the epoch that opens a cycle (currently 0.50, i.e.
-  about halfway), every validator is scored and the delegation set is chosen. **The set is then
-  fixed for the rest of the cycle.**
+  about halfway), every validator is scored and the delegation set is chosen. No validator *joins*
+  the set again until the next scoring event — but see the caveat below: the set can still shrink.
 - Later in each epoch, once `instant_unstake_epoch_progress` through it (currently 0.90),
   emergency-unstake criteria are evaluated. A validator marked for instant unstake has its target
   dropped to zero for the remainder of the cycle.
@@ -47,6 +47,13 @@ quoting this document.
   share**: 1/N of the undirected pool, where N is the set size.
 - Rank decides *whether* you are in the set and *what order* stake reaches you. It does not decide
   how much. Everyone in the set has the same target.
+
+**The set is not frozen for the cycle, and N is not constant.** When a validator with a live
+delegation is instant-unstaked, the program zeroes its numerator and decrements **every** other
+member's denominator, so N falls and every remaining member's target *rises* mid-cycle. This is not
+rare: at epoch 1012, 160 validators were marked for instant unstake and N had already moved from 312
+to 311 partway through the cycle. Re-read N and the target rather than caching them, and never assume
+a target computed earlier in a cycle is still current.
 
 **Eligibility is pass/fail and comes first.** Failing any single filter sets the score to 0, which
 means no delegation for the whole cycle — not a reduced amount:
@@ -169,8 +176,16 @@ Mainnet accounts:
 
 ### Preferred route: the released `steward-cli`
 
-From [github.com/jito-foundation/stakenet](https://github.com/jito-foundation/stakenet), built with
-`cargo build --release -p steward-cli`. These commands exist in the released tool:
+From [github.com/jito-foundation/stakenet](https://github.com/jito-foundation/stakenet). Build it
+with `make build-release`, or equivalently:
+
+```bash
+cargo build --release --features jito-steward/idl-build,validator-history/idl-build -p steward-cli
+```
+
+The bare `cargo build --release -p steward-cli` **does not work** — it fails to compile without those
+feature flags. The binary lands at `target/release/steward-cli`. These commands exist in the released
+tool:
 
 ```bash
 # Parameters and thresholds — every value referenced under "How delegation works"
@@ -245,23 +260,40 @@ any check fails, stop and tell the user the decode is unreliable — do not repo
 Across all validators in the pool:
 
 ```
-total_shortfall - total_excess  ==  reserve + transient      (± base lamports and rounding)
+(total_shortfall - total_excess) + clamp_loss  ==  reserve + transient
 
 where  total_shortfall = Σ max(0, target - current)   over set members
        total_excess    = Σ max(0, current - target)   over set members
                        + Σ current                   over validators no longer in the set
+       clamp_loss      = Σ [ current - (active - directed - base) ]   over all pool validators
 ```
 
-This holds because the pool is closed: someone below target means someone else is above.
-**If it does not hold, your numbers are wrong.** Two failure signatures worth recognising:
+`clamp_loss` is the information the saturating subtractions throw away, and it is **not optional** —
+omit it and the identity misses by thousands of SOL on a healthy pool. For each validator it is the
+difference between the saturated `current` and the signed `active - directed - base`. It is non-zero
+whenever a balance would have gone negative, which happens in two ordinary situations:
+
+- **Near-empty validators**, where `active - directed` is below `base`. There are typically hundreds
+  of these, each contributing up to `base`.
+- **Directed stake recorded above active stake.** A known accounting drift — the repo has a
+  `sync-directed-stake-lamports` action for it — and it can contribute thousands of SOL on its own.
+
+Verified against mainnet at epoch 1012: left side 129,430 SOL, right side 129,366 SOL, residual
+64 SOL on a 9.95M pool. Allow a tolerance of roughly `base × (validator_list_len - num_pool_validators)`
+plus rounding; treat a residual above a few hundred SOL as a real failure.
+
+This identity holds because the pool is closed: someone below target means someone else is above.
+**If it does not hold, your numbers are wrong.** Three failure signatures worth recognising:
 
 - **The difference comes out ≈ `reserve + transient + directed_total`.** You divided *gross* TVL by
   N instead of the undirected pool. Every target is overstated by `directed_total / N`, and you
   have invented a pool-wide shortfall equal to the entire directed balance. This is the single
   easiest mistake to make here, it looks exactly like a real structural finding, and it will
   survive casual sanity-checking. Subtract directed stake and recompute.
-- **The difference is large and unrelated to either.** Your field offsets are wrong, or you are
-  reading a stale account. Fall back to the CLI.
+- **The difference is a few thousand SOL and you omitted `clamp_loss`.** Add the term before
+  concluding anything is wrong; this is the most likely cause of a first failed check.
+- **The difference is large and unrelated to any of these.** Your field offsets are wrong, or you
+  are reading a stale account. Fall back to the CLI.
 
 ### Cross-validation
 
@@ -287,6 +319,12 @@ document exists to prevent.
 
 ## 5. The calculation
 
+Read `minimum_delegation` from `getStakeMinimumDelegation` and `stake_rent` from
+`getMinimumBalanceForRentExemption(200)`. Do not hardcode either: the stake program's minimum
+delegation is a cluster-level value and currently returns **1 SOL** on mainnet, so `base` is about
+1.0023 SOL per validator — roughly 700 SOL across the whole pool, not the sub-SOL figure you get if
+you assume the smaller SPL floor.
+
 `sat_sub(a, b)` below means **saturating** subtraction — `max(0, a - b)`, never negative. The
 program uses saturating subtraction at each of these points, so a literal signed subtraction can
 produce a negative intermediate that then propagates into a nonsense target or shortfall.
@@ -295,7 +333,7 @@ produce a negative intermediate that then propagates into a nonsense target or s
 # Pool level
 directed_total   = sum of directed stake across the pool
 undirected_pool  = sat_sub(stake_pool.total_lamports, directed_total)
-base             = minimum_delegation + stake_rent          # per validator, ~0.0033 SOL
+base             = minimum_delegation + stake_rent          # per validator, ~1.0023 SOL today
 delegatable      = undirected_pool - (base × validator_count)
 N                = delegation denominator (equals the count of set members)
 target           = delegatable / N                          # same for every member
@@ -303,7 +341,7 @@ target           = delegatable / N                          # same for every mem
 # Per validator
 current    = sat_sub(sat_sub(active_stake, directed_stake), base)     # undirected only
 shortfall  = sat_sub(target, current)
-rank       = position in sorted_score_indices, counting only set members
+rank       = position in sorted_score_indices, counting only set members (0-based)
 sol_ahead  = sum of shortfall over set members with a lower rank number
 
 # Supply
@@ -313,6 +351,13 @@ usable_reserve     = sat_sub(reserve_lamports, stake_rent × (validator_count + 
 ```
 
 Three of these need care beyond the saturation:
+
+**`rank` here is not the same number `view-state` prints.** This document's rank is 0-based and
+counts only delegation-set members. The CLI's `Overall Rank` is 1-based and ranks *every* pool
+validator by score, so it reads a few positions higher for the same validator — at epoch 1012 a
+validator at set-rank 199 showed as Overall Rank 202. Both are correct; they measure different
+things. Say which one you are quoting, because an operator comparing them will otherwise assume one
+is broken.
 
 **`usable_reserve` is a conservative lower bound, not an exact figure.** The rent buffer the program
 withholds is `stake_rent × (validator_count + 1 - processed)`, where `processed` is the number of
