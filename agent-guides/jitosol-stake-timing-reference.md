@@ -176,16 +176,19 @@ Mainnet accounts:
 
 ### Preferred route: the released `steward-cli`
 
-From [github.com/jito-foundation/stakenet](https://github.com/jito-foundation/stakenet). Build it
-with `make build-release`, or equivalently:
+From [github.com/jito-foundation/stakenet](https://github.com/jito-foundation/stakenet). Build from
+the repository root with the target the repo documents:
 
 ```bash
-cargo build --release --features jito-steward/idl-build,validator-history/idl-build -p steward-cli
+make build-release
 ```
 
-The bare `cargo build --release -p steward-cli` **does not work** — it fails to compile without those
-feature flags. The binary lands at `target/release/steward-cli`. These commands exist in the released
-tool:
+The binary lands at `target/release/steward-cli`. Build from the root rather than scoping to the
+package — a package-scoped `cargo build -p steward-cli` does not currently compile in this workspace,
+because the `idl-build` feature has to be enabled workspace-wide. If you prefer cargo directly, use
+the same form the Makefile does: `cargo build --release --features idl-build`.
+
+These commands exist in the released tool:
 
 ```bash
 # Parameters and thresholds — every value referenced under "How delegation works"
