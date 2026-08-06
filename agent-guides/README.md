@@ -31,8 +31,9 @@ refuse to give a date and must explain why.
 ## Usage
 
 1. Give your agent both files, by path or by URL.
-2. Fill in your vote account and an RPC endpoint in the prompt. A private RPC is strongly preferred;
-   these reads touch a lot of accounts and the public endpoint rate-limits.
+2. Fill in the prompt's three placeholders: your vote account, an RPC endpoint, and the path or URL
+   where the agent can read the reference. A private RPC is strongly preferred; these reads touch a
+   lot of accounts and the public endpoint rate-limits.
 3. Run it. Re-run it in a later epoch — the firm facts will have moved slightly, and that movement is
    the point rather than a defect.
 

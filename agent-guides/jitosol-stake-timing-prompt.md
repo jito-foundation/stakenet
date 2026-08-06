@@ -1,11 +1,13 @@
 # Prompt: "When will my validator get JitoSOL stake?"
 
 Copy the block below into Claude Code, Codex, Cursor, or any agent that can run shell commands and
-read files. Replace the two placeholders first.
+read files. Replace the three placeholders first.
 
 **You need:**
 
-- `jitosol-stake-timing-reference.md` saved alongside, or reachable by URL
+- `jitosol-stake-timing-reference.md` — either saved locally or reachable by URL. Whichever it is,
+  put that path or URL in the `<PATH_OR_URL_TO_REFERENCE>` placeholder below; if your agent cannot
+  fetch URLs, download the file first and give it a local path.
 - Your validator's **vote account** address
 - A Solana RPC endpoint (a private one is strongly preferred — the public endpoint rate-limits and
   these commands read a lot of accounts)
@@ -20,10 +22,12 @@ queue, and what is actually knowable about when stake might arrive.
 
 My vote account: <YOUR_VOTE_ACCOUNT>
 RPC endpoint:    <YOUR_RPC_URL>
+Reference doc:   <PATH_OR_URL_TO_REFERENCE>
 
-Read ./jitosol-stake-timing-reference.md first and follow it. It describes how JitoSOL
-delegation works, which accounts hold the data, how to compute each quantity, and — most
-importantly — what you must not claim.
+Read the reference doc above before doing anything else, and follow it. It describes how
+JitoSOL delegation works, which accounts hold the data, how to compute each quantity, and —
+most importantly — what you must not claim. If you cannot read it, stop and tell me rather
+than working from memory: the details that matter here are easy to get subtly wrong.
 
 Do this:
 
