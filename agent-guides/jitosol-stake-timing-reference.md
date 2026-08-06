@@ -237,30 +237,49 @@ document exists to prevent.
 
 ## 5. The calculation
 
+`sat_sub(a, b)` below means **saturating** subtraction — `max(0, a - b)`, never negative. The
+program uses saturating subtraction at each of these points, so a literal signed subtraction can
+produce a negative intermediate that then propagates into a nonsense target or shortfall.
+
 ```
 # Pool level
 directed_total   = sum of directed stake across the pool
-undirected_pool  = stake_pool.total_lamports - directed_total
+undirected_pool  = sat_sub(stake_pool.total_lamports, directed_total)
 base             = minimum_delegation + stake_rent          # per validator, ~0.0033 SOL
 delegatable      = undirected_pool - (base × validator_count)
 N                = delegation denominator (equals the count of set members)
 target           = delegatable / N                          # same for every member
 
 # Per validator
-current    = active_stake - directed_stake - base           # undirected only
-shortfall  = max(0, target - current)
+current    = sat_sub(sat_sub(active_stake, directed_stake), base)     # undirected only
+shortfall  = sat_sub(target, current)
 rank       = position in sorted_score_indices, counting only set members
 sol_ahead  = sum of shortfall over set members with a lower rank number
 
 # Supply
 scoring_cap        = delegatable × scoring_unstake_cap_bps / 10_000
-scoring_remaining  = max(0, scoring_cap - scoring_unstake_total)
-usable_reserve     = reserve_lamports - stake_rent × (validator_count + 1)
+scoring_remaining  = sat_sub(scoring_cap, scoring_unstake_total)
+usable_reserve     = sat_sub(reserve_lamports, stake_rent × (validator_count + 1 - processed))
 ```
 
-Note that `scoring_cap` is recomputed from the current undirected pool on every rebalance while
-`scoring_unstake_total` accumulates across the cycle. If directed stake grew mid-cycle the total
-can slightly exceed the cap. Clamp at zero; do not treat it as an error.
+Three of these need care beyond the saturation:
+
+**`usable_reserve` is a conservative lower bound, not an exact figure.** The rent buffer the program
+withholds is `stake_rent × (validator_count + 1 - processed)`, where `processed` is the number of
+validators already rebalanced in the current epoch's pass. The buffer therefore *shrinks* as the pass
+proceeds and usable reserve grows. Setting `processed = 0` — the start-of-pass value, which is what
+you can observe between passes — gives the largest buffer and so the smallest usable reserve. Use
+that, treat the result as a floor, and do not present it as the exact amount available.
+
+**`delegatable` is a checked subtraction on-chain, not a saturating one.** If `base × validator_count`
+exceeded the undirected pool the program would error rather than clamp. In practice it never comes
+close, but if your arithmetic produces a negative here, something upstream is wrong — investigate
+rather than clamping to zero.
+
+**`scoring_remaining` can hit zero with the total slightly above the cap.** `scoring_cap` is
+recomputed from the current undirected pool on every rebalance while `scoring_unstake_total`
+accumulates across the cycle, so if directed stake grew mid-cycle the accumulated total can exceed
+the present cap. The saturation handles it; do not report it as an error.
 
 ### Determine the binding constraint
 
