@@ -240,8 +240,18 @@ pub struct Args {
     #[arg(long, env, default_value = "true")]
     pub run_block_metadata: bool,
 
-    /// Interval to update block metadata in local SQLite file (default 17280 sec, which is ~1/10 of an epoch)
-    #[arg(long, env, default_value = "17280")]
+    /// Interval to update block metadata in local SQLite file, in seconds.
+    ///
+    /// The job is a catch-up pass keyed off what is already in SQLite, so this only
+    /// controls how often it wakes up, not how much it covers. It must fire several
+    /// times per epoch to keep each batch small.
+    ///
+    /// The previous default of 17280 was derived as one tenth of a 432,000-slot epoch
+    /// at 400ms slots. SIMD-0525 keeps the epoch at 432,000 slots while cutting slot
+    /// time to 200ms, which halves epoch wall-clock and would have turned this into
+    /// ~1/5 of an epoch. 8640 holds the ~1/10 ratio at 200ms and simply runs more
+    /// often (a cheap no-op when SQLite is already current) at slower slot times.
+    #[arg(long, env, default_value = "8640")]
     pub block_metadata_interval: u64,
 
     /// Path to the local SQLite file

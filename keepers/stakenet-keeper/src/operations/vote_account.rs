@@ -145,12 +145,7 @@ pub async fn update_vote_accounts(
         && !keeper_state.keeper_flags.check_flag(KeeperFlag::RerunVote)
     {
         vote_accounts_to_update.retain(|vote_account| {
-            !vote_account_uploaded_recently(
-                validator_history_map,
-                vote_account,
-                epoch_info.epoch,
-                epoch_info.absolute_slot,
-            )
+            !vote_account_uploaded_recently(validator_history_map, vote_account, epoch_info)
         });
     }
 

@@ -87,8 +87,7 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
             !vote_account_uploaded_recently(
                 &validator_history_map,
                 &vote_history.vote_account,
-                epoch_info.epoch,
-                epoch_info.absolute_slot,
+                &epoch_info,
             )
         })
         .map(|vote_history| &vote_history.vote_account)

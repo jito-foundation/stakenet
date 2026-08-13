@@ -2,7 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use jito_steward::{constants::BASIS_POINTS_MAX, DirectedStakeMeta, DirectedStakeTicket};
 use solana_client::{client_error::ClientError, nonblocking::rpc_client::RpcClient};
-use solana_sdk::{account::Account, pubkey::Pubkey, stake::state::StakeStateV2};
+use solana_sdk::{
+    account::Account, epoch_info::EpochInfo, pubkey::Pubkey, stake::state::StakeStateV2,
+};
 use spl_associated_token_account::get_associated_token_address;
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
@@ -15,18 +17,41 @@ use solana_program::vote::program::ID as VOTE_PROGRAM_ID;
 
 use super::accounts::get_validator_history_address;
 
+/// How stale a `copy_vote_account` upload may be before it is worth re-submitting,
+/// as a fraction of an epoch.
+///
+/// Deliberately expressed as an epoch fraction rather than a fixed slot count: the
+/// on-chain consumers of `vote_account_last_update_slot` gate on epoch progress
+/// (`Steward::compute_instant_unstake` requires the upload to land after
+/// `instant_unstake_inputs_epoch_progress`), so the freshness budget belongs in the
+/// same unit. It also keeps its meaning if `slots_per_epoch` ever changes.
+///
+/// The value reproduces the previous hardcoded 50,000 slots at 432,000 slots/epoch.
+/// Note this window is epoch-relative, not wall-clock: under SIMD-0525 an epoch keeps
+/// its 432,000 slots but shrinks in real time, so the window shrinks with it (~5.6h at
+/// 400ms slots, ~2.8h at 200ms). That direction is safe — a shorter window only causes
+/// more redundant uploads, never a missed one — and the number of re-uploads per epoch
+/// is unchanged.
+const VOTE_ACCOUNT_UPLOAD_STALENESS_EPOCH_FRACTION: f64 = 50_000. / 432_000.;
+
 pub fn vote_account_uploaded_recently(
     validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
     vote_account: &Pubkey,
-    epoch: u64,
-    slot: u64,
+    epoch_info: &EpochInfo,
 ) -> bool {
+    let staleness_window_slots =
+        (epoch_info.slots_in_epoch as f64 * VOTE_ACCOUNT_UPLOAD_STALENESS_EPOCH_FRACTION) as u64;
+    // saturating: `absolute_slot` is below the window on a freshly started local cluster
+    let oldest_fresh_slot = epoch_info
+        .absolute_slot
+        .saturating_sub(staleness_window_slots);
+
     if let Some(validator_history) = validator_history_map.get(vote_account) {
         if let Some(entry) = validator_history.history.last() {
-            if entry.epoch == epoch as u16
+            if entry.epoch == epoch_info.epoch as u16
                 && entry.vote_account_last_update_slot
                     != ValidatorHistoryEntry::default().vote_account_last_update_slot
-                && entry.vote_account_last_update_slot > slot - 50000
+                && entry.vote_account_last_update_slot > oldest_fresh_slot
             {
                 return true;
             }
@@ -339,6 +364,7 @@ pub fn aggregate_validator_targets(
 mod tests {
     use super::*;
     use jito_steward::{utils::U8Bool, DirectedStakePreference};
+    use validator_history::CircBuf;
 
     #[test]
     fn test_is_live_vote_account_true_for_vote_owned_account() {
@@ -358,6 +384,104 @@ mod tests {
         };
 
         assert!(!is_live_vote_account(Some(&account)));
+    }
+
+    const SLOTS_IN_EPOCH: u64 = 432_000;
+    /// Window is 50_000 slots at 432_000 slots/epoch
+    const STALENESS_WINDOW: u64 = 50_000;
+
+    fn epoch_info_at(epoch: u64, absolute_slot: u64) -> EpochInfo {
+        EpochInfo {
+            epoch,
+            slot_index: absolute_slot % SLOTS_IN_EPOCH,
+            slots_in_epoch: SLOTS_IN_EPOCH,
+            absolute_slot,
+            block_height: absolute_slot,
+            transaction_count: None,
+        }
+    }
+
+    fn history_map_with_upload(
+        vote_account: Pubkey,
+        epoch: u16,
+        last_update_slot: u64,
+    ) -> HashMap<Pubkey, ValidatorHistory> {
+        let mut validator_history = ValidatorHistory {
+            struct_version: 0,
+            vote_account,
+            index: 0,
+            bump: 0,
+            _padding0: [0; 7],
+            last_ip_timestamp: 0,
+            last_version_timestamp: 0,
+            validator_age: 0,
+            validator_age_last_updated_epoch: 0,
+            _padding1: [0; 226],
+            history: CircBuf::default(),
+        };
+        validator_history.history.is_empty = 0;
+        validator_history.history.idx = 0;
+        validator_history.history.arr[0] = ValidatorHistoryEntry {
+            epoch,
+            vote_account_last_update_slot: last_update_slot,
+            ..Default::default()
+        };
+
+        HashMap::from([(vote_account, validator_history)])
+    }
+
+    #[test]
+    fn test_vote_account_uploaded_recently_within_window() {
+        let vote_account = Pubkey::new_unique();
+        let current_slot = 1_000_000;
+        let map = history_map_with_upload(vote_account, 2, current_slot - STALENESS_WINDOW + 1);
+
+        assert!(vote_account_uploaded_recently(
+            &map,
+            &vote_account,
+            &epoch_info_at(2, current_slot)
+        ));
+    }
+
+    #[test]
+    fn test_vote_account_uploaded_recently_outside_window() {
+        let vote_account = Pubkey::new_unique();
+        let current_slot = 1_000_000;
+        let map = history_map_with_upload(vote_account, 2, current_slot - STALENESS_WINDOW);
+
+        assert!(!vote_account_uploaded_recently(
+            &map,
+            &vote_account,
+            &epoch_info_at(2, current_slot)
+        ));
+    }
+
+    #[test]
+    fn test_vote_account_uploaded_recently_ignores_previous_epoch() {
+        let vote_account = Pubkey::new_unique();
+        let current_slot = 1_000_000;
+        // Recent enough by slot, but recorded against the previous epoch
+        let map = history_map_with_upload(vote_account, 1, current_slot - 10);
+
+        assert!(!vote_account_uploaded_recently(
+            &map,
+            &vote_account,
+            &epoch_info_at(2, current_slot)
+        ));
+    }
+
+    /// Regression: the slot cursor sits below the staleness window on a freshly
+    /// started local cluster, which used to underflow and panic.
+    #[test]
+    fn test_vote_account_uploaded_recently_below_staleness_window() {
+        let vote_account = Pubkey::new_unique();
+        let map = history_map_with_upload(vote_account, 0, 10);
+
+        assert!(vote_account_uploaded_recently(
+            &map,
+            &vote_account,
+            &epoch_info_at(0, 100)
+        ));
     }
 
     #[test]
