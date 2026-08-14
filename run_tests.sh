@@ -2,8 +2,8 @@
 set -e
 
 # Build programs
-cargo build-sbf --manifest-path programs/steward/Cargo.toml;
-cargo build-sbf --manifest-path programs/validator-history/Cargo.toml;
+ ~/.cargo/bin/solana-verify build --library-name jito_steward -- --features mainnet-beta
+ ~/.cargo/bin/solana-verify build --library-name validator-history
 
 # Run all tests
 SBF_OUT_DIR=$(pwd)/target/deploy RUST_MIN_STACK=20000000 cargo nextest run -p tests --all-features --color auto

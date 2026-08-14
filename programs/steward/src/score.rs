@@ -16,6 +16,7 @@ use crate::{
     },
     errors::StewardError::{self, ArithmeticError},
     score::running_bam::calculate_running_bam_score,
+    utils::u32_to_f64,
     Config,
 };
 
@@ -369,7 +370,7 @@ pub fn validator_score(
     let validator_age = validator.validator_age;
 
     // Scale the normalized vote credits ratio for precision and cap at 25 bits
-    let scaled_ratio = (vote_credits_ratio * VOTE_CREDITS_RATIO_MAX as f64) as u64;
+    let scaled_ratio = (vote_credits_ratio * u32_to_f64(VOTE_CREDITS_RATIO_MAX)) as u64;
     let vote_credits_avg = scaled_ratio.min((1u64 << 25) - 1) as u32;
 
     // Calculate raw 4-tier score
@@ -504,7 +505,7 @@ pub fn calculate_epoch_credits(
         return Err(StewardError::ArithmeticError.into());
     }
 
-    let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
+    let average_vote_credits = u32_to_f64(epoch_credits_window.iter().filter_map(|&i| i).sum())
         / epoch_credits_window.len() as f64;
 
     let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
@@ -514,7 +515,7 @@ pub fn calculate_epoch_credits(
 
     // Get average of total blocks in window, ignoring values where upload was missed
     let average_blocks =
-        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
+        u32_to_f64(total_blocks_window.iter().filter_map(|&i| i).sum()) / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1u8;
@@ -530,7 +531,7 @@ pub fn calculate_epoch_credits(
             // If vote credits are None, then validator was not active because we retroactively fill credits for last 64 epochs.
             // If total blocks are None, then keepers missed an upload and validator should not be punished.
             let credits = maybe_credits.unwrap_or(0);
-            let ratio = credits as f64 / (blocks * TVC_MULTIPLIER) as f64;
+            let ratio = u32_to_f64(credits) / u32_to_f64(blocks * TVC_MULTIPLIER);
             if ratio < scoring_delinquency_threshold_ratio {
                 delinquency_score = 0;
                 delinquency_ratio = ratio;
@@ -543,7 +544,7 @@ pub fn calculate_epoch_credits(
     }
 
     let normalized_vote_credits_ratio =
-        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
+        average_vote_credits / (average_blocks * u32_to_f64(TVC_MULTIPLIER));
 
     Ok((
         normalized_vote_credits_ratio,
@@ -976,12 +977,12 @@ pub fn calculate_instant_unstake_delinquency(
         return Err(StewardError::ArithmeticError.into());
     }
 
-    let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
-    let vote_credits_rate = epoch_credits_latest as f64 / validator_history_slot_index as f64;
+    let blocks_produced_rate = u32_to_f64(total_blocks_latest) / cluster_history_slot_index as f64;
+    let vote_credits_rate = u32_to_f64(epoch_credits_latest) / validator_history_slot_index as f64;
 
     if blocks_produced_rate > 0. {
         Ok(
-            (vote_credits_rate / (blocks_produced_rate * (TVC_MULTIPLIER as f64)))
+            (vote_credits_rate / (blocks_produced_rate * u32_to_f64(TVC_MULTIPLIER)))
                 < instant_unstake_delinquency_threshold_ratio,
         )
     } else {

@@ -156,6 +156,27 @@ pub fn get_config_priority_fee_parameter_authority(
     Ok(config.priority_fee_parameters_authority)
 }
 
+/// Converts a `u32` to `f64` without relying on a direct `as` cast.
+///
+/// A bug in the Solana LLVM fork sign-extends 32-bit arguments to the *unsigned*
+/// int-to-float runtime helper, which expects the upper bits zeroed. Values with bit 31
+/// set (`>= 2^31`) can therefore convert to a substantially wrong `f64` when built with an
+/// affected toolchain. Reconstructing the value from its `i32` reinterpretation avoids the
+/// miscompiled path entirely.
+///
+/// Fixed upstream by https://github.com/anza-xyz/llvm-project/pull/202; this helper can be
+/// dropped once the program is built with a platform-tools release containing that fix.
+#[inline]
+pub fn u32_to_f64(value: u32) -> f64 {
+    let signed = value as i32;
+    let result = signed as f64;
+    if signed < 0 {
+        result + 4_294_967_296.0
+    } else {
+        result
+    }
+}
+
 pub fn epoch_progress(clock: &Clock, epoch_schedule: &EpochSchedule) -> Result<f64> {
     let current_epoch = clock.epoch;
     let current_slot = clock.slot;
@@ -458,5 +479,32 @@ impl From<bool> for U8Bool {
 impl From<U8Bool> for bool {
     fn from(val: U8Bool) -> Self {
         val.is_true()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_u32_to_f64() {
+        let cases: [(u32, f64); 12] = [
+            (0, 0.0),
+            (1, 1.0),
+            (16, 16.0),                       // TVC_MULTIPLIER
+            (10_000_000, 10_000_000.0),       // VOTE_CREDITS_RATIO_MAX
+            (6_912_000, 6_912_000.0),         // max TVC credits in one epoch
+            (207_360_000, 207_360_000.0),     // 30-epoch window sum at mainnet params
+            (2_147_483_647, 2_147_483_647.0), // 2^31 - 1, largest pass-through
+            (2_147_483_648, 2_147_483_648.0), // 2^31
+            (2_147_483_649, 2_147_483_649.0),
+            (3_000_000_000, 3_000_000_000.0),
+            (3_532_032_000, 3_532_032_000.0),
+            (u32::MAX, 4_294_967_295.0),
+        ];
+
+        for (value, expected) in cases {
+            assert_eq!(u32_to_f64(value), expected);
+        }
     }
 }
