@@ -190,7 +190,7 @@ pub async fn get_vote_accounts_with_retry(
             return Ok(response
                 .current
                 .into_iter()
-                .chain(response.delinquent.into_iter())
+                .chain(response.delinquent)
                 .filter(|vote_account| vote_account.epoch_credits.len() >= min_vote_epochs)
                 .collect::<Vec<_>>());
         }
@@ -202,7 +202,7 @@ pub async fn get_vote_accounts_with_retry(
         Ok(response) => Ok(response
             .current
             .into_iter()
-            .chain(response.delinquent.into_iter())
+            .chain(response.delinquent)
             .filter(|vote_account| vote_account.epoch_credits.len() >= min_vote_epochs)
             .collect::<Vec<_>>()),
         Err(e) => Err(e),

@@ -191,17 +191,19 @@ pub fn _get_update_stake_pool_ixs(
             (_, None) => false,
         };
 
-        if should_deactivate && reference_vote_account.is_some() {
-            let stake_account =
-                get_stake_address(&validator_info.vote_account_address, stake_pool_address);
+        if should_deactivate {
+            if let Some(reference_vote) = reference_vote_account {
+                let stake_account =
+                    get_stake_address(&validator_info.vote_account_address, stake_pool_address);
 
-            let ix = deactivate_delinquent_stake(
-                &stake_account,
-                &validator_info.vote_account_address,
-                &reference_vote_account.unwrap().vote_account_address,
-            );
+                let ix = deactivate_delinquent_stake(
+                    &stake_account,
+                    &validator_info.vote_account_address,
+                    &reference_vote.vote_account_address,
+                );
 
-            deactivate_delinquent_instructions.push(ix);
+                deactivate_delinquent_instructions.push(ix);
+            }
         }
     }
 

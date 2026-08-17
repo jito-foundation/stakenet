@@ -1,41 +1,50 @@
-use crate::entries::gossip_entry::GossipEntry;
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
-use crate::state::keeper_config::KeeperConfig;
-use crate::state::keeper_state::KeeperState;
+//! This program starts several threads to manage the creation of validator history accounts,
+//! and the updating of the various data feeds within the accounts.
+//! It will emit metrics for each data feed if the env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLockReadGuard,
+    },
+    time::Duration,
+};
+
 use bytemuck::{bytes_of, Pod, Zeroable};
-use log::*;
-use solana_client::nonblocking::rpc_client::RpcClient;
-use solana_client::rpc_response::RpcVoteAccountInfo;
-use solana_gossip::crds::Crds;
-use solana_gossip::crds_data::CrdsData;
-use solana_gossip::crds_value::{CrdsValue, CrdsValueLabel};
-use solana_gossip::gossip_service::make_gossip_node;
+use log::{debug, error, info, warn};
+use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
+use solana_gossip::{
+    contact_info::ContactInfo,
+    crds::Crds,
+    crds_value::{CrdsValue, CrdsValueLabel},
+    gossip_service::make_node,
+};
+use solana_keypair::signable::Signable;
 use solana_metrics::{datapoint_error, datapoint_info};
-use solana_sdk::signature::Signable;
+use solana_net_utils::SocketAddrSpace;
 use solana_sdk::{
     epoch_info::EpochInfo,
     instruction::Instruction,
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{Keypair, Signature, Signer},
 };
-use solana_streamer::socket::SocketAddrSpace;
-use stakenet_sdk::models::submit_stats::SubmitStats;
-use stakenet_sdk::utils::transactions::submit_transactions;
-use std::net::{IpAddr, Ipv4Addr};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLockReadGuard;
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
-use tokio::time::sleep;
-use validator_history::ValidatorHistory;
-use validator_history::ValidatorHistoryEntry;
+use stakenet_sdk::{models::submit_stats::SubmitStats, utils::transactions::submit_transactions};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    time::sleep,
+};
+use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+
+use crate::{
+    entries::gossip_entry::GossipEntry,
+    state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
+};
 
 use super::keeper_operations::{check_flag, KeeperOperations};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 // Constants for the IP echo server protocol
 // https://github.com/anza-xyz/agave/blob/master/net-utils/src/ip_echo_server.rs
@@ -229,31 +238,21 @@ pub async fn fire(
 // ----------------- OPERATION SPECIFIC FUNCTIONS -----------------
 
 fn check_entry_valid(
-    entry: &CrdsValue,
+    contact_info: &ContactInfo,
     validator_history: &ValidatorHistory,
-    validator_identity: Pubkey,
+    validator_identity: &solana_pubkey::Pubkey,
 ) -> bool {
     // Filters out invalid gossip entries that would fail transaction submission. Checks for:
-    // 0. Entry belongs to one of the expected types
     // 1. Entry timestamp is not too old
     // 2. Entry is for the correct validator
-    match &entry.data {
-        CrdsData::ContactInfo(contact_info) => {
-            if contact_info.wallclock() < validator_history.last_ip_timestamp
-                || contact_info.wallclock() < validator_history.last_version_timestamp
-            {
-                return false;
-            }
-        }
-        _ => {
-            return false;
-        }
-    };
+    if contact_info.wallclock() < validator_history.last_ip_timestamp
+        || contact_info.wallclock() < validator_history.last_version_timestamp
+    {
+        return false;
+    }
 
-    let signer = entry.pubkey();
-
-    if signer != validator_identity {
-        warn!("Gossip entry signer mismatch validator_identity={validator_identity}");
+    if contact_info.pubkey() != validator_identity {
+        warn!("Invalid gossip value retrieved for validator {validator_identity}");
         return false;
     }
     true
@@ -269,21 +268,25 @@ fn build_gossip_entry(
     let validator_identity = Pubkey::from_str(&vote_account.node_pubkey).ok()?;
     let validator_vote_pubkey = Pubkey::from_str(&vote_account.vote_pubkey).ok()?;
 
-    let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(validator_identity);
+    // solana-gossip rides a newer solana-pubkey major than solana-sdk; bridge via raw bytes
+    let gossip_identity = solana_pubkey::Pubkey::from(validator_identity.to_bytes());
+    let contact_info_key: CrdsValueLabel = CrdsValueLabel::ContactInfo(gossip_identity);
 
     // ContactInfo is the only gossip message we are interested in. Legacy* and Version
     // are fully deprecated and will not be transmitted on the gossip network.
+    let contact_info = crds.get::<&ContactInfo>(gossip_identity)?;
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
-        if !check_entry_valid(entry, validator_history, validator_identity) {
-            debug!("Skipping gossip entry vote_account={validator_vote_pubkey}");
+        if !check_entry_valid(contact_info, validator_history, &gossip_identity) {
+            debug!("Invalid entry for validator {validator_vote_pubkey}");
             return None;
         }
+        let signature = Signature::try_from(entry.get_signature().as_ref()).ok()?;
         return Some(vec![GossipEntry::new(
             &validator_vote_pubkey,
-            &entry.get_signature(),
+            &signature,
             &entry.signable_data(),
             &program_id,
-            &entry.pubkey(),
+            &validator_identity,
             &keypair.pubkey(),
         )]);
     }
@@ -338,9 +341,9 @@ pub async fn upload_gossip_values(
             .expect("unable to find an available gossip port"),
         );
 
-        let (_gossip_service, _ip_echo, cluster_info) = make_gossip_node(
-            Keypair::from_base58_string(keypair.to_base58_string().as_str()),
-            Some(entrypoint),
+        let (_gossip_service, _ip_echo, cluster_info) = make_node(
+            solana_keypair::Keypair::from_base58_string(keypair.to_base58_string().as_str()),
+            std::slice::from_ref(entrypoint),
             exit.clone(),
             Some(&gossip_addr),
             cluster_shred_version,
