@@ -84,7 +84,7 @@ pub fn confirmed_blocks_in_epoch(
     // The bitvec inner data is taken ownership of, then returned to be reused.
     let mut blocks_in_epoch: u32 = 0;
 
-    let first_full_block_slot = if start_slot % BITVEC_BLOCK_SIZE == 0 {
+    let first_full_block_slot = if start_slot.is_multiple_of(BITVEC_BLOCK_SIZE) {
         start_slot
     } else {
         start_slot

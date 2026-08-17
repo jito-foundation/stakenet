@@ -39,6 +39,7 @@ serde_derive = "1.0.183"
 solana-gossip = { workspace = true }
 solana-program = { workspace = true }
 solana-program-test = { workspace = true }
+solana-pubkey = { workspace = true }
 solana-sdk = { workspace = true }
 solana-version = { workspace = true }
 spl-associated-token-account = { workspace = true, features = ["no-entrypoint"] }

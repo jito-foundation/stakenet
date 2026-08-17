@@ -44,7 +44,7 @@ pub async fn command_migrate_state_to_v2(
     let blockhash = client.get_latest_blockhash().await?;
 
     let transaction = Transaction::new_signed_with_payer(
-        &[ix.clone()],
+        std::slice::from_ref(&ix),
         Some(&authority.pubkey()),
         &[&authority],
         blockhash,
