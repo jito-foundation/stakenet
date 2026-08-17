@@ -663,7 +663,7 @@ pub async fn emit_directed_stake_stats(
             log::warn!("Failed to fetch directed stake whitelist");
         }
     } else {
-        log::error!("No steward accounts found");
+        log::error!("No steward accounts found, skipping steward metrics");
     }
 
     Ok(())

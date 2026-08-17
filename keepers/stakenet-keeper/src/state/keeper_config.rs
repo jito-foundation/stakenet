@@ -306,6 +306,20 @@ fn parse_connection_rate(s: &str) -> Result<f64, String> {
     }
 }
 
+/// Strips the path, query, and userinfo from an RPC URL so API keys embedded
+/// in it (`?api-key=...`, `https://KEY@host`, `user:pass@host`) never reach
+/// the logs
+fn redact_url(url: &str) -> String {
+    match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+            let host = authority.rsplit('@').next().unwrap_or("");
+            format!("{scheme}://{host}/<redacted>")
+        }
+        None => "<redacted>".to_string(),
+    }
+}
+
 impl fmt::Display for Args {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -358,7 +372,7 @@ impl fmt::Display for Args {
             Coinbase Vote Pubkey: {:?}\n\
             Min BAM Connection Rate: {:?}\n\
             -------------------------------",
-            self.json_rpc_url,
+            redact_url(&self.json_rpc_url),
             self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,
@@ -395,7 +409,9 @@ impl fmt::Display for Args {
             self.lookback_start_offset_epochs,
             self.sqlite_path,
             self.region,
-            self.redundant_rpc_urls,
+            self.redundant_rpc_urls
+                .as_ref()
+                .map(|urls| urls.iter().map(|url| redact_url(url)).collect::<Vec<_>>()),
             self.run_priority_fee_commission,
             self.validator_history_min_stake,
             self.run_directed_staking,
@@ -404,5 +420,51 @@ impl fmt::Display for Args {
             self.coinbase_vote_pubkey,
             self.min_bam_connection_rate,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_url;
+
+    #[test]
+    fn test_redact_url_strips_path_and_query() {
+        assert_eq!(
+            redact_url("https://mainnet.helius-rpc.com/?api-key=SECRET"),
+            "https://mainnet.helius-rpc.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://example.com/rpc/SECRET"),
+            "https://example.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://example.com#SECRET"),
+            "https://example.com/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_strips_userinfo() {
+        assert_eq!(
+            redact_url("https://SECRET@example.com/rpc"),
+            "https://example.com/<redacted>"
+        );
+        assert_eq!(
+            redact_url("https://user:SECRET@example.com:8899"),
+            "https://example.com:8899/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_keeps_host_and_port() {
+        assert_eq!(
+            redact_url("http://127.0.0.1:8899"),
+            "http://127.0.0.1:8899/<redacted>"
+        );
+    }
+
+    #[test]
+    fn test_redact_url_without_scheme() {
+        assert_eq!(redact_url("not a url"), "<redacted>");
     }
 }

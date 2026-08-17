@@ -63,8 +63,6 @@ impl GossipEntry {
             ),
         ];
 
-        // info!("Ed25519 instruction data length: {}", ixs[0].data.len());
-
         ixs.push(Instruction {
             program_id: self.program_id,
             accounts: validator_history::accounts::CopyGossipContactInfo {

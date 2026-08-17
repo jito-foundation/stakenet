@@ -349,8 +349,7 @@ impl KeeperState {
 
         if epoch_progress <= 0.5 {
             log::debug!(
-                "Epoch progress {:.2}% - too early to copy targets",
-                epoch_progress * 100.0,
+                "Too early to copy directed stake targets epoch_progress={epoch_progress:.2}"
             );
             return Ok(false);
         }
@@ -367,7 +366,7 @@ impl KeeperState {
 
         // If no valid targets exist, we should copy
         if valid_targets.is_empty() {
-            log::info!("No valid targets found - triggering copy");
+            log::info!("No valid directed stake targets found, triggering copy");
             return Ok(true);
         }
 
@@ -379,7 +378,7 @@ impl KeeperState {
         let should_copy = !any_target_updated;
 
         log::info!(
-            "Epoch {}, {} valid targets, any updated: {} - should_copy: {}",
+            "Directed stake copy check epoch={} valid_targets={} any_updated={} should_copy={}",
             current_epoch,
             valid_targets.len(),
             any_target_updated,

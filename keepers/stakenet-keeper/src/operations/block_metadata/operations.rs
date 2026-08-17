@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use anchor_lang::{prelude::SlotHistory, AnchorDeserialize};
 use futures::future::join_all;
 use jito_priority_fee_distribution::state::PriorityFeeDistributionAccount;
-use log::{error, info};
+use log::{debug, error, info, warn};
 use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
@@ -108,7 +108,7 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                for message in stats.results.iter().chain(stats.results.iter()) {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!(
                             "block-metadata-keeper-error",
@@ -204,7 +204,7 @@ async fn update_block_metadata(
         ..(current_epoch + 1 - lookback_start_offset_epochs);
 
     // 1. Update Epoch Schedule
-    info!("\n\n\n1. Update Epoch Schedule\n\n\n");
+    info!("Updating epoch schedule");
     for epoch in epoch_range.clone() {
         let start_time = std::time::Instant::now();
         let epoch_starting_slot = epoch_schedule.get_first_slot_in_epoch(epoch);
@@ -212,17 +212,17 @@ async fn update_block_metadata(
         // Check if slot exists
         if DBSlotInfo::check_random_slot_exists_in_epoch(sqlite_connection, epoch, epoch_schedule)?
         {
-            info!("Epoch {epoch} already exists");
+            debug!("Epoch already in database epoch={epoch}");
             continue;
         } else {
-            info!("Updating epoch {epoch}")
+            info!("Updating epoch schedule epoch={epoch}")
         }
 
         let epoch_leader_schedule_result =
             get_leader_schedule_safe(client, epoch_starting_slot).await;
 
         if epoch_leader_schedule_result.is_err() {
-            info!("Could not find leader schedule for epoch {epoch}");
+            warn!("Leader schedule unavailable epoch={epoch}");
             continue;
         }
 
@@ -238,21 +238,22 @@ async fn update_block_metadata(
             Ok(write_count) => {
                 let time_ms = start_time.elapsed().as_millis();
                 info!(
-                    "Wrote {} leaders for epoch {} in {:.3}s",
-                    write_count,
+                    "Wrote leader schedule epoch={} leaders={} seconds={:.3}",
                     epoch,
+                    write_count,
                     time_ms as f64 / 1000.0
                 )
             }
-            Err(err) => error!("Error writing leaders {err:?}"),
+            Err(err) => error!("Failed to write leader schedule epoch={epoch}: {err:?}"),
         }
 
         // 1.b Log out missing vote accounts
-        for leader in epoch_leader_schedule.keys() {
-            if !identity_to_vote_map.contains_key(leader) {
-                // TODO
-                error!("TODO Could not find Vote for {leader} in epoch {epoch}")
-            }
+        let missing_vote_count = epoch_leader_schedule
+            .keys()
+            .filter(|leader| !identity_to_vote_map.contains_key(*leader))
+            .count();
+        if missing_vote_count > 0 {
+            warn!("Missing vote accounts for leaders epoch={epoch} count={missing_vote_count}");
         }
     }
 
@@ -260,7 +261,7 @@ async fn update_block_metadata(
     // NOTE: The mapping is only good for the current epoch, however
     // we need some mapping for backfilling the epochs
     {
-        info!("\n\n\n2. Map Identity to Vote\n\n\n");
+        info!("Mapping validator identities to vote accounts");
         let start_time = std::time::Instant::now();
         match DBSlotInfo::upsert_vote_identity_mapping(
             sqlite_connection,
@@ -270,18 +271,18 @@ async fn update_block_metadata(
             Ok(write_counter) => {
                 let time_ms = start_time.elapsed().as_millis();
                 info!(
-                    "Wrote {} identity/vote mappings in {:.3}s",
+                    "Wrote identity-to-vote mappings count={} seconds={:.3}",
                     write_counter,
                     time_ms as f64 / 1000.0
                 )
             }
-            Err(err) => error!("Error updating identity/vote mapping {err:?}"),
+            Err(err) => error!("Failed to update identity-to-vote mapping: {err:?}"),
         }
     }
 
     // 3. Update Blocks ( Tries to update all blocks )
     {
-        info!("\n\n\n3. Update Blocks\n\n\n");
+        info!("Updating blocks");
         let start_total_time = std::time::Instant::now();
         let slots_needing_blocks =
             DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
@@ -320,7 +321,7 @@ async fn update_block_metadata(
                             DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
                         }
                         _ => {
-                            info!("Could not get block info for slot {slot} - skipping: {err:?}")
+                            debug!("Skipping block slot={slot}: {err:?}")
                         }
                     },
                 }
@@ -333,20 +334,20 @@ async fn update_block_metadata(
                     total_blocks += write_counter;
 
                     info!(
-                        "Wrote {} blocks in {:.3}s ({:.1} blocks/s)",
+                        "Wrote blocks count={} seconds={:.3} blocks_per_second={:.1}",
                         write_counter,
                         time_ms as f64 / 1000.0,
                         blocks_per_second
                     )
                 }
-                Err(err) => error!("Error writing blocks {err:?}"),
+                Err(err) => error!("Failed to write blocks: {err:?}"),
             }
         }
 
         let time_ms = start_total_time.elapsed().as_millis();
         let blocks_per_second = (total_blocks as f64 * 1000.0) / time_ms.max(1) as f64;
         info!(
-            "Wrote Total {} blocks in {:.3}s ({:.1} blocks/s)",
+            "Finished updating blocks total={} seconds={:.3} blocks_per_second={:.1}",
             total_blocks,
             time_ms as f64 / 1000.0,
             blocks_per_second
@@ -356,7 +357,7 @@ async fn update_block_metadata(
     // 4. Aggregate Update TXs
     let mut ixs = vec![];
     {
-        info!("\n\n\n4. Aggregate Update TXs\n\n\n");
+        info!("Aggregating update transactions");
 
         let mut needs_update_counter = 0;
 
@@ -371,7 +372,7 @@ async fn update_block_metadata(
             ) {
                 Ok(map) => map,
                 Err(err) => {
-                    error!("Could not get update map - skipping... {err:?}");
+                    error!("Failed to get update map epoch={epoch}: {err:?}");
                     continue;
                 }
             };
@@ -476,16 +477,19 @@ async fn update_block_metadata(
 
         let time_ms = start_time.elapsed().as_millis();
         info!(
-            "Aggregated {} in {:.3}s",
+            "Aggregated update instructions instructions={} needs_update={} seconds={:.3}",
             ixs.len(),
+            needs_update_counter,
             time_ms as f64 / 1000.0,
         );
-        info!("Block Metadata: {needs_update_counter}");
     }
 
     // 5. Submit TXs
     {
-        info!("\n\n\n. Submitting txs ({})\n\n\n", ixs.len());
+        info!(
+            "Submitting block metadata transactions instructions={}",
+            ixs.len()
+        );
 
         let start_time = std::time::Instant::now();
         let submit_result = submit_chunk_instructions(
@@ -502,7 +506,7 @@ async fn update_block_metadata(
 
         let time_ms = start_time.elapsed().as_millis();
         info!(
-            "Sent {}🟩 {}🟥 in {:.3}s",
+            "Submitted block metadata transactions successes={} errors={} seconds={:.3}",
             submit_result.successes,
             submit_result.errors,
             time_ms as f64 / 1000.0,

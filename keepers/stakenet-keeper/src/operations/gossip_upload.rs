@@ -14,7 +14,7 @@ use std::{
 };
 
 use bytemuck::{bytes_of, Pod, Zeroable};
-use log::{error, info};
+use log::{debug, error, info, warn};
 use solana_client::{nonblocking::rpc_client::RpcClient, rpc_response::RpcVoteAccountInfo};
 use solana_gossip::{
     contact_info::ContactInfo,
@@ -214,7 +214,7 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                for message in stats.results.iter().chain(stats.results.iter()) {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!("gossip-upload-error", ("error", e.to_string(), String),);
                     } else {
@@ -252,7 +252,7 @@ fn check_entry_valid(
     }
 
     if contact_info.pubkey() != validator_identity {
-        error!("Invalid gossip value retrieved for validator {validator_identity}");
+        warn!("Invalid gossip value retrieved for validator {validator_identity}");
         return false;
     }
     true
@@ -277,7 +277,7 @@ fn build_gossip_entry(
     let contact_info = crds.get::<&ContactInfo>(gossip_identity)?;
     if let Some(entry) = crds.get::<&CrdsValue>(&contact_info_key) {
         if !check_entry_valid(contact_info, validator_history, &gossip_identity) {
-            error!("Invalid entry for validator {validator_vote_pubkey}");
+            debug!("Invalid entry for validator {validator_vote_pubkey}");
             return None;
         }
         let signature = Signature::try_from(entry.get_signature().as_ref()).ok()?;
@@ -324,7 +324,7 @@ pub async fn upload_gossip_values(
         let ip_echo_response = match ip_echo_client.fetch_ip_and_shred_version().await {
             Ok(res) => res,
             Err(e) => {
-                error!("Failed to fetch IP and shred version from gossip entrypoint: {entrypoint}, Error: {e}");
+                error!("Failed to fetch IP and shred version entrypoint={entrypoint}: {e}");
                 continue;
             }
         };
@@ -351,7 +351,9 @@ pub async fn upload_gossip_values(
             SocketAddrSpace::Global,
         );
 
-        info!("Gossip service started on {gossip_addr} with entrypoint {entrypoint}. Waiting for validators to be discovered...");
+        info!(
+            "Gossip service started, waiting for validator discovery gossip_addr={gossip_addr} entrypoint={entrypoint}"
+        );
 
         // Wait for all active validators to be received
         sleep(Duration::from_secs(150)).await;
