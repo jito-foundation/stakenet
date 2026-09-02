@@ -12,7 +12,11 @@ use stakenet_sdk::{
     },
 };
 
+use crate::entries::CU_COPY_DIRECTED_STAKE_TARGETS_PER_IX;
 use crate::state::keeper_config::KeeperConfig;
+
+/// Instructions packed per `copy_directed_stake_targets` transaction.
+const TARGETS_PER_TX: usize = 8;
 
 /// Copy directed stake targets to [`DirectedStakeMeta`] account
 pub async fn crank_copy_directed_stake_targets(
@@ -47,8 +51,15 @@ pub async fn crank_copy_directed_stake_targets(
         normal_ixs.len()
     );
 
-    let normal_txs_to_run =
-        package_instructions(&normal_ixs, 8, Some(*priority_fee), Some(1_400_000), None);
+    let compute_limit = CU_COPY_DIRECTED_STAKE_TARGETS_PER_IX.saturating_mul(TARGETS_PER_TX as u32);
+
+    let normal_txs_to_run = package_instructions(
+        &normal_ixs,
+        TARGETS_PER_TX,
+        Some(*priority_fee),
+        Some(compute_limit),
+        None,
+    );
     let normal_stats =
         submit_packaged_transactions(client, normal_txs_to_run, &keypair, Some(50), None).await?;
     stats.combine(&normal_stats);
@@ -71,9 +82,9 @@ pub async fn crank_copy_directed_stake_targets(
 
     let coinbase_delegation_txs_to_run = package_instructions(
         &coinbase_delegation_ixs,
-        8,
+        TARGETS_PER_TX,
         Some(*priority_fee),
-        Some(1_400_000),
+        Some(compute_limit),
         None,
     );
     let coinbase_delegation_stats = submit_packaged_transactions(

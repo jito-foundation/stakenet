@@ -13,13 +13,13 @@ use solana_metrics::datapoint_error;
 use solana_program::hash::Hash;
 use solana_sdk::bs58;
 use solana_sdk::commitment_config::CommitmentLevel;
-use solana_sdk::compute_budget::ComputeBudgetInstruction;
+use solana_sdk::compute_budget::{ComputeBudgetInstruction, ID as COMPUTE_BUDGET_ID};
 use solana_sdk::packet::PACKET_DATA_SIZE;
 use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
     account::Account, commitment_config::CommitmentConfig, instruction::AccountMeta,
-    instruction::Instruction, packet::Packet, pubkey::Pubkey, signature::Keypair,
-    signature::Signature, signer::Signer, transaction::Transaction,
+    instruction::Instruction, instruction::InstructionError, packet::Packet, pubkey::Pubkey,
+    signature::Keypair, signature::Signature, signer::Signer, transaction::Transaction,
 };
 use solana_transaction_status::TransactionStatus;
 use tokio::task;
@@ -33,6 +33,55 @@ use crate::models::submit_stats::SubmitStats;
 use std::future::Future;
 
 pub const DEFAULT_COMPUTE_LIMIT: u64 = 200_000;
+
+/// Max compute units a single transaction may request.
+pub const MAX_COMPUTE_LIMIT: u32 = 1_400_000;
+
+/// True if this failure was the runtime rejecting the transaction for exhausting its
+/// compute budget, whether reported by preflight simulation or by a landed transaction.
+pub fn is_compute_budget_exceeded(error: &JitoSendTransactionError) -> bool {
+    match error {
+        JitoSendTransactionError::RpcSimulateTransactionResult(result) => matches!(
+            result.err,
+            Some(TransactionError::InstructionError(
+                _,
+                InstructionError::ComputationalBudgetExceeded
+            ))
+        ),
+        JitoSendTransactionError::TransactionError(message) => {
+            message.contains("ComputationalBudgetExceeded")
+        }
+        JitoSendTransactionError::ExceededRetries => false,
+    }
+}
+
+/// Returns `instructions` with its compute unit limit set to `limit`, replacing an
+/// existing `SetComputeUnitLimit` or prepending one if absent.
+pub fn raise_compute_limit(instructions: &[Instruction], limit: u32) -> Vec<Instruction> {
+    // SetComputeUnitLimit is discriminant 2 in the ComputeBudget instruction enum.
+    const SET_COMPUTE_UNIT_LIMIT: u8 = 2;
+
+    let mut replaced = false;
+    let mut result: Vec<Instruction> = instructions
+        .iter()
+        .map(|ix| {
+            if ix.program_id == COMPUTE_BUDGET_ID
+                && ix.data.first() == Some(&SET_COMPUTE_UNIT_LIMIT)
+            {
+                replaced = true;
+                ComputeBudgetInstruction::set_compute_unit_limit(limit)
+            } else {
+                ix.clone()
+            }
+        })
+        .collect();
+
+    if !replaced {
+        result.insert(0, ComputeBudgetInstruction::set_compute_unit_limit(limit));
+    }
+
+    result
+}
 
 pub async fn retry<F, Fut, T, E>(mut f: F, retries: usize) -> Result<T, E>
 where
@@ -982,28 +1031,65 @@ pub async fn submit_packaged_transactions(
     retry_interval: Option<u64>,
 ) -> Result<SubmitStats, JitoTransactionExecutionError> {
     let mut stats = SubmitStats::default();
-    let tx_slice = transactions
-        .iter()
-        .map(|t| t.as_slice())
-        .collect::<Vec<_>>();
+    let retry_count = retry_count.unwrap_or(3);
+    let retry_interval = retry_interval.unwrap_or(20);
 
-    match parallel_execute_transactions(
-        client,
-        &tx_slice,
-        keypair,
-        retry_count.unwrap_or(3),
-        retry_interval.unwrap_or(20),
-    )
-    .await
-    {
-        Ok(results) => {
-            stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
-            stats.errors = results.len() as u64 - stats.successes;
-            stats.results = results;
-            Ok(stats)
+    let mut results = {
+        let tx_slice = transactions
+            .iter()
+            .map(|t| t.as_slice())
+            .collect::<Vec<_>>();
+
+        parallel_execute_transactions(client, &tx_slice, keypair, retry_count, retry_interval)
+            .await?
+    };
+
+    // Instructions carry tuned compute limits, so a transaction whose consumption exceeds
+    // the sampled maximum can be rejected for running out of budget. Retry those once at
+    // the ceiling rather than dropping the work.
+    let exhausted: Vec<usize> = results
+        .iter()
+        .enumerate()
+        .filter(|(_, result)| {
+            result
+                .as_ref()
+                .err()
+                .is_some_and(is_compute_budget_exceeded)
+        })
+        .map(|(index, _)| index)
+        .collect();
+
+    if !exhausted.is_empty() {
+        warn!(
+            "Retrying compute-exhausted transactions count={} limit={}",
+            exhausted.len(),
+            MAX_COMPUTE_LIMIT
+        );
+
+        let raised: Vec<Vec<Instruction>> = exhausted
+            .iter()
+            .map(|&index| raise_compute_limit(&transactions[index], MAX_COMPUTE_LIMIT))
+            .collect();
+        let raised_slice = raised.iter().map(|t| t.as_slice()).collect::<Vec<_>>();
+
+        let raised_results = parallel_execute_transactions(
+            client,
+            &raised_slice,
+            keypair,
+            retry_count,
+            retry_interval,
+        )
+        .await?;
+
+        for (index, result) in exhausted.into_iter().zip(raised_results) {
+            results[index] = result;
         }
-        Err(e) => Err(e),
     }
+
+    stats.successes = results.iter().filter(|&tx| tx.is_ok()).count() as u64;
+    stats.errors = results.len() as u64 - stats.successes;
+    stats.results = results;
+    Ok(stats)
 }
 
 pub fn format_steward_error_log(error: &JitoSendTransactionError) -> String {
@@ -1057,4 +1143,114 @@ pub fn print_base58_tx(ixs: &[Instruction]) {
         let base58_string = bs58::encode(&ix.data).into_string();
         println!("{base58_string}\n");
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use solana_client::rpc_response::RpcSimulateTransactionResult;
+
+    fn dummy_ix() -> Instruction {
+        Instruction {
+            program_id: Pubkey::new_unique(),
+            accounts: vec![],
+            data: vec![7],
+        }
+    }
+
+    fn sim_result(err: Option<TransactionError>) -> JitoSendTransactionError {
+        JitoSendTransactionError::RpcSimulateTransactionResult(RpcSimulateTransactionResult {
+            err,
+            logs: None,
+            accounts: None,
+            units_consumed: None,
+            loaded_accounts_data_size: None,
+            return_data: None,
+            inner_instructions: None,
+            replacement_blockhash: None,
+        })
+    }
+
+    #[test]
+    fn raise_compute_limit_replaces_existing_limit() {
+        let ixs = vec![
+            ComputeBudgetInstruction::set_compute_unit_price(200_000),
+            ComputeBudgetInstruction::set_compute_unit_limit(39_000),
+            dummy_ix(),
+        ];
+
+        let raised = raise_compute_limit(&ixs, MAX_COMPUTE_LIMIT);
+
+        // Same instruction count and order, only the limit value changed.
+        assert_eq!(raised.len(), 3);
+        assert_eq!(raised[0], ixs[0]);
+        assert_eq!(
+            raised[1],
+            ComputeBudgetInstruction::set_compute_unit_limit(MAX_COMPUTE_LIMIT)
+        );
+        assert_eq!(raised[2], ixs[2]);
+    }
+
+    #[test]
+    fn raise_compute_limit_prepends_when_absent() {
+        let ixs = vec![
+            ComputeBudgetInstruction::set_compute_unit_price(200_000),
+            dummy_ix(),
+        ];
+
+        let raised = raise_compute_limit(&ixs, MAX_COMPUTE_LIMIT);
+
+        assert_eq!(raised.len(), 3);
+        assert_eq!(
+            raised[0],
+            ComputeBudgetInstruction::set_compute_unit_limit(MAX_COMPUTE_LIMIT)
+        );
+        assert_eq!(raised[1], ixs[0]);
+        assert_eq!(raised[2], ixs[1]);
+    }
+
+    #[test]
+    fn raise_compute_limit_leaves_price_instruction_alone() {
+        // SetComputeUnitPrice is discriminant 3 and must not be mistaken for a limit.
+        let ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(200_000)];
+
+        let raised = raise_compute_limit(&ixs, MAX_COMPUTE_LIMIT);
+
+        assert_eq!(raised.len(), 2);
+        assert_eq!(raised[1], ixs[0]);
+    }
+
+    #[test]
+    fn detects_compute_budget_exhaustion_from_preflight() {
+        let err = sim_result(Some(TransactionError::InstructionError(
+            2,
+            InstructionError::ComputationalBudgetExceeded,
+        )));
+        assert!(is_compute_budget_exceeded(&err));
+    }
+
+    #[test]
+    fn ignores_unrelated_failures() {
+        assert!(!is_compute_budget_exceeded(&sim_result(Some(
+            TransactionError::BlockhashNotFound
+        ))));
+        assert!(!is_compute_budget_exceeded(&sim_result(Some(
+            TransactionError::InstructionError(0, InstructionError::Custom(6001))
+        ))));
+        assert!(!is_compute_budget_exceeded(&sim_result(None)));
+        assert!(!is_compute_budget_exceeded(
+            &JitoSendTransactionError::ExceededRetries
+        ));
+        assert!(!is_compute_budget_exceeded(
+            &JitoSendTransactionError::TransactionError("TX Error: AccountInUse".to_string())
+        ));
+    }
+
+    #[test]
+    fn detects_compute_budget_exhaustion_from_landed_tx_string() {
+        let err = JitoSendTransactionError::TransactionError(
+            "TX Error: InstructionError(2, ComputationalBudgetExceeded)".to_string(),
+        );
+        assert!(is_compute_budget_exceeded(&err));
+    }
 }

@@ -48,10 +48,17 @@ use stakenet_sdk::{
         helpers::{
             check_stake_accounts, get_unprogressed_validators, DirectedRebalanceProgressionInfo,
         },
-        transactions::{configure_instruction, package_instructions, submit_packaged_transactions},
+        transactions::{
+            configure_instruction, package_instructions, submit_packaged_transactions,
+            MAX_COMPUTE_LIMIT,
+        },
     },
 };
 use validator_history::ValidatorHistory;
+
+use crate::entries::{
+    CU_COMPUTE_DELEGATIONS, CU_COMPUTE_INSTANT_UNSTAKE, CU_EPOCH_MAINTENANCE, CU_IDLE,
+};
 
 pub fn _get_update_stake_pool_ixs(
     program_id: &Pubkey,
@@ -687,8 +694,11 @@ async fn _handle_epoch_maintenance(
             .data(),
         };
 
-        let cu = validator_index_to_remove.map(|_| 1_400_000);
-        let configured_ix = configure_instruction(&[ix], priority_fee, cu, None);
+        // Removing a validator is the expensive, unsampled branch; keep it at the ceiling.
+        let cu = validator_index_to_remove
+            .map(|_| MAX_COMPUTE_LIMIT)
+            .unwrap_or(CU_EPOCH_MAINTENANCE);
+        let configured_ix = configure_instruction(&[ix], priority_fee, Some(cu), None);
 
         let new_stats =
             submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None)
@@ -783,7 +793,8 @@ async fn _handle_compute_delegations(
         data: jito_steward::instruction::ComputeDelegations {}.data(),
     };
 
-    let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
+    let configured_ix =
+        configure_instruction(&[ix], priority_fee, Some(CU_COMPUTE_DELEGATIONS), None);
 
     let stats =
         submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None).await?;
@@ -809,7 +820,7 @@ async fn _handle_idle(
         data: jito_steward::instruction::Idle {}.data(),
     };
 
-    let configured_ix = configure_instruction(&[ix], priority_fee, None, None);
+    let configured_ix = configure_instruction(&[ix], priority_fee, Some(CU_IDLE), None);
 
     let stats =
         submit_packaged_transactions(client, vec![configured_ix], payer, Some(50), None).await?;
@@ -849,7 +860,13 @@ async fn _handle_compute_instant_unstake(
         })
         .collect::<Vec<Instruction>>();
 
-    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+    let txs_to_run = package_instructions(
+        &ixs_to_run,
+        1,
+        priority_fee,
+        Some(CU_COMPUTE_INSTANT_UNSTAKE),
+        None,
+    );
 
     info!(
         "Submitting transactions step=compute_instant_unstake instructions={} transactions={}",
