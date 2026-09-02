@@ -1,12 +1,25 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use kobe_client::client::KobeClient;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::Keypair};
 use stakenet_sdk::models::cluster::Cluster;
 use tokio::sync::Mutex;
+
+/// How `--tx-version` selects a transaction format.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub enum TxVersionArg {
+    /// Use v1 where the cluster has activated `enable_tx_v1`, legacy otherwise.
+    #[default]
+    Auto,
+    /// Always build legacy transactions.
+    Legacy,
+    /// Always build v1 transactions. Fails against a cluster without the
+    /// feature, so it is only useful for testing ahead of activation.
+    V1,
+}
 
 pub struct KeeperConfig {
     pub client: Arc<RpcClient>,
@@ -223,6 +236,13 @@ pub struct Args {
     /// DEBUGGING Don't smart pack instructions - it will be faster, but more expensive
     #[arg(long, env, default_value = "false")]
     pub no_pack: bool,
+
+    /// Transaction format to submit in. `auto` reads the `enable_tx_v1` feature
+    /// gate at startup and uses v1 where the cluster has activated it, which
+    /// packs ~3x more instructions per transaction; `legacy` pins the old
+    /// format regardless.
+    #[arg(long, env, default_value = "auto")]
+    pub tx_version: TxVersionArg,
 
     /// Pay for the creation of new accounts when needed
     #[arg(long, env, default_value = "false")]

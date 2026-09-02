@@ -28,10 +28,14 @@ serde_derive = "1.0.183"
 serde_json = "1.0.102"
 sha2 = "0.10.8"
 solana-account-decoder = "=2.3.3"
+solana-address = "2.7.0"
 solana-bincode = "=2.2.1"
 solana-clap-utils = "=1.8.26"
 solana-client = "=2.3.3"
 solana-gossip = { git = "https://github.com/gzalz/agave", branch = "gzalz/v2.3.3" }
+solana-hash = "4.6.0"
+solana-instruction = "3.5.0"
+solana-message = { version = "4.6.0", features = ["wincode"] }
 solana-metrics = "=2.3.3"
 solana-native-token = "=2.2.2"
 solana-net-utils = "=2.3.3"
@@ -53,7 +57,7 @@ spl-pod = "0.5.1"
 spl-stake-pool = { features = ["no-entrypoint"], version = "2.0.0" }
 spl-token = { version = "4.0", features = ["no-entrypoint"] }
 squads-multisig = { git = "https://github.com/jito-foundation/squads-v4", rev = "8deba5de275904e2336c46188ab3039faecd0537" }
-stakenet-sdk = { path = "sdk", version = "0.1.0" }
+stakenet-sdk = { path = "sdk", version = "0.2.0" }
 thiserror = "1.0.37"
 tokio = { version = "1.47.1", features = ["full"] }
 tower = { version = "0.4.13", features = ["limit", "buffer", "timeout", "load-shed"] }

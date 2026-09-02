@@ -40,14 +40,38 @@ use stakenet_keeper::{
         keeper_operations::{set_flag, KeeperCreates, KeeperOperations},
     },
     state::{
-        keeper_config::{Args, KeeperConfig},
+        keeper_config::{Args, KeeperConfig, TxVersionArg},
         keeper_state::{KeeperFlag, KeeperState},
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
+use stakenet_sdk::utils::transaction_v1::{self, TxVersion};
 use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
+
+/// Picks the transaction format for the rest of the run.
+///
+/// `auto` reads the `enable_tx_v1` feature gate, so the keeper follows a
+/// cluster across activation on the next restart without a config change. If
+/// that read fails the keeper stays on legacy, which every cluster accepts.
+async fn set_tx_version(client: &RpcClient, arg: TxVersionArg) {
+    let version = match arg {
+        TxVersionArg::Legacy => TxVersion::Legacy,
+        TxVersionArg::V1 => TxVersion::V1,
+        TxVersionArg::Auto => match transaction_v1::is_v1_active(client).await {
+            Ok(true) => TxVersion::V1,
+            Ok(false) => TxVersion::Legacy,
+            Err(e) => {
+                warn!("Failed to read enable_tx_v1 feature gate, staying on legacy error={e:?}");
+                TxVersion::Legacy
+            }
+        },
+    };
+
+    transaction_v1::set_tx_version(version);
+    info!("Transaction version selected requested={arg:?} using={version:?}");
+}
 
 fn set_run_flags(args: &Args) -> u32 {
     let mut run_flags = 0;
@@ -416,6 +440,8 @@ fn main() {
             args.json_rpc_url.clone(),
             Duration::from_secs(60),
         ));
+
+        set_tx_version(&client, args.tx_version).await;
 
         let keypair =
             Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));

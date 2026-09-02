@@ -10,7 +10,7 @@ use solana_sdk::{
     pubkey::Pubkey, signature::read_keypair_file, signer::Signer, transaction::Transaction,
 };
 
-use crate::commands::command_args::CrankIdle;
+use crate::{commands::command_args::CrankIdle, utils::transactions::submit_packaged_transactions};
 use stakenet_sdk::utils::{
     accounts::get_all_steward_accounts,
     transactions::{configure_instruction, print_base58_tx},
@@ -72,11 +72,16 @@ pub async fn command_crank_idle(
     if args.transaction_parameters.print_tx {
         print_base58_tx(&configured_ix)
     } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
+        let submit_stats =
+            submit_packaged_transactions(client, vec![configured_ix], &Arc::new(payer), None, None)
+                .await?;
 
-        println!("Signature: {signature}");
+        println!("Submit stats: {submit_stats:?}");
+        // let signature = client
+        //     .send_and_confirm_transaction_with_spinner(&transaction)
+        //     .await?;
+
+        // println!("Signature: {signature}");
     }
 
     Ok(())

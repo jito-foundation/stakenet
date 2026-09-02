@@ -14,7 +14,6 @@ use solana_program::hash::Hash;
 use solana_sdk::bs58;
 use solana_sdk::commitment_config::CommitmentLevel;
 use solana_sdk::compute_budget::ComputeBudgetInstruction;
-use solana_sdk::packet::PACKET_DATA_SIZE;
 use solana_sdk::transaction::TransactionError;
 use solana_sdk::{
     account::Account, commitment_config::CommitmentConfig, instruction::AccountMeta,
@@ -29,6 +28,7 @@ use crate::models::errors::{
     JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError,
 };
 use crate::models::submit_stats::SubmitStats;
+use crate::utils::transaction_v1::{self, TxVersion, V1Transaction};
 
 use std::future::Future;
 
@@ -269,11 +269,17 @@ async fn find_ix_per_tx(
     // additional size per ix
     let size_per_ix =
         instruction.accounts.len() * size_of::<AccountMeta>() + instruction.data.len();
-    let size_max = (PACKET_DATA_SIZE - serialized_size + size_per_ix) / size_per_ix;
+    let size_max =
+        (transaction_v1::max_transaction_size() - serialized_size + size_per_ix) / size_per_ix;
 
     let compute_max = max_cu_per_tx as usize / compute as usize;
 
-    let size = size_max.min(compute_max);
+    // v1 also caps a message at 64 instructions. The 64-address cap is enforced
+    // while chunking, where the addresses actually shared across a group are
+    // known.
+    let size = size_max
+        .min(compute_max)
+        .min(transaction_v1::max_instructions());
 
     Ok(size)
 }
@@ -331,22 +337,70 @@ async fn parallel_confirm_transactions(
     confirmed_signatures
 }
 
+/// A transaction ready to submit, in whichever format the cluster expects.
+enum SignedTx {
+    Legacy(Transaction),
+    V1(V1Transaction),
+}
+
+impl SignedTx {
+    fn signature(&self) -> Signature {
+        match self {
+            Self::Legacy(tx) => tx.signatures[0],
+            Self::V1(tx) => tx.signature(),
+        }
+    }
+
+    async fn send(&self, client: &RpcClient) -> Result<Signature, ClientError> {
+        match self {
+            Self::Legacy(tx) => client.send_transaction(tx).await,
+            Self::V1(tx) => {
+                transaction_v1::send_v1_transaction(
+                    client,
+                    tx,
+                    RpcSendTransactionConfig {
+                        preflight_commitment: Some(client.commitment().commitment),
+                        ..RpcSendTransactionConfig::default()
+                    },
+                )
+                .await
+            }
+        }
+    }
+}
+
 fn sign_txs(
     transactions: &[&[Instruction]],
     signer: &Arc<Keypair>,
     blockhash: Hash,
-) -> Vec<Transaction> {
-    transactions
-        .iter()
-        .map(|instructions| {
-            Transaction::new_signed_with_payer(
-                instructions,
-                Some(&signer.pubkey()),
-                &[signer.as_ref()],
-                blockhash,
-            )
-        })
-        .collect()
+) -> Vec<SignedTx> {
+    let sign_legacy = |instructions: &&[Instruction]| {
+        SignedTx::Legacy(Transaction::new_signed_with_payer(
+            instructions,
+            Some(&signer.pubkey()),
+            &[signer.as_ref()],
+            blockhash,
+        ))
+    };
+
+    match transaction_v1::tx_version() {
+        TxVersion::Legacy => transactions.iter().map(sign_legacy).collect(),
+        TxVersion::V1 => transactions
+            .iter()
+            .map(|instructions| {
+                match transaction_v1::build_v1_transaction(instructions, signer, blockhash) {
+                    Ok(tx) => SignedTx::V1(tx),
+                    Err(e) => {
+                        warn!(
+                            "Falling back to legacy transaction instructions={} error={e}",
+                            instructions.len()
+                        );
+                        sign_legacy(instructions)
+                    }
+                }
+            })
+            .collect(),
+    }
 }
 
 /// Batch size for parallel submission - keeps blockhash fresh between batches
@@ -502,7 +556,7 @@ pub async fn parallel_execute_transactions(
             }
 
             // Future optimization: submit these in parallel batches and refresh blockhash for every batch
-            match client.send_transaction(tx).await {
+            match tx.send(client).await {
                 Ok(signature) => {
                     debug!("Submitted transaction signature={signature}");
                     submitted_signatures.insert(signature, idx);
@@ -515,11 +569,8 @@ pub async fn parallel_execute_transactions(
                             is_blockhash_not_found = true;
                         }
                         Some(TransactionError::AlreadyProcessed) => {
-                            debug!(
-                                "Transaction already processed signature={}",
-                                tx.signatures[0]
-                            );
-                            submitted_signatures.insert(tx.signatures[0], idx);
+                            debug!("Transaction already processed signature={}", tx.signature());
+                            submitted_signatures.insert(tx.signature(), idx);
                         }
                         Some(_) => {
                             match e.kind {
@@ -711,16 +762,82 @@ pub async fn pack_instructions(
     // Convert HashMap to Vec<Vec<&Instruction>>, ensuring each group meets the length requirement
     let mut result: Vec<Vec<Instruction>> = Vec::new();
     for (group_number, group) in grouped_instructions {
-        for chunk in group.chunks(group_number) {
+        for chunk in chunk_group(
+            &group,
+            group_number,
+            transaction_v1::max_addresses(),
+            &signer.pubkey(),
+        ) {
             let mut tx_instructions = Vec::new();
             for instruction in chunk {
-                tx_instructions.push((*instruction).clone());
+                tx_instructions.push(instruction.clone());
             }
             result.push(tx_instructions);
         }
     }
 
     Ok(result)
+}
+
+/// Splits `group` into per-transaction chunks of at most `max_instructions`.
+///
+/// A v1 message also holds at most 64 inline addresses, and that cap binds
+/// before the size does for the instructions the keeper sends — each
+/// `copy_vote_account` contributes two addresses the message has not seen yet.
+/// So chunks close on whichever limit is reached first. Legacy has no address
+/// cap of its own and chunks purely by count.
+fn chunk_group<'a>(
+    group: &[&'a Instruction],
+    max_instructions: usize,
+    max_addresses: usize,
+    payer: &Pubkey,
+) -> Vec<Vec<&'a Instruction>> {
+    let max_instructions = max_instructions.max(1);
+
+    // Legacy reports no address cap, so counting addresses would never close a
+    // chunk early; skip the bookkeeping entirely.
+    if max_addresses == usize::MAX {
+        return group.chunks(max_instructions).map(<[_]>::to_vec).collect();
+    }
+
+    let mut chunks: Vec<Vec<&Instruction>> = Vec::new();
+    let mut chunk: Vec<&Instruction> = Vec::new();
+    // The payer always occupies a slot, whether or not an instruction names it.
+    let mut addresses: HashSet<Pubkey> = HashSet::from([*payer]);
+
+    for instruction in group {
+        let is_full = !chunk.is_empty()
+            && (chunk.len() >= max_instructions
+                || addresses.len() + count_new_addresses(&addresses, instruction) > max_addresses);
+
+        if is_full {
+            chunks.push(std::mem::take(&mut chunk));
+            addresses.clear();
+            addresses.insert(*payer);
+        }
+
+        addresses.extend(instruction.accounts.iter().map(|account| account.pubkey));
+        addresses.insert(instruction.program_id);
+        chunk.push(instruction);
+    }
+
+    if !chunk.is_empty() {
+        chunks.push(chunk);
+    }
+
+    chunks
+}
+
+/// How many addresses `instruction` adds to a message that already holds `seen`.
+fn count_new_addresses(seen: &HashSet<Pubkey>, instruction: &Instruction) -> usize {
+    instruction
+        .accounts
+        .iter()
+        .map(|account| account.pubkey)
+        .chain(std::iter::once(instruction.program_id))
+        .filter(|address| !seen.contains(address))
+        .collect::<HashSet<_>>()
+        .len()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1057,4 +1174,109 @@ pub fn print_base58_tx(ixs: &[Instruction]) {
         let base58_string = bs58::encode(&ix.data).into_string();
         println!("{base58_string}\n");
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Shaped like `copy_vote_account`: a shared program and signer, plus two
+    /// accounts the message has not seen before.
+    fn copy_vote_account_like(program_id: Pubkey, signer: Pubkey) -> Instruction {
+        Instruction {
+            program_id,
+            accounts: vec![
+                AccountMeta::new(Pubkey::new_unique(), false),
+                AccountMeta::new_readonly(Pubkey::new_unique(), false),
+                AccountMeta::new(signer, true),
+            ],
+            data: vec![0; 8],
+        }
+    }
+
+    fn group_of(count: usize, program_id: Pubkey, signer: Pubkey) -> Vec<Instruction> {
+        (0..count)
+            .map(|_| copy_vote_account_like(program_id, signer))
+            .collect()
+    }
+
+    #[test]
+    fn chunking_closes_on_the_address_cap_before_the_instruction_count() {
+        let (program_id, signer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let instructions = group_of(70, program_id, signer);
+        let group = instructions.iter().collect::<Vec<_>>();
+
+        // The payer and the program id take two of the 64 slots, and each
+        // instruction claims two more, so 31 fit.
+        let chunks = chunk_group(&group, 64, 64, &signer);
+
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), [31, 31, 8]);
+        assert_eq!(
+            chunks.iter().map(Vec::len).sum::<usize>(),
+            70,
+            "no instruction is dropped"
+        );
+    }
+
+    #[test]
+    fn every_chunk_stays_within_the_address_cap() {
+        let (program_id, signer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let instructions = group_of(70, program_id, signer);
+        let group = instructions.iter().collect::<Vec<_>>();
+
+        for chunk in chunk_group(&group, 64, 64, &signer) {
+            let mut addresses = HashSet::from([signer]);
+            for instruction in chunk {
+                addresses.extend(instruction.accounts.iter().map(|account| account.pubkey));
+                addresses.insert(instruction.program_id);
+            }
+            assert!(
+                addresses.len() <= 64,
+                "chunk held {} addresses",
+                addresses.len()
+            );
+        }
+    }
+
+    #[test]
+    fn a_tighter_instruction_count_still_wins() {
+        let (program_id, signer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let instructions = group_of(25, program_id, signer);
+        let group = instructions.iter().collect::<Vec<_>>();
+
+        let chunks = chunk_group(&group, 10, 64, &signer);
+
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), [10, 10, 5]);
+    }
+
+    #[test]
+    fn legacy_chunks_purely_by_count() {
+        let (program_id, signer) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let instructions = group_of(25, program_id, signer);
+        let group = instructions.iter().collect::<Vec<_>>();
+
+        let chunks = chunk_group(&group, 9, usize::MAX, &signer);
+
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), [9, 9, 7]);
+    }
+
+    #[test]
+    fn an_instruction_wider_than_the_cap_still_gets_its_own_chunk() {
+        let signer = Pubkey::new_unique();
+        let wide = Instruction {
+            program_id: Pubkey::new_unique(),
+            accounts: (0..70)
+                .map(|_| AccountMeta::new(Pubkey::new_unique(), false))
+                .collect(),
+            data: vec![],
+        };
+        let instructions = [wide.clone(), wide];
+        let group = instructions.iter().collect::<Vec<_>>();
+
+        // Neither fits, but chunking must not loop or drop them: signing reports
+        // the real failure.
+        let chunks = chunk_group(&group, 64, 64, &signer);
+
+        assert_eq!(chunks.iter().map(Vec::len).collect::<Vec<_>>(), [1, 1]);
+    }
 }

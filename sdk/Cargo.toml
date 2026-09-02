@@ -1,6 +1,6 @@
 [package]
 name = "stakenet-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "SDK for Stakenet"
 edition = "2021"
 license = "Apache-2.0"
@@ -21,8 +21,13 @@ jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
 jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
 kobe-client = { workspace = true }
 log = "0.4.18"
+serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
+solana-address = { workspace = true }
 solana-client = { workspace = true }
+solana-hash = { workspace = true }
+solana-instruction = { workspace = true }
+solana-message = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
@@ -33,3 +38,10 @@ spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }
+
+[dev-dependencies]
+# Cross-checks the hand-assembled v1 wire bytes against upstream's own
+# serializer, so the layout cannot silently drift from the format the RPC reads.
+solana-signature = "3.4.1"
+solana-transaction = { version = "4.1.6", features = ["wincode"] }
+wincode = "0.6"
