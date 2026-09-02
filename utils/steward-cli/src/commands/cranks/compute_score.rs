@@ -39,17 +39,17 @@ pub async fn command_crank_compute_score(
                 .progress
                 .get(validator_index as usize)
                 .expect("Index is not in progress bitmask");
-            // if has_been_scored {
-            //     None
-            // } else {
-            let vote_account = steward_accounts.validator_list_account.validators
-                [validator_index as usize]
-                .vote_account_address;
-            let history_account =
-                get_validator_history_address(&vote_account, &validator_history_program_id);
+            if has_been_scored {
+                None
+            } else {
+                let vote_account = steward_accounts.validator_list_account.validators
+                    [validator_index as usize]
+                    .vote_account_address;
+                let history_account =
+                    get_validator_history_address(&vote_account, &validator_history_program_id);
 
-            Some((validator_index as usize, vote_account, history_account))
-            // }
+                Some((validator_index as usize, vote_account, history_account))
+            }
         })
         .collect::<Vec<(usize, Pubkey, Pubkey)>>();
 
