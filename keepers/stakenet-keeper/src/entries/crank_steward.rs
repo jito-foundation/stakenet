@@ -643,22 +643,34 @@ async fn _handle_epoch_maintenance(
 ) -> Result<SubmitStats, JitoTransactionError> {
     let mut current_epoch = epoch;
     let mut state_epoch = all_steward_accounts.state_account.state.current_epoch;
-    let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators;
+    let mut num_validators = all_steward_accounts.state_account.state.num_pool_validators
+        + all_steward_accounts.state_account.state.validators_added as u64;
     let mut validators_to_remove = all_steward_accounts
         .state_account
         .state
         .validators_to_remove;
+    let mut validators_for_immediate_removal = all_steward_accounts
+        .state_account
+        .state
+        .validators_for_immediate_removal;
 
     let mut stats = SubmitStats::default();
 
     while state_epoch != current_epoch {
         let mut validator_index_to_remove = None;
         for i in 0..num_validators {
-            if validators_to_remove.get(i as usize).map_err(|e| {
+            let index = i as usize;
+            let marked = validators_to_remove.get(index).map_err(|e| {
                 JitoTransactionError::Custom(format!(
                     "Error fetching bitmask index for removed validator: {i}/{num_validators} - {e}"
                 ))
-            })? {
+            })? || validators_for_immediate_removal.get(index).map_err(|e| {
+                JitoTransactionError::Custom(format!(
+                    "Error fetching bitmask index for immediately removed validator: {i}/{num_validators} - {e}"
+                ))
+            })?;
+
+            if marked {
                 validator_index_to_remove = Some(i);
                 break;
             }
@@ -707,14 +719,23 @@ async fn _handle_epoch_maintenance(
                 .await
                 .unwrap();
 
-        num_validators = updated_state_account.state.num_pool_validators;
+        num_validators = updated_state_account.state.num_pool_validators
+            + updated_state_account.state.validators_added as u64;
         validators_to_remove = updated_state_account.state.validators_to_remove;
+        validators_for_immediate_removal =
+            updated_state_account.state.validators_for_immediate_removal;
         state_epoch = updated_state_account.state.current_epoch;
         current_epoch = client.get_epoch_info().await?.epoch;
 
         info!(
             "Epoch maintenance progressed state_epoch={state_epoch} current_epoch={current_epoch}"
         );
+
+        if validator_index_to_remove.is_none() && state_epoch != current_epoch {
+            return Err(JitoTransactionError::Custom(format!(
+                "Epoch maintenance did not advance the epoch and nothing is marked for removal: state_epoch={state_epoch} current_epoch={current_epoch}"
+            )));
+        }
     }
 
     Ok(stats)
