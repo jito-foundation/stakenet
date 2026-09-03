@@ -600,10 +600,16 @@ async fn _handle_delinquent_validators(
                 .all_stake_account_map
                 .get(vote_account)
                 .and_then(|stake_account| stake_account.as_ref());
-            if !matches!(raw_stake_account, Some(stake_account) if stake_account.owner == stake::program::id())
-            {
+            let has_valid_stake_account = match raw_stake_account {
+                Some(stake_account) if stake_account.owner == stake::program::id() => matches!(
+                    StakeStateV2::deserialize(&mut stake_account.data.as_slice()),
+                    Ok(StakeStateV2::Stake(..))
+                ),
+                _ => false,
+            };
+            if !has_valid_stake_account {
                 error!(
-                    "Cannot auto remove validator without a stake account vote_account={vote_account} stake_account={stake_address}"
+                    "Cannot auto remove validator without a delegated stake account vote_account={vote_account} stake_account={stake_address}"
                 );
                 return None;
             }
