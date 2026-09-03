@@ -596,6 +596,18 @@ async fn _handle_delinquent_validators(
             let stake_address =
                 get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
+            let raw_stake_account = all_steward_validator_accounts
+                .all_stake_account_map
+                .get(vote_account)
+                .and_then(|stake_account| stake_account.as_ref());
+            if !matches!(raw_stake_account, Some(stake_account) if stake_account.owner == stake::program::id())
+            {
+                error!(
+                    "Cannot auto remove validator without a stake account vote_account={vote_account} stake_account={stake_address}"
+                );
+                return None;
+            }
+
             let transient_stake_address = get_transient_stake_address(
                 vote_account,
                 &all_steward_accounts.stake_pool_address,

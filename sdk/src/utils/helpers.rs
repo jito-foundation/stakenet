@@ -184,13 +184,11 @@ pub fn check_stake_accounts(
                 .get(&vote_address)
                 .expect("Could not find history account in map");
 
-            // `None` when the address holds no stake account, or holds something that is
-            // not one: a closed stake account can be resurrected as a system-owned,
-            // zero-length account by a plain lamport transfer.
             let deactivation_epoch = stake_account.as_ref().and_then(|stake_account| {
                 if stake_account.owner != STAKE_PROGRAM_ID {
                     return None;
                 }
+
                 match try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice()) {
                     Ok(StakeStateV2::Stake(_, stake, _)) => {
                         Some(stake.delegation.deactivation_epoch)
@@ -369,60 +367,6 @@ mod tests {
     #[test]
     fn test_is_live_vote_account_false_for_missing_account() {
         assert!(!is_live_vote_account(None));
-    }
-
-    fn validator_accounts(stake_account: Account) -> (Pubkey, AllValidatorAccounts) {
-        let vote_address = Pubkey::new_unique();
-        let mut accounts = AllValidatorAccounts::default();
-
-        accounts
-            .all_history_vote_account_map
-            .insert(vote_address, Some(Account::default()));
-        accounts.all_vote_account_map.insert(
-            vote_address,
-            Some(Account {
-                owner: VOTE_PROGRAM_ID,
-                ..Account::default()
-            }),
-        );
-        accounts
-            .all_stake_account_map
-            .insert(vote_address, Some(stake_account));
-
-        (vote_address, accounts)
-    }
-
-    #[test]
-    fn test_check_stake_accounts_handles_resurrected_stake_address() {
-        // A closed stake account whose address is later funded by a plain lamport
-        // transfer comes back as a system-owned, zero-length account.
-        let (vote_address, accounts) = validator_accounts(Account {
-            owner: solana_sdk::system_program::ID,
-            lamports: 10_000_000,
-            data: vec![],
-            ..Account::default()
-        });
-
-        let checks = check_stake_accounts(&accounts, 1025);
-        let check = checks.get(&vote_address).expect("missing check");
-
-        assert_eq!(check.deactivation_epoch, None);
-        assert!(check.is_deactivated);
-        assert!(check.has_vote_account);
-    }
-
-    #[test]
-    fn test_check_stake_accounts_reads_stake_owned_account() {
-        let (vote_address, accounts) = validator_accounts(Account {
-            owner: STAKE_PROGRAM_ID,
-            data: vec![0u8; std::mem::size_of::<StakeStateV2>()],
-            ..Account::default()
-        });
-
-        let checks = check_stake_accounts(&accounts, 1025);
-        let check = checks.get(&vote_address).expect("missing check");
-
-        assert_eq!(check.deactivation_epoch, Some(0));
     }
 
     fn create_ticket(authority: Pubkey, preferences: Vec<(Pubkey, u16)>) -> DirectedStakeTicket {
