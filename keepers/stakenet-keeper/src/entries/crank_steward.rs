@@ -115,19 +115,24 @@ pub fn _get_update_stake_pool_ixs(
             .get(&validator_info.vote_account_address)
             .expect("Vote account not found");
 
-        if raw_vote_account.is_none() {
+        let Some(raw_vote_account) = raw_vote_account else {
             return false;
-        }
+        };
 
         let vote_pubkey =
             SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
-        let vote_account =
-            VoteStateV4::deserialize(&raw_vote_account.clone().unwrap().data, &vote_pubkey)
-                .expect("Could not deserialize vote account");
+        let vote_account = match VoteStateV4::deserialize(&raw_vote_account.data, &vote_pubkey) {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Failed to deserialize vote account vote_account={vote_pubkey}: {e:?}");
+                return false;
+            }
+        };
 
-        let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
-
-        latest_epoch == epoch || latest_epoch == epoch - 1
+        match vote_account.epoch_credits.iter().last() {
+            Some(entry) => entry.0 == epoch || entry.0 == epoch - 1,
+            None => false,
+        }
     });
 
     for validator_info in validator_list.validators.iter() {
@@ -141,12 +146,31 @@ pub fn _get_update_stake_pool_ixs(
             .get(&validator_info.vote_account_address)
             .expect("Stake account not found");
 
+        let raw_stake_account = raw_stake_account.as_ref().filter(|stake_account| {
+            let is_stake_account = stake_account.owner == stake::program::id();
+            if !is_stake_account {
+                error!(
+                    "Stake account is not owned by the stake program vote_account={} owner={}",
+                    validator_info.vote_account_address, stake_account.owner
+                );
+            }
+            is_stake_account
+        });
+
         let should_deactivate = match (raw_vote_account, raw_stake_account) {
             (None, Some(_)) => true,
             (Some(raw_vote_account), Some(raw_stake_account)) => {
                 let stake_account =
-                    StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice())
-                        .expect("Could not deserialize stake account");
+                    match StakeStateV2::deserialize(&mut raw_stake_account.data.as_slice()) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!(
+                                "Failed to deserialize stake account vote_account={}: {e:?}",
+                                validator_info.vote_account_address
+                            );
+                            continue;
+                        }
+                    };
 
                 let vote_pubkey =
                     SolanaPubkey::new_from_array(validator_info.vote_account_address.to_bytes());
