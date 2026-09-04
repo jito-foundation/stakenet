@@ -12,6 +12,7 @@ use crate::models::{
 };
 use solana_program::borsh1::try_from_slice_unchecked;
 use solana_program::vote::program::ID as VOTE_PROGRAM_ID;
+use solana_sdk::stake::program::ID as STAKE_PROGRAM_ID;
 
 use super::accounts::get_validator_history_address;
 
@@ -183,14 +184,17 @@ pub fn check_stake_accounts(
                 .get(&vote_address)
                 .expect("Could not find history account in map");
 
-            let deactivation_epoch = stake_account.as_ref().map(|stake_account| {
-                // This code will only run if stake_account is Some
-                let stake_state =
-                    try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice())
-                        .expect("Could not parse stake state");
-                match stake_state {
-                    StakeStateV2::Stake(_, stake, _) => stake.delegation.deactivation_epoch,
-                    _ => 0,
+            let deactivation_epoch = stake_account.as_ref().and_then(|stake_account| {
+                if stake_account.owner != STAKE_PROGRAM_ID {
+                    return None;
+                }
+
+                match try_from_slice_unchecked::<StakeStateV2>(stake_account.data.as_slice()) {
+                    Ok(StakeStateV2::Stake(_, stake, _)) => {
+                        Some(stake.delegation.deactivation_epoch)
+                    }
+                    Ok(_) => Some(0),
+                    Err(_) => None,
                 }
             });
 
