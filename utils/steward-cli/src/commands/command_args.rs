@@ -46,6 +46,7 @@ use crate::commands::{
         view_directed_stake_ticket::ViewDirectedStakeTicket,
     },
     init::{
+        init_directed_stake_ticket::InitDirectedStakeTicket,
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
     },
@@ -960,29 +961,6 @@ pub struct InitDirectedStakeMeta {
     /// Authority keypair path, also used as payer
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
-
-    #[command(flatten)]
-    pub transaction_parameters: TransactionParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "Initialize DirectedStakeTicket account")]
-pub struct InitDirectedStakeTicket {
-    /// Steward config account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// Authority keypair path, also used as payer
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
-
-    /// Ticket update authority pubkey
-    #[arg(long, env)]
-    pub ticket_update_authority: Pubkey,
-
-    /// Whether the ticket holder is a protocol (default: false)
-    #[arg(long, env, default_value = "false")]
-    pub ticket_holder_is_protocol: bool,
 
     #[command(flatten)]
     pub transaction_parameters: TransactionParameters,

@@ -1,12 +1,13 @@
 //! Copies the Jito BAM client status for each validator
 //! into their respective ValidatorHistory accounts.
 //!
-//! This operation queries the Kobe API to determine which validators are registered
-//! BAM clients, then writes a boolean flag (`is_bam_connected`) to each validator's
-//! on-chain history entry for the current epoch.
+//! This operation queries the Kobe API for validator stats from the previous epoch and
+//! marks a validator as BAM-connected when its reported `bam_connection_rate` meets the
+//! configured `min_bam_connection_rate` threshold, then writes a boolean flag
+//! (`is_bam_connected`) to each validator's on-chain history entry for that epoch.
 //!
-//! The operation runs at 30%, 60%, and 90% epoch completion to ensure BAM connection
-//! data is captured, spaced out to avoid missing all runs if the keeper is down late in the epoch.
+//! The operation runs once at 10% epoch completion, timed to avoid missing the run
+//! entirely if the keeper is down late in the epoch.
 
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 
@@ -89,12 +90,10 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
 
     /// Returns `true` when the operation should execute.
     ///
-    /// Runs up to 3 times per epoch at 30%, 60%, and 90% slot completion.
-    /// Spaced out to avoid missing all runs if the keeper is down late in the epoch.
+    /// Runs once per epoch after 10% slot completion.
+    /// Timed to avoid missing the run entirely if the keeper is down late in the epoch.
     fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
-        (epoch_info.slot_index > epoch_info.slots_in_epoch * 30 / 100 && runs_for_epoch < 1)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 60 / 100 && runs_for_epoch < 2)
-            || (epoch_info.slot_index > epoch_info.slots_in_epoch * 90 / 100 && runs_for_epoch < 3)
+        epoch_info.slot_index > epoch_info.slots_in_epoch * 10 / 100 && runs_for_epoch < 1
     }
 
     /// Entry point for the operation. Checks whether the operation should run,
@@ -142,6 +141,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
     /// for all validators
     async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
         let epoch_info = &self.keeper_state.epoch_info;
+        let last_epoch = epoch_info.epoch.saturating_sub(1);
         let validator_history_map = &self.keeper_state.validator_history_map;
         let candidates: Vec<Pubkey> = validator_history_map.keys().copied().collect();
 
@@ -165,17 +165,26 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
             .filter(|pubkey| live_vote_accounts.contains(pubkey))
             .collect();
 
-        let bam_validators = self
+        let validators = self
             .keeper_config
             .kobe_client
-            .get_bam_validators(epoch_info.epoch)
+            .get_validators(Some(last_epoch))
             .await
             .map_err(|e| JitoTransactionError::Custom(e.to_string()))?
-            .bam_validators;
+            .validators;
 
-        let bam_vote_accounts: HashSet<Pubkey> = bam_validators
+        let bam_vote_accounts: HashSet<Pubkey> = validators
             .iter()
-            .filter_map(|bam_v| Pubkey::from_str(&bam_v.vote_account).ok())
+            .filter_map(|bam_v| {
+                let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
+                let connection_rate = bam_v.bam_connection_rate?;
+
+                if connection_rate >= self.keeper_config.min_bam_connection_rate {
+                    return Some(vote_account);
+                }
+
+                None
+            })
             .collect();
 
         let update_instructions = entries_to_update
@@ -187,7 +196,7 @@ impl<'a> CopyIsBamConnectedOperation<'a> {
                     *vote_account,
                     &self.program_id,
                     &self.oracle_authority_keypair.pubkey(),
-                    epoch_info.epoch,
+                    last_epoch,
                     is_bam_connected,
                 )
                 .update_instruction()

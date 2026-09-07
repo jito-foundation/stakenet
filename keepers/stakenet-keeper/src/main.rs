@@ -1,8 +1,28 @@
-/*
-This program starts several threads to manage the creation of validator history accounts,
-and the updating of the various data feeds within the accounts.
-It will emits metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
-*/
+//* This program starts several threads to manage the creation of validator history accounts,
+//* and the updating of the various data feeds within the accounts.
+//* It will emit metrics for each data feed, if env var SOLANA_METRICS_CONFIG is set to a valid influx server.
+//*
+//* The main loop fires operations on fixed tick intervals (see `should_fire`/`should_update`), but
+//* WHEN within an epoch each operation actually does work is decided by per-operation gating, NOT by
+//* this loop. There are three patterns:
+//*
+//*  1. Epoch-progress gated in the keeper (each op's `_should_run` checks epoch_info.slot_index):
+//*       ~0% / 50% / 90%  vote_account, cluster_history, stake_upload, gossip_upload (3 runs/epoch)
+//*       10%              copy_is_bam_connected (1 run/epoch)
+//*
+//*  2. Steward — the keeper is purely reactive and just cranks whatever state the on-chain state
+//*     machine is currently in. The epoch-progress timeline is governed by the steward `Parameters`
+//*     (config-driven; defaults shown), not by this loop:
+//*       0% ──────────────► 50% ──────────────────► 90% ────────────────► 100%
+//*       RebalanceDirected   ComputeScores            ComputeInstantUnstake
+//*       (until ~50%, then   → ComputeDelegations      → Rebalance
+//*        forced to Idle at  (compute_score_           (instant_unstake_
+//*        compute_score_      epoch_progress = 0.5)     epoch_progress = 0.9)
+//*        epoch_progress)
+//*
+//*  3. No epoch gate — run on every tick their interval fires (`_should_run` returns `true`):
+//*       mev_commission, mev_earned, priority_fee_commission, block_metadata, metrics_emit
+
 use clap::Parser;
 use dotenvy::dotenv;
 use kobe_client::client_builder::KobeApiClientBuilder;
@@ -103,7 +123,7 @@ async fn random_cooldown(range: u8) {
     let mut rng = rand::thread_rng();
     let sleep_duration = rng.gen_range(0..=60 * (range as u64 + 1));
 
-    info!("\n\n⏰ Cooldown for {sleep_duration} seconds\n");
+    info!("Cooldown before next fire seconds={sleep_duration}");
     sleep(Duration::from_secs(sleep_duration)).await;
 }
 
@@ -137,7 +157,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         // The fetch ( update ) functions fetch everything we need for the operations from the blockchain
         // Additionally, this function will update the keeper state. If update fails - it will skip the fire functions.
         if should_update(tick, &intervals) {
-            info!("Pre-fetching data for update...({tick})");
+            debug!("Pre-fetching update data tick={tick}");
             match pre_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PreCreateUpdate);
@@ -154,7 +174,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             }
 
             if keeper_config.pay_for_new_accounts {
-                info!("Creating missing accounts...({tick})");
+                debug!("Creating missing accounts tick={tick}");
                 match create_missing_accounts(&keeper_config, &keeper_state).await {
                     Ok(new_accounts_created) => {
                         keeper_state.increment_update_run_for_epoch(
@@ -190,7 +210,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 }
             }
 
-            info!("Post-fetching data for update...({tick})");
+            debug!("Post-fetching update data tick={tick}");
             match post_create_update(&keeper_config, &mut keeper_state).await {
                 Ok(_) => {
                     keeper_state.increment_update_run_for_epoch(KeeperOperations::PostCreateUpdate);
@@ -211,30 +231,28 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // VALIDATOR HISTORY
         if should_fire(tick, validator_history_interval) {
-            info!("Firing operations...");
-
-            info!("Updating cluster history...");
+            debug!("Running operation operation=cluster_history");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::cluster_history::fire(&keeper_config, &keeper_state).await,
             );
 
-            info!("Updating copy vote accounts...");
+            debug!("Running operation operation=vote_account");
             keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::vote_account::fire(&keeper_config, &keeper_state).await,
             );
 
-            info!("Updating mev commission...");
+            debug!("Running operation operation=mev_commission");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::mev_commission::fire(&keeper_config, &keeper_state).await,
             );
 
-            info!("Updating mev earned...");
+            debug!("Running operation operation=mev_earned");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::mev_earned::fire(&keeper_config, &keeper_state).await,
             );
 
             if keeper_config.oracle_authority_keypair.is_some() {
-                info!("Updating stake accounts...");
+                debug!("Running operation operation=stake_upload");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
                     operations::stake_upload::fire(&keeper_config, &keeper_state).await,
                 );
@@ -243,19 +261,19 @@ async fn run_keeper(keeper_config: KeeperConfig) {
             if keeper_config.oracle_authority_keypair.is_some()
                 && keeper_config.gossip_entrypoints.is_some()
             {
-                info!("Updating gossip accounts...");
+                debug!("Running operation operation=gossip_upload");
                 keeper_state.set_runs_errors_and_txs_for_epoch(
                     operations::gossip_upload::fire(&keeper_config, &keeper_state).await,
                 );
             }
 
-            info!("Updating priority fee commission...");
+            debug!("Running operation operation=priority_fee_commission");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::priority_fee_commission::fire(&keeper_config, &keeper_state).await,
             );
 
             if keeper_config.oracle_authority_keypair.is_some() {
-                info!("Copying is jito bam client...");
+                debug!("Running operation operation=copy_is_bam_connected");
                 let copy_is_bam_connected_op =
                     CopyIsBamConnectedOperation::new(&keeper_config, &keeper_state);
                 keeper_state
@@ -269,7 +287,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 
         // STEWARD
         if should_fire(tick, steward_interval) {
-            info!("Cranking Steward...");
+            debug!("Running operation operation=steward");
             keeper_state.set_runs_errors_txs_and_flags_for_epoch(
                 operations::steward::fire(&keeper_config, &keeper_state).await,
             );
@@ -285,7 +303,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                 .priority_fee_oracle_authority_keypair
                 .is_some()
         {
-            info!("Updating priority fee block metadata...");
+            debug!("Running operation operation=block_metadata");
             keeper_state.set_runs_errors_and_txs_for_epoch(
                 operations::block_metadata::operations::fire(&keeper_config, &keeper_state).await,
             );
@@ -305,7 +323,7 @@ async fn run_keeper(keeper_config: KeeperConfig) {
         }
 
         if should_emit(tick, &intervals) {
-            info!("Emitting metrics...");
+            debug!("Emitting keeper state metrics");
             keeper_state.emit();
 
             KeeperOperations::emit(
@@ -332,16 +350,21 @@ async fn run_keeper(keeper_config: KeeperConfig) {
 }
 
 fn main() {
-    info!("\n👋 Welcome to the Jito Stakenet Keeper!\n\n");
-
     dotenv().ok();
     env_logger::init();
+
+    info!("Starting Jito Stakenet Keeper");
+
     let args = Args::parse();
 
     let flag_args = Args::parse();
     let run_flags = set_run_flags(&flag_args);
 
-    info!("{args}\n\n");
+    // Log the config one line at a time so every line carries a level and
+    // timestamp when shipped to a log aggregator
+    for line in args.to_string().lines() {
+        info!("{line}");
+    }
 
     let gossip_entrypoints =
         args.gossip_entrypoints
@@ -465,6 +488,7 @@ fn main() {
             validator_history_min_stake: args.validator_history_min_stake,
             kobe_client,
             coinbase_vote_pubkey: args.coinbase_vote_pubkey,
+            min_bam_connection_rate: args.min_bam_connection_rate,
         };
 
         run_keeper(config).await;

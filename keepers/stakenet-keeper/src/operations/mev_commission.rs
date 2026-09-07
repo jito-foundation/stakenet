@@ -89,7 +89,7 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                for message in stats.results.iter().chain(stats.results.iter()) {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!("vote-account-error", ("error", e.to_string(), String),);
                         errors_for_epoch += 1;

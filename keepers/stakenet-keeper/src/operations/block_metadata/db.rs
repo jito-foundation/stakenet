@@ -1,5 +1,5 @@
 use anchor_lang::prelude::EpochSchedule;
-use log::{error, info};
+use log::{debug, info, warn};
 use rand::Rng;
 use reqwest;
 use rusqlite::{params, Connection};
@@ -171,7 +171,6 @@ impl DBSlotInfo {
                     )?;
                 }
 
-                // info!("Wrote {} Leaders", write_counter);
                 transaction.commit()?;
                 transaction = connection.transaction()?;
             }
@@ -216,7 +215,6 @@ impl DBSlotInfo {
             }
             transaction.commit()?;
             transaction = connection.transaction()?;
-            info!("Wrote {write_counter} Mappings");
         }
 
         Ok(write_counter)
@@ -376,7 +374,7 @@ impl DBSlotInfo {
         }
 
         info!(
-            "Found {} slots that need updating",
+            "Found slots needing block data count={}",
             slots_needing_update.len()
         );
         Ok(slots_needing_update)
@@ -467,14 +465,20 @@ impl DBSlotInfo {
             let vote_key_string = match slot_info.vote_key {
                 Some(vote_key) => vote_key,
                 None => {
-                    error!("No vote key - skipping");
+                    warn!(
+                        "Skipping slot with missing vote key slot={} identity={}",
+                        slot_info.absolute_slot, slot_info.identity_key
+                    );
                     continue;
                 }
             };
             let vote_key = match Pubkey::from_str(&vote_key_string) {
                 Ok(vote_key) => vote_key,
                 Err(_) => {
-                    error!("Could not parse vote key - skipping");
+                    warn!(
+                        "Skipping slot with invalid vote key slot={} vote_key={vote_key_string}",
+                        slot_info.absolute_slot
+                    );
                     continue;
                 }
             };
@@ -502,7 +506,10 @@ impl DBSlotInfo {
                 }
                 DBSlotInfoState::Error => {
                     entry.blocks_error += 1;
-                    info!("Block Error {:?}", slot_info.error_string);
+                    debug!(
+                        "Block error recorded slot={} error={:?}",
+                        slot_info.absolute_slot, slot_info.error_string
+                    );
                 }
             }
 
@@ -541,13 +548,13 @@ impl DBSlotInfo {
         let mut offset = starting_offset;
         let mut has_more = true;
 
-        info!("Starting Dune API fetch for query {query_id}");
+        info!("Starting Dune API fetch query_id={query_id}");
 
         while has_more {
             // Build URL with pagination
             let url = format!("{base_url}?limit={batch_size}&offset={offset}");
 
-            info!("Fetching batch from Dune API, offset: {offset}");
+            debug!("Fetching Dune API batch offset={offset}");
 
             // Make API request
             let response = client
@@ -606,7 +613,7 @@ impl DBSlotInfo {
                 total_written += written;
 
                 info!(
-                    "Wrote {} entries for slots {}-{} (epoch {})",
+                    "Wrote Dune entries count={} slots={}-{} epoch={}",
                     written,
                     slots_start,
                     slots_end,
@@ -622,7 +629,7 @@ impl DBSlotInfo {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        info!("Completed Dune API fetch. Total entries written: {total_written}");
+        info!("Completed Dune API fetch total_written={total_written}");
         Ok(total_written)
     }
 

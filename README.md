@@ -88,6 +88,31 @@ For detailed information on using the Validator History CLI, see the [CLI docume
 For detailed information on using the Jito Steward CLI, see the [CLI documentation](https://www.jito.network/docs/stakenet/jito-steward/developers/cli/).
 
 
+## Agent Guides
+
+[`agent-guides/`](./agent-guides/) holds reference documents written to be consumed by an AI agent,
+so a validator operator can answer StakeNet questions with their own tooling.
+
+The first pair covers the question we get asked most: **"when will my validator receive JitoSOL
+stake?"**
+
+| File | Purpose |
+| :- | :- |
+| [`jitosol-stake-timing-reference.md`](./agent-guides/jitosol-stake-timing-reference.md) | How delegation timing works, which accounts hold the data, how to compute each quantity, and what an agent must not claim |
+| [`jitosol-stake-timing-prompt.md`](./agent-guides/jitosol-stake-timing-prompt.md) | A copy-paste prompt, with a worked example of a good answer |
+
+**To use them:** give both files to any agent that can run shell commands (Claude Code, Codex,
+Cursor, …), fill in your vote account and an RPC endpoint in the prompt, and run it. A private RPC is
+strongly preferred — these reads touch a lot of accounts.
+
+The eligibility and queue-position half of the answer is deterministic and comes straight off the
+chain. The timing half is not: deposit and withdrawal flow, other validators' commission and
+performance decisions, and the per-cycle re-scoring all move delegations and none are predictable.
+The reference is explicit that an agent following it must refuse to give a date and must say why —
+**nothing in these guides constitutes a guarantee of stake.** See
+[`agent-guides/README.md`](./agent-guides/README.md) for the reasoning and for the self-checks an
+agent has to pass before reporting any figure.
+
 ## Audits
 
 | Program | Date | Commit |

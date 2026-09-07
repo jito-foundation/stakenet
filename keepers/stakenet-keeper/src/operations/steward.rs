@@ -169,7 +169,7 @@ pub async fn run_crank_steward(
     {
         if let Some(steward_accounts) = &keeper_state.all_steward_accounts {
             if let Some(keypair) = &keeper_config.directed_stake_oracle_authority_keypair {
-                log::info!("Cranking Copy Directed Targets...");
+                log::info!("Cranking copy directed stake targets");
 
                 let stats = crank_copy_directed_stake_targets(
                     keeper_config,

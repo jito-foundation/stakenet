@@ -32,7 +32,6 @@ use jito_steward::DirectedStakeTicket;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
-    transaction::Transaction,
 };
 use stakenet_sdk::utils::{
     accounts::{get_all_steward_accounts, get_directed_stake_meta, get_directed_stake_tickets},
@@ -42,7 +41,7 @@ use stakenet_sdk::utils::{
 
 use crate::{
     commands::command_args::PermissionedParameters,
-    utils::transactions::{configure_instruction, maybe_print_tx},
+    utils::transactions::{maybe_print_tx, package_instructions, submit_packaged_transactions},
 };
 
 #[derive(Parser)]
@@ -181,24 +180,8 @@ pub async fn command_crank_compute_directed_stake_meta(
     .await
     .map_err(|e| anyhow!(e.to_string()))?;
 
-    let configured_ix = configure_instruction(
-        &ixs,
-        args.permissioned_parameters
-            .transaction_parameters
-            .priority_fee,
-        args.permissioned_parameters
-            .transaction_parameters
-            .compute_limit,
-        args.permissioned_parameters
-            .transaction_parameters
-            .heap_size,
-    );
-
     // If we are printing, do so and return early without requiring the authority keypair
-    if maybe_print_tx(
-        &configured_ix,
-        &args.permissioned_parameters.transaction_parameters,
-    ) {
+    if maybe_print_tx(&ixs, &args.permissioned_parameters.transaction_parameters) {
         return Ok(());
     }
 
@@ -206,21 +189,14 @@ pub async fn command_crank_compute_directed_stake_meta(
     let authority = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
         .map_err(|e| anyhow!("Failed to read keypair file: {e}"))?;
 
-    let blockhash = client.get_latest_blockhash().await?;
+    let txs_to_run = package_instructions(&ixs, 2, None, None, None);
 
-    let transaction = Transaction::new_signed_with_payer(
-        &configured_ix,
-        Some(&authority.pubkey()),
-        &[&authority],
-        blockhash,
-    );
+    println!("Submitting {} instructions", ixs.len());
+    println!("Submitting {} transactions", txs_to_run.len());
 
-    let signature = client
-        .send_and_confirm_transaction_with_spinner(&transaction)
-        .await?;
+    submit_packaged_transactions(client, txs_to_run, &Arc::new(authority), None, None).await?;
 
     println!("\n=== Transaction Successful ===");
-    println!("Signature: {signature}");
     println!("Updated metadata:");
     println!("  - {num_tickets} tickets processed");
     println!("  - {tickets_with_balance} tickets with balance");
