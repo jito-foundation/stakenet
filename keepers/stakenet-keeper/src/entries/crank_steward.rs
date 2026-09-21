@@ -22,7 +22,6 @@ use solana_sdk::{
     system_program,
 };
 use solana_vote_interface::state::VoteStateV4;
-use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
 use spl_stake_pool::{
@@ -53,6 +52,7 @@ use stakenet_sdk::{
     },
 };
 use validator_history::ValidatorHistory;
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
 pub fn _get_update_stake_pool_ixs(
     program_id: &Pubkey,
