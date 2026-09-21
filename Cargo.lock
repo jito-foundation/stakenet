@@ -11308,6 +11308,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "validator-history",
+ "validator-history-vote-state",
 ]
 
 [[package]]
@@ -11336,6 +11337,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "validator-history",
+ "validator-history-vote-state",
 ]
 
 [[package]]
@@ -12421,7 +12423,7 @@ dependencies = [
 
 [[package]]
 name = "validator-history-vote-state"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anchor-lang",
  "bincode",

@@ -22,6 +22,7 @@ use solana_sdk::{
     system_program,
 };
 use solana_vote_interface::state::VoteStateV4;
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 use spl_associated_token_account::get_associated_token_address;
 #[allow(deprecated)]
 use spl_stake_pool::{
@@ -129,8 +130,14 @@ pub fn _get_update_stake_pool_ixs(
             }
         };
 
-        match vote_account.epoch_credits.iter().last() {
-            Some(entry) => entry.0 == epoch || entry.0 == epoch - 1,
+        match vote_account
+            .epoch_credits
+            .iter()
+            .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
+            .map(|(epoch, _, _)| *epoch)
+            .max()
+        {
+            Some(latest_epoch) => latest_epoch == epoch || latest_epoch == epoch - 1,
             None => false,
         }
     });
@@ -185,30 +192,34 @@ pub fn _get_update_stake_pool_ixs(
                         }
                     };
 
-                if vote_account.epoch_credits.iter().last().is_none() {
+                let Some(latest_epoch) = vote_account
+                    .epoch_credits
+                    .iter()
+                    .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
+                    .map(|(epoch, _, _)| *epoch)
+                    .max()
+                else {
                     error!(
                         "Vote account has no epoch credits entries vote_account={}",
                         validator_info.vote_account_address
                     );
-                    false
-                } else {
-                    let latest_epoch = vote_account.epoch_credits.iter().last().unwrap().0;
+                    continue;
+                };
 
-                    match stake_account {
-                        StakeStateV2::Stake(_meta, stake, _stake_flags) => {
-                            if stake.delegation.deactivation_epoch != u64::MAX {
-                                false
-                            } else {
-                                latest_epoch <= epoch - 5
-                            }
-                        }
-                        _ => {
-                            error!(
-                                "Stake account is not in Stake state vote_account={}",
-                                validator_info.vote_account_address
-                            );
+                match stake_account {
+                    StakeStateV2::Stake(_meta, stake, _stake_flags) => {
+                        if stake.delegation.deactivation_epoch != u64::MAX {
                             false
+                        } else {
+                            latest_epoch <= epoch - 5
                         }
+                    }
+                    _ => {
+                        error!(
+                            "Stake account is not in Stake state vote_account={}",
+                            validator_info.vote_account_address
+                        );
+                        false
                     }
                 }
             }
