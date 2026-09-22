@@ -166,9 +166,6 @@ async fn test_initialize_alpenglow_migration_counts_distinct_epochs() {
         data: validator_history::instruction::InitializeValidatorHistoryAccount {}.data(),
     };
 
-    // Mid migration: only 4 distinct epochs, but epoch 3 is split into a tower era entry and an
-    // alpenglow era entry, so there are 5 entries once the marker is stripped. Counting entries
-    // instead of distinct epochs would let this through.
     let epoch_credits = vec![
         (0, 10, 0),
         (1, 20, 10),
@@ -191,7 +188,6 @@ async fn test_initialize_alpenglow_migration_counts_distinct_epochs() {
     test.submit_transaction_assert_error(transaction, "NotEnoughVotingHistory")
         .await;
 
-    // Same shape, but now 5 distinct epochs. The split epoch must not block a valid account.
     let epoch_credits = vec![
         (0, 10, 0),
         (1, 20, 10),

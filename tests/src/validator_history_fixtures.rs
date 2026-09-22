@@ -80,8 +80,6 @@ impl TestFixture {
 
         program.add_account(
             vote_account,
-            // 10 distinct epochs, zero credits each. A vote account never holds repeated entries
-            // for one epoch, and initialization requires MIN_VOTE_EPOCHS distinct epochs.
             new_vote_account(
                 identity_pubkey,
                 vote_account,

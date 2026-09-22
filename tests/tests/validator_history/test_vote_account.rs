@@ -146,7 +146,6 @@ async fn test_copy_vote_account() {
 
 #[tokio::test]
 async fn test_copy_vote_account_alpenglow_migration() {
-    // Initialize
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
@@ -183,8 +182,6 @@ async fn test_copy_vote_account_alpenglow_migration() {
     );
     fixture.submit_transaction_assert_success(transaction).await;
 
-    // Alpenglow migrates during epoch 1, so the vote account now carries the migration marker and
-    // epoch 1 is split into a tower era entry and an alpenglow era entry.
     fixture.advance_num_epochs(2).await;
     let epoch_credits = vec![
         (0, 22, 10),
@@ -223,7 +220,6 @@ async fn test_copy_vote_account_alpenglow_migration() {
         ctx.borrow().last_blockhash,
     );
 
-    // Without the marker being stripped this fails with EpochTooLarge
     fixture.submit_transaction_assert_success(transaction).await;
 
     let account: ValidatorHistory = fixture
@@ -235,7 +231,6 @@ async fn test_copy_vote_account_alpenglow_migration() {
     assert_eq!(account.history.arr[1].epoch, 1);
     assert_eq!(account.history.arr[2].epoch, 2);
     assert_eq!(account.history.arr[0].epoch_credits, 12);
-    // The migration epoch sums both halves: 13 tower era + 5 alpenglow era
     assert_eq!(account.history.arr[1].epoch_credits, 18);
     assert_eq!(account.history.arr[2].epoch_credits, 14);
 }
