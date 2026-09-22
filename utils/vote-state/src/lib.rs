@@ -745,8 +745,6 @@ mod tests {
 
     #[test]
     fn test_deserialize_epoch_credits_strips_migration_marker() {
-        // What a vote account looks like mid alpenglow migration: epoch 71 is split into a tower
-        // era entry and an alpenglow era entry, separated by the marker.
         let test_epoch_credits: Vec<(Epoch, u64, u64)> = vec![
             (70, 9, 6),
             (71, 20, 9),
@@ -785,8 +783,6 @@ mod tests {
             0,
         );
 
-        // The marker is dropped, but both halves of the migration epoch survive so callers can
-        // sum them.
         let epoch_credits_result =
             VoteStateVersions::deserialize_epoch_credits(&account_current).unwrap();
         assert_eq!(

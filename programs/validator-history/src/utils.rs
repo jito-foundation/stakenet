@@ -23,7 +23,7 @@ pub fn cast_epoch(epoch: u64) -> Result<u16> {
 /// 1. epoch cumulative votes
 /// 2. prev epoch cumulative votes
 pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u16, u32>> {
-    let mut credits_by_epoch: HashMap<u16, u32> = HashMap::new();
+    let mut credits_by_epoch: HashMap<u16, u32> = HashMap::with_capacity(epoch_credits.len());
     for (epoch, cur, prev) in epoch_credits.iter() {
         if *epoch >= u16::MAX as u64 {
             continue;
@@ -31,8 +31,11 @@ pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u1
         let credits = cur
             .checked_sub(*prev)
             .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
-        let entry = credits_by_epoch.entry(*epoch as u16).or_default();
-        *entry = entry.saturating_add(u32::try_from(credits).unwrap_or(u32::MAX));
+        let credits = u32::try_from(credits).unwrap_or(u32::MAX);
+        credits_by_epoch
+            .entry(*epoch as u16)
+            .and_modify(|entry| *entry = entry.saturating_add(credits))
+            .or_insert(credits);
     }
     Ok(credits_by_epoch)
 }
