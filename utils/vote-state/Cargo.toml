@@ -1,6 +1,6 @@
 [package]
 name = "validator-history-vote-state"
-version = "0.2.0"
+version = "0.1.2"
 edition = "2021"
 description = "VoteState code copied from Solana."
 license = "Apache-2.0"

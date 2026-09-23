@@ -62,8 +62,8 @@ tracing = { version = "0.1.37" }
 tracing-core = "0.1.32"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 uriparse = "0.6.4"
-validator-history = { path = "programs/validator-history", version = "0.3.0", features = ["no-entrypoint"] }
-validator-history-vote-state = { path = "utils/vote-state", version = "0.2.0" }
+validator-history = { path = "programs/validator-history", version = "0.2.1", features = ["no-entrypoint"] }
+validator-history-vote-state = { path = "utils/vote-state", version = "0.1.2" }
 
 [patch.crates-io]
 home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }
