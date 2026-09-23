@@ -1,15 +1,45 @@
 #![allow(clippy::await_holding_refcell_ref)]
+#[allow(deprecated)]
 use anchor_lang::{
-    solana_program::instruction::Instruction, Discriminator, InstructionData, ToAccountMetas,
+    solana_program::{
+        hash::Hash,
+        instruction::Instruction,
+        stake::{
+            instruction::create_account_and_delegate_stake,
+            state::{Authorized, Lockup, StakeStateV2},
+        },
+    },
+    AnchorDeserialize, Discriminator, InstructionData, ToAccountMetas,
 };
 use solana_program_test::*;
 use solana_sdk::{
-    account::Account, clock::Clock, compute_budget::ComputeBudgetInstruction, signer::Signer,
-    transaction::Transaction, vote::state::MAX_EPOCH_CREDITS_HISTORY,
+    account::Account, clock::Clock, compute_budget::ComputeBudgetInstruction,
+    native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer, transaction::Transaction,
+    vote::state::MAX_EPOCH_CREDITS_HISTORY,
 };
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
-use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history::{utils::MAX_EPOCH_CREDITS, ValidatorHistory, ValidatorHistoryEntry};
 use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
+
+fn copy_vote_account_transaction(fixture: &TestFixture, blockhash: Hash) -> Transaction {
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        blockhash,
+    )
+}
 
 #[tokio::test]
 async fn test_copy_vote_account() {
@@ -233,6 +263,101 @@ async fn test_copy_vote_account_alpenglow_migration() {
     assert_eq!(account.history.arr[0].epoch_credits, 12);
     assert_eq!(account.history.arr[1].epoch_credits, 18);
     assert_eq!(account.history.arr[2].epoch_credits, 14);
+    assert_eq!(account.history.arr[0].epoch_credits_uncapped, 12);
+    assert_eq!(account.history.arr[1].epoch_credits_uncapped, 18);
+    assert_eq!(account.history.arr[2].epoch_credits_uncapped, 14);
+}
+
+#[tokio::test]
+async fn test_copy_vote_account_alpenglow_lamports_uncapped() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    // A validator that started voting in the migration epoch, earning 300 SOL of vote rewards
+    let lamports = 300 * LAMPORTS_PER_SOL;
+    let epoch_credits = vec![AG_MIGRATION_EPOCH_CREDIT, (0, lamports, 0)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            9,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let transaction = copy_vote_account_transaction(&fixture, ctx.borrow().last_blockhash);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    assert_eq!(account.history.arr[0].epoch, 0);
+    assert_eq!(account.history.arr[0].epoch_credits, MAX_EPOCH_CREDITS);
+    assert_eq!(account.history.arr[0].epoch_credits_uncapped, lamports);
+}
+
+#[tokio::test]
+async fn test_copy_vote_account_epoch_stake() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    // Delegated in epoch 0, so the stake is activating in epoch 0 and active in epoch 1
+    let stake_keypair = Keypair::new();
+    let instructions = create_account_and_delegate_stake(
+        &fixture.keypair.pubkey(),
+        &stake_keypair.pubkey(),
+        &fixture.vote_account,
+        &Authorized::auto(&fixture.keypair.pubkey()),
+        &Lockup::default(),
+        10 * LAMPORTS_PER_SOL,
+    );
+    let transaction = Transaction::new_signed_with_payer(
+        &instructions,
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair, &stake_keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let stake_account = ctx
+        .borrow_mut()
+        .banks_client
+        .get_account(stake_keypair.pubkey())
+        .await
+        .unwrap()
+        .unwrap();
+    let delegated_stake = StakeStateV2::deserialize(&mut stake_account.data.as_slice())
+        .unwrap()
+        .delegation()
+        .unwrap()
+        .stake;
+
+    let transaction = copy_vote_account_transaction(&fixture, ctx.borrow().last_blockhash);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert_eq!(account.history.arr[0].epoch, 0);
+    assert_eq!(account.history.arr[0].epoch_stake_lamports, 0);
+
+    fixture.advance_num_epochs(1).await;
+    let transaction = copy_vote_account_transaction(&fixture, ctx.borrow().last_blockhash);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+    assert_eq!(account.history.arr[0].epoch_stake_lamports, 0);
+    assert_eq!(account.history.arr[1].epoch, 1);
+    assert_eq!(account.history.arr[1].epoch_stake_lamports, delegated_stake);
 }
 
 #[tokio::test]

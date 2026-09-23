@@ -13,7 +13,10 @@ use {
         constants::TVC_MULTIPLIER,
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
-        utils::{epoch_credits_map, find_insert_position, get_max_epoch, get_min_epoch},
+        utils::{
+            epoch_credits_map, find_insert_position, get_max_epoch, get_min_epoch,
+            MAX_EPOCH_CREDITS,
+        },
     },
     anchor_lang::{
         prelude::*,
@@ -195,7 +198,17 @@ pub struct ValidatorHistoryEntry {
     /// 1 = connected, 0 = not connected, u8::MAX = unset/unknown.
     pub is_bam_connected: u8,
 
-    pub padding1: [u8; 46],
+    pub padding1: [u8; 6],
+
+    /// `epoch_credits` without the `MAX_EPOCH_CREDITS` cap.
+    /// Vote credits in tower epochs, vote reward lamports in alpenglow epochs.
+    pub epoch_credits_uncapped: u64,
+
+    /// Stake delegated to this vote account in this epoch, read with the `sol_get_epoch_stake` syscall.
+    /// Alpenglow computes the next epoch's vote rewards against this stake.
+    pub epoch_stake_lamports: u64,
+
+    pub padding2: [u8; 24],
 }
 
 // Default values for fields in `ValidatorHistoryEntry` are the type's max value.
@@ -229,7 +242,10 @@ impl Default for ValidatorHistoryEntry {
             block_data_updated_at_slot: u64::MAX,
             priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
             is_bam_connected: u8::MAX,
-            padding1: [u8::MAX; 46],
+            padding1: [u8::MAX; 6],
+            epoch_credits_uncapped: u64::MAX,
+            epoch_stake_lamports: u64::MAX,
+            padding2: [u8::MAX; 24],
         }
     }
 }
@@ -930,7 +946,8 @@ impl ValidatorHistory {
             let position = (self.history.idx as usize + len - i) % len;
             let entry = &mut self.history.arr[position];
             if let Some(&epoch_credits) = credits_by_epoch.get(&entry.epoch) {
-                entry.epoch_credits = epoch_credits;
+                entry.epoch_credits = epoch_credits.min(u64::from(MAX_EPOCH_CREDITS)) as u32;
+                entry.epoch_credits_uncapped = epoch_credits;
             }
             if entry.epoch == min_epoch {
                 break;
@@ -971,6 +988,16 @@ impl ValidatorHistory {
         };
         self.history.push(entry);
 
+        Ok(())
+    }
+
+    pub fn set_epoch_stake(&mut self, epoch: u16, epoch_stake_lamports: u64) -> Result<()> {
+        // Always called after `set_commission_and_slot` so we can assume the entry for this epoch exists
+        if let Some(entry) = self.history.last_mut() {
+            if entry.epoch == epoch {
+                entry.epoch_stake_lamports = epoch_stake_lamports;
+            }
+        }
         Ok(())
     }
 
@@ -1298,6 +1325,8 @@ pub struct ClusterHistory {
     pub history: CircBufCluster,
 }
 
+static_assertions::const_assert_eq!(size_of::<ClusterHistoryEntry>(), 256);
+
 #[derive(BorshSerialize)]
 #[zero_copy]
 pub struct ClusterHistoryEntry {
@@ -1305,7 +1334,25 @@ pub struct ClusterHistoryEntry {
     pub epoch: u16,
     pub padding0: [u8; 2],
     pub epoch_start_timestamp: u64,
-    pub padding: [u8; 240],
+
+    /// Total stake in this epoch, read with the `sol_get_epoch_stake` syscall.
+    /// Alpenglow computes the next epoch's vote rewards against this stake.
+    pub total_epoch_stake_lamports: u64,
+
+    /// Inflation rewards budgeted for this epoch (`EpochRewards::total_rewards`).
+    /// Recorded in the next epoch, once the rewards for this epoch have been paid out.
+    pub total_inflation_rewards: u64,
+
+    /// Inflation rewards actually paid for this epoch (`EpochRewards::distributed_rewards`).
+    /// Recorded in the next epoch, once the rewards for this epoch have been paid out.
+    pub distributed_inflation_rewards: u64,
+
+    /// 1 if this epoch's inflation rewards were paid without reward points (alpenglow),
+    /// 0 if they were paid by reward points (tower), u8::MAX = unset/unknown.
+    /// The migration epoch still pays its tower portion by points, so it is the last 0 before the first 1.
+    pub is_alpenglow: u8,
+
+    pub padding: [u8; 215],
 }
 
 impl Default for ClusterHistoryEntry {
@@ -1315,7 +1362,11 @@ impl Default for ClusterHistoryEntry {
             epoch: u16::MAX,
             padding0: [u8::MAX; 2],
             epoch_start_timestamp: u64::MAX,
-            padding: [u8::MAX; 240],
+            total_epoch_stake_lamports: u64::MAX,
+            total_inflation_rewards: u64::MAX,
+            distributed_inflation_rewards: u64::MAX,
+            is_alpenglow: u8::MAX,
+            padding: [u8::MAX; 215],
         }
     }
 }
@@ -1470,6 +1521,42 @@ impl ClusterHistory {
             if entry.epoch == epoch {
                 entry.epoch_start_timestamp = epoch_start_timestamp;
             }
+        }
+        Ok(())
+    }
+
+    pub fn set_total_epoch_stake(
+        &mut self,
+        epoch: u16,
+        total_epoch_stake_lamports: u64,
+    ) -> Result<()> {
+        // Always called after `set_blocks` so we can assume the entry for this epoch exists
+        if let Some(entry) = self.history.last_mut() {
+            if entry.epoch == epoch {
+                entry.total_epoch_stake_lamports = total_epoch_stake_lamports;
+            }
+        }
+        Ok(())
+    }
+
+    // Sets the inflation rewards paid out for the target epoch
+    pub fn set_inflation_rewards(
+        &mut self,
+        epoch: u16,
+        total_inflation_rewards: u64,
+        distributed_inflation_rewards: u64,
+        is_alpenglow: bool,
+    ) -> Result<()> {
+        // Always called after `set_blocks` for this epoch so we can assume the entry exists
+        if let Some(entry) = self
+            .history
+            .arr_mut()
+            .iter_mut()
+            .find(|entry| entry.epoch == epoch)
+        {
+            entry.total_inflation_rewards = total_inflation_rewards;
+            entry.distributed_inflation_rewards = distributed_inflation_rewards;
+            entry.is_alpenglow = is_alpenglow as u8;
         }
         Ok(())
     }

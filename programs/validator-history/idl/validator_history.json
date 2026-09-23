@@ -1042,11 +1042,44 @@
             "type": "u64"
           },
           {
+            "name": "total_epoch_stake_lamports",
+            "docs": [
+              "Total stake in this epoch, read with the `sol_get_epoch_stake` syscall.",
+              "Alpenglow computes the next epoch's vote rewards against this stake."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_inflation_rewards",
+            "docs": [
+              "Inflation rewards budgeted for this epoch (`EpochRewards::total_rewards`).",
+              "Recorded in the next epoch, once the rewards for this epoch have been paid out."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "distributed_inflation_rewards",
+            "docs": [
+              "Inflation rewards actually paid for this epoch (`EpochRewards::distributed_rewards`).",
+              "Recorded in the next epoch, once the rewards for this epoch have been paid out."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "is_alpenglow",
+            "docs": [
+              "1 if this epoch's inflation rewards were paid without reward points (alpenglow),",
+              "0 if they were paid by reward points (tower), u8::MAX = unset/unknown.",
+              "The migration epoch still pays its tower portion by points, so it is the last 0 before the first 1."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                240
+                215
               ]
             }
           }
@@ -1334,7 +1367,32 @@
             "type": {
               "array": [
                 "u8",
-                46
+                6
+              ]
+            }
+          },
+          {
+            "name": "epoch_credits_uncapped",
+            "docs": [
+              "`epoch_credits` without the `MAX_EPOCH_CREDITS` cap.",
+              "Vote credits in tower epochs, vote reward lamports in alpenglow epochs."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "epoch_stake_lamports",
+            "docs": [
+              "Stake delegated to this vote account in this epoch, read with the `sol_get_epoch_stake` syscall.",
+              "Alpenglow computes the next epoch's vote rewards against this stake."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                24
               ]
             }
           }
