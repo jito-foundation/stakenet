@@ -4,6 +4,7 @@ use solana_program_test::*;
 use solana_sdk::{signer::Signer, transaction::Transaction};
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{constants::MAX_ALLOC_BYTES, Config, ValidatorHistory};
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
 #[tokio::test]
 async fn test_initialize() {
@@ -144,6 +145,79 @@ async fn test_initialize_fail() {
     );
     test.submit_transaction_assert_error(transaction, "NotEnoughVotingHistory")
         .await;
+}
+
+#[tokio::test]
+async fn test_initialize_alpenglow_migration_counts_distinct_epochs() {
+    let test = TestFixture::new().await;
+    let ctx = &test.ctx;
+
+    test.initialize_config().await;
+
+    let init_ix = Instruction {
+        program_id: validator_history::id(),
+        accounts: validator_history::accounts::InitializeValidatorHistoryAccount {
+            validator_history_account: test.validator_history_account,
+            vote_account: test.vote_account,
+            system_program: anchor_lang::solana_program::system_program::id(),
+            signer: test.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+        data: validator_history::instruction::InitializeValidatorHistoryAccount {}.data(),
+    };
+
+    let epoch_credits = vec![
+        (0, 10, 0),
+        (1, 20, 10),
+        (2, 30, 20),
+        (3, 40, 30),
+        AG_MIGRATION_EPOCH_CREDIT,
+        (3, 45, 40),
+    ];
+    ctx.borrow_mut().set_account(
+        &test.vote_account,
+        &new_vote_account(test.vote_account, test.vote_account, 0, Some(epoch_credits)).into(),
+    );
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[init_ix.clone()],
+        Some(&test.keypair.pubkey()),
+        &[&test.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    test.submit_transaction_assert_error(transaction, "NotEnoughVotingHistory")
+        .await;
+
+    let epoch_credits = vec![
+        (0, 10, 0),
+        (1, 20, 10),
+        (2, 30, 20),
+        (3, 40, 30),
+        AG_MIGRATION_EPOCH_CREDIT,
+        (3, 45, 40),
+        (4, 55, 45),
+    ];
+    ctx.borrow_mut().set_account(
+        &test.vote_account,
+        &new_vote_account(test.vote_account, test.vote_account, 0, Some(epoch_credits)).into(),
+    );
+
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    let transaction = Transaction::new_signed_with_payer(
+        &[init_ix],
+        Some(&test.keypair.pubkey()),
+        &[&test.keypair],
+        blockhash,
+    );
+    test.submit_transaction_assert_success(transaction).await;
+
+    let account = ctx
+        .borrow_mut()
+        .banks_client
+        .get_account(test.validator_history_account)
+        .await
+        .unwrap();
+    assert!(account.is_some());
 }
 
 #[tokio::test]

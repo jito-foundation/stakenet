@@ -11308,6 +11308,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "validator-history",
+ "validator-history-vote-state",
 ]
 
 [[package]]
@@ -11336,6 +11337,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "validator-history",
+ "validator-history-vote-state",
 ]
 
 [[package]]
