@@ -16,6 +16,13 @@ pub fn cast_epoch(epoch: u64) -> Result<u16> {
     Ok(epoch as u16)
 }
 
+/// Largest value stored in `ValidatorHistoryEntry::epoch_credits`.
+///
+/// `u32::MAX` means unset to every reader, so values saturate one below it. Tower credits never
+/// get close, but Alpenglow reward lamports do, and landing on `u32::MAX` would make a validator
+/// read as not voting (delinquent, and flagged for instant unstake).
+pub const MAX_EPOCH_CREDITS: u32 = u32::MAX - 1;
+
 /// Credits earned per epoch, derived from a vote account's raw `epoch_credits`.
 ///
 /// Epoch credits
@@ -31,10 +38,10 @@ pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u1
         let credits = cur
             .checked_sub(*prev)
             .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
-        let credits = u32::try_from(credits).unwrap_or(u32::MAX);
+        let credits = credits.min(u64::from(MAX_EPOCH_CREDITS)) as u32;
         credits_by_epoch
             .entry(*epoch as u16)
-            .and_modify(|entry| *entry = entry.saturating_add(credits))
+            .and_modify(|entry| *entry = entry.saturating_add(credits).min(MAX_EPOCH_CREDITS))
             .or_insert(credits);
     }
     Ok(credits_by_epoch)

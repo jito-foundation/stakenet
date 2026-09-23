@@ -1048,3 +1048,23 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
         Ok(false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use validator_history::utils::MAX_EPOCH_CREDITS;
+
+    use super::*;
+
+    #[test]
+    fn test_saturated_alpenglow_credits() {
+        let result =
+            calculate_instant_unstake_delinquency(1000, 1000, MAX_EPOCH_CREDITS, 1000, 0.7)
+                .unwrap();
+        assert!(!result);
+
+        let result =
+            calculate_instant_unstake_delinquency(1000, 1000, MAX_EPOCH_CREDITS + 1, 1000, 0.7)
+                .unwrap();
+        assert!(result);
+    }
+}
