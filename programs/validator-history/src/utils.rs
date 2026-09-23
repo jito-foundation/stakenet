@@ -25,12 +25,15 @@ pub const MAX_EPOCH_CREDITS: u32 = u32::MAX - 1;
 
 /// Credits earned per epoch, derived from a vote account's raw `epoch_credits`.
 ///
+/// Values are uncapped, so they must be capped at `MAX_EPOCH_CREDITS` before being stored in
+/// `ValidatorHistoryEntry::epoch_credits`.
+///
 /// Epoch credits
 /// 0. epoch
 /// 1. epoch cumulative votes
 /// 2. prev epoch cumulative votes
-pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u16, u32>> {
-    let mut credits_by_epoch: HashMap<u16, u32> = HashMap::with_capacity(epoch_credits.len());
+pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u16, u64>> {
+    let mut credits_by_epoch: HashMap<u16, u64> = HashMap::with_capacity(epoch_credits.len());
     for (epoch, cur, prev) in epoch_credits.iter() {
         if *epoch >= u16::MAX as u64 {
             continue;
@@ -38,10 +41,9 @@ pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u1
         let credits = cur
             .checked_sub(*prev)
             .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
-        let credits = credits.min(u64::from(MAX_EPOCH_CREDITS)) as u32;
         credits_by_epoch
             .entry(*epoch as u16)
-            .and_modify(|entry| *entry = entry.saturating_add(credits).min(MAX_EPOCH_CREDITS))
+            .and_modify(|entry| *entry = entry.saturating_add(credits))
             .or_insert(credits);
     }
     Ok(credits_by_epoch)
@@ -189,6 +191,16 @@ mod tests {
     #[test]
     fn test_epoch_credits_map_rejects_decreasing_credits() {
         assert!(epoch_credits_map(&[(70, 6, 9)]).is_err());
+    }
+
+    #[test]
+    fn test_epoch_credits_map_does_not_cap_alpenglow_lamports() {
+        // 300 SOL of vote rewards, well past what `ValidatorHistoryEntry::epoch_credits` can hold
+        let lamports = 300_000_000_000;
+        let map = epoch_credits_map(&[(72, 1_000 + lamports, 1_000)]).unwrap();
+
+        assert_eq!(map[&72], lamports);
+        assert!(map[&72] > u64::from(MAX_EPOCH_CREDITS));
     }
 
     #[test]
