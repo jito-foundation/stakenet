@@ -405,12 +405,12 @@ pub fn validator_score(
     // Exclude the current epoch from the BAM window so the cranker has time
     // to upload BAM eligibility for this epoch (it's a permissioned field).
     let bam_window_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
-    let is_bam_connected_window = validator.history.is_bam_connected_range(
-        bam_window_end
-            .checked_sub(params.jito_bam_window_epochs as u16)
-            .ok_or(ArithmeticError)?,
-        bam_window_end,
-    );
+    let bam_window_start = current_epoch
+        .checked_sub(params.jito_bam_window_epochs as u16)
+        .ok_or(ArithmeticError)?;
+    let is_bam_connected_window = validator
+        .history
+        .is_bam_connected_range(bam_window_start, bam_window_end);
 
     let running_bam_score =
         calculate_running_bam_score(&is_bam_connected_window, params.jito_bam_minimum_epochs);

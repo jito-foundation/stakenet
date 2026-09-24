@@ -46,8 +46,8 @@ pub struct UpdateParametersArgs {
     pub jito_bam_minimum_epochs: Option<u8>,
 
     /// Window size (in epochs) over which to check BAM connectivity.
-    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
-    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
+    /// The evaluated range is `[current_epoch - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans exactly `jito_bam_window_epochs` epochs.
     /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
     /// out of those epochs to qualify for delegation.
     /// `None` means do not update the current value.
@@ -277,8 +277,8 @@ pub struct Parameters {
     pub jito_bam_minimum_epochs: u8,
 
     /// Window size (in epochs) over which to check BAM connectivity.
-    /// The evaluated range is `[(current_epoch - 1) - jito_bam_window_epochs, current_epoch - 1]`
-    /// (inclusive on both ends), which spans `jito_bam_window_epochs + 1` epochs.
+    /// The evaluated range is `[current_epoch - jito_bam_window_epochs, current_epoch - 1]`
+    /// (inclusive on both ends), which spans exactly `jito_bam_window_epochs` epochs.
     /// Validators must be BAM connected for at least `jito_bam_minimum_epochs`
     /// out of those epochs to qualify for delegation.
     pub jito_bam_window_epochs: u8,
