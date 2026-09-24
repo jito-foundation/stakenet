@@ -1,3 +1,5 @@
+use std::{cmp::Ordering, mem::size_of, net::IpAddr};
+
 #[cfg(feature = "idl-build")]
 use anchor_lang::idl::{
     types::{IdlEnumVariant, IdlTypeDef, IdlTypeDefTy},
@@ -11,7 +13,7 @@ use {
         constants::TVC_MULTIPLIER,
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
-        utils::{cast_epoch, find_insert_position, get_max_epoch, get_min_epoch},
+        utils::{epoch_credits_map, find_insert_position, get_max_epoch, get_min_epoch},
     },
     anchor_lang::{
         prelude::*,
@@ -19,7 +21,6 @@ use {
     },
     borsh::{BorshDeserialize, BorshSerialize},
     bytemuck::{Pod, Zeroable},
-    std::{cmp::Ordering, collections::HashMap, mem::size_of, net::IpAddr},
     type_layout::TypeLayout,
 };
 
@@ -891,18 +892,10 @@ impl ValidatorHistory {
             .map(|entry| entry.is_some())
             .collect::<Vec<bool>>();
 
-        let epoch_credits_map: HashMap<u16, u32> =
-            HashMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
-                (
-                    cast_epoch(*epoch).unwrap(), // all epochs in list will be valid if current epoch is valid
-                    (cur.checked_sub(*prev)
-                        .ok_or(ValidatorHistoryError::InvalidEpochCredits)
-                        .unwrap() as u32),
-                )
-            }));
+        let credits_by_epoch = epoch_credits_map(epoch_credits)?;
 
         for (entry_is_some, epoch) in entries.iter().zip(start_epoch as u16..=end_epoch) {
-            if !*entry_is_some && epoch_credits_map.contains_key(&epoch) {
+            if !*entry_is_some && credits_by_epoch.contains_key(&epoch) {
                 // Inserts blank entry that will have credits copied to it later
                 let entry = ValidatorHistoryEntry {
                     epoch,
@@ -926,27 +919,17 @@ impl ValidatorHistory {
     ) -> Result<()> {
         // Assumes `set_commission` has already been run in `copy_vote_account`,
         // guaranteeing an entry exists for the current epoch
-        if epoch_credits.is_empty() {
+        let credits_by_epoch = epoch_credits_map(epoch_credits)?;
+        let Some(&min_epoch) = credits_by_epoch.keys().min() else {
             return Ok(());
-        }
-        let epoch_credits_map: HashMap<u16, u32> =
-            HashMap::from_iter(epoch_credits.iter().map(|(epoch, cur, prev)| {
-                (
-                    cast_epoch(*epoch).unwrap(), // all epochs in list will be valid if current epoch is valid
-                    (cur.checked_sub(*prev)
-                        .ok_or(ValidatorHistoryError::InvalidEpochCredits)
-                        .unwrap() as u32),
-                )
-            }));
-
-        let min_epoch = get_min_epoch(epoch_credits)?;
+        };
 
         // Traverses entries in reverse order, breaking once we hit the lowest epoch in epoch_credits
         let len = self.history.arr.len();
         for i in 0..len {
             let position = (self.history.idx as usize + len - i) % len;
             let entry = &mut self.history.arr[position];
-            if let Some(&epoch_credits) = epoch_credits_map.get(&entry.epoch) {
+            if let Some(&epoch_credits) = credits_by_epoch.get(&entry.epoch) {
                 entry.epoch_credits = epoch_credits;
             }
             if entry.epoch == min_epoch {

@@ -80,7 +80,12 @@ impl TestFixture {
 
         program.add_account(
             vote_account,
-            new_vote_account(identity_pubkey, vote_account, 1, Some(vec![(0, 0, 0); 10])),
+            new_vote_account(
+                identity_pubkey,
+                vote_account,
+                1,
+                Some((0..10u64).map(|epoch| (epoch, 0, 0)).collect()),
+            ),
         );
         program.add_account(keypair.pubkey(), system_account(100_000_000_000));
         program.add_account(identity_pubkey, system_account(100_000_000_000));

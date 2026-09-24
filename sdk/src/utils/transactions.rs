@@ -24,11 +24,12 @@ use solana_sdk::{
 use solana_transaction_status::TransactionStatus;
 use tokio::task;
 use tokio::time::sleep;
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
-use crate::models::errors::{
-    JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError,
+use crate::models::{
+    errors::{JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError},
+    submit_stats::SubmitStats,
 };
-use crate::models::submit_stats::SubmitStats;
 
 use std::future::Future;
 
@@ -191,7 +192,15 @@ pub async fn get_vote_accounts_with_retry(
                 .current
                 .into_iter()
                 .chain(response.delinquent.into_iter())
-                .filter(|vote_account| vote_account.epoch_credits.len() >= min_vote_epochs)
+                .filter(|vote_account| {
+                    let voted_epochs: HashSet<u64> = vote_account
+                        .epoch_credits
+                        .iter()
+                        .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
+                        .map(|(epoch, _, _)| *epoch)
+                        .collect();
+                    voted_epochs.len() >= min_vote_epochs
+                })
                 .collect::<Vec<_>>());
         }
     }
@@ -203,7 +212,15 @@ pub async fn get_vote_accounts_with_retry(
             .current
             .into_iter()
             .chain(response.delinquent.into_iter())
-            .filter(|vote_account| vote_account.epoch_credits.len() >= min_vote_epochs)
+            .filter(|vote_account| {
+                let voted_epochs: HashSet<u64> = vote_account
+                    .epoch_credits
+                    .iter()
+                    .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
+                    .map(|(epoch, _, _)| *epoch)
+                    .collect();
+                voted_epochs.len() >= min_vote_epochs
+            })
             .collect::<Vec<_>>()),
         Err(e) => Err(e),
     }

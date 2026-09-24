@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anchor_lang::{
     prelude::{AccountInfo, Pubkey, Result},
     require,
@@ -14,6 +16,37 @@ pub fn cast_epoch(epoch: u64) -> Result<u16> {
     Ok(epoch as u16)
 }
 
+/// Largest value stored in `ValidatorHistoryEntry::epoch_credits`.
+///
+/// `u32::MAX` means unset to every reader, so values saturate one below it. Tower credits never
+/// get close, but Alpenglow reward lamports do, and landing on `u32::MAX` would make a validator
+/// read as not voting (delinquent, and flagged for instant unstake).
+pub const MAX_EPOCH_CREDITS: u32 = u32::MAX - 1;
+
+/// Credits earned per epoch, derived from a vote account's raw `epoch_credits`.
+///
+/// Epoch credits
+/// 0. epoch
+/// 1. epoch cumulative votes
+/// 2. prev epoch cumulative votes
+pub fn epoch_credits_map(epoch_credits: &[(u64, u64, u64)]) -> Result<HashMap<u16, u32>> {
+    let mut credits_by_epoch: HashMap<u16, u32> = HashMap::with_capacity(epoch_credits.len());
+    for (epoch, cur, prev) in epoch_credits.iter() {
+        if *epoch >= u16::MAX as u64 {
+            continue;
+        }
+        let credits = cur
+            .checked_sub(*prev)
+            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?;
+        let credits = credits.min(u64::from(MAX_EPOCH_CREDITS)) as u32;
+        credits_by_epoch
+            .entry(*epoch as u16)
+            .and_modify(|entry| *entry = entry.saturating_add(credits).min(MAX_EPOCH_CREDITS))
+            .or_insert(credits);
+    }
+    Ok(credits_by_epoch)
+}
+
 pub fn get_min_epoch(
     epoch_credits: &[(
         u64, /* epoch */
@@ -21,13 +54,17 @@ pub fn get_min_epoch(
         u64, /* prev epoch cumulative votes */
     )],
 ) -> Result<u16> {
-    cast_epoch(
-        epoch_credits
-            .iter()
-            .min_by_key(|(epoch, _, _)| *epoch)
-            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?
-            .0,
-    )
+    epoch_credits
+        .iter()
+        .filter_map(|(epoch, _, _)| {
+            if *epoch < u16::MAX as u64 {
+                Some(*epoch as u16)
+            } else {
+                None
+            }
+        })
+        .min()
+        .ok_or_else(|| ValidatorHistoryError::InvalidEpochCredits.into())
 }
 
 pub fn get_max_epoch(
@@ -37,13 +74,17 @@ pub fn get_max_epoch(
         u64, /* prev epoch cumulative votes */
     )],
 ) -> Result<u16> {
-    cast_epoch(
-        epoch_credits
-            .iter()
-            .max_by_key(|(epoch, _, _)| *epoch)
-            .ok_or(ValidatorHistoryError::InvalidEpochCredits)?
-            .0,
-    )
+    epoch_credits
+        .iter()
+        .filter_map(|(epoch, _, _)| {
+            if *epoch < u16::MAX as u64 {
+                Some(*epoch as u16)
+            } else {
+                None
+            }
+        })
+        .max()
+        .ok_or_else(|| ValidatorHistoryError::InvalidEpochCredits.into())
 }
 
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
@@ -118,7 +159,47 @@ pub fn find_insert_position(
 
 #[cfg(test)]
 mod tests {
+    use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
+
     use super::*;
+
+    /// What a vote account looks like mid alpenglow migration: epoch 71 is split into a tower era
+    /// entry and an alpenglow era entry, separated by the marker.
+    fn migrating_epoch_credits() -> Vec<(u64, u64, u64)> {
+        vec![
+            (70, 9, 6),
+            (71, 20, 9),
+            AG_MIGRATION_EPOCH_CREDIT,
+            (71, 35, 20),
+            (72, 50, 35),
+        ]
+    }
+
+    #[test]
+    fn test_epoch_credits_map_handles_migration() {
+        let map = epoch_credits_map(&migrating_epoch_credits()).unwrap();
+
+        assert_eq!(map.len(), 3);
+        assert_eq!(map[&70], 3);
+
+        assert_eq!(map[&71], 11 + 15);
+        assert_eq!(map[&72], 15);
+    }
+
+    #[test]
+    fn test_epoch_credits_map_rejects_decreasing_credits() {
+        assert!(epoch_credits_map(&[(70, 6, 9)]).is_err());
+    }
+
+    #[test]
+    fn test_min_max_epoch_skip_migration_marker() {
+        let epoch_credits = migrating_epoch_credits();
+        assert_eq!(get_min_epoch(&epoch_credits).unwrap(), 70);
+        assert_eq!(get_max_epoch(&epoch_credits).unwrap(), 72);
+
+        assert!(get_min_epoch(&[AG_MIGRATION_EPOCH_CREDIT]).is_err());
+        assert!(get_max_epoch(&[]).is_err());
+    }
 
     #[test]
     fn test_fixed_point_sol() {
