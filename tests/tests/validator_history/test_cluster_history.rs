@@ -1,8 +1,14 @@
 #![allow(clippy::await_holding_refcell_ref)]
+#[allow(deprecated)]
 use {
     anchor_lang::{
-        solana_program::{instruction::Instruction, slot_history::SlotHistory},
-        InstructionData, ToAccountMetas,
+        solana_program::{
+            instruction::Instruction,
+            slot_history::SlotHistory,
+            stake::{self, state::StakeStateV2},
+            sysvar::epoch_rewards::EpochRewards,
+        },
+        AnchorDeserialize, InstructionData, ToAccountMetas,
     },
     rand::{rngs::StdRng, Rng, SeedableRng},
     solana_program_test::*,
@@ -84,6 +90,107 @@ async fn test_copy_cluster_info() {
     assert!(account.cluster_history_last_update_slot == latest_slot);
     assert!(account.history.arr[1].epoch == 1);
     assert!(account.history.arr[1].total_blocks == 1);
+}
+
+#[tokio::test]
+async fn test_copy_cluster_info_epoch_stake_and_inflation_rewards() {
+    // Initialize
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_cluster_history_account().await;
+
+    fixture.advance_num_epochs(1).await;
+    // End the payout of epoch 0's rewards so the test controls the EpochRewards sysvar
+    ctx.borrow_mut()
+        .warp_forward_force_reward_interval_end()
+        .unwrap();
+
+    // The only stake is the bootstrap validator's, which is active from genesis
+    let genesis_stake: u64 = ctx
+        .borrow()
+        .genesis_config()
+        .accounts
+        .values()
+        .filter(|account| account.owner == stake::program::id())
+        .filter_map(|account| StakeStateV2::deserialize(&mut account.data.as_slice()).ok())
+        .filter_map(|stake_state| stake_state.delegation())
+        .map(|delegation| delegation.stake)
+        .sum();
+    assert!(genesis_stake > 0);
+
+    // Alpenglow pays out vote account credits directly, without reward points
+    ctx.borrow_mut().set_sysvar(&EpochRewards {
+        total_points: 0,
+        total_rewards: 1_000,
+        distributed_rewards: 900,
+        active: false,
+        ..EpochRewards::default()
+    });
+    let transaction = create_copy_cluster_history_transaction(&fixture);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ClusterHistory = fixture
+        .load_and_deserialize(&fixture.cluster_history_account)
+        .await;
+
+    assert_eq!(account.history.arr[0].epoch, 0);
+    assert_eq!(account.history.arr[0].total_inflation_rewards, 1_000);
+    assert_eq!(account.history.arr[0].distributed_inflation_rewards, 900);
+    assert_eq!(account.history.arr[0].is_alpenglow, 1);
+    // Epoch stake can only be read during its own epoch
+    assert_eq!(account.history.arr[0].total_epoch_stake_lamports, u64::MAX);
+
+    assert_eq!(account.history.arr[1].epoch, 1);
+    assert_eq!(
+        account.history.arr[1].total_epoch_stake_lamports,
+        genesis_stake
+    );
+    // Epoch 1's rewards are only paid out in epoch 2
+    assert_eq!(account.history.arr[1].total_inflation_rewards, u64::MAX);
+    assert_eq!(account.history.arr[1].is_alpenglow, u8::MAX);
+
+    // A payout that is still in progress is skipped
+    ctx.borrow_mut().set_sysvar(&EpochRewards {
+        total_points: 10,
+        total_rewards: 2_000,
+        distributed_rewards: 100,
+        active: true,
+        ..EpochRewards::default()
+    });
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    ctx.borrow_mut().last_blockhash = blockhash;
+    let transaction = create_copy_cluster_history_transaction(&fixture);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ClusterHistory = fixture
+        .load_and_deserialize(&fixture.cluster_history_account)
+        .await;
+
+    assert_eq!(account.history.arr[0].total_inflation_rewards, 1_000);
+    assert_eq!(account.history.arr[0].distributed_inflation_rewards, 900);
+    assert_eq!(account.history.arr[0].is_alpenglow, 1);
+
+    // Tower pays out by reward points
+    ctx.borrow_mut().set_sysvar(&EpochRewards {
+        total_points: 10,
+        total_rewards: 2_000,
+        distributed_rewards: 1_900,
+        active: false,
+        ..EpochRewards::default()
+    });
+    let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
+    ctx.borrow_mut().last_blockhash = blockhash;
+    let transaction = create_copy_cluster_history_transaction(&fixture);
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ClusterHistory = fixture
+        .load_and_deserialize(&fixture.cluster_history_account)
+        .await;
+
+    assert_eq!(account.history.arr[0].total_inflation_rewards, 2_000);
+    assert_eq!(account.history.arr[0].distributed_inflation_rewards, 1_900);
+    assert_eq!(account.history.arr[0].is_alpenglow, 0);
 }
 
 #[tokio::test]
