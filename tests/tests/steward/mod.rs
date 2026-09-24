@@ -1,5 +1,6 @@
 #![allow(unexpected_cfgs)]
 mod test_algorithms;
+mod test_alpenglow_scoring;
 mod test_cycle;
 mod test_directed_increase_decrease;
 mod test_directed_rebalance_instructions;
