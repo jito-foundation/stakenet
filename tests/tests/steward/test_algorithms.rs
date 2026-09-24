@@ -31,7 +31,7 @@ use jito_steward::{
     },
     select_validators_to_delegate, Delegation,
 };
-use solana_sdk::native_token::LAMPORTS_PER_SOL;
+use solana_sdk::{epoch_schedule::DEFAULT_SLOTS_PER_EPOCH, native_token::LAMPORTS_PER_SOL};
 use spl_stake_pool::big_vec::BigVec;
 use tests::steward_fixtures::StateMachineFixtures;
 use validator_history::{
@@ -61,6 +61,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -110,6 +111,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -157,6 +159,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -204,6 +207,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -255,6 +259,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -304,6 +309,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -354,6 +360,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -406,6 +413,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -458,6 +466,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -514,6 +523,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -560,6 +570,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -613,6 +624,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -661,6 +673,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -714,6 +727,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -765,6 +779,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -823,6 +838,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert!(components.superminority_score == 0);
@@ -837,6 +853,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res == Err(StewardError::StakeHistoryNotRecentEnough.into()));
 
@@ -853,6 +870,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -905,6 +923,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -957,6 +976,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -1011,6 +1031,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -1065,6 +1086,7 @@ fn test_compute_score() {
         &config,
         current_epoch as u16,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     )
     .unwrap();
     assert_eq!(
@@ -1140,6 +1162,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -1178,6 +1201,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -1213,6 +1237,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -1250,6 +1275,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert_eq!(res, Err(StewardError::ClusterHistoryNotRecentEnough.into()));
@@ -1266,6 +1292,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert!(res.is_ok());
@@ -1306,6 +1333,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
 
     assert_eq!(res, Err(StewardError::VoteHistoryNotRecentEnough.into()));
@@ -1320,6 +1348,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -1355,6 +1384,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -1390,6 +1420,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -1429,6 +1460,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(
@@ -1467,6 +1499,7 @@ fn test_instant_unstake() {
         start_slot,
         current_epoch,
         TVC_ACTIVATION_EPOCH,
+        DEFAULT_SLOTS_PER_EPOCH,
     );
     assert!(res.is_ok());
     assert_eq!(

@@ -6,7 +6,8 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
+    constants::TVC_MULTIPLIER, ClusterHistory, ClusterHistoryEntry, MerkleRootUploadAuthority,
+    ValidatorHistory, ValidatorHistoryEntry,
 };
 
 use crate::{
@@ -306,6 +307,7 @@ pub fn validator_score(
     config: &Config,
     current_epoch: u16,
     tvc_activation_epoch: u64,
+    slots_per_epoch: u64,
 ) -> Result<ScoreComponentsV5> {
     let params = &config.parameters;
 
@@ -323,10 +325,13 @@ pub fn validator_score(
     // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
 
-    let normalized_epoch_credits_window = validator.history.epoch_credits_range_normalized(
+    let normalized_epoch_credits_window = epoch_credits_range(
+        validator,
+        cluster,
         epoch_credits_start,
         epoch_credits_end,
         tvc_activation_epoch,
+        slots_per_epoch,
     );
 
     let total_blocks_window = cluster
@@ -349,7 +354,7 @@ pub fn validator_score(
         )?;
 
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
-        calculate_epoch_credits(
+        calculate_scorable_epoch_credits(
             &normalized_epoch_credits_window,
             &total_blocks_window,
             epoch_credits_start,
@@ -551,6 +556,237 @@ pub fn calculate_epoch_credits(
 
     Ok((
         normalized_vote_credits_ratio,
+        delinquency_score,
+        delinquency_ratio,
+        delinquency_epoch,
+    ))
+}
+
+/// Epoch credits a validator earned in one epoch, normalized to timely vote credits
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EpochCredits {
+    /// Credits earned, `None` if the validator earned none
+    Scored(Option<u32>),
+
+    /// Inputs are missing, or the credits mix tower vote credits with alpenglow reward lamports
+    Unscorable,
+}
+
+/// Epoch credits for each epoch in [start_epoch, end_epoch], normalized so that
+/// `credits / (total_blocks * TVC_MULTIPLIER)` means the same in tower and alpenglow epochs.
+///
+/// Epochs flagged `is_alpenglow` in cluster history hold vote reward lamports, which are converted
+/// with `alpenglow_epoch_credits`. Any other epoch holding more credits than tower can pay out must
+/// contain alpenglow lamports (the migration epoch, or an alpenglow epoch whose inflation rewards
+/// haven't been recorded yet), so it is unscorable.
+pub fn epoch_credits_range(
+    validator: &ValidatorHistory,
+    cluster: &ClusterHistory,
+    start_epoch: u16,
+    end_epoch: u16,
+    tvc_activation_epoch: u64,
+    slots_per_epoch: u64,
+) -> Vec<EpochCredits> {
+    let tower_credits = validator.history.epoch_credits_range_normalized(
+        start_epoch,
+        end_epoch,
+        tvc_activation_epoch,
+    );
+    let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
+
+    // Alpenglow pays each epoch's vote rewards against the stake recorded in the epoch before it
+    let lookback_epoch = start_epoch.saturating_sub(1);
+    let validator_entries = validator.history.epoch_range(lookback_epoch, end_epoch);
+    let cluster_entries = cluster.history.epoch_range(lookback_epoch, end_epoch);
+
+    (start_epoch..=end_epoch)
+        .zip(tower_credits)
+        .map(|(epoch, tower_credits)| {
+            let index = (epoch - lookback_epoch) as usize;
+            if let Some(cluster_entry) = cluster_entries[index].filter(|e| e.is_alpenglow == 1) {
+                let previous_index = index.checked_sub(1);
+                return alpenglow_entry_credits(
+                    validator_entries[index],
+                    previous_index.and_then(|i| validator_entries[i]),
+                    cluster_entry,
+                    previous_index.and_then(|i| cluster_entries[i]),
+                    slots_per_epoch,
+                );
+            }
+
+            match tower_credits {
+                Some(credits) if u64::from(credits) > max_tower_credits => EpochCredits::Unscorable,
+                credits => EpochCredits::Scored(credits),
+            }
+        })
+        .collect()
+}
+
+/// Reads the inputs of `alpenglow_epoch_credits` for one alpenglow epoch from validator and cluster history.
+fn alpenglow_entry_credits(
+    entry: Option<&ValidatorHistoryEntry>,
+    previous_entry: Option<&ValidatorHistoryEntry>,
+    cluster_entry: &ClusterHistoryEntry,
+    previous_cluster_entry: Option<&ClusterHistoryEntry>,
+    slots_per_epoch: u64,
+) -> EpochCredits {
+    let default_entry = ValidatorHistoryEntry::default();
+    let default_cluster_entry = ClusterHistoryEntry::default();
+
+    // `copy_vote_account` backfills every epoch the vote account earned in, so no entry means no credits
+    let Some(entry) = entry else {
+        return EpochCredits::Scored(None);
+    };
+    if entry.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
+        return if entry.epoch_credits == default_entry.epoch_credits {
+            EpochCredits::Scored(None)
+        } else {
+            // Copied before uncapped credits were recorded
+            EpochCredits::Unscorable
+        };
+    }
+
+    // Prefer the stake alpenglow paid against, falling back to the stake oracle's upload
+    let reward_stake_lamports = match previous_entry {
+        Some(previous) if previous.epoch_stake_lamports != default_entry.epoch_stake_lamports => {
+            previous.epoch_stake_lamports
+        }
+        Some(previous)
+            if previous.activated_stake_lamports != default_entry.activated_stake_lamports =>
+        {
+            previous.activated_stake_lamports
+        }
+        _ => return EpochCredits::Unscorable,
+    };
+    let total_reward_stake_lamports = match previous_cluster_entry {
+        Some(previous)
+            if previous.total_epoch_stake_lamports
+                != default_cluster_entry.total_epoch_stake_lamports =>
+        {
+            previous.total_epoch_stake_lamports
+        }
+        _ => return EpochCredits::Unscorable,
+    };
+    if cluster_entry.total_blocks == default_cluster_entry.total_blocks
+        || cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
+        || cluster_entry.distributed_inflation_rewards
+            == default_cluster_entry.distributed_inflation_rewards
+    {
+        return EpochCredits::Unscorable;
+    }
+
+    // The oracle only uploads block data for leaders, so unset means no leader slots. A missed
+    // upload also reads as 0, which can only make the validator look better.
+    let blocks_produced = if entry.blocks_produced == default_entry.blocks_produced {
+        0
+    } else {
+        entry.blocks_produced
+    };
+
+    match alpenglow_epoch_credits(
+        entry.epoch_credits_uncapped,
+        blocks_produced,
+        reward_stake_lamports,
+        total_reward_stake_lamports,
+        cluster_entry.total_inflation_rewards,
+        cluster_entry.distributed_inflation_rewards,
+        cluster_entry.total_blocks,
+        slots_per_epoch,
+    ) {
+        Some(credits) => EpochCredits::Scored(Some(credits)),
+        None => EpochCredits::Unscorable,
+    }
+}
+
+/// Converts an alpenglow epoch's vote reward lamports into the timely vote credits they're worth, so
+/// the epoch can be scored against `total_blocks * TVC_MULTIPLIER` like a tower epoch.
+///
+/// Every block's reward certificate pays each voter in it
+/// `total_inflation_rewards * reward_stake / (2 * slots_per_epoch * total_reward_stake)`, and pays
+/// the block's leader the other half of every voter's reward. The leader's share is estimated as half
+/// the epoch's average payout per block for each block produced; dividing what's left by the reward
+/// per certificate counts the certificates the validator voted in.
+///
+/// Returns `None` if the validator had no stake to earn with, or the cluster inputs are empty.
+#[allow(clippy::too_many_arguments)]
+pub fn alpenglow_epoch_credits(
+    reward_lamports: u64,
+    blocks_produced: u32,
+    reward_stake_lamports: u64,
+    total_reward_stake_lamports: u64,
+    total_inflation_rewards: u64,
+    distributed_inflation_rewards: u64,
+    total_blocks: u32,
+    slots_per_epoch: u64,
+) -> Option<u32> {
+    if reward_stake_lamports == 0
+        || total_reward_stake_lamports == 0
+        || total_inflation_rewards == 0
+        || total_blocks == 0
+        || slots_per_epoch == 0
+    {
+        return None;
+    }
+
+    let leader_lamports =
+        blocks_produced as f64 * distributed_inflation_rewards as f64 / (2. * total_blocks as f64);
+    let vote_lamports = (reward_lamports as f64 - leader_lamports).max(0.);
+    let lamports_per_vote = total_inflation_rewards as f64 * reward_stake_lamports as f64
+        / (2. * slots_per_epoch as f64 * total_reward_stake_lamports as f64);
+    let votes = vote_lamports / lamports_per_vote;
+
+    Some((votes * TVC_MULTIPLIER as f64).round() as u32)
+}
+
+/// `calculate_epoch_credits` over only the scorable epochs in the window, so unscorable epochs are
+/// neither averaged in nor checked for delinquency.
+pub fn calculate_scorable_epoch_credits(
+    epoch_credits_window: &[EpochCredits],
+    total_blocks_window: &[Option<u32>],
+    epoch_credits_start: u16,
+    scoring_delinquency_threshold_ratio: f64,
+) -> Result<(f64, u8, f64, u16)> {
+    let mut epochs = Vec::with_capacity(epoch_credits_window.len());
+    let mut credits_window = Vec::with_capacity(epoch_credits_window.len());
+    let mut blocks_window = Vec::with_capacity(epoch_credits_window.len());
+    for (i, (epoch_credits, total_blocks)) in epoch_credits_window
+        .iter()
+        .zip(total_blocks_window.iter())
+        .enumerate()
+    {
+        if let EpochCredits::Scored(credits) = epoch_credits {
+            epochs.push(
+                epoch_credits_start
+                    .checked_add(i as u16)
+                    .ok_or(StewardError::ArithmeticError)?,
+            );
+            credits_window.push(*credits);
+            blocks_window.push(*total_blocks);
+        }
+    }
+
+    if epochs.is_empty() {
+        // Nothing to judge the validator by, so it isn't treated as delinquent
+        return Ok((0., 1, 1., EPOCH_DEFAULT));
+    }
+
+    let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_index) =
+        calculate_epoch_credits(
+            &credits_window,
+            &blocks_window,
+            0,
+            scoring_delinquency_threshold_ratio,
+        )?;
+    let delinquency_epoch = if delinquency_score == 0 {
+        *epochs
+            .get(delinquency_index as usize)
+            .ok_or(StewardError::ArithmeticError)?
+    } else {
+        EPOCH_DEFAULT
+    };
+
+    Ok((
+        vote_credits_ratio,
         delinquency_score,
         delinquency_ratio,
         delinquency_epoch,
@@ -881,6 +1117,7 @@ pub fn instant_unstake_validator(
     epoch_start_slot: u64,
     current_epoch: u16,
     tvc_activation_epoch: u64,
+    slots_per_epoch: u64,
 ) -> Result<InstantUnstakeComponentsV3> {
     let params = &config.parameters;
 
@@ -910,13 +1147,38 @@ pub fn instant_unstake_validator(
         .unwrap_or(0);
 
     /////// Component calculations ///////
-    let delinquency_check = calculate_instant_unstake_delinquency(
-        total_blocks_latest,
-        cluster_history_slot_index,
-        epoch_credits_latest,
-        validator_history_slot_index,
-        params.instant_unstake_delinquency_threshold_ratio,
-    )?;
+    // Alpenglow votes can only be counted once an epoch's inflation rewards are paid out, so after the
+    // migration the validator is judged by the previous, complete epoch instead of the current one
+    let previous_alpenglow_epoch = current_epoch.checked_sub(1).filter(|&epoch| {
+        cluster
+            .history
+            .epoch_range(epoch, epoch)
+            .first()
+            .and_then(|entry| *entry)
+            .is_some_and(|entry| entry.is_alpenglow == 1)
+    });
+    let (delinquency_check, epoch_credits_latest, total_blocks_latest) =
+        match previous_alpenglow_epoch {
+            Some(epoch) => calculate_alpenglow_instant_unstake_delinquency(
+                validator,
+                cluster,
+                epoch,
+                tvc_activation_epoch,
+                slots_per_epoch,
+                params.instant_unstake_delinquency_threshold_ratio,
+            ),
+            None => (
+                calculate_instant_unstake_delinquency(
+                    total_blocks_latest,
+                    cluster_history_slot_index,
+                    epoch_credits_latest,
+                    validator_history_slot_index,
+                    params.instant_unstake_delinquency_threshold_ratio,
+                )?,
+                epoch_credits_latest,
+                total_blocks_latest,
+            ),
+        };
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
         validator,
@@ -966,6 +1228,47 @@ pub fn instant_unstake_validator(
             mev_commission: mev_commission_bps,
         },
     })
+}
+
+/// Checks whether the validator was delinquent in `epoch`, a complete alpenglow epoch, using the same
+/// ratio as scoring. Returns the check along with the epoch credits and total blocks behind it.
+fn calculate_alpenglow_instant_unstake_delinquency(
+    validator: &ValidatorHistory,
+    cluster: &ClusterHistory,
+    epoch: u16,
+    tvc_activation_epoch: u64,
+    slots_per_epoch: u64,
+    instant_unstake_delinquency_threshold_ratio: f64,
+) -> (bool, u32, u32) {
+    let epoch_credits = epoch_credits_range(
+        validator,
+        cluster,
+        epoch,
+        epoch,
+        tvc_activation_epoch,
+        slots_per_epoch,
+    );
+    let total_blocks = cluster
+        .history
+        .total_blocks_range(epoch, epoch)
+        .first()
+        .copied()
+        .flatten()
+        .unwrap_or(0);
+
+    match epoch_credits.first() {
+        Some(EpochCredits::Scored(credits)) if total_blocks > 0 => {
+            let credits = credits.unwrap_or(0);
+            let ratio = credits as f64 / (total_blocks as f64 * TVC_MULTIPLIER as f64);
+            (
+                ratio < instant_unstake_delinquency_threshold_ratio,
+                credits,
+                total_blocks,
+            )
+        }
+        // An epoch that can't be scored is no reason to unstake
+        _ => (false, 0, total_blocks),
+    }
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
@@ -1055,9 +1358,327 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
 
 #[cfg(test)]
 mod tests {
-    use validator_history::utils::MAX_EPOCH_CREDITS;
+    use validator_history::{utils::MAX_EPOCH_CREDITS, CircBuf, CircBufCluster};
 
     use super::*;
+
+    const SLOTS_PER_EPOCH: u64 = 432_000;
+    const TOTAL_BLOCKS: u32 = 1_000;
+
+    // 86_400 SOL of inflation over 432_000 slots, split with the leader, pays a validator holding
+    // 0.1% of the stake 100_000 lamports per reward certificate
+    const REWARD_STAKE: u64 = 1_000_000_000_000;
+    const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+    const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+    const LAMPORTS_PER_VOTE: u64 = 100_000;
+
+    /// What a validator earns for voting in `votes` reward certificates and leading `blocks_produced`
+    /// blocks, when `participation` of the stake votes in every certificate
+    fn reward_lamports(votes: u64, blocks_produced: u64, participation: f64) -> u64 {
+        let leader_lamports_per_block =
+            INFLATION_REWARDS as f64 * participation / (2. * SLOTS_PER_EPOCH as f64);
+        votes * LAMPORTS_PER_VOTE + (blocks_produced as f64 * leader_lamports_per_block) as u64
+    }
+
+    fn distributed_rewards(participation: f64) -> u64 {
+        (TOTAL_BLOCKS as f64 * INFLATION_REWARDS as f64 * participation / SLOTS_PER_EPOCH as f64)
+            as u64
+    }
+
+    fn credits(reward_lamports: u64, blocks_produced: u32, participation: f64) -> Option<u32> {
+        alpenglow_epoch_credits(
+            reward_lamports,
+            blocks_produced,
+            REWARD_STAKE,
+            TOTAL_REWARD_STAKE,
+            INFLATION_REWARDS,
+            distributed_rewards(participation),
+            TOTAL_BLOCKS,
+            SLOTS_PER_EPOCH,
+        )
+    }
+
+    fn entry_mut(validator: &mut ValidatorHistory, epoch: u16) -> &mut ValidatorHistoryEntry {
+        validator
+            .history
+            .arr_mut()
+            .iter_mut()
+            .find(|entry| entry.epoch == epoch)
+            .unwrap()
+    }
+
+    fn validator_history() -> ValidatorHistory {
+        ValidatorHistory {
+            struct_version: 0,
+            vote_account: Pubkey::default(),
+            index: 0,
+            bump: 0,
+            _padding0: [0; 7],
+            last_ip_timestamp: 0,
+            last_version_timestamp: 0,
+            validator_age: 0,
+            validator_age_last_updated_epoch: 0,
+            _padding1: [0; 226],
+            history: CircBuf::default(),
+        }
+    }
+
+    fn cluster_history() -> ClusterHistory {
+        ClusterHistory {
+            struct_version: 0,
+            bump: 0,
+            _padding0: [0; 7],
+            cluster_history_last_update_slot: 0,
+            _padding1: [0; 232],
+            history: CircBufCluster::default(),
+        }
+    }
+
+    /// Epochs 10 and 11 are tower, 12 is the migration epoch, and 13 and 14 are alpenglow. The
+    /// validator votes in every reward certificate and leads one block per epoch.
+    fn migrating_history() -> (ValidatorHistory, ClusterHistory) {
+        let mut validator = validator_history();
+        let mut cluster = cluster_history();
+        for epoch in 10..=14u16 {
+            let epoch_credits_uncapped = match epoch {
+                10 | 11 => 1_000 * u64::from(TVC_MULTIPLIER),
+                // Tower credits for part of the epoch, plus alpenglow lamports for the rest
+                12 => 500 * u64::from(TVC_MULTIPLIER) + reward_lamports(500, 1, 1.),
+                _ => reward_lamports(1_000, 1, 1.),
+            };
+            validator.history.push(ValidatorHistoryEntry {
+                epoch,
+                epoch_credits: epoch_credits_uncapped.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
+                epoch_credits_uncapped,
+                epoch_stake_lamports: REWARD_STAKE,
+                blocks_produced: 1,
+                ..ValidatorHistoryEntry::default()
+            });
+            cluster.history.push(ClusterHistoryEntry {
+                epoch,
+                total_blocks: TOTAL_BLOCKS,
+                total_epoch_stake_lamports: TOTAL_REWARD_STAKE,
+                total_inflation_rewards: INFLATION_REWARDS,
+                distributed_inflation_rewards: distributed_rewards(1.),
+                is_alpenglow: (epoch >= 13) as u8,
+                ..ClusterHistoryEntry::default()
+            });
+        }
+        (validator, cluster)
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_counts_votes() {
+        assert_eq!(
+            credits(reward_lamports(1_000, 1, 0.95), 1, 0.95),
+            Some(1_000 * TVC_MULTIPLIER)
+        );
+        assert_eq!(
+            credits(reward_lamports(800, 1, 0.95), 1, 0.95),
+            Some(800 * TVC_MULTIPLIER)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_ignores_leader_luck() {
+        for blocks_produced in [0, 1, 3] {
+            assert_eq!(
+                credits(
+                    reward_lamports(1_000, blocks_produced, 0.95),
+                    blocks_produced as u32,
+                    0.95
+                ),
+                Some(1_000 * TVC_MULTIPLIER)
+            );
+        }
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_floors_at_zero() {
+        // Earned less than the leader share of the blocks it produced
+        assert_eq!(credits(0, 1, 0.95), Some(0));
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_needs_stake_and_blocks() {
+        let distributed = distributed_rewards(0.95);
+        assert_eq!(
+            alpenglow_epoch_credits(
+                0,
+                0,
+                0,
+                TOTAL_REWARD_STAKE,
+                INFLATION_REWARDS,
+                distributed,
+                TOTAL_BLOCKS,
+                SLOTS_PER_EPOCH
+            ),
+            None
+        );
+        assert_eq!(
+            alpenglow_epoch_credits(
+                0,
+                0,
+                REWARD_STAKE,
+                TOTAL_REWARD_STAKE,
+                INFLATION_REWARDS,
+                distributed,
+                0,
+                SLOTS_PER_EPOCH
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_epoch_credits_range_across_migration() {
+        let (validator, cluster) = migrating_history();
+        assert_eq!(
+            epoch_credits_range(&validator, &cluster, 10, 14, 0, SLOTS_PER_EPOCH),
+            vec![
+                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Unscorable,
+                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_epoch_credits_range_alpenglow_inputs() {
+        let (mut validator, mut cluster) = migrating_history();
+
+        // Falls back to the stake oracle when the stake snapshot is missing
+        let entry = entry_mut(&mut validator, 12);
+        entry.epoch_stake_lamports = u64::MAX;
+        entry.activated_stake_lamports = REWARD_STAKE;
+        // Epoch 14 can't be scored without the total stake that paid it
+        let cluster_entry = cluster
+            .history
+            .arr_mut()
+            .iter_mut()
+            .find(|entry| entry.epoch == 13)
+            .unwrap();
+        cluster_entry.total_epoch_stake_lamports = u64::MAX;
+
+        assert_eq!(
+            epoch_credits_range(&validator, &cluster, 13, 14, 0, SLOTS_PER_EPOCH),
+            vec![
+                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Unscorable
+            ]
+        );
+
+        // Copied before uncapped credits were recorded
+        entry_mut(&mut validator, 13).epoch_credits_uncapped = u64::MAX;
+        assert_eq!(
+            epoch_credits_range(&validator, &cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            vec![EpochCredits::Unscorable]
+        );
+
+        // Earned nothing
+        entry_mut(&mut validator, 13).epoch_credits = u32::MAX;
+        assert_eq!(
+            epoch_credits_range(&validator, &cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            vec![EpochCredits::Scored(None)]
+        );
+    }
+
+    #[test]
+    fn test_scorable_epoch_credits_matches_tower_scoring() {
+        let credits = [Some(16_000), None, Some(8_000), Some(16_000)];
+        let total_blocks = [Some(1_000), Some(1_000), None, Some(1_000)];
+        assert_eq!(
+            calculate_scorable_epoch_credits(
+                &credits.map(EpochCredits::Scored),
+                &total_blocks,
+                100,
+                0.9
+            )
+            .unwrap(),
+            calculate_epoch_credits(&credits, &total_blocks, 100, 0.9).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_scorable_epoch_credits_skips_unscorable_epochs() {
+        let window = [
+            EpochCredits::Scored(Some(16_000)),
+            EpochCredits::Unscorable,
+            EpochCredits::Scored(Some(16_000)),
+        ];
+        let (vote_credits_ratio, delinquency_score, _, delinquency_epoch) =
+            calculate_scorable_epoch_credits(&window, &[Some(1_000); 3], 100, 0.97).unwrap();
+        assert_eq!(vote_credits_ratio, 1.);
+        assert_eq!(delinquency_score, 1);
+        assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
+
+        let window = [
+            EpochCredits::Unscorable,
+            EpochCredits::Scored(Some(16_000)),
+            EpochCredits::Scored(Some(0)),
+        ];
+        let (_, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_scorable_epoch_credits(&window, &[Some(1_000); 3], 100, 0.97).unwrap();
+        assert_eq!(delinquency_score, 0);
+        assert_eq!(delinquency_ratio, 0.);
+        assert_eq!(delinquency_epoch, 102);
+
+        assert_eq!(
+            calculate_scorable_epoch_credits(
+                &[EpochCredits::Unscorable; 3],
+                &[Some(1_000); 3],
+                100,
+                0.97
+            )
+            .unwrap(),
+            (0., 1, 1., EPOCH_DEFAULT)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_instant_unstake_delinquency() {
+        let (mut validator, cluster) = migrating_history();
+        assert_eq!(
+            calculate_alpenglow_instant_unstake_delinquency(
+                &validator,
+                &cluster,
+                13,
+                0,
+                SLOTS_PER_EPOCH,
+                0.7
+            ),
+            (false, 1_000 * TVC_MULTIPLIER, TOTAL_BLOCKS)
+        );
+
+        // Voted in half of the reward certificates
+        entry_mut(&mut validator, 13).epoch_credits_uncapped = reward_lamports(500, 1, 1.);
+        assert_eq!(
+            calculate_alpenglow_instant_unstake_delinquency(
+                &validator,
+                &cluster,
+                13,
+                0,
+                SLOTS_PER_EPOCH,
+                0.7
+            ),
+            (true, 500 * TVC_MULTIPLIER, TOTAL_BLOCKS)
+        );
+
+        // The migration epoch can't be scored, so it's no reason to unstake
+        assert_eq!(
+            calculate_alpenglow_instant_unstake_delinquency(
+                &validator,
+                &cluster,
+                12,
+                0,
+                SLOTS_PER_EPOCH,
+                0.7
+            ),
+            (false, 0, TOTAL_BLOCKS)
+        );
+    }
 
     #[test]
     fn test_large_alpenglow_credits_do_not_overflow() {
