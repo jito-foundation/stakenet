@@ -73,6 +73,15 @@ pub mod validator_history {
         handle_copy_vote_account(ctx)
     }
 
+    // Bulk version of `copy_vote_account`: copies vote-account data for many validators
+    // in a single instruction. Pairs are passed via `remaining_accounts`. See
+    // `handle_copy_vote_accounts` for details.
+    pub fn copy_vote_accounts<'info>(
+        ctx: Context<'_, '_, 'info, 'info, CopyVoteAccounts<'info>>,
+    ) -> Result<()> {
+        handle_copy_vote_accounts(ctx)
+    }
+
     pub fn copy_tip_distribution_account(
         ctx: Context<CopyTipDistributionAccount>,
         epoch: u64,

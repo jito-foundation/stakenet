@@ -264,6 +264,27 @@
       "args": []
     },
     {
+      "name": "copy_vote_accounts",
+      "discriminator": [
+        138,
+        205,
+        41,
+        188,
+        119,
+        205,
+        242,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_cluster_history_account",
       "discriminator": [
         8,
@@ -850,6 +871,11 @@
       "code": 6016,
       "name": "InvalidBamClientValue",
       "msg": "Invalid BAM client value, must be 0 or 1"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidBulkVoteAccounts",
+      "msg": "Invalid accounts passed to bulk copy_vote_accounts: remaining accounts must be [validator_history_account, vote_account] pairs with matching, program-owned PDAs"
     }
   ],
   "types": [
