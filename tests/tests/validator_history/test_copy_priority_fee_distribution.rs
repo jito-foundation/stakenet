@@ -14,7 +14,12 @@ use validator_history::{Config, MerkleRootUploadAuthority, ValidatorHistory};
 const TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
 #[tokio::test]
-async fn test_priority_fee_distribution_account_does_not_exist() {
+async fn test_priority_fee_distribution_account_does_not_exist_fails() {
+    // Prior to the `owner` constraint on `distribution_account`, calling this instruction
+    // before the real distribution account was created would silently succeed and record a
+    // permanent `DNE` entry (see `PriorityFeeDistributionAccountAlreadyCopied`), poisoning
+    // validator history for that epoch. It must now fail instead, matching the equivalent
+    // uninitialized-account case for `copy_tip_distribution_account` (test_mev_commission_fail).
     let fixture = TestFixture::new().await;
     let ctx = &fixture.ctx;
     fixture.initialize_config().await;
@@ -51,19 +56,9 @@ async fn test_priority_fee_distribution_account_does_not_exist() {
         &[&fixture.keypair],
         blockhash,
     );
-    fixture.submit_transaction_assert_success(transaction).await;
-
-    let account: ValidatorHistory = fixture
-        .load_and_deserialize(&fixture.validator_history_account)
+    fixture
+        .submit_transaction_assert_error(transaction, "ConstraintOwner")
         .await;
-    assert!(account.history.idx == 0);
-    assert!(account.history.arr[0].epoch == 0);
-    assert!(account.history.arr[0].priority_fee_commission == 0);
-    assert!(account.history.arr[0].priority_fee_tips == 0);
-    assert!(
-        account.history.arr[0].priority_fee_merkle_root_upload_authority
-            == MerkleRootUploadAuthority::DNE
-    );
 }
 
 #[tokio::test]

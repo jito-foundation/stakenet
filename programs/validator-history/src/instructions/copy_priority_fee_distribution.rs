@@ -41,6 +41,7 @@ pub struct CopyPriorityFeeDistribution<'info> {
         ],
         bump,
         seeds::program = config.priority_fee_distribution_program.key(),
+        owner = config.priority_fee_distribution_program.key()
     )]
     pub distribution_account: UncheckedAccount<'info>,
 
