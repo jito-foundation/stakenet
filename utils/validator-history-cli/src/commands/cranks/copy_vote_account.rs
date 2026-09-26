@@ -30,20 +30,27 @@ pub struct CrankCopyVoteAccount {
     /// If not provided, processes all validator history accounts.
     #[arg(long, env)]
     validator_list_pubkey: Option<String>,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
-pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(args: CrankCopyVoteAccount, client: Arc<RpcClient>) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
-    let client = RpcClient::new(rpc_url.clone());
-    let client = Arc::new(client);
 
     let epoch_info = client.get_epoch_info().await?;
 
     // Fetch validator history accounts
     let validator_histories =
-        get_all_validator_history_accounts(&client, validator_history::id()).await?;
+        get_all_validator_history_accounts(&client, args.validator_history_program_id).await?;
 
     let validator_history_map = HashMap::from_iter(
         validator_histories
@@ -102,7 +109,11 @@ pub async fn run(args: CrankCopyVoteAccount, rpc_url: String) -> anyhow::Result<
     let entries = vote_accounts_to_update
         .iter()
         .map(|vote_account| {
-            CopyVoteAccountEntry::new(vote_account, &validator_history::id(), &keypair.pubkey())
+            CopyVoteAccountEntry::new(
+                vote_account,
+                &args.validator_history_program_id,
+                &keypair.pubkey(),
+            )
         })
         .collect::<Vec<_>>();
 

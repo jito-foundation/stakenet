@@ -89,6 +89,16 @@ pub struct Args {
     #[arg(long, global = true, env, default_value = "confirmed")]
     pub commitment: CommitmentLevel,
 
+    /// Send transactions straight to the leaders' TPU over QUIC instead of RPC sendTransaction.
+    /// Reads, preflight simulation and confirmation still go through --json-rpc-url
+    #[arg(long, global = true, env, default_value_t = false)]
+    pub tpu: bool,
+
+    /// Websocket URL the TPU client tracks slots with. Needs slotsUpdatesSubscribe support
+    /// [default: derived from --json-rpc-url, like the solana CLI]
+    #[arg(long, global = true, env)]
+    pub websocket_url: Option<String>,
+
     #[command(subcommand)]
     pub commands: Commands,
 }

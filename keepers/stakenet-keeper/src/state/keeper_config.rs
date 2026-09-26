@@ -76,6 +76,16 @@ pub struct Args {
     #[arg(long, env, default_value = "https://api.mainnet-beta.solana.com")]
     pub json_rpc_url: String,
 
+    /// Send transactions straight to the leaders' TPU over QUIC instead of RPC sendTransaction.
+    /// Reads, preflight simulation and confirmation still go through --json-rpc-url
+    #[arg(long, env, default_value_t = false)]
+    pub tpu: bool,
+
+    /// Websocket URL the TPU client tracks slots with. Needs slotsUpdatesSubscribe support
+    /// [default: derived from --json-rpc-url, like the solana CLI]
+    #[arg(long, env)]
+    pub websocket_url: Option<String>,
+
     /// Gossip entrypoints in the form of URL:PORT
     ///
     /// - Accept multiple URLs
@@ -327,6 +337,8 @@ impl fmt::Display for Args {
             "Stakenet Keeper Configuration:\n\
             -------------------------------\n\
             JSON RPC URL: {}\n\
+            TPU: {}\n\
+            Websocket URL: {:?}\n\
             Gossip Entrypoints: {:?}\n\
             Keypair Path: {:?}\n\
             Oracle Authority Keypair Path: {:?}\n\
@@ -373,6 +385,8 @@ impl fmt::Display for Args {
             Min BAM Connection Rate: {:?}\n\
             -------------------------------",
             redact_url(&self.json_rpc_url),
+            self.tpu,
+            self.websocket_url.as_deref().map(redact_url),
             self.gossip_entrypoints,
             self.keypair,
             self.oracle_authority_keypair,

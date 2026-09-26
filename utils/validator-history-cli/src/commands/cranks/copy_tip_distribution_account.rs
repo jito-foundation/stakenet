@@ -33,12 +33,13 @@ pub struct CrankCopyTipDistributionAccount {
     epoch: Option<u64>,
 }
 
-pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(
+    args: CrankCopyTipDistributionAccount,
+    client: Arc<RpcClient>,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
-    let client = RpcClient::new(rpc_url);
-    let client = Arc::new(client);
 
     let epoch_info = client.get_epoch_info().await?;
     let epoch = args.epoch.unwrap_or(epoch_info.epoch);

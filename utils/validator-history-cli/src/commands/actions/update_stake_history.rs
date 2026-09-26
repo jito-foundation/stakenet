@@ -24,12 +24,10 @@ pub struct UpdateStakeHistory {
     vote_account: Pubkey,
 }
 
-pub async fn run(args: UpdateStakeHistory, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(args: UpdateStakeHistory, client: Arc<RpcClient>) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
-    let client = RpcClient::new(rpc_url);
-    let client = Arc::new(client);
 
     let vote_accounts = client.get_vote_accounts().await?;
     let vote_accounts: Vec<&RpcVoteAccountInfo> = vote_accounts.current.iter().collect();

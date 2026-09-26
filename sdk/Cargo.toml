@@ -12,6 +12,7 @@ name = "stakenet_sdk"
 
 [dependencies]
 anchor-lang = "0.31.1"
+async-trait = "0.1"
 base64 = "0.21"
 bincode = "1.3.3"
 borsh = "0.10"
@@ -21,10 +22,12 @@ jito-steward = { features = ["no-entrypoint"], path = "../programs/steward" }
 jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
 kobe-client = { workspace = true }
 log = "0.4.18"
+serde_json = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-metrics = { workspace = true }
 solana-program = { workspace = true }
+solana-quic-client = { workspace = true }
 solana-sdk = { workspace = true }
 solana-transaction-status = { workspace = true }
 spl-associated-token-account = { workspace = true }
@@ -32,4 +35,5 @@ spl-pod = { workspace = true }
 spl-stake-pool = { features = ["no-entrypoint"], workspace = true }
 thiserror = "1.0.37"
 tokio = { version = "1.36.0", features = ["full"] }
+url = "2"
 validator-history = { features = ["no-entrypoint"], path = "../programs/validator-history" }

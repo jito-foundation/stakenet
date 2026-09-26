@@ -41,6 +41,7 @@ use commands::{
 };
 use dotenvy::dotenv;
 use solana_client::nonblocking::rpc_client::RpcClient;
+use stakenet_sdk::utils::tpu_sender::{derive_websocket_url, new_tpu_rpc_client};
 
 use crate::{
     cli_signer::CliSigner,
@@ -94,11 +95,28 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
     let commitment_config = args.commitment.into();
-    let client = Arc::new(RpcClient::new_with_timeout_and_commitment(
-        args.json_rpc_url.clone(),
-        Duration::from_secs(60),
-        commitment_config,
-    ));
+    let client = if args.tpu {
+        let websocket_url = args
+            .websocket_url
+            .clone()
+            .or_else(|| derive_websocket_url(&args.json_rpc_url))
+            .ok_or_else(|| anyhow!("Cannot derive a websocket URL, pass --websocket-url"))?;
+        Arc::new(
+            new_tpu_rpc_client(
+                args.json_rpc_url.clone(),
+                &websocket_url,
+                Duration::from_secs(60),
+                commitment_config,
+            )
+            .await?,
+        )
+    } else {
+        Arc::new(RpcClient::new_with_timeout_and_commitment(
+            args.json_rpc_url.clone(),
+            Duration::from_secs(60),
+            commitment_config,
+        ))
+    };
 
     let steward_program_id = args.steward_program_id;
     let validator_history_program_id = args.validator_history_program_id;

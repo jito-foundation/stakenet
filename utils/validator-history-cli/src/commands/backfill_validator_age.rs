@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use tokio::time;
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
 
@@ -40,14 +40,12 @@ struct SourceData {
     credits: u32,
 }
 
-pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
+pub async fn run(args: BackfillValidatorAge, client: Arc<RpcClient>) {
     println!("/////////////////////////////////////////////////");
     println!("// Starting Backfill ////////////////////////////");
     println!("/////////////////////////////////////////////////");
     // Parse oracle keypair
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
-    // Build async client
-    let client = RpcClient::new_with_timeout(rpc_url, Duration::from_secs(60));
     // Read oracle source data
     println!("\nReading oracle data ...");
     let oracle = read_oracle_data(args.oracle_source);

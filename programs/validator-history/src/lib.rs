@@ -19,7 +19,7 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "mainnet-beta")] {
         declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");
     } else if #[cfg(feature = "testnet")] {
-        declare_id!("HisTBTgDnsdxfMp3m63fgKxCx9xVQE17MhA9BWRdrAP");
+        declare_id!("FmKiz2cHz5kAVV95UY6UR8EEB9GACYM7CGcbNvXywbwS");
     } else {
         declare_id!("HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa");
     }

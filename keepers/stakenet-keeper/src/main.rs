@@ -31,7 +31,7 @@ use rand::Rng;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::set_host_id;
-use solana_sdk::signature::read_keypair_file;
+use solana_sdk::{commitment_config::CommitmentConfig, signature::read_keypair_file};
 use stakenet_keeper::{
     operations::{
         self,
@@ -45,6 +45,7 @@ use stakenet_keeper::{
         update_state::{create_missing_accounts, post_create_update, pre_create_update},
     },
 };
+use stakenet_sdk::utils::tpu_sender::{derive_websocket_url, new_tpu_rpc_client};
 use std::{process::Command, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
@@ -412,10 +413,29 @@ fn main() {
             args.region, args.cluster, hostname
         ));
 
-        let client = Arc::new(RpcClient::new_with_timeout(
-            args.json_rpc_url.clone(),
-            Duration::from_secs(60),
-        ));
+        let client = if args.tpu {
+            let websocket_url = args
+                .websocket_url
+                .clone()
+                .filter(|websocket_url| !websocket_url.is_empty())
+                .or_else(|| derive_websocket_url(&args.json_rpc_url))
+                .expect("Cannot derive a websocket URL, pass --websocket-url");
+            Arc::new(
+                new_tpu_rpc_client(
+                    args.json_rpc_url.clone(),
+                    &websocket_url,
+                    Duration::from_secs(60),
+                    CommitmentConfig::default(),
+                )
+                .await
+                .expect("Failed to create TPU client"),
+            )
+        } else {
+            Arc::new(RpcClient::new_with_timeout(
+                args.json_rpc_url.clone(),
+                Duration::from_secs(60),
+            ))
+        };
 
         let keypair =
             Arc::new(read_keypair_file(args.keypair).expect("Failed reading keypair file"));

@@ -1,4 +1,5 @@
 use anchor_lang::{AccountDeserialize, Discriminator, InstructionData, ToAccountMetas};
+use anyhow::anyhow;
 use clap::{Parser, Subcommand, ValueEnum};
 use dotenvy::dotenv;
 use ipinfo::{BatchReqOpts, IpInfo, IpInfoConfig};
@@ -34,6 +35,7 @@ impl From<CommitmentLevel> for CommitmentConfig {
 }
 use spl_stake_pool::state::{StakePool, ValidatorList};
 use stakenet_keeper::operations::block_metadata::db::DBSlotInfo;
+use stakenet_sdk::utils::tpu_sender::{derive_websocket_url, new_tpu_rpc_client};
 use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 use validator_history::{
     constants::MAX_ALLOC_BYTES, ClusterHistory, ClusterHistoryEntry, Config, ValidatorHistory,
@@ -50,6 +52,7 @@ use validator_history_cli::{
             copy_is_bam_connected::CrankCopyIsBamConnected,
             copy_tip_distribution_account::CrankCopyTipDistributionAccount,
             copy_vote_account::CrankCopyVoteAccount,
+            create_validator_history::CrankCreateValidatorHistory,
         },
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
@@ -70,6 +73,17 @@ struct Args {
     /// Commitment level for RPC queries
     #[arg(long, global = true, env, default_value = "confirmed")]
     commitment: CommitmentLevel,
+
+    /// Send transactions straight to the leaders' TPU over QUIC instead of RPC sendTransaction.
+    /// Reads, preflight simulation and confirmation still go through --json-rpc-url.
+    /// Supported by the crank-*, update-stake-history and backfill-validator-age commands
+    #[arg(long, global = true, env, default_value_t = false)]
+    tpu: bool,
+
+    /// Websocket URL the TPU client tracks slots with. Needs slotsUpdatesSubscribe support
+    /// [default: derived from --json-rpc-url, like the solana CLI]
+    #[arg(long, global = true, env)]
+    websocket_url: Option<String>,
 
     #[command(subcommand)]
     commands: Commands,
@@ -102,6 +116,7 @@ enum Commands {
     CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
     CrankCopyIsBamConnected(CrankCopyIsBamConnected),
+    CrankCreateValidatorHistory(CrankCreateValidatorHistory),
 }
 
 #[derive(Parser)]
@@ -126,6 +141,15 @@ struct InitConfig {
     /// If not provided, the initial keypair will be the authority
     #[arg(short, long, env, required(false))]
     stake_authority: Option<Pubkey>,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
 #[derive(Parser)]
@@ -142,6 +166,15 @@ struct InitClusterHistory {
     /// Path to keypair used to pay for account creation and execute transactions
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     keypair_path: PathBuf,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
 #[derive(Parser, Debug)]
@@ -158,6 +191,15 @@ struct CrankerStatus {
         help = "This will print out account information in JSON format"
     )]
     pub print_json: bool,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
 #[derive(Parser)]
@@ -170,6 +212,15 @@ struct ClusterHistoryStatus {
         help = "This will print out account information in JSON format"
     )]
     pub print_json: bool,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
 #[derive(Parser)]
@@ -189,6 +240,15 @@ struct History {
         help = "This will print out account information in JSON format"
     )]
     pub print_json: bool,
+
+    /// Validator History Program ID
+    #[arg(
+        long,
+        alias = "program-id",
+        env,
+        default_value_t = validator_history::id()
+    )]
+    validator_history_program_id: Pubkey,
 }
 
 #[derive(Parser)]
@@ -286,11 +346,12 @@ struct StakeByCountry {
 fn command_init_config(args: InitConfig, client: RpcClient) {
     // Creates config account, sets tip distribution program address, and optionally sets authority for commission history program
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let program_id = args.validator_history_program_id;
 
     let mut instructions = vec![];
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::InitializeConfig {
             config: config_pda,
             system_program: solana_program::system_program::id(),
@@ -304,7 +365,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     });
 
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::SetNewTipDistributionProgram {
             config: config_pda,
             new_tip_distribution_program: args.tip_distribution_program_id,
@@ -316,7 +377,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
 
     if let Some(new_authority) = args.tip_distribution_authority {
         instructions.push(Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::SetNewAdmin {
                 config: config_pda,
                 new_admin: new_authority,
@@ -329,7 +390,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
 
     if let Some(new_authority) = args.stake_authority {
         instructions.push(Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::SetNewOracleAuthority {
                 config: config_pda,
                 new_oracle_authority: new_authority,
@@ -390,12 +451,13 @@ fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
 fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     // Creates cluster history account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
+    let program_id = args.validator_history_program_id;
 
     let mut instructions = vec![];
     let (cluster_history_pda, _) =
-        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &program_id);
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::InitializeClusterHistoryAccount {
             cluster_history_account: cluster_history_pda,
             system_program: solana_program::system_program::id(),
@@ -408,7 +470,7 @@ fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     let num_reallocs = (ClusterHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
     instructions.extend(vec![
         Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::ReallocClusterHistoryAccount {
                 cluster_history_account: cluster_history_pda,
                 system_program: solana_program::system_program::id(),
@@ -546,7 +608,8 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     });
 
     // Config account
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) =
+        Pubkey::find_program_address(&[Config::SEED], &args.validator_history_program_id);
     // Fetch config account
     let config_account = client
         .get_account(&config_pda)
@@ -567,7 +630,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         ..RpcProgramAccountsConfig::default()
     };
     let validator_history_accounts = client
-        .get_program_accounts_with_config(&validator_history::id(), gpa_config)
+        .get_program_accounts_with_config(&args.validator_history_program_id, gpa_config)
         .expect("Failed to get validator history accounts");
 
     let mut validator_histories = validator_history_accounts
@@ -728,7 +791,7 @@ fn command_history(args: History, client: RpcClient) {
     // Get single validator history account and display all epochs of history
     let (validator_history_pda, _) = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, args.validator.as_ref()],
-        &validator_history::ID,
+        &args.validator_history_program_id,
     );
     let validator_history_account = client
         .get_account(&validator_history_pda)
@@ -845,7 +908,7 @@ fn command_view_config(client: RpcClient) {
 
 fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
     let (cluster_history_pda, _) =
-        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &args.validator_history_program_id);
 
     let cluster_history_account = client
         .get_account(&cluster_history_pda)
@@ -1309,6 +1372,41 @@ async fn main() -> anyhow::Result<()> {
         Duration::from_secs(60),
         commitment_config,
     );
+    // Shared by the async commands; with --tpu its sends go straight to the leaders' TPU
+    let nonblocking_client = Arc::new(if args.tpu {
+        if !matches!(
+            args.commands,
+            Commands::BackfillValidatorAge(_)
+                | Commands::UpdateStakeHistory(_)
+                | Commands::CrankCopyClusterInfo(_)
+                | Commands::CrankCopyGossipContactInfo(_)
+                | Commands::CrankCopyTipDistributionAccount(_)
+                | Commands::CrankCopyVoteAccount(_)
+                | Commands::CrankCopyIsBamConnected(_)
+                | Commands::CrankCreateValidatorHistory(_)
+        ) {
+            return Err(anyhow!(
+                "--tpu is only supported by the crank-*, update-stake-history and backfill-validator-age commands"
+            ));
+        }
+        let websocket_url = args
+            .websocket_url
+            .clone()
+            .or_else(|| derive_websocket_url(&args.json_rpc_url))
+            .ok_or_else(|| anyhow!("Cannot derive a websocket URL, pass --websocket-url"))?;
+        new_tpu_rpc_client(
+            args.json_rpc_url.clone(),
+            &websocket_url,
+            Duration::from_secs(60),
+            CommitmentConfig::default(),
+        )
+        .await?
+    } else {
+        solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
+            args.json_rpc_url.clone(),
+            Duration::from_secs(60),
+        )
+    });
     match args.commands {
         Commands::InitConfig(args) => command_init_config(args, client),
         Commands::ReallocConfig(args) => command_realloc_config(args, client),
@@ -1329,31 +1427,31 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
         Commands::BackfillValidatorAge(command_args) => {
-            commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+            commands::backfill_validator_age::run(command_args, nonblocking_client).await
         }
         Commands::UpdateStakeHistory(command_args) => {
-            commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
+            commands::actions::update_stake_history::run(command_args, nonblocking_client).await?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
-            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_cluster_info::run(command_args, nonblocking_client).await?
         }
         Commands::CrankCopyGossipContactInfo(command_args) => {
-            let client = solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
-                args.json_rpc_url.clone(),
-                Duration::from_secs(60),
-            );
-            let client = Arc::new(client);
-            commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
+            commands::cranks::copy_gossip_contact_info::run(command_args, nonblocking_client)
+                .await?
         }
         Commands::CrankCopyTipDistributionAccount(command_args) => {
-            commands::cranks::copy_tip_distribution_account::run(command_args, args.json_rpc_url)
+            commands::cranks::copy_tip_distribution_account::run(command_args, nonblocking_client)
                 .await?
         }
         Commands::CrankCopyVoteAccount(command_args) => {
-            commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_vote_account::run(command_args, nonblocking_client).await?
+        }
+        Commands::CrankCreateValidatorHistory(command_args) => {
+            commands::cranks::create_validator_history::run(command_args, nonblocking_client)
+                .await?
         }
         Commands::CrankCopyIsBamConnected(command_args) => {
-            commands::cranks::copy_is_bam_connected::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_is_bam_connected::run(command_args, nonblocking_client).await?
         }
     };
 
