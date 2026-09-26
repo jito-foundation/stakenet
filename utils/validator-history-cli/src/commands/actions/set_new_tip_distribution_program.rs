@@ -21,12 +21,12 @@ pub struct SetNewTipDistributionProgram {
     tip_distribution_program_id: Pubkey,
 }
 
-pub fn run(args: SetNewTipDistributionProgram, client: RpcClient) {
+pub fn run(args: SetNewTipDistributionProgram, client: RpcClient, program_id: Pubkey) {
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
 
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     let instruction = Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::SetNewTipDistributionProgram {
             config: config_pda,
             new_tip_distribution_program: args.tip_distribution_program_id,
