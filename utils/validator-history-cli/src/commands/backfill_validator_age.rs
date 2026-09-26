@@ -40,7 +40,7 @@ struct SourceData {
     credits: u32,
 }
 
-pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
+pub async fn run(args: BackfillValidatorAge, rpc_url: String, program_id: Pubkey) {
     println!("/////////////////////////////////////////////////");
     println!("// Starting Backfill ////////////////////////////");
     println!("/////////////////////////////////////////////////");
@@ -59,7 +59,7 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
     let current_epoch = epoch_info.epoch;
     // Get all validator history accounts
     println!("Fetching onchain history accounts ...");
-    let accounts = get_all_validator_history_accounts(&client, validator_history::ID)
+    let accounts = get_all_validator_history_accounts(&client, program_id)
         .await
         .expect("Failed to fetch all validator history accounts");
     // Filter for valid vote accounts
@@ -70,7 +70,7 @@ pub async fn run(args: BackfillValidatorAge, rpc_url: String) {
     for chunk in validator_ages.chunks(10) {
         let instructions = chunk
             .iter()
-            .map(|tup| build_instruction(*tup, keypair.pubkey(), current_epoch as u16))
+            .map(|tup| build_instruction(*tup, keypair.pubkey(), current_epoch as u16, program_id))
             .collect::<Vec<_>>();
         // Retry up to 3 times on failure
         let mut retry_count = 0;
@@ -155,14 +155,16 @@ async fn validate_validator_history_accounts(
     validated
 }
 
-fn build_instruction(validator_age: (Pubkey, u32), signer: Pubkey, epoch: u16) -> Instruction {
+fn build_instruction(
+    validator_age: (Pubkey, u32),
+    signer: Pubkey,
+    epoch: u16,
+    program_id: Pubkey,
+) -> Instruction {
     let (vote_pubkey, age) = validator_age;
-    let config =
-        stakenet_sdk::utils::accounts::get_validator_history_config_address(&validator_history::ID);
-    let validator_history_pda = stakenet_sdk::utils::accounts::get_validator_history_address(
-        &vote_pubkey,
-        &validator_history::ID,
-    );
+    let config = stakenet_sdk::utils::accounts::get_validator_history_config_address(&program_id);
+    let validator_history_pda =
+        stakenet_sdk::utils::accounts::get_validator_history_address(&vote_pubkey, &program_id);
     let accounts = validator_history::accounts::UploadValidatorAge {
         validator_history_account: validator_history_pda,
         vote_account: vote_pubkey,
@@ -174,7 +176,7 @@ fn build_instruction(validator_age: (Pubkey, u32), signer: Pubkey, epoch: u16) -
         validator_age_last_updated_epoch: epoch,
     };
     Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: accounts.to_account_metas(None),
         data: data.data(),
     }
