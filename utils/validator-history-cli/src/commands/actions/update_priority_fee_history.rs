@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::anyhow;
 use clap::Parser;
-use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file, signer::Signer,
     transaction::Transaction,
@@ -53,7 +53,7 @@ pub struct UpdatePriorityFeeHistory {
     dry_run: bool,
 }
 
-pub async fn run(args: UpdatePriorityFeeHistory, rpc_url: String) -> anyhow::Result<()> {
+pub fn run(args: UpdatePriorityFeeHistory, client: RpcClient) -> anyhow::Result<()> {
     if args.blocks_produced > args.total_leader_slots {
         return Err(anyhow!(
             "blocks_produced ({}) cannot exceed total_leader_slots ({})",
@@ -65,14 +65,13 @@ pub async fn run(args: UpdatePriorityFeeHistory, rpc_url: String) -> anyhow::Res
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
-    let client = Arc::new(RpcClient::new(rpc_url));
 
     let program_id = validator_history::id();
     let config_address = get_validator_history_config_address(&program_id);
     let validator_history_account = get_validator_history_address(&args.vote_account, &program_id);
 
     // The program rejects future epochs with `EpochOutOfRange`; fail early with a clearer message.
-    let epoch_info = client.get_epoch_info().await?;
+    let epoch_info = client.get_epoch_info()?;
     if args.epoch > epoch_info.epoch {
         return Err(anyhow!(
             "Cannot write epoch {} because the current epoch is {}",
@@ -85,7 +84,6 @@ pub async fn run(args: UpdatePriorityFeeHistory, rpc_url: String) -> anyhow::Res
     // mismatched signer fails on-chain. Check it up front so the error is actionable.
     let config_account = client
         .get_account(&config_address)
-        .await
         .map_err(|e| anyhow!("Failed fetching config account {config_address}: {e}"))?;
     let config = Config::try_deserialize(&mut config_account.data.as_slice())
         .map_err(|e| anyhow!("Failed deserializing config account {config_address}: {e}"))?;
@@ -134,7 +132,6 @@ pub async fn run(args: UpdatePriorityFeeHistory, rpc_url: String) -> anyhow::Res
 
     let hash = client
         .get_latest_blockhash()
-        .await
         .map_err(|e| anyhow!("Failed to fetch latest blockhash: {e}"))?;
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
@@ -142,7 +139,7 @@ pub async fn run(args: UpdatePriorityFeeHistory, rpc_url: String) -> anyhow::Res
         &[keypair.clone()],
         hash,
     );
-    let signature = client.send_transaction(&transaction).await?;
+    let signature = client.send_transaction(&transaction)?;
     println!("Submit Result: {signature:?}");
 
     Ok(())
