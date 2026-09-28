@@ -25,11 +25,14 @@ pub struct SetNewPriorityFeeOracleAuthority {
     new_priority_fee_oracle_authority: Pubkey,
 }
 
-pub fn run(args: SetNewPriorityFeeOracleAuthority, client: RpcClient) -> anyhow::Result<()> {
+pub fn run(
+    args: SetNewPriorityFeeOracleAuthority,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
 
-    let program_id = validator_history::ID;
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
 
     let config_account = client

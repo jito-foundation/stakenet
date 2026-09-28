@@ -74,6 +74,10 @@ struct Args {
     #[arg(long, global = true, env, default_value = "confirmed")]
     commitment: CommitmentLevel,
 
+    /// Validator history program ID (Pubkey as base58 string)
+    #[arg(long, global = true, env, default_value_t = validator_history::ID)]
+    validator_history_program_id: Pubkey,
+
     #[command(subcommand)]
     commands: Commands,
 }
@@ -1310,6 +1314,7 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Args::parse();
     let commitment_config = args.commitment.into();
+    let program_id = args.validator_history_program_id;
     let client = RpcClient::new_with_timeout_and_commitment(
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
@@ -1345,10 +1350,18 @@ async fn main() -> anyhow::Result<()> {
                 .await?
         }
         Commands::SetNewPriorityFeeOracleAuthority(command_args) => {
-            commands::actions::set_new_priority_fee_oracle_authority::run(command_args, client)?
+            commands::actions::set_new_priority_fee_oracle_authority::run(
+                command_args,
+                client,
+                program_id,
+            )?
         }
         Commands::SetNewPriorityFeeDistributionProgram(command_args) => {
-            commands::actions::set_new_priority_fee_distribution_program::run(command_args, client)?
+            commands::actions::set_new_priority_fee_distribution_program::run(
+                command_args,
+                client,
+                program_id,
+            )?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
