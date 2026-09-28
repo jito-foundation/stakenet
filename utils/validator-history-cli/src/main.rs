@@ -42,7 +42,10 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
+        actions::set_new_priority_fee_distribution_program::SetNewPriorityFeeDistributionProgram,
+        actions::set_new_priority_fee_oracle_authority::SetNewPriorityFeeOracleAuthority,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
+        actions::update_priority_fee_history::UpdatePriorityFeeHistory,
         actions::update_stake_history::UpdateStakeHistory,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
@@ -95,6 +98,9 @@ enum Commands {
 
     // Actions
     UpdateStakeHistory(UpdateStakeHistory),
+    UpdatePriorityFeeHistory(UpdatePriorityFeeHistory),
+    SetNewPriorityFeeOracleAuthority(SetNewPriorityFeeOracleAuthority),
+    SetNewPriorityFeeDistributionProgram(SetNewPriorityFeeDistributionProgram),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
