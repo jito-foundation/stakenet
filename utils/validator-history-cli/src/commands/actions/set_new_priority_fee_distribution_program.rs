@@ -20,10 +20,6 @@ pub struct SetNewPriorityFeeDistributionProgram {
     /// New priority fee distribution program ID (Pubkey as base58 string)
     #[arg(long, env)]
     new_priority_fee_distribution_program: Pubkey,
-
-    /// Print the change that would be made without sending a transaction
-    #[arg(long, env, default_value = "false")]
-    dry_run: bool,
 }
 
 pub fn run(args: SetNewPriorityFeeDistributionProgram, client: RpcClient) -> anyhow::Result<()> {
@@ -74,11 +70,6 @@ pub fn run(args: SetNewPriorityFeeDistributionProgram, client: RpcClient) -> any
                 args.new_priority_fee_distribution_program
             ));
         }
-    }
-
-    if args.dry_run {
-        println!("Dry run: no transaction submitted");
-        return Ok(());
     }
 
     let instruction = Instruction {

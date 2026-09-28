@@ -23,10 +23,6 @@ pub struct SetNewPriorityFeeOracleAuthority {
     /// `total_priority_fees`, `total_leader_slots`, and `blocks_produced`.
     #[arg(long, env)]
     new_priority_fee_oracle_authority: Pubkey,
-
-    /// Print the change that would be made without sending a transaction
-    #[arg(long, env, default_value = "false")]
-    dry_run: bool,
 }
 
 pub fn run(args: SetNewPriorityFeeOracleAuthority, client: RpcClient) -> anyhow::Result<()> {
@@ -36,8 +32,6 @@ pub fn run(args: SetNewPriorityFeeOracleAuthority, client: RpcClient) -> anyhow:
     let program_id = validator_history::ID;
     let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
 
-    // `SetNewPriorityFeeOracleAuthority` has a `has_one = admin` constraint, so a mismatched
-    // signer fails on-chain. Check it up front so the error is actionable.
     let config_account = client
         .get_account(&config_pda)
         .map_err(|e| anyhow!("Failed fetching config account {config_pda}: {e}"))?;
@@ -68,11 +62,6 @@ pub fn run(args: SetNewPriorityFeeOracleAuthority, client: RpcClient) -> anyhow:
             "Refusing to set the priority fee oracle authority to {DNE_AUTHORITY}, which would \
              make update_priority_fee_history impossible to sign for"
         ));
-    }
-
-    if args.dry_run {
-        println!("Dry run: no transaction submitted");
-        return Ok(());
     }
 
     let instruction = Instruction {
