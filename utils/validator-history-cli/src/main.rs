@@ -1340,6 +1340,16 @@ async fn main() -> anyhow::Result<()> {
         Commands::UpdateStakeHistory(command_args) => {
             commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
         }
+        Commands::UpdatePriorityFeeHistory(command_args) => {
+            commands::actions::update_priority_fee_history::run(command_args, args.json_rpc_url)
+                .await?
+        }
+        Commands::SetNewPriorityFeeOracleAuthority(command_args) => {
+            commands::actions::set_new_priority_fee_oracle_authority::run(command_args, client)?
+        }
+        Commands::SetNewPriorityFeeDistributionProgram(command_args) => {
+            commands::actions::set_new_priority_fee_distribution_program::run(command_args, client)?
+        }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
         }
