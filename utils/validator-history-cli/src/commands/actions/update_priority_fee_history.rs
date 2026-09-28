@@ -47,13 +47,13 @@ pub struct UpdatePriorityFeeHistory {
     /// overwriting this entry.
     #[arg(long, env)]
     highest_oracle_recorded_slot: u64,
-
-    /// Print the values that would be submitted without sending a transaction
-    #[arg(long, env, default_value = "false")]
-    dry_run: bool,
 }
 
-pub fn run(args: UpdatePriorityFeeHistory, client: RpcClient) -> anyhow::Result<()> {
+pub fn run(
+    args: UpdatePriorityFeeHistory,
+    client: RpcClient,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     if args.blocks_produced > args.total_leader_slots {
         return Err(anyhow!(
             "blocks_produced ({}) cannot exceed total_leader_slots ({})",
@@ -66,7 +66,6 @@ pub fn run(args: UpdatePriorityFeeHistory, client: RpcClient) -> anyhow::Result<
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
 
-    let program_id = validator_history::id();
     let config_address = get_validator_history_config_address(&program_id);
     let validator_history_account = get_validator_history_address(&args.vote_account, &program_id);
 
@@ -77,6 +76,14 @@ pub fn run(args: UpdatePriorityFeeHistory, client: RpcClient) -> anyhow::Result<
             "Cannot write epoch {} because the current epoch is {}",
             args.epoch,
             epoch_info.epoch
+        ));
+    }
+
+    if args.highest_oracle_recorded_slot > epoch_info.absolute_slot {
+        return Err(anyhow!(
+            "Highest oracle recorded slot {} cannot exceed current slot {}",
+            args.highest_oracle_recorded_slot,
+            epoch_info.absolute_slot
         ));
     }
 
@@ -105,11 +112,6 @@ pub fn run(args: UpdatePriorityFeeHistory, client: RpcClient) -> anyhow::Result<
         "Block data updated at:     {}",
         args.highest_oracle_recorded_slot
     );
-
-    if args.dry_run {
-        println!("Dry run: no transaction submitted");
-        return Ok(());
-    }
 
     let instruction = Instruction {
         program_id,

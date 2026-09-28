@@ -1346,7 +1346,7 @@ async fn main() -> anyhow::Result<()> {
             commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
         }
         Commands::UpdatePriorityFeeHistory(command_args) => {
-            commands::actions::update_priority_fee_history::run(command_args, client)?
+            commands::actions::update_priority_fee_history::run(command_args, client, program_id)?
         }
         Commands::SetNewPriorityFeeOracleAuthority(command_args) => {
             commands::actions::set_new_priority_fee_oracle_authority::run(
