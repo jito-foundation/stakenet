@@ -1,4 +1,7 @@
-use solana_client::{client_error::ClientError, rpc_request::RpcError};
+use solana_client::{
+    client_error::{ClientError, ClientErrorKind},
+    rpc_request::RpcError,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,4 +24,16 @@ pub enum BlockMetadataKeeperError {
     SlotInFuture(u64),
     #[error("Other Error {0}")]
     OtherError(String),
+}
+
+impl BlockMetadataKeeperError {
+    /// Whether retrying this fetch could ever succeed.
+    pub fn is_permanent(&self) -> bool {
+        match self {
+            Self::SolanaClientError(err) => {
+                matches!(err.kind(), ClientErrorKind::SerdeJson(_))
+            }
+            _ => false,
+        }
+    }
 }

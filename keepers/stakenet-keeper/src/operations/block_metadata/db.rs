@@ -297,6 +297,42 @@ impl DBSlotInfo {
         Ok(())
     }
 
+    /// Records a failed block fetch attempt
+    pub fn record_block_fetch_failure(
+        connection: &mut Connection,
+        failures: &[(u64, String)], // slot, error
+        max_retries: u32,
+    ) -> Result<u64, BlockMetadataKeeperError> {
+        let bump_sql = "UPDATE slot_info
+         SET retry_count = retry_count + 1, error_string = ?
+         WHERE absolute_slot = ? AND state = ?";
+
+        let retire_sql = "UPDATE slot_info
+         SET priority_fees = 0, state = ?
+         WHERE absolute_slot = ? AND state = ? AND retry_count >= ?";
+
+        let mut retired_counter = 0;
+        let transaction = connection.transaction()?;
+        for (slot, error_string) in failures {
+            transaction.execute(
+                bump_sql,
+                params![error_string, slot, DBSlotInfoState::Created as u8],
+            )?;
+            retired_counter += transaction.execute(
+                retire_sql,
+                params![
+                    DBSlotInfoState::Error as u8,
+                    slot,
+                    DBSlotInfoState::Created as u8,
+                    max_retries
+                ],
+            )? as u64;
+        }
+        transaction.commit()?;
+
+        Ok(retired_counter)
+    }
+
     pub fn check_random_slot_exists_in_epoch(
         connection: &Connection,
         epoch: u64,
@@ -346,23 +382,25 @@ impl DBSlotInfo {
         Ok(unmapped_identities)
     }
 
+    /// Returns slots that still need block data fetched
     pub fn get_slots_needing_blocks(
         connection: &Connection,
         current_slot: u64,
+        min_epoch: u64,
     ) -> Result<Vec<u64>, BlockMetadataKeeperError> {
         // Prepare query to find slots in Created state before current_slot
         // Ordered by absolute_slot ASC (oldest first) with a limit
         let mut statement = connection.prepare(
             "SELECT absolute_slot
              FROM slot_info
-             WHERE state = ? AND absolute_slot < ?
+             WHERE state = ? AND absolute_slot < ? AND epoch >= ?
              ORDER BY absolute_slot ASC
              LIMIT 100000",
         )?;
 
         // Execute query with parameters
         let slot_results = statement.query_map(
-            params![DBSlotInfoState::Created as u8, current_slot],
+            params![DBSlotInfoState::Created as u8, current_slot, min_epoch],
             |row| row.get::<_, u64>(0),
         )?;
 
@@ -438,6 +476,7 @@ impl DBSlotInfo {
         epoch: u64,
         program_id: &Pubkey,
         priority_fee_oracle_authority: &Pubkey,
+        current_finalized_slot: u64,
     ) -> Result<HashMap<String, PriorityFeeAndBlockMetadataEntry>, BlockMetadataKeeperError> {
         // Fetch all entries for the given vote account and epoch
         let mut statement = connection.prepare(
@@ -496,6 +535,10 @@ impl DBSlotInfo {
             match slot_info.state {
                 DBSlotInfoState::Created => {
                     entry.blocks_left += 1;
+
+                    if slot_info.absolute_slot < current_finalized_slot {
+                        entry.blocks_pending += 1;
+                    }
                 }
                 DBSlotInfoState::Done => {
                     entry.blocks_produced += 1;
@@ -706,10 +749,150 @@ pub fn create_sqlite_tables(conn: &Connection) -> Result<(), BlockMetadataKeeper
           identity_key TEXT,
           priority_fees INTEGER,
           state INTEGER,
-          error_string TEXT
+          error_string TEXT,
+          retry_count INTEGER NOT NULL DEFAULT 0
       )",
         (),
     )?;
 
+    // Migration for databases created before `retry_count` existed. SQLite has no
+    // `ADD COLUMN IF NOT EXISTS`, so a duplicate-column error is the expected no-op.
+    if let Err(err) = conn.execute(
+        "ALTER TABLE slot_info ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+        (),
+    ) {
+        let message = err.to_string();
+        if !message.contains("duplicate column name") {
+            return Err(err.into());
+        }
+    }
+
+    // Supports the hot path in `get_slots_needing_blocks`.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_slot_info_state_epoch_slot
+         ON slot_info (state, epoch, absolute_slot)",
+        (),
+    )?;
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PROGRAM_ID: Pubkey = Pubkey::new_from_array([1u8; 32]);
+    const AUTHORITY: Pubkey = Pubkey::new_from_array([2u8; 32]);
+
+    fn test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        create_sqlite_tables(&conn).unwrap();
+        conn
+    }
+
+    fn insert_slot(
+        conn: &Connection,
+        slot: u64,
+        epoch: u64,
+        vote_key: &str,
+        state: DBSlotInfoState,
+    ) {
+        conn.execute(
+            "INSERT INTO slot_info (absolute_slot, relative_slot, epoch, vote_key, identity_key, priority_fees, state, error_string, retry_count)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)",
+            params![slot, 0u64, epoch, vote_key, "identity", 0u64, state as u8, ""],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_get_slots_needing_blocks_ignores_epochs_below_min() {
+        let conn = test_db();
+        // An old, permanently unfetchable slot must not crowd out current work.
+        insert_slot(&conn, 100, 850, "vote", DBSlotInfoState::Created);
+        insert_slot(&conn, 5_000, 1045, "vote", DBSlotInfoState::Created);
+
+        let slots = DBSlotInfo::get_slots_needing_blocks(&conn, 10_000, 1040).unwrap();
+
+        assert_eq!(slots, vec![5_000]);
+    }
+
+    #[test]
+    fn test_record_block_fetch_failure_retires_only_after_max_retries() {
+        let mut conn = test_db();
+        insert_slot(&conn, 100, 1045, "vote", DBSlotInfoState::Created);
+
+        let failures = vec![(100u64, "boom".to_string())];
+
+        // Below the retry budget the slot stays retryable.
+        let retired = DBSlotInfo::record_block_fetch_failure(&mut conn, &failures, 3).unwrap();
+        assert_eq!(retired, 0);
+        let state: u8 = conn
+            .query_row(
+                "SELECT state FROM slot_info WHERE absolute_slot = 100",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, DBSlotInfoState::Created as u8);
+
+        // Exceeding it retires the slot so it stops blocking the queue.
+        DBSlotInfo::record_block_fetch_failure(&mut conn, &failures, 3).unwrap();
+        let retired = DBSlotInfo::record_block_fetch_failure(&mut conn, &failures, 3).unwrap();
+        assert_eq!(retired, 1);
+        let state: u8 = conn
+            .query_row(
+                "SELECT state FROM slot_info WHERE absolute_slot = 100",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(state, DBSlotInfoState::Error as u8);
+    }
+
+    #[test]
+    fn test_entry_incomplete_when_finalized_slots_unfetched() {
+        let conn = test_db();
+        let vote = Pubkey::new_from_array([3u8; 32]).to_string();
+        insert_slot(&conn, 100, 1045, &vote, DBSlotInfoState::Done);
+        // Finalized but never fetched => aggregate is an undercount.
+        insert_slot(&conn, 101, 1045, &vote, DBSlotInfoState::Created);
+
+        let map = DBSlotInfo::get_priority_fee_and_block_metadata_entries(
+            &conn,
+            1045,
+            &PROGRAM_ID,
+            &AUTHORITY,
+            10_000,
+        )
+        .unwrap();
+
+        let entry = map.get(&vote).unwrap();
+        assert_eq!(entry.blocks_pending, 1);
+        assert!(!entry.is_complete());
+    }
+
+    #[test]
+    fn test_entry_complete_when_remaining_slots_are_in_future() {
+        let conn = test_db();
+        let vote = Pubkey::new_from_array([3u8; 32]).to_string();
+        insert_slot(&conn, 100, 1045, &vote, DBSlotInfoState::Done);
+        insert_slot(&conn, 101, 1045, &vote, DBSlotInfoState::BlockDNE);
+        // Not yet finalized, so it is not an undercount.
+        insert_slot(&conn, 20_000, 1045, &vote, DBSlotInfoState::Created);
+
+        let map = DBSlotInfo::get_priority_fee_and_block_metadata_entries(
+            &conn,
+            1045,
+            &PROGRAM_ID,
+            &AUTHORITY,
+            10_000,
+        )
+        .unwrap();
+
+        let entry = map.get(&vote).unwrap();
+        assert_eq!(entry.blocks_produced, 1);
+        assert_eq!(entry.blocks_pending, 0);
+        assert!(entry.is_complete());
+    }
 }

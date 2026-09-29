@@ -20,6 +20,9 @@ pub struct PriorityFeeAndBlockMetadataEntry {
     pub highest_done_slot: u64,        // Highest Done slot within an epoch
     // Aux Data
     pub blocks_left: u32,
+    /// Slots still in `Created` that are already finalized, i.e. block data we should
+    /// have been able to fetch but haven't. Non-zero means this entry is incomplete.
+    pub blocks_pending: u32,
     pub blocks_error: u32,
     pub blocks_missed: u32,
 }
@@ -46,10 +49,21 @@ impl PriorityFeeAndBlockMetadataEntry {
             blocks_produced: 0,
             highest_global_done_slot: 0,
             blocks_left: 0,
+            blocks_pending: 0,
             blocks_error: 0,
             blocks_missed: 0,
             highest_done_slot: 0,
         }
+    }
+
+    /// Whether this entry is complete enough to publish on chain.
+    ///
+    /// `set_total_priority_fees_and_block_metadata` overwrites the stored values
+    /// unconditionally, so publishing a partially-aggregated entry clobbers good data with
+    /// an undercount. Only publish once every finalized leader slot has been resolved to
+    /// `Done`, `BlockDNE`, or `Error`.
+    pub fn is_complete(&self) -> bool {
+        self.blocks_pending == 0
     }
 }
 

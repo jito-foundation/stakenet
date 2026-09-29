@@ -8,16 +8,14 @@ use regex::Regex;
 use rusqlite::Connection;
 use solana_client::{
     client_error::ClientErrorKind, nonblocking::rpc_client::RpcClient, rpc_config::RpcBlockConfig,
-    rpc_request::RpcError,
+    rpc_request::RpcError, rpc_request::RpcRequest,
 };
 use solana_metrics::{datapoint_error, datapoint_info};
 use solana_sdk::{
     commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Keypair, signer::Signer,
     slot_history,
 };
-use solana_transaction_status::{
-    RewardType, TransactionDetails, UiConfirmedBlock, UiTransactionEncoding,
-};
+use solana_transaction_status::{TransactionDetails, UiTransactionEncoding};
 use stakenet_sdk::{
     models::{cluster::Cluster, entries::UpdateInstruction, submit_stats::SubmitStats},
     utils::transactions::submit_chunk_instructions,
@@ -33,6 +31,9 @@ use crate::{
 };
 
 use super::errors::BlockMetadataKeeperError;
+
+/// Number of failed fetch attempts before a slot is retired to `Error` state.
+const MAX_BLOCK_FETCH_RETRIES: u32 = 25;
 
 fn _get_operation() -> KeeperOperations {
     KeeperOperations::BlockMetadataKeeper
@@ -202,6 +203,7 @@ async fn update_block_metadata(
 
     let epoch_range = (current_epoch - lookback_epochs - lookback_start_offset_epochs)
         ..(current_epoch + 1 - lookback_start_offset_epochs);
+    let min_tracked_epoch = epoch_range.start;
 
     // 1. Update Epoch Schedule
     info!("Updating epoch schedule");
@@ -284,11 +286,17 @@ async fn update_block_metadata(
     {
         info!("Updating blocks");
         let start_total_time = std::time::Instant::now();
-        let slots_needing_blocks =
-            DBSlotInfo::get_slots_needing_blocks(sqlite_connection, current_finalized_slot)?;
+        let slots_needing_blocks = DBSlotInfo::get_slots_needing_blocks(
+            sqlite_connection,
+            current_finalized_slot,
+            min_tracked_epoch,
+        )?;
         let chunk_size = 1000;
 
         let mut total_blocks = 0;
+        let mut total_retired = 0;
+        let mut total_permanent = 0;
+        let mut permanent_failures: Vec<(u64, String)> = vec![];
         for slots_needing_blocks in slots_needing_blocks.chunks(chunk_size) {
             // Add timing measurement before the operation
             let start_time = std::time::Instant::now();
@@ -304,26 +312,58 @@ async fn update_block_metadata(
             )
             .await;
             let mut ok_entries = vec![];
+            let mut failed_entries = vec![];
             for (slot, maybe_block_data) in block_data {
                 match maybe_block_data {
                     Ok(block) => {
-                        let priority_fees = block
-                            .rewards
-                            .unwrap()
-                            .into_iter()
-                            .filter(|r| r.reward_type == Some(RewardType::Fee))
-                            .map(|r| r.lamports as u64)
-                            .sum::<u64>();
+                        let priority_fees = sum_priority_fees(&block["rewards"]);
                         ok_entries.push((slot, priority_fees));
                     }
                     Err(err) => match err {
                         BlockMetadataKeeperError::SkippedBlock => {
                             DBSlotInfo::set_block_dne(sqlite_connection, slot)?;
                         }
+                        BlockMetadataKeeperError::SlotInFuture(_) => {
+                            debug!("Skipping future slot slot={slot}")
+                        }
+                        err if err.is_permanent() => {
+                            warn!("Permanent block fetch failure slot={slot}: {err:?}");
+                            permanent_failures.push((slot, format!("{err:?}")));
+                        }
                         _ => {
-                            debug!("Skipping block slot={slot}: {err:?}")
+                            debug!("Failed to fetch block slot={slot}: {err:?}");
+                            failed_entries.push((slot, format!("{err:?}")));
                         }
                     },
+                }
+            }
+
+            for (slot, error_string) in &permanent_failures {
+                if let Err(err) =
+                    DBSlotInfo::set_block_error(sqlite_connection, *slot, error_string)
+                {
+                    error!("Failed to record permanent failure slot={slot}: {err:?}");
+                } else {
+                    total_permanent += 1;
+                }
+            }
+            permanent_failures.clear();
+
+            if !failed_entries.is_empty() {
+                match DBSlotInfo::record_block_fetch_failure(
+                    sqlite_connection,
+                    &failed_entries,
+                    MAX_BLOCK_FETCH_RETRIES,
+                ) {
+                    Ok(retired) => {
+                        total_retired += retired;
+                        if retired > 0 {
+                            warn!(
+                                "Retired slots after {MAX_BLOCK_FETCH_RETRIES} failed fetch attempts count={retired}"
+                            );
+                        }
+                    }
+                    Err(err) => error!("Failed to record block fetch failures: {err:?}"),
                 }
             }
 
@@ -347,8 +387,10 @@ async fn update_block_metadata(
         let time_ms = start_total_time.elapsed().as_millis();
         let blocks_per_second = (total_blocks as f64 * 1000.0) / time_ms.max(1) as f64;
         info!(
-            "Finished updating blocks total={} seconds={:.3} blocks_per_second={:.1}",
+            "Finished updating blocks total={} retired={} permanent_failures={} seconds={:.3} blocks_per_second={:.1}",
             total_blocks,
+            total_retired,
+            total_permanent,
             time_ms as f64 / 1000.0,
             blocks_per_second
         );
@@ -360,6 +402,7 @@ async fn update_block_metadata(
         info!("Aggregating update transactions");
 
         let mut needs_update_counter = 0;
+        let mut incomplete_counter = 0;
 
         let start_time = std::time::Instant::now();
         for epoch in epoch_range {
@@ -369,6 +412,7 @@ async fn update_block_metadata(
                 epoch,
                 program_id,
                 &priority_fee_oracle_authority_keypair.pubkey(),
+                current_finalized_slot,
             ) {
                 Ok(map) => map,
                 Err(err) => {
@@ -423,6 +467,20 @@ async fn update_block_metadata(
                     }
                 }
 
+                let is_complete = entry.is_complete();
+                if needs_update && !is_complete {
+                    needs_update = false;
+                    incomplete_counter += 1;
+                    warn!(
+                        "Skipping incomplete entry epoch={} vote={} pending={} produced={} leader_slots={}",
+                        epoch,
+                        vote_account,
+                        entry.blocks_pending,
+                        entry.blocks_produced,
+                        entry.total_leader_slots
+                    );
+                }
+
                 // Calculate total lamports transferred
                 let (
                     priority_fee_distribution_account,
@@ -438,9 +496,11 @@ async fn update_block_metadata(
                 .await;
 
                 datapoint_info!(
-                  "pfh-block-info-0.0.9",
+                  "pfh-block-info-0.0.10",
                   ("blocks-error", entry.blocks_error, i64),
                   ("blocks-left", entry.blocks_left, i64),
+                  ("blocks-pending", entry.blocks_pending, i64),
+                  ("entry-is-complete", is_complete, bool),
                   ("blocks-missed", entry.blocks_missed, i64),
                   ("blocks-produced", entry.blocks_produced, i64),
                   ("epoch", entry.epoch, i64),
@@ -477,9 +537,10 @@ async fn update_block_metadata(
 
         let time_ms = start_time.elapsed().as_millis();
         info!(
-            "Aggregated update instructions instructions={} needs_update={} seconds={:.3}",
+            "Aggregated update instructions instructions={} needs_update={} skipped_incomplete={} seconds={:.3}",
             ixs.len(),
             needs_update_counter,
+            incomplete_counter,
             time_ms as f64 / 1000.0,
         );
     }
@@ -578,6 +639,21 @@ pub async fn get_leader_schedule_safe(
     }
 }
 
+/// Sums the priority (transaction) fees credited to the block leader.
+fn sum_priority_fees(rewards: &serde_json::Value) -> u64 {
+    rewards
+        .as_array()
+        .map(|rewards| {
+            rewards
+                .iter()
+                .filter(|reward| reward.get("rewardType").and_then(|t| t.as_str()) == Some("Fee"))
+                .filter_map(|reward| reward.get("lamports").and_then(|l| l.as_i64()))
+                .map(|lamports| lamports.max(0) as u64)
+                .sum()
+        })
+        .unwrap_or(0)
+}
+
 async fn get_bulk_block_safe(
     client: &RpcClient,
     slots: &[u64],
@@ -586,7 +662,7 @@ async fn get_bulk_block_safe(
     encoding: Option<UiTransactionEncoding>,
     transaction_details: Option<TransactionDetails>,
     chunk_size: Option<usize>,
-) -> Vec<(u64, Result<UiConfirmedBlock, BlockMetadataKeeperError>)> {
+) -> Vec<(u64, Result<serde_json::Value, BlockMetadataKeeperError>)> {
     let chunk_size = chunk_size.unwrap_or(50);
 
     let mut results = vec![];
@@ -627,24 +703,22 @@ async fn get_block_safe(
     maybe_redundant_rpc_urls: &Option<Arc<Vec<RpcClient>>>,
     encoding: Option<UiTransactionEncoding>,
     transaction_details: Option<TransactionDetails>,
-) -> Result<UiConfirmedBlock, BlockMetadataKeeperError> {
+) -> Result<serde_json::Value, BlockMetadataKeeperError> {
     let mut current_client = client;
     let mut redundant_rpc_index = 0;
 
     let slot_skipped_regex = Regex::new(r"^Slot [\d]+ was skipped").unwrap();
 
     loop {
+        let config = RpcBlockConfig {
+            encoding,
+            transaction_details,
+            rewards: Some(true),
+            commitment: Some(CommitmentConfig::finalized()),
+            max_supported_transaction_version: Some(0),
+        };
         let block_res = current_client
-            .get_block_with_config(
-                slot,
-                RpcBlockConfig {
-                    encoding,
-                    transaction_details,
-                    rewards: Some(true),
-                    commitment: Some(CommitmentConfig::finalized()),
-                    max_supported_transaction_version: Some(0),
-                },
-            )
+            .send::<serde_json::Value>(RpcRequest::GetBlock, serde_json::json!([slot, config]))
             .await;
         match block_res {
             Ok(block) => return Ok(block),
@@ -699,5 +773,86 @@ async fn get_block_safe(
                 _ => return Err(BlockMetadataKeeperError::SolanaClientError(err)),
             },
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_sum_priority_fees_ignores_unknown_reward_types() {
+        // Shape taken from testnet slot 445052256, which previously failed to decode
+        // because `VATDebit` is not a known `RewardType` in our pinned crate version.
+        let rewards = json!([
+            {"pubkey": "a", "lamports": 5997500, "rewardType": "Fee"},
+            {"pubkey": "b", "lamports": 12345, "rewardType": "VATDebit"},
+            {"pubkey": "c", "lamports": 999, "rewardType": "Voting"},
+            {"pubkey": "d", "lamports": 42, "rewardType": "DeactivatedStake"},
+        ]);
+
+        assert_eq!(sum_priority_fees(&rewards), 5997500);
+    }
+
+    #[test]
+    fn test_sum_priority_fees_sums_multiple_fee_rewards() {
+        let rewards = json!([
+            {"lamports": 100, "rewardType": "Fee"},
+            {"lamports": 250, "rewardType": "Fee"},
+            {"lamports": 900, "rewardType": "Staking"},
+        ]);
+
+        assert_eq!(sum_priority_fees(&rewards), 350);
+    }
+
+    #[test]
+    fn test_sum_priority_fees_handles_missing_and_malformed() {
+        assert_eq!(sum_priority_fees(&json!(null)), 0);
+        assert_eq!(sum_priority_fees(&json!([])), 0);
+        // Missing rewardType or lamports must not panic.
+        assert_eq!(sum_priority_fees(&json!([{"lamports": 5}])), 0);
+        assert_eq!(sum_priority_fees(&json!([{"rewardType": "Fee"}])), 0);
+        // Negative fee lamports clamp to zero rather than wrapping.
+        assert_eq!(
+            sum_priority_fees(&json!([{"lamports": -5, "rewardType": "Fee"}])),
+            0
+        );
+    }
+
+    /// Guards the hand-built param array in `get_block_safe`. Using `RpcRequest::GetBlock`
+    /// directly means we no longer get the client's typed param construction, so this pins
+    /// the wire format: `[slot, config]` with camelCase config keys.
+    #[test]
+    fn test_get_block_params_serialize_to_expected_wire_format() {
+        let config = RpcBlockConfig {
+            encoding: Some(UiTransactionEncoding::Json),
+            transaction_details: Some(TransactionDetails::None),
+            rewards: Some(true),
+            commitment: Some(CommitmentConfig::finalized()),
+            max_supported_transaction_version: Some(0),
+        };
+        let params = json!([123u64, config]);
+
+        assert_eq!(params[0], json!(123u64));
+        assert_eq!(params[1]["encoding"], json!("json"));
+        assert_eq!(params[1]["transactionDetails"], json!("none"));
+        assert_eq!(params[1]["rewards"], json!(true));
+        assert_eq!(params[1]["commitment"], json!("finalized"));
+        assert_eq!(params[1]["maxSupportedTransactionVersion"], json!(0));
+    }
+
+    #[test]
+    fn test_serde_errors_are_permanent_others_are_not() {
+        let serde_err: BlockMetadataKeeperError = solana_client::client_error::ClientError::from(
+            ClientErrorKind::SerdeJson(serde_json::from_str::<u8>("notjson").unwrap_err()),
+        )
+        .into();
+        assert!(serde_err.is_permanent());
+
+        // Transient conditions must keep their retry budget.
+        assert!(!BlockMetadataKeeperError::SkippedBlock.is_permanent());
+        assert!(!BlockMetadataKeeperError::SlotInFuture(1).is_permanent());
+        assert!(!BlockMetadataKeeperError::OtherError("x".into()).is_permanent());
     }
 }
