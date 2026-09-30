@@ -42,7 +42,10 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
+        actions::set_new_priority_fee_distribution_program::SetNewPriorityFeeDistributionProgram,
+        actions::set_new_priority_fee_oracle_authority::SetNewPriorityFeeOracleAuthority,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
+        actions::update_priority_fee_history::UpdatePriorityFeeHistory,
         actions::update_stake_history::UpdateStakeHistory,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
@@ -99,6 +102,9 @@ enum Commands {
 
     // Actions
     UpdateStakeHistory(UpdateStakeHistory),
+    UpdatePriorityFeeHistory(UpdatePriorityFeeHistory),
+    SetNewPriorityFeeOracleAuthority(SetNewPriorityFeeOracleAuthority),
+    SetNewPriorityFeeDistributionProgram(SetNewPriorityFeeDistributionProgram),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
@@ -1371,6 +1377,23 @@ async fn main() -> anyhow::Result<()> {
                 program_id,
             )
             .await?
+        }
+        Commands::UpdatePriorityFeeHistory(command_args) => {
+            commands::actions::update_priority_fee_history::run(command_args, client, program_id)?
+        }
+        Commands::SetNewPriorityFeeOracleAuthority(command_args) => {
+            commands::actions::set_new_priority_fee_oracle_authority::run(
+                command_args,
+                client,
+                program_id,
+            )?
+        }
+        Commands::SetNewPriorityFeeDistributionProgram(command_args) => {
+            commands::actions::set_new_priority_fee_distribution_program::run(
+                command_args,
+                client,
+                program_id,
+            )?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
             commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url, program_id)
