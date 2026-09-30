@@ -19,7 +19,10 @@ use crate::{
             get_directed_stake_tickets, get_directed_stake_whitelist_address,
             get_stake_pool_account, get_steward_config_account, get_validator_list_account,
         },
-        helpers::{aggregate_validator_targets, calculate_conversion_rate_bps, get_token_balance},
+        helpers::{
+            aggregate_validator_targets, calculate_conversion_rate_bps, calculate_share_lamports,
+            get_token_balance, split_lamports_pro_rata,
+        },
     },
 };
 
@@ -259,6 +262,87 @@ pub async fn compute_coinbase_targets(
             instructions.push(ix);
         }
     }
+
+    Ok(instructions)
+}
+
+/// Share of total JitoSOL TVL that is directed to Jito-operated validators, in basis points.
+///
+/// 2,500 bps = 25%. At ~9.2M SOL of TVL this directs ~2.3M SOL.
+pub const JITOSOL_PRIME_SHARE_BPS: u16 = 2_500;
+
+/// Computes the directed stake targets for the Jito-operated ("JitoSOL Prime") validators.
+///
+/// Directs [`JITOSOL_PRIME_SHARE_BPS`] of total JitoSOL TVL to the supplied Jito-operated vote
+/// accounts, split pro-rata (equally) between them. At the current TVL of ~9.2M SOL this moves
+/// ~2.3M SOL of delegation.
+///
+/// # Process Overview
+///
+/// 1. Reads total pool lamports from the stake pool to determine current TVL.
+/// 2. Computes the Jito-operated share as `total_lamports * share_bps / 10_000`.
+/// 3. Splits that share pro-rata across the supplied vote accounts, distributing the integer
+///    division remainder so the parts sum exactly to the share.
+/// 4. Emits one `CopyDirectedStakeTargets` instruction per vote account found in the validator
+///    list.
+///
+/// # Return Value
+///
+/// Returns an empty vector if `jitosol_prime_vote_pubkeys` is empty. Vote accounts that are not
+/// present in the on-chain validator list are skipped; their share is **not** redistributed to
+/// the remaining validators, so the on-chain total may be less than the full share.
+pub async fn compute_jitosol_prime_targets(
+    client: Arc<RpcClient>,
+    steward_config: &Pubkey,
+    authority_pubkey: &Pubkey,
+    program_id: &Pubkey,
+    jitosol_prime_vote_pubkeys: &[Pubkey],
+    share_bps: u16,
+) -> Result<Vec<Instruction>, JitoInstructionError> {
+    if jitosol_prime_vote_pubkeys.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let directed_stake_meta_pda = get_directed_stake_meta_address(steward_config, program_id);
+    let config_account = get_steward_config_account(&client, steward_config).await?;
+    let stake_pool_account = get_stake_pool_account(&client, &config_account.stake_pool).await?;
+    let validator_list_address = stake_pool_account.validator_list;
+    let validator_list_account =
+        get_validator_list_account(&client, &validator_list_address).await?;
+
+    let total_share_lamports =
+        calculate_share_lamports(stake_pool_account.total_lamports, share_bps)?;
+    let per_validator_lamports =
+        split_lamports_pro_rata(total_share_lamports, jitosol_prime_vote_pubkeys.len());
+
+    let instructions = jitosol_prime_vote_pubkeys
+        .iter()
+        .zip(per_validator_lamports)
+        .filter_map(|(vote_pubkey, total_target_lamports)| {
+            let validator_list_index = validator_list_account
+                .validators
+                .iter()
+                .position(|v| v.vote_account_address.eq(vote_pubkey))?;
+
+            Some(Instruction {
+                program_id: *program_id,
+                accounts: jito_steward::accounts::CopyDirectedStakeTargets {
+                    config: *steward_config,
+                    directed_stake_meta: directed_stake_meta_pda,
+                    authority: *authority_pubkey,
+                    clock: solana_sdk::sysvar::clock::id(),
+                    validator_list: validator_list_address,
+                }
+                .to_account_metas(None),
+                data: jito_steward::instruction::CopyDirectedStakeTargets {
+                    vote_pubkey: *vote_pubkey,
+                    total_target_lamports,
+                    validator_list_index: validator_list_index as u32,
+                }
+                .data(),
+            })
+        })
+        .collect();
 
     Ok(instructions)
 }

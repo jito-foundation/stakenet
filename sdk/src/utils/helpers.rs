@@ -293,6 +293,58 @@ pub fn calculate_conversion_rate_bps(
         .ok_or(JitoInstructionError::ArithmeticError)
 }
 
+/// Calculates a share of `total_lamports` expressed in basis points.
+///
+/// Formula: `(total_lamports * share_bps) / 10,000`
+///
+/// # Example
+///
+/// ```
+/// use stakenet_sdk::utils::helpers::calculate_share_lamports;
+///
+/// // 25% of a 9.2M SOL pool is ~2.3M SOL
+/// let share = calculate_share_lamports(9_200_000_000_000_000, 2_500)?;
+/// assert_eq!(share, 2_300_000_000_000_000);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn calculate_share_lamports(
+    total_lamports: u64,
+    share_bps: u16,
+) -> Result<u64, JitoInstructionError> {
+    if share_bps > BASIS_POINTS_MAX {
+        return Err(JitoInstructionError::Custom(format!(
+            "share_bps ({share_bps}) cannot exceed {BASIS_POINTS_MAX}"
+        )));
+    }
+
+    (total_lamports as u128)
+        .checked_mul(share_bps as u128)
+        .and_then(|n| n.checked_div(BASIS_POINTS_MAX as u128))
+        .map(|n| n as u64)
+        .ok_or(JitoInstructionError::ArithmeticError)
+}
+
+/// Splits `total_lamports` pro-rata across `num_targets` equally weighted targets.
+///
+/// Each target receives `total_lamports / num_targets`, and the remainder from integer
+/// division is spread one lamport at a time across the leading targets so that the
+/// returned amounts always sum to exactly `total_lamports`.
+///
+/// Returns an empty vector when `num_targets` is `0`.
+pub fn split_lamports_pro_rata(total_lamports: u64, num_targets: usize) -> Vec<u64> {
+    if num_targets == 0 {
+        return Vec::new();
+    }
+
+    let num_targets_u64 = num_targets as u64;
+    let base = total_lamports / num_targets_u64;
+    let remainder = total_lamports % num_targets_u64;
+
+    (0..num_targets_u64)
+        .map(|i| if i < remainder { base + 1 } else { base })
+        .collect()
+}
+
 /// Aggregates validator target delegations from all tickets.
 ///
 /// For each ticket and each validator preference, calculates the lamports to allocate
@@ -343,6 +395,7 @@ pub fn aggregate_validator_targets(
 mod tests {
     use super::*;
     use jito_steward::{utils::U8Bool, DirectedStakePreference};
+    use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
     #[test]
     fn test_is_live_vote_account_true_for_vote_owned_account() {
@@ -419,6 +472,48 @@ mod tests {
 
         // Test zero pool supply
         assert!(calculate_conversion_rate_bps(1_000_000, 0).is_err());
+    }
+
+    #[test]
+    fn test_calculate_share_lamports() {
+        // 25% of ~9.2M SOL is ~2.3M SOL
+        let total_lamports = 9_200_000 * LAMPORTS_PER_SOL;
+        let share = calculate_share_lamports(total_lamports, 2_500).unwrap();
+        assert_eq!(share, 2_300_000 * LAMPORTS_PER_SOL);
+
+        // Full share and no share
+        assert_eq!(
+            calculate_share_lamports(total_lamports, BASIS_POINTS_MAX).unwrap(),
+            total_lamports
+        );
+        assert_eq!(calculate_share_lamports(total_lamports, 0).unwrap(), 0);
+
+        // Rounds down
+        assert_eq!(calculate_share_lamports(3, 2_500).unwrap(), 0);
+
+        // No overflow at u64::MAX, since the math is done in u128
+        assert_eq!(
+            calculate_share_lamports(u64::MAX, BASIS_POINTS_MAX).unwrap(),
+            u64::MAX
+        );
+
+        // Rejects shares above 100%
+        assert!(calculate_share_lamports(total_lamports, BASIS_POINTS_MAX + 1).is_err());
+    }
+
+    #[test]
+    fn test_split_lamports_pro_rata() {
+        assert!(split_lamports_pro_rata(1_000, 0).is_empty());
+        assert_eq!(split_lamports_pro_rata(1_000, 1), vec![1_000]);
+        assert_eq!(split_lamports_pro_rata(1_000, 4), vec![250; 4]);
+
+        // Remainder is spread across the leading targets and the parts sum to the total
+        let parts = split_lamports_pro_rata(1_002, 4);
+        assert_eq!(parts, vec![251, 251, 250, 250]);
+        assert_eq!(parts.iter().sum::<u64>(), 1_002);
+
+        let parts = split_lamports_pro_rata(2_300_000 * LAMPORTS_PER_SOL + 2, 3);
+        assert_eq!(parts.iter().sum::<u64>(), 2_300_000 * LAMPORTS_PER_SOL + 2);
     }
 
     #[test]
