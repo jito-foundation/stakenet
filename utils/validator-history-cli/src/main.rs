@@ -42,7 +42,10 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
+        actions::set_new_priority_fee_distribution_program::SetNewPriorityFeeDistributionProgram,
+        actions::set_new_priority_fee_oracle_authority::SetNewPriorityFeeOracleAuthority,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
+        actions::update_priority_fee_history::UpdatePriorityFeeHistory,
         actions::update_stake_history::UpdateStakeHistory,
         cranks::{
             copy_cluster_info::CrankCopyClusterInfo,
@@ -71,6 +74,10 @@ struct Args {
     #[arg(long, global = true, env, default_value = "confirmed")]
     commitment: CommitmentLevel,
 
+    /// Validator history program ID (Pubkey as base58 string)
+    #[arg(long, global = true, env, default_value_t = validator_history::ID)]
+    validator_history_program_id: Pubkey,
+
     #[command(subcommand)]
     commands: Commands,
 }
@@ -95,6 +102,9 @@ enum Commands {
 
     // Actions
     UpdateStakeHistory(UpdateStakeHistory),
+    UpdatePriorityFeeHistory(UpdatePriorityFeeHistory),
+    SetNewPriorityFeeOracleAuthority(SetNewPriorityFeeOracleAuthority),
+    SetNewPriorityFeeDistributionProgram(SetNewPriorityFeeDistributionProgram),
 
     // Cranks
     CrankCopyClusterInfo(CrankCopyClusterInfo),
@@ -283,14 +293,14 @@ struct StakeByCountry {
     ip_info_token: String,
 }
 
-fn command_init_config(args: InitConfig, client: RpcClient) {
+fn command_init_config(args: InitConfig, client: RpcClient, program_id: Pubkey) {
     // Creates config account, sets tip distribution program address, and optionally sets authority for commission history program
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
 
     let mut instructions = vec![];
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::InitializeConfig {
             config: config_pda,
             system_program: solana_program::system_program::id(),
@@ -304,7 +314,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     });
 
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::SetNewTipDistributionProgram {
             config: config_pda,
             new_tip_distribution_program: args.tip_distribution_program_id,
@@ -316,7 +326,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
 
     if let Some(new_authority) = args.tip_distribution_authority {
         instructions.push(Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::SetNewAdmin {
                 config: config_pda,
                 new_admin: new_authority,
@@ -329,7 +339,7 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
 
     if let Some(new_authority) = args.stake_authority {
         instructions.push(Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::SetNewOracleAuthority {
                 config: config_pda,
                 new_oracle_authority: new_authority,
@@ -356,12 +366,12 @@ fn command_init_config(args: InitConfig, client: RpcClient) {
     println!("Signature: {signature}");
 }
 
-fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
+fn command_realloc_config(args: ReallocConfig, client: RpcClient, program_id: Pubkey) {
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
 
     let instructions = vec![Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::ReallocConfigAccount {
             config_account: config_pda,
             system_program: solana_program::system_program::id(),
@@ -387,15 +397,15 @@ fn command_realloc_config(args: ReallocConfig, client: RpcClient) {
     println!("Signature: {signature}");
 }
 
-fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
+fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient, program_id: Pubkey) {
     // Creates cluster history account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
 
     let mut instructions = vec![];
     let (cluster_history_pda, _) =
-        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &program_id);
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::InitializeClusterHistoryAccount {
             cluster_history_account: cluster_history_pda,
             system_program: solana_program::system_program::id(),
@@ -408,7 +418,7 @@ fn command_init_cluster_history(args: InitClusterHistory, client: RpcClient) {
     let num_reallocs = (ClusterHistory::SIZE - MAX_ALLOC_BYTES) / MAX_ALLOC_BYTES + 1;
     instructions.extend(vec![
         Instruction {
-            program_id: validator_history::ID,
+            program_id,
             accounts: validator_history::accounts::ReallocClusterHistoryAccount {
                 cluster_history_account: cluster_history_pda,
                 system_program: solana_program::system_program::id(),
@@ -544,7 +554,7 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
     }
 }
 
-fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
+fn command_cranker_status(args: CrankerStatus, client: RpcClient, program_id: Pubkey) {
     // Displays current epoch ValidatorHistory entry for each validator, and summary of updated fields
     let epoch = args.epoch.unwrap_or_else(|| {
         client
@@ -554,7 +564,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     });
 
     // Config account
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     // Fetch config account
     let config_account = client
         .get_account(&config_pda)
@@ -575,7 +585,7 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
         ..RpcProgramAccountsConfig::default()
     };
     let validator_history_accounts = client
-        .get_program_accounts_with_config(&validator_history::id(), gpa_config)
+        .get_program_accounts_with_config(&program_id, gpa_config)
         .expect("Failed to get validator history accounts");
 
     let mut validator_histories = validator_history_accounts
@@ -732,11 +742,11 @@ fn command_cranker_status(args: CrankerStatus, client: RpcClient) {
     }
 }
 
-fn command_history(args: History, client: RpcClient) {
+fn command_history(args: History, client: RpcClient, program_id: Pubkey) {
     // Get single validator history account and display all epochs of history
     let (validator_history_pda, _) = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, args.validator.as_ref()],
-        &validator_history::ID,
+        &program_id,
     );
     let validator_history_account = client
         .get_account(&validator_history_pda)
@@ -830,9 +840,9 @@ fn command_history(args: History, client: RpcClient) {
     }
 }
 
-fn command_view_config(client: RpcClient) {
+fn command_view_config(client: RpcClient, program_id: Pubkey) {
     // Get single validator history account and display all epochs of history
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     let config_account = client
         .get_account(&config_pda)
         .expect("Failed to get validator history account");
@@ -851,9 +861,9 @@ fn command_view_config(client: RpcClient) {
     println!("Validator History Account Counter: {}\n", config.counter);
 }
 
-fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
+fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient, program_id: Pubkey) {
     let (cluster_history_pda, _) =
-        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &program_id);
 
     let cluster_history_account = client
         .get_account(&cluster_history_pda)
@@ -912,15 +922,19 @@ fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient) {
     }
 }
 
-fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcClient) {
+fn command_backfill_cluster_history(
+    args: BackfillClusterHistory,
+    client: RpcClient,
+    program_id: Pubkey,
+) {
     // Backfill cluster history account for a specific epoch
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
     sleep(Duration::from_secs(5));
 
     let mut instructions = vec![];
     let (cluster_history_pda, _) =
-        Pubkey::find_program_address(&[ClusterHistory::SEED], &validator_history::ID);
-    let (config, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+        Pubkey::find_program_address(&[ClusterHistory::SEED], &program_id);
+    let (config, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     let cluster_history_account = client
         .get_account(&cluster_history_pda)
         .expect("Failed to get cluster history account");
@@ -935,7 +949,7 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     }
 
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::BackfillTotalBlocks {
             cluster_history_account: cluster_history_pda,
             config,
@@ -965,14 +979,18 @@ fn command_backfill_cluster_history(args: BackfillClusterHistory, client: RpcCli
     println!("Signature: {signature}");
 }
 
-fn command_update_oracle_authority(args: UpdateOracleAuthority, client: RpcClient) {
+fn command_update_oracle_authority(
+    args: UpdateOracleAuthority,
+    client: RpcClient,
+    program_id: Pubkey,
+) {
     // Update oracle authority for config account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
 
     let mut instructions = vec![];
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
     instructions.push(Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::SetNewOracleAuthority {
             config: config_pda,
             new_oracle_authority: args.oracle_authority,
@@ -998,7 +1016,7 @@ fn command_update_oracle_authority(args: UpdateOracleAuthority, client: RpcClien
     println!("Signature: {signature}");
 }
 
-async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
+async fn command_stake_by_country(args: StakeByCountry, client: RpcClient, program_id: Pubkey) {
     let ip_config = IpInfoConfig {
         token: Some(args.ip_info_token),
         ..Default::default()
@@ -1063,7 +1081,7 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
                     ValidatorHistory::SEED,
                     validator.vote_account_address.as_ref(),
                 ],
-                &validator_history::ID,
+                &program_id,
             );
             validator_history_pda
         })
@@ -1211,8 +1229,8 @@ async fn command_stake_by_country(args: StakeByCountry, client: RpcClient) {
     }
 }
 
-fn command_get_config(client: RpcClient) {
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+fn command_get_config(client: RpcClient, program_id: Pubkey) {
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
 
     match client.get_account(&config_pda) {
         Ok(account) => match Config::try_deserialize(&mut account.data.as_slice()) {
@@ -1272,7 +1290,7 @@ async fn command_dune_priority_fee_backfill(args: DunePriorityFeeBackfill, clien
     println!("Total entries written: {entries_written}");
 }
 
-fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
+fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient, program_id: Pubkey) {
     // Upload validator age for a specific vote account
     let keypair = read_keypair_file(args.keypair_path).expect("Failed reading keypair file");
 
@@ -1285,14 +1303,14 @@ fn command_upload_validator_age(args: UploadValidatorAge, client: RpcClient) {
     // Get validator history account address
     let (validator_history_pda, _) = Pubkey::find_program_address(
         &[ValidatorHistory::SEED, args.vote_account.as_ref()],
-        &validator_history::ID,
+        &program_id,
     );
 
     // Get config account address
-    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &validator_history::ID);
+    let (config_pda, _) = Pubkey::find_program_address(&[Config::SEED], &program_id);
 
     let instruction = Instruction {
-        program_id: validator_history::ID,
+        program_id,
         accounts: validator_history::accounts::UploadValidatorAge {
             validator_history_account: validator_history_pda,
             vote_account: args.vote_account,
@@ -1334,38 +1352,82 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Args::parse();
     let commitment_config = args.commitment.into();
+    let program_id = args.validator_history_program_id;
     let client = RpcClient::new_with_timeout_and_commitment(
         args.json_rpc_url.clone(),
         Duration::from_secs(60),
         commitment_config,
     );
     match args.commands {
-        Commands::InitConfig(args) => command_init_config(args, client),
-        Commands::ReallocConfig(args) => command_realloc_config(args, client),
-        Commands::CrankerStatus(args) => command_cranker_status(args, client),
-        Commands::InitClusterHistory(args) => command_init_cluster_history(args, client),
-        Commands::ClusterHistoryStatus(args) => command_cluster_history(args, client),
-        Commands::ViewConfig => command_view_config(client),
-        Commands::History(args) => command_history(args, client),
-        Commands::BackfillClusterHistory(args) => command_backfill_cluster_history(args, client),
-        Commands::UpdateOracleAuthority(args) => command_update_oracle_authority(args, client),
-        Commands::SetNewTipDistributionProgram(args) => {
-            commands::actions::set_new_tip_distribution_program::run(args, client)
+        Commands::InitConfig(command_args) => command_init_config(command_args, client, program_id),
+        Commands::ReallocConfig(command_args) => {
+            command_realloc_config(command_args, client, program_id)
         }
-        Commands::StakeByCountry(args) => command_stake_by_country(args, client).await,
-        Commands::GetConfig => command_get_config(client),
-        Commands::DunePriorityFeeBackfill(args) => {
-            command_dune_priority_fee_backfill(args, client).await
+        Commands::CrankerStatus(command_args) => {
+            command_cranker_status(command_args, client, program_id)
         }
-        Commands::UploadValidatorAge(args) => command_upload_validator_age(args, client),
+        Commands::InitClusterHistory(command_args) => {
+            command_init_cluster_history(command_args, client, program_id)
+        }
+        Commands::ClusterHistoryStatus(command_args) => {
+            command_cluster_history(command_args, client, program_id)
+        }
+        Commands::ViewConfig => command_view_config(client, program_id),
+        Commands::History(command_args) => command_history(command_args, client, program_id),
+        Commands::BackfillClusterHistory(command_args) => {
+            command_backfill_cluster_history(command_args, client, program_id)
+        }
+        Commands::UpdateOracleAuthority(command_args) => {
+            command_update_oracle_authority(command_args, client, program_id)
+        }
+        Commands::SetNewTipDistributionProgram(command_args) => {
+            commands::actions::set_new_tip_distribution_program::run(
+                command_args,
+                client,
+                program_id,
+            )
+        }
+        Commands::StakeByCountry(command_args) => {
+            command_stake_by_country(command_args, client, program_id).await
+        }
+        Commands::GetConfig => command_get_config(client, program_id),
+        Commands::DunePriorityFeeBackfill(command_args) => {
+            command_dune_priority_fee_backfill(command_args, client).await
+        }
+        Commands::UploadValidatorAge(command_args) => {
+            command_upload_validator_age(command_args, client, program_id)
+        }
         Commands::BackfillValidatorAge(command_args) => {
-            commands::backfill_validator_age::run(command_args, args.json_rpc_url).await
+            commands::backfill_validator_age::run(command_args, args.json_rpc_url, program_id).await
         }
         Commands::UpdateStakeHistory(command_args) => {
-            commands::actions::update_stake_history::run(command_args, args.json_rpc_url).await?
+            commands::actions::update_stake_history::run(
+                command_args,
+                args.json_rpc_url,
+                program_id,
+            )
+            .await?
+        }
+        Commands::UpdatePriorityFeeHistory(command_args) => {
+            commands::actions::update_priority_fee_history::run(command_args, client, program_id)?
+        }
+        Commands::SetNewPriorityFeeOracleAuthority(command_args) => {
+            commands::actions::set_new_priority_fee_oracle_authority::run(
+                command_args,
+                client,
+                program_id,
+            )?
+        }
+        Commands::SetNewPriorityFeeDistributionProgram(command_args) => {
+            commands::actions::set_new_priority_fee_distribution_program::run(
+                command_args,
+                client,
+                program_id,
+            )?
         }
         Commands::CrankCopyClusterInfo(command_args) => {
-            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_cluster_info::run(command_args, args.json_rpc_url, program_id)
+                .await?
         }
         Commands::CrankCopyGossipContactInfo(command_args) => {
             let client = solana_client::nonblocking::rpc_client::RpcClient::new_with_timeout(
@@ -1373,17 +1435,28 @@ async fn main() -> anyhow::Result<()> {
                 Duration::from_secs(60),
             );
             let client = Arc::new(client);
-            commands::cranks::copy_gossip_contact_info::run(command_args, client).await?
-        }
-        Commands::CrankCopyTipDistributionAccount(command_args) => {
-            commands::cranks::copy_tip_distribution_account::run(command_args, args.json_rpc_url)
+            commands::cranks::copy_gossip_contact_info::run(command_args, client, program_id)
                 .await?
         }
+        Commands::CrankCopyTipDistributionAccount(command_args) => {
+            commands::cranks::copy_tip_distribution_account::run(
+                command_args,
+                args.json_rpc_url,
+                program_id,
+            )
+            .await?
+        }
         Commands::CrankCopyVoteAccount(command_args) => {
-            commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_vote_account::run(command_args, args.json_rpc_url, program_id)
+                .await?
         }
         Commands::CrankCopyIsBamConnected(command_args) => {
-            commands::cranks::copy_is_bam_connected::run(command_args, args.json_rpc_url).await?
+            commands::cranks::copy_is_bam_connected::run(
+                command_args,
+                args.json_rpc_url,
+                program_id,
+            )
+            .await?
         }
     };
 
