@@ -363,8 +363,11 @@ pub struct CrankCopyGossipContactInfo {
     entrypoint: String,
 }
 
-pub async fn run(args: CrankCopyGossipContactInfo, client: Arc<RpcClient>) -> anyhow::Result<()> {
-    let program_id = validator_history::id();
+pub async fn run(
+    args: CrankCopyGossipContactInfo,
+    client: Arc<RpcClient>,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let vote_accounts = get_vote_accounts_with_retry(&client, 5, None).await?;
     let entrypoint = solana_net_utils::parse_host_port(&args.entrypoint).map_err(|err| {
         anyhow!(

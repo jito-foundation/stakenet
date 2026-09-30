@@ -51,7 +51,11 @@ fn parse_connection_rate(s: &str) -> Result<f64, String> {
 /// Maximum number of accounts per `get_multiple_accounts` RPC call.
 const GET_MULTIPLE_ACCOUNTS_BATCH_SIZE: usize = 100;
 
-pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(
+    args: CrankCopyIsBamConnected,
+    rpc_url: String,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
@@ -61,7 +65,6 @@ pub async fn run(args: CrankCopyIsBamConnected, rpc_url: String) -> anyhow::Resu
     let epoch_info = client.get_epoch_info().await?;
     let epoch = args.epoch.unwrap_or(epoch_info.epoch);
     let last_epoch = epoch.saturating_sub(1);
-    let program_id = validator_history::id();
 
     println!("Target epoch: {epoch}");
 
