@@ -9,6 +9,7 @@ use solana_sdk::{
 };
 use tests::validator_history_fixtures::{new_vote_account, TestFixture};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
 #[tokio::test]
 async fn test_copy_vote_account() {
@@ -141,6 +142,97 @@ async fn test_copy_vote_account() {
         account.validator_age_last_updated_epoch, 1,
         "Last updated epoch should be 1 (epoch 2 - 1)"
     );
+}
+
+#[tokio::test]
+async fn test_copy_vote_account_alpenglow_migration() {
+    let fixture = TestFixture::new().await;
+    let ctx = &fixture.ctx;
+    fixture.initialize_config().await;
+    fixture.initialize_validator_history_account().await;
+
+    let epoch_credits = vec![(0, 20, 10)];
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            9,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    fixture.advance_num_epochs(2).await;
+    let epoch_credits = vec![
+        (0, 22, 10),
+        (1, 35, 22),
+        AG_MIGRATION_EPOCH_CREDIT,
+        (1, 40, 35),
+        (2, 54, 40),
+    ];
+
+    ctx.borrow_mut().set_account(
+        &fixture.vote_account,
+        &new_vote_account(
+            fixture.vote_account,
+            fixture.vote_account,
+            8,
+            Some(epoch_credits),
+        )
+        .into(),
+    );
+
+    let instruction = Instruction {
+        program_id: validator_history::id(),
+        data: validator_history::instruction::CopyVoteAccount {}.data(),
+        accounts: validator_history::accounts::CopyVoteAccount {
+            validator_history_account: fixture.validator_history_account,
+            vote_account: fixture.vote_account,
+            signer: fixture.keypair.pubkey(),
+        }
+        .to_account_metas(None),
+    };
+
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(&fixture.keypair.pubkey()),
+        &[&fixture.keypair],
+        ctx.borrow().last_blockhash,
+    );
+
+    fixture.submit_transaction_assert_success(transaction).await;
+
+    let account: ValidatorHistory = fixture
+        .load_and_deserialize(&fixture.validator_history_account)
+        .await;
+
+    assert_eq!(account.history.idx, 2);
+    assert_eq!(account.history.arr[0].epoch, 0);
+    assert_eq!(account.history.arr[1].epoch, 1);
+    assert_eq!(account.history.arr[2].epoch, 2);
+    assert_eq!(account.history.arr[0].epoch_credits, 12);
+    assert_eq!(account.history.arr[1].epoch_credits, 18);
+    assert_eq!(account.history.arr[2].epoch_credits, 14);
 }
 
 #[tokio::test]

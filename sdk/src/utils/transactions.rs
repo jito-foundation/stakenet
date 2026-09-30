@@ -25,10 +25,10 @@ use solana_transaction_status::TransactionStatus;
 use tokio::task;
 use tokio::time::sleep;
 
-use crate::models::errors::{
-    JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError,
+use crate::models::{
+    errors::{JitoMultipleAccountsError, JitoSendTransactionError, JitoTransactionExecutionError},
+    submit_stats::SubmitStats,
 };
-use crate::models::submit_stats::SubmitStats;
 
 use std::future::Future;
 
