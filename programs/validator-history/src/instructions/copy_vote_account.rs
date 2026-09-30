@@ -2,6 +2,7 @@ use anchor_lang::{
     prelude::*,
     solana_program::{clock::Clock, vote},
 };
+use solana_program::epoch_stake::get_epoch_stake_for_vote_account;
 use validator_history_vote_state::VoteStateVersions;
 
 use crate::{state::ValidatorHistory, utils::cast_epoch};
@@ -30,6 +31,10 @@ pub fn handle_copy_vote_account(ctx: Context<CopyVoteAccount>) -> Result<()> {
     // Set commission and slot
     let commission = VoteStateVersions::deserialize_commission(&ctx.accounts.vote_account)?;
     validator_history_account.set_commission_and_slot(epoch, commission, clock.slot)?;
+
+    // Set epoch stake, which only this epoch can read
+    let epoch_stake_lamports = get_epoch_stake_for_vote_account(ctx.accounts.vote_account.key);
+    validator_history_account.set_epoch_stake(epoch, epoch_stake_lamports)?;
 
     // Set epoch credits
     let epoch_credits = VoteStateVersions::deserialize_epoch_credits(&ctx.accounts.vote_account)?;
