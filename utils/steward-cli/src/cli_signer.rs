@@ -201,28 +201,6 @@ fn ledger_candidate_paths() -> Vec<DerivationPath> {
     derivation_paths
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ledger_candidate_paths_include_default_and_common_accounts() {
-        let paths = ledger_candidate_paths();
-
-        assert_eq!(paths[0].get_query(), "");
-        assert!(paths.iter().any(|path| path.get_query() == "?key=0'"));
-        assert!(paths.iter().any(|path| path.get_query() == "?key=0'/0'"));
-        assert!(paths.iter().any(|path| path.get_query() == "?key=19'"));
-        assert!(paths.iter().any(|path| path.get_query() == "?key=19'/0'"));
-    }
-
-    #[test]
-    fn parse_ledger_key_supports_account_and_change_paths() {
-        assert_eq!(parse_ledger_key("0").unwrap().get_query(), "?key=0'");
-        assert_eq!(parse_ledger_key("2/1").unwrap().get_query(), "?key=2'/1'");
-    }
-}
-
 impl Signer for CliSigner {
     fn try_pubkey(&self) -> Result<Pubkey, SignerError> {
         self.keypair.as_ref().map_or_else(
@@ -253,5 +231,27 @@ impl Signer for CliSigner {
     fn is_interactive(&self) -> bool {
         // Remote wallets are typically interactive, local keypairs are not
         self.remote_keypair.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ledger_candidate_paths_include_default_and_common_accounts() {
+        let paths = ledger_candidate_paths();
+
+        assert_eq!(paths[0].get_query(), "");
+        assert!(paths.iter().any(|path| path.get_query() == "?key=0'"));
+        assert!(paths.iter().any(|path| path.get_query() == "?key=0'/0'"));
+        assert!(paths.iter().any(|path| path.get_query() == "?key=19'"));
+        assert!(paths.iter().any(|path| path.get_query() == "?key=19'/0'"));
+    }
+
+    #[test]
+    fn parse_ledger_key_supports_account_and_change_paths() {
+        assert_eq!(parse_ledger_key("0").unwrap().get_query(), "?key=0'");
+        assert_eq!(parse_ledger_key("2/1").unwrap().get_query(), "?key=2'/1'");
     }
 }
