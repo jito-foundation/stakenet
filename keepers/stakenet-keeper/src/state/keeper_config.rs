@@ -296,17 +296,13 @@ pub struct Args {
     )]
     pub coinbase_vote_pubkey: Pubkey,
 
-    /// Vote pubkeys of the Jito-operated ("JitoSOL Prime") validators
-    ///
-    /// - Accepts multiple comma-separated pubkeys
-    /// - The JitoSOL Prime share is split pro-rata between them
+    /// Vote pubkeys of the JitoSOL Prime validator
     #[arg(
         long,
         env,
-        value_delimiter = ',',
         default_value = "J1to5o1Q7W7Y2Q7zpETTezv3DyzPMHKDg66X2nZPMr4X"
     )]
-    pub jitosol_prime_vote_pubkeys: Vec<Pubkey>,
+    pub jitosol_prime_vote_pubkey: Pubkey,
 
     /// Share of total JitoSOL TVL directed to the Jito-operated validators, in basis points
     ///
@@ -411,7 +407,7 @@ impl fmt::Display for Args {
             Run Copy Is BAM Connected Operation: {:?}\n\
             Kobe API Base URL: {:?}\n\
             Coinbase Vote Pubkey: {:?}\n\
-            JitoSOL Prime Vote Pubkeys: {:?}\n\
+            JitoSOL Prime Vote Pubkey: {:?}\n\
             JitoSOL Prime Share Bps: {:?}\n\
             Min BAM Connection Rate: {:?}\n\
             -------------------------------",
@@ -461,7 +457,7 @@ impl fmt::Display for Args {
             self.run_copy_is_bam_connected,
             self.kobe_api_base_url,
             self.coinbase_vote_pubkey,
-            self.jitosol_prime_vote_pubkeys,
+            self.jitosol_prime_vote_pubkey,
             self.jitosol_prime_share_bps,
             self.min_bam_connection_rate,
         )
