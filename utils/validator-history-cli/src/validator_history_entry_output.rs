@@ -61,6 +61,9 @@ pub struct ValidatorHistoryEntryOutput {
 
     /// Validator's Tip Distribution Account's merkle root upload authority
     pub priority_fee_merkle_root_upload_authority: Option<String>,
+
+    /// Whether this validator is connected to the BAM
+    pub is_bam_connected: Option<String>,
 }
 
 impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
@@ -146,6 +149,9 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
                 .priority_fee_merkle_root_upload_authority
                 .eq(&default_entry.priority_fee_merkle_root_upload_authority))
             .then_some((value.priority_fee_merkle_root_upload_authority as u8).to_string()),
+
+            is_bam_connected: (!value.is_bam_connected.eq(&default_entry.is_bam_connected))
+                .then_some((value.is_bam_connected).to_string()),
         }
     }
 }

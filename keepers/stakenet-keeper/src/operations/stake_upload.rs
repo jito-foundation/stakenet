@@ -90,7 +90,7 @@ pub async fn fire(
         .await
         {
             Ok(stats) => {
-                for message in stats.results.iter().chain(stats.results.iter()) {
+                for message in stats.results.iter() {
                     if let Err(e) = message {
                         datapoint_error!("stake-history-error", ("error", e.to_string(), String),);
                     } else {
@@ -213,7 +213,7 @@ fn stake_entry_uploaded(
 Calculates ordering of validators by stake, assigning a 0..N rank (validator 0 has the most stake),
 and returns the index at which all validators before are in the superminority. 0-indexed.
 */
-fn get_stake_rank_map_and_superminority_count(
+pub fn get_stake_rank_map_and_superminority_count(
     vote_accounts: &[&RpcVoteAccountInfo],
 ) -> (HashMap<String, u32>, u32) {
     let mut stake_vec = vote_accounts

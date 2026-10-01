@@ -47,11 +47,13 @@ use crate::{
     commands::{
         actions::{
             add_to_directed_stake_whitelist::command_add_to_directed_stake_whitelist,
+            admin_mark_for_removal::command_admin_mark_for_removal,
             close_directed_stake_meta::command_close_directed_stake_meta,
             close_directed_stake_ticket::command_close_directed_stake_ticket,
             close_directed_stake_whitelist::command_close_directed_stake_whitelist,
             close_steward::command_close_steward,
             copy_directed_stake_targets::command_copy_directed_stake_targets,
+            migrate_directed_to_algorithmic::command_migrate_directed_to_algorithmic,
             migrate_state_to_v2::command_migrate_state_to_v2,
             remove_from_directed_stake_whitelist::command_remove_from_directed_stake_whitelist,
             sync_directed_stake_lamports::command_sync_directed_stake_lamports,
@@ -59,6 +61,7 @@ use crate::{
         },
         cranks::{
             compute_directed_stake_meta::command_crank_compute_directed_stake_meta,
+            instant_remove_validators::command_crank_instant_remove_validators,
             rebalance_directed::command_crank_rebalance_directed,
         },
         info::{
@@ -92,7 +95,14 @@ fn load_cli_signer(
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv().ok(); // Loads in .env file
+    dotenv().ok();
+
+    env_logger::Builder::from_env(
+        env_logger::Env::default()
+            .default_filter_or("info,stakenet_sdk::utils::transactions=debug"),
+    )
+    .init();
+
     let args = Args::parse();
     let commitment_config = args.commitment.into();
     let client = Arc::new(RpcClient::new_with_timeout_and_commitment(
@@ -216,6 +226,9 @@ async fn main() -> Result<()> {
         Commands::UpdateValidatorListBalance(args) => {
             command_update_validator_list_balance(&client, args, steward_program_id).await
         }
+        Commands::AdminMarkForRemoval(command_args) => {
+            command_admin_mark_for_removal(command_args, &client, steward_program_id).await
+        }
         Commands::InitDirectedStakeMeta(args) => {
             command_init_directed_stake_meta(args, &client, steward_program_id).await
         }
@@ -255,6 +268,9 @@ async fn main() -> Result<()> {
         Commands::CloseDirectedStakeMeta(args) => {
             command_close_directed_stake_meta(args, &client, steward_program_id).await
         }
+        Commands::MigrateDirectedToAlgorithmic(args) => {
+            command_migrate_directed_to_algorithmic(args, &client, steward_program_id).await
+        }
 
         // --- Cranks ---
         Commands::CrankSteward(args) => {
@@ -284,6 +300,9 @@ async fn main() -> Result<()> {
         }
         Commands::CrankUpdateStakePool(args) => {
             command_crank_update_stake_pool(args, &client, steward_program_id).await
+        }
+        Commands::CrankInstantRemoveValidators(args) => {
+            command_crank_instant_remove_validators(args, &client, steward_program_id).await
         }
     };
 

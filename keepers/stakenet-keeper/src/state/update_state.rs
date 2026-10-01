@@ -67,8 +67,10 @@ pub async fn pre_create_update(
         .await
     {
         Ok(maybe_sysvar_history) => {
-            let account = maybe_sysvar_history.value.unwrap();
-            keeper_state.slot_history = deserialize::<SlotHistory>(&account.data).unwrap();
+            let account = maybe_sysvar_history
+                .value
+                .ok_or("SlotHistory sysvar not found at finalized commitment")?;
+            keeper_state.slot_history = deserialize::<SlotHistory>(&account.data)?;
         }
         Err(e) => {
             return Err(Box::new(e));

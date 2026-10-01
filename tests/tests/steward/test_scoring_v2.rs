@@ -410,7 +410,6 @@ mod validator_score_integration_tests {
         assert_eq!(result.blacklisted_score, 1);
         assert_eq!(result.superminority_score, 1);
         assert_eq!(result.delinquency_score, 1);
-        assert_eq!(result.running_jito_score, 1);
         assert_eq!(result.commission_score, 1);
         assert_eq!(result.historical_commission_score, 1);
     }
@@ -511,31 +510,139 @@ mod validator_score_integration_tests {
     }
 
     #[test]
-    fn test_validator_score_not_running_jito() {
+    fn test_validator_score_bam_window_all_connected() {
         let mut validator = create_validator_history();
         let cluster = create_cluster_history(20);
-        let config = create_test_config();
+        let mut config = create_test_config();
         let current_epoch = 20u16;
 
-        // Set up validator with no MEV commission (not running Jito)
+        // Require 7 of the last 10 epochs
+        config.parameters.jito_bam_minimum_epochs = 7;
+        config.parameters.jito_bam_window_epochs = 10;
+
         for epoch in 0..=20 {
             validator.history.push(ValidatorHistoryEntry {
                 epoch: epoch as u16,
                 commission: 5,
-                mev_commission: u16::MAX, // MAX means None/not set
+                mev_commission: 100,
                 epoch_credits: 1000 * TVC_MULTIPLIER,
                 vote_account_last_update_slot: 1000,
                 is_superminority: 0,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }
 
         let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
 
-        // Score should be 0 due to not running Jito
+        // All epochs connected, so BAM filter should pass
+        assert_eq!(result.running_bam_score, 1);
+        assert!(result.score > 0);
+    }
+
+    #[test]
+    fn test_validator_score_bam_window_partial_connected_passes() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let mut config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Require 7 of the last 10 epochs.
+        // The current epoch is excluded from the window, so the evaluated range is
+        // is_bam_connected_range(10, 19) = epochs 10..=19 = 10 entries.
+        config.parameters.jito_bam_minimum_epochs = 7;
+        config.parameters.jito_bam_window_epochs = 10;
+
+        for epoch in 0..=20 {
+            // Disconnect for 3 epochs within the window (epochs 10, 11, 12)
+            // That leaves 7 of 10 connected — exactly meets threshold of 7
+            let bam_connected = if (10..=12).contains(&epoch) { 0 } else { 1 };
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                is_bam_connected: bam_connected,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // 7 of 10 epochs connected — exactly meets threshold
+        assert_eq!(result.running_bam_score, 1);
+        assert!(result.score > 0);
+    }
+
+    #[test]
+    fn test_validator_score_bam_window_partial_connected_fails() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let mut config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Require 7 of the last 10 epochs.
+        // The current epoch is excluded from the window, so the evaluated range is
+        // is_bam_connected_range(10, 19) = epochs 10..=19 = 10 entries.
+        config.parameters.jito_bam_minimum_epochs = 7;
+        config.parameters.jito_bam_window_epochs = 10;
+
+        for epoch in 0..=20 {
+            // Disconnect for 4 epochs within the window (epochs 10, 11, 12, 13)
+            // That leaves only 6 of 10 connected — just below threshold of 7
+            let bam_connected = if (10..=13).contains(&epoch) { 0 } else { 1 };
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                is_bam_connected: bam_connected,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // Only 6 of 10 epochs connected — below threshold of 7
+        assert_eq!(result.running_bam_score, 0);
         assert_eq!(result.score, 0);
         assert!(result.raw_score > 0);
-        assert_eq!(result.running_jito_score, 0); // Not running Jito filter failed
+    }
+
+    #[test]
+    fn test_validator_score_bam_window_no_connection() {
+        let mut validator = create_validator_history();
+        let cluster = create_cluster_history(20);
+        let mut config = create_test_config();
+        let current_epoch = 20u16;
+
+        // Require 7 of the last 10 epochs
+        config.parameters.jito_bam_minimum_epochs = 7;
+        config.parameters.jito_bam_window_epochs = 10;
+
+        for epoch in 0..=20 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch: epoch as u16,
+                commission: 5,
+                mev_commission: 100,
+                epoch_credits: 1000 * TVC_MULTIPLIER,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                is_bam_connected: 0, // Never connected
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+
+        // No epochs connected — fails BAM filter
+        assert_eq!(result.running_bam_score, 0);
+        assert_eq!(result.score, 0);
+        assert!(result.raw_score > 0);
     }
 
     #[test]

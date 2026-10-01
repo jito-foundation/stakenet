@@ -172,4 +172,12 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_set_new_priority_fee_oracle_authority(ctx)
     }
+
+    pub fn copy_is_bam_connected(
+        ctx: Context<CopyIsBamConnected>,
+        epoch: u64,
+        is_bam_connected: u8,
+    ) -> Result<()> {
+        handle_copy_is_bam_connected(ctx, epoch, is_bam_connected)
+    }
 }

@@ -25,10 +25,12 @@ impl From<CommitmentLevel> for CommitmentConfig {
 use crate::commands::{
     actions::{
         add_to_directed_stake_whitelist::AddToDirectedStakeWhitelist,
+        admin_mark_for_removal::AdminMarkForRemoval,
         close_directed_stake_meta::CloseDirectedStakeMeta,
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
         copy_directed_stake_targets::CopyDirectedStakeTargets,
+        migrate_directed_to_algorithmic::MigrateDirectedToAlgorithmic,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
         sync_directed_stake_lamports::SyncDirectedStakeLamports,
@@ -36,10 +38,15 @@ use crate::commands::{
     },
     cranks::{
         compute_directed_stake_meta::ComputeDirectedStakeMeta,
+        instant_remove_validators::CrankInstantRemoveValidators,
         rebalance_directed::CrankRebalanceDirected,
     },
-    info::{view_blacklist::ViewBlacklist, view_directed_stake_ticket::ViewDirectedStakeTicket},
+    info::{
+        view_blacklist::ViewBlacklist, view_directed_stake_meta::ViewDirectedStakeMeta,
+        view_directed_stake_ticket::ViewDirectedStakeTicket,
+    },
     init::{
+        init_directed_stake_ticket::InitDirectedStakeTicket,
         realloc_directed_stake_meta::ReallocDirectedStakeMeta,
         realloc_directed_stake_whitelist::ReallocDirectedStakeWhitelist,
     },
@@ -188,6 +195,15 @@ pub struct ConfigParameters {
     /// Percent of total pool lamports that can be unstaked due to directed stake requests
     #[arg(long, env)]
     pub directed_stake_unstake_cap_bps: Option<u16>,
+
+    /// Minimum number of epochs a validator must have been a Jito BAM client
+    /// within the window to qualify for delegation.
+    #[arg(long, env)]
+    pub jito_bam_minimum_epochs: Option<u8>,
+
+    /// Window size (in epochs) over which to check BAM connectivity.
+    #[arg(long, env)]
+    pub jito_bam_window_epochs: Option<u8>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -215,6 +231,8 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             compute_score_epoch_progress: config.compute_score_epoch_progress,
             undirected_stake_ceiling_lamports: config.undirected_stake_ceiling_lamports,
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
+            jito_bam_minimum_epochs: config.jito_bam_minimum_epochs,
+            jito_bam_window_epochs: config.jito_bam_window_epochs,
         }
     }
 }
@@ -372,6 +390,7 @@ pub enum Commands {
     AutoAddValidatorFromPool(AutoAddValidatorFromPool),
     InstantRemoveValidator(InstantRemoveValidator),
     UpdateValidatorListBalance(UpdateValidatorListBalance),
+    AdminMarkForRemoval(AdminMarkForRemoval),
 
     InitDirectedStakeMeta(InitDirectedStakeMeta),
     ReallocDirectedStakeMeta(ReallocDirectedStakeMeta),
@@ -387,6 +406,7 @@ pub enum Commands {
     CloseDirectedStakeTicket(CloseDirectedStakeTicket),
     CloseDirectedStakeWhitelist(CloseDirectedStakeWhitelist),
     CloseDirectedStakeMeta(CloseDirectedStakeMeta),
+    MigrateDirectedToAlgorithmic(MigrateDirectedToAlgorithmic),
 
     // Cranks
     CrankSteward(CrankSteward),
@@ -398,6 +418,7 @@ pub enum Commands {
     CrankRebalance(CrankRebalance),
     CrankRebalanceDirected(CrankRebalanceDirected),
     CrankUpdateStakePool(CrankUpdateStakePool),
+    CrankInstantRemoveValidators(CrankInstantRemoveValidators),
 }
 
 // ---------- VIEWS ------------
@@ -908,22 +929,6 @@ pub struct ViewDirectedStakeWhitelist {
 }
 
 #[derive(Parser)]
-#[command(about = "View DirectedStakeMeta account contents")]
-pub struct ViewDirectedStakeMeta {
-    /// Steward config account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// Print account information in JSON format
-    #[arg(
-        long,
-        default_value = "false",
-        help = "This will print out account information in JSON format"
-    )]
-    pub print_json: bool,
-}
-
-#[derive(Parser)]
 #[command(about = "Get JitoSOL balance for a specific token account")]
 pub struct GetJitosolBalance {
     /// Token account pubkey to check balance for
@@ -964,29 +969,6 @@ pub struct InitDirectedStakeMeta {
     /// Authority keypair path, also used as payer
     #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
     pub authority_keypair_path: PathBuf,
-
-    #[command(flatten)]
-    pub transaction_parameters: TransactionParameters,
-}
-
-#[derive(Parser)]
-#[command(about = "Initialize DirectedStakeTicket account")]
-pub struct InitDirectedStakeTicket {
-    /// Steward config account
-    #[arg(long, env)]
-    pub steward_config: Pubkey,
-
-    /// Authority keypair path, also used as payer
-    #[arg(short, long, env, default_value = "~/.config/solana/id.json")]
-    pub authority_keypair_path: PathBuf,
-
-    /// Ticket update authority pubkey
-    #[arg(long, env)]
-    pub ticket_update_authority: Pubkey,
-
-    /// Whether the ticket holder is a protocol (default: false)
-    #[arg(long, env, default_value = "false")]
-    pub ticket_holder_is_protocol: bool,
 
     #[command(flatten)]
     pub transaction_parameters: TransactionParameters,

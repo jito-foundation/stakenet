@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anyhow::Result;
+use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
@@ -19,26 +20,53 @@ use stakenet_sdk::utils::{
     transactions::{configure_instruction, print_base58_tx},
 };
 
-use crate::commands::command_args::InitDirectedStakeTicket;
+use crate::{
+    commands::command_args::PermissionedParameters, utils::accounts::get_steward_config_account,
+};
+
+#[derive(Parser)]
+#[command(about = "Initialize DirectedStakeTicket account")]
+pub struct InitDirectedStakeTicket {
+    #[command(flatten)]
+    permissioned_parameters: PermissionedParameters,
+
+    /// Ticket update authority pubkey
+    #[arg(long, env)]
+    ticket_update_authority: Pubkey,
+
+    /// Whether the ticket holder is a protocol
+    #[arg(long, env)]
+    ticket_holder_is_protocol: bool,
+}
 
 pub async fn command_init_directed_stake_ticket(
     args: InitDirectedStakeTicket,
     client: &Arc<RpcClient>,
     program_id: Pubkey,
 ) -> Result<()> {
-    let authority_keypair = read_keypair_file(&args.authority_keypair_path)
+    let steward_config_pubkey = args.permissioned_parameters.steward_config;
+    let authority_keypair = read_keypair_file(&args.permissioned_parameters.authority_keypair_path)
         .map_err(|e| anyhow::anyhow!("Failed to read keypair: {e}"))?;
-    let authority_pubkey = authority_keypair.pubkey();
+
+    let authority_pubkey = if args.permissioned_parameters.transaction_parameters.print_tx {
+        let config = get_steward_config_account(client, &steward_config_pubkey).await?;
+        config.directed_stake_ticket_override_authority
+    } else {
+        authority_keypair.pubkey()
+    };
 
     let directed_stake_whitelist_pda =
-        get_directed_stake_whitelist_address(&args.steward_config, &program_id);
+        get_directed_stake_whitelist_address(&steward_config_pubkey, &program_id);
 
-    let directed_stake_ticket_pda =
-        get_directed_stake_ticket_address(&args.steward_config, &authority_pubkey, &program_id);
+    let directed_stake_ticket_pda = get_directed_stake_ticket_address(
+        &steward_config_pubkey,
+        &args.ticket_update_authority,
+        &program_id,
+    );
 
     println!("Initializing DirectedStakeTicket...");
     println!("  Authority: {authority_pubkey}");
-    println!("  Steward Config: {}", args.steward_config);
+    println!("  Steward Config: {steward_config_pubkey}");
     println!(
         "  Ticket Update Authority: {}",
         args.ticket_update_authority
@@ -52,7 +80,7 @@ pub async fn command_init_directed_stake_ticket(
     let instruction = Instruction {
         program_id,
         accounts: jito_steward::accounts::InitializeDirectedStakeTicket {
-            config: args.steward_config,
+            config: steward_config_pubkey,
             whitelist_account: directed_stake_whitelist_pda,
             ticket_account: directed_stake_ticket_pda,
             system_program: solana_sdk::system_program::ID,
@@ -66,14 +94,25 @@ pub async fn command_init_directed_stake_ticket(
         .data(),
     };
 
-    let blockhash = client.get_latest_blockhash().await?;
-
     let configured_ix = configure_instruction(
         &[instruction],
-        args.transaction_parameters.priority_fee,
-        args.transaction_parameters.compute_limit,
-        args.transaction_parameters.heap_size,
+        args.permissioned_parameters
+            .transaction_parameters
+            .priority_fee,
+        args.permissioned_parameters
+            .transaction_parameters
+            .compute_limit,
+        args.permissioned_parameters
+            .transaction_parameters
+            .heap_size,
     );
+
+    if args.permissioned_parameters.transaction_parameters.print_tx {
+        print_base58_tx(&configured_ix);
+        return Ok(());
+    }
+
+    let blockhash = client.get_latest_blockhash().await?;
 
     let transaction = Transaction::new_signed_with_payer(
         &configured_ix,
@@ -82,17 +121,13 @@ pub async fn command_init_directed_stake_ticket(
         blockhash,
     );
 
-    if args.transaction_parameters.print_tx {
-        print_base58_tx(&configured_ix)
-    } else {
-        let signature = client
-            .send_and_confirm_transaction_with_spinner(&transaction)
-            .await?;
+    let signature = client
+        .send_and_confirm_transaction_with_spinner(&transaction)
+        .await?;
 
-        println!("✅ DirectedStakeTicket initialized successfully!");
-        println!("  Transaction signature: {signature}");
-        println!("  DirectedStakeTicket account: {directed_stake_ticket_pda}");
-    }
+    println!("✅ DirectedStakeTicket initialized successfully!");
+    println!("  Transaction signature: {signature}");
+    println!("  DirectedStakeTicket account: {directed_stake_ticket_pda}");
 
     Ok(())
 }

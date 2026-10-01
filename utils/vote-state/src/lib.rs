@@ -201,6 +201,8 @@ impl VoteStateVersions {
     const VOTE_STATE_1_14_1_COMMISSION_INDEX: usize = 68;
     // Enum index + Pubkey + Pubkey + Epoch + (CircBuf: 32 * (Pubkey + 2 * Epoch + Slot) + usize + bool) + Pubkey
     const VOTE_STATE_0_23_5_COMMISSION_INDEX: usize = 1909;
+    const MAX_COMMISSION_BPS: u16 = 10_000;
+    const BPS_PER_PERCENT: u16 = 100;
     const INFLATION_REWARDS_COMMISSION_BPS_BYTES: usize = 2;
     const BLOCK_REVENUE_COMMISSION_BPS_BYTES: usize = 2;
     const PENDING_DELEGATOR_REWARDS_BYTES: usize = 8;
@@ -245,11 +247,22 @@ impl VoteStateVersions {
                     .map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
             }
             3 => {
-                if data.len() < Self::VOTE_STATE_COMMISSION_INDEX {
+                if data.len()
+                    < Self::VOTE_STATE_COMMISSION_INDEX
+                        + Self::INFLATION_REWARDS_COMMISSION_BPS_BYTES
+                {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
-                bincode::deserialize::<u8>(&data[Self::VOTE_STATE_COMMISSION_INDEX..])
-                    .map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
+                let inflation_rewards_commission_bps =
+                    bincode::deserialize::<u16>(&data[Self::VOTE_STATE_COMMISSION_INDEX..])
+                        .map_err(|_| ErrorCode::VoteAccountDataNotValid)
+                        .map_err(anchor_lang::error::Error::from)?;
+                if inflation_rewards_commission_bps > Self::MAX_COMMISSION_BPS {
+                    return Err(ErrorCode::VoteAccountDataNotValid.into());
+                }
+
+                let commission = inflation_rewards_commission_bps / Self::BPS_PER_PERCENT;
+                u8::try_from(commission).map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
             }
             _ => Err(ErrorCode::VoteAccountDataNotValid.into()),
         }
@@ -816,6 +829,96 @@ mod tests {
             VoteStateVersions::deserialize_commission(&account_current).unwrap(),
             99
         );
+
+        let vote_state_v4 = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 500,
+            block_revenue_commission_bps: 10_000,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_v4 = bincode::serialize(&vote_state_v4).unwrap();
+        let account_v4 = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_v4.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        assert_eq!(
+            VoteStateVersions::deserialize_commission(&account_v4).unwrap(),
+            5
+        );
+
+        let vote_state_v4_max = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 10_000,
+            block_revenue_commission_bps: 10_000,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_v4_max = bincode::serialize(&vote_state_v4_max).unwrap();
+        let account_v4_max = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_v4_max.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        assert_eq!(
+            VoteStateVersions::deserialize_commission(&account_v4_max).unwrap(),
+            100
+        );
+
+        let vote_state_v4_invalid = VoteStateVersions::Current(Box::new(crate::VoteState {
+            node_pubkey: Pubkey::new_unique(),
+            authorized_withdrawer: Pubkey::new_unique(),
+            inflation_rewards_collector: Pubkey::new_unique(),
+            block_revenue_collector: Pubkey::new_unique(),
+            inflation_rewards_commission_bps: 10_001,
+            block_revenue_commission_bps: 10_000,
+            pending_delegator_rewards: 0,
+            bls_pubkey_compressed: None,
+            votes: VecDeque::new(),
+            root_slot: None,
+            authorized_voters: AuthorizedVoters::default(),
+            epoch_credits: Vec::new(),
+            last_timestamp: BlockTimestamp::default(),
+        }));
+        let mut ser_v4_invalid = bincode::serialize(&vote_state_v4_invalid).unwrap();
+        let account_v4_invalid = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            ser_v4_invalid.as_mut_slice(),
+            &owner,
+            false,
+            0,
+        );
+        assert!(VoteStateVersions::deserialize_commission(&account_v4_invalid).is_err());
     }
 
     #[test]

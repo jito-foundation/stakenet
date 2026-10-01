@@ -403,6 +403,19 @@ cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 ad
 cargo run -- --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 remove-from-blacklist --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv --authority-keypair-path ../../credentials/stakenet_test.json --validator-history-index-to-deblacklist 2168
 ```
 
+### Admin Mark For Removal
+
+```bash
+./target/release/steward-cli \
+    --steward-program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    admin-mark-for-removal \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --authority-keypair-path ../../credentials/stakenet_test.json \
+    --mark-for-removal \
+    --immediate \
+    --validator-vote-account ""
+```
+
 ## Close Steward
 
 ```bash
@@ -734,6 +747,19 @@ Aggregates all tickets and computes the final stake distribution. Should be run:
 ```
 
 The token mint (JitoSOL) is used to query balances and weight stake preferences accordingly.
+
+#### Migrate Directed to Algorithmic
+
+Migrates a pool from directed stake mode back to algorithmic stake mode. This is a one-time privileged operation that removes the `DirectedStakeMeta` account and hands stake distribution back to the Steward's scoring algorithm. Run this when directed stake is no longer needed for a config.
+
+```bash
+./target/release/steward-cli \
+    --json-rpc-url http://127.0.0.1:8899 \
+    --program-id Stewardf95sJbmtcZsyagb2dg4Mo8eVQho8gpECvLx8 \
+    migrate-directed-to-algorithmic \
+    --steward-config jitoVjT9jRUyeXHzvCwzPgHj7yWNRhLcUoXtes4wtjv \
+    --authority-keypair-path ~/.config/solana/id.json
+```
 
 ### Ongoing Operations
 

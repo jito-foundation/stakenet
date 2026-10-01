@@ -12,7 +12,7 @@ use crate::{
     errors::StewardError,
     events::{DecreaseComponents, StateTransition},
     score::{
-        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV4,
+        instant_unstake_validator, validator_score, InstantUnstakeComponentsV3, ScoreComponentsV5,
     },
     state::directed_stake::DirectedStakeMeta,
     utils::{epoch_progress, get_target_lamports},
@@ -675,7 +675,7 @@ impl StewardStateV2 {
         cluster: &ClusterHistory,
         config: &Config,
         num_pool_validators: u64,
-    ) -> Result<Option<ScoreComponentsV4>> {
+    ) -> Result<Option<ScoreComponentsV5>> {
         if matches!(self.state_tag, StewardStateEnum::ComputeScores) {
             let current_epoch = clock.epoch;
             let current_slot = clock.slot;
@@ -903,6 +903,27 @@ impl StewardStateV2 {
         Err(StewardError::InvalidState.into())
     }
 
+    /// Simulates the on-chain reconciliation performed by
+    /// `adjust_directed_stake_for_deposits_and_withdrawals` in `rebalance_directed.rs`,
+    /// returning the post-state `(new_directed_stake_lamports, new_total_stake_lamports)`
+    /// for a single validator without mutating any account. Used by scoring and rebalance
+    /// calculations (see `delegation.rs::{increase,decrease}_stake_calculation`) so they
+    /// see the same totals the on-chain instruction would write — keeping their branches
+    /// in sync is required for scoring/rebalance correctness.
+    ///
+    /// Returns `(0, target_total_staked_lamports)` when no directed-stake target is wired
+    /// up for this validator (`directed_stake_meta_indices[i] == u64::MAX`).
+    ///
+    /// Otherwise handles three cases mirroring the on-chain instruction:
+    /// - **Withdrawal** (`target_total < steward_state`): subtract the withdrawal from
+    ///   directed accounting, rolling any remainder over to undirected stake.
+    /// - **Deposit** (`target_total > steward_state` and applied < target): credit up to
+    ///   the directed deficit against the deposit.
+    /// - **Stale `total_staked_lamports`** (`applied > target_total`): an undirected
+    ///   rebalance has already synced `validator_lamport_balances` to the validator list,
+    ///   but the directed accounting wasn't updated. Cap `directed_stake_lamports[i]` to
+    ///   the validator list stake; `new_total_stake_lamports` is left at the current
+    ///   `validator_lamport_balances[i]` because it is already correct.
     pub fn simulate_adjust_directed_stake_for_deposits_and_withdrawals(
         &self,
         target_total_staked_lamports: u64,
@@ -913,12 +934,16 @@ impl StewardStateV2 {
         if directed_stake_meta.directed_stake_meta_indices[validator_list_index] == u64::MAX {
             return Ok((0, target_total_staked_lamports));
         }
-        let (mut new_directed_stake_lamports, mut new_total_stake_lamports) = (0u64, 0u64);
+
+        let mut new_directed_stake_lamports;
+        let new_total_stake_lamports;
+
         let steward_state_total_lamports = self.validator_lamport_balances[validator_list_index];
         let directed_stake_target_lamports =
             directed_stake_meta.targets[directed_stake_meta_index].total_target_lamports;
         let directed_stake_applied_lamports =
             directed_stake_meta.targets[directed_stake_meta_index].total_staked_lamports;
+
         if target_total_staked_lamports < steward_state_total_lamports {
             let withdrawal_lamports =
                 steward_state_total_lamports.saturating_sub(target_total_staked_lamports);
@@ -957,7 +982,16 @@ impl StewardStateV2 {
                 .saturating_add(increase_lamports);
             new_total_stake_lamports = self.validator_lamport_balances[validator_list_index]
                 .saturating_add(increase_lamports);
+        } else {
+            new_directed_stake_lamports =
+                directed_stake_meta.directed_stake_lamports[validator_list_index];
+            new_total_stake_lamports = steward_state_total_lamports;
         }
+
+        if new_directed_stake_lamports > target_total_staked_lamports {
+            new_directed_stake_lamports = target_total_staked_lamports;
+        }
+
         Ok((new_directed_stake_lamports, new_total_stake_lamports))
     }
 
@@ -1412,5 +1446,28 @@ mod tests {
         state.transition_idle(20, 0.3, 0.9, 0.5).unwrap();
         assert!(matches!(state.state_tag, StewardStateEnum::Idle));
         assert!(state.has_flag(PRE_LOOP_IDLE));
+    }
+
+    #[test]
+    fn test_simulate_adjust_directed_stale_total_staked() {
+        let mut state = default_state();
+        // validator_lamport_balances already synced down to 5M.
+        state.validator_lamport_balances[0] = 5_000_000;
+
+        let mut meta = DirectedStakeMeta::default();
+        // Wire validator-list index 0 to target 0 so we run past the u64::MAX guard.
+        meta.directed_stake_meta_indices[0] = 0;
+        meta.total_stake_targets = 1;
+        meta.targets[0].total_target_lamports = 6_000_000;
+        meta.targets[0].total_staked_lamports = 6_000_000; // stale, exceeds on-chain
+        meta.directed_stake_lamports[0] = 6_000_000;
+
+        let (new_directed, new_total) = state
+            .simulate_adjust_directed_stake_for_deposits_and_withdrawals(5_000_000, 0, 0, &meta)
+            .unwrap();
+
+        // Directed capped to the on-chain stake; total unchanged (already correct).
+        assert_eq!(new_directed, 5_000_000);
+        assert_eq!(new_total, 5_000_000);
     }
 }

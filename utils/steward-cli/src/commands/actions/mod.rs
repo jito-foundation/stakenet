@@ -1,5 +1,6 @@
 pub mod add_to_blacklist;
 pub mod add_to_directed_stake_whitelist;
+pub mod admin_mark_for_removal;
 pub mod auto_add_validator_from_pool;
 pub mod auto_remove_validator_from_pool;
 pub mod close_directed_stake_meta;
@@ -11,6 +12,7 @@ pub mod instant_remove_validator;
 pub mod manually_copy_all_vote_accounts;
 pub mod manually_copy_vote_accounts;
 pub mod manually_remove_validator;
+pub mod migrate_directed_to_algorithmic;
 pub mod migrate_state_to_v2;
 pub mod pause;
 pub mod remove_bad_validators;

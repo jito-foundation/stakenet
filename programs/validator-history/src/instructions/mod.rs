@@ -1,6 +1,7 @@
 pub mod backfill_total_blocks;
 pub mod copy_cluster_info;
 pub mod copy_gossip_contact_info;
+pub mod copy_is_bam_connected;
 pub mod copy_priority_fee_distribution;
 pub mod copy_tip_distribution_account;
 pub mod copy_vote_account;
@@ -22,6 +23,7 @@ pub mod upload_validator_age;
 pub use backfill_total_blocks::*;
 pub use copy_cluster_info::*;
 pub use copy_gossip_contact_info::*;
+pub use copy_is_bam_connected::*;
 pub use copy_priority_fee_distribution::*;
 pub use copy_tip_distribution_account::*;
 pub use copy_vote_account::*;

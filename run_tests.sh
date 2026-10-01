@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Build programs
 cargo build-sbf --manifest-path programs/steward/Cargo.toml;

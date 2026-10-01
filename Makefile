@@ -1,5 +1,5 @@
 # Makefile for Stakenet
-.PHONY: check build build-release build-sbf idl-build test
+.PHONY: check build build-release build-sbf build-idl test
 
 # Check the project
 check:
@@ -18,7 +18,7 @@ build-sbf:
 	cargo-build-sbf --manifest-path programs/validator-history/Cargo.toml
 
 # IDL Build
-idl-build:
+build-idl:
 	anchor idl build -p steward -o ./programs/steward/idl/steward.json
 	anchor idl build -p validator-history -o ./programs/validator-history/idl/validator_history.json
 

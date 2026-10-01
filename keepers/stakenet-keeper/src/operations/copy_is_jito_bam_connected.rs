@@ -1,0 +1,219 @@
+//! Copies the Jito BAM client status for each validator
+//! into their respective ValidatorHistory accounts.
+//!
+//! This operation queries the Kobe API for validator stats from the previous epoch and
+//! marks a validator as BAM-connected when its reported `bam_connection_rate` meets the
+//! configured `min_bam_connection_rate` threshold, then writes a boolean flag
+//! (`is_bam_connected`) to each validator's on-chain history entry for that epoch.
+//!
+//! The operation runs once at 10% epoch completion, timed to avoid missing the run
+//! entirely if the keeper is down late in the epoch.
+
+use std::{collections::HashSet, str::FromStr, sync::Arc};
+
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_metrics::datapoint_error;
+use solana_sdk::{
+    epoch_info::EpochInfo,
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+};
+use stakenet_sdk::{
+    models::{entries::UpdateInstruction, errors::JitoTransactionError, submit_stats::SubmitStats},
+    utils::{helpers::is_live_vote_account, transactions::submit_instructions},
+};
+
+use crate::{
+    entries::is_bam_connected_entry::IsBamConnectedEntry,
+    state::{keeper_config::KeeperConfig, keeper_state::KeeperState},
+};
+
+use super::keeper_operations::{check_flag, KeeperOperations};
+
+/// Manages the copying of Jito BAM client status into validator history accounts.
+///
+/// Constructed from [`KeeperConfig`] and [`KeeperState`], this struct holds all
+/// the context needed to fetch BAM validator data from the Kobe API and submit
+/// on-chain transactions that record each validator's BAM participation status.
+pub struct CopyIsBamConnectedOperation<'a> {
+    /// RPC Client
+    client: Arc<RpcClient>,
+
+    /// Oracle authority keypair
+    oracle_authority_keypair: Arc<Keypair>,
+
+    /// Validator History Program ID
+    program_id: Pubkey,
+
+    /// Keeper Config
+    keeper_config: &'a KeeperConfig,
+
+    /// Keeper State
+    keeper_state: &'a KeeperState,
+
+    /// Retry count
+    retry_count: u16,
+
+    /// Confirmation Time
+    confirmation_time: u64,
+
+    /// Priority Fee
+    priority_fee_in_microlamports: u64,
+
+    /// No pack
+    no_pack: bool,
+}
+
+impl<'a> CopyIsBamConnectedOperation<'a> {
+    /// Creates a new operation from the keeper's config and current state.
+    pub fn new(keeper_config: &'a KeeperConfig, keeper_state: &'a KeeperState) -> Self {
+        Self {
+            client: keeper_config.client.clone(),
+            oracle_authority_keypair: keeper_config
+                .oracle_authority_keypair
+                .clone()
+                .expect("CopyIsBamConnectedOperation requires oracle_authority_keypair"),
+            program_id: keeper_config.validator_history_program_id,
+            keeper_config,
+            keeper_state,
+            retry_count: keeper_config.tx_retry_count,
+            confirmation_time: keeper_config.tx_confirmation_seconds,
+            priority_fee_in_microlamports: keeper_config.priority_fee_in_microlamports,
+            no_pack: keeper_config.no_pack,
+        }
+    }
+
+    /// Returns the [`KeeperOperations`] variant for this operation.
+    fn operation() -> KeeperOperations {
+        KeeperOperations::CopyIsBamConnected
+    }
+
+    /// Returns `true` when the operation should execute.
+    ///
+    /// Runs once per epoch after 10% slot completion.
+    /// Timed to avoid missing the run entirely if the keeper is down late in the epoch.
+    fn should_run(epoch_info: &EpochInfo, runs_for_epoch: u64) -> bool {
+        epoch_info.slot_index > epoch_info.slots_in_epoch * 10 / 100 && runs_for_epoch < 1
+    }
+
+    /// Entry point for the operation. Checks whether the operation should run,
+    /// executes it, and returns updated run/error/transaction counts for the epoch.
+    pub async fn fire(&self) -> (KeeperOperations, u64, u64, u64) {
+        let operation = Self::operation();
+
+        let (mut runs_for_epoch, mut errors_for_epoch, mut txs_for_epoch) = self
+            .keeper_state
+            .copy_runs_errors_and_txs_for_epoch(operation);
+
+        let should_run = Self::should_run(&self.keeper_state.epoch_info, runs_for_epoch)
+            && check_flag(self.keeper_config.run_flags, operation);
+
+        if should_run {
+            match self.process().await {
+                Ok(stats) => {
+                    for message in stats.results.iter() {
+                        if let Err(e) = message {
+                            datapoint_error!(
+                                "is-bam-connected-error",
+                                ("error", e.to_string(), String),
+                            );
+                            errors_for_epoch += 1;
+                        } else {
+                            txs_for_epoch += 1;
+                        }
+                    }
+                    if stats.errors == 0 {
+                        runs_for_epoch += 1;
+                    }
+                }
+                Err(e) => {
+                    datapoint_error!("is-bam-connected-error", ("error", e.to_string(), String),);
+                    errors_for_epoch += 1;
+                }
+            }
+        }
+
+        (operation, runs_for_epoch, errors_for_epoch, txs_for_epoch)
+    }
+
+    /// Fetches BAM validator data from the Kobe API, determines each validator's
+    /// BAM client status, and submits `CopyIsJitoBamClient` instructions on-chain
+    /// for all validators
+    async fn process(&self) -> Result<SubmitStats, JitoTransactionError> {
+        let epoch_info = &self.keeper_state.epoch_info;
+        let last_epoch = epoch_info.epoch.saturating_sub(1);
+        let validator_history_map = &self.keeper_state.validator_history_map;
+        let candidates: Vec<Pubkey> = validator_history_map.keys().copied().collect();
+
+        // Filter out closed/reassigned vote accounts
+        let mut live_vote_accounts: HashSet<Pubkey> = HashSet::new();
+        for chunk in candidates.chunks(100) {
+            let accounts = self
+                .client
+                .get_multiple_accounts(chunk)
+                .await
+                .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
+            for (pubkey, account) in chunk.iter().zip(accounts.iter()) {
+                if is_live_vote_account(account.as_ref()) {
+                    live_vote_accounts.insert(*pubkey);
+                }
+            }
+        }
+
+        let entries_to_update: Vec<Pubkey> = candidates
+            .into_iter()
+            .filter(|pubkey| live_vote_accounts.contains(pubkey))
+            .collect();
+
+        let validators = self
+            .keeper_config
+            .kobe_client
+            .get_validators(Some(last_epoch))
+            .await
+            .map_err(|e| JitoTransactionError::Custom(e.to_string()))?
+            .validators;
+
+        let bam_vote_accounts: HashSet<Pubkey> = validators
+            .iter()
+            .filter_map(|bam_v| {
+                let vote_account = Pubkey::from_str(&bam_v.vote_account).ok()?;
+                let connection_rate = bam_v.bam_connection_rate?;
+
+                if connection_rate >= self.keeper_config.min_bam_connection_rate {
+                    return Some(vote_account);
+                }
+
+                None
+            })
+            .collect();
+
+        let update_instructions = entries_to_update
+            .iter()
+            .map(|vote_account| {
+                let is_bam_connected = bam_vote_accounts.contains(vote_account);
+
+                IsBamConnectedEntry::new(
+                    *vote_account,
+                    &self.program_id,
+                    &self.oracle_authority_keypair.pubkey(),
+                    last_epoch,
+                    is_bam_connected,
+                )
+                .update_instruction()
+            })
+            .collect::<Vec<_>>();
+
+        submit_instructions(
+            &self.client,
+            update_instructions,
+            &self.oracle_authority_keypair,
+            self.priority_fee_in_microlamports,
+            self.retry_count,
+            self.confirmation_time,
+            None,
+            self.no_pack,
+        )
+        .await
+        .map_err(|e| e.into())
+    }
+}

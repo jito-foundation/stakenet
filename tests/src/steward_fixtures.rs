@@ -382,6 +382,8 @@ impl TestFixture {
             compute_score_epoch_progress: Some(0.50),
             undirected_stake_ceiling_lamports: Some(10_000_000_000 * 1_000_000_000),
             directed_stake_unstake_cap_bps: Some(10_000),
+            jito_bam_minimum_epochs: Some(0),
+            jito_bam_window_epochs: Some(0),
         });
 
         let update_priority_fee_parameters_args =
@@ -851,24 +853,27 @@ impl TestFixture {
 
     pub async fn fetch_minimum_delegation(&self) -> u64 {
         let ix = solana_program::stake::instruction::get_minimum_delegation();
+        let blockhash = self.get_latest_blockhash().await;
+
         let tx = Transaction::new_signed_with_payer(
             &[ix],
             Some(&self.keypair.pubkey()),
             &[&self.keypair],
-            self.ctx.borrow_mut().last_blockhash,
+            blockhash,
         );
 
-        let process_tx_result = {
+        let result = {
             let banks_client = self.ctx.borrow_mut().banks_client.clone();
-            banks_client.process_transaction_with_metadata(tx).await
+            banks_client.simulate_transaction(tx).await.unwrap()
         };
 
-        let result = process_tx_result.unwrap();
-
-        assert!(result.result.is_ok());
-        let metadata = result.metadata.unwrap();
+        if let Some(Err(ref e)) = result.result {
+            panic!("fetch_minimum_delegation failed: {e:?}");
+        }
+        let simulation_details = result.simulation_details.unwrap();
+        let return_data = simulation_details.return_data.unwrap();
         let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(&metadata.return_data.clone().unwrap().data[..8]);
+        bytes.copy_from_slice(&return_data.data[..8]);
         u64::from_le_bytes(bytes)
     }
 
@@ -2305,7 +2310,9 @@ impl Default for StateMachineFixtures {
             directed_stake_unstake_cap_bps: 750,
             compute_score_epoch_progress: 0.5,
             undirected_stake_ceiling_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
-            _padding_0: [0; 6],
+            jito_bam_minimum_epochs: 0,
+            jito_bam_window_epochs: 0,
+            _padding_0: [0; 4],
             _padding_1: [0; 28],
             _padding_2: [0; 6],
         };
@@ -2357,6 +2364,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -2379,6 +2387,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }
@@ -2401,6 +2410,7 @@ impl Default for StateMachineFixtures {
                 vote_account_last_update_slot: epoch_schedule.get_last_slot_in_epoch(i),
                 merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
                 priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::TipRouter,
+                is_bam_connected: 1,
                 ..ValidatorHistoryEntry::default()
             });
         }

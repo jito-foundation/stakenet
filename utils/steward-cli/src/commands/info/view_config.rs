@@ -155,6 +155,14 @@ fn _print_default_config(
         "Compute Score Epoch Progress:  {:?}\n",
         config_account.parameters.compute_score_epoch_progress
     );
+    formatted_string += &format!(
+        "Jito BAM Minimum Epochs:  {:?}\n",
+        config_account.parameters.jito_bam_minimum_epochs
+    );
+    formatted_string += &format!(
+        "Jito BAM Window Epochs:  {:?}\n",
+        config_account.parameters.jito_bam_window_epochs
+    );
     formatted_string += "\n⚙️ Priority Fee Parameters ⚙️\n";
     formatted_string += &format!(
         "Priority Fee Lookback Epochs:  {:?}\n",

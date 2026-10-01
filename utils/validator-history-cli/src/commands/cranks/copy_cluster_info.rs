@@ -6,8 +6,8 @@ use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 #[allow(deprecated)]
 use solana_sdk::{
-    compute_budget, instruction::Instruction, signature::read_keypair_file, signer::Signer,
-    transaction::Transaction,
+    compute_budget, instruction::Instruction, pubkey::Pubkey, signature::read_keypair_file,
+    signer::Signer, transaction::Transaction,
 };
 use stakenet_sdk::utils::accounts::get_cluster_history_address;
 
@@ -19,20 +19,24 @@ pub struct CrankCopyClusterInfo {
     keypair_path: PathBuf,
 }
 
-pub async fn run(args: CrankCopyClusterInfo, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(
+    args: CrankCopyClusterInfo,
+    rpc_url: String,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
     let client = RpcClient::new(rpc_url);
     let client = Arc::new(client);
 
-    let cluster_history_address = get_cluster_history_address(&validator_history::id());
+    let cluster_history_address = get_cluster_history_address(&program_id);
     let priority_fee_ix = compute_budget::ComputeBudgetInstruction::set_compute_unit_price(20000);
     let heap_request_ix = compute_budget::ComputeBudgetInstruction::request_heap_frame(256 * 1024);
     let compute_budget_ix =
         compute_budget::ComputeBudgetInstruction::set_compute_unit_limit(1_400_000);
     let update_instruction = Instruction {
-        program_id: validator_history::id(),
+        program_id,
         accounts: validator_history::accounts::CopyClusterInfo {
             cluster_history_account: cluster_history_address,
             slot_history: solana_program::sysvar::slot_history::id(),
