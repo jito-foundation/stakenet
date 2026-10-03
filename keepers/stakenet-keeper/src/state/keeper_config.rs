@@ -1,6 +1,7 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use clap::Parser;
+use jito_steward::constants::BASIS_POINTS_MAX;
 use kobe_client::client::KobeClient;
 use rusqlite::Connection;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -58,6 +59,12 @@ pub struct KeeperConfig {
 
     /// A coinbase vote pubkey
     pub coinbase_vote_pubkey: Pubkey,
+
+    /// Vote pubkey of the JitoSOL Prime validator
+    pub jitosol_prime_vote_pubkey: Pubkey,
+
+    /// Share of total JitoSOL TVL directed to the JitoSOL Prime validator, in basis points
+    pub jitosol_prime_share_bps: u16,
 
     /// Minimum BAM connection rate for a validator to be considered BAM-connected
     pub min_bam_connection_rate: f64,
@@ -287,9 +294,37 @@ pub struct Args {
     )]
     pub coinbase_vote_pubkey: Pubkey,
 
+    /// Vote pubkey of the JitoSOL Prime validator
+    #[arg(
+        long,
+        env,
+        default_value = "J1to5o1Q7W7Y2Q7zpETTezv3DyzPMHKDg66X2nZPMr4X"
+    )]
+    pub jitosol_prime_vote_pubkey: Pubkey,
+
+    /// Share of total JitoSOL TVL directed to the JitoSOL Prime validator, in basis points
+    ///
+    /// Defaults to 2,500 bps (25%), which is ~2.3M SOL at current TVL.
+    #[arg(long, env, default_value = "2500", value_parser = parse_share_bps)]
+    pub jitosol_prime_share_bps: u16,
+
     /// Minimum BAM connection rate for a validator to be considered BAM-connected
     #[arg(long, env, value_parser = parse_connection_rate)]
     pub min_bam_connection_rate: f64,
+}
+
+/// Parses a basis point share, validating it falls within the inclusive range `0..=10_000`.
+fn parse_share_bps(s: &str) -> Result<u16, String> {
+    let v: u16 = s
+        .parse()
+        .map_err(|_| format!("`{s}` is not a valid basis point value"))?;
+    if v <= BASIS_POINTS_MAX {
+        Ok(v)
+    } else {
+        Err(format!(
+            "basis points must be between 0 and {BASIS_POINTS_MAX}, got `{s}`"
+        ))
+    }
 }
 
 /// Parses a connection rate, validating it falls within the inclusive range `0.0..=1.0`.
@@ -370,6 +405,8 @@ impl fmt::Display for Args {
             Run Copy Is BAM Connected Operation: {:?}\n\
             Kobe API Base URL: {:?}\n\
             Coinbase Vote Pubkey: {:?}\n\
+            JitoSOL Prime Vote Pubkey: {:?}\n\
+            JitoSOL Prime Share Bps: {:?}\n\
             Min BAM Connection Rate: {:?}\n\
             -------------------------------",
             redact_url(&self.json_rpc_url),
@@ -418,6 +455,8 @@ impl fmt::Display for Args {
             self.run_copy_is_bam_connected,
             self.kobe_api_base_url,
             self.coinbase_vote_pubkey,
+            self.jitosol_prime_vote_pubkey,
+            self.jitosol_prime_share_bps,
             self.min_bam_connection_rate,
         )
     }

@@ -488,6 +488,8 @@ fn main() {
             validator_history_min_stake: args.validator_history_min_stake,
             kobe_client,
             coinbase_vote_pubkey: args.coinbase_vote_pubkey,
+            jitosol_prime_vote_pubkey: args.jitosol_prime_vote_pubkey,
+            jitosol_prime_share_bps: args.jitosol_prime_share_bps,
             min_bam_connection_rate: args.min_bam_connection_rate,
         };
 
