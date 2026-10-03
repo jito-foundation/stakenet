@@ -60,12 +60,10 @@ pub struct KeeperConfig {
     /// A coinbase vote pubkey
     pub coinbase_vote_pubkey: Pubkey,
 
-    /// Vote pubkeys of the Jito-operated ("JitoSOL Prime") validators
-    ///
-    /// The JitoSOL Prime share is split pro-rata between these validators.
-    pub jitosol_prime_vote_pubkeys: Vec<Pubkey>,
+    /// Vote pubkey of the JitoSOL Prime validator
+    pub jitosol_prime_vote_pubkey: Pubkey,
 
-    /// Share of total JitoSOL TVL directed to the Jito-operated validators, in basis points
+    /// Share of total JitoSOL TVL directed to the JitoSOL Prime validator, in basis points
     pub jitosol_prime_share_bps: u16,
 
     /// Minimum BAM connection rate for a validator to be considered BAM-connected
@@ -296,7 +294,7 @@ pub struct Args {
     )]
     pub coinbase_vote_pubkey: Pubkey,
 
-    /// Vote pubkeys of the JitoSOL Prime validator
+    /// Vote pubkey of the JitoSOL Prime validator
     #[arg(
         long,
         env,
@@ -304,7 +302,7 @@ pub struct Args {
     )]
     pub jitosol_prime_vote_pubkey: Pubkey,
 
-    /// Share of total JitoSOL TVL directed to the Jito-operated validators, in basis points
+    /// Share of total JitoSOL TVL directed to the JitoSOL Prime validator, in basis points
     ///
     /// Defaults to 2,500 bps (25%), which is ~2.3M SOL at current TVL.
     #[arg(long, env, default_value = "2500", value_parser = parse_share_bps)]

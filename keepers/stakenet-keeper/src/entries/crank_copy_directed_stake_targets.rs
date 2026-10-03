@@ -48,7 +48,7 @@ pub async fn crank_copy_directed_stake_targets(
         priority_fee_in_microlamports: priority_fee,
         kobe_client,
         coinbase_vote_pubkey,
-        jitosol_prime_vote_pubkeys,
+        jitosol_prime_vote_pubkey,
         jitosol_prime_share_bps,
         ..
     } = keeper_config;
@@ -95,7 +95,7 @@ pub async fn crank_copy_directed_stake_targets(
         &all_steward_accounts.config_address,
         &keypair.pubkey(),
         program_id,
-        jitosol_prime_vote_pubkeys,
+        jitosol_prime_vote_pubkey,
         *jitosol_prime_share_bps,
     )
     .await

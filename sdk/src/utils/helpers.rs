@@ -324,27 +324,6 @@ pub fn calculate_share_lamports(
         .ok_or(JitoInstructionError::ArithmeticError)
 }
 
-/// Splits `total_lamports` pro-rata across `num_targets` equally weighted targets.
-///
-/// Each target receives `total_lamports / num_targets`, and the remainder from integer
-/// division is spread one lamport at a time across the leading targets so that the
-/// returned amounts always sum to exactly `total_lamports`.
-///
-/// Returns an empty vector when `num_targets` is `0`.
-pub fn split_lamports_pro_rata(total_lamports: u64, num_targets: usize) -> Vec<u64> {
-    if num_targets == 0 {
-        return Vec::new();
-    }
-
-    let num_targets_u64 = num_targets as u64;
-    let base = total_lamports / num_targets_u64;
-    let remainder = total_lamports % num_targets_u64;
-
-    (0..num_targets_u64)
-        .map(|i| if i < remainder { base + 1 } else { base })
-        .collect()
-}
-
 /// Aggregates validator target delegations from all tickets.
 ///
 /// For each ticket and each validator preference, calculates the lamports to allocate
@@ -499,21 +478,6 @@ mod tests {
 
         // Rejects shares above 100%
         assert!(calculate_share_lamports(total_lamports, BASIS_POINTS_MAX + 1).is_err());
-    }
-
-    #[test]
-    fn test_split_lamports_pro_rata() {
-        assert!(split_lamports_pro_rata(1_000, 0).is_empty());
-        assert_eq!(split_lamports_pro_rata(1_000, 1), vec![1_000]);
-        assert_eq!(split_lamports_pro_rata(1_000, 4), vec![250; 4]);
-
-        // Remainder is spread across the leading targets and the parts sum to the total
-        let parts = split_lamports_pro_rata(1_002, 4);
-        assert_eq!(parts, vec![251, 251, 250, 250]);
-        assert_eq!(parts.iter().sum::<u64>(), 1_002);
-
-        let parts = split_lamports_pro_rata(2_300_000 * LAMPORTS_PER_SOL + 2, 3);
-        assert_eq!(parts.iter().sum::<u64>(), 2_300_000 * LAMPORTS_PER_SOL + 2);
     }
 
     #[test]
