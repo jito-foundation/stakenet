@@ -65,10 +65,6 @@ pub async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    let normal_stats =
-        submit_targets(client, &keypair, *priority_fee, "normal", &normal_ixs).await?;
-    stats.combine(&normal_stats);
-
     let coinbase_delegation_ixs = compute_coinbase_targets(
         client.clone(),
         kobe_client,
@@ -79,16 +75,6 @@ pub async fn crank_copy_directed_stake_targets(
     )
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
-
-    let coinbase_delegation_stats = submit_targets(
-        client,
-        &keypair,
-        *priority_fee,
-        "coinbase_delegation",
-        &coinbase_delegation_ixs,
-    )
-    .await?;
-    stats.combine(&coinbase_delegation_stats);
 
     let jitosol_prime_ixs = compute_jitosol_prime_targets(
         client.clone(),
@@ -101,15 +87,20 @@ pub async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    let jitosol_prime_stats = submit_targets(
+    let normal_stats =
+        submit_targets(client, &keypair, *priority_fee, "normal", &normal_ixs).await?;
+    stats.combine(&normal_stats);
+
+    let coinbase_and_jitosol_prime_ixs = [coinbase_delegation_ixs, jitosol_prime_ixs].concat();
+    let coinbase_and_jitosol_prime_stats = submit_targets(
         client,
         &keypair,
         *priority_fee,
-        "jitosol_prime",
-        &jitosol_prime_ixs,
+        "coinbase_and_jitosol_prime",
+        &coinbase_and_jitosol_prime_ixs,
     )
     .await?;
-    stats.combine(&jitosol_prime_stats);
+    stats.combine(&coinbase_and_jitosol_prime_stats);
 
     Ok(stats)
 }
