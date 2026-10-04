@@ -57,6 +57,27 @@ Displays the full epoch-by-epoch history for a single validator.
 - `--end-epoch`: Epoch to stop displaying history at (optional, defaults to current epoch)
 - `--json` (`-j`): Print output in JSON format (optional)
 
+#### Init Validator History
+
+Creates the validator history account for a single vote account. The keeper only creates accounts for vote accounts above its minimum activated stake (`validator_history_min_stake`, default 500 SOL). Use this command to create one for a vote account below that threshold.
+
+```bash
+./target/release/validator-history-cli \
+  --json-rpc-url <JSON_RPC_URL> \
+  init-validator-history \
+  --keypair-path ~/.config/solana/id.json \
+  --vote-account <VOTE_ACCOUNT_PUBKEY> \
+```
+
+##### Description
+
+Anyone can call this. The signer pays the rent for the full-size account; the command prints the amount before sending. The program has no instruction to close the account, so the rent can't be recovered. The program requires the vote account to have at least 5 epochs of vote credits. The command sends the same initialize and realloc instructions as the keeper, in one transaction. It simulates the transaction first and prints the program logs if the simulation fails. It does nothing if the account already exists.
+
+##### Parameters
+
+- `--keypair-path` (`-k`): Path to the keypair that pays for the account and signs the transaction (default: `~/.config/solana/id.json`)
+- `--vote-account`: The vote account to create the validator history account for (required). Pass the vote account, not the validator identity.
+
 #### Set New Tip Distribution Program
 
 Updates the tip distribution program address stored in the on-chain Config account. Must be signed by the Config admin.
