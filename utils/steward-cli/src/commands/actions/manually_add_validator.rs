@@ -2,7 +2,7 @@ use std::{num::NonZeroU32, sync::Arc};
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
-
+use clap::Parser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_program::instruction::Instruction;
 #[allow(deprecated)]
@@ -17,8 +17,34 @@ use stakenet_sdk::utils::{
 };
 use validator_history::id as validator_history_id;
 
-use crate::commands::command_args::ManuallyAddValidator;
-use crate::utils::transactions::maybe_print_tx;
+use crate::{commands::command_args::PermissionedParameters, utils::transactions::maybe_print_tx};
+
+#[derive(Parser)]
+#[command(about = "Admin-only: adds a validator to the pool")]
+pub struct ManuallyAddValidator {
+    #[command(flatten)]
+    pub permissioned_parameters: PermissionedParameters,
+
+    /// Validator vote account to add
+    #[arg(long, env)]
+    pub vote_account: Pubkey,
+
+    /// Optional validator seed for the stake account derivation
+    #[arg(long, env)]
+    pub validator_seed: Option<u32>,
+
+    /// Skip the check that the ValidatorHistory account exists.
+    /// Adding a validator without one will stall the state machine at the next
+    /// scoring cycle - only use this if you know what you're doing.
+    #[arg(long, env, default_value = "false")]
+    pub skip_validator_history_check: bool,
+
+    /// Skip the check that the steward is not mid-scoring-cycle.
+    /// Adding during ComputeScores risks the validator being pulled into the
+    /// current cohort if scoring restarts - only use this if you know what you're doing.
+    #[arg(long, env, default_value = "false")]
+    pub skip_state_check: bool,
+}
 
 /// Admin passthrough to `spl_stake_pool::add_validator_to_pool`.
 ///

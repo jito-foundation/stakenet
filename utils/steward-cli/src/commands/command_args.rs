@@ -30,6 +30,7 @@ use crate::commands::{
         close_directed_stake_ticket::CloseDirectedStakeTicket,
         close_directed_stake_whitelist::CloseDirectedStakeWhitelist,
         copy_directed_stake_targets::CopyDirectedStakeTargets,
+        manually_add_validator::ManuallyAddValidator,
         migrate_directed_to_algorithmic::MigrateDirectedToAlgorithmic,
         migrate_state_to_v2::MigrateStateToV2,
         remove_from_directed_stake_whitelist::RemoveFromDirectedStakeWhitelist,
@@ -750,30 +751,6 @@ pub struct ManuallyCopyVoteAccount {
 pub struct ManuallyCopyAllVoteAccounts {
     #[command(flatten)]
     pub permissionless_parameters: PermissionlessParameters,
-}
-
-#[derive(Parser)]
-#[command(
-    about = "Admin-only: adds a validator to the pool, bypassing the stake/voting minimums \
-             enforced by `auto-add-validator-from-pool`"
-)]
-pub struct ManuallyAddValidator {
-    #[command(flatten)]
-    pub permissioned_parameters: PermissionedParameters,
-
-    /// Validator vote account to add
-    #[arg(long, env)]
-    pub vote_account: Pubkey,
-
-    /// Optional validator seed for the stake account derivation
-    #[arg(long, env)]
-    pub validator_seed: Option<u32>,
-
-    /// Skip the check that the ValidatorHistory account exists.
-    /// Adding a validator without one will stall the state machine at the next
-    /// scoring cycle - only use this if you know what you're doing.
-    #[arg(long, env, default_value = "false")]
-    pub skip_validator_history_check: bool,
 }
 
 #[derive(Parser)]
