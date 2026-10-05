@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{num::NonZeroU32, sync::Arc};
 
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anyhow::Result;
@@ -92,11 +92,13 @@ pub async fn command_manually_add_validator(
 
     let steward_accounts = get_all_steward_accounts(client, &program_id, &steward_config).await?;
 
+    let validator_seed = NonZeroU32::new(args.validator_seed.unwrap_or_default());
+
     let (stake_address, _) = find_stake_program_address(
         &spl_stake_pool::id(),
         &vote_account,
         &steward_accounts.stake_pool_address,
-        None,
+        validator_seed,
     );
 
     let ix = Instruction {
