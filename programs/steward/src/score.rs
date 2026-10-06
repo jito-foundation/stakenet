@@ -7,7 +7,7 @@ use anchor_lang::{
 use serde::{Deserialize, Serialize};
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, EpochCreditsRatio, MerkleRootUploadAuthority,
-    ValidatorHistory, ValidatorHistoryEntry,
+    ValidatorHistory,
 };
 
 use crate::{
@@ -928,7 +928,6 @@ pub fn instant_unstake_validator(
     });
 
     let delinquency_check = match previous_epoch_era {
-        // The previous epoch is a complete alpenglow epoch, so judge the validator by it
         Some((epoch, true)) => {
             let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
                 cluster,
@@ -942,17 +941,10 @@ pub fn instant_unstake_validator(
                 Some(&EpochCreditsRatio::Scored(ratio)) => {
                     ratio < params.instant_unstake_delinquency_threshold_ratio
                 }
-                // An epoch that can't be scored is no reason to unstake
                 _ => false,
             }
         }
-        // The previous epoch is tower, but the current epoch may be the migration epoch, whose
-        // credits mix tower vote credits with alpenglow reward lamports. Comparing those against
-        // `total_blocks * TVC_MULTIPLIER` would read as delinquent, so only judge the current epoch
-        // while the cluster is still fully on tower.
-        Some((_, false))
-            if !current_epoch_has_alpenglow_credits(validator, current_epoch, slots_per_epoch) =>
-        {
+        Some((_epoch, false)) if !cluster.history.alpenglow_activated_by(current_epoch) => {
             calculate_instant_unstake_delinquency(
                 total_blocks_latest,
                 cluster_history_slot_index,
@@ -961,8 +953,6 @@ pub fn instant_unstake_validator(
                 params.instant_unstake_delinquency_threshold_ratio,
             )?
         }
-        // No entry for the previous epoch, or the cluster is mid-migration. Neither calculator can
-        // be trusted, so don't unstake on delinquency this epoch.
         _ => false,
     };
 
@@ -1014,27 +1004,6 @@ pub fn instant_unstake_validator(
             mev_commission: mev_commission_bps,
         },
     })
-}
-
-/// Whether the current epoch's credits hold alpenglow reward lamports rather than tower vote
-/// credits, which cluster history can't tell us yet because this epoch's inflation rewards aren't
-/// recorded until it ends.
-fn current_epoch_has_alpenglow_credits(
-    validator_history: &ValidatorHistory,
-    current_epoch: u16,
-    slots_per_epoch: u64,
-) -> bool {
-    let default_entry = ValidatorHistoryEntry::default();
-    let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
-    validator_history
-        .history
-        .epoch_range(current_epoch, current_epoch)
-        .first()
-        .and_then(|entry| *entry)
-        .is_some_and(|entry| {
-            entry.epoch_credits_uncapped != default_entry.epoch_credits_uncapped
-                && entry.epoch_credits_uncapped > max_tower_credits
-        })
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
@@ -1311,28 +1280,16 @@ mod tests {
     }
 
     #[test]
-    fn test_current_epoch_alpenglow_credits_detected_before_cluster_knows() {
-        let (mut validator, _) = migrating_history();
+    fn test_alpenglow_activated_by_identifies_the_transition() {
+        // Epochs 13 and 14 are alpenglow, 12 is the migration epoch, 10 and 11 are tower
+        let (_, cluster) = migrating_history();
 
-        assert!(current_epoch_has_alpenglow_credits(
-            &validator,
-            13,
-            SLOTS_PER_EPOCH
-        ));
-
-        assert!(!current_epoch_has_alpenglow_credits(
-            &validator,
-            10,
-            SLOTS_PER_EPOCH
-        ));
-
-        entry_mut(&mut validator, 13).epoch_credits_uncapped =
-            ValidatorHistoryEntry::default().epoch_credits_uncapped;
-        assert!(!current_epoch_has_alpenglow_credits(
-            &validator,
-            13,
-            SLOTS_PER_EPOCH
-        ));
+        assert!(!cluster.history.alpenglow_activated_by(11));
+        // The migration epoch is still flagged tower, so only the cluster's era reveals it
+        assert!(!cluster.history.alpenglow_activated_by(12));
+        assert!(cluster.history.alpenglow_activated_by(13));
+        // Once the cluster migrates it never reads as tower again
+        assert!(cluster.history.alpenglow_activated_by(14));
     }
 
     #[test]
