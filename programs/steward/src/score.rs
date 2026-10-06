@@ -519,12 +519,8 @@ pub fn calculate_epoch_credits(
     }
 
     // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks = total_blocks_window
-        .iter()
-        .filter_map(|&i| i)
-        .map(u64::from)
-        .sum::<u64>() as f64
-        / nonzero_blocks as f64;
+    let average_blocks =
+        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1u8;
@@ -553,7 +549,7 @@ pub fn calculate_epoch_credits(
     }
 
     let normalized_vote_credits_ratio =
-        average_vote_credits / (average_blocks * u64::from(TVC_MULTIPLIER) as f64);
+        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
 
     Ok((
         normalized_vote_credits_ratio,
