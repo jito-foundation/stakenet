@@ -583,27 +583,36 @@ impl CircBuf {
                     return EpochCreditsRatio::Unscorable;
                 };
 
-                if cluster_entry.is_alpenglow.eq(&1) {
-                    let previous_index = index.checked_sub(1);
-                    return alpenglow_entry_credits_ratio(
-                        validator_entries[index],
-                        previous_index.and_then(|i| validator_entries[i]),
-                        cluster_entry,
-                        previous_index.and_then(|i| cluster_entries[i]),
-                    );
-                }
-
-                // Tower epochs are scored against the credits the cluster's blocks could pay
-                let max_credits =
-                    u64::from(cluster_entry.total_blocks).saturating_mul(u64::from(TVC_MULTIPLIER));
-                match tower_credits {
-                    Some(credits) if u64::from(credits) > max_tower_credits => {
-                        EpochCreditsRatio::Unscorable
+                match cluster_entry.is_alpenglow_activated() {
+                    Some(true) => {
+                        let previous_index = index.checked_sub(1);
+                        alpenglow_entry_credits_ratio(
+                            validator_entries[index],
+                            previous_index.and_then(|i| validator_entries[i]),
+                            cluster_entry,
+                            previous_index.and_then(|i| cluster_entries[i]),
+                        )
                     }
-                    _ if max_credits == 0 => EpochCreditsRatio::Unscorable,
-                    credits => EpochCreditsRatio::Scored(
-                        u64::from(credits.unwrap_or(0)) as f64 / max_credits as f64,
-                    ),
+                    Some(false) | None => {
+                        if cluster_entry
+                            .total_blocks
+                            .eq(&ClusterHistoryEntry::default().total_blocks)
+                            || cluster_entry.total_blocks.eq(&0)
+                        {
+                            return EpochCreditsRatio::Unscorable;
+                        }
+
+                        let max_credits = u64::from(cluster_entry.total_blocks)
+                            .saturating_mul(u64::from(TVC_MULTIPLIER));
+                        match tower_credits {
+                            Some(credits) if u64::from(credits) > max_tower_credits => {
+                                EpochCreditsRatio::Unscorable
+                            }
+                            credits => EpochCreditsRatio::Scored(
+                                u64::from(credits.unwrap_or(0)) as f64 / max_credits as f64,
+                            ),
+                        }
+                    }
                 }
             })
             .collect()
@@ -1437,6 +1446,18 @@ impl Default for ClusterHistoryEntry {
     }
 }
 
+impl ClusterHistoryEntry {
+    /// Whether this epoch's inflation rewards were paid the alpenglow way, or `None` if the oracle
+    /// hasn't recorded it yet.
+    pub fn is_alpenglow_activated(&self) -> Option<bool> {
+        match self.is_alpenglow {
+            0 => Some(false),
+            1 => Some(true),
+            _ => None,
+        }
+    }
+}
+
 #[derive(BorshSerialize)]
 #[zero_copy]
 pub struct CircBufCluster {
@@ -1691,6 +1712,45 @@ impl ClusterHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A validator that earned full tower credits in epoch 0, and a cluster that produced
+    /// `total_blocks` that epoch. The era is left unrecorded, as it is for every epoch from before
+    /// the alpenglow oracle started writing it.
+    fn tower_history(total_blocks: u32) -> (ValidatorHistory, ClusterHistory) {
+        let mut validator = ValidatorHistory {
+            struct_version: 0,
+            vote_account: Pubkey::default(),
+            index: 0,
+            bump: 0,
+            _padding0: [0; 7],
+            last_ip_timestamp: 0,
+            last_version_timestamp: 0,
+            validator_age: 0,
+            validator_age_last_updated_epoch: 0,
+            _padding1: [0; 226],
+            history: CircBuf::default(),
+        };
+        let mut cluster = ClusterHistory {
+            struct_version: 0,
+            bump: 0,
+            _padding0: [0; 7],
+            cluster_history_last_update_slot: 0,
+            _padding1: [0; 232],
+            history: CircBufCluster::default(),
+        };
+
+        validator.history.push(ValidatorHistoryEntry {
+            epoch: 0,
+            epoch_credits: 1_000 * TVC_MULTIPLIER,
+            ..ValidatorHistoryEntry::default()
+        });
+        cluster.history.push(ClusterHistoryEntry {
+            epoch: 0,
+            total_blocks,
+            ..ClusterHistoryEntry::default()
+        });
+        (validator, cluster)
+    }
 
     // Utility test to see struct layout
     #[test]
@@ -2016,6 +2076,37 @@ mod tests {
 
         assert!(
             circ_buf.insert(entry, 50) == Err(Error::from(ValidatorHistoryError::EpochOutOfRange))
+        );
+    }
+
+    #[test]
+    fn test_unrecorded_era_reads_as_tower() {
+        let (validator, cluster) = tower_history(1_000);
+        assert_eq!(cluster.history.arr[0].is_alpenglow_activated(), None);
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+            vec![EpochCreditsRatio::Scored(1.)]
+        );
+    }
+
+    #[test]
+    fn test_tower_epoch_needs_uploaded_total_blocks() {
+        let (validator, cluster) = tower_history(ClusterHistoryEntry::default().total_blocks);
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+            vec![EpochCreditsRatio::Unscorable]
+        );
+
+        let (validator, cluster) = tower_history(0);
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+            vec![EpochCreditsRatio::Unscorable]
         );
     }
 }

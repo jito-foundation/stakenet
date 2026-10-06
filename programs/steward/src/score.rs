@@ -916,18 +916,20 @@ pub fn instant_unstake_validator(
         .unwrap_or(0);
 
     /////// Component calculations ///////
-    let previous_epoch = current_epoch.checked_sub(1);
-    let previous_epoch_era = previous_epoch.and_then(|epoch| {
+    // An epoch with no recorded era predates the alpenglow migration, so it reads as tower. Only a
+    // missing entry leaves the era genuinely unknown.
+    let previous_epoch_era = current_epoch.checked_sub(1).and_then(|epoch| {
         cluster
             .history
             .epoch_range(epoch, epoch)
             .first()
             .and_then(|entry| *entry)
-            .map(|entry| (epoch, entry.is_alpenglow))
+            .map(|entry| (epoch, entry.is_alpenglow_activated().unwrap_or(false)))
     });
 
     let delinquency_check = match previous_epoch_era {
-        Some((epoch, 1)) => {
+        // The previous epoch is a complete alpenglow epoch, so judge the validator by it
+        Some((epoch, true)) => {
             let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
                 cluster,
                 epoch,
@@ -940,10 +942,15 @@ pub fn instant_unstake_validator(
                 Some(&EpochCreditsRatio::Scored(ratio)) => {
                     ratio < params.instant_unstake_delinquency_threshold_ratio
                 }
+                // An epoch that can't be scored is no reason to unstake
                 _ => false,
             }
         }
-        Some((_, 0))
+        // The previous epoch is tower, but the current epoch may be the migration epoch, whose
+        // credits mix tower vote credits with alpenglow reward lamports. Comparing those against
+        // `total_blocks * TVC_MULTIPLIER` would read as delinquent, so only judge the current epoch
+        // while the cluster is still fully on tower.
+        Some((_, false))
             if !current_epoch_has_alpenglow_credits(validator, current_epoch, slots_per_epoch) =>
         {
             calculate_instant_unstake_delinquency(
@@ -954,6 +961,8 @@ pub fn instant_unstake_validator(
                 params.instant_unstake_delinquency_threshold_ratio,
             )?
         }
+        // No entry for the previous epoch, or the cluster is mid-migration. Neither calculator can
+        // be trusted, so don't unstake on delinquency this epoch.
         _ => false,
     };
 
