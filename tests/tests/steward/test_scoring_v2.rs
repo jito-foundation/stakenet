@@ -827,13 +827,17 @@ mod validator_score_integration_tests {
 
     #[test]
     fn test_validator_score_across_alpenglow_migration() {
-        // 86_400 SOL of inflation per epoch pays a validator holding 0.1% of the stake 100_000
-        // lamports per reward certificate, and each block's leader 100_000_000 lamports
+        // 86_400 SOL of inflation per epoch, against which a validator holding 0.1% of the stake
+        // is expected to earn 0.1% — vote and leader rewards together
         const REWARD_STAKE: u64 = 1_000_000_000_000;
-        const LAMPORTS_PER_VOTE: u64 = 100_000;
-        const LEADER_LAMPORTS_PER_BLOCK: u64 = 100_000_000;
+        const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+        const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+        const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
+        const TOTAL_BLOCKS: u64 = 1_000;
         const MIGRATION_EPOCH: u16 = 15;
-        let reward_lamports = |votes: u64| votes * LAMPORTS_PER_VOTE + LEADER_LAMPORTS_PER_BLOCK;
+        // What the validator earns when it captures `blocks` out of `TOTAL_BLOCKS` of its expected
+        // share. Scoring sees no split between vote and leader rewards.
+        let reward_lamports = |blocks: u64| EXPECTED_LAMPORTS * blocks / TOTAL_BLOCKS;
 
         let mut cluster = create_cluster_history(20);
         for entry in cluster
@@ -842,13 +846,12 @@ mod validator_score_integration_tests {
             .iter_mut()
             .filter(|entry| entry.epoch <= 20)
         {
-            entry.total_epoch_stake_lamports = 1_000 * REWARD_STAKE;
-            entry.total_inflation_rewards = 86_400_000_000_000;
-            entry.distributed_inflation_rewards = 2 * LEADER_LAMPORTS_PER_BLOCK * 1_000;
+            entry.total_epoch_stake_lamports = TOTAL_REWARD_STAKE;
+            entry.total_inflation_rewards = INFLATION_REWARDS;
             entry.is_alpenglow = (entry.epoch > MIGRATION_EPOCH) as u8;
         }
 
-        // Votes in every reward certificate and leads one block per epoch
+        // Earns everything it was expected to in every epoch
         let mut validator = create_validator_history();
         for epoch in 0..=20 {
             let epoch_credits_uncapped = match epoch {
@@ -884,7 +887,7 @@ mod validator_score_integration_tests {
         assert_eq!(result.delinquency_score, 1);
         assert_eq!(result.vote_credits_avg, VOTE_CREDITS_RATIO_MAX);
 
-        // Voted in only half of the reward certificates of one alpenglow epoch
+        // Earned only half its expected share in one alpenglow epoch
         validator
             .history
             .arr_mut()

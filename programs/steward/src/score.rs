@@ -6,8 +6,7 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, EpochCreditsRatio, MerkleRootUploadAuthority,
-    ValidatorHistory,
+    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
 };
 
 use crate::{
@@ -16,6 +15,7 @@ use crate::{
         VOTE_CREDITS_RATIO_MAX,
     },
     errors::StewardError::{self, ArithmeticError},
+    instant_unstake::epoch_credits::calculate_instant_unstake_delinquency,
     score::{
         epoch_credits::calculate_scorable_epoch_credits, running_bam::calculate_running_bam_score,
     },
@@ -916,45 +916,18 @@ pub fn instant_unstake_validator(
         .unwrap_or(0);
 
     /////// Component calculations ///////
-    // An epoch with no recorded era predates the alpenglow migration, so it reads as tower. Only a
-    // missing entry leaves the era genuinely unknown.
-    let previous_epoch_era = current_epoch.checked_sub(1).and_then(|epoch| {
-        cluster
-            .history
-            .epoch_range(epoch, epoch)
-            .first()
-            .and_then(|entry| *entry)
-            .map(|entry| (epoch, entry.is_alpenglow_activated().unwrap_or(false)))
-    });
-
-    let delinquency_check = match previous_epoch_era {
-        Some((epoch, true)) => {
-            let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
-                cluster,
-                epoch,
-                epoch,
-                tvc_activation_epoch,
-                slots_per_epoch,
-            );
-
-            match epoch_credits_ratio.first() {
-                Some(&EpochCreditsRatio::Scored(ratio)) => {
-                    ratio < params.instant_unstake_delinquency_threshold_ratio
-                }
-                _ => false,
-            }
-        }
-        Some((_epoch, false)) if !cluster.history.alpenglow_activated_by(current_epoch) => {
-            calculate_instant_unstake_delinquency(
-                total_blocks_latest,
-                cluster_history_slot_index,
-                epoch_credits_latest,
-                validator_history_slot_index,
-                params.instant_unstake_delinquency_threshold_ratio,
-            )?
-        }
-        _ => false,
-    };
+    let delinquency_check = calculate_instant_unstake_delinquency(
+        validator,
+        cluster,
+        current_epoch,
+        tvc_activation_epoch,
+        slots_per_epoch,
+        total_blocks_latest,
+        cluster_history_slot_index,
+        epoch_credits_latest,
+        validator_history_slot_index,
+        params.instant_unstake_delinquency_threshold_ratio,
+    )?;
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
         validator,
@@ -1004,31 +977,6 @@ pub fn instant_unstake_validator(
             mev_commission: mev_commission_bps,
         },
     })
-}
-
-/// Calculates if the validator should be unstaked due to delinquency
-pub fn calculate_instant_unstake_delinquency(
-    total_blocks_latest: u32,
-    cluster_history_slot_index: u64,
-    epoch_credits_latest: u32,
-    validator_history_slot_index: u64,
-    instant_unstake_delinquency_threshold_ratio: f64,
-) -> Result<bool> {
-    if cluster_history_slot_index == 0 || validator_history_slot_index == 0 {
-        return Err(StewardError::ArithmeticError.into());
-    }
-
-    let blocks_produced_rate = total_blocks_latest as f64 / cluster_history_slot_index as f64;
-    let vote_credits_rate = epoch_credits_latest as f64 / validator_history_slot_index as f64;
-
-    if blocks_produced_rate > 0. {
-        Ok(
-            (vote_credits_rate / (blocks_produced_rate * (TVC_MULTIPLIER as f64)))
-                < instant_unstake_delinquency_threshold_ratio,
-        )
-    } else {
-        Ok(false)
-    }
 }
 
 /// Calculates if the validator should be unstaked due to MEV commission
@@ -1094,7 +1042,7 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
 #[cfg(test)]
 mod tests {
     use validator_history::{
-        utils::MAX_EPOCH_CREDITS, CircBuf, CircBufCluster, ClusterHistoryEntry,
+        utils::MAX_EPOCH_CREDITS, CircBuf, CircBufCluster, ClusterHistoryEntry, EpochCreditsRatio,
         ValidatorHistoryEntry,
     };
 
@@ -1300,16 +1248,5 @@ mod tests {
             calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.97).unwrap();
         assert_eq!(delinquency_score, 1);
         assert!(vote_credits_ratio > 1.0);
-    }
-
-    #[test]
-    fn test_saturated_alpenglow_credits() {
-        let result =
-            calculate_instant_unstake_delinquency(1000, 1000, MAX_EPOCH_CREDITS, 1000, 0.7)
-                .unwrap();
-        assert!(!result);
-
-        let result = calculate_instant_unstake_delinquency(1000, 1000, 0, 1000, 0.7).unwrap();
-        assert!(result);
     }
 }
