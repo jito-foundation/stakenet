@@ -24,18 +24,20 @@ mod tests {
     };
     use validator_history::{ClusterHistory, ValidatorHistory};
 
-    // 86_400 SOL of inflation per epoch pays a validator holding 0.1% of the stake 100_000 lamports
-    // per reward certificate, and each block's leader 100_000_000 lamports
+    // 86_400 SOL of inflation per epoch, against which a validator holding 0.1% of the stake is
+    // expected to earn 0.1% — vote and leader rewards together
     const REWARD_STAKE: u64 = 1_000_000_000_000;
-    const LAMPORTS_PER_VOTE: u64 = 100_000;
-    const LEADER_LAMPORTS_PER_BLOCK: u64 = 100_000_000;
+    const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+    const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+    const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
     const TOTAL_BLOCKS: u64 = 1_000;
 
     /// The keeper packs 5 `compute_score` instructions into a 1.4M compute unit transaction
     const COMPUTE_UNITS_PER_INSTRUCTION: u64 = 1_400_000 / 5;
 
-    /// Turns every epoch after the first into an alpenglow epoch where the validator voted in
-    /// `votes(epoch)` of the reward certificates and led one block.
+    /// Turns every epoch after the first into an alpenglow epoch in which the validator captured
+    /// `votes(epoch)` out of `TOTAL_BLOCKS` of the rewards it was expected to earn. `votes` equal to
+    /// `TOTAL_BLOCKS` is a flawless epoch; scoring sees no split between vote and leader rewards.
     fn to_alpenglow(validator: &mut ValidatorHistory, votes: impl Fn(u16) -> u64) {
         for entry in validator
             .history
@@ -46,7 +48,7 @@ mod tests {
             entry.epoch_stake_lamports = REWARD_STAKE;
             if entry.epoch > 0 {
                 entry.epoch_credits_uncapped =
-                    votes(entry.epoch) * LAMPORTS_PER_VOTE + LEADER_LAMPORTS_PER_BLOCK;
+                    EXPECTED_LAMPORTS * votes(entry.epoch) / TOTAL_BLOCKS;
                 entry.epoch_credits =
                     entry.epoch_credits_uncapped.min(u64::from(u32::MAX - 1)) as u32;
             }
@@ -60,9 +62,8 @@ mod tests {
             .iter_mut()
             .filter(|entry| entry.epoch <= 20)
         {
-            entry.total_epoch_stake_lamports = 1_000 * REWARD_STAKE;
-            entry.total_inflation_rewards = 86_400_000_000_000;
-            entry.distributed_inflation_rewards = 2 * LEADER_LAMPORTS_PER_BLOCK * TOTAL_BLOCKS;
+            entry.total_epoch_stake_lamports = TOTAL_REWARD_STAKE;
+            entry.total_inflation_rewards = INFLATION_REWARDS;
             entry.is_alpenglow = (entry.epoch > 0) as u8;
         }
     }
@@ -101,8 +102,8 @@ mod tests {
         let mut fixture_accounts = FixtureDefaultAccounts::default();
         let mut unit_test_fixtures = Box::<StateMachineFixtures>::default();
 
-        // Validator 0 votes in every reward certificate, validator 1 in 20% of them (and fails the
-        // commission filters anyway), and validator 2 in only half of them in epoch 10
+        // Validator 0 earns everything it was expected to, validator 1 only 20% of it (and fails
+        // the commission filters anyway), and validator 2 only half of it in epoch 10
         to_alpenglow(&mut unit_test_fixtures.validators[0], |_| 1_000);
         to_alpenglow(&mut unit_test_fixtures.validators[1], |_| 200);
         to_alpenglow(&mut unit_test_fixtures.validators[2], |epoch| {
@@ -268,7 +269,7 @@ mod tests {
         fixture.advance_num_slots(160_000).await;
         crank_idle(&fixture).await;
 
-        // Validator 0 votes in only half of the reward certificates in epoch 19, the last complete
+        // Validator 0 earns only half of what it was expected to in epoch 19, the last complete
         // epoch, which is what instant unstake judges once the cluster is on alpenglow
         let mut validator = unit_test_fixtures.validators[0];
         to_alpenglow(
