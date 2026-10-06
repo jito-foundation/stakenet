@@ -6,7 +6,7 @@ use anchor_lang::{
     solana_program::native_token::lamports_to_sol,
 };
 
-use crate::{errors::ValidatorHistoryError, ValidatorHistoryEntry};
+use crate::{constants::TVC_MULTIPLIER, errors::ValidatorHistoryError, ValidatorHistoryEntry};
 
 pub fn cast_epoch(epoch: u64) -> Result<u16> {
     require!(
@@ -87,6 +87,52 @@ pub fn get_max_epoch(
         })
         .max()
         .ok_or_else(|| ValidatorHistoryError::InvalidEpochCredits.into())
+}
+
+/// Converts an alpenglow epoch's vote reward lamports into the timely vote credits they're worth, so
+/// the epoch can be compared against `total_blocks * TVC_MULTIPLIER` like a tower epoch.
+///
+/// Alpenglow pays a validator for voting in reward certificates and for leading blocks, and the two
+/// are indistinguishable once summed into `epoch_credits`. Rather than estimating the leader portion
+/// and subtracting it, this compares what the validator actually earned against what a validator
+/// holding its share of the stake was expected to earn:
+///
+/// `reward_lamports / (inflation_rewards * reward_stake / total_reward_stake)`
+///
+/// Leader rewards sit in both the numerator and the denominator, so they cancel: a stake-weighted
+/// leader schedule hands out leader slots in proportion to the same stake share. That removes the
+/// dependence on per-validator block counts entirely, and leader luck no longer moves the result.
+///
+/// The ratio is then expressed on the tower scale, against the blocks the cluster actually produced.
+///
+/// Returns `None` if the validator had no stake to earn with, or the cluster inputs are empty.
+pub fn alpenglow_epoch_credits(
+    reward_lamports: u64,
+    reward_stake_lamports: u64,
+    total_reward_stake_lamports: u64,
+    inflation_rewards: u64,
+    total_blocks: u32,
+) -> Option<u32> {
+    if reward_stake_lamports == 0
+        || total_reward_stake_lamports == 0
+        || inflation_rewards == 0
+        || total_blocks == 0
+    {
+        return None;
+    }
+
+    // What a validator holding this share of the stake was expected to earn, vote and leader
+    // rewards together
+    let expected_lamports = inflation_rewards as f64 * reward_stake_lamports as f64
+        / total_reward_stake_lamports as f64;
+    let earned_ratio = reward_lamports as f64 / expected_lamports;
+
+    // Express on the same scale as tower credits. Capped at the full ratio of 1 so that credits can
+    // never saturate into the `>= 2^31` range where `u32 as f64` is miscompiled on affected SBF
+    // toolchains, and so an over-earning validator can't outrank a perfect one.
+    let credits = earned_ratio.min(1.) * u64::from(total_blocks) as f64 * TVC_MULTIPLIER as f64;
+
+    Some(credits.round() as u32)
 }
 
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
@@ -191,6 +237,89 @@ mod tests {
     #[test]
     fn test_epoch_credits_map_rejects_decreasing_credits() {
         assert!(epoch_credits_map(&[(70, 6, 9)]).is_err());
+    }
+
+    const TOTAL_BLOCKS: u32 = 1_000;
+
+    // A validator holding 0.1% of the stake is expected to earn 0.1% of the epoch's inflation
+    const REWARD_STAKE: u64 = 1_000_000_000_000;
+    const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+    const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+    const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
+
+    fn credits(reward_lamports: u64) -> Option<u32> {
+        alpenglow_epoch_credits(
+            reward_lamports,
+            REWARD_STAKE,
+            TOTAL_REWARD_STAKE,
+            INFLATION_REWARDS,
+            TOTAL_BLOCKS,
+        )
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_measures_against_expected_earnings() {
+        // Earned exactly its stake-weighted share, so it gets full credit for every block
+        assert_eq!(
+            credits(EXPECTED_LAMPORTS),
+            Some(TOTAL_BLOCKS * TVC_MULTIPLIER)
+        );
+        // Earned 80% of it
+        assert_eq!(
+            credits(EXPECTED_LAMPORTS * 8 / 10),
+            Some(TOTAL_BLOCKS * TVC_MULTIPLIER * 8 / 10)
+        );
+        assert_eq!(
+            credits(EXPECTED_LAMPORTS / 2),
+            Some(TOTAL_BLOCKS * TVC_MULTIPLIER / 2)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_ignores_leader_luck() {
+        // Leader rewards land in the earnings and in the expectation alike, so a validator that
+        // earned its full share scores the same however that share was split between voting and
+        // leading. No block count is involved.
+        assert_eq!(
+            credits(EXPECTED_LAMPORTS),
+            Some(TOTAL_BLOCKS * TVC_MULTIPLIER)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_caps_at_full_participation() {
+        // Over-earning can't outrank a perfect validator, and nonsense reward lamports can't push
+        // credits into the `>= 2^31` range where `u32 as f64` is miscompiled
+        assert_eq!(
+            credits(EXPECTED_LAMPORTS * 10),
+            Some(TOTAL_BLOCKS * TVC_MULTIPLIER)
+        );
+        assert_eq!(credits(u64::MAX), Some(TOTAL_BLOCKS * TVC_MULTIPLIER));
+        assert!(credits(u64::MAX).unwrap() < 1 << 31);
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_floors_at_zero() {
+        assert_eq!(credits(0), Some(0));
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_credits_needs_stake_and_rewards() {
+        // No stake to earn with
+        assert_eq!(
+            alpenglow_epoch_credits(0, 0, TOTAL_REWARD_STAKE, INFLATION_REWARDS, TOTAL_BLOCKS),
+            None
+        );
+        // Inflation rewards not recorded yet
+        assert_eq!(
+            alpenglow_epoch_credits(0, REWARD_STAKE, TOTAL_REWARD_STAKE, 0, TOTAL_BLOCKS),
+            None
+        );
+        // Blocks not recorded yet
+        assert_eq!(
+            alpenglow_epoch_credits(0, REWARD_STAKE, TOTAL_REWARD_STAKE, INFLATION_REWARDS, 0),
+            None
+        );
     }
 
     #[test]

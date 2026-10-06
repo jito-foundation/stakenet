@@ -14,8 +14,8 @@ use {
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
         utils::{
-            epoch_credits_map, find_insert_position, get_max_epoch, get_min_epoch,
-            MAX_EPOCH_CREDITS,
+            alpenglow_epoch_credits, epoch_credits_map, find_insert_position, get_max_epoch,
+            get_min_epoch, MAX_EPOCH_CREDITS,
         },
     },
     anchor_lang::{
@@ -538,6 +538,54 @@ impl CircBuf {
                         credits
                     }
                 })
+            })
+            .collect()
+    }
+
+    /// Decodes the credits each epoch in [start_epoch, end_epoch] is worth, normalized so that
+    /// `credits / (total_blocks * TVC_MULTIPLIER)` means the same in tower and alpenglow epochs.
+    ///
+    /// Epochs flagged `is_alpenglow` in cluster history hold vote reward lamports, which are
+    /// converted with `alpenglow_epoch_credits`. `None` means the epoch can't be decoded: either an
+    /// input hasn't been uploaded yet, or the credits mix tower vote credits with alpenglow reward
+    /// lamports (the migration epoch, or an alpenglow epoch whose rewards aren't recorded yet).
+    /// Callers decide what an undecodable epoch means for them.
+    pub fn epoch_credits_range_decoded(
+        &self,
+        cluster: &CircBufCluster,
+        start_epoch: u16,
+        end_epoch: u16,
+        tvc_activation_epoch: u64,
+        slots_per_epoch: u64,
+    ) -> Vec<Option<Option<u32>>> {
+        let tower_credits =
+            self.epoch_credits_range_normalized(start_epoch, end_epoch, tvc_activation_epoch);
+        let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
+
+        // Alpenglow pays each epoch's vote rewards against the stake recorded in the epoch before it
+        let lookback_epoch = start_epoch.saturating_sub(1);
+        let validator_entries = self.epoch_range(lookback_epoch, end_epoch);
+        let cluster_entries = cluster.epoch_range(lookback_epoch, end_epoch);
+
+        (start_epoch..=end_epoch)
+            .zip(tower_credits)
+            .map(|(epoch, tower_credits)| {
+                let index = (epoch - lookback_epoch) as usize;
+                if let Some(cluster_entry) = cluster_entries[index].filter(|e| e.is_alpenglow == 1)
+                {
+                    let previous_index = index.checked_sub(1);
+                    return alpenglow_entry_credits(
+                        validator_entries[index],
+                        previous_index.and_then(|i| validator_entries[i]),
+                        cluster_entry,
+                        previous_index.and_then(|i| cluster_entries[i]),
+                    );
+                }
+
+                match tower_credits {
+                    Some(credits) if u64::from(credits) > max_tower_credits => None,
+                    credits => Some(credits),
+                }
             })
             .collect()
     }
@@ -1388,6 +1436,66 @@ impl Default for CircBufCluster {
             padding: [0; 7],
         }
     }
+}
+
+/// Reads the inputs of `alpenglow_epoch_credits` for one alpenglow epoch from validator and cluster
+/// history. The outer `None` means the epoch can't be decoded, the inner `None` means the validator
+/// earned nothing.
+fn alpenglow_entry_credits(
+    entry: Option<&ValidatorHistoryEntry>,
+    previous_entry: Option<&ValidatorHistoryEntry>,
+    cluster_entry: &ClusterHistoryEntry,
+    previous_cluster_entry: Option<&ClusterHistoryEntry>,
+) -> Option<Option<u32>> {
+    let default_entry = ValidatorHistoryEntry::default();
+    let default_cluster_entry = ClusterHistoryEntry::default();
+
+    // `copy_vote_account` backfills every epoch the vote account earned in, so no entry means no credits
+    let entry = entry?;
+    if entry.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
+        return if entry.epoch_credits == default_entry.epoch_credits {
+            Some(None)
+        } else {
+            // Copied before uncapped credits were recorded
+            None
+        };
+    }
+
+    // Prefer the stake alpenglow paid against, falling back to the stake oracle's upload
+    let reward_stake_lamports = match previous_entry {
+        Some(previous) if previous.epoch_stake_lamports != default_entry.epoch_stake_lamports => {
+            previous.epoch_stake_lamports
+        }
+        Some(previous)
+            if previous.activated_stake_lamports != default_entry.activated_stake_lamports =>
+        {
+            previous.activated_stake_lamports
+        }
+        _ => return None,
+    };
+    let total_reward_stake_lamports = match previous_cluster_entry {
+        Some(previous)
+            if previous.total_epoch_stake_lamports
+                != default_cluster_entry.total_epoch_stake_lamports =>
+        {
+            previous.total_epoch_stake_lamports
+        }
+        _ => return None,
+    };
+    if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
+        || cluster_entry.total_blocks == default_cluster_entry.total_blocks
+    {
+        return None;
+    }
+
+    alpenglow_epoch_credits(
+        entry.epoch_credits_uncapped,
+        reward_stake_lamports,
+        total_reward_stake_lamports,
+        cluster_entry.total_inflation_rewards,
+        cluster_entry.total_blocks,
+    )
+    .map(Some)
 }
 
 impl CircBufCluster {
