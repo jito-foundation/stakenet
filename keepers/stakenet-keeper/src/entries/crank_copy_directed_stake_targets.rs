@@ -1,18 +1,39 @@
 use std::sync::Arc;
 
-use solana_sdk::{signature::Keypair, signer::Signer};
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{instruction::Instruction, signature::Keypair, signer::Signer};
 use stakenet_sdk::{
     models::{
         aggregate_accounts::AllStewardAccounts, errors::JitoTransactionError,
         submit_stats::SubmitStats,
     },
     utils::{
-        instructions::{compute_coinbase_targets, compute_directed_stake_meta},
+        instructions::{
+            compute_coinbase_targets, compute_directed_stake_meta, compute_jitosol_prime_targets,
+        },
         transactions::{package_instructions, submit_packaged_transactions},
     },
 };
 
 use crate::state::keeper_config::KeeperConfig;
+
+/// Packages and submits a batch of `CopyDirectedStakeTargets` instructions.
+async fn submit_targets(
+    client: &Arc<RpcClient>,
+    keypair: &Arc<Keypair>,
+    priority_fee: u64,
+    kind: &str,
+    ixs: &[Instruction],
+) -> Result<SubmitStats, JitoTransactionError> {
+    log::info!(
+        "Copying directed stake targets kind={kind} instructions={}",
+        ixs.len()
+    );
+
+    let txs_to_run = package_instructions(ixs, 8, Some(priority_fee), Some(1_400_000), None);
+
+    Ok(submit_packaged_transactions(client, txs_to_run, keypair, Some(50), None).await?)
+}
 
 /// Copy directed stake targets to [`DirectedStakeMeta`] account
 pub async fn crank_copy_directed_stake_targets(
@@ -27,6 +48,8 @@ pub async fn crank_copy_directed_stake_targets(
         priority_fee_in_microlamports: priority_fee,
         kobe_client,
         coinbase_vote_pubkey,
+        jitosol_prime_vote_pubkey,
+        jitosol_prime_share_bps,
         ..
     } = keeper_config;
     let mut stats = SubmitStats::default();
@@ -42,17 +65,6 @@ pub async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    log::info!(
-        "Copying directed stake targets kind=normal instructions={}",
-        normal_ixs.len()
-    );
-
-    let normal_txs_to_run =
-        package_instructions(&normal_ixs, 8, Some(*priority_fee), Some(1_400_000), None);
-    let normal_stats =
-        submit_packaged_transactions(client, normal_txs_to_run, &keypair, Some(50), None).await?;
-    stats.combine(&normal_stats);
-
     let coinbase_delegation_ixs = compute_coinbase_targets(
         client.clone(),
         kobe_client,
@@ -64,27 +76,31 @@ pub async fn crank_copy_directed_stake_targets(
     .await
     .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    log::info!(
-        "Copying directed stake targets kind=coinbase_delegation instructions={}",
-        coinbase_delegation_ixs.len()
-    );
+    let jitosol_prime_ixs = compute_jitosol_prime_targets(
+        client.clone(),
+        &all_steward_accounts.config_address,
+        &keypair.pubkey(),
+        program_id,
+        jitosol_prime_vote_pubkey,
+        *jitosol_prime_share_bps,
+    )
+    .await
+    .map_err(|e| JitoTransactionError::Custom(e.to_string()))?;
 
-    let coinbase_delegation_txs_to_run = package_instructions(
-        &coinbase_delegation_ixs,
-        8,
-        Some(*priority_fee),
-        Some(1_400_000),
-        None,
-    );
-    let coinbase_delegation_stats = submit_packaged_transactions(
+    let normal_stats =
+        submit_targets(client, &keypair, *priority_fee, "normal", &normal_ixs).await?;
+    stats.combine(&normal_stats);
+
+    let coinbase_and_jitosol_prime_ixs = [coinbase_delegation_ixs, jitosol_prime_ixs].concat();
+    let coinbase_and_jitosol_prime_stats = submit_targets(
         client,
-        coinbase_delegation_txs_to_run,
         &keypair,
-        Some(50),
-        None,
+        *priority_fee,
+        "coinbase_and_jitosol_prime",
+        &coinbase_and_jitosol_prime_ixs,
     )
     .await?;
-    stats.combine(&coinbase_delegation_stats);
+    stats.combine(&coinbase_and_jitosol_prime_stats);
 
     Ok(stats)
 }
