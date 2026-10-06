@@ -6,7 +6,8 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, MerkleRootUploadAuthority, ValidatorHistory,
+    constants::TVC_MULTIPLIER, ClusterHistory, EpochCredits, MerkleRootUploadAuthority,
+    ValidatorHistory,
 };
 
 use crate::{
@@ -324,8 +325,7 @@ pub fn validator_score(
     // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
 
-    let normalized_epoch_credits_window = epoch_credits_range(
-        validator,
+    let normalized_epoch_credits_window = validator.history.epoch_credits_range_across_migration(
         cluster,
         epoch_credits_start,
         epoch_credits_end,
@@ -559,47 +559,6 @@ pub fn calculate_epoch_credits(
         delinquency_ratio,
         delinquency_epoch,
     ))
-}
-
-/// Epoch credits a validator earned in one epoch, normalized to timely vote credits
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EpochCredits {
-    /// Credits earned, `None` if the validator earned none
-    Scored(Option<u32>),
-
-    /// Inputs are missing, or the credits mix tower vote credits with alpenglow reward lamports
-    Unscorable,
-}
-
-/// Epoch credits for each epoch in [start_epoch, end_epoch], normalized by
-/// `epoch_credits_range_decoded` so that `credits / (total_blocks * TVC_MULTIPLIER)` means the same
-/// in tower and alpenglow epochs.
-///
-/// An epoch validator history can't decode is `Unscorable`: steward declines to judge a validator on
-/// an epoch whose inputs are missing or ambiguous, rather than scoring it as zero.
-pub fn epoch_credits_range(
-    validator: &ValidatorHistory,
-    cluster: &ClusterHistory,
-    start_epoch: u16,
-    end_epoch: u16,
-    tvc_activation_epoch: u64,
-    slots_per_epoch: u64,
-) -> Vec<EpochCredits> {
-    validator
-        .history
-        .epoch_credits_range_decoded(
-            &cluster.history,
-            start_epoch,
-            end_epoch,
-            tvc_activation_epoch,
-            slots_per_epoch,
-        )
-        .into_iter()
-        .map(|decoded| match decoded {
-            Some(credits) => EpochCredits::Scored(credits),
-            None => EpochCredits::Unscorable,
-        })
-        .collect()
 }
 
 /// `calculate_epoch_credits` over only the scorable epochs in the window, so unscorable epochs are
@@ -1104,8 +1063,7 @@ fn calculate_alpenglow_instant_unstake_delinquency(
     slots_per_epoch: u64,
     instant_unstake_delinquency_threshold_ratio: f64,
 ) -> (bool, u32, u32) {
-    let epoch_credits = epoch_credits_range(
-        validator,
+    let epoch_credits = validator.history.epoch_credits_range_across_migration(
         cluster,
         epoch,
         epoch,
@@ -1316,7 +1274,9 @@ mod tests {
     fn test_epoch_credits_range_across_migration() {
         let (validator, cluster) = migrating_history();
         assert_eq!(
-            epoch_credits_range(&validator, &cluster, 10, 14, 0, SLOTS_PER_EPOCH),
+            validator
+                .history
+                .epoch_credits_range_across_migration(&cluster, 10, 14, 0, SLOTS_PER_EPOCH),
             vec![
                 EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
                 EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
@@ -1345,7 +1305,9 @@ mod tests {
         cluster_entry.total_epoch_stake_lamports = u64::MAX;
 
         assert_eq!(
-            epoch_credits_range(&validator, &cluster, 13, 14, 0, SLOTS_PER_EPOCH),
+            validator
+                .history
+                .epoch_credits_range_across_migration(&cluster, 13, 14, 0, SLOTS_PER_EPOCH),
             vec![
                 EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
                 EpochCredits::Unscorable
@@ -1355,14 +1317,18 @@ mod tests {
         // Copied before uncapped credits were recorded
         entry_mut(&mut validator, 13).epoch_credits_uncapped = u64::MAX;
         assert_eq!(
-            epoch_credits_range(&validator, &cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            validator
+                .history
+                .epoch_credits_range_across_migration(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
             vec![EpochCredits::Unscorable]
         );
 
         // Earned nothing
         entry_mut(&mut validator, 13).epoch_credits = u32::MAX;
         assert_eq!(
-            epoch_credits_range(&validator, &cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            validator
+                .history
+                .epoch_credits_range_across_migration(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
             vec![EpochCredits::Scored(None)]
         );
     }
