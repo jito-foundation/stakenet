@@ -6,7 +6,7 @@ use anchor_lang::{
     solana_program::native_token::lamports_to_sol,
 };
 
-use crate::{constants::TVC_MULTIPLIER, errors::ValidatorHistoryError, ValidatorHistoryEntry};
+use crate::{errors::ValidatorHistoryError, ValidatorHistoryEntry};
 
 pub fn cast_epoch(epoch: u64) -> Result<u16> {
     require!(
@@ -109,12 +109,6 @@ pub fn alpenglow_earned_ratio(
 
     // Truncating to `u64` is lossless: `expected_lamports` can't exceed `inflation_rewards`
     Some(reward_lamports as f64 / expected_lamports as u64 as f64)
-}
-
-/// Credits a validator earns for a flawless tower epoch in which the cluster produced
-/// `total_blocks`: the denominator that turns stored vote credits into a 0..=1 ratio.
-pub fn max_epoch_credits(total_blocks: u32) -> u64 {
-    u64::from(total_blocks).saturating_mul(u64::from(TVC_MULTIPLIER))
 }
 
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
