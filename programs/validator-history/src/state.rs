@@ -992,7 +992,6 @@ impl ValidatorHistory {
     }
 
     pub fn set_epoch_stake(&mut self, epoch: u16, epoch_stake_lamports: u64) -> Result<()> {
-        // Always called after `set_commission_and_slot` so we can assume the entry for this epoch exists
         if let Some(entry) = self.history.last_mut() {
             if entry.epoch == epoch {
                 entry.epoch_stake_lamports = epoch_stake_lamports;
