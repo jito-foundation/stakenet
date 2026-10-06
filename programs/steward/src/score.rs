@@ -6,7 +6,7 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, EpochCredits, MerkleRootUploadAuthority,
+    constants::TVC_MULTIPLIER, ClusterHistory, EpochCreditsRatio, MerkleRootUploadAuthority,
     ValidatorHistory,
 };
 
@@ -328,7 +328,7 @@ pub fn validator_score(
     // Epoch credits should not include current epoch because it is in progress and data would be incomplete
     let epoch_credits_end = current_epoch.checked_sub(1).ok_or(ArithmeticError)?;
 
-    let normalized_epoch_credits_window = validator.history.epoch_credits_range_across_migration(
+    let epoch_credits_ratio_window = validator.history.epoch_credits_ratio_range(
         cluster,
         epoch_credits_start,
         epoch_credits_end,
@@ -353,7 +353,7 @@ pub fn validator_score(
 
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
         calculate_scorable_epoch_credits(
-            &normalized_epoch_credits_window,
+            &epoch_credits_ratio_window,
             epoch_credits_start,
             params.scoring_delinquency_threshold_ratio,
         )?;
@@ -930,7 +930,7 @@ pub fn instant_unstake_validator(
     });
     let delinquency_check = match previous_alpenglow_epoch {
         Some(epoch) => {
-            let epoch_credits = validator.history.epoch_credits_range_across_migration(
+            let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
                 cluster,
                 epoch,
                 epoch,
@@ -938,8 +938,8 @@ pub fn instant_unstake_validator(
                 slots_per_epoch,
             );
 
-            match epoch_credits.first() {
-                Some(&EpochCredits::Scored(ratio)) => {
+            match epoch_credits_ratio.first() {
+                Some(&EpochCreditsRatio::Scored(ratio)) => {
                     ratio < params.instant_unstake_delinquency_threshold_ratio
                 }
                 _ => false,
@@ -1182,22 +1182,18 @@ mod tests {
     }
 
     #[test]
-    fn test_epoch_credits_range_across_migration() {
+    fn test_epoch_credits_ratio_range() {
         let (validator, cluster) = migrating_history();
         assert_eq!(
-            validator.history.epoch_credits_range_across_migration(
-                &cluster,
-                10,
-                14,
-                0,
-                SLOTS_PER_EPOCH
-            ),
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 10, 14, 0, SLOTS_PER_EPOCH),
             vec![
-                EpochCredits::Scored(1.),
-                EpochCredits::Scored(1.),
-                EpochCredits::Unscorable,
-                EpochCredits::Scored(1.),
-                EpochCredits::Scored(1.),
+                EpochCreditsRatio::Scored(1.),
+                EpochCreditsRatio::Scored(1.),
+                EpochCreditsRatio::Unscorable,
+                EpochCreditsRatio::Scored(1.),
+                EpochCreditsRatio::Scored(1.),
             ]
         );
     }
@@ -1220,40 +1216,28 @@ mod tests {
         cluster_entry.total_epoch_stake_lamports = u64::MAX;
 
         assert_eq!(
-            validator.history.epoch_credits_range_across_migration(
-                &cluster,
-                13,
-                14,
-                0,
-                SLOTS_PER_EPOCH
-            ),
-            vec![EpochCredits::Scored(1.), EpochCredits::Unscorable]
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 13, 14, 0, SLOTS_PER_EPOCH),
+            vec![EpochCreditsRatio::Scored(1.), EpochCreditsRatio::Unscorable]
         );
 
         // Copied before uncapped credits were recorded
         entry_mut(&mut validator, 13).epoch_credits_uncapped = u64::MAX;
         assert_eq!(
-            validator.history.epoch_credits_range_across_migration(
-                &cluster,
-                13,
-                13,
-                0,
-                SLOTS_PER_EPOCH
-            ),
-            vec![EpochCredits::Unscorable]
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            vec![EpochCreditsRatio::Unscorable]
         );
 
         // Earned nothing
         entry_mut(&mut validator, 13).epoch_credits = u32::MAX;
         assert_eq!(
-            validator.history.epoch_credits_range_across_migration(
-                &cluster,
-                13,
-                13,
-                0,
-                SLOTS_PER_EPOCH
-            ),
-            vec![EpochCredits::Scored(0.)]
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+            vec![EpochCreditsRatio::Scored(0.)]
         );
     }
 
@@ -1265,10 +1249,10 @@ mod tests {
     ) -> Option<f64> {
         match validator
             .history
-            .epoch_credits_range_across_migration(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH)
+            .epoch_credits_ratio_range(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH)
             .first()
         {
-            Some(&EpochCredits::Scored(ratio)) => Some(ratio),
+            Some(&EpochCreditsRatio::Scored(ratio)) => Some(ratio),
             _ => None,
         }
     }

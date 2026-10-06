@@ -1,5 +1,5 @@
 use anchor_lang::Result;
-use validator_history::EpochCredits;
+use validator_history::EpochCreditsRatio;
 
 use crate::{constants::EPOCH_DEFAULT, errors::StewardError};
 
@@ -9,13 +9,13 @@ use crate::{constants::EPOCH_DEFAULT, errors::StewardError};
 ///
 /// Returns `(average_ratio, delinquency_score, delinquency_ratio, delinquency_epoch)`.
 pub fn calculate_scorable_epoch_credits(
-    epoch_credits_window: &[EpochCredits],
+    epoch_credits_ratio_window: &[EpochCreditsRatio],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
 ) -> Result<(f64, u8, f64, u16)> {
-    let mut scored = Vec::with_capacity(epoch_credits_window.len());
-    for (i, epoch_credits) in epoch_credits_window.iter().enumerate() {
-        if let EpochCredits::Scored(ratio) = *epoch_credits {
+    let mut scored = Vec::with_capacity(epoch_credits_ratio_window.len());
+    for (i, participation) in epoch_credits_ratio_window.iter().enumerate() {
+        if let EpochCreditsRatio::Scored(ratio) = *participation {
             let epoch = epoch_credits_start
                 .checked_add(i as u16)
                 .ok_or(StewardError::ArithmeticError)?;
@@ -57,9 +57,9 @@ mod tests {
     #[test]
     fn test_scorable_epoch_credits_averages_scored_epochs() {
         let window = [
-            EpochCredits::Scored(1.),
-            EpochCredits::Scored(0.5),
-            EpochCredits::Scored(0.9),
+            EpochCreditsRatio::Scored(1.),
+            EpochCreditsRatio::Scored(0.5),
+            EpochCreditsRatio::Scored(0.9),
         ];
         let (average_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_scorable_epoch_credits(&window, 100, 0.4).unwrap();
@@ -72,9 +72,9 @@ mod tests {
     #[test]
     fn test_scorable_epoch_credits_flags_first_delinquent_epoch() {
         let window = [
-            EpochCredits::Scored(1.),
-            EpochCredits::Scored(0.5),
-            EpochCredits::Scored(0.2),
+            EpochCreditsRatio::Scored(1.),
+            EpochCreditsRatio::Scored(0.5),
+            EpochCreditsRatio::Scored(0.2),
         ];
         let (_, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
@@ -87,9 +87,9 @@ mod tests {
     fn test_scorable_epoch_credits_skips_unscorable_epochs() {
         // The unscorable epoch is neither averaged in nor treated as delinquent
         let window = [
-            EpochCredits::Scored(1.),
-            EpochCredits::Unscorable,
-            EpochCredits::Scored(1.),
+            EpochCreditsRatio::Scored(1.),
+            EpochCreditsRatio::Unscorable,
+            EpochCreditsRatio::Scored(1.),
         ];
         let (average_ratio, delinquency_score, _, delinquency_epoch) =
             calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
@@ -99,9 +99,9 @@ mod tests {
 
         // Delinquency epochs stay aligned to the real epoch numbers despite the skip
         let window = [
-            EpochCredits::Unscorable,
-            EpochCredits::Scored(1.),
-            EpochCredits::Scored(0.),
+            EpochCreditsRatio::Unscorable,
+            EpochCreditsRatio::Scored(1.),
+            EpochCreditsRatio::Scored(0.),
         ];
         let (_, delinquency_score, delinquency_ratio, delinquency_epoch) =
             calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(delinquency_epoch, 102);
 
         assert_eq!(
-            calculate_scorable_epoch_credits(&[EpochCredits::Unscorable; 3], 100, 0.97).unwrap(),
+            calculate_scorable_epoch_credits(&[EpochCreditsRatio::Unscorable; 3], 100, 0.97).unwrap(),
             (0., 1, 1., EPOCH_DEFAULT)
         );
     }
