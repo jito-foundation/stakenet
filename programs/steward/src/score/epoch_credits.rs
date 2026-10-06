@@ -21,9 +21,6 @@ pub fn calculate_scorable_epoch_credits(
             let epoch = epoch_credits_start
                 .checked_add(i as u16)
                 .ok_or(StewardError::ArithmeticError)?;
-            if params.is_alpenglow_transition_epoch(epoch) {
-                continue;
-            }
             scored.push((epoch, ratio));
         }
     }

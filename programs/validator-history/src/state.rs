@@ -639,6 +639,12 @@ impl CircBuf {
 
     /// How fully the validator participated in each epoch in [start_epoch, end_epoch], on one scale
     /// across the alpenglow migration. See [`EpochCreditsRatio`].
+    ///
+    /// `alpenglow_migration_epoch` is the epoch the cluster migrated in, or `u16::MAX` if it hasn't
+    /// been declared. It decides each epoch's era: cluster history can't, because an epoch's own
+    /// flag is only written once its rewards are paid, during the epoch after it. The migration
+    /// epoch and the one following it hold credits that can't be measured against either era's
+    /// denominator, so they are unscorable.
     pub fn epoch_credits_ratio_range(
         &self,
         cluster: &ClusterHistory,
@@ -646,15 +652,16 @@ impl CircBuf {
         end_epoch: u16,
         tvc_activation_epoch: u64,
         slots_per_epoch: u64,
+        alpenglow_migration_epoch: u16,
     ) -> Vec<EpochCreditsRatio> {
         let tower_credits =
             self.epoch_credits_range_normalized(start_epoch, end_epoch, tvc_activation_epoch);
         let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
 
         let lookback_epoch = start_epoch.saturating_sub(1);
-        let lookahead_epoch = end_epoch.saturating_add(1);
         let validator_history_entries = self.epoch_range(lookback_epoch, end_epoch);
-        let cluster_entries = cluster.history.epoch_range(lookback_epoch, lookahead_epoch);
+        let cluster_entries = cluster.history.epoch_range(lookback_epoch, end_epoch);
+        let migration_declared = alpenglow_migration_epoch != u16::MAX;
 
         (start_epoch..=end_epoch)
             .zip(tower_credits)
@@ -664,8 +671,23 @@ impl CircBuf {
                     return EpochCreditsRatio::Unscorable;
                 };
 
-                match cluster_entry.is_alpenglow_activated() {
-                    Some(true) => {
+                // The migration epoch mixes tower vote credits with alpenglow reward lamports, and
+                // the epoch after it is the first whose credits are pure lamports. Neither can be
+                // measured.
+                if migration_declared
+                    && (epoch == alpenglow_migration_epoch
+                        || epoch == alpenglow_migration_epoch.saturating_add(1))
+                {
+                    return EpochCreditsRatio::Unscorable;
+                }
+
+                // Every epoch after the migration is alpenglow, including ones whose own flag the
+                // oracle hasn't written yet. Until a migration is declared the cluster is on
+                // tower, which is also true of every epoch before one is reached.
+                let is_alpenglow = migration_declared && epoch > alpenglow_migration_epoch;
+
+                match is_alpenglow {
+                    true => {
                         let previous_index = index.checked_sub(1);
                         match validator_history_entries[index] {
                             Some(entry) => entry.alpenglow_credits_ratio(
@@ -676,7 +698,7 @@ impl CircBuf {
                             None => EpochCreditsRatio::Scored(0.),
                         }
                     }
-                    Some(false) | None => {
+                    false => {
                         if cluster_entry
                             .total_blocks
                             .eq(&ClusterHistoryEntry::default().total_blocks)
@@ -2150,13 +2172,76 @@ mod tests {
     }
 
     #[test]
-    fn test_unrecorded_era_reads_as_tower() {
+    fn test_epochs_before_the_migration_are_tower() {
+        // No migration declared, so every epoch is scored on vote credits
         let (validator, cluster) = tower_history(1_000);
-        assert_eq!(cluster.history.arr[0].is_alpenglow_activated(), None);
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000, u16::MAX),
+            vec![EpochCreditsRatio::Scored(1.)]
+        );
+
+        // Still tower when the migration is declared for a later epoch
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000, 5),
+            vec![EpochCreditsRatio::Scored(1.)]
+        );
+    }
+
+    /// Epochs 0 and 1 hold the stake alpenglow pays epoch 2's rewards against, and epoch 2 earns
+    /// its full expected share. No epoch's era flag is set, as it is for the newest epochs.
+    fn unflagged_alpenglow_history() -> (ValidatorHistory, ClusterHistory) {
+        let (mut validator, mut cluster) = tower_history(1_000);
+        for epoch in 1..=2u16 {
+            validator.history.push(ValidatorHistoryEntry {
+                epoch,
+                epoch_credits_uncapped: EXPECTED_LAMPORTS,
+                epoch_credits: EXPECTED_LAMPORTS.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
+                epoch_stake_lamports: REWARD_STAKE,
+                ..ValidatorHistoryEntry::default()
+            });
+            cluster.history.push(ClusterHistoryEntry {
+                epoch,
+                total_blocks: 1_000,
+                total_epoch_stake_lamports: TOTAL_REWARD_STAKE,
+                total_inflation_rewards: INFLATION_REWARDS,
+                ..ClusterHistoryEntry::default()
+            });
+        }
+        (validator, cluster)
+    }
+
+    #[test]
+    fn test_declared_migration_epoch_decides_the_era() {
+        let (validator, cluster) = unflagged_alpenglow_history();
+
+        // With no migration declared, epoch 2's unset flag reads as tower, and its reward lamports
+        // blow past the tower ceiling
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, u16::MAX),
+            vec![EpochCreditsRatio::Unscorable]
+        );
+
+        // Declaring the migration at epoch 1 makes epoch 2 the epoch after it, which is a
+        // transition epoch
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, 1),
+            vec![EpochCreditsRatio::Unscorable]
+        );
+
+        // Declaring it at epoch 0 makes epoch 2 an ordinary alpenglow epoch, scored on its
+        // lamports even though the oracle hasn't written its flag yet
+        assert_eq!(
+            validator
+                .history
+                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, 0),
             vec![EpochCreditsRatio::Scored(1.)]
         );
     }
@@ -2167,7 +2252,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000, u16::MAX),
             vec![EpochCreditsRatio::Unscorable]
         );
 
@@ -2175,7 +2260,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
+                .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000, u16::MAX),
             vec![EpochCreditsRatio::Unscorable]
         );
     }

@@ -334,6 +334,7 @@ pub fn validator_score(
         epoch_credits_end,
         tvc_activation_epoch,
         slots_per_epoch,
+        params.alpenglow_migration_epoch,
     );
 
     let commission_window = validator.history.commission_range(
@@ -1133,7 +1134,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 10, 14, 0, SLOTS_PER_EPOCH),
+                .epoch_credits_ratio_range(&cluster, 10, 14, 0, SLOTS_PER_EPOCH, u16::MAX),
             vec![
                 EpochCreditsRatio::Scored(1.),
                 EpochCreditsRatio::Scored(1.),
@@ -1164,7 +1165,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 13, 14, 0, SLOTS_PER_EPOCH),
+                .epoch_credits_ratio_range(&cluster, 13, 14, 0, SLOTS_PER_EPOCH, u16::MAX),
             vec![EpochCreditsRatio::Scored(1.), EpochCreditsRatio::Unscorable]
         );
 
@@ -1173,7 +1174,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH, u16::MAX),
             vec![EpochCreditsRatio::Unscorable]
         );
 
@@ -1182,7 +1183,7 @@ mod tests {
         assert_eq!(
             validator
                 .history
-                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH),
+                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH, u16::MAX),
             vec![EpochCreditsRatio::Scored(0.)]
         );
     }
@@ -1195,7 +1196,7 @@ mod tests {
     ) -> Option<f64> {
         match validator
             .history
-            .epoch_credits_ratio_range(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH)
+            .epoch_credits_ratio_range(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH, u16::MAX)
             .first()
         {
             Some(&EpochCreditsRatio::Scored(ratio)) => Some(ratio),

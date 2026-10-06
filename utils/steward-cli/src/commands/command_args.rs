@@ -196,6 +196,11 @@ pub struct ConfigParameters {
     /// Window size (in epochs) over which to check BAM connectivity.
     #[arg(long, env)]
     pub jito_bam_window_epochs: Option<u8>,
+
+    /// The epoch in which the cluster migrated from tower to alpenglow, or `u16::MAX` if it has
+    /// not been set.
+    #[arg(long, env)]
+    pub alpenglow_migration_epoch: Option<u16>,
 }
 
 impl From<ConfigParameters> for UpdateParametersArgs {
@@ -225,6 +230,7 @@ impl From<ConfigParameters> for UpdateParametersArgs {
             directed_stake_unstake_cap_bps: config.directed_stake_unstake_cap_bps,
             jito_bam_minimum_epochs: config.jito_bam_minimum_epochs,
             jito_bam_window_epochs: config.jito_bam_window_epochs,
+            alpenglow_migration_epoch: config.alpenglow_migration_epoch,
         }
     }
 }
