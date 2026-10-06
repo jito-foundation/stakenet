@@ -89,28 +89,6 @@ pub fn get_max_epoch(
         .ok_or_else(|| ValidatorHistoryError::InvalidEpochCredits.into())
 }
 
-/// How much of its expected inflation reward a validator actually captured in an alpenglow epoch.
-pub fn alpenglow_earned_ratio(
-    reward_lamports: u64,
-    reward_stake_lamports: u64,
-    total_reward_stake_lamports: u64,
-    inflation_rewards: u64,
-) -> Option<f64> {
-    if reward_stake_lamports == 0 || total_reward_stake_lamports == 0 || inflation_rewards == 0 {
-        return None;
-    }
-
-    let expected_lamports = u128::from(inflation_rewards)
-        .checked_mul(u128::from(reward_stake_lamports))?
-        .checked_div(u128::from(total_reward_stake_lamports))?;
-    if expected_lamports == 0 {
-        return None;
-    }
-
-    // Truncating to `u64` is lossless: `expected_lamports` can't exceed `inflation_rewards`
-    Some(reward_lamports as f64 / expected_lamports as u64 as f64)
-}
-
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {
     start_timestamp.try_into().unwrap()
 }
@@ -213,73 +191,6 @@ mod tests {
     #[test]
     fn test_epoch_credits_map_rejects_decreasing_credits() {
         assert!(epoch_credits_map(&[(70, 6, 9)]).is_err());
-    }
-
-    // A validator holding 0.1% of the stake is expected to earn 0.1% of the epoch's inflation
-    const REWARD_STAKE: u64 = 1_000_000_000_000;
-    const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
-    const INFLATION_REWARDS: u64 = 86_400_000_000_000;
-    const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
-
-    fn ratio(reward_lamports: u64) -> Option<f64> {
-        alpenglow_earned_ratio(
-            reward_lamports,
-            REWARD_STAKE,
-            TOTAL_REWARD_STAKE,
-            INFLATION_REWARDS,
-        )
-    }
-
-    #[test]
-    fn test_alpenglow_earned_ratio_measures_against_expected_earnings() {
-        // Earned exactly its stake-weighted share
-        assert_eq!(ratio(EXPECTED_LAMPORTS), Some(1.));
-        // Partial participation is reported precisely, not truncated to 0 or 1
-        assert_eq!(ratio(EXPECTED_LAMPORTS * 8 / 10), Some(0.8));
-        assert_eq!(ratio(EXPECTED_LAMPORTS / 2), Some(0.5));
-
-        // A validator one lamport short is not treated as having earned nothing
-        let almost = ratio(EXPECTED_LAMPORTS - 1).unwrap();
-        assert!(almost < 1.);
-        assert!(almost > 0.999_999);
-    }
-
-    #[test]
-    fn test_alpenglow_earned_ratio_ignores_leader_luck() {
-        // Leader rewards land in the earnings and in the expectation alike, so a validator that
-        // earned its full share scores 1.0 however that share was split between voting and leading.
-        // No block count is involved.
-        assert_eq!(ratio(EXPECTED_LAMPORTS), Some(1.));
-    }
-
-    #[test]
-    fn test_alpenglow_earned_ratio_allows_over_earning() {
-        // Winning more leader slots than expected is normal, since blocks are won whole
-        assert_eq!(ratio(EXPECTED_LAMPORTS * 2), Some(2.));
-    }
-
-    #[test]
-    fn test_alpenglow_earned_ratio_floors_at_zero() {
-        assert_eq!(ratio(0), Some(0.));
-    }
-
-    #[test]
-    fn test_alpenglow_earned_ratio_needs_stake_and_rewards() {
-        // No stake to earn with
-        assert_eq!(
-            alpenglow_earned_ratio(0, 0, TOTAL_REWARD_STAKE, INFLATION_REWARDS),
-            None
-        );
-        // Inflation rewards not recorded yet
-        assert_eq!(
-            alpenglow_earned_ratio(0, REWARD_STAKE, TOTAL_REWARD_STAKE, 0),
-            None
-        );
-        // Total stake not recorded yet
-        assert_eq!(
-            alpenglow_earned_ratio(0, REWARD_STAKE, 0, INFLATION_REWARDS),
-            None
-        );
     }
 
     #[test]

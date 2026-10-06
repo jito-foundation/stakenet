@@ -14,8 +14,8 @@ use {
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
         utils::{
-            alpenglow_earned_ratio, epoch_credits_map, find_insert_position, get_max_epoch,
-            get_min_epoch, MAX_EPOCH_CREDITS,
+            epoch_credits_map, find_insert_position, get_max_epoch, get_min_epoch,
+            MAX_EPOCH_CREDITS,
         },
     },
     anchor_lang::{
@@ -261,6 +261,87 @@ impl Default for ValidatorHistoryEntry {
             epoch_stake_lamports: u64::MAX,
             padding2: [u8::MAX; 24],
         }
+    }
+}
+
+impl ValidatorHistoryEntry {
+    /// How much of its expected inflation reward this validator captured in an alpenglow epoch.
+    ///
+    /// Alpenglow pays for voting in reward certificates and for leading blocks, and the two are
+    /// indistinguishable once summed into `epoch_credits`. Rather than estimating the leader
+    /// portion and subtracting it, this compares what the validator earned against what a validator
+    /// holding its share of the stake was expected to earn. Leader rewards sit in both the
+    /// numerator and the denominator, so they cancel: a stake-weighted leader schedule hands out
+    /// leader slots in proportion to the same stake share. Leader luck therefore doesn't move the
+    /// result, and no per-validator block count is needed.
+    ///
+    /// Alpenglow pays an epoch's rewards against the stake recorded in the epoch before it, so the
+    /// previous entries supply the stake share.
+    fn alpenglow_credits_ratio(
+        &self,
+        previous_entry: Option<&ValidatorHistoryEntry>,
+        cluster_entry: &ClusterHistoryEntry,
+        previous_cluster_entry: Option<&ClusterHistoryEntry>,
+    ) -> EpochCreditsRatio {
+        let default_entry = ValidatorHistoryEntry::default();
+        let default_cluster_entry = ClusterHistoryEntry::default();
+
+        if self.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
+            return if self.epoch_credits == default_entry.epoch_credits {
+                EpochCreditsRatio::Scored(0.)
+            } else {
+                // Copied before uncapped credits were recorded
+                EpochCreditsRatio::Unscorable
+            };
+        }
+
+        // Prefer the stake alpenglow paid against, falling back to the stake oracle's upload
+        let reward_stake_lamports = match previous_entry {
+            Some(previous)
+                if previous.epoch_stake_lamports != default_entry.epoch_stake_lamports =>
+            {
+                previous.epoch_stake_lamports
+            }
+            Some(previous)
+                if previous.activated_stake_lamports != default_entry.activated_stake_lamports =>
+            {
+                previous.activated_stake_lamports
+            }
+            _ => return EpochCreditsRatio::Unscorable,
+        };
+        let total_reward_stake_lamports = match previous_cluster_entry {
+            Some(previous)
+                if previous.total_epoch_stake_lamports
+                    != default_cluster_entry.total_epoch_stake_lamports =>
+            {
+                previous.total_epoch_stake_lamports
+            }
+            _ => return EpochCreditsRatio::Unscorable,
+        };
+        let inflation_rewards = cluster_entry.total_inflation_rewards;
+        if inflation_rewards == default_cluster_entry.total_inflation_rewards
+            || inflation_rewards == 0
+            || reward_stake_lamports == 0
+            || total_reward_stake_lamports == 0
+        {
+            return EpochCreditsRatio::Unscorable;
+        }
+
+        // Built with `u128` integer math, and the final division widens both operands to `u64`,
+        // because a bug in the Solana LLVM fork miscompiles `u32`-to-float conversions for values
+        // with bit 31 set
+        let Some(expected_lamports) = u128::from(inflation_rewards)
+            .checked_mul(u128::from(reward_stake_lamports))
+            .map(|product| product / u128::from(total_reward_stake_lamports))
+            .filter(|expected| *expected > 0)
+        else {
+            return EpochCreditsRatio::Unscorable;
+        };
+
+        // Truncating to `u64` is lossless: `expected_lamports` can't exceed `inflation_rewards`
+        EpochCreditsRatio::Scored(
+            self.epoch_credits_uncapped as f64 / expected_lamports as u64 as f64,
+        )
     }
 }
 
@@ -572,7 +653,7 @@ impl CircBuf {
 
         let lookback_epoch = start_epoch.saturating_sub(1);
         let lookahead_epoch = end_epoch.saturating_add(1);
-        let validator_entries = self.epoch_range(lookback_epoch, end_epoch);
+        let validator_history_entries = self.epoch_range(lookback_epoch, end_epoch);
         let cluster_entries = cluster.history.epoch_range(lookback_epoch, lookahead_epoch);
 
         (start_epoch..=end_epoch)
@@ -586,12 +667,14 @@ impl CircBuf {
                 match cluster_entry.is_alpenglow_activated() {
                     Some(true) => {
                         let previous_index = index.checked_sub(1);
-                        alpenglow_entry_credits_ratio(
-                            validator_entries[index],
-                            previous_index.and_then(|i| validator_entries[i]),
-                            cluster_entry,
-                            previous_index.and_then(|i| cluster_entries[i]),
-                        )
+                        match validator_history_entries[index] {
+                            Some(entry) => entry.alpenglow_credits_ratio(
+                                previous_index.and_then(|i| validator_history_entries[i]),
+                                cluster_entry,
+                                previous_index.and_then(|i| cluster_entries[i]),
+                            ),
+                            None => EpochCreditsRatio::Scored(0.),
+                        }
                     }
                     Some(false) | None => {
                         let follows_into_alpenglow = cluster_entries
@@ -1487,66 +1570,6 @@ impl Default for CircBufCluster {
     }
 }
 
-/// Reads the inputs of `alpenglow_earned_ratio` for one alpenglow epoch from validator and cluster
-/// history.
-fn alpenglow_entry_credits_ratio(
-    entry: Option<&ValidatorHistoryEntry>,
-    previous_entry: Option<&ValidatorHistoryEntry>,
-    cluster_entry: &ClusterHistoryEntry,
-    previous_cluster_entry: Option<&ClusterHistoryEntry>,
-) -> EpochCreditsRatio {
-    let default_entry = ValidatorHistoryEntry::default();
-    let default_cluster_entry = ClusterHistoryEntry::default();
-
-    // `copy_vote_account` backfills every epoch the vote account earned in, so no entry means no credits
-    let Some(entry) = entry else {
-        return EpochCreditsRatio::Scored(0.);
-    };
-    if entry.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
-        return if entry.epoch_credits == default_entry.epoch_credits {
-            EpochCreditsRatio::Scored(0.)
-        } else {
-            // Copied before uncapped credits were recorded
-            EpochCreditsRatio::Unscorable
-        };
-    }
-
-    // Prefer the stake alpenglow paid against, falling back to the stake oracle's upload
-    let reward_stake_lamports = match previous_entry {
-        Some(previous) if previous.epoch_stake_lamports != default_entry.epoch_stake_lamports => {
-            previous.epoch_stake_lamports
-        }
-        Some(previous)
-            if previous.activated_stake_lamports != default_entry.activated_stake_lamports =>
-        {
-            previous.activated_stake_lamports
-        }
-        _ => return EpochCreditsRatio::Unscorable,
-    };
-    let total_reward_stake_lamports = match previous_cluster_entry {
-        Some(previous)
-            if previous.total_epoch_stake_lamports
-                != default_cluster_entry.total_epoch_stake_lamports =>
-        {
-            previous.total_epoch_stake_lamports
-        }
-        _ => return EpochCreditsRatio::Unscorable,
-    };
-    if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards {
-        return EpochCreditsRatio::Unscorable;
-    }
-
-    match alpenglow_earned_ratio(
-        entry.epoch_credits_uncapped,
-        reward_stake_lamports,
-        total_reward_stake_lamports,
-        cluster_entry.total_inflation_rewards,
-    ) {
-        Some(ratio) => EpochCreditsRatio::Scored(ratio),
-        None => EpochCreditsRatio::Unscorable,
-    }
-}
-
 impl CircBufCluster {
     pub fn push(&mut self, item: ClusterHistoryEntry) {
         self.idx = (self.idx + 1) % self.arr.len() as u64;
@@ -1734,6 +1757,12 @@ impl ClusterHistory {
 mod tests {
     use super::*;
 
+    // A validator holding 0.1% of the stake is expected to earn 0.1% of the epoch's inflation
+    const REWARD_STAKE: u64 = 1_000_000_000_000;
+    const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+    const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+    const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
+
     /// A validator that earned full tower credits in epoch 0, and a cluster that produced
     /// `total_blocks` that epoch. The era is left unrecorded, as it is for every epoch from before
     /// the alpenglow oracle started writing it.
@@ -1771,6 +1800,47 @@ mod tests {
             ..ClusterHistoryEntry::default()
         });
         (validator, cluster)
+    }
+
+    /// The four entries `alpenglow_credits_ratio` reads: the epoch being scored, and the epoch
+    /// before it holding the stake alpenglow paid that epoch's rewards against.
+    fn alpenglow_entries(
+        reward_lamports: u64,
+    ) -> (
+        ValidatorHistoryEntry,
+        ValidatorHistoryEntry,
+        ClusterHistoryEntry,
+        ClusterHistoryEntry,
+    ) {
+        (
+            ValidatorHistoryEntry {
+                epoch: 1,
+                epoch_credits_uncapped: reward_lamports,
+                epoch_credits: reward_lamports.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
+                ..ValidatorHistoryEntry::default()
+            },
+            ValidatorHistoryEntry {
+                epoch: 0,
+                epoch_stake_lamports: REWARD_STAKE,
+                ..ValidatorHistoryEntry::default()
+            },
+            ClusterHistoryEntry {
+                epoch: 1,
+                total_inflation_rewards: INFLATION_REWARDS,
+                is_alpenglow: 1,
+                ..ClusterHistoryEntry::default()
+            },
+            ClusterHistoryEntry {
+                epoch: 0,
+                total_epoch_stake_lamports: TOTAL_REWARD_STAKE,
+                ..ClusterHistoryEntry::default()
+            },
+        )
+    }
+
+    fn alpenglow_ratio(reward_lamports: u64) -> EpochCreditsRatio {
+        let (entry, previous, cluster, previous_cluster) = alpenglow_entries(reward_lamports);
+        entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster))
     }
 
     // Utility test to see struct layout
@@ -2128,6 +2198,75 @@ mod tests {
                 .history
                 .epoch_credits_ratio_range(&cluster, 0, 0, 0, 432_000),
             vec![EpochCreditsRatio::Unscorable]
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_measured_against_expected_earnings() {
+        assert_eq!(
+            alpenglow_ratio(EXPECTED_LAMPORTS),
+            EpochCreditsRatio::Scored(1.)
+        );
+
+        // Partial participation is reported precisely, not truncated to 0 or 1
+        assert_eq!(
+            alpenglow_ratio(EXPECTED_LAMPORTS * 8 / 10),
+            EpochCreditsRatio::Scored(0.8)
+        );
+        assert_eq!(
+            alpenglow_ratio(EXPECTED_LAMPORTS / 2),
+            EpochCreditsRatio::Scored(0.5)
+        );
+
+        // A validator one lamport short is not treated as having earned nothing
+        let EpochCreditsRatio::Scored(almost) = alpenglow_ratio(EXPECTED_LAMPORTS - 1) else {
+            panic!("expected a scored epoch");
+        };
+        assert!(almost < 1.);
+        assert!(almost > 0.999_999);
+
+        // Winning more leader slots than expected is normal, since blocks are won whole
+        assert_eq!(
+            alpenglow_ratio(EXPECTED_LAMPORTS * 2),
+            EpochCreditsRatio::Scored(2.)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_needs_stake_and_rewards() {
+        // Earned nothing
+        assert_eq!(alpenglow_ratio(0), EpochCreditsRatio::Scored(0.));
+
+        // The stake snapshot the rewards were paid against is missing
+        let (entry, mut previous, cluster, previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
+        previous.epoch_stake_lamports = ValidatorHistoryEntry::default().epoch_stake_lamports;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            EpochCreditsRatio::Unscorable
+        );
+
+        // It falls back to the stake oracle's upload when the snapshot is missing
+        previous.activated_stake_lamports = REWARD_STAKE;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            EpochCreditsRatio::Scored(1.)
+        );
+
+        // The cluster's total stake is missing
+        let (entry, previous, cluster, mut previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
+        previous_cluster.total_epoch_stake_lamports =
+            ClusterHistoryEntry::default().total_epoch_stake_lamports;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            EpochCreditsRatio::Unscorable
+        );
+
+        // The epoch's inflation rewards haven't been recorded yet
+        let (entry, previous, mut cluster, previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
+        cluster.total_inflation_rewards = ClusterHistoryEntry::default().total_inflation_rewards;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            EpochCreditsRatio::Unscorable
         );
     }
 }

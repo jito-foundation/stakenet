@@ -713,7 +713,9 @@ fn test_compute_score() {
         }
     );
 
-    // Test cluster history not updated won't punish validators for delinquency
+    // Test cluster history not updated won't punish validators for delinquency. Epochs the keeper
+    // missed are skipped entirely, so the validator is judged only on the 18 epochs with data — all
+    // of which it voted perfectly in.
     let mut validator = good_validator;
     let mut cluster_history = default_fixture.cluster_history;
     validator.history.arr[10].epoch_credits = ValidatorHistoryEntry::default().epoch_credits;
@@ -733,12 +735,12 @@ fn test_compute_score() {
     assert_eq!(
         components,
         ScoreComponentsV5 {
-            score: 7249739868912833600,
-            raw_score: 7249739868912833600,
+            score: 7249739868913833600,
+            raw_score: 7249739868913833600,
             commission_max: 0,
             mev_commission_avg: 0,
             validator_age: 0,
-            vote_credits_avg: 9000000,
+            vote_credits_avg: VOTE_CREDITS_RATIO_MAX,
             mev_commission_score: 1,
             blacklisted_score: 1,
             superminority_score: 1,
