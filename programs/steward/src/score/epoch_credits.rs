@@ -110,7 +110,8 @@ mod tests {
         assert_eq!(delinquency_epoch, 102);
 
         assert_eq!(
-            calculate_scorable_epoch_credits(&[EpochCreditsRatio::Unscorable; 3], 100, 0.97).unwrap(),
+            calculate_scorable_epoch_credits(&[EpochCreditsRatio::Unscorable; 3], 100, 0.97)
+                .unwrap(),
             (0., 1, 1., EPOCH_DEFAULT)
         );
     }
