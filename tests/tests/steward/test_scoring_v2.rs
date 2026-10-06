@@ -864,7 +864,6 @@ mod validator_score_integration_tests {
                 epoch_credits: epoch_credits_uncapped.min(u64::from(u32::MAX - 1)) as u32,
                 epoch_credits_uncapped,
                 epoch_stake_lamports: REWARD_STAKE,
-                blocks_produced: 1,
                 vote_account_last_update_slot: 1000,
                 is_superminority: 0,
                 ..ValidatorHistoryEntry::default()

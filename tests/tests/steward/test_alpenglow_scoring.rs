@@ -42,7 +42,6 @@ fn to_alpenglow(validator: &mut ValidatorHistory, votes: impl Fn(u16) -> u64) {
         .filter(|entry| entry.epoch <= 20)
     {
         entry.epoch_stake_lamports = REWARD_STAKE;
-        entry.blocks_produced = 1;
         if entry.epoch > 0 {
             entry.epoch_credits_uncapped =
                 votes(entry.epoch) * LAMPORTS_PER_VOTE + LEADER_LAMPORTS_PER_BLOCK;

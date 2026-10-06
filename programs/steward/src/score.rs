@@ -667,30 +667,19 @@ fn alpenglow_entry_credits(
         }
         _ => return EpochCredits::Unscorable,
     };
-    if cluster_entry.total_blocks == default_cluster_entry.total_blocks
-        || cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
+    if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
         || cluster_entry.distributed_inflation_rewards
             == default_cluster_entry.distributed_inflation_rewards
     {
         return EpochCredits::Unscorable;
     }
 
-    // The oracle only uploads block data for leaders, so unset means no leader slots. A missed
-    // upload also reads as 0, which can only make the validator look better.
-    let blocks_produced = if entry.blocks_produced == default_entry.blocks_produced {
-        0
-    } else {
-        entry.blocks_produced
-    };
-
     match alpenglow_epoch_credits(
         entry.epoch_credits_uncapped,
-        blocks_produced,
         reward_stake_lamports,
         total_reward_stake_lamports,
         cluster_entry.total_inflation_rewards,
         cluster_entry.distributed_inflation_rewards,
-        cluster_entry.total_blocks,
         slots_per_epoch,
     ) {
         Some(credits) => EpochCredits::Scored(Some(credits)),
@@ -703,33 +692,32 @@ fn alpenglow_entry_credits(
 ///
 /// Every block's reward certificate pays each voter in it
 /// `total_inflation_rewards * reward_stake / (2 * slots_per_epoch * total_reward_stake)`, and pays
-/// the block's leader the other half of every voter's reward. The leader's share is estimated as half
-/// the epoch's average payout per block for each block produced; dividing what's left by the reward
-/// per certificate counts the certificates the validator voted in.
+/// the block's leader the other half of every voter's reward. The leader's share is estimated from
+/// the validator's share of the stake, since the leader schedule is stake-weighted, rather than from
+/// the oracle's block counts; dividing what's left by the reward per certificate counts the
+/// certificates the validator voted in.
 ///
 /// Returns `None` if the validator had no stake to earn with, or the cluster inputs are empty.
-#[allow(clippy::too_many_arguments)]
 pub fn alpenglow_epoch_credits(
     reward_lamports: u64,
-    blocks_produced: u32,
     reward_stake_lamports: u64,
     total_reward_stake_lamports: u64,
     total_inflation_rewards: u64,
     distributed_inflation_rewards: u64,
-    total_blocks: u32,
     slots_per_epoch: u64,
 ) -> Option<u32> {
     if reward_stake_lamports == 0
         || total_reward_stake_lamports == 0
         || total_inflation_rewards == 0
-        || total_blocks == 0
         || slots_per_epoch == 0
     {
         return None;
     }
 
-    let leader_lamports =
-        blocks_produced as f64 * distributed_inflation_rewards as f64 / (2. * total_blocks as f64);
+    // A stake-weighted leader schedule gives the validator `reward_stake / total_reward_stake` of
+    // the epoch's blocks, each paying half of what that block's certificate paid out
+    let leader_lamports = distributed_inflation_rewards as f64 * reward_stake_lamports as f64
+        / (2. * total_reward_stake_lamports as f64);
     let vote_lamports = (reward_lamports as f64 - leader_lamports).max(0.);
     let lamports_per_vote = total_inflation_rewards as f64 * reward_stake_lamports as f64
         / (2. * slots_per_epoch as f64 * total_reward_stake_lamports as f64);
@@ -1385,15 +1373,13 @@ mod tests {
             as u64
     }
 
-    fn credits(reward_lamports: u64, blocks_produced: u32, participation: f64) -> Option<u32> {
+    fn credits(reward_lamports: u64, participation: f64) -> Option<u32> {
         alpenglow_epoch_credits(
             reward_lamports,
-            blocks_produced,
             REWARD_STAKE,
             TOTAL_REWARD_STAKE,
             INFLATION_REWARDS,
             distributed_rewards(participation),
-            TOTAL_BLOCKS,
             SLOTS_PER_EPOCH,
         )
     }
@@ -1451,7 +1437,6 @@ mod tests {
                 epoch_credits: epoch_credits_uncapped.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
                 epoch_credits_uncapped,
                 epoch_stake_lamports: REWARD_STAKE,
-                blocks_produced: 1,
                 ..ValidatorHistoryEntry::default()
             });
             cluster.history.push(ClusterHistoryEntry {
@@ -1469,48 +1454,48 @@ mod tests {
 
     #[test]
     fn test_alpenglow_epoch_credits_counts_votes() {
+        // The validator holds 0.1% of the stake, so it is expected to lead 1 of the 1_000 blocks
         assert_eq!(
-            credits(reward_lamports(1_000, 1, 0.95), 1, 0.95),
+            credits(reward_lamports(1_000, 1, 0.95), 0.95),
             Some(1_000 * TVC_MULTIPLIER)
         );
         assert_eq!(
-            credits(reward_lamports(800, 1, 0.95), 1, 0.95),
+            credits(reward_lamports(800, 1, 0.95), 0.95),
             Some(800 * TVC_MULTIPLIER)
         );
     }
 
     #[test]
-    fn test_alpenglow_epoch_credits_ignores_leader_luck() {
-        for blocks_produced in [0, 1, 3] {
-            assert_eq!(
-                credits(
-                    reward_lamports(1_000, blocks_produced, 0.95),
-                    blocks_produced as u32,
-                    0.95
-                ),
-                Some(1_000 * TVC_MULTIPLIER)
-            );
-        }
+    fn test_alpenglow_epoch_credits_charges_the_expected_leader_share() {
+        // Leader rewards are indistinguishable from vote rewards in the lamport total, so the
+        // stake-weighted expectation is deducted no matter how many blocks the validator led. Each
+        // block pays its leader 950 votes' worth here, so leader luck moves the credits.
+        assert_eq!(
+            credits(reward_lamports(1_000, 0, 0.95), 0.95),
+            Some(50 * TVC_MULTIPLIER)
+        );
+        assert_eq!(
+            credits(reward_lamports(1_000, 3, 0.95), 0.95),
+            Some(2_900 * TVC_MULTIPLIER)
+        );
     }
 
     #[test]
     fn test_alpenglow_epoch_credits_floors_at_zero() {
-        // Earned less than the leader share of the blocks it produced
-        assert_eq!(credits(0, 1, 0.95), Some(0));
+        // Earned less than the leader share it is expected to have been paid
+        assert_eq!(credits(0, 0.95), Some(0));
     }
 
     #[test]
-    fn test_alpenglow_epoch_credits_needs_stake_and_blocks() {
+    fn test_alpenglow_epoch_credits_needs_stake_and_rewards() {
         let distributed = distributed_rewards(0.95);
         assert_eq!(
             alpenglow_epoch_credits(
                 0,
                 0,
-                0,
                 TOTAL_REWARD_STAKE,
                 INFLATION_REWARDS,
                 distributed,
-                TOTAL_BLOCKS,
                 SLOTS_PER_EPOCH
             ),
             None
@@ -1518,12 +1503,10 @@ mod tests {
         assert_eq!(
             alpenglow_epoch_credits(
                 0,
-                0,
                 REWARD_STAKE,
                 TOTAL_REWARD_STAKE,
-                INFLATION_REWARDS,
-                distributed,
                 0,
+                distributed,
                 SLOTS_PER_EPOCH
             ),
             None
