@@ -7,7 +7,7 @@ use anchor_lang::{
 use serde::{Deserialize, Serialize};
 use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, EpochCreditsRatio, MerkleRootUploadAuthority,
-    ValidatorHistory,
+    ValidatorHistory, ValidatorHistoryEntry,
 };
 
 use crate::{
@@ -916,16 +916,18 @@ pub fn instant_unstake_validator(
         .unwrap_or(0);
 
     /////// Component calculations ///////
-    let previous_alpenglow_epoch = current_epoch.checked_sub(1).filter(|&epoch| {
+    let previous_epoch = current_epoch.checked_sub(1);
+    let previous_epoch_era = previous_epoch.and_then(|epoch| {
         cluster
             .history
             .epoch_range(epoch, epoch)
             .first()
             .and_then(|entry| *entry)
-            .is_some_and(|entry| entry.is_alpenglow.eq(&1))
+            .map(|entry| (epoch, entry.is_alpenglow))
     });
-    let delinquency_check = match previous_alpenglow_epoch {
-        Some(epoch) => {
+
+    let delinquency_check = match previous_epoch_era {
+        Some((epoch, 1)) => {
             let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
                 cluster,
                 epoch,
@@ -941,13 +943,18 @@ pub fn instant_unstake_validator(
                 _ => false,
             }
         }
-        None => calculate_instant_unstake_delinquency(
-            total_blocks_latest,
-            cluster_history_slot_index,
-            epoch_credits_latest,
-            validator_history_slot_index,
-            params.instant_unstake_delinquency_threshold_ratio,
-        )?,
+        Some((_, 0))
+            if !current_epoch_has_alpenglow_credits(validator, current_epoch, slots_per_epoch) =>
+        {
+            calculate_instant_unstake_delinquency(
+                total_blocks_latest,
+                cluster_history_slot_index,
+                epoch_credits_latest,
+                validator_history_slot_index,
+                params.instant_unstake_delinquency_threshold_ratio,
+            )?
+        }
+        _ => false,
     };
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
@@ -998,6 +1005,27 @@ pub fn instant_unstake_validator(
             mev_commission: mev_commission_bps,
         },
     })
+}
+
+/// Whether the current epoch's credits hold alpenglow reward lamports rather than tower vote
+/// credits, which cluster history can't tell us yet because this epoch's inflation rewards aren't
+/// recorded until it ends.
+fn current_epoch_has_alpenglow_credits(
+    validator_history: &ValidatorHistory,
+    current_epoch: u16,
+    slots_per_epoch: u64,
+) -> bool {
+    let default_entry = ValidatorHistoryEntry::default();
+    let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
+    validator_history
+        .history
+        .epoch_range(current_epoch, current_epoch)
+        .first()
+        .and_then(|entry| *entry)
+        .is_some_and(|entry| {
+            entry.epoch_credits_uncapped != default_entry.epoch_credits_uncapped
+                && entry.epoch_credits_uncapped > max_tower_credits
+        })
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
@@ -1271,6 +1299,31 @@ mod tests {
 
         // The migration epoch can't be scored, so it's no reason to unstake
         assert_eq!(alpenglow_unstake_ratio(&validator, &cluster, 12), None);
+    }
+
+    #[test]
+    fn test_current_epoch_alpenglow_credits_detected_before_cluster_knows() {
+        let (mut validator, _) = migrating_history();
+
+        assert!(current_epoch_has_alpenglow_credits(
+            &validator,
+            13,
+            SLOTS_PER_EPOCH
+        ));
+
+        assert!(!current_epoch_has_alpenglow_credits(
+            &validator,
+            10,
+            SLOTS_PER_EPOCH
+        ));
+
+        entry_mut(&mut validator, 13).epoch_credits_uncapped =
+            ValidatorHistoryEntry::default().epoch_credits_uncapped;
+        assert!(!current_epoch_has_alpenglow_credits(
+            &validator,
+            13,
+            SLOTS_PER_EPOCH
+        ));
     }
 
     #[test]
