@@ -6,8 +6,8 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, utils::max_epoch_credits, ClusterHistory, EpochCredits,
-    MerkleRootUploadAuthority, ValidatorHistory,
+    constants::TVC_MULTIPLIER, ClusterHistory, EpochCredits, MerkleRootUploadAuthority,
+    ValidatorHistory,
 };
 
 use crate::{
@@ -928,28 +928,31 @@ pub fn instant_unstake_validator(
             .and_then(|entry| *entry)
             .is_some_and(|entry| entry.is_alpenglow.eq(&1))
     });
-    let (delinquency_check, epoch_credits_latest, total_blocks_latest) =
-        match previous_alpenglow_epoch {
-            Some(epoch) => calculate_alpenglow_instant_unstake_delinquency(
-                validator,
+    let delinquency_check = match previous_alpenglow_epoch {
+        Some(epoch) => {
+            let epoch_credits = validator.history.epoch_credits_range_across_migration(
                 cluster,
+                epoch,
                 epoch,
                 tvc_activation_epoch,
                 slots_per_epoch,
-                params.instant_unstake_delinquency_threshold_ratio,
-            ),
-            None => (
-                calculate_instant_unstake_delinquency(
-                    total_blocks_latest,
-                    cluster_history_slot_index,
-                    epoch_credits_latest,
-                    validator_history_slot_index,
-                    params.instant_unstake_delinquency_threshold_ratio,
-                )?,
-                epoch_credits_latest,
-                total_blocks_latest,
-            ),
-        };
+            );
+
+            match epoch_credits.first() {
+                Some(&EpochCredits::Scored(ratio)) => {
+                    ratio < params.instant_unstake_delinquency_threshold_ratio
+                }
+                _ => false,
+            }
+        }
+        None => calculate_instant_unstake_delinquency(
+            total_blocks_latest,
+            cluster_history_slot_index,
+            epoch_credits_latest,
+            validator_history_slot_index,
+            params.instant_unstake_delinquency_threshold_ratio,
+        )?,
+    };
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
         validator,
@@ -999,47 +1002,6 @@ pub fn instant_unstake_validator(
             mev_commission: mev_commission_bps,
         },
     })
-}
-
-/// Checks whether the validator was delinquent in `epoch`, a complete alpenglow epoch, using the same
-/// ratio as scoring. Returns the check along with the epoch credits and total blocks behind it.
-fn calculate_alpenglow_instant_unstake_delinquency(
-    validator: &ValidatorHistory,
-    cluster: &ClusterHistory,
-    epoch: u16,
-    tvc_activation_epoch: u64,
-    slots_per_epoch: u64,
-    instant_unstake_delinquency_threshold_ratio: f64,
-) -> (bool, u32, u32) {
-    let epoch_credits = validator.history.epoch_credits_range_across_migration(
-        cluster,
-        epoch,
-        epoch,
-        tvc_activation_epoch,
-        slots_per_epoch,
-    );
-    let total_blocks = cluster
-        .history
-        .total_blocks_range(epoch, epoch)
-        .first()
-        .copied()
-        .flatten()
-        .unwrap_or(0);
-
-    match epoch_credits.first() {
-        Some(&EpochCredits::Scored(ratio)) => {
-            // Reported on the tower credit scale, so the emitted details stay comparable to the
-            // pre-migration ones
-            let credits = (ratio * max_epoch_credits(total_blocks) as f64) as u32;
-            (
-                ratio < instant_unstake_delinquency_threshold_ratio,
-                credits,
-                total_blocks,
-            )
-        }
-        // An epoch that can't be scored is no reason to unstake
-        _ => (false, 0, total_blocks),
-    }
 }
 
 /// Calculates if the validator should be unstaked due to delinquency
@@ -1295,47 +1257,40 @@ mod tests {
         );
     }
 
+    /// The ratio `instant_unstake_validator` judges a complete alpenglow epoch by
+    fn alpenglow_unstake_ratio(
+        validator: &ValidatorHistory,
+        cluster: &ClusterHistory,
+        epoch: u16,
+    ) -> Option<f64> {
+        match validator
+            .history
+            .epoch_credits_range_across_migration(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH)
+            .first()
+        {
+            Some(&EpochCredits::Scored(ratio)) => Some(ratio),
+            _ => None,
+        }
+    }
+
     #[test]
     fn test_alpenglow_instant_unstake_delinquency() {
         let (mut validator, cluster) = migrating_history();
-        assert_eq!(
-            calculate_alpenglow_instant_unstake_delinquency(
-                &validator,
-                &cluster,
-                13,
-                0,
-                SLOTS_PER_EPOCH,
-                0.7
-            ),
-            (false, TOTAL_BLOCKS * TVC_MULTIPLIER, TOTAL_BLOCKS)
-        );
+        let threshold = 0.7;
+
+        // Earned its full expected share, so it is not delinquent
+        let ratio = alpenglow_unstake_ratio(&validator, &cluster, 13).unwrap();
+        assert_eq!(ratio, 1.);
+        assert!(ratio >= threshold);
 
         // Earned only half its expected share
         entry_mut(&mut validator, 13).epoch_credits_uncapped = reward_lamports(0.5);
-        assert_eq!(
-            calculate_alpenglow_instant_unstake_delinquency(
-                &validator,
-                &cluster,
-                13,
-                0,
-                SLOTS_PER_EPOCH,
-                0.7
-            ),
-            (true, TOTAL_BLOCKS * TVC_MULTIPLIER / 2, TOTAL_BLOCKS)
-        );
+        let ratio = alpenglow_unstake_ratio(&validator, &cluster, 13).unwrap();
+        assert_eq!(ratio, 0.5);
+        assert!(ratio < threshold);
 
         // The migration epoch can't be scored, so it's no reason to unstake
-        assert_eq!(
-            calculate_alpenglow_instant_unstake_delinquency(
-                &validator,
-                &cluster,
-                12,
-                0,
-                SLOTS_PER_EPOCH,
-                0.7
-            ),
-            (false, 0, TOTAL_BLOCKS)
-        );
+        assert_eq!(alpenglow_unstake_ratio(&validator, &cluster, 12), None);
     }
 
     #[test]
