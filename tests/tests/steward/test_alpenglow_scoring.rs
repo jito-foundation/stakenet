@@ -164,6 +164,7 @@ mod tests {
                     directed_stake_unstake_cap_bps: Some(10_000),
                     jito_bam_minimum_epochs: Some(0),
                     jito_bam_window_epochs: Some(0),
+                    alpenglow_migration_epoch: None,
                 }),
                 None,
             )

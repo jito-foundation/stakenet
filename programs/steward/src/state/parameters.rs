@@ -52,6 +52,9 @@ pub struct UpdateParametersArgs {
     /// out of those epochs to qualify for delegation.
     /// `None` means do not update the current value.
     pub jito_bam_window_epochs: Option<u8>,
+
+    /// The epoch in which the cluster migrated from tower to alpenglow
+    pub alpenglow_migration_epoch: Option<u16>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -176,6 +179,11 @@ impl IdlBuild for UpdateParametersArgs {
                         docs: Default::default(),
                     },
                     IdlField {
+                        name: "alpenglow_migration_epoch".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
+                    IdlField {
                         name: "jito_bam_window_epochs".to_string(),
                         ty: IdlType::Option(Box::new(IdlType::U8)),
                         docs: Default::default(),
@@ -283,7 +291,11 @@ pub struct Parameters {
     /// out of those epochs to qualify for delegation.
     pub jito_bam_window_epochs: u8,
 
-    pub _padding_0: [u8; 4],
+    /// The epoch in which the cluster migrated from tower to alpenglow, or `u16::MAX` if it has
+    /// not been set.
+    pub alpenglow_migration_epoch: u16,
+
+    pub _padding_0: [u8; 2],
 
     pub _padding_1: [u64; 28],
     /// The minimum epoch progress for computing scores
@@ -305,6 +317,13 @@ pub struct Parameters {
 impl Parameters {
     pub fn undirected_stake_ceiling_lamports(&self) -> u64 {
         u64::from_le_bytes(self.undirected_stake_ceiling_lamports)
+    }
+
+    /// Whether `epoch` holds credits that can't be compared against either era's denominator.
+    pub fn is_alpenglow_transition_epoch(&self, epoch: u16) -> bool {
+        let migration_epoch = self.alpenglow_migration_epoch;
+        migration_epoch != u16::MAX
+            && (epoch == migration_epoch || epoch == migration_epoch.saturating_add(1))
     }
 
     /// Merges the updated parameters with the current parameters and validates them
@@ -339,6 +358,7 @@ impl Parameters {
             undirected_stake_ceiling_lamports,
             jito_bam_minimum_epochs,
             jito_bam_window_epochs,
+            alpenglow_migration_epoch,
         } = *args;
 
         let mut new_parameters = self;
@@ -439,6 +459,10 @@ impl Parameters {
 
         if let Some(jito_bam_window_epochs) = jito_bam_window_epochs {
             new_parameters.jito_bam_window_epochs = jito_bam_window_epochs;
+        }
+
+        if let Some(alpenglow_migration_epoch) = alpenglow_migration_epoch {
+            new_parameters.alpenglow_migration_epoch = alpenglow_migration_epoch;
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -696,7 +720,8 @@ mod tests {
             undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
             jito_bam_minimum_epochs: 10,
             jito_bam_window_epochs: 10,
-            _padding_0: [0; 4],
+            alpenglow_migration_epoch: u16::MAX,
+            _padding_0: [0; 2],
             _padding_1: [0; 28],
             _padding_2: [0; 6],
         }

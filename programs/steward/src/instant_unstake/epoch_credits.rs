@@ -3,26 +3,23 @@ use validator_history::{
     constants::TVC_MULTIPLIER, ClusterHistory, EpochCreditsRatio, ValidatorHistory,
 };
 
-use crate::errors::StewardError;
+use crate::{errors::StewardError, Parameters};
 
 /// Whether the validator should be instantly unstaked for delinquency.
-///
-/// Which calculator applies depends on the era of the epoch being judged, and the era has to come
-/// from cluster history rather than from the size of the validator's credits: alpenglow reward
-/// lamports scale with stake, so a small validator's lamports look just like tower vote credits.
 ///
 /// - A complete alpenglow epoch is judged by the share of its expected inflation the validator
 ///   captured, taken from the previous epoch because alpenglow rewards aren't paid until an epoch
 ///   ends.
 /// - A tower epoch is judged by the current epoch's vote credit rate.
-/// - The migration epoch is judged by neither. Its credits mix tower vote credits with alpenglow
-///   reward lamports, which sum to an ordinary-looking total that would read as delinquent against
-///   a tower denominator. Delinquency unstaking pauses for that one epoch; every other instant
-///   unstake trigger still applies.
+/// - The transition epochs are judged by neither, because their credits can't be compared against
+///   either era's denominator. See [`Parameters::is_alpenglow_transition_epoch`].
+///
+/// Every other instant unstake trigger still applies while delinquency is skipped.
 #[allow(clippy::too_many_arguments)]
 pub fn calculate_instant_unstake_delinquency(
     validator: &ValidatorHistory,
     cluster: &ClusterHistory,
+    params: &Parameters,
     current_epoch: u16,
     tvc_activation_epoch: u64,
     slots_per_epoch: u64,
@@ -30,8 +27,14 @@ pub fn calculate_instant_unstake_delinquency(
     cluster_history_slot_index: u64,
     epoch_credits_latest: u32,
     validator_history_slot_index: u64,
-    instant_unstake_delinquency_threshold_ratio: f64,
 ) -> Result<bool> {
+    let instant_unstake_delinquency_threshold_ratio =
+        params.instant_unstake_delinquency_threshold_ratio;
+
+    if params.is_alpenglow_transition_epoch(current_epoch) {
+        return Ok(false);
+    }
+
     let previous_epoch_era = current_epoch.checked_sub(1).and_then(|epoch| {
         cluster
             .history
@@ -55,19 +58,19 @@ pub fn calculate_instant_unstake_delinquency(
                 Some(&EpochCreditsRatio::Scored(ratio)) => {
                     ratio < instant_unstake_delinquency_threshold_ratio
                 }
+                // An epoch that can't be scored is no reason to unstake
                 _ => false,
             })
         }
-        Some((_, false)) if !cluster.history.alpenglow_activated_by(current_epoch) => {
-            calculate_instant_unstake_tower_delinquency(
-                total_blocks_latest,
-                cluster_history_slot_index,
-                epoch_credits_latest,
-                validator_history_slot_index,
-                instant_unstake_delinquency_threshold_ratio,
-            )
-        }
-        _ => Ok(false),
+        Some((_, false)) => calculate_instant_unstake_tower_delinquency(
+            total_blocks_latest,
+            cluster_history_slot_index,
+            epoch_credits_latest,
+            validator_history_slot_index,
+            instant_unstake_delinquency_threshold_ratio,
+        ),
+        // No entry for the previous epoch, so there is no era to judge by
+        None => Ok(false),
     }
 }
 
@@ -104,6 +107,7 @@ pub fn calculate_instant_unstake_tower_delinquency(
 #[cfg(test)]
 mod tests {
     use anchor_lang::solana_program::pubkey::Pubkey;
+    use bytemuck::Zeroable;
     use validator_history::{
         utils::MAX_EPOCH_CREDITS, CircBuf, CircBufCluster, ClusterHistoryEntry,
         ValidatorHistoryEntry,
@@ -188,14 +192,46 @@ mod tests {
         (validator, cluster)
     }
 
+    /// Clears the era of every epoch at or after `current_epoch`, modelling the oracle's real
+    /// publishing lag: an epoch's era is only written once its rewards are paid, during the epoch
+    /// after it, so the current epoch's flag is always unset.
+    fn apply_oracle_lag(cluster: &mut ClusterHistory, current_epoch: u16) {
+        for entry in cluster
+            .history
+            .arr_mut()
+            .iter_mut()
+            .filter(|entry| entry.epoch >= current_epoch)
+        {
+            entry.is_alpenglow = ClusterHistoryEntry::default().is_alpenglow;
+        }
+    }
+
+    /// Parameters with no alpenglow migration declared
+    fn params() -> Parameters {
+        let mut params = Parameters::zeroed();
+        params.instant_unstake_delinquency_threshold_ratio = THRESHOLD;
+        params.alpenglow_migration_epoch = u16::MAX;
+        params
+    }
+
     fn check(
         validator: &ValidatorHistory,
         cluster: &ClusterHistory,
         current_epoch: u16,
     ) -> Result<bool> {
+        check_with(validator, cluster, &params(), current_epoch)
+    }
+
+    fn check_with(
+        validator: &ValidatorHistory,
+        cluster: &ClusterHistory,
+        params: &Parameters,
+        current_epoch: u16,
+    ) -> Result<bool> {
         calculate_instant_unstake_delinquency(
             validator,
             cluster,
+            params,
             current_epoch,
             0,
             SLOTS_PER_EPOCH,
@@ -203,7 +239,6 @@ mod tests {
             SLOTS_PER_EPOCH / 2,
             u64::from(TOTAL_BLOCKS).min(u64::from(u32::MAX)) as u32 * TVC_MULTIPLIER,
             SLOTS_PER_EPOCH / 2,
-            THRESHOLD,
         )
     }
 
@@ -255,6 +290,50 @@ mod tests {
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         // Nothing recorded before epoch 10, so epoch 10 has no previous entry to read an era from
         assert!(!check(&validator, &cluster, 10).unwrap());
+    }
+
+    #[test]
+    fn test_declared_transition_epochs_are_never_unstaked() {
+        let (mut validator, mut cluster) = migrating_history(0);
+        let mut params = params();
+        params.alpenglow_migration_epoch = 12;
+
+        for epoch in [12, 13] {
+            apply_oracle_lag(&mut cluster, epoch);
+            for entry in validator
+                .history
+                .arr_mut()
+                .iter_mut()
+                .filter(|entry| entry.epoch >= epoch)
+            {
+                entry.epoch_credits = ValidatorHistoryEntry::default().epoch_credits;
+                entry.epoch_credits_uncapped =
+                    ValidatorHistoryEntry::default().epoch_credits_uncapped;
+            }
+
+            assert!(
+                !check_with(&validator, &cluster, &params, epoch).unwrap(),
+                "transition epoch {epoch} must not be unstaked"
+            );
+        }
+    }
+
+    #[test]
+    fn test_steady_state_tower_still_judged_under_oracle_lag() {
+        let (mut validator, mut cluster) = migrating_history(0);
+        apply_oracle_lag(&mut cluster, 11);
+        // Earned nothing this epoch while the cluster produced blocks
+        for entry in validator
+            .history
+            .arr_mut()
+            .iter_mut()
+            .filter(|entry| entry.epoch >= 11)
+        {
+            entry.epoch_credits = 0;
+            entry.epoch_credits_uncapped = 0;
+        }
+
+        assert!(check(&validator, &cluster, 11).unwrap());
     }
 
     #[test]
