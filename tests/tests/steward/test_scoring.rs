@@ -1034,68 +1034,6 @@ mod test_calculate_priority_fee_commission {
     }
 }
 
-mod test_calculate_instant_unstake_delinquency {
-    use validator_history::constants::TVC_MULTIPLIER;
-
-    use super::*;
-
-    #[test]
-    fn test_normal() {
-        let total_blocks_latest = 1000;
-        let cluster_history_slot_index = 1000;
-        let epoch_credits_latest = 900 * TVC_MULTIPLIER;
-        let validator_history_slot_index = 1000;
-        let threshold = 0.8;
-
-        let result = calculate_instant_unstake_delinquency(
-            total_blocks_latest,
-            cluster_history_slot_index,
-            epoch_credits_latest,
-            validator_history_slot_index,
-            threshold,
-        )
-        .unwrap();
-
-        assert!(!result);
-
-        // Delinquency detected
-        let result = calculate_instant_unstake_delinquency(1000, 1000, 700, 1000, 0.8).unwrap();
-        assert!(result);
-    }
-
-    #[test]
-    fn test_edge_cases() {
-        let total_blocks_latest = 0;
-        let cluster_history_slot_index = 1000;
-        let epoch_credits_latest = 900 * TVC_MULTIPLIER;
-        let validator_history_slot_index = 1000;
-        let threshold = 0.8;
-
-        // Zero blocks produced
-        let result = calculate_instant_unstake_delinquency(
-            total_blocks_latest,
-            cluster_history_slot_index,
-            epoch_credits_latest,
-            validator_history_slot_index,
-            threshold,
-        )
-        .unwrap();
-        assert!(!result);
-
-        // Zero slots
-        let total_blocks_latest = 1000;
-        let cluster_history_slot_index = 0;
-        let result = calculate_instant_unstake_delinquency(
-            total_blocks_latest,
-            cluster_history_slot_index,
-            epoch_credits_latest,
-            validator_history_slot_index,
-            threshold,
-        );
-        assert!(result.is_err());
-    }
-}
-
 mod test_calculate_instant_unstake_mev_commission {
     use super::*;
 
