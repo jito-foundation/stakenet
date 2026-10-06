@@ -98,14 +98,6 @@ pub fn get_max_epoch(
 /// holding its share of the stake was expected to earn:
 ///
 /// `reward_lamports / (inflation_rewards * reward_stake / total_reward_stake)`
-///
-/// Leader rewards sit in both the numerator and the denominator, so they cancel: a stake-weighted
-/// leader schedule hands out leader slots in proportion to the same stake share. That removes the
-/// dependence on per-validator block counts entirely, and leader luck no longer moves the result.
-///
-/// The ratio is then expressed on the tower scale, against the blocks the cluster actually produced.
-///
-/// Returns `None` if the validator had no stake to earn with, or the cluster inputs are empty.
 pub fn alpenglow_epoch_credits(
     reward_lamports: u64,
     reward_stake_lamports: u64,
@@ -113,6 +105,7 @@ pub fn alpenglow_epoch_credits(
     inflation_rewards: u64,
     total_blocks: u32,
 ) -> Option<u32> {
+    // `checked_div` below also rejects these, but returning early keeps the intent obvious
     if reward_stake_lamports == 0
         || total_reward_stake_lamports == 0
         || inflation_rewards == 0
@@ -121,18 +114,18 @@ pub fn alpenglow_epoch_credits(
         return None;
     }
 
-    // What a validator holding this share of the stake was expected to earn, vote and leader
-    // rewards together
-    let expected_lamports = inflation_rewards as f64 * reward_stake_lamports as f64
-        / total_reward_stake_lamports as f64;
-    let earned_ratio = reward_lamports as f64 / expected_lamports;
+    // Full credit for the epoch, the same scale a tower epoch is scored on
+    let max_credits = u128::from(total_blocks).checked_mul(u128::from(TVC_MULTIPLIER))?;
 
-    // Express on the same scale as tower credits. Capped at the full ratio of 1 so that credits can
-    // never saturate into the `>= 2^31` range where `u32 as f64` is miscompiled on affected SBF
-    // toolchains, and so an over-earning validator can't outrank a perfect one.
-    let credits = earned_ratio.min(1.) * u64::from(total_blocks) as f64 * TVC_MULTIPLIER as f64;
+    let expected_lamports = u128::from(inflation_rewards)
+        .checked_mul(u128::from(reward_stake_lamports))?
+        .checked_div(u128::from(total_reward_stake_lamports))?;
 
-    Some(credits.round() as u32)
+    let credits = u128::from(reward_lamports)
+        .checked_mul(max_credits)?
+        .checked_div(expected_lamports)?;
+
+    Some(credits.min(max_credits) as u32)
 }
 
 pub fn cast_epoch_start_timestamp(start_timestamp: i64) -> u64 {

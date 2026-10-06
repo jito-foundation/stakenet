@@ -33,6 +33,16 @@ pub static DNE_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
 pub static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
 pub static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
+/// Epoch credits a validator earned in one epoch, normalized to timely vote credits
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EpochCredits {
+    /// Credits earned, `None` if the validator earned none
+    Scored(Option<u32>),
+
+    /// Inputs are missing, or the credits mix tower vote credits with alpenglow reward lamports
+    Unscorable,
+}
+
 #[account]
 pub struct Config {
     // This program is used to distribute MEV + track which validators are running jito-solana for a given epoch
@@ -542,22 +552,22 @@ impl CircBuf {
             .collect()
     }
 
-    /// Decodes the credits each epoch in [start_epoch, end_epoch] is worth, normalized so that
-    /// `credits / (total_blocks * TVC_MULTIPLIER)` means the same in tower and alpenglow epochs.
+    /// What each epoch in [start_epoch, end_epoch] is worth, on one scale across the alpenglow
+    /// migration: `credits / (total_blocks * TVC_MULTIPLIER)` means the same in either era.
     ///
     /// Epochs flagged `is_alpenglow` in cluster history hold vote reward lamports, which are
-    /// converted with `alpenglow_epoch_credits`. `None` means the epoch can't be decoded: either an
-    /// input hasn't been uploaded yet, or the credits mix tower vote credits with alpenglow reward
-    /// lamports (the migration epoch, or an alpenglow epoch whose rewards aren't recorded yet).
-    /// Callers decide what an undecodable epoch means for them.
-    pub fn epoch_credits_range_decoded(
+    /// converted with `alpenglow_epoch_credits`; the rest hold tower vote credits. An epoch is
+    /// `Unscorable` when it can't be read: either an input hasn't been uploaded yet, or the credits
+    /// mix tower vote credits with alpenglow reward lamports (the migration epoch, or an alpenglow
+    /// epoch whose rewards aren't recorded yet).
+    pub fn epoch_credits_range_across_migration(
         &self,
-        cluster: &CircBufCluster,
+        cluster: &ClusterHistory,
         start_epoch: u16,
         end_epoch: u16,
         tvc_activation_epoch: u64,
         slots_per_epoch: u64,
-    ) -> Vec<Option<Option<u32>>> {
+    ) -> Vec<EpochCredits> {
         let tower_credits =
             self.epoch_credits_range_normalized(start_epoch, end_epoch, tvc_activation_epoch);
         let max_tower_credits = u64::from(TVC_MULTIPLIER).saturating_mul(slots_per_epoch);
@@ -565,7 +575,7 @@ impl CircBuf {
         // Alpenglow pays each epoch's vote rewards against the stake recorded in the epoch before it
         let lookback_epoch = start_epoch.saturating_sub(1);
         let validator_entries = self.epoch_range(lookback_epoch, end_epoch);
-        let cluster_entries = cluster.epoch_range(lookback_epoch, end_epoch);
+        let cluster_entries = cluster.history.epoch_range(lookback_epoch, end_epoch);
 
         (start_epoch..=end_epoch)
             .zip(tower_credits)
@@ -583,8 +593,10 @@ impl CircBuf {
                 }
 
                 match tower_credits {
-                    Some(credits) if u64::from(credits) > max_tower_credits => None,
-                    credits => Some(credits),
+                    Some(credits) if u64::from(credits) > max_tower_credits => {
+                        EpochCredits::Unscorable
+                    }
+                    credits => EpochCredits::Scored(credits),
                 }
             })
             .collect()
@@ -1439,25 +1451,26 @@ impl Default for CircBufCluster {
 }
 
 /// Reads the inputs of `alpenglow_epoch_credits` for one alpenglow epoch from validator and cluster
-/// history. The outer `None` means the epoch can't be decoded, the inner `None` means the validator
-/// earned nothing.
+/// history.
 fn alpenglow_entry_credits(
     entry: Option<&ValidatorHistoryEntry>,
     previous_entry: Option<&ValidatorHistoryEntry>,
     cluster_entry: &ClusterHistoryEntry,
     previous_cluster_entry: Option<&ClusterHistoryEntry>,
-) -> Option<Option<u32>> {
+) -> EpochCredits {
     let default_entry = ValidatorHistoryEntry::default();
     let default_cluster_entry = ClusterHistoryEntry::default();
 
     // `copy_vote_account` backfills every epoch the vote account earned in, so no entry means no credits
-    let entry = entry?;
+    let Some(entry) = entry else {
+        return EpochCredits::Scored(None);
+    };
     if entry.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
         return if entry.epoch_credits == default_entry.epoch_credits {
-            Some(None)
+            EpochCredits::Scored(None)
         } else {
             // Copied before uncapped credits were recorded
-            None
+            EpochCredits::Unscorable
         };
     }
 
@@ -1471,7 +1484,7 @@ fn alpenglow_entry_credits(
         {
             previous.activated_stake_lamports
         }
-        _ => return None,
+        _ => return EpochCredits::Unscorable,
     };
     let total_reward_stake_lamports = match previous_cluster_entry {
         Some(previous)
@@ -1480,22 +1493,24 @@ fn alpenglow_entry_credits(
         {
             previous.total_epoch_stake_lamports
         }
-        _ => return None,
+        _ => return EpochCredits::Unscorable,
     };
     if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
         || cluster_entry.total_blocks == default_cluster_entry.total_blocks
     {
-        return None;
+        return EpochCredits::Unscorable;
     }
 
-    alpenglow_epoch_credits(
+    match alpenglow_epoch_credits(
         entry.epoch_credits_uncapped,
         reward_stake_lamports,
         total_reward_stake_lamports,
         cluster_entry.total_inflation_rewards,
         cluster_entry.total_blocks,
-    )
-    .map(Some)
+    ) {
+        Some(credits) => EpochCredits::Scored(Some(credits)),
+        None => EpochCredits::Unscorable,
+    }
 }
 
 impl CircBufCluster {
