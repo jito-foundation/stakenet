@@ -170,6 +170,7 @@ async fn test_cycle() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -455,6 +456,7 @@ async fn test_cycle_with_directed_stake_persistent_unstake_state() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -757,6 +759,7 @@ async fn test_cycle_with_directed_stake_unstake_minimum_delegation() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -991,6 +994,7 @@ async fn test_cycle_with_directed_stake_unstake_cap() {
                 directed_stake_unstake_cap_bps: Some(100),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1223,6 +1227,7 @@ async fn test_cycle_with_directed_stake_noop_copy() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1432,6 +1437,7 @@ async fn test_cycle_with_directed_stake_partial_copy() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1642,6 +1648,7 @@ async fn test_cycle_with_directed_stake_undirected() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1804,6 +1811,7 @@ async fn test_cycle_with_directed_stake_increase_minimum_delegation() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1969,6 +1977,7 @@ async fn test_cycle_with_directed_stake_targets() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -2361,6 +2370,7 @@ async fn test_remove_validator_mid_epoch() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -2662,6 +2672,7 @@ async fn test_add_validator_next_cycle() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -2916,6 +2927,7 @@ async fn test_directed_stake_large_target_low_reserve() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )

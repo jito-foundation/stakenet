@@ -352,11 +352,7 @@ pub fn validator_score(
         )?;
 
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
-        calculate_scorable_epoch_credits(
-            &epoch_credits_ratio_window,
-            epoch_credits_start,
-            params.scoring_delinquency_threshold_ratio,
-        )?;
+        calculate_scorable_epoch_credits(&epoch_credits_ratio_window, params, epoch_credits_start)?;
 
     let (commission_score, max_commission, max_commission_epoch) = calculate_max_commission(
         &commission_window,
@@ -919,6 +915,7 @@ pub fn instant_unstake_validator(
     let delinquency_check = calculate_instant_unstake_delinquency(
         validator,
         cluster,
+        params,
         current_epoch,
         tvc_activation_epoch,
         slots_per_epoch,
@@ -926,7 +923,6 @@ pub fn instant_unstake_validator(
         cluster_history_slot_index,
         epoch_credits_latest,
         validator_history_slot_index,
-        params.instant_unstake_delinquency_threshold_ratio,
     )?;
 
     let (mev_commission_check, mev_commission_bps) = calculate_instant_unstake_mev_commission(
@@ -1225,19 +1221,6 @@ mod tests {
 
         // The migration epoch can't be scored, so it's no reason to unstake
         assert_eq!(alpenglow_unstake_ratio(&validator, &cluster, 12), None);
-    }
-
-    #[test]
-    fn test_alpenglow_activated_by_identifies_the_transition() {
-        // Epochs 13 and 14 are alpenglow, 12 is the migration epoch, 10 and 11 are tower
-        let (_, cluster) = migrating_history();
-
-        assert!(!cluster.history.alpenglow_activated_by(11));
-        // The migration epoch is still flagged tower, so only the cluster's era reveals it
-        assert!(!cluster.history.alpenglow_activated_by(12));
-        assert!(cluster.history.alpenglow_activated_by(13));
-        // Once the cluster migrates it never reads as tower again
-        assert!(cluster.history.alpenglow_activated_by(14));
     }
 
     #[test]

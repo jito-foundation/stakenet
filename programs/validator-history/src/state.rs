@@ -677,15 +677,6 @@ impl CircBuf {
                         }
                     }
                     Some(false) | None => {
-                        let follows_into_alpenglow = cluster_entries
-                            .get(index + 1)
-                            .and_then(|entry| *entry)
-                            .and_then(|entry| entry.is_alpenglow_activated())
-                            .unwrap_or(false);
-                        if follows_into_alpenglow {
-                            return EpochCreditsRatio::Unscorable;
-                        }
-
                         if cluster_entry
                             .total_blocks
                             .eq(&ClusterHistoryEntry::default().total_blocks)
@@ -1625,18 +1616,6 @@ impl CircBufCluster {
                 None
             })
             .collect()
-    }
-
-    /// Whether any epoch up to and including `epoch` has been recorded as alpenglow.
-    ///
-    /// Once the cluster migrates it never returns to tower, so this stays true afterwards. Use it
-    /// to recognize the migration epoch itself, whose own flag is still `0`: the epoch is
-    /// mid-transition when the cluster has gone alpenglow but that epoch hasn't been marked.
-    pub fn alpenglow_activated_by(&self, epoch: u16) -> bool {
-        self.arr
-            .iter()
-            .filter(|entry| entry.epoch <= epoch)
-            .any(|entry| entry.is_alpenglow_activated().unwrap_or(false))
     }
 
     pub fn total_blocks_latest(&self) -> Option<u32> {
