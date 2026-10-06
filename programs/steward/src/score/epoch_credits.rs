@@ -6,8 +6,6 @@ use crate::{constants::EPOCH_DEFAULT, errors::StewardError};
 /// Averages the participation ratios of the scorable epochs in the window, and flags the first one
 /// that falls below the delinquency threshold. Unscorable epochs are neither averaged in nor checked
 /// for delinquency, so a validator isn't judged on an epoch whose inputs are missing or ambiguous.
-///
-/// Returns `(average_ratio, delinquency_score, delinquency_ratio, delinquency_epoch)`.
 pub fn calculate_scorable_epoch_credits(
     epoch_credits_ratio_window: &[EpochCreditsRatio],
     epoch_credits_start: u16,
