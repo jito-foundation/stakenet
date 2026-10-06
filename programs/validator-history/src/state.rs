@@ -14,7 +14,7 @@ use {
         crds_value::{ContactInfo, LegacyContactInfo, LegacyVersion, Version2},
         errors::ValidatorHistoryError,
         utils::{
-            alpenglow_epoch_credits, epoch_credits_map, find_insert_position, get_max_epoch,
+            alpenglow_earned_ratio, epoch_credits_map, find_insert_position, get_max_epoch,
             get_min_epoch, MAX_EPOCH_CREDITS,
         },
     },
@@ -33,11 +33,15 @@ pub static DNE_AUTHORITY: Pubkey = pubkey!("11111111111111111111111111111111");
 pub static JITO_LABS_AUTHORITY: Pubkey = pubkey!("GZctHpWXmsZC1YHACTGGcHhYxjdRqQvTpYkb9LMvxDib");
 pub static TIP_ROUTER_AUTHORITY: Pubkey = pubkey!("8F4jGUmxF36vQ6yabnsxX6AQVXdKBhs8kGSUuRKSg8Xt");
 
-/// Epoch credits a validator earned in one epoch, normalized to timely vote credits
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// How fully a validator participated in one epoch, on a scale that means the same in both eras.
+///
+/// `1.0` is a flawless epoch: every vote credit tower could pay, or exactly the inflation reward
+/// alpenglow expected for the validator's stake share. Alpenglow epochs can land slightly above
+/// `1.0`, since leader slots are won in whole blocks.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EpochCredits {
-    /// Credits earned, `None` if the validator earned none
-    Scored(Option<u32>),
+    /// Participation ratio for the epoch
+    Scored(f64),
 
     /// Inputs are missing, or the credits mix tower vote credits with alpenglow reward lamports
     Unscorable,
@@ -552,14 +556,8 @@ impl CircBuf {
             .collect()
     }
 
-    /// What each epoch in [start_epoch, end_epoch] is worth, on one scale across the alpenglow
-    /// migration: `credits / (total_blocks * TVC_MULTIPLIER)` means the same in either era.
-    ///
-    /// Epochs flagged `is_alpenglow` in cluster history hold vote reward lamports, which are
-    /// converted with `alpenglow_epoch_credits`; the rest hold tower vote credits. An epoch is
-    /// `Unscorable` when it can't be read: either an input hasn't been uploaded yet, or the credits
-    /// mix tower vote credits with alpenglow reward lamports (the migration epoch, or an alpenglow
-    /// epoch whose rewards aren't recorded yet).
+    /// How fully the validator participated in each epoch in [start_epoch, end_epoch], on one scale
+    /// across the alpenglow migration. See [`EpochCredits`].
     pub fn epoch_credits_range_across_migration(
         &self,
         cluster: &ClusterHistory,
@@ -581,8 +579,11 @@ impl CircBuf {
             .zip(tower_credits)
             .map(|(epoch, tower_credits)| {
                 let index = (epoch - lookback_epoch) as usize;
-                if let Some(cluster_entry) = cluster_entries[index].filter(|e| e.is_alpenglow == 1)
-                {
+                let Some(cluster_entry) = cluster_entries[index] else {
+                    return EpochCredits::Unscorable;
+                };
+
+                if cluster_entry.is_alpenglow.eq(&1) {
                     let previous_index = index.checked_sub(1);
                     return alpenglow_entry_credits(
                         validator_entries[index],
@@ -592,11 +593,17 @@ impl CircBuf {
                     );
                 }
 
+                // Tower epochs are scored against the credits the cluster's blocks could pay
+                let max_credits =
+                    u64::from(cluster_entry.total_blocks).saturating_mul(u64::from(TVC_MULTIPLIER));
                 match tower_credits {
                     Some(credits) if u64::from(credits) > max_tower_credits => {
                         EpochCredits::Unscorable
                     }
-                    credits => EpochCredits::Scored(credits),
+                    _ if max_credits == 0 => EpochCredits::Unscorable,
+                    credits => EpochCredits::Scored(
+                        u64::from(credits.unwrap_or(0)) as f64 / max_credits as f64,
+                    ),
                 }
             })
             .collect()
@@ -1450,7 +1457,7 @@ impl Default for CircBufCluster {
     }
 }
 
-/// Reads the inputs of `alpenglow_epoch_credits` for one alpenglow epoch from validator and cluster
+/// Reads the inputs of `alpenglow_earned_ratio` for one alpenglow epoch from validator and cluster
 /// history.
 fn alpenglow_entry_credits(
     entry: Option<&ValidatorHistoryEntry>,
@@ -1463,11 +1470,11 @@ fn alpenglow_entry_credits(
 
     // `copy_vote_account` backfills every epoch the vote account earned in, so no entry means no credits
     let Some(entry) = entry else {
-        return EpochCredits::Scored(None);
+        return EpochCredits::Scored(0.);
     };
     if entry.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
         return if entry.epoch_credits == default_entry.epoch_credits {
-            EpochCredits::Scored(None)
+            EpochCredits::Scored(0.)
         } else {
             // Copied before uncapped credits were recorded
             EpochCredits::Unscorable
@@ -1495,20 +1502,17 @@ fn alpenglow_entry_credits(
         }
         _ => return EpochCredits::Unscorable,
     };
-    if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards
-        || cluster_entry.total_blocks == default_cluster_entry.total_blocks
-    {
+    if cluster_entry.total_inflation_rewards == default_cluster_entry.total_inflation_rewards {
         return EpochCredits::Unscorable;
     }
 
-    match alpenglow_epoch_credits(
+    match alpenglow_earned_ratio(
         entry.epoch_credits_uncapped,
         reward_stake_lamports,
         total_reward_stake_lamports,
         cluster_entry.total_inflation_rewards,
-        cluster_entry.total_blocks,
     ) {
-        Some(credits) => EpochCredits::Scored(Some(credits)),
+        Some(ratio) => EpochCredits::Scored(ratio),
         None => EpochCredits::Unscorable,
     }
 }

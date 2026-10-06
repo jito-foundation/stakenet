@@ -1,57 +1,49 @@
 use anchor_lang::Result;
 use validator_history::EpochCredits;
 
-use crate::{constants::EPOCH_DEFAULT, errors::StewardError, score::calculate_epoch_credits};
+use crate::{constants::EPOCH_DEFAULT, errors::StewardError};
 
-/// `calculate_epoch_credits` over only the scorable epochs in the window, so unscorable epochs are
-/// neither averaged in nor checked for delinquency.
+/// Averages the participation ratios of the scorable epochs in the window, and flags the first one
+/// that falls below the delinquency threshold. Unscorable epochs are neither averaged in nor checked
+/// for delinquency, so a validator isn't judged on an epoch whose inputs are missing or ambiguous.
+///
+/// Returns `(average_ratio, delinquency_score, delinquency_ratio, delinquency_epoch)`.
 pub fn calculate_scorable_epoch_credits(
     epoch_credits_window: &[EpochCredits],
-    total_blocks_window: &[Option<u32>],
     epoch_credits_start: u16,
     scoring_delinquency_threshold_ratio: f64,
 ) -> Result<(f64, u8, f64, u16)> {
-    let mut epochs = Vec::with_capacity(epoch_credits_window.len());
-    let mut credits_window = Vec::with_capacity(epoch_credits_window.len());
-    let mut blocks_window = Vec::with_capacity(epoch_credits_window.len());
-    for (i, (epoch_credits, total_blocks)) in epoch_credits_window
-        .iter()
-        .zip(total_blocks_window.iter())
-        .enumerate()
-    {
-        if let EpochCredits::Scored(credits) = epoch_credits {
-            epochs.push(
-                epoch_credits_start
-                    .checked_add(i as u16)
-                    .ok_or(StewardError::ArithmeticError)?,
-            );
-            credits_window.push(*credits);
-            blocks_window.push(*total_blocks);
+    let mut scored = Vec::with_capacity(epoch_credits_window.len());
+    for (i, epoch_credits) in epoch_credits_window.iter().enumerate() {
+        if let EpochCredits::Scored(ratio) = *epoch_credits {
+            let epoch = epoch_credits_start
+                .checked_add(i as u16)
+                .ok_or(StewardError::ArithmeticError)?;
+            scored.push((epoch, ratio));
         }
     }
 
-    if epochs.is_empty() {
-        // Nothing to judge the validator by, so it isn't treated as delinquent
+    if scored.is_empty() {
         return Ok((0., 1, 1., EPOCH_DEFAULT));
     }
 
-    let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_index) =
-        calculate_epoch_credits(
-            &credits_window,
-            &blocks_window,
-            0,
-            scoring_delinquency_threshold_ratio,
-        )?;
-    let delinquency_epoch = if delinquency_score == 0 {
-        *epochs
-            .get(delinquency_index as usize)
-            .ok_or(StewardError::ArithmeticError)?
-    } else {
-        EPOCH_DEFAULT
-    };
+    // Delinquency heuristic - not actual delinquency
+    let mut delinquency_score = 1u8;
+    let mut delinquency_ratio = 1.0;
+    let mut delinquency_epoch = EPOCH_DEFAULT;
+    for &(epoch, ratio) in scored.iter() {
+        if ratio < scoring_delinquency_threshold_ratio {
+            delinquency_score = 0;
+            delinquency_ratio = ratio;
+            delinquency_epoch = epoch;
+            break;
+        }
+    }
+
+    let average_ratio = scored.iter().map(|&(_, ratio)| ratio).sum::<f64>() / scored.len() as f64;
 
     Ok((
-        vote_credits_ratio,
+        average_ratio,
         delinquency_score,
         delinquency_ratio,
         delinquency_epoch,
@@ -63,53 +55,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scorable_epoch_credits_matches_tower_scoring() {
-        let credits = [Some(16_000), None, Some(8_000), Some(16_000)];
-        let total_blocks = [Some(1_000), Some(1_000), None, Some(1_000)];
-        assert_eq!(
-            calculate_scorable_epoch_credits(
-                &credits.map(EpochCredits::Scored),
-                &total_blocks,
-                100,
-                0.9
-            )
-            .unwrap(),
-            calculate_epoch_credits(&credits, &total_blocks, 100, 0.9).unwrap()
-        );
+    fn test_scorable_epoch_credits_averages_scored_epochs() {
+        let window = [
+            EpochCredits::Scored(1.),
+            EpochCredits::Scored(0.5),
+            EpochCredits::Scored(0.9),
+        ];
+        let (average_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_scorable_epoch_credits(&window, 100, 0.4).unwrap();
+        assert!((average_ratio - 0.8).abs() < 1e-9);
+        assert_eq!(delinquency_score, 1);
+        assert_eq!(delinquency_ratio, 1.);
+        assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
+    }
+
+    #[test]
+    fn test_scorable_epoch_credits_flags_first_delinquent_epoch() {
+        let window = [
+            EpochCredits::Scored(1.),
+            EpochCredits::Scored(0.5),
+            EpochCredits::Scored(0.2),
+        ];
+        let (_, delinquency_score, delinquency_ratio, delinquency_epoch) =
+            calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
+        assert_eq!(delinquency_score, 0);
+        assert_eq!(delinquency_ratio, 0.5);
+        assert_eq!(delinquency_epoch, 101);
     }
 
     #[test]
     fn test_scorable_epoch_credits_skips_unscorable_epochs() {
+        // The unscorable epoch is neither averaged in nor treated as delinquent
         let window = [
-            EpochCredits::Scored(Some(16_000)),
+            EpochCredits::Scored(1.),
             EpochCredits::Unscorable,
-            EpochCredits::Scored(Some(16_000)),
+            EpochCredits::Scored(1.),
         ];
-        let (vote_credits_ratio, delinquency_score, _, delinquency_epoch) =
-            calculate_scorable_epoch_credits(&window, &[Some(1_000); 3], 100, 0.97).unwrap();
-        assert_eq!(vote_credits_ratio, 1.);
+        let (average_ratio, delinquency_score, _, delinquency_epoch) =
+            calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
+        assert_eq!(average_ratio, 1.);
         assert_eq!(delinquency_score, 1);
         assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
 
+        // Delinquency epochs stay aligned to the real epoch numbers despite the skip
         let window = [
             EpochCredits::Unscorable,
-            EpochCredits::Scored(Some(16_000)),
-            EpochCredits::Scored(Some(0)),
+            EpochCredits::Scored(1.),
+            EpochCredits::Scored(0.),
         ];
         let (_, delinquency_score, delinquency_ratio, delinquency_epoch) =
-            calculate_scorable_epoch_credits(&window, &[Some(1_000); 3], 100, 0.97).unwrap();
+            calculate_scorable_epoch_credits(&window, 100, 0.97).unwrap();
         assert_eq!(delinquency_score, 0);
         assert_eq!(delinquency_ratio, 0.);
         assert_eq!(delinquency_epoch, 102);
 
         assert_eq!(
-            calculate_scorable_epoch_credits(
-                &[EpochCredits::Unscorable; 3],
-                &[Some(1_000); 3],
-                100,
-                0.97
-            )
-            .unwrap(),
+            calculate_scorable_epoch_credits(&[EpochCredits::Unscorable; 3], 100, 0.97).unwrap(),
             (0., 1, 1., EPOCH_DEFAULT)
         );
     }

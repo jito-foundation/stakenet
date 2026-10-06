@@ -6,8 +6,8 @@ use anchor_lang::{
 };
 use serde::{Deserialize, Serialize};
 use validator_history::{
-    constants::TVC_MULTIPLIER, ClusterHistory, EpochCredits, MerkleRootUploadAuthority,
-    ValidatorHistory,
+    constants::TVC_MULTIPLIER, utils::max_epoch_credits, ClusterHistory, EpochCredits,
+    MerkleRootUploadAuthority, ValidatorHistory,
 };
 
 use crate::{
@@ -336,10 +336,6 @@ pub fn validator_score(
         slots_per_epoch,
     );
 
-    let total_blocks_window = cluster
-        .history
-        .total_blocks_range(epoch_credits_start, epoch_credits_end);
-
     let commission_window = validator.history.commission_range(
         current_epoch
             .checked_sub(params.commission_range)
@@ -358,7 +354,6 @@ pub fn validator_score(
     let (vote_credits_ratio, delinquency_score, delinquency_ratio, delinquency_epoch) =
         calculate_scorable_epoch_credits(
             &normalized_epoch_credits_window,
-            &total_blocks_window,
             epoch_credits_start,
             params.scoring_delinquency_threshold_ratio,
         )?;
@@ -524,8 +519,12 @@ pub fn calculate_epoch_credits(
     }
 
     // Get average of total blocks in window, ignoring values where upload was missed
-    let average_blocks =
-        total_blocks_window.iter().filter_map(|&i| i).sum::<u32>() as f64 / nonzero_blocks as f64;
+    let average_blocks = total_blocks_window
+        .iter()
+        .filter_map(|&i| i)
+        .map(u64::from)
+        .sum::<u64>() as f64
+        / nonzero_blocks as f64;
 
     // Delinquency heuristic - not actual delinquency
     let mut delinquency_score = 1u8;
@@ -554,7 +553,7 @@ pub fn calculate_epoch_credits(
     }
 
     let normalized_vote_credits_ratio =
-        average_vote_credits / (average_blocks * (TVC_MULTIPLIER as f64));
+        average_vote_credits / (average_blocks * u64::from(TVC_MULTIPLIER) as f64);
 
     Ok((
         normalized_vote_credits_ratio,
@@ -881,6 +880,9 @@ pub struct InstantUnstakeDetails {
 
 /// Method to calculate if a validator should be unstaked instantly this epoch.
 /// Before running, checks are needed on cluster and validator history to be updated this epoch past the halfway point of the epoch.
+///
+/// Alpenglow votes can only be counted once an epoch's inflation rewards are paid out, so after the
+/// migration the validator is judged by the previous, complete epoch instead of the current one
 pub fn instant_unstake_validator(
     validator: &ValidatorHistory,
     cluster: &ClusterHistory,
@@ -918,15 +920,13 @@ pub fn instant_unstake_validator(
         .unwrap_or(0);
 
     /////// Component calculations ///////
-    // Alpenglow votes can only be counted once an epoch's inflation rewards are paid out, so after the
-    // migration the validator is judged by the previous, complete epoch instead of the current one
     let previous_alpenglow_epoch = current_epoch.checked_sub(1).filter(|&epoch| {
         cluster
             .history
             .epoch_range(epoch, epoch)
             .first()
             .and_then(|entry| *entry)
-            .is_some_and(|entry| entry.is_alpenglow == 1)
+            .is_some_and(|entry| entry.is_alpenglow.eq(&1))
     });
     let (delinquency_check, epoch_credits_latest, total_blocks_latest) =
         match previous_alpenglow_epoch {
@@ -1027,9 +1027,10 @@ fn calculate_alpenglow_instant_unstake_delinquency(
         .unwrap_or(0);
 
     match epoch_credits.first() {
-        Some(EpochCredits::Scored(credits)) if total_blocks > 0 => {
-            let credits = credits.unwrap_or(0);
-            let ratio = credits as f64 / (total_blocks as f64 * TVC_MULTIPLIER as f64);
+        Some(&EpochCredits::Scored(ratio)) => {
+            // Reported on the tower credit scale, so the emitted details stay comparable to the
+            // pre-migration ones
+            let credits = (ratio * max_epoch_credits(total_blocks) as f64) as u32;
             (
                 ratio < instant_unstake_delinquency_threshold_ratio,
                 credits,
@@ -1230,11 +1231,11 @@ mod tests {
                 SLOTS_PER_EPOCH
             ),
             vec![
-                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
-                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Scored(1.),
+                EpochCredits::Scored(1.),
                 EpochCredits::Unscorable,
-                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
-                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
+                EpochCredits::Scored(1.),
+                EpochCredits::Scored(1.),
             ]
         );
     }
@@ -1264,10 +1265,7 @@ mod tests {
                 0,
                 SLOTS_PER_EPOCH
             ),
-            vec![
-                EpochCredits::Scored(Some(1_000 * TVC_MULTIPLIER)),
-                EpochCredits::Unscorable
-            ]
+            vec![EpochCredits::Scored(1.), EpochCredits::Unscorable]
         );
 
         // Copied before uncapped credits were recorded
@@ -1293,7 +1291,7 @@ mod tests {
                 0,
                 SLOTS_PER_EPOCH
             ),
-            vec![EpochCredits::Scored(None)]
+            vec![EpochCredits::Scored(0.)]
         );
     }
 
@@ -1309,7 +1307,7 @@ mod tests {
                 SLOTS_PER_EPOCH,
                 0.7
             ),
-            (false, 1_000 * TVC_MULTIPLIER, TOTAL_BLOCKS)
+            (false, TOTAL_BLOCKS * TVC_MULTIPLIER, TOTAL_BLOCKS)
         );
 
         // Earned only half its expected share
@@ -1323,7 +1321,7 @@ mod tests {
                 SLOTS_PER_EPOCH,
                 0.7
             ),
-            (true, 500 * TVC_MULTIPLIER, TOTAL_BLOCKS)
+            (true, TOTAL_BLOCKS * TVC_MULTIPLIER / 2, TOTAL_BLOCKS)
         );
 
         // The migration epoch can't be scored, so it's no reason to unstake
