@@ -326,6 +326,11 @@ impl Parameters {
             && (epoch == migration_epoch || epoch == migration_epoch.saturating_add(1))
     }
 
+    /// Whether `epoch` earns alpenglow reward lamports rather than tower vote credits.
+    pub fn is_alpenglow_epoch(&self, epoch: u16) -> bool {
+        self.alpenglow_migration_epoch != u16::MAX && epoch > self.alpenglow_migration_epoch
+    }
+
     /// Merges the updated parameters with the current parameters and validates them
     pub fn get_valid_updated_parameters(
         self,

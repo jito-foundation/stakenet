@@ -68,7 +68,6 @@ mod tests {
 
     #[test]
     fn test_scorable_epoch_credits_skips_transition_epochs() {
-        // Epochs 100..=102, with the migration declared at 101, so 101 and 102 are skipped
         let window = [
             EpochCreditsRatio::Scored(1.),
             EpochCreditsRatio::Scored(0.),
@@ -115,7 +114,6 @@ mod tests {
 
     #[test]
     fn test_scorable_epoch_credits_skips_unscorable_epochs() {
-        // The unscorable epoch is neither averaged in nor treated as delinquent
         let window = [
             EpochCreditsRatio::Scored(1.),
             EpochCreditsRatio::Unscorable,
@@ -127,7 +125,6 @@ mod tests {
         assert_eq!(delinquency_score, 1);
         assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
 
-        // Delinquency epochs stay aligned to the real epoch numbers despite the skip
         let window = [
             EpochCreditsRatio::Unscorable,
             EpochCreditsRatio::Scored(1.),
