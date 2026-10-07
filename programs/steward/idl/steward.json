@@ -5448,9 +5448,9 @@
             }
           },
           {
-            "name": "epoch_credits_uncapped",
+            "name": "reward_lamports",
             "docs": [
-              "`epoch_credits` without the `MAX_EPOCH_CREDITS` cap.",
+              "`reward_lamports` without the `MAX_EPOCH_CREDITS` cap.",
               "Vote credits in tower epochs, vote reward lamports in alpenglow epochs."
             ],
             "type": "u64"
