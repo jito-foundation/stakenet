@@ -35,43 +35,34 @@ pub fn calculate_instant_unstake_delinquency(
         return Ok(false);
     }
 
-    let previous_epoch_era = current_epoch.checked_sub(1).and_then(|epoch| {
-        cluster
-            .history
-            .epoch_range(epoch, epoch)
-            .first()
-            .and_then(|entry| *entry)
-            .map(|entry| (epoch, entry.is_alpenglow_activated().unwrap_or(false)))
-    });
+    let Some(previous_epoch) = current_epoch.checked_sub(1) else {
+        return Ok(false);
+    };
 
-    match previous_epoch_era {
-        Some((epoch, true)) => {
-            let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
-                cluster,
-                epoch,
-                epoch,
-                tvc_activation_epoch,
-                slots_per_epoch,
-                params.alpenglow_migration_epoch,
-            );
+    if params.is_alpenglow_epoch(current_epoch) {
+        let epoch_credits_ratio = validator.history.epoch_credits_ratio_range(
+            cluster,
+            previous_epoch,
+            previous_epoch,
+            tvc_activation_epoch,
+            slots_per_epoch,
+            params.alpenglow_migration_epoch,
+        );
 
-            Ok(match epoch_credits_ratio.first() {
-                Some(&EpochCreditsRatio::Scored(ratio)) => {
-                    ratio < instant_unstake_delinquency_threshold_ratio
-                }
-                // An epoch that can't be scored is no reason to unstake
-                _ => false,
-            })
-        }
-        Some((_, false)) => calculate_instant_unstake_tower_delinquency(
+        Ok(match epoch_credits_ratio.first() {
+            Some(&EpochCreditsRatio::Scored(ratio)) => {
+                ratio < instant_unstake_delinquency_threshold_ratio
+            }
+            _ => false,
+        })
+    } else {
+        calculate_instant_unstake_tower_delinquency(
             total_blocks_latest,
             cluster_history_slot_index,
             epoch_credits_latest,
             validator_history_slot_index,
             instant_unstake_delinquency_threshold_ratio,
-        ),
-        // No entry for the previous epoch, so there is no era to judge by
-        None => Ok(false),
+        )
     }
 }
 
@@ -88,8 +79,6 @@ pub fn calculate_instant_unstake_tower_delinquency(
         return Err(StewardError::ArithmeticError.into());
     }
 
-    // Operands are widened to `u64` before converting: the LLVM miscompile affecting these
-    // keeper-written values applies to `u32`-to-float conversions, not `u64`
     let blocks_produced_rate =
         u64::from(total_blocks_latest) as f64 / cluster_history_slot_index as f64;
     let vote_credits_rate =
@@ -207,20 +196,22 @@ mod tests {
         }
     }
 
-    /// Parameters with no alpenglow migration declared
-    fn params() -> Parameters {
+    /// Parameters declaring the migration at `alpenglow_migration_epoch`, or `u16::MAX` for a
+    /// cluster that hasn't migrated
+    fn params(alpenglow_migration_epoch: u16) -> Parameters {
         let mut params = Parameters::zeroed();
         params.instant_unstake_delinquency_threshold_ratio = THRESHOLD;
-        params.alpenglow_migration_epoch = u16::MAX;
+        params.alpenglow_migration_epoch = alpenglow_migration_epoch;
         params
     }
 
+    /// `migrating_history` migrates in epoch 12, so that is the declared migration epoch
     fn check(
         validator: &ValidatorHistory,
         cluster: &ClusterHistory,
         current_epoch: u16,
     ) -> Result<bool> {
-        check_with(validator, cluster, &params(), current_epoch)
+        check_with(validator, cluster, &params(12), current_epoch)
     }
 
     fn check_with(
@@ -245,7 +236,6 @@ mod tests {
 
     #[test]
     fn test_alpenglow_epoch_judged_by_previous_epoch() {
-        // Epoch 14 is alpenglow and so is 13, the epoch it is judged by
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         assert!(!check(&validator, &cluster, 14).unwrap());
     }
@@ -253,7 +243,6 @@ mod tests {
     #[test]
     fn test_alpenglow_epoch_unstakes_when_under_threshold() {
         let (mut validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        // Earned only half its expected share in epoch 13
         validator
             .history
             .arr_mut()
@@ -266,38 +255,47 @@ mod tests {
 
     #[test]
     fn test_migration_epoch_is_not_judged() {
-        // Epoch 13 is the first alpenglow epoch, so epoch 12 is the migration epoch. Its credits
-        // mix tower vote credits with alpenglow reward lamports, and the previous epoch 11 is
-        // tower, so neither calculator applies.
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         assert!(!check(&validator, &cluster, 13).unwrap());
 
-        // Even a validator that looks delinquent by the tower measure is not unstaked, because the
-        // measurement itself is meaningless mid-migration
         let (validator, cluster) = migrating_history(0);
         assert!(!check(&validator, &cluster, 13).unwrap());
     }
 
     #[test]
     fn test_tower_epoch_uses_the_current_epoch() {
-        // Epochs 10 and 11 are tower with the era unrecorded, which is how every pre-migration
-        // epoch looks. A validator voting at the cluster's block rate is not delinquent.
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         assert!(!check(&validator, &cluster, 11).unwrap());
+
+        let (validator, cluster) = migrating_history(0);
+        assert!(check(&validator, &cluster, 11).unwrap());
     }
 
     #[test]
     fn test_missing_previous_epoch_is_not_judged() {
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        // Nothing recorded before epoch 10, so epoch 10 has no previous entry to read an era from
         assert!(!check(&validator, &cluster, 10).unwrap());
+    }
+
+    #[test]
+    fn test_alpenglow_epoch_judged_before_its_era_is_recorded() {
+        let (mut validator, mut cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
+        apply_oracle_lag(&mut cluster, 13);
+        validator
+            .history
+            .arr_mut()
+            .iter_mut()
+            .find(|entry| entry.epoch == 13)
+            .unwrap()
+            .epoch_credits_uncapped = EXPECTED_LAMPORTS / 2;
+
+        assert!(check(&validator, &cluster, 14).unwrap());
     }
 
     #[test]
     fn test_declared_transition_epochs_are_never_unstaked() {
         let (mut validator, mut cluster) = migrating_history(0);
-        let mut params = params();
-        params.alpenglow_migration_epoch = 12;
+        let params = params(12);
 
         for epoch in [12, 13] {
             apply_oracle_lag(&mut cluster, epoch);
@@ -320,10 +318,11 @@ mod tests {
     }
 
     #[test]
-    fn test_steady_state_tower_still_judged_under_oracle_lag() {
+    fn test_cluster_that_never_migrates_is_still_judged() {
+        // With no migration declared, every epoch is tower and the tower measure keeps applying
         let (mut validator, mut cluster) = migrating_history(0);
         apply_oracle_lag(&mut cluster, 11);
-        // Earned nothing this epoch while the cluster produced blocks
+
         for entry in validator
             .history
             .arr_mut()
@@ -334,12 +333,11 @@ mod tests {
             entry.epoch_credits_uncapped = 0;
         }
 
-        assert!(check(&validator, &cluster, 11).unwrap());
+        assert!(check_with(&validator, &cluster, &params(u16::MAX), 11).unwrap());
     }
 
     #[test]
     fn test_tower_delinquency_compares_vote_rate_to_block_rate() {
-        // Voting at the full block rate
         assert!(!calculate_instant_unstake_tower_delinquency(
             1_000,
             SLOTS_PER_EPOCH,
@@ -349,7 +347,6 @@ mod tests {
         )
         .unwrap());
 
-        // Just above the threshold, at 90% of the block rate
         assert!(!calculate_instant_unstake_tower_delinquency(
             1_000,
             SLOTS_PER_EPOCH,
@@ -359,7 +356,6 @@ mod tests {
         )
         .unwrap());
 
-        // Voting at half the block rate
         assert!(calculate_instant_unstake_tower_delinquency(
             1_000,
             SLOTS_PER_EPOCH,
@@ -369,8 +365,6 @@ mod tests {
         )
         .unwrap());
 
-        // Credits saturated at the storage cap read as fully participating rather than
-        // overflowing into a delinquent ratio
         assert!(!calculate_instant_unstake_tower_delinquency(
             1_000,
             SLOTS_PER_EPOCH,
@@ -383,7 +377,6 @@ mod tests {
 
     #[test]
     fn test_tower_delinquency_edge_cases() {
-        // A cluster that has produced no blocks yet is no reason to unstake
         assert!(!calculate_instant_unstake_tower_delinquency(
             0,
             SLOTS_PER_EPOCH,
@@ -393,7 +386,6 @@ mod tests {
         )
         .unwrap());
 
-        // A validator that earned nothing is delinquent
         assert!(calculate_instant_unstake_tower_delinquency(
             1_000,
             SLOTS_PER_EPOCH,
@@ -403,7 +395,6 @@ mod tests {
         )
         .unwrap());
 
-        // Neither history has been updated this epoch, so there is no rate to compare
         assert!(calculate_instant_unstake_tower_delinquency(
             1_000,
             0,
