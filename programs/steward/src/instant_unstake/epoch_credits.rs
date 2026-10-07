@@ -142,14 +142,16 @@ mod tests {
         }
     }
 
-    /// Epochs 10 and 11 are tower, 12 is the migration epoch, and 13 and 14 are alpenglow. The
-    /// validator earns its full expected share in every epoch, and `is_alpenglow` is left
-    /// unrecorded for the tower epochs, as it is on a cluster that hasn't migrated.
+    /// The cluster migrates in epoch 10, so epochs 10 and 11 are the transition epochs and 12
+    /// onward are alpenglow. The validator earns `tower_credits` in tower epochs and its full
+    /// expected share in alpenglow ones.
+    const MIGRATION_EPOCH: u16 = 10;
+
     fn migrating_history(tower_credits: u32) -> (ValidatorHistory, ClusterHistory) {
         let mut validator = validator_history();
         let mut cluster = cluster_history();
-        for epoch in 10..=14u16 {
-            let is_alpenglow = epoch >= 13;
+        for epoch in 8..=14u16 {
+            let is_alpenglow = epoch > MIGRATION_EPOCH;
             validator.history.push(ValidatorHistoryEntry {
                 epoch,
                 epoch_credits: if is_alpenglow {
@@ -205,13 +207,12 @@ mod tests {
         params
     }
 
-    /// `migrating_history` migrates in epoch 12, so that is the declared migration epoch
     fn check(
         validator: &ValidatorHistory,
         cluster: &ClusterHistory,
         current_epoch: u16,
     ) -> Result<bool> {
-        check_with(validator, cluster, &params(12), current_epoch)
+        check_with(validator, cluster, &params(MIGRATION_EPOCH), current_epoch)
     }
 
     fn check_with(
@@ -220,6 +221,15 @@ mod tests {
         params: &Parameters,
         current_epoch: u16,
     ) -> Result<bool> {
+        let epoch_credits_latest = validator
+            .history
+            .epoch_range(current_epoch, current_epoch)
+            .first()
+            .and_then(|entry| *entry)
+            .map(|entry| entry.epoch_credits)
+            .filter(|credits| *credits != ValidatorHistoryEntry::default().epoch_credits)
+            .unwrap_or(0);
+
         calculate_instant_unstake_delinquency(
             validator,
             cluster,
@@ -229,7 +239,7 @@ mod tests {
             SLOTS_PER_EPOCH,
             TOTAL_BLOCKS,
             SLOTS_PER_EPOCH / 2,
-            u64::from(TOTAL_BLOCKS).min(u64::from(u32::MAX)) as u32 * TVC_MULTIPLIER,
+            epoch_credits_latest,
             SLOTS_PER_EPOCH / 2,
         )
     }
@@ -255,26 +265,36 @@ mod tests {
 
     #[test]
     fn test_migration_epoch_is_not_judged() {
+        // The migration epoch mixes the two eras' credits, so neither measure applies — not even
+        // for a validator that earned nothing
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        assert!(!check(&validator, &cluster, 13).unwrap());
+        assert!(!check(&validator, &cluster, MIGRATION_EPOCH).unwrap());
 
         let (validator, cluster) = migrating_history(0);
-        assert!(!check(&validator, &cluster, 13).unwrap());
+        assert!(!check(&validator, &cluster, MIGRATION_EPOCH).unwrap());
+    }
+
+    #[test]
+    fn test_first_full_alpenglow_epoch_is_judged_by_the_migration_epoch() {
+        // The epoch after the migration holds pure reward lamports, so it is measured normally.
+        // It is judged by the migration epoch, which is unscorable, so nothing is unstaked.
+        let (validator, cluster) = migrating_history(0);
+        assert!(!check(&validator, &cluster, MIGRATION_EPOCH + 1).unwrap());
     }
 
     #[test]
     fn test_tower_epoch_uses_the_current_epoch() {
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        assert!(!check(&validator, &cluster, 11).unwrap());
+        assert!(!check(&validator, &cluster, 9).unwrap());
 
         let (validator, cluster) = migrating_history(0);
-        assert!(check(&validator, &cluster, 11).unwrap());
+        assert!(check(&validator, &cluster, 9).unwrap());
     }
 
     #[test]
     fn test_missing_previous_epoch_is_not_judged() {
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        assert!(!check(&validator, &cluster, 10).unwrap());
+        assert!(!check(&validator, &cluster, 8).unwrap());
     }
 
     #[test]
@@ -293,47 +313,13 @@ mod tests {
     }
 
     #[test]
-    fn test_declared_transition_epochs_are_never_unstaked() {
-        let (mut validator, mut cluster) = migrating_history(0);
-        let params = params(12);
-
-        for epoch in [12, 13] {
-            apply_oracle_lag(&mut cluster, epoch);
-            for entry in validator
-                .history
-                .arr_mut()
-                .iter_mut()
-                .filter(|entry| entry.epoch >= epoch)
-            {
-                entry.epoch_credits = ValidatorHistoryEntry::default().epoch_credits;
-                entry.epoch_credits_uncapped =
-                    ValidatorHistoryEntry::default().epoch_credits_uncapped;
-            }
-
-            assert!(
-                !check_with(&validator, &cluster, &params, epoch).unwrap(),
-                "transition epoch {epoch} must not be unstaked"
-            );
-        }
-    }
-
-    #[test]
     fn test_cluster_that_never_migrates_is_still_judged() {
-        // With no migration declared, every epoch is tower and the tower measure keeps applying
-        let (mut validator, mut cluster) = migrating_history(0);
-        apply_oracle_lag(&mut cluster, 11);
+        // With no migration declared every epoch is tower, so epoch 9's own vote credits decide
+        let (validator, cluster) = migrating_history(0);
+        assert!(check_with(&validator, &cluster, &params(u16::MAX), 9).unwrap());
 
-        for entry in validator
-            .history
-            .arr_mut()
-            .iter_mut()
-            .filter(|entry| entry.epoch >= 11)
-        {
-            entry.epoch_credits = 0;
-            entry.epoch_credits_uncapped = 0;
-        }
-
-        assert!(check_with(&validator, &cluster, &params(u16::MAX), 11).unwrap());
+        let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
+        assert!(!check_with(&validator, &cluster, &params(u16::MAX), 9).unwrap());
     }
 
     #[test]
