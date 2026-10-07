@@ -873,7 +873,8 @@ mod validator_score_integration_tests {
             });
         }
 
-        let config = create_test_config();
+        let mut config = create_test_config();
+        config.parameters.alpenglow_migration_epoch = MIGRATION_EPOCH;
         let result = validator_score(
             &validator,
             &cluster,
