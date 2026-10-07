@@ -294,21 +294,19 @@ impl ValidatorHistoryEntry {
 
         let reward_stake_lamports = match previous_entry {
             Some(previous)
-                if previous.epoch_stake_lamports != default_entry.epoch_stake_lamports =>
+                if previous
+                    .epoch_stake_lamports
+                    .ne(&default_entry.epoch_stake_lamports) =>
             {
                 previous.epoch_stake_lamports
-            }
-            Some(previous)
-                if previous.activated_stake_lamports != default_entry.activated_stake_lamports =>
-            {
-                previous.activated_stake_lamports
             }
             _ => return EpochCreditsRatio::Unscorable,
         };
         let total_reward_stake_lamports = match previous_cluster_entry {
             Some(previous)
-                if previous.total_epoch_stake_lamports
-                    != default_cluster_entry.total_epoch_stake_lamports =>
+                if previous
+                    .total_epoch_stake_lamports
+                    .ne(&default_cluster_entry.total_epoch_stake_lamports) =>
             {
                 previous.total_epoch_stake_lamports
             }
