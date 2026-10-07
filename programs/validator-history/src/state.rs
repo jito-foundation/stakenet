@@ -200,9 +200,9 @@ pub struct ValidatorHistoryEntry {
 
     pub padding1: [u8; 6],
 
-    /// `epoch_credits` without the `MAX_EPOCH_CREDITS` cap.
+    /// `reward_lamports` without the `MAX_EPOCH_CREDITS` cap.
     /// Vote credits in tower epochs, vote reward lamports in alpenglow epochs.
-    pub epoch_credits_uncapped: u64,
+    pub reward_lamports: u64,
 
     /// Stake delegated to this vote account in this epoch, read with the `sol_get_epoch_stake` syscall.
     /// Alpenglow computes the next epoch's vote rewards against this stake.
@@ -243,7 +243,7 @@ impl Default for ValidatorHistoryEntry {
             priority_fee_merkle_root_upload_authority: MerkleRootUploadAuthority::Unset,
             is_bam_connected: u8::MAX,
             padding1: [u8::MAX; 6],
-            epoch_credits_uncapped: u64::MAX,
+            reward_lamports: u64::MAX,
             epoch_stake_lamports: u64::MAX,
             padding2: [u8::MAX; 24],
         }
@@ -947,7 +947,7 @@ impl ValidatorHistory {
             let entry = &mut self.history.arr[position];
             if let Some(&epoch_credits) = credits_by_epoch.get(&entry.epoch) {
                 entry.epoch_credits = epoch_credits.min(u64::from(MAX_EPOCH_CREDITS)) as u32;
-                entry.epoch_credits_uncapped = epoch_credits;
+                entry.reward_lamports = epoch_credits;
             }
             if entry.epoch == min_epoch {
                 break;
