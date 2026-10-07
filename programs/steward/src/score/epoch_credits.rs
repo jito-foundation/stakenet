@@ -67,23 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn test_scorable_epoch_credits_skips_transition_epochs() {
-        let window = [
-            EpochCreditsRatio::Scored(1.),
-            EpochCreditsRatio::Scored(0.),
-            EpochCreditsRatio::Scored(0.),
-        ];
-        let mut params = params(0.97);
-        params.alpenglow_migration_epoch = 101;
-
-        let (average_ratio, delinquency_score, _, delinquency_epoch) =
-            calculate_scorable_epoch_credits(&window, &params, 100).unwrap();
-        assert_eq!(average_ratio, 1.);
-        assert_eq!(delinquency_score, 1);
-        assert_eq!(delinquency_epoch, EPOCH_DEFAULT);
-    }
-
-    #[test]
     fn test_scorable_epoch_credits_averages_scored_epochs() {
         let window = [
             EpochCreditsRatio::Scored(1.),

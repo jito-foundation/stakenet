@@ -665,10 +665,7 @@ impl CircBuf {
                     return EpochCreditsRatio::Unscorable;
                 };
 
-                if migration_declared
-                    && (epoch == alpenglow_migration_epoch
-                        || epoch == alpenglow_migration_epoch.saturating_add(1))
-                {
+                if migration_declared && epoch == alpenglow_migration_epoch {
                     return EpochCreditsRatio::Unscorable;
                 }
 

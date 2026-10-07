@@ -1097,6 +1097,8 @@ mod tests {
 
     /// Epochs 10 and 11 are tower, 12 is the migration epoch, and 13 and 14 are alpenglow. The
     /// validator earns its full expected share in every epoch.
+    const MIGRATION_EPOCH: u16 = 12;
+
     fn migrating_history() -> (ValidatorHistory, ClusterHistory) {
         let mut validator = validator_history();
         let mut cluster = cluster_history();
@@ -1138,7 +1140,7 @@ mod tests {
                 14,
                 0,
                 SLOTS_PER_EPOCH,
-                u16::MAX
+                MIGRATION_EPOCH
             ),
             vec![
                 EpochCreditsRatio::Scored(1.),
@@ -1173,7 +1175,7 @@ mod tests {
                 14,
                 0,
                 SLOTS_PER_EPOCH,
-                u16::MAX
+                MIGRATION_EPOCH
             ),
             vec![EpochCreditsRatio::Scored(1.), EpochCreditsRatio::Unscorable]
         );
@@ -1186,7 +1188,7 @@ mod tests {
                 13,
                 0,
                 SLOTS_PER_EPOCH,
-                u16::MAX
+                MIGRATION_EPOCH
             ),
             vec![EpochCreditsRatio::Unscorable]
         );
@@ -1199,7 +1201,7 @@ mod tests {
                 13,
                 0,
                 SLOTS_PER_EPOCH,
-                u16::MAX
+                MIGRATION_EPOCH
             ),
             vec![EpochCreditsRatio::Scored(0.)]
         );
@@ -1213,7 +1215,7 @@ mod tests {
     ) -> Option<f64> {
         match validator
             .history
-            .epoch_credits_ratio_range(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH, u16::MAX)
+            .epoch_credits_ratio_range(cluster, epoch, epoch, 0, SLOTS_PER_EPOCH, MIGRATION_EPOCH)
             .first()
         {
             Some(&EpochCreditsRatio::Scored(ratio)) => Some(ratio),

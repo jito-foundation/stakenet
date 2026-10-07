@@ -320,13 +320,23 @@ impl Parameters {
     }
 
     /// Whether `epoch` holds credits that can't be compared against either era's denominator.
+    ///
+    /// Only the migration epoch itself qualifies: it mixes tower vote credits earned before the
+    /// switch with alpenglow reward lamports earned after, and the sum means nothing in either
+    /// unit. Every later epoch holds pure reward lamports and is measured normally.
+    ///
+    /// Always false until `alpenglow_migration_epoch` is set.
     pub fn is_alpenglow_transition_epoch(&self, epoch: u16) -> bool {
-        let migration_epoch = self.alpenglow_migration_epoch;
-        migration_epoch != u16::MAX
-            && (epoch == migration_epoch || epoch == migration_epoch.saturating_add(1))
+        self.alpenglow_migration_epoch != u16::MAX && epoch == self.alpenglow_migration_epoch
     }
 
     /// Whether `epoch` earns alpenglow reward lamports rather than tower vote credits.
+    ///
+    /// Cluster history can't answer this for a recent epoch, because an epoch's era is only
+    /// recorded once its inflation rewards are paid, during the epoch after it. The declared
+    /// migration epoch answers it immediately.
+    ///
+    /// Always false until `alpenglow_migration_epoch` is set.
     pub fn is_alpenglow_epoch(&self, epoch: u16) -> bool {
         self.alpenglow_migration_epoch != u16::MAX && epoch > self.alpenglow_migration_epoch
     }
