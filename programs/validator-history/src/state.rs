@@ -286,7 +286,7 @@ impl ValidatorHistoryEntry {
         let default_entry = ValidatorHistoryEntry::default();
         let default_cluster_entry = ClusterHistoryEntry::default();
 
-        if self.epoch_credits_uncapped == default_entry.epoch_credits_uncapped {
+        if self.reward_lamports.eq(&default_entry.reward_lamports) {
             return if self.epoch_credits == default_entry.epoch_credits {
                 EpochCreditsRatio::Scored(0.)
             } else {
@@ -333,9 +333,7 @@ impl ValidatorHistoryEntry {
             return EpochCreditsRatio::Unscorable;
         };
 
-        EpochCreditsRatio::Scored(
-            self.epoch_credits_uncapped as f64 / expected_lamports as u64 as f64,
-        )
+        EpochCreditsRatio::Scored(self.reward_lamports as f64 / expected_lamports as u64 as f64)
     }
 }
 
