@@ -11,8 +11,11 @@ use crate::{errors::StewardError, Parameters};
 ///   captured, taken from the previous epoch because alpenglow rewards aren't paid until an epoch
 ///   ends.
 /// - A tower epoch is judged by the current epoch's vote credit rate.
-/// - The transition epochs are judged by neither, because their credits can't be compared against
-///   either era's denominator. See [`Parameters::is_alpenglow_transition_epoch`].
+/// - The migration epoch is judged by neither, because its credits mix the two eras and can't be
+///   compared against either denominator. See [`Parameters::is_alpenglow_transition_epoch`].
+///
+/// The epoch right after the migration needs no special case: it holds pure reward lamports, and
+/// it is judged by the migration epoch, which is unscorable, so nothing is unstaked.
 ///
 /// Every other instant unstake trigger still applies while delinquency is skipped.
 #[allow(clippy::too_many_arguments)]

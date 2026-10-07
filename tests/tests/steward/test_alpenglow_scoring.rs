@@ -35,9 +35,14 @@ mod tests {
     /// The keeper packs 5 `compute_score` instructions into a 1.4M compute unit transaction
     const COMPUTE_UNITS_PER_INSTRUCTION: u64 = 1_400_000 / 5;
 
-    /// Turns every epoch after the first into an alpenglow epoch in which the validator captured
-    /// `votes(epoch)` out of `TOTAL_BLOCKS` of the rewards it was expected to earn. `votes` equal to
-    /// `TOTAL_BLOCKS` is a flawless epoch; scoring sees no split between vote and leader rewards.
+    /// The cluster migrates in this epoch, so every later epoch is alpenglow. It can't be epoch 0,
+    /// which `Parameters::alpenglow_migration_epoch` reads as "not set".
+    const MIGRATION_EPOCH: u16 = 1;
+
+    /// Turns every epoch after the migration into an alpenglow epoch in which the validator
+    /// captured `votes(epoch)` out of `TOTAL_BLOCKS` of the rewards it was expected to earn.
+    /// `votes` equal to `TOTAL_BLOCKS` is a flawless epoch; scoring sees no split between vote and
+    /// leader rewards.
     fn to_alpenglow(validator: &mut ValidatorHistory, votes: impl Fn(u16) -> u64) {
         for entry in validator
             .history
@@ -46,7 +51,7 @@ mod tests {
             .filter(|entry| entry.epoch <= 20)
         {
             entry.epoch_stake_lamports = REWARD_STAKE;
-            if entry.epoch > 0 {
+            if entry.epoch > MIGRATION_EPOCH {
                 entry.reward_lamports = EXPECTED_LAMPORTS * votes(entry.epoch) / TOTAL_BLOCKS;
                 entry.epoch_credits = entry.reward_lamports.min(u64::from(u32::MAX - 1)) as u32;
             }
@@ -62,7 +67,7 @@ mod tests {
         {
             entry.total_epoch_stake_lamports = TOTAL_REWARD_STAKE;
             entry.total_inflation_rewards = INFLATION_REWARDS;
-            entry.is_alpenglow = (entry.epoch > 0) as u8;
+            entry.is_alpenglow = (entry.epoch > MIGRATION_EPOCH) as u8;
         }
     }
 
@@ -162,7 +167,8 @@ mod tests {
                     directed_stake_unstake_cap_bps: Some(10_000),
                     jito_bam_minimum_epochs: Some(0),
                     jito_bam_window_epochs: Some(0),
-                    alpenglow_migration_epoch: None,
+                    // `to_alpenglow_cluster` migrates in epoch 1, so epochs 2 onward are alpenglow
+                    alpenglow_migration_epoch: Some(MIGRATION_EPOCH),
                 }),
                 None,
             )
