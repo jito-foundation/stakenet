@@ -8,8 +8,9 @@ use validator_history::utils::cast_epoch;
 
 use crate::{
     constants::{
-        BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN, EPOCH_PROGRESS_MAX,
-        MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
+        ALPENGLOW_MIGRATION_EPOCH, BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN,
+        EPOCH_PROGRESS_MAX, MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX,
+        VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
     },
     errors::StewardError,
 };
@@ -319,26 +320,36 @@ impl Parameters {
         u64::from_le_bytes(self.undirected_stake_ceiling_lamports)
     }
 
+    /// The epoch the cluster migrates from tower to alpenglow.
+    ///
+    /// Falls back to [`ALPENGLOW_MIGRATION_EPOCH`] when the parameter is zero, which is what a
+    /// `Config` written before this field existed reads as: it was carved out of padding bytes
+    /// that were initialized to zero. Epoch zero is never a real migration epoch, so zero can
+    /// safely mean "not set".
+    pub fn alpenglow_migration_epoch(&self) -> u16 {
+        if self.alpenglow_migration_epoch == 0 {
+            ALPENGLOW_MIGRATION_EPOCH
+        } else {
+            self.alpenglow_migration_epoch
+        }
+    }
+
     /// Whether `epoch` holds credits that can't be compared against either era's denominator.
     ///
     /// Only the migration epoch itself qualifies: it mixes tower vote credits earned before the
     /// switch with alpenglow reward lamports earned after, and the sum means nothing in either
     /// unit. Every later epoch holds pure reward lamports and is measured normally.
-    ///
-    /// Always false until `alpenglow_migration_epoch` is set.
     pub fn is_alpenglow_transition_epoch(&self, epoch: u16) -> bool {
-        self.alpenglow_migration_epoch != u16::MAX && epoch == self.alpenglow_migration_epoch
+        epoch == self.alpenglow_migration_epoch()
     }
 
     /// Whether `epoch` earns alpenglow reward lamports rather than tower vote credits.
     ///
     /// Cluster history can't answer this for a recent epoch, because an epoch's era is only
-    /// recorded once its inflation rewards are paid, during the epoch after it. The declared
-    /// migration epoch answers it immediately.
-    ///
-    /// Always false until `alpenglow_migration_epoch` is set.
+    /// recorded once its inflation rewards are paid, during the epoch after it. The migration
+    /// epoch answers it immediately.
     pub fn is_alpenglow_epoch(&self, epoch: u16) -> bool {
-        self.alpenglow_migration_epoch != u16::MAX && epoch > self.alpenglow_migration_epoch
+        epoch > self.alpenglow_migration_epoch()
     }
 
     /// Merges the updated parameters with the current parameters and validates them
@@ -704,6 +715,25 @@ mod tests {
 
     const CURRENT_EPOCH: u64 = 1000;
     const SLOTS_PER_EPOCH: u64 = 432_000;
+
+    #[test]
+    fn test_alpenglow_migration_epoch_falls_back_when_unset() {
+        let mut params = valid_parameters();
+        params.alpenglow_migration_epoch = 0;
+        assert_eq!(
+            params.alpenglow_migration_epoch(),
+            ALPENGLOW_MIGRATION_EPOCH
+        );
+        assert!(!params.is_alpenglow_epoch(1));
+        assert!(!params.is_alpenglow_transition_epoch(1));
+
+        params.alpenglow_migration_epoch = 1058;
+        assert_eq!(params.alpenglow_migration_epoch(), 1058);
+        assert!(params.is_alpenglow_transition_epoch(1058));
+        assert!(!params.is_alpenglow_epoch(1058));
+        assert!(params.is_alpenglow_epoch(1059));
+        assert!(!params.is_alpenglow_epoch(1057));
+    }
 
     fn valid_parameters() -> Parameters {
         Parameters {

@@ -46,7 +46,7 @@ pub fn calculate_instant_unstake_delinquency(
             previous_epoch,
             tvc_activation_epoch,
             slots_per_epoch,
-            params.alpenglow_migration_epoch,
+            params.alpenglow_migration_epoch(),
         );
 
         Ok(match epoch_credits_ratio.first() {

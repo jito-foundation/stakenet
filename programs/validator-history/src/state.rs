@@ -655,7 +655,6 @@ impl CircBuf {
         let lookback_epoch = start_epoch.saturating_sub(1);
         let validator_history_entries = self.epoch_range(lookback_epoch, end_epoch);
         let cluster_entries = cluster.history.epoch_range(lookback_epoch, end_epoch);
-        let migration_declared = alpenglow_migration_epoch != u16::MAX;
 
         (start_epoch..=end_epoch)
             .zip(tower_credits)
@@ -665,13 +664,16 @@ impl CircBuf {
                     return EpochCreditsRatio::Unscorable;
                 };
 
-                if migration_declared && epoch == alpenglow_migration_epoch {
+                // The migration epoch mixes tower vote credits earned before the switch with
+                // alpenglow reward lamports earned after, and the sum means nothing in either
+                // unit. Every later epoch holds pure lamports and is measured normally.
+                if epoch == alpenglow_migration_epoch {
                     return EpochCreditsRatio::Unscorable;
                 }
 
-                let is_alpenglow = migration_declared && epoch > alpenglow_migration_epoch;
-
-                match is_alpenglow {
+                // Every epoch after the migration is alpenglow, including ones whose own flag the
+                // oracle hasn't written yet
+                match epoch > alpenglow_migration_epoch {
                     true => {
                         let previous_index = index.checked_sub(1);
                         match validator_history_entries[index] {
