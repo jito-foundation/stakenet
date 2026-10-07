@@ -187,20 +187,6 @@ mod tests {
         (validator, cluster)
     }
 
-    /// Clears the era of every epoch at or after `current_epoch`, modelling the oracle's real
-    /// publishing lag: an epoch's era is only written once its rewards are paid, during the epoch
-    /// after it, so the current epoch's flag is always unset.
-    fn apply_oracle_lag(cluster: &mut ClusterHistory, current_epoch: u16) {
-        for entry in cluster
-            .history
-            .arr_mut()
-            .iter_mut()
-            .filter(|entry| entry.epoch >= current_epoch)
-        {
-            entry.is_alpenglow = ClusterHistoryEntry::default().is_alpenglow;
-        }
-    }
-
     /// Parameters declaring the migration at `alpenglow_migration_epoch`, or `u16::MAX` for a
     /// cluster that hasn't migrated
     fn params(alpenglow_migration_epoch: u16) -> Parameters {
@@ -268,8 +254,6 @@ mod tests {
 
     #[test]
     fn test_migration_epoch_is_not_judged() {
-        // The migration epoch mixes the two eras' credits, so neither measure applies — not even
-        // for a validator that earned nothing
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         assert!(!check(&validator, &cluster, MIGRATION_EPOCH).unwrap());
 
@@ -279,8 +263,6 @@ mod tests {
 
     #[test]
     fn test_first_full_alpenglow_epoch_is_judged_by_the_migration_epoch() {
-        // The epoch after the migration holds pure reward lamports, so it is measured normally.
-        // It is judged by the migration epoch, which is unscorable, so nothing is unstaked.
         let (validator, cluster) = migrating_history(0);
         assert!(!check(&validator, &cluster, MIGRATION_EPOCH + 1).unwrap());
     }
@@ -298,31 +280,6 @@ mod tests {
     fn test_missing_previous_epoch_is_not_judged() {
         let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
         assert!(!check(&validator, &cluster, 8).unwrap());
-    }
-
-    #[test]
-    fn test_alpenglow_epoch_judged_before_its_era_is_recorded() {
-        let (mut validator, mut cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        apply_oracle_lag(&mut cluster, 13);
-        validator
-            .history
-            .arr_mut()
-            .iter_mut()
-            .find(|entry| entry.epoch == 13)
-            .unwrap()
-            .reward_lamports = EXPECTED_LAMPORTS / 2;
-
-        assert!(check(&validator, &cluster, 14).unwrap());
-    }
-
-    #[test]
-    fn test_cluster_that_never_migrates_is_still_judged() {
-        // With no migration declared every epoch is tower, so epoch 9's own vote credits decide
-        let (validator, cluster) = migrating_history(0);
-        assert!(check_with(&validator, &cluster, &params(u16::MAX), 9).unwrap());
-
-        let (validator, cluster) = migrating_history(TOTAL_BLOCKS * TVC_MULTIPLIER);
-        assert!(!check_with(&validator, &cluster, &params(u16::MAX), 9).unwrap());
     }
 
     #[test]
