@@ -47,10 +47,8 @@ mod tests {
         {
             entry.epoch_stake_lamports = REWARD_STAKE;
             if entry.epoch > 0 {
-                entry.epoch_credits_uncapped =
-                    EXPECTED_LAMPORTS * votes(entry.epoch) / TOTAL_BLOCKS;
-                entry.epoch_credits =
-                    entry.epoch_credits_uncapped.min(u64::from(u32::MAX - 1)) as u32;
+                entry.reward_lamports = EXPECTED_LAMPORTS * votes(entry.epoch) / TOTAL_BLOCKS;
+                entry.epoch_credits = entry.reward_lamports.min(u64::from(u32::MAX - 1)) as u32;
             }
         }
     }

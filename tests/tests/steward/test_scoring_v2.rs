@@ -854,7 +854,7 @@ mod validator_score_integration_tests {
         // Earns everything it was expected to in every epoch
         let mut validator = create_validator_history();
         for epoch in 0..=20 {
-            let epoch_credits_uncapped = match epoch {
+            let reward_lamports = match epoch {
                 epoch if epoch < MIGRATION_EPOCH => 1000 * u64::from(TVC_MULTIPLIER),
                 // Tower credits for half of the epoch, alpenglow lamports for the other half
                 MIGRATION_EPOCH => 500 * u64::from(TVC_MULTIPLIER) + reward_lamports(500),
@@ -864,8 +864,8 @@ mod validator_score_integration_tests {
                 epoch,
                 commission: 0,
                 mev_commission: 0,
-                epoch_credits: epoch_credits_uncapped.min(u64::from(u32::MAX - 1)) as u32,
-                epoch_credits_uncapped,
+                epoch_credits: reward_lamports.min(u64::from(u32::MAX - 1)) as u32,
+                reward_lamports,
                 epoch_stake_lamports: REWARD_STAKE,
                 vote_account_last_update_slot: 1000,
                 is_superminority: 0,
@@ -895,7 +895,7 @@ mod validator_score_integration_tests {
             .iter_mut()
             .find(|entry| entry.epoch == 17)
             .unwrap()
-            .epoch_credits_uncapped = reward_lamports(500);
+            .reward_lamports = reward_lamports(500);
         let result = validator_score(
             &validator,
             &cluster,
