@@ -5201,15 +5201,15 @@
             }
           },
           {
-            "name": "alpenglow_migration_epoch",
-            "type": {
-              "option": "u16"
-            }
-          },
-          {
             "name": "jito_bam_window_epochs",
             "type": {
               "option": "u8"
+            }
+          },
+          {
+            "name": "alpenglow_migration_epoch",
+            "type": {
+              "option": "u16"
             }
           }
         ]
