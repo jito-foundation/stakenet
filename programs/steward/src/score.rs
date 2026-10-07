@@ -334,7 +334,7 @@ pub fn validator_score(
         epoch_credits_end,
         tvc_activation_epoch,
         slots_per_epoch,
-        params.alpenglow_migration_epoch,
+        params.alpenglow_migration_epoch(),
     );
 
     let commission_window = validator.history.commission_range(
