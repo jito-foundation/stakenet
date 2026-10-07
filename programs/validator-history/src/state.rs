@@ -634,9 +634,11 @@ impl CircBuf {
     ///
     /// `alpenglow_migration_epoch` is the epoch the cluster migrated in, or `u16::MAX` if it hasn't
     /// been declared. It decides each epoch's era: cluster history can't, because an epoch's own
-    /// flag is only written once its rewards are paid, during the epoch after it. The migration
-    /// epoch and the one following it hold credits that can't be measured against either era's
-    /// denominator, so they are unscorable.
+    /// flag is only written once its rewards are paid, during the epoch after it.
+    ///
+    /// The migration epoch itself is unscorable, because its credits mix tower vote credits earned
+    /// before the switch with alpenglow reward lamports earned after, and the sum means nothing in
+    /// either unit. Every later epoch holds pure reward lamports and is measured normally.
     pub fn epoch_credits_ratio_range(
         &self,
         cluster: &ClusterHistory,
@@ -2201,26 +2203,27 @@ mod tests {
     fn test_declared_migration_epoch_decides_the_era() {
         let (validator, cluster) = unflagged_alpenglow_history();
 
-        assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, u16::MAX),
-            vec![EpochCreditsRatio::Unscorable]
-        );
+        let score_epoch_2 = |alpenglow_migration_epoch: u16| {
+            validator.history.epoch_credits_ratio_range(
+                &cluster,
+                2, // start_epoch
+                2, // end_epoch
+                0, // tvc_activation_epoch
+                432_000,
+                alpenglow_migration_epoch,
+            )
+        };
 
-        assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, 1),
-            vec![EpochCreditsRatio::Unscorable]
-        );
+        assert_eq!(score_epoch_2(u16::MAX), vec![EpochCreditsRatio::Unscorable]);
 
-        assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 2, 2, 0, 432_000, 0),
-            vec![EpochCreditsRatio::Scored(1.)]
-        );
+        assert_eq!(score_epoch_2(2), vec![EpochCreditsRatio::Unscorable]);
+
+        for migration_epoch in [0, 1] {
+            assert_eq!(
+                score_epoch_2(migration_epoch),
+                vec![EpochCreditsRatio::Scored(1.)]
+            );
+        }
     }
 
     #[test]
