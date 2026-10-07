@@ -544,8 +544,8 @@ fn formatted_entry(entry: ValidatorHistoryEntry, print_json: bool) -> String {
             format_option(entry_output.is_bam_connected)
         ));
         field_descriptions.push(format!(
-            "Epoch Credits Uncapped: {}",
-            format_option(entry_output.epoch_credits_uncapped)
+            "Reward Lamports: {}",
+            format_option(entry_output.reward_lamports)
         ));
         field_descriptions.push(format!(
             "Epoch Stake Lamports: {}",
