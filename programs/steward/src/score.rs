@@ -1132,9 +1132,14 @@ mod tests {
     fn test_epoch_credits_ratio_range() {
         let (validator, cluster) = migrating_history();
         assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 10, 14, 0, SLOTS_PER_EPOCH, u16::MAX),
+            validator.history.epoch_credits_ratio_range(
+                &cluster,
+                10,
+                14,
+                0,
+                SLOTS_PER_EPOCH,
+                u16::MAX
+            ),
             vec![
                 EpochCreditsRatio::Scored(1.),
                 EpochCreditsRatio::Scored(1.),
@@ -1163,27 +1168,42 @@ mod tests {
         cluster_entry.total_epoch_stake_lamports = u64::MAX;
 
         assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 13, 14, 0, SLOTS_PER_EPOCH, u16::MAX),
+            validator.history.epoch_credits_ratio_range(
+                &cluster,
+                13,
+                14,
+                0,
+                SLOTS_PER_EPOCH,
+                u16::MAX
+            ),
             vec![EpochCreditsRatio::Scored(1.), EpochCreditsRatio::Unscorable]
         );
 
         // Copied before uncapped credits were recorded
         entry_mut(&mut validator, 13).epoch_credits_uncapped = u64::MAX;
         assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH, u16::MAX),
+            validator.history.epoch_credits_ratio_range(
+                &cluster,
+                13,
+                13,
+                0,
+                SLOTS_PER_EPOCH,
+                u16::MAX
+            ),
             vec![EpochCreditsRatio::Unscorable]
         );
 
         // Earned nothing
         entry_mut(&mut validator, 13).epoch_credits = u32::MAX;
         assert_eq!(
-            validator
-                .history
-                .epoch_credits_ratio_range(&cluster, 13, 13, 0, SLOTS_PER_EPOCH, u16::MAX),
+            validator.history.epoch_credits_ratio_range(
+                &cluster,
+                13,
+                13,
+                0,
+                SLOTS_PER_EPOCH,
+                u16::MAX
+            ),
             vec![EpochCreditsRatio::Scored(0.)]
         );
     }

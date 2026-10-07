@@ -4039,11 +4039,19 @@
             "type": "u8"
           },
           {
+            "name": "alpenglow_migration_epoch",
+            "docs": [
+              "The epoch in which the cluster migrated from tower to alpenglow, or `u16::MAX` if it has",
+              "not been set."
+            ],
+            "type": "u16"
+          },
+          {
             "name": "_padding_0",
             "type": {
               "array": [
                 "u8",
-                4
+                2
               ]
             }
           },
@@ -5190,6 +5198,12 @@
             "name": "jito_bam_minimum_epochs",
             "type": {
               "option": "u8"
+            }
+          },
+          {
+            "name": "alpenglow_migration_epoch",
+            "type": {
+              "option": "u16"
             }
           },
           {
