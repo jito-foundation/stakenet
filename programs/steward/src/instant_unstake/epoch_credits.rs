@@ -159,7 +159,7 @@ mod tests {
                 } else {
                     tower_credits
                 },
-                epoch_credits_uncapped: if is_alpenglow {
+                reward_lamports: if is_alpenglow {
                     EXPECTED_LAMPORTS
                 } else {
                     u64::from(tower_credits)
@@ -259,7 +259,7 @@ mod tests {
             .iter_mut()
             .find(|entry| entry.epoch == 13)
             .unwrap()
-            .epoch_credits_uncapped = EXPECTED_LAMPORTS / 2;
+            .reward_lamports = EXPECTED_LAMPORTS / 2;
         assert!(check(&validator, &cluster, 14).unwrap());
     }
 
@@ -307,7 +307,7 @@ mod tests {
             .iter_mut()
             .find(|entry| entry.epoch == 13)
             .unwrap()
-            .epoch_credits_uncapped = EXPECTED_LAMPORTS / 2;
+            .reward_lamports = EXPECTED_LAMPORTS / 2;
 
         assert!(check(&validator, &cluster, 14).unwrap());
     }

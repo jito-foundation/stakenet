@@ -1103,9 +1103,8 @@ mod tests {
         let mut validator = validator_history();
         let mut cluster = cluster_history();
         for epoch in 10..=14u16 {
-            let epoch_credits_uncapped = match epoch {
+            let reward_lamports = match epoch {
                 10 | 11 => u64::from(TOTAL_BLOCKS) * u64::from(TVC_MULTIPLIER),
-                // Tower credits for part of the epoch, plus alpenglow lamports for the rest
                 12 => {
                     u64::from(TOTAL_BLOCKS) / 2 * u64::from(TVC_MULTIPLIER) + reward_lamports(0.5)
                 }
@@ -1113,8 +1112,8 @@ mod tests {
             };
             validator.history.push(ValidatorHistoryEntry {
                 epoch,
-                epoch_credits: epoch_credits_uncapped.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
-                epoch_credits_uncapped,
+                epoch_credits: reward_lamports.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
+                reward_lamports,
                 epoch_stake_lamports: REWARD_STAKE,
                 ..ValidatorHistoryEntry::default()
             });
@@ -1180,7 +1179,7 @@ mod tests {
             vec![EpochCreditsRatio::Scored(1.), EpochCreditsRatio::Unscorable]
         );
 
-        entry_mut(&mut validator, 13).epoch_credits_uncapped = u64::MAX;
+        entry_mut(&mut validator, 13).reward_lamports = u64::MAX;
         assert_eq!(
             validator.history.epoch_credits_ratio_range(
                 &cluster,
@@ -1232,7 +1231,7 @@ mod tests {
         assert_eq!(ratio, 1.);
         assert!(ratio >= threshold);
 
-        entry_mut(&mut validator, 13).epoch_credits_uncapped = reward_lamports(0.5);
+        entry_mut(&mut validator, 13).reward_lamports = reward_lamports(0.5);
         let ratio = alpenglow_unstake_ratio(&validator, &cluster, 13).unwrap();
         assert_eq!(ratio, 0.5);
         assert!(ratio < threshold);
