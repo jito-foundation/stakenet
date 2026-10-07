@@ -180,13 +180,13 @@ impl IdlBuild for UpdateParametersArgs {
                         docs: Default::default(),
                     },
                     IdlField {
-                        name: "alpenglow_migration_epoch".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        name: "jito_bam_window_epochs".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U8)),
                         docs: Default::default(),
                     },
                     IdlField {
-                        name: "jito_bam_window_epochs".to_string(),
-                        ty: IdlType::Option(Box::new(IdlType::U8)),
+                        name: "alpenglow_migration_epoch".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
                         docs: Default::default(),
                     },
                 ])),
