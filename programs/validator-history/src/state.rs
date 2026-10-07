@@ -1801,7 +1801,7 @@ mod tests {
         (
             ValidatorHistoryEntry {
                 epoch: 1,
-                epoch_credits_uncapped: reward_lamports,
+                reward_lamports,
                 epoch_credits: reward_lamports.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
                 ..ValidatorHistoryEntry::default()
             },
@@ -2181,7 +2181,7 @@ mod tests {
         for epoch in 1..=2u16 {
             validator.history.push(ValidatorHistoryEntry {
                 epoch,
-                epoch_credits_uncapped: EXPECTED_LAMPORTS,
+                reward_lamports: EXPECTED_LAMPORTS,
                 epoch_credits: EXPECTED_LAMPORTS.min(u64::from(MAX_EPOCH_CREDITS)) as u32,
                 epoch_stake_lamports: REWARD_STAKE,
                 ..ValidatorHistoryEntry::default()
