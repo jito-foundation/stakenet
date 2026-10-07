@@ -263,9 +263,9 @@ async fn test_copy_vote_account_alpenglow_migration() {
     assert_eq!(account.history.arr[0].epoch_credits, 12);
     assert_eq!(account.history.arr[1].epoch_credits, 18);
     assert_eq!(account.history.arr[2].epoch_credits, 14);
-    assert_eq!(account.history.arr[0].epoch_credits_uncapped, 12);
-    assert_eq!(account.history.arr[1].epoch_credits_uncapped, 18);
-    assert_eq!(account.history.arr[2].epoch_credits_uncapped, 14);
+    assert_eq!(account.history.arr[0].reward_lamports, 12);
+    assert_eq!(account.history.arr[1].reward_lamports, 18);
+    assert_eq!(account.history.arr[2].reward_lamports, 14);
 }
 
 #[tokio::test]
@@ -298,7 +298,7 @@ async fn test_copy_vote_account_alpenglow_lamports_uncapped() {
 
     assert_eq!(account.history.arr[0].epoch, 0);
     assert_eq!(account.history.arr[0].epoch_credits, MAX_EPOCH_CREDITS);
-    assert_eq!(account.history.arr[0].epoch_credits_uncapped, lamports);
+    assert_eq!(account.history.arr[0].reward_lamports, lamports);
 }
 
 #[tokio::test]
