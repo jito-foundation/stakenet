@@ -42,6 +42,7 @@ use validator_history::{
 use validator_history_cli::{
     commands::{
         self,
+        actions::init_validator_history::InitValidatorHistory,
         actions::set_new_priority_fee_distribution_program::SetNewPriorityFeeDistributionProgram,
         actions::set_new_priority_fee_oracle_authority::SetNewPriorityFeeOracleAuthority,
         actions::set_new_tip_distribution_program::SetNewTipDistributionProgram,
@@ -101,6 +102,7 @@ enum Commands {
     UploadValidatorAge(UploadValidatorAge),
 
     // Actions
+    InitValidatorHistory(InitValidatorHistory),
     UpdateStakeHistory(UpdateStakeHistory),
     UpdatePriorityFeeHistory(UpdatePriorityFeeHistory),
     SetNewPriorityFeeOracleAuthority(SetNewPriorityFeeOracleAuthority),
@@ -1369,6 +1371,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::BackfillValidatorAge(command_args) => {
             commands::backfill_validator_age::run(command_args, args.json_rpc_url, program_id).await
+        }
+        Commands::InitValidatorHistory(command_args) => {
+            commands::actions::init_validator_history::run(command_args, client, program_id)?
         }
         Commands::UpdateStakeHistory(command_args) => {
             commands::actions::update_stake_history::run(

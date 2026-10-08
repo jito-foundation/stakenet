@@ -1,3 +1,4 @@
+pub mod init_validator_history;
 pub mod set_new_priority_fee_distribution_program;
 pub mod set_new_priority_fee_oracle_authority;
 pub mod set_new_tip_distribution_program;
