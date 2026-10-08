@@ -35,7 +35,8 @@ use commands::{
         view_directed_stake_tickets::command_view_directed_stake_tickets,
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
         view_next_index_to_remove::command_view_next_index_to_remove,
-        view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
+        view_priority_fee_config::command_view_priority_fee_config,
+        view_scores::command_view_scores, view_state::command_view_state,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
@@ -107,6 +108,7 @@ async fn main() -> Result<()> {
     let result = match args.commands {
         // ---- Views ----
         Commands::ViewConfig(args) => command_view_config(args, &client, steward_program_id).await,
+        Commands::ViewScores(args) => command_view_scores(args, &client, steward_program_id).await,
         Commands::ViewPriorityFeeConfig(args) => {
             command_view_priority_fee_config(args, &client, steward_program_id).await
         }

@@ -350,6 +350,7 @@ pub enum Commands {
     // Views
     ViewState(ViewState),
     ViewConfig(ViewConfig),
+    ViewScores(ViewScores),
     ViewPriorityFeeConfig(ViewPriorityFeeConfig),
     ViewNextIndexToRemove(ViewNextIndexToRemove),
     ViewBlacklist(ViewBlacklist),
@@ -440,6 +441,28 @@ pub struct ViewState {
 pub struct ViewConfig {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "Recompute a validator's score off-chain, showing the per-epoch participation window"
+)]
+pub struct ViewScores {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+
+    /// Vote account to score
+    #[arg(long)]
+    pub vote_account: Pubkey,
+
+    /// Epoch to score as of. Defaults to the current epoch.
+    #[arg(long)]
+    pub epoch: Option<u16>,
+
+    /// Override the configured alpenglow migration epoch, to see how the same history scores on
+    /// either side of the boundary
+    #[arg(long)]
+    pub alpenglow_migration_epoch: Option<u16>,
 }
 
 #[derive(Parser)]
