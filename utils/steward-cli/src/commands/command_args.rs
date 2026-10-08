@@ -445,15 +445,16 @@ pub struct ViewConfig {
 
 #[derive(Parser)]
 #[command(
-    about = "Recompute a validator's score off-chain, showing the per-epoch participation window"
+    about = "Recompute scores and instant unstake off-chain, without waiting for a scoring cycle"
 )]
 pub struct ViewScores {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
 
-    /// Vote account to score
+    /// Only score this vote account, and show its per-epoch participation window. Defaults to
+    /// every validator in the pool.
     #[arg(long)]
-    pub vote_account: Pubkey,
+    pub vote_account: Option<Pubkey>,
 
     /// Epoch to score as of. Defaults to the current epoch.
     #[arg(long)]
