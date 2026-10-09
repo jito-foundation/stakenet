@@ -504,7 +504,11 @@ pub fn calculate_epoch_credits(
         return Err(StewardError::ArithmeticError.into());
     }
 
-    let average_vote_credits = epoch_credits_window.iter().filter_map(|&i| i).sum::<u32>() as f64
+    let average_vote_credits = epoch_credits_window
+        .iter()
+        .filter_map(|&i| i)
+        .map(u64::from)
+        .sum::<u64>() as f64
         / epoch_credits_window.len() as f64;
 
     let nonzero_blocks = total_blocks_window.iter().filter(|i| i.is_some()).count();
@@ -1046,5 +1050,33 @@ pub fn calculate_instant_unstake_merkle_root_upload_auth(
         // that prevent a validator with no history from getting stake, so we don't want this to be
         // the hidden linchpin
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use validator_history::utils::MAX_EPOCH_CREDITS;
+
+    use super::*;
+
+    #[test]
+    fn test_large_alpenglow_credits_do_not_overflow() {
+        let epoch_credits = [Some(u32::MAX - 1); 30];
+        let total_blocks = [Some(1000); 30];
+        let (vote_credits_ratio, delinquency_score, _, _) =
+            calculate_epoch_credits(&epoch_credits, &total_blocks, 0, 0.97).unwrap();
+        assert_eq!(delinquency_score, 1);
+        assert!(vote_credits_ratio > 1.0);
+    }
+
+    #[test]
+    fn test_saturated_alpenglow_credits() {
+        let result =
+            calculate_instant_unstake_delinquency(1000, 1000, MAX_EPOCH_CREDITS, 1000, 0.7)
+                .unwrap();
+        assert!(!result);
+
+        let result = calculate_instant_unstake_delinquency(1000, 1000, 0, 1000, 0.7).unwrap();
+        assert!(result);
     }
 }

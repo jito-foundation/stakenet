@@ -20,6 +20,7 @@ use stakenet_sdk::models::submit_stats::SubmitStats;
 use stakenet_sdk::utils::transactions::submit_instructions;
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 use validator_history::{ValidatorHistory, ValidatorHistoryEntry};
+use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
 use super::keeper_operations::{check_flag, KeeperOperations};
 
@@ -133,8 +134,13 @@ pub async fn update_stake_history(
     // so we find the largest epoch a validator has voted on to confirm the data is fresh
     let max_vote_account_epoch = vote_accounts
         .iter()
-        .flat_map(|vote_account| vote_account.epoch_credits.clone())
-        .map(|(epoch, _, _)| epoch)
+        .flat_map(|vote_account| {
+            vote_account
+                .epoch_credits
+                .iter()
+                .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
+                .map(|(epoch, _, _)| *epoch)
+        })
         .max()
         .unwrap_or(0);
 
