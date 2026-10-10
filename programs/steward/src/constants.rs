@@ -28,7 +28,7 @@ pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 0;
 
 /// The epoch the cluster migrates from tower to alpenglow (SIMD-0326).
 #[cfg(feature = "mainnet-beta")]
-pub const ALPENGLOW_MIGRATION_EPOCH: u16 = 1058;
+pub const ALPENGLOW_MIGRATION_EPOCH: u16 = 1064;
 
 #[cfg(all(not(feature = "mainnet-beta"), feature = "testnet"))]
 pub const ALPENGLOW_MIGRATION_EPOCH: u16 = 1042;
