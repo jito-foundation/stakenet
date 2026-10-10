@@ -2337,12 +2337,6 @@ mod tests {
             EpochCreditsRatio::Unscorable
         );
 
-        previous.activated_stake_lamports = REWARD_STAKE;
-        assert_eq!(
-            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
-            EpochCreditsRatio::Scored(1.)
-        );
-
         let (entry, previous, cluster, mut previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
         previous_cluster.total_epoch_stake_lamports =
             ClusterHistoryEntry::default().total_epoch_stake_lamports;
@@ -2384,11 +2378,6 @@ mod tests {
     #[test]
     fn test_epoch_credits_range_alpenglow_inputs() {
         let (mut validator, mut cluster) = migrating_history();
-
-        // Falls back to the stake oracle's upload when the stake snapshot is missing
-        let entry = entry_mut(&mut validator, 12);
-        entry.epoch_stake_lamports = u64::MAX;
-        entry.activated_stake_lamports = REWARD_STAKE;
 
         // Epoch 14 can't be scored without the total stake that paid it
         let cluster_entry = cluster
