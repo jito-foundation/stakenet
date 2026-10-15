@@ -217,6 +217,7 @@ async fn test_update_parameters() {
             directed_stake_unstake_cap_bps: Some(10_000),
             jito_bam_minimum_epochs: Some(0),
             jito_bam_window_epochs: Some(0),
+            alpenglow_migration_epoch: None,
         },
         &fixture.keypair,
     )
@@ -260,7 +261,8 @@ fn _test_parameter(
         undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
         jito_bam_minimum_epochs: 0,
         jito_bam_window_epochs: 0,
-        _padding_0: [0; 4],
+        alpenglow_migration_epoch: u16::MAX,
+        _padding_0: [0; 2],
         _padding_1: [0; 28],
         _padding_2: [0; 6],
     });

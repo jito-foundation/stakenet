@@ -138,6 +138,7 @@ async fn test_copy_cluster_info_epoch_stake_and_inflation_rewards() {
     assert_eq!(account.history.arr[0].total_inflation_rewards, 1_000);
     assert_eq!(account.history.arr[0].distributed_inflation_rewards, 900);
     assert_eq!(account.history.arr[0].is_alpenglow, 1);
+    assert_eq!(account.history.arr[0].is_alpenglow_activated(), Some(true));
     // Epoch stake can only be read during its own epoch
     assert_eq!(account.history.arr[0].total_epoch_stake_lamports, u64::MAX);
 
@@ -149,6 +150,8 @@ async fn test_copy_cluster_info_epoch_stake_and_inflation_rewards() {
     // Epoch 1's rewards are only paid out in epoch 2
     assert_eq!(account.history.arr[1].total_inflation_rewards, u64::MAX);
     assert_eq!(account.history.arr[1].is_alpenglow, u8::MAX);
+    // The era is only recorded once the epoch's rewards are paid, so it reads as unknown until then
+    assert_eq!(account.history.arr[1].is_alpenglow_activated(), None);
 
     // A payout that is still in progress is skipped
     ctx.borrow_mut().set_sysvar(&EpochRewards {
@@ -191,6 +194,7 @@ async fn test_copy_cluster_info_epoch_stake_and_inflation_rewards() {
     assert_eq!(account.history.arr[0].total_inflation_rewards, 2_000);
     assert_eq!(account.history.arr[0].distributed_inflation_rewards, 1_900);
     assert_eq!(account.history.arr[0].is_alpenglow, 0);
+    assert_eq!(account.history.arr[0].is_alpenglow_activated(), Some(false));
 }
 
 #[tokio::test]

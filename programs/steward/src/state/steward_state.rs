@@ -762,6 +762,7 @@ impl StewardStateV2 {
                 config,
                 current_epoch as u16,
                 TVC_ACTIVATION_EPOCH,
+                epoch_schedule.slots_per_epoch,
             )?;
 
             // Store both raw score and final score
@@ -893,6 +894,7 @@ impl StewardStateV2 {
                 first_slot,
                 clock.epoch as u16,
                 TVC_ACTIVATION_EPOCH,
+                epoch_schedule.slots_per_epoch,
             )?;
 
             self.instant_unstake

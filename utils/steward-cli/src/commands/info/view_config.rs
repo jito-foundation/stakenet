@@ -184,6 +184,10 @@ fn _print_default_config(
         "Priority Fee Scoring Start Epoch:  {:?}\n",
         config_account.parameters.priority_fee_scoring_start_epoch
     );
+    formatted_string += &format!(
+        "Alpenglow Migration Epoch:  {:?}\n",
+        config_account.parameters.alpenglow_migration_epoch
+    );
     formatted_string += "\n⚙️ Directed Stake Parameters ⚙️\n";
     formatted_string += &format!(
         "Directed Stake Unstake Cap BPS:  {:?}\n",

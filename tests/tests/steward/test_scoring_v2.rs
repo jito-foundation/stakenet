@@ -304,7 +304,7 @@ fn test_vote_credits_impact() {
 mod validator_score_integration_tests {
     use super::*;
     use jito_steward::{score::validator_score, Config, LargeBitMask, Parameters};
-    use solana_sdk::pubkey::Pubkey;
+    use solana_sdk::{epoch_schedule::DEFAULT_SLOTS_PER_EPOCH, pubkey::Pubkey};
     use validator_history::{
         constants::TVC_MULTIPLIER, CircBufCluster, ClusterHistory, ClusterHistoryEntry,
     };
@@ -393,6 +393,7 @@ mod validator_score_integration_tests {
             &config,
             current_epoch,
             0, // tvc_activation_epoch
+            DEFAULT_SLOTS_PER_EPOCH,
         )
         .unwrap();
 
@@ -435,7 +436,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // Score should be 0 due to commission filter
         assert_eq!(result.score, 0);
@@ -465,7 +474,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // Score should be 0 due to MEV commission filter
         assert_eq!(result.score, 0);
@@ -500,7 +517,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // Check if delinquency was detected
         if result.delinquency_score == 0 {
@@ -533,7 +558,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // All epochs connected, so BAM filter should pass
         assert_eq!(result.running_bam_score, 1);
@@ -569,7 +602,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // 7 of 10 epochs connected — exactly meets threshold
         assert_eq!(result.running_bam_score, 1);
@@ -605,7 +646,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // Only 6 of 10 epochs connected — below threshold of 7
         assert_eq!(result.running_bam_score, 0);
@@ -637,7 +686,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // No epochs connected — fails BAM filter
         assert_eq!(result.running_bam_score, 0);
@@ -671,7 +728,15 @@ mod validator_score_integration_tests {
             });
         }
 
-        let result = validator_score(&validator, &cluster, &config, current_epoch, 0).unwrap();
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            current_epoch,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
 
         // Score should be 0 due to blacklist
         assert_eq!(result.score, 0);
@@ -737,7 +802,15 @@ mod validator_score_integration_tests {
         // Calculate scores
         let mut scores = vec![];
         for (name, validator) in &validators {
-            let result = validator_score(validator, &cluster, &config, current_epoch, 0).unwrap();
+            let result = validator_score(
+                validator,
+                &cluster,
+                &config,
+                current_epoch,
+                0,
+                DEFAULT_SLOTS_PER_EPOCH,
+            )
+            .unwrap();
             scores.push((name, result.score));
         }
 
@@ -750,5 +823,91 @@ mod validator_score_integration_tests {
             scores[1].1 > scores[2].1,
             "Good should score higher than ok"
         );
+    }
+
+    #[test]
+    fn test_validator_score_across_alpenglow_migration() {
+        // 86_400 SOL of inflation per epoch, against which a validator holding 0.1% of the stake
+        // is expected to earn 0.1% — vote and leader rewards together
+        const REWARD_STAKE: u64 = 1_000_000_000_000;
+        const TOTAL_REWARD_STAKE: u64 = 1_000 * REWARD_STAKE;
+        const INFLATION_REWARDS: u64 = 86_400_000_000_000;
+        const EXPECTED_LAMPORTS: u64 = INFLATION_REWARDS / 1_000;
+        const TOTAL_BLOCKS: u64 = 1_000;
+        const MIGRATION_EPOCH: u16 = 15;
+        // What the validator earns when it captures `blocks` out of `TOTAL_BLOCKS` of its expected
+        // share. Scoring sees no split between vote and leader rewards.
+        let reward_lamports = |blocks: u64| EXPECTED_LAMPORTS * blocks / TOTAL_BLOCKS;
+
+        let mut cluster = create_cluster_history(20);
+        for entry in cluster
+            .history
+            .arr_mut()
+            .iter_mut()
+            .filter(|entry| entry.epoch <= 20)
+        {
+            entry.total_epoch_stake_lamports = TOTAL_REWARD_STAKE;
+            entry.total_inflation_rewards = INFLATION_REWARDS;
+            entry.is_alpenglow = (entry.epoch > MIGRATION_EPOCH) as u8;
+        }
+
+        // Earns everything it was expected to in every epoch
+        let mut validator = create_validator_history();
+        for epoch in 0..=20 {
+            let reward_lamports = match epoch {
+                epoch if epoch < MIGRATION_EPOCH => 1000 * u64::from(TVC_MULTIPLIER),
+                // Tower credits for half of the epoch, alpenglow lamports for the other half
+                MIGRATION_EPOCH => 500 * u64::from(TVC_MULTIPLIER) + reward_lamports(500),
+                _ => reward_lamports(1_000),
+            };
+            validator.history.push(ValidatorHistoryEntry {
+                epoch,
+                commission: 0,
+                mev_commission: 0,
+                epoch_credits: reward_lamports.min(u64::from(u32::MAX - 1)) as u32,
+                reward_lamports,
+                epoch_stake_lamports: REWARD_STAKE,
+                vote_account_last_update_slot: 1000,
+                is_superminority: 0,
+                ..ValidatorHistoryEntry::default()
+            });
+        }
+
+        let mut config = create_test_config();
+        config.parameters.alpenglow_migration_epoch = MIGRATION_EPOCH;
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            20,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
+        // The migration epoch is left out, and the alpenglow epochs score like the tower ones
+        assert_eq!(result.delinquency_score, 1);
+        assert_eq!(result.vote_credits_avg, VOTE_CREDITS_RATIO_MAX);
+
+        // Earned only half its expected share in one alpenglow epoch
+        validator
+            .history
+            .arr_mut()
+            .iter_mut()
+            .find(|entry| entry.epoch == 17)
+            .unwrap()
+            .reward_lamports = reward_lamports(500);
+        let result = validator_score(
+            &validator,
+            &cluster,
+            &config,
+            20,
+            0,
+            DEFAULT_SLOTS_PER_EPOCH,
+        )
+        .unwrap();
+        assert_eq!(result.delinquency_score, 0);
+        assert_eq!(result.details.delinquency_epoch, 17);
+        assert_eq!(result.details.delinquency_ratio, 0.5);
+        assert_eq!(result.score, 0);
     }
 }

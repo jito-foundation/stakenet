@@ -8,8 +8,9 @@ use validator_history::utils::cast_epoch;
 
 use crate::{
     constants::{
-        BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN, EPOCH_PROGRESS_MAX,
-        MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX, VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
+        ALPENGLOW_MIGRATION_EPOCH, BASIS_POINTS_MAX, COMMISSION_MAX, COMPUTE_SCORE_SLOT_RANGE_MIN,
+        EPOCH_PROGRESS_MAX, MAX_VALIDATORS, NUM_EPOCHS_BETWEEN_SCORING_MAX,
+        VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH,
     },
     errors::StewardError,
 };
@@ -52,6 +53,9 @@ pub struct UpdateParametersArgs {
     /// out of those epochs to qualify for delegation.
     /// `None` means do not update the current value.
     pub jito_bam_window_epochs: Option<u8>,
+
+    /// The epoch in which the cluster migrated from tower to alpenglow
+    pub alpenglow_migration_epoch: Option<u16>,
 }
 
 #[cfg(feature = "idl-build")]
@@ -180,6 +184,11 @@ impl IdlBuild for UpdateParametersArgs {
                         ty: IdlType::Option(Box::new(IdlType::U8)),
                         docs: Default::default(),
                     },
+                    IdlField {
+                        name: "alpenglow_migration_epoch".to_string(),
+                        ty: IdlType::Option(Box::new(IdlType::U16)),
+                        docs: Default::default(),
+                    },
                 ])),
             },
             docs: Default::default(),
@@ -283,7 +292,11 @@ pub struct Parameters {
     /// out of those epochs to qualify for delegation.
     pub jito_bam_window_epochs: u8,
 
-    pub _padding_0: [u8; 4],
+    /// The epoch in which the cluster migrated from tower to alpenglow, or `u16::MAX` if it has
+    /// not been set.
+    pub alpenglow_migration_epoch: u16,
+
+    pub _padding_0: [u8; 2],
 
     pub _padding_1: [u64; 28],
     /// The minimum epoch progress for computing scores
@@ -305,6 +318,25 @@ pub struct Parameters {
 impl Parameters {
     pub fn undirected_stake_ceiling_lamports(&self) -> u64 {
         u64::from_le_bytes(self.undirected_stake_ceiling_lamports)
+    }
+
+    /// The epoch the cluster migrates from tower to alpenglow.
+    pub fn alpenglow_migration_epoch(&self) -> u16 {
+        if self.alpenglow_migration_epoch == 0 {
+            ALPENGLOW_MIGRATION_EPOCH
+        } else {
+            self.alpenglow_migration_epoch
+        }
+    }
+
+    /// Whether `epoch` holds credits that can't be compared against either era's denominator.
+    pub fn is_alpenglow_transition_epoch(&self, epoch: u16) -> bool {
+        epoch == self.alpenglow_migration_epoch()
+    }
+
+    /// Whether `epoch` earns alpenglow reward lamports rather than tower vote credits.
+    pub fn is_alpenglow_epoch(&self, epoch: u16) -> bool {
+        epoch > self.alpenglow_migration_epoch()
     }
 
     /// Merges the updated parameters with the current parameters and validates them
@@ -339,6 +371,7 @@ impl Parameters {
             undirected_stake_ceiling_lamports,
             jito_bam_minimum_epochs,
             jito_bam_window_epochs,
+            alpenglow_migration_epoch,
         } = *args;
 
         let mut new_parameters = self;
@@ -439,6 +472,10 @@ impl Parameters {
 
         if let Some(jito_bam_window_epochs) = jito_bam_window_epochs {
             new_parameters.jito_bam_window_epochs = jito_bam_window_epochs;
+        }
+
+        if let Some(alpenglow_migration_epoch) = alpenglow_migration_epoch {
+            new_parameters.alpenglow_migration_epoch = alpenglow_migration_epoch;
         }
 
         // Validation will throw an error if any of the parameters are invalid
@@ -666,6 +703,25 @@ mod tests {
     const CURRENT_EPOCH: u64 = 1000;
     const SLOTS_PER_EPOCH: u64 = 432_000;
 
+    #[test]
+    fn test_alpenglow_migration_epoch_falls_back_when_unset() {
+        let mut params = valid_parameters();
+        params.alpenglow_migration_epoch = 0;
+        assert_eq!(
+            params.alpenglow_migration_epoch(),
+            ALPENGLOW_MIGRATION_EPOCH
+        );
+        assert!(!params.is_alpenglow_epoch(1));
+        assert!(!params.is_alpenglow_transition_epoch(1));
+
+        params.alpenglow_migration_epoch = 1058;
+        assert_eq!(params.alpenglow_migration_epoch(), 1058);
+        assert!(params.is_alpenglow_transition_epoch(1058));
+        assert!(!params.is_alpenglow_epoch(1058));
+        assert!(params.is_alpenglow_epoch(1059));
+        assert!(!params.is_alpenglow_epoch(1057));
+    }
+
     fn valid_parameters() -> Parameters {
         Parameters {
             mev_commission_range: 10,
@@ -696,7 +752,8 @@ mod tests {
             undirected_stake_ceiling_lamports: (10_000_000u64 * 1_000_000_000u64).to_le_bytes(),
             jito_bam_minimum_epochs: 10,
             jito_bam_window_epochs: 10,
-            _padding_0: [0; 4],
+            alpenglow_migration_epoch: u16::MAX,
+            _padding_0: [0; 2],
             _padding_1: [0; 28],
             _padding_2: [0; 6],
         }
