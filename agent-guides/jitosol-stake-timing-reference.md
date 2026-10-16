@@ -67,7 +67,7 @@ means no delegation for the whole cycle — not a reduced amount:
 | Superminority | must not be in it |
 | Blacklist | must not be on it |
 | Tip Distribution merkle root upload authority | must be TipRouter or legacy Jito |
-| BAM | connected for ≥ `jito_bam_minimum_epochs` of the trailing `jito_bam_window_epochs + 1` epochs |
+| BAM | connected for ≥ `jito_bam_minimum_epochs` of the trailing `jito_bam_window_epochs` epochs |
 
 Running the BAM client is therefore a binary requirement for the pool: not connected means score
 zero means no stake.

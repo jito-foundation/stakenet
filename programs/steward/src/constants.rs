@@ -25,6 +25,18 @@ pub const COMPUTE_SCORE_SLOT_RANGE_MIN: u64 = 100;
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 520;
 #[cfg(not(feature = "mainnet-beta"))]
 pub const VALIDATOR_HISTORY_FIRST_RELIABLE_EPOCH: u64 = 0;
+
+/// The epoch the cluster migrates from tower to alpenglow (SIMD-0326).
+#[cfg(feature = "mainnet-beta")]
+pub const ALPENGLOW_MIGRATION_EPOCH: u16 = 1064;
+
+#[cfg(all(not(feature = "mainnet-beta"), feature = "testnet"))]
+pub const ALPENGLOW_MIGRATION_EPOCH: u16 = 1042;
+
+/// Localnet never migrates, so no epoch is treated as the transition
+#[cfg(all(not(feature = "mainnet-beta"), not(feature = "testnet")))]
+pub const ALPENGLOW_MIGRATION_EPOCH: u16 = u16::MAX;
+
 pub const TVC_FEATURE_PUBKEY: &str = "tvcF6b1TRz353zKuhBjinZkKzjmihXmBAHJdjNYw1sQ";
 #[cfg(feature = "mainnet-beta")]
 pub const TVC_ACTIVATION_EPOCH: u64 = 703;

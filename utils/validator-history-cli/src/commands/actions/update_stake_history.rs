@@ -24,7 +24,11 @@ pub struct UpdateStakeHistory {
     vote_account: Pubkey,
 }
 
-pub async fn run(args: UpdateStakeHistory, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(
+    args: UpdateStakeHistory,
+    rpc_url: String,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
@@ -55,7 +59,7 @@ pub async fn run(args: UpdateStakeHistory, rpc_url: String) -> anyhow::Result<()
     {
         let copy_vote_account_entry = StakeHistoryEntry::new(
             vote_account_info,
-            &validator_history::id(),
+            &program_id,
             &keypair.pubkey(),
             epoch_info.epoch,
             rank,

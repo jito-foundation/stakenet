@@ -14,6 +14,7 @@ pub mod delegation;
 pub mod directed_delegation;
 pub mod errors;
 pub mod events;
+pub mod instant_unstake;
 pub mod instructions;
 pub mod score;
 pub mod stake_pool_utils;

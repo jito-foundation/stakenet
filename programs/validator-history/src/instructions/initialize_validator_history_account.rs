@@ -29,8 +29,18 @@ pub fn handle_initialize_validator_history_account(
 ) -> Result<()> {
     // Need minimum 5 epochs of vote credits to be valid
     let epoch_credits = VoteStateVersions::deserialize_epoch_credits(&ctx.accounts.vote_account)?;
-    if epoch_credits.len() < MIN_VOTE_EPOCHS {
+    let mut distinct_epochs: usize = 0;
+    let mut previous_epoch: Option<u64> = None;
+    for (epoch, _, _) in epoch_credits.iter() {
+        if previous_epoch != Some(*epoch) {
+            distinct_epochs = distinct_epochs.saturating_add(1);
+            previous_epoch = Some(*epoch);
+        }
+    }
+
+    if distinct_epochs < MIN_VOTE_EPOCHS {
         return Err(ValidatorHistoryError::NotEnoughVotingHistory.into());
     }
+
     Ok(())
 }

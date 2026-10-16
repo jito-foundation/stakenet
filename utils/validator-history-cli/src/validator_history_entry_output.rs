@@ -64,6 +64,13 @@ pub struct ValidatorHistoryEntryOutput {
 
     /// Whether this validator is connected to the BAM
     pub is_bam_connected: Option<String>,
+
+    /// Epoch credits without the u32 cap: vote credits in tower epochs, vote reward lamports in
+    /// alpenglow epochs, otherwise NULL
+    pub reward_lamports: Option<String>,
+
+    /// Stake delegated to this vote account in this epoch, otherwise NULL
+    pub epoch_stake_lamports: Option<String>,
 }
 
 impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
@@ -152,6 +159,14 @@ impl From<ValidatorHistoryEntry> for ValidatorHistoryEntryOutput {
 
             is_bam_connected: (!value.is_bam_connected.eq(&default_entry.is_bam_connected))
                 .then_some((value.is_bam_connected).to_string()),
+
+            reward_lamports: (!value.reward_lamports.eq(&default_entry.reward_lamports))
+                .then_some(value.reward_lamports.to_string()),
+
+            epoch_stake_lamports: (!value
+                .epoch_stake_lamports
+                .eq(&default_entry.epoch_stake_lamports))
+            .then_some(value.epoch_stake_lamports.to_string()),
         }
     }
 }

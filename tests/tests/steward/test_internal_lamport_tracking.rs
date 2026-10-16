@@ -283,6 +283,7 @@ async fn test_internal_lamport_tracking_basic() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -508,6 +509,7 @@ async fn test_internal_lamport_tracking_with_withdraw() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -730,6 +732,7 @@ async fn test_internal_lamport_tracking_with_withdraw_remainder() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1134,6 +1137,7 @@ async fn test_internal_lamport_tracking_with_deposit() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )
@@ -1358,6 +1362,7 @@ async fn test_internal_lamport_tracking_with_deposit_meeting_target() {
                 directed_stake_unstake_cap_bps: Some(10_000),
                 jito_bam_minimum_epochs: Some(0),
                 jito_bam_window_epochs: Some(0),
+                alpenglow_migration_epoch: None,
             }),
             None,
         )

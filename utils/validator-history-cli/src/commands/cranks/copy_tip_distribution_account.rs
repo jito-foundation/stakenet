@@ -33,7 +33,11 @@ pub struct CrankCopyTipDistributionAccount {
     epoch: Option<u64>,
 }
 
-pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyhow::Result<()> {
+pub async fn run(
+    args: CrankCopyTipDistributionAccount,
+    rpc_url: String,
+    program_id: Pubkey,
+) -> anyhow::Result<()> {
     let keypair = read_keypair_file(args.keypair_path)
         .map_err(|e| anyhow!("Failed reading keypair file: {e}"))?;
     let keypair = Arc::new(keypair);
@@ -45,8 +49,7 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
 
     println!("Processing MEV commission for epoch {epoch}");
 
-    let validator_histories =
-        get_all_validator_history_accounts(&client, validator_history::id()).await?;
+    let validator_histories = get_all_validator_history_accounts(&client, program_id).await?;
 
     let validator_history_map: HashMap<Pubkey, ValidatorHistory> = HashMap::from_iter(
         validator_histories
@@ -132,7 +135,7 @@ pub async fn run(args: CrankCopyTipDistributionAccount, rpc_url: String) -> anyh
             ValidatorMevCommissionEntry::new(
                 vote_account,
                 epoch,
-                &validator_history::id(),
+                &program_id,
                 &args.tip_distribution_program_id,
                 &keypair.pubkey(),
             )

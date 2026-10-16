@@ -1,3 +1,4 @@
+use solana_program::{epoch_rewards::EpochRewards, epoch_stake::get_epoch_total_stake};
 use {
     crate::{
         errors::ValidatorHistoryError,
@@ -28,6 +29,13 @@ pub struct CopyClusterInfo<'info> {
     pub signer: Signer<'info>,
 }
 
+/// Copies the previous and current epoch's block counts, and the current epoch's start timestamp
+/// and total stake.
+///
+/// Also copies the previous epoch's inflation rewards from the `EpochRewards` sysvar. The runtime
+/// pays those out over the first blocks of each epoch (at most 10% of it), and a call made during
+/// the payout skips them. At least one call must land after the payout and before the epoch ends,
+/// since the next epoch boundary overwrites the sysvar.
 pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let mut cluster_history_account = ctx.accounts.cluster_history_account.load_mut()?;
     let slot_history: Box<SlotHistory> =
@@ -63,6 +71,23 @@ pub fn handle_copy_cluster_info(ctx: Context<CopyClusterInfo>) -> Result<()> {
     let (num_blocks, _) = confirmed_blocks_in_epoch(start_slot, clock.slot, *slot_history)?;
     cluster_history_account.set_blocks(epoch, num_blocks)?;
     cluster_history_account.set_epoch_start_timestamp(epoch, epoch_start_timestamp)?;
+    cluster_history_account.set_total_epoch_stake(epoch, get_epoch_total_stake())?;
+
+    if epoch > 0 {
+        if let Ok(epoch_rewards) = EpochRewards::get() {
+            if !epoch_rewards.active {
+                // Alpenglow pays out the credits in each vote account directly, so it computes no reward points
+                let is_alpenglow =
+                    epoch_rewards.total_points == 0 && epoch_rewards.total_rewards > 0;
+                cluster_history_account.set_inflation_rewards(
+                    epoch - 1,
+                    epoch_rewards.total_rewards,
+                    epoch_rewards.distributed_rewards,
+                    is_alpenglow,
+                )?;
+            }
+        }
+    }
 
     cluster_history_account.cluster_history_last_update_slot = clock.slot;
 

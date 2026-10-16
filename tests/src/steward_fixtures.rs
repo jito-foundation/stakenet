@@ -384,6 +384,7 @@ impl TestFixture {
             directed_stake_unstake_cap_bps: Some(10_000),
             jito_bam_minimum_epochs: Some(0),
             jito_bam_window_epochs: Some(0),
+            alpenglow_migration_epoch: None,
         });
 
         let update_priority_fee_parameters_args =
@@ -2312,7 +2313,8 @@ impl Default for StateMachineFixtures {
             undirected_stake_ceiling_lamports: (10_000_000 * LAMPORTS_PER_SOL).to_le_bytes(),
             jito_bam_minimum_epochs: 0,
             jito_bam_window_epochs: 0,
-            _padding_0: [0; 4],
+            alpenglow_migration_epoch: u16::MAX,
+            _padding_0: [0; 2],
             _padding_1: [0; 28],
             _padding_2: [0; 6],
         };
