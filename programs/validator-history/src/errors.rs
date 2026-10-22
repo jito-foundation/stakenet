@@ -41,4 +41,7 @@ pub enum ValidatorHistoryError {
 
     #[msg("Invalid BAM client value, must be 0 or 1")]
     InvalidBamClientValue,
+
+    #[msg("Leader slots exceed the slots in the epoch")]
+    InvalidLeaderSlots,
 }
