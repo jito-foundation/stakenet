@@ -180,4 +180,12 @@ pub mod validator_history {
     ) -> Result<()> {
         handle_copy_is_bam_connected(ctx, epoch, is_bam_connected)
     }
+
+    pub fn update_leader_slots(
+        ctx: Context<UpdateLeaderSlots>,
+        epoch: u64,
+        total_leader_slots: u32,
+    ) -> Result<()> {
+        handle_update_leader_slots(ctx, epoch, total_leader_slots)
+    }
 }
