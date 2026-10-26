@@ -9,4 +9,5 @@ pub mod mev_earned;
 pub mod priority_fee_commission;
 pub mod stake_upload;
 pub mod steward;
+pub mod update_leader_slots;
 pub mod vote_account;
