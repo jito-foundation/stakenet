@@ -18,7 +18,11 @@ use solana_sdk::{
     signature::Keypair,
     signer::Signer,
     stake,
-    stake::{instruction::deactivate_delinquent_stake, state::StakeStateV2},
+    stake::{
+        instruction::deactivate_delinquent_stake,
+        state::StakeStateV2,
+        tools::{acceptable_reference_epoch_credits, eligible_for_deactivate_delinquent},
+    },
     system_program,
 };
 use solana_vote_interface::state::VoteStateV4;
@@ -52,7 +56,6 @@ use stakenet_sdk::{
     },
 };
 use validator_history::ValidatorHistory;
-use validator_history_vote_state::AG_MIGRATION_EPOCH_CREDIT;
 
 pub fn _get_update_stake_pool_ixs(
     program_id: &Pubkey,
@@ -130,16 +133,7 @@ pub fn _get_update_stake_pool_ixs(
             }
         };
 
-        match vote_account
-            .epoch_credits
-            .iter()
-            .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
-            .map(|(epoch, _, _)| *epoch)
-            .max()
-        {
-            Some(latest_epoch) => latest_epoch == epoch || latest_epoch == epoch - 1,
-            None => false,
-        }
+        acceptable_reference_epoch_credits(&vote_account.epoch_credits, epoch)
     });
 
     for validator_info in validator_list.validators.iter() {
@@ -192,26 +186,12 @@ pub fn _get_update_stake_pool_ixs(
                         }
                     };
 
-                let Some(latest_epoch) = vote_account
-                    .epoch_credits
-                    .iter()
-                    .filter(|entry| **entry != AG_MIGRATION_EPOCH_CREDIT)
-                    .map(|(epoch, _, _)| *epoch)
-                    .max()
-                else {
-                    error!(
-                        "Vote account has no epoch credits entries vote_account={}",
-                        validator_info.vote_account_address
-                    );
-                    continue;
-                };
-
                 match stake_account {
                     StakeStateV2::Stake(_meta, stake, _stake_flags) => {
                         if stake.delegation.deactivation_epoch != u64::MAX {
                             false
                         } else {
-                            latest_epoch <= epoch - 5
+                            eligible_for_deactivate_delinquent(&vote_account.epoch_credits, epoch)
                         }
                     }
                     _ => {
@@ -238,6 +218,12 @@ pub fn _get_update_stake_pool_ixs(
 
             deactivate_delinquent_instructions.push(ix);
         }
+    }
+
+    if reference_vote_account.is_none() {
+        info!(
+            "No vote account satisfies the stake program's reference requirements, skipping delinquent deactivation epoch={epoch}"
+        );
     }
 
     let final_instructions = vec![
