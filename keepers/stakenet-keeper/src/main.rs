@@ -8,6 +8,7 @@
 //*
 //*  1. Epoch-progress gated in the keeper (each op's `_should_run` checks epoch_info.slot_index):
 //*       ~0% / 50% / 90%  vote_account, cluster_history, stake_upload, gossip_upload (3 runs/epoch)
+//*       1% / 50%         update_leader_slots (2 runs/epoch)
 //*       10%              copy_is_bam_connected (1 run/epoch)
 //*
 //*  2. Steward — the keeper is purely reactive and just cranks whatever state the on-chain state
@@ -87,6 +88,9 @@ fn set_run_flags(args: &Args) -> u32 {
     }
     if args.run_copy_is_bam_connected {
         run_flags = set_flag(run_flags, KeeperOperations::CopyIsBamConnected);
+    }
+    if args.run_update_leader_slots {
+        run_flags = set_flag(run_flags, KeeperOperations::UpdateLeaderSlots);
     }
 
     run_flags
@@ -278,6 +282,13 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     CopyIsBamConnectedOperation::new(&keeper_config, &keeper_state);
                 keeper_state
                     .set_runs_errors_and_txs_for_epoch(copy_is_bam_connected_op.fire().await);
+            }
+
+            if keeper_config.oracle_authority_keypair.is_some() {
+                debug!("Running operation operation=update_leader_slots");
+                keeper_state.set_runs_errors_and_txs_for_epoch(
+                    operations::update_leader_slots::fire(&keeper_config, &keeper_state).await,
+                );
             }
 
             if !keeper_state.keeper_flags.check_flag(KeeperFlag::Startup) {
