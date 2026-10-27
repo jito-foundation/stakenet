@@ -32,6 +32,36 @@ Vote accounts that are missing or no longer owned by the vote program are automa
 - `--keypair-path` (`-k`): Path to the oracle authority keypair used for signing transactions (default: `~/.config/solana/id.json`)
 - `--kobe-api-base-url`: Base URL for the Kobe API (e.g., `https://kobe.testnet.jito.network` for testnet, `https://kobe.mainnet.jito.network` for mainnet)
 
+#### Crank Update Leader Slots
+
+Records how many leader slots each validator is scheduled for in an epoch.
+
+```bash
+# Build
+make build-release
+
+# Run
+./target/release/validator-history-cli \
+  --json-rpc-url https://api.testnet.solana.com \
+  crank-update-leader-slots \
+  --keypair-path ~/.config/solana/id.json \
+  --epoch 931
+```
+
+##### Description
+
+This command reads the epoch's leader schedule in a single `getLeaderSchedule` call, maps each leader's identity to its vote account via `getVoteAccounts`, and submits `update_leader_slots` instructions that write `total_leader_slots` into each validator history account.
+
+Alpenglow pays half of each slot's rewards to its leader, so the participation ratio needs this field. The block metadata keeper also writes it, but only after walking every block of the epoch; this command fills it in from the start of the epoch instead.
+
+Leaders without a known vote account or without a validator history account are skipped, as are validators whose on-chain count already matches the schedule. That makes re-running the command a no-op once it has succeeded for an epoch.
+
+##### Parameters
+
+- `--keypair-path` (`-k`): Path to the oracle authority keypair used for signing transactions (default: `~/.config/solana/id.json`)
+- `--epoch`: Epoch to write the entries for (optional, defaults to the current epoch). Must not be in the future, since the program rejects future epochs.
+- `--force`: Write every entry, even when the on-chain count already matches the schedule (optional)
+
 #### History
 
 Displays the full epoch-by-epoch history for a single validator.

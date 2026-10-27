@@ -269,11 +269,21 @@ impl ValidatorHistoryEntry {
     ///
     /// Alpenglow pays for voting in reward certificates and for leading blocks, and the two are
     /// indistinguishable once summed into `epoch_credits`. Rather than estimating the leader
-    /// portion and subtracting it, this compares what the validator earned against what a validator
-    /// holding its share of the stake was expected to earn. The denominator includes expected
-    /// leader rewards, while the numerator includes realized leader rewards. Stake weighting
-    /// cancels their effect only in expectation, so leader luck can move an individual epoch's
-    /// ratio above or below `1.0` even with flawless voting participation.
+    /// portion and subtracting it, this compares what the validator earned against its fair share
+    /// of the epoch's inflation.
+    ///
+    /// Every paid slot splits its reward equally between the voters and the leader whose block
+    /// carries the reward certificate, so half of the epoch's inflation follows stake and half
+    /// follows the leader schedule. The validator's fair share of the voter half is its stake
+    /// share, and of the leader half, the share of the epoch's slots it was scheduled to lead. The
+    /// leader schedule is fixed before the epoch starts, so how many slots a validator happened to
+    /// draw cancels out of the ratio, while skipping its own slots or producing blocks that leave
+    /// out reward certificates still lowers it. Without that, a validator holding a small share of
+    /// the stake leads few enough slots that an unlucky schedule alone can push a flawless epoch
+    /// below the delinquency threshold.
+    ///
+    /// When the epoch's leader slots haven't been recorded, both halves fall back to the stake
+    /// share, which matches the schedule only on average.
     ///
     /// Alpenglow pays an epoch's rewards against the stake recorded in the epoch before it, so the
     /// previous entries supply the stake share.
@@ -282,6 +292,7 @@ impl ValidatorHistoryEntry {
         previous_entry: Option<&ValidatorHistoryEntry>,
         cluster_entry: &ClusterHistoryEntry,
         previous_cluster_entry: Option<&ClusterHistoryEntry>,
+        slots_per_epoch: u64,
     ) -> EpochCreditsRatio {
         let default_entry = ValidatorHistoryEntry::default();
         let default_cluster_entry = ClusterHistoryEntry::default();
@@ -321,9 +332,26 @@ impl ValidatorHistoryEntry {
             return EpochCreditsRatio::Unscorable;
         }
 
-        let Some(expected_lamports) = u128::from(inflation_rewards)
+        let Some(stake_share_lamports) = u128::from(inflation_rewards)
             .checked_mul(u128::from(reward_stake_lamports))
             .map(|product| product / u128::from(total_reward_stake_lamports))
+        else {
+            return EpochCreditsRatio::Unscorable;
+        };
+
+        let leader_slots = self.total_leader_slots;
+        let leader_share_lamports = if leader_slots.ne(&default_entry.total_leader_slots)
+            && slots_per_epoch > 0
+            && u64::from(leader_slots) <= slots_per_epoch
+        {
+            u128::from(inflation_rewards) * u128::from(leader_slots) / u128::from(slots_per_epoch)
+        } else {
+            stake_share_lamports
+        };
+
+        let Some(expected_lamports) = stake_share_lamports
+            .checked_add(leader_share_lamports)
+            .map(|sum| sum / 2)
             .filter(|expected| *expected > 0)
         else {
             return EpochCreditsRatio::Unscorable;
@@ -680,6 +708,7 @@ impl CircBuf {
                             previous_index.and_then(|i| validator_history_entries[i]),
                             cluster_entry,
                             previous_index.and_then(|i| cluster_entries[i]),
+                            slots_per_epoch,
                         )
                     }
                     false => {
@@ -1476,6 +1505,34 @@ impl ValidatorHistory {
         self.history.push(entry);
         Ok(())
     }
+
+    pub fn set_total_leader_slots(&mut self, epoch: u16, total_leader_slots: u32) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.total_leader_slots = total_leader_slots;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    for entry in self.history.arr_mut().iter_mut() {
+                        if entry.epoch == epoch {
+                            entry.total_leader_slots = total_leader_slots;
+                            return Ok(());
+                        }
+                    }
+                    return Err(ValidatorHistoryError::EpochOutOfRange.into());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            total_leader_slots,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+        Ok(())
+    }
 }
 
 #[derive(BorshSerialize)]
@@ -1881,7 +1938,12 @@ mod tests {
 
     fn alpenglow_ratio(reward_lamports: u64) -> EpochCreditsRatio {
         let (entry, previous, cluster, previous_cluster) = alpenglow_entries(reward_lamports);
-        entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster))
+        entry.alpenglow_credits_ratio(
+            Some(&previous),
+            &cluster,
+            Some(&previous_cluster),
+            SLOTS_PER_EPOCH,
+        )
     }
 
     // Utility test to see struct layout
@@ -2333,7 +2395,12 @@ mod tests {
         let (entry, mut previous, cluster, previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
         previous.epoch_stake_lamports = ValidatorHistoryEntry::default().epoch_stake_lamports;
         assert_eq!(
-            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            entry.alpenglow_credits_ratio(
+                Some(&previous),
+                &cluster,
+                Some(&previous_cluster),
+                SLOTS_PER_EPOCH,
+            ),
             EpochCreditsRatio::Unscorable
         );
 
@@ -2341,15 +2408,135 @@ mod tests {
         previous_cluster.total_epoch_stake_lamports =
             ClusterHistoryEntry::default().total_epoch_stake_lamports;
         assert_eq!(
-            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            entry.alpenglow_credits_ratio(
+                Some(&previous),
+                &cluster,
+                Some(&previous_cluster),
+                SLOTS_PER_EPOCH,
+            ),
             EpochCreditsRatio::Unscorable
         );
 
         let (entry, previous, mut cluster, previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
         cluster.total_inflation_rewards = ClusterHistoryEntry::default().total_inflation_rewards;
         assert_eq!(
-            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster)),
+            entry.alpenglow_credits_ratio(
+                Some(&previous),
+                &cluster,
+                Some(&previous_cluster),
+                SLOTS_PER_EPOCH,
+            ),
             EpochCreditsRatio::Unscorable
+        );
+    }
+
+    /// The ratio for a validator with 0.1% of the stake, so 432 leader slots on average, that
+    /// voted on every slot and was scheduled to lead `leader_slots` slots, producing
+    /// `blocks_produced` of them. Each slot pays half its reward to voters by stake and half to
+    /// the leader that carries its certificate.
+    fn alpenglow_ratio_with_schedule(
+        leader_slots: u32,
+        blocks_produced: u32,
+        recorded_leader_slots: u32,
+    ) -> EpochCreditsRatio {
+        let voter_lamports = EXPECTED_LAMPORTS / 2;
+        let leader_lamports = INFLATION_REWARDS / 2 * u64::from(blocks_produced) / SLOTS_PER_EPOCH;
+        assert!(blocks_produced <= leader_slots);
+        let (mut entry, previous, cluster, previous_cluster) =
+            alpenglow_entries(voter_lamports + leader_lamports);
+        entry.total_leader_slots = recorded_leader_slots;
+        entry.blocks_produced = blocks_produced;
+        entry.alpenglow_credits_ratio(
+            Some(&previous),
+            &cluster,
+            Some(&previous_cluster),
+            SLOTS_PER_EPOCH,
+        )
+    }
+
+    fn scored(ratio: EpochCreditsRatio) -> f64 {
+        let EpochCreditsRatio::Scored(ratio) = ratio else {
+            panic!("expected a scored epoch");
+        };
+        ratio
+    }
+
+    #[test]
+    fn test_alpenglow_unlucky_schedule_is_not_delinquent() {
+        // A flawless validator that drew half its average number of leader slots earns 75% of its
+        // stake share. Without the schedule that reads as delinquent at any threshold above 0.75.
+        assert_eq!(
+            alpenglow_ratio_with_schedule(216, 216, u32::MAX),
+            EpochCreditsRatio::Scored(0.75)
+        );
+        // Measured against the slots it was actually scheduled, it captured everything it could
+        assert_eq!(
+            alpenglow_ratio_with_schedule(216, 216, 216),
+            EpochCreditsRatio::Scored(1.)
+        );
+
+        // No leader slots at all leaves only the voter half to earn
+        assert_eq!(
+            alpenglow_ratio_with_schedule(0, 0, u32::MAX),
+            EpochCreditsRatio::Scored(0.5)
+        );
+        assert_eq!(
+            alpenglow_ratio_with_schedule(0, 0, 0),
+            EpochCreditsRatio::Scored(1.)
+        );
+    }
+
+    #[test]
+    fn test_alpenglow_lucky_schedule_does_not_hide_skipped_slots() {
+        // Twice its average number of leader slots, half of them skipped: the stake share alone
+        // reads 1.0
+        assert_eq!(
+            alpenglow_ratio_with_schedule(864, 432, u32::MAX),
+            EpochCreditsRatio::Scored(1.)
+        );
+        // Against its schedule, the validator earned two thirds of what it could have
+        let ratio = scored(alpenglow_ratio_with_schedule(864, 432, 864));
+        assert!((ratio - 2. / 3.).abs() < 1e-9);
+
+        // Skipping half its slots on an unlucky schedule still costs it half of the leader rewards
+        // for that schedule: it earns 0.625 of its stake share against a fair share of 0.75
+        let ratio = scored(alpenglow_ratio_with_schedule(216, 108, 216));
+        assert!((ratio - 5. / 6.).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_alpenglow_average_schedule_matches_stake_share() {
+        // Leading exactly the stake share's slots gives the same ratio as before
+        for (blocks_produced, ratio) in [(432, 1.), (216, 0.75), (0, 0.5)] {
+            assert_eq!(
+                alpenglow_ratio_with_schedule(432, blocks_produced, 432),
+                EpochCreditsRatio::Scored(ratio)
+            );
+            assert_eq!(
+                alpenglow_ratio_with_schedule(432, blocks_produced, u32::MAX),
+                EpochCreditsRatio::Scored(ratio)
+            );
+        }
+    }
+
+    #[test]
+    fn test_alpenglow_ignores_impossible_leader_slots() {
+        // More leader slots than the epoch has can't be right, so the stake share stands in
+        let (mut entry, previous, cluster, previous_cluster) = alpenglow_entries(EXPECTED_LAMPORTS);
+        entry.total_leader_slots = SLOTS_PER_EPOCH as u32 + 1;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(
+                Some(&previous),
+                &cluster,
+                Some(&previous_cluster),
+                SLOTS_PER_EPOCH,
+            ),
+            EpochCreditsRatio::Scored(1.)
+        );
+        entry.total_leader_slots = 0;
+        assert_eq!(
+            entry.alpenglow_credits_ratio(Some(&previous), &cluster, Some(&previous_cluster), 0),
+            EpochCreditsRatio::Scored(1.)
         );
     }
 

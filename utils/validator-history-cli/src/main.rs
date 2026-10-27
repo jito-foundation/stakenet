@@ -53,7 +53,7 @@ use validator_history_cli::{
             copy_gossip_contact_info::CrankCopyGossipContactInfo,
             copy_is_bam_connected::CrankCopyIsBamConnected,
             copy_tip_distribution_account::CrankCopyTipDistributionAccount,
-            copy_vote_account::CrankCopyVoteAccount,
+            copy_vote_account::CrankCopyVoteAccount, update_leader_slots::CrankUpdateLeaderSlots,
         },
     },
     validator_history_entry_output::ValidatorHistoryEntryOutput,
@@ -114,6 +114,7 @@ enum Commands {
     CrankCopyTipDistributionAccount(CrankCopyTipDistributionAccount),
     CrankCopyVoteAccount(CrankCopyVoteAccount),
     CrankCopyIsBamConnected(CrankCopyIsBamConnected),
+    CrankUpdateLeaderSlots(CrankUpdateLeaderSlots),
 }
 
 #[derive(Parser)]
@@ -1462,6 +1463,10 @@ async fn main() -> anyhow::Result<()> {
                 program_id,
             )
             .await?
+        }
+        Commands::CrankUpdateLeaderSlots(command_args) => {
+            commands::cranks::update_leader_slots::run(command_args, args.json_rpc_url, program_id)
+                .await?
         }
     };
 
