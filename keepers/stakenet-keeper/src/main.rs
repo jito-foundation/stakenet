@@ -285,7 +285,10 @@ async fn run_keeper(keeper_config: KeeperConfig) {
                     .set_runs_errors_and_txs_for_epoch(copy_is_bam_connected_op.fire().await);
             }
 
-            if keeper_config.oracle_authority_keypair.is_some() {
+            if keeper_config
+                .priority_fee_oracle_authority_keypair
+                .is_some()
+            {
                 debug!("Running operation operation=update_leader_slots");
                 let update_leader_slots_op =
                     UpdateLeaderSlotsOperation::new(&keeper_config, &keeper_state);
