@@ -268,7 +268,9 @@ impl VoteStateVersions {
                     return Err(ErrorCode::VoteAccountDataNotValid.into());
                 }
 
-                let commission = inflation_rewards_commission_bps / Self::BPS_PER_PERCENT;
+                // Round up, as RPC does when reporting a bps commission as a percent. Flooring would
+                // let e.g. 499 bps (4.99%) score as 4% and pass a 4% commission cap.
+                let commission = inflation_rewards_commission_bps.div_ceil(Self::BPS_PER_PERCENT);
                 u8::try_from(commission).map_err(|_| ErrorCode::VoteAccountDataNotValid.into())
             }
             _ => Err(ErrorCode::VoteAccountDataNotValid.into()),
@@ -978,6 +980,59 @@ mod tests {
             0,
         );
         assert!(VoteStateVersions::deserialize_commission(&account_v4_invalid).is_err());
+    }
+
+    #[test]
+    fn test_deserialize_commission_rounds_bps_up_to_percent() {
+        let key = Pubkey::new_unique();
+        let owner = vote::program::ID.key();
+        let mut lamports = 0;
+
+        for (inflation_rewards_commission_bps, expected_commission) in [
+            (0, 0),
+            (1, 1),
+            (99, 1),
+            (100, 1),
+            (101, 2),
+            (499, 5),
+            (500, 5),
+            (501, 6),
+            (1_099, 11),
+            (9_999, 100),
+            (10_000, 100),
+        ] {
+            let vote_state_v4 = VoteStateVersions::Current(Box::new(crate::VoteState {
+                node_pubkey: Pubkey::new_unique(),
+                authorized_withdrawer: Pubkey::new_unique(),
+                inflation_rewards_collector: Pubkey::new_unique(),
+                block_revenue_collector: Pubkey::new_unique(),
+                inflation_rewards_commission_bps,
+                block_revenue_commission_bps: 10_000,
+                pending_delegator_rewards: 0,
+                bls_pubkey_compressed: None,
+                votes: VecDeque::new(),
+                root_slot: None,
+                authorized_voters: AuthorizedVoters::default(),
+                epoch_credits: Vec::new(),
+                last_timestamp: BlockTimestamp::default(),
+            }));
+            let mut ser_v4 = bincode::serialize(&vote_state_v4).unwrap();
+            let account_v4 = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                ser_v4.as_mut_slice(),
+                &owner,
+                false,
+                0,
+            );
+            assert_eq!(
+                VoteStateVersions::deserialize_commission(&account_v4).unwrap(),
+                expected_commission,
+                "{inflation_rewards_commission_bps} bps"
+            );
+        }
     }
 
     #[test]

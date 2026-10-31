@@ -870,12 +870,17 @@ fn command_cluster_history(args: ClusterHistoryStatus, client: RpcClient, progra
     let cluster_history_account = client
         .get_account(&cluster_history_pda)
         .expect("Failed to get cluster history account");
-    let cluster_history =
+    let mut cluster_history =
         ClusterHistory::try_deserialize(&mut cluster_history_account.data.as_slice())
             .expect("Failed to deserialize cluster history account");
 
     let mut results = Vec::with_capacity(cluster_history.history.arr.len());
     let default_entry = ClusterHistoryEntry::default();
+
+    cluster_history
+        .history
+        .arr
+        .sort_by(|a, b| a.epoch.cmp(&b.epoch));
 
     for entry in cluster_history.history.arr.iter() {
         let total_epoch_stake_lamports = (entry.total_epoch_stake_lamports

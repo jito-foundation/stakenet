@@ -43,6 +43,7 @@ pub enum KeeperOperations {
     PriorityFeeCommission,
     DirectedStaking,
     CopyIsBamConnected,
+    UpdateLeaderSlots,
 }
 
 pub fn set_flag(run_flags: u32, flag: KeeperOperations) -> u32 {
@@ -58,7 +59,7 @@ pub fn check_flag(run_flags: u32, flag: KeeperOperations) -> bool {
 }
 
 impl KeeperOperations {
-    pub const LEN: usize = 15;
+    pub const LEN: usize = 16;
 
     pub fn emit(
         runs_for_epoch: &[u64; KeeperOperations::LEN],
@@ -266,6 +267,22 @@ impl KeeperOperations {
             (
                 "num-stewpf-commissionard-txs",
                 txs_for_epoch[KeeperOperations::PriorityFeeCommission as usize],
+                i64
+            ),
+            // UPDATE LEADER SLOTS
+            (
+                "num-update-leader-slots-runs",
+                runs_for_epoch[KeeperOperations::UpdateLeaderSlots as usize],
+                i64
+            ),
+            (
+                "num-update-leader-slots-errors",
+                errors_for_epoch[KeeperOperations::UpdateLeaderSlots as usize],
+                i64
+            ),
+            (
+                "num-update-leader-slots-txs",
+                txs_for_epoch[KeeperOperations::UpdateLeaderSlots as usize],
                 i64
             ),
             "cluster" => cluster,
