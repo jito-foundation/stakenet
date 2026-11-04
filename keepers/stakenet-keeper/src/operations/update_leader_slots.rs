@@ -242,21 +242,33 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
         }
 
         let led_slots = leader_slots.len();
-        for vote_account in self.keeper_state.vote_account_map.keys() {
-            if self
+        let mut shared_identities = 0;
+        for (vote_account, vote_account_info) in self.keeper_state.vote_account_map.iter() {
+            if !self
                 .keeper_state
                 .validator_history_map
                 .contains_key(vote_account)
+                || leader_slots.contains_key(vote_account)
             {
-                leader_slots.entry(*vote_account).or_insert(0);
+                continue;
             }
+
+            // Absent from the counted set while its identity holds slots: another vote account
+            // won this identity in the map, so whether this one led slots is unknown.
+            if leader_schedule.contains_key(&vote_account_info.node_pubkey) {
+                shared_identities += 1;
+                continue;
+            }
+
+            leader_slots.insert(*vote_account, 0);
         }
 
         log::info!(
-            "Leader slots counted epoch={} led_slots={} led_none={}",
+            "Leader slots counted epoch={} led_slots={} led_none={} shared_identities={}",
             self.keeper_state.epoch_info.epoch,
             led_slots,
             leader_slots.len() - led_slots,
+            shared_identities,
         );
 
         leader_slots
