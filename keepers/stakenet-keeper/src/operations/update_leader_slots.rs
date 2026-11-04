@@ -203,19 +203,9 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
         &self,
         leader_schedule: &HashMap<String, Vec<usize>>,
     ) -> HashMap<Pubkey, u32> {
-        let mut leader_slots: HashMap<Pubkey, u32> = self
-            .keeper_state
-            .vote_account_map
-            .keys()
-            .filter(|vote_account| {
-                self.keeper_state
-                    .validator_history_map
-                    .contains_key(*vote_account)
-            })
-            .map(|vote_account| (*vote_account, 0))
-            .collect();
-        let eligible = leader_slots.len();
-        let mut missing_vote_accounts = 0;
+        let mut leader_slots: HashMap<Pubkey, u32> = HashMap::new();
+        let mut unresolved_identities = 0;
+        let mut unresolved_slots = 0usize;
 
         for (identity, slots) in leader_schedule.iter() {
             let Some(vote_account) = self
@@ -224,7 +214,8 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
                 .get(identity)
                 .and_then(|vote_account| vote_account.parse::<Pubkey>().ok())
             else {
-                missing_vote_accounts += 1;
+                unresolved_identities += 1;
+                unresolved_slots += slots.len();
                 continue;
             };
 
@@ -239,16 +230,33 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
             *leader_slots.entry(vote_account).or_default() += slots.len() as u32;
         }
 
-        if missing_vote_accounts > 0 {
-            log::warn!("Missing vote accounts for leaders count={missing_vote_accounts}");
+        if unresolved_identities > 0 {
+            log::warn!(
+                "Skipping leader slot zeros epoch={} unresolved_identities={} unresolved_slots={}",
+                self.keeper_state.epoch_info.epoch,
+                unresolved_identities,
+                unresolved_slots,
+            );
+
+            return leader_slots;
         }
 
-        let led_none = leader_slots.values().filter(|slots| **slots == 0).count();
+        let led_slots = leader_slots.len();
+        for vote_account in self.keeper_state.vote_account_map.keys() {
+            if self
+                .keeper_state
+                .validator_history_map
+                .contains_key(vote_account)
+            {
+                leader_slots.entry(*vote_account).or_insert(0);
+            }
+        }
+
         log::info!(
-            "Leader slots counted validators={} led_none={} eligible={}",
-            leader_slots.len(),
-            led_none,
-            eligible
+            "Leader slots counted epoch={} led_slots={} led_none={}",
+            self.keeper_state.epoch_info.epoch,
+            led_slots,
+            leader_slots.len() - led_slots,
         );
 
         leader_slots
