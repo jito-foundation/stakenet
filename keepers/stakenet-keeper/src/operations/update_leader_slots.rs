@@ -203,7 +203,18 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
         &self,
         leader_schedule: &HashMap<String, Vec<usize>>,
     ) -> HashMap<Pubkey, u32> {
-        let mut leader_slots: HashMap<Pubkey, u32> = HashMap::new();
+        let mut leader_slots: HashMap<Pubkey, u32> = self
+            .keeper_state
+            .vote_account_map
+            .keys()
+            .filter(|vote_account| {
+                self.keeper_state
+                    .validator_history_map
+                    .contains_key(*vote_account)
+            })
+            .map(|vote_account| (*vote_account, 0))
+            .collect();
+        let eligible = leader_slots.len();
         let mut missing_vote_accounts = 0;
 
         for (identity, slots) in leader_schedule.iter() {
@@ -231,6 +242,14 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
         if missing_vote_accounts > 0 {
             log::warn!("Missing vote accounts for leaders count={missing_vote_accounts}");
         }
+
+        let led_none = leader_slots.values().filter(|slots| **slots == 0).count();
+        log::info!(
+            "Leader slots counted validators={} led_none={} eligible={}",
+            leader_slots.len(),
+            led_none,
+            eligible
+        );
 
         leader_slots
     }
