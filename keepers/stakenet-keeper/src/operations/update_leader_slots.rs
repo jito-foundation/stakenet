@@ -204,7 +204,8 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
         leader_schedule: &HashMap<String, Vec<usize>>,
     ) -> HashMap<Pubkey, u32> {
         let mut leader_slots: HashMap<Pubkey, u32> = HashMap::new();
-        let mut missing_vote_accounts = 0;
+        let mut unresolved_identities = 0;
+        let mut unresolved_slots = 0usize;
 
         for (identity, slots) in leader_schedule.iter() {
             let Some(vote_account) = self
@@ -213,7 +214,8 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
                 .get(identity)
                 .and_then(|vote_account| vote_account.parse::<Pubkey>().ok())
             else {
-                missing_vote_accounts += 1;
+                unresolved_identities += 1;
+                unresolved_slots += slots.len();
                 continue;
             };
 
@@ -228,9 +230,46 @@ impl<'a> UpdateLeaderSlotsOperation<'a> {
             *leader_slots.entry(vote_account).or_default() += slots.len() as u32;
         }
 
-        if missing_vote_accounts > 0 {
-            log::warn!("Missing vote accounts for leaders count={missing_vote_accounts}");
+        if unresolved_identities > 0 {
+            log::warn!(
+                "Skipping leader slot zeros epoch={} unresolved_identities={} unresolved_slots={}",
+                self.keeper_state.epoch_info.epoch,
+                unresolved_identities,
+                unresolved_slots,
+            );
+
+            return leader_slots;
         }
+
+        let led_slots = leader_slots.len();
+        let mut shared_identities = 0;
+        for (vote_account, vote_account_info) in self.keeper_state.vote_account_map.iter() {
+            if !self
+                .keeper_state
+                .validator_history_map
+                .contains_key(vote_account)
+                || leader_slots.contains_key(vote_account)
+            {
+                continue;
+            }
+
+            // Absent from the counted set while its identity holds slots: another vote account
+            // won this identity in the map, so whether this one led slots is unknown.
+            if leader_schedule.contains_key(&vote_account_info.node_pubkey) {
+                shared_identities += 1;
+                continue;
+            }
+
+            leader_slots.insert(*vote_account, 0);
+        }
+
+        log::info!(
+            "Leader slots counted epoch={} led_slots={} led_none={} shared_identities={}",
+            self.keeper_state.epoch_info.epoch,
+            led_slots,
+            leader_slots.len() - led_slots,
+            shared_identities,
+        );
 
         leader_slots
     }

@@ -1,6 +1,6 @@
 [package]
 name = "stakenet-keeper"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 description = "Script to keep validator history accounts up to date"
 
@@ -14,7 +14,7 @@ env_logger = "0.10.0"
 futures = "0.3.21"
 futures-util = "0.3.21"
 jito-priority-fee-distribution = { features = ["no-entrypoint"], workspace = true }
-jito-steward = { features = ["no-entrypoint"], path = "../../programs/steward" }
+jito-steward.workspace = true
 jito-tip-distribution = { features = ["no-entrypoint"], workspace = true }
 jito-tip-distribution-sdk = { workspace = true }
 kobe-client = { workspace = true }
