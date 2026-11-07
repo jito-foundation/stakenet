@@ -1505,6 +1505,34 @@ impl ValidatorHistory {
         self.history.push(entry);
         Ok(())
     }
+
+    pub fn set_total_leader_slots(&mut self, epoch: u16, total_leader_slots: u32) -> Result<()> {
+        if let Some(entry) = self.history.last_mut() {
+            match entry.epoch.cmp(&epoch) {
+                Ordering::Equal => {
+                    entry.total_leader_slots = total_leader_slots;
+                    return Ok(());
+                }
+                Ordering::Greater => {
+                    for entry in self.history.arr_mut().iter_mut() {
+                        if entry.epoch == epoch {
+                            entry.total_leader_slots = total_leader_slots;
+                            return Ok(());
+                        }
+                    }
+                    return Err(ValidatorHistoryError::EpochOutOfRange.into());
+                }
+                Ordering::Less => {}
+            }
+        }
+        let entry = ValidatorHistoryEntry {
+            epoch,
+            total_leader_slots,
+            ..ValidatorHistoryEntry::default()
+        };
+        self.history.push(entry);
+        Ok(())
+    }
 }
 
 #[derive(BorshSerialize)]

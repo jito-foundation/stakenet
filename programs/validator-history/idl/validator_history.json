@@ -585,6 +585,45 @@
       "args": []
     },
     {
+      "name": "update_leader_slots",
+      "discriminator": [
+        167,
+        146,
+        86,
+        243,
+        72,
+        177,
+        153,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "validator_history_account",
+          "writable": true
+        },
+        {
+          "name": "vote_account"
+        },
+        {
+          "name": "oracle_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u64"
+        },
+        {
+          "name": "total_leader_slots",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "update_priority_fee_history",
       "discriminator": [
         238,
@@ -850,6 +889,11 @@
       "code": 6016,
       "name": "InvalidBamClientValue",
       "msg": "Invalid BAM client value, must be 0 or 1"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidLeaderSlots",
+      "msg": "Leader slots exceed the slots in the epoch"
     }
   ],
   "types": [

@@ -11,4 +11,5 @@ mod test_set_new_priority_fee_program;
 mod test_stake;
 mod test_state;
 mod test_total_priority_fees;
+mod test_update_leader_slots;
 mod test_vote_account;
