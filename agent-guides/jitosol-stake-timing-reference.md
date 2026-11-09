@@ -42,7 +42,9 @@ quoting this document.
   the set again until the next scoring event — but see the caveat below: the set can still shrink.
 - Later in each epoch, once `instant_unstake_epoch_progress` through it (currently 0.90),
   emergency-unstake criteria are evaluated. A validator marked for instant unstake has its target
-  dropped to zero for the remainder of the cycle.
+  dropped to zero for the remainder of the cycle. Since the Alpenglow migration, the delinquency
+  part of that check judges the *previous* epoch (rewards are only paid when an epoch ends), and it
+  is skipped in the migration epoch itself.
 - The set holds up to `num_delegation_validators` (currently 400). Every member gets an **equal
   share**: 1/N of the undirected pool, where N is the set size.
 - Rank decides *whether* you are in the set and *what order* stake reaches you. It does not decide
@@ -63,14 +65,25 @@ means no delegation for the whole cycle — not a reduced amount:
 | Inflation commission | ≤ `commission_threshold`% in each of the last `commission_range` epochs |
 | MEV commission | ≤ `mev_commission_bps_threshold` bps in each of the last `mev_commission_range` epochs |
 | Historical commission | ≤ `historical_commission_threshold`% across all tracked history |
-| Vote credits | > `scoring_delinquency_threshold_ratio` of cluster blocks in **every** epoch of the window |
+| Performance ratio | ≥ `scoring_delinquency_threshold_ratio` in **every** scorable epoch of the window (see below) |
 | Superminority | must not be in it |
 | Blacklist | must not be on it |
 | Tip Distribution merkle root upload authority | must be TipRouter or legacy Jito |
 | BAM | connected for ≥ `jito_bam_minimum_epochs` of the trailing `jito_bam_window_epochs` epochs |
 
 Running the BAM client is therefore a binary requirement for the pool: not connected means score
-zero means no stake.
+zero means no stake. The window is exactly `jito_bam_window_epochs` full epochs; an off-by-one that
+made it `jito_bam_window_epochs + 1` was fixed in #340.
+
+**The performance ratio changed at the Alpenglow migration** (`alpenglow_migration_epoch`, mainnet
+1058). Before it, each epoch is scored as vote credits ÷ (cluster blocks × TVC multiplier). After it,
+vote credits no longer exist in that form, and each epoch is scored as the validator's reward
+lamports ÷ the lamports it was expected to earn: its share of that epoch's inflation by stake (since
+#359, the leader half is measured against its scheduled leader slots when those are recorded). Both
+are expressed as the same 0–1 ratio. The migration epoch itself, and any epoch with missing inputs,
+is **Unscorable**: it is skipped, not counted as zero, for both the filter and the tier-4 average.
+If you are reading `Vote Credits` from `view-state`, that field now holds the scaled average of this
+ratio, not a raw credit count.
 
 **The lookback windows are configuration, not constants.** `commission_range`,
 `mev_commission_range` and `epoch_credits_range` are three *separate* DAO-settable parameters. They
@@ -92,7 +105,7 @@ Use the range that belongs to the filter that actually failed:
 | :- | :- | :- |
 | Inflation commission | `commission_range` | `[current - commission_range, current]` |
 | MEV commission | `mev_commission_range` | `[current - mev_commission_range, current]` |
-| Vote credits / delinquency | `epoch_credits_range` | `[current - epoch_credits_range, current - 1]` |
+| Performance ratio / delinquency | `epoch_credits_range` | `[current - epoch_credits_range, current - 1]` |
 | Historical commission | **none — see below** | first reliable epoch … `current` |
 
 Worked example, using whatever `commission_range` actually is rather than an assumed value: if it
@@ -117,7 +130,7 @@ tier always dominates every lower one:
 1. Inflation commission (lowest preferred; uses the **maximum** over the window)
 2. MEV commission (lowest preferred; uses the **average** over the window)
 3. Validator age (older preferred; epochs with non-zero vote credits)
-4. Vote credits ratio (tiebreaker only)
+4. Performance ratio — average over the scorable epochs of the window (tiebreaker only)
 
 ## 2. Why arrival is a queue
 
@@ -134,8 +147,8 @@ So a validator's wait is set by two quantities:
 Unstaked SOL takes about one epoch to cool down before it can be re-delegated. An unstake today is
 not spendable today.
 
-Rotation is deliberately throttled: only `scoring_unstake_cap_bps` (currently 750 = 7.5%) of the
-pool may be unstaked **per cycle** for rebalancing. The cap exists because each redelegation costs
+Rotation is deliberately throttled: only `scoring_unstake_cap_bps` (currently 100 = 1%; it was 750
+= 7.5% when this guide was first written) of the pool may be unstaked **per cycle** for rebalancing. The cap exists because each redelegation costs
 roughly two epochs of yield on the moved stake. **When that budget is spent, rotation stops until
 the cycle resets, however far below target anyone is.** This is the most common reason an eligible
 validator sees nothing happening, and it is directly observable.
@@ -161,6 +174,23 @@ Two consequences an agent must handle:
   the target in total.** Report the undirected balance and the directed balance separately. Never
   describe such a validator as "near-empty" or "underfunded" without stating what it actually
   holds.
+
+**Directed stake is now a large share of the pool, and it is still growing.** Under JIP-39 the
+keeper sets a directed target for the Jito-operated JitoSOL Prime validator
+(`J1to5o1Q7W7Y2Q7zpETTezv3DyzPMHKDg66X2nZPMr4X`) equal to `jitosol_prime_share_bps` of pool TVL
+(currently 2,500 = 25%), re-computed every epoch. Directed rebalancing moves stake toward that
+target under its own cap (`directed_stake_unstake_cap_bps`, separate from the scoring cap). Two
+consequences:
+
+- While JitoSOL Prime is below its directed target, `directed_total` rises epoch by epoch, so the
+  undirected pool and every 1/N target **fall** over time. Do not assume targets only move with
+  TVL. Read `view-directed-stake-meta` each time and compare JitoSOL Prime's `Staked Lamports` to
+  its `Target Lamports` to see how far the ramp has progressed.
+- A validator sitting exactly at target can drift above it without receiving anything, purely
+  because the target moved down. "Above target" does not mean it was recently given stake.
+
+At epoch 1080, for illustration only: directed targets totalled about 3.24M SOL, with about 1.95M
+staked, on a ~10.2M SOL pool.
 
 ## 4. Where to read the data
 
@@ -411,8 +441,9 @@ In order of leverage:
    connected, that is the whole problem.
 2. **Lower inflation and MEV commission.** Funding order is by score, so this moves the validator
    *up the queue*, not merely into the set — the one lever with real time value attached.
-3. **Keep vote credits above the threshold every epoch.** One bad epoch stays in the window for the
-   whole `epoch_credits_range`.
+3. **Keep the performance ratio above the threshold every epoch.** One bad epoch stays in the
+   window for the whole `epoch_credits_range`. Since Alpenglow, that ratio is measured on rewards
+   earned, so skipped leader slots lower it as well as missed votes.
 
 Pool size, deposit flow, and other operators' behaviour are **not** controllable, and are a large
 part of why no date can be given.
@@ -433,14 +464,14 @@ than an estimate.
 > scored, the delegation set is chosen, and each member is assigned an equal share of the pool.
 > That set is then fixed until the next cycle.
 >
-> Whether you are in the set is **pass/fail** on a list of filters — commissions, vote credits,
+> Whether you are in the set is **pass/fail** on a list of filters — commissions, performance,
 > superminority, blacklist, tip-distribution authority, and running the BAM client. Fail any one and
 > your score is zero, which means no stake for the whole cycle. That part is fully determined and
 > you can check it yourself.
 >
 > When stake actually *arrives* is a queue, not a schedule. Increases are funded from the pool's
 > reserve in descending score order, so your wait depends on how much is queued ahead of you and how
-> much supply exists. Rotation is capped — currently at 7.5% of the pool per cycle — to limit the
+> much supply exists. Rotation is capped — currently at 1% of the pool per cycle — to limit the
 > yield lost to moving stake, and when that budget is spent nothing moves until the cycle resets.
 >
 > What nobody can predict: the rate of deposits into and withdrawals out of JitoSOL, other
@@ -460,7 +491,7 @@ When asked when a validator will receive JitoSOL stake:
 - Never give a date, an epoch, or a countdown to reaching target. It is not derivable.
 - Do say: eligibility is pass/fail and checkable; the delegation set is fixed for the cycle;
   arrival is a reserve-funded queue served in descending score order; rotation is capped per
-  cycle (currently 7.5% of the pool).
+  cycle (currently 1% of the pool).
 - Any figure you quote from memory is a current DAO-set value, not a constant. Say so, or
   omit the number.
 - Do say what is unpredictable and why it dominates: deposit/withdrawal flow, other
