@@ -2,6 +2,7 @@
 mod test_cluster_history;
 mod test_copy_is_bam_connected;
 mod test_copy_priority_fee_distribution;
+mod test_copy_vote_accounts;
 mod test_gossip;
 mod test_initialize;
 mod test_mev_commission;

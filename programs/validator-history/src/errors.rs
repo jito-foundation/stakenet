@@ -41,4 +41,9 @@ pub enum ValidatorHistoryError {
 
     #[msg("Invalid BAM client value, must be 0 or 1")]
     InvalidBamClientValue,
+
+    #[msg(
+        "Invalid accounts passed to bulk copy_vote_accounts: remaining accounts must be [validator_history_account, vote_account] pairs with matching, program-owned PDAs"
+    )]
+    InvalidBulkVoteAccounts,
 }
