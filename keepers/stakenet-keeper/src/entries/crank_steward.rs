@@ -422,9 +422,49 @@ impl ReserveCosts {
         self.minimum_delegation.saturating_add(self.stake_rent)
     }
 
-    /// Reserve lamports that are actually spendable without tripping the pool's reserve floor.
-    fn spendable_reserve(&self) -> u64 {
-        self.reserve_lamports.saturating_sub(self.reserve_floor)
+    /// Total reserve balance required to add `count` validators, i.e. the balance at which the
+    /// pool's `reserve_lamports - required_lamports < minimum_lamports` check stops failing.
+    fn required_reserve_for(&self, count: u64) -> u64 {
+        self.add_validator_cost()
+            .saturating_mul(count)
+            .saturating_add(self.reserve_floor)
+    }
+
+    /// Lamports that must be deposited for `count` adds to succeed, 0 if the reserve already
+    /// covers them.
+    ///
+    /// This deliberately subtracts the reserve balance last. A reserve sitting *below* its own
+    /// floor has a deficit that an intermediate saturating subtraction would clamp to zero,
+    /// under-funding the deposit by exactly that deficit.
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn shortfall_for(&self, count: u64) -> u64 {
+        self.required_reserve_for(count)
+            .saturating_sub(self.reserve_lamports)
+    }
+
+    /// How much the reserve currently sits *below* its own floor. Usually 0.
+    fn deficit(&self) -> u64 {
+        self.reserve_floor.saturating_sub(self.reserve_lamports)
+    }
+
+    /// How many validators the reserve can fund on its own, with no deposits at all.
+    fn reserve_only_count(&self) -> u64 {
+        self.reserve_lamports
+            .saturating_sub(self.reserve_floor)
+            .checked_div(self.add_validator_cost())
+            .unwrap_or(0)
+    }
+
+    /// Per-transaction deposit that lets an add succeed **regardless of the order** in which the
+    /// batch's transactions land.
+    ///
+    /// Transactions are submitted concurrently, so a transaction cannot assume any sibling's
+    /// deposit has already settled. Depositing `cost + deficit` makes each one self-sufficient:
+    /// the worst case is landing first, against the untouched reserve, where
+    /// `reserve + deposit - cost == max(reserve, floor)` still clears the floor. Because the
+    /// deposit is at least `cost`, every later landing only has more headroom.
+    fn self_funded_deposit(&self) -> u64 {
+        self.add_validator_cost().saturating_add(self.deficit())
     }
 }
 
@@ -469,24 +509,13 @@ async fn _get_reserve_costs(
 }
 
 /// Builds the instructions needed to top the reserve up by `amount` lamports via `DepositSol`.
-async fn _build_reserve_deposit_ixs(
+fn _build_reserve_deposit_ixs(
     payer: &Arc<Keypair>,
-    client: &Arc<RpcClient>,
     all_steward_accounts: &AllStewardAccounts,
     amount: u64,
-) -> Result<Option<Vec<Instruction>>, JitoTransactionError> {
+) -> Vec<Instruction> {
     if amount == 0 {
-        return Ok(None);
-    }
-
-    let payer_balance = client.get_balance(&payer.pubkey()).await?;
-    let affordable = payer_balance.saturating_sub(KEEPER_WALLET_RESERVE_LAMPORTS);
-
-    if affordable < amount {
-        error!(
-            "Keeper cannot fund stake pool reserve needed={amount} affordable={affordable} payer_balance={payer_balance}"
-        );
-        return Ok(None);
+        return vec![];
     }
 
     let acc_token_address = get_associated_token_address(
@@ -494,7 +523,7 @@ async fn _build_reserve_deposit_ixs(
         &all_steward_accounts.stake_pool_account.pool_mint,
     );
 
-    Ok(Some(vec![
+    vec![
         create_associated_token_account_idempotent(
             &payer.pubkey(),
             &payer.pubkey(),
@@ -514,7 +543,7 @@ async fn _build_reserve_deposit_ixs(
             &spl_token::id(),
             amount,
         ),
-    ]))
+    ]
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -643,7 +672,6 @@ async fn _handle_adding_validators(
     }
 
     let reserve_costs = _get_reserve_costs(client, all_steward_accounts).await?;
-    let cost_per_validator = reserve_costs.add_validator_cost();
 
     if good_vote_accounts.len() > MAX_VALIDATORS_TO_ADD_PER_CRANK {
         info!(
@@ -653,65 +681,54 @@ async fn _handle_adding_validators(
         good_vote_accounts.truncate(MAX_VALIDATORS_TO_ADD_PER_CRANK);
     }
 
-    let total_cost = cost_per_validator.saturating_mul(good_vote_accounts.len() as u64);
-    let spendable_reserve = reserve_costs.spendable_reserve();
+    let payer_balance = client.get_balance(&payer.pubkey()).await?;
+    let payer_spendable = payer_balance.saturating_sub(KEEPER_WALLET_RESERVE_LAMPORTS);
 
-    let deposit_ixs = if total_cost > spendable_reserve {
-        let shortfall = total_cost.saturating_sub(spendable_reserve);
+    let free_adds = reserve_costs.reserve_only_count() as usize;
+    let self_funded_deposit = reserve_costs.self_funded_deposit();
+    let payer_funded_adds = payer_spendable
+        .checked_div(self_funded_deposit.max(1))
+        .unwrap_or(0) as usize;
 
-        match _build_reserve_deposit_ixs(payer, client, all_steward_accounts, shortfall).await? {
-            Some(ixs) => Some(ixs),
-            None => {
-                let affordable = (spendable_reserve / cost_per_validator.max(1)) as usize;
-
-                if affordable == 0 {
-                    error!(
-                        "Skipping all validator adds, reserve cannot fund any step=auto_add_validators eligible={} cost_per_validator={cost_per_validator} spendable_reserve={spendable_reserve}",
-                        good_vote_accounts.len()
-                    );
-                    return Ok(SubmitStats::default());
-                }
-
-                info!(
-                    "Limiting validator adds to reserve capacity step=auto_add_validators eligible={} affordable={affordable} cost_per_validator={cost_per_validator} spendable_reserve={spendable_reserve}",
-                    good_vote_accounts.len()
-                );
-                good_vote_accounts.truncate(affordable);
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    // Deposit once up front rather than per-transaction, so a single top-up covers the batch.
-    let mut return_stats = SubmitStats::default();
-    if let Some(deposit_ixs) = deposit_ixs {
-        info!(
-            "Funding stake pool reserve step=auto_add_validators validators={} cost_per_validator={cost_per_validator}",
-            good_vote_accounts.len()
+    let fundable = free_adds.saturating_add(payer_funded_adds);
+    if fundable == 0 {
+        error!(
+            "Skipping all validator adds, reserve and payer cannot fund any step=auto_add_validators eligible={} reserve_lamports={} reserve_floor={} payer_spendable={payer_spendable}",
+            good_vote_accounts.len(),
+            reserve_costs.reserve_lamports,
+            reserve_costs.reserve_floor
         );
-
-        let txs_to_run = package_instructions(&deposit_ixs, 2, priority_fee, Some(1_400_000), None);
-        let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
-        return_stats.combine(&stats);
-
-        if stats.errors > 0 {
-            error!("Failed to fund stake pool reserve, skipping validator adds this crank");
-            return Ok(return_stats);
-        }
+        return Ok(SubmitStats::default());
     }
 
-    let ixs_to_run = good_vote_accounts
+    if good_vote_accounts.len() > fundable {
+        info!(
+            "Limiting validator adds to fundable capacity step=auto_add_validators eligible={} fundable={fundable} free_adds={free_adds} reserve_lamports={} reserve_floor={} payer_spendable={payer_spendable}",
+            good_vote_accounts.len(),
+            reserve_costs.reserve_lamports,
+            reserve_costs.reserve_floor
+        );
+        good_vote_accounts.truncate(fundable);
+    }
+
+    let txs_to_run = good_vote_accounts
         .iter()
-        .map(|vote_account| {
+        .enumerate()
+        .map(|(idx, vote_account)| {
             let history_account =
                 get_validator_history_address(vote_account, &validator_history::id());
 
             let stake_address =
                 get_stake_address(vote_account, &all_steward_accounts.stake_pool_address);
 
-            Instruction {
+            let deposit = if idx < free_adds {
+                0
+            } else {
+                self_funded_deposit
+            };
+            let mut ixs = _build_reserve_deposit_ixs(payer, all_steward_accounts, deposit);
+
+            ixs.push(Instruction {
                 program_id: *program_id,
                 accounts: jito_steward::accounts::AutoAddValidator {
                     config: all_steward_accounts.config_address,
@@ -733,22 +750,21 @@ async fn _handle_adding_validators(
                 }
                 .to_account_metas(None),
                 data: jito_steward::instruction::AutoAddValidatorToPool {}.data(),
-            }
-        })
-        .collect::<Vec<Instruction>>();
+            });
 
-    let txs_to_run = package_instructions(&ixs_to_run, 1, priority_fee, Some(1_400_000), None);
+            configure_instruction(&ixs, priority_fee, Some(1_400_000), None)
+        })
+        .collect::<Vec<Vec<Instruction>>>();
 
     info!(
-        "Submitting transactions step=auto_add_validators instructions={} transactions={}",
-        ixs_to_run.len(),
+        "Submitting transactions step=auto_add_validators validators={} transactions={}",
+        good_vote_accounts.len(),
         txs_to_run.len()
     );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
-    return_stats.combine(&stats);
 
-    Ok(return_stats)
+    Ok(stats)
 }
 
 async fn _handle_delinquent_validators(
