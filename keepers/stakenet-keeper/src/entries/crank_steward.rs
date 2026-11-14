@@ -61,6 +61,13 @@ use stakenet_sdk::{
 };
 use validator_history::ValidatorHistory;
 
+/// Upper bound on how many validators the keeper will add to the pool in a single crank.
+const MAX_VALIDATORS_TO_ADD_PER_CRANK: usize = 10;
+
+/// Lamports the keeper always keeps in its own wallet for transaction fees. Never spent on
+/// topping up the pool reserve.
+const KEEPER_WALLET_RESERVE_LAMPORTS: u64 = 1_000_000_000;
+
 pub fn _get_update_stake_pool_ixs(
     program_id: &Pubkey,
     stake_pool: &StakePool,
@@ -464,10 +471,21 @@ async fn _get_reserve_costs(
 /// Builds the instructions needed to top the reserve up by `amount` lamports via `DepositSol`.
 async fn _build_reserve_deposit_ixs(
     payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
     all_steward_accounts: &AllStewardAccounts,
     amount: u64,
 ) -> Result<Option<Vec<Instruction>>, JitoTransactionError> {
     if amount == 0 {
+        return Ok(None);
+    }
+
+    let payer_balance = client.get_balance(&payer.pubkey()).await?;
+    let affordable = payer_balance.saturating_sub(KEEPER_WALLET_RESERVE_LAMPORTS);
+
+    if affordable < amount {
+        error!(
+            "Keeper cannot fund stake pool reserve needed={amount} affordable={affordable} payer_balance={payer_balance}"
+        );
         return Ok(None);
     }
 
@@ -627,13 +645,21 @@ async fn _handle_adding_validators(
     let reserve_costs = _get_reserve_costs(client, all_steward_accounts).await?;
     let cost_per_validator = reserve_costs.add_validator_cost();
 
+    if good_vote_accounts.len() > MAX_VALIDATORS_TO_ADD_PER_CRANK {
+        info!(
+            "Capping validators to add step=auto_add_validators eligible={} cap={MAX_VALIDATORS_TO_ADD_PER_CRANK}",
+            good_vote_accounts.len()
+        );
+        good_vote_accounts.truncate(MAX_VALIDATORS_TO_ADD_PER_CRANK);
+    }
+
     let total_cost = cost_per_validator.saturating_mul(good_vote_accounts.len() as u64);
     let spendable_reserve = reserve_costs.spendable_reserve();
 
     let deposit_ixs = if total_cost > spendable_reserve {
         let shortfall = total_cost.saturating_sub(spendable_reserve);
 
-        match _build_reserve_deposit_ixs(payer, all_steward_accounts, shortfall).await? {
+        match _build_reserve_deposit_ixs(payer, client, all_steward_accounts, shortfall).await? {
             Some(ixs) => Some(ixs),
             None => {
                 let affordable = (spendable_reserve / cost_per_validator.max(1)) as usize;
