@@ -464,7 +464,6 @@ async fn _get_reserve_costs(
 /// Builds the instructions needed to top the reserve up by `amount` lamports via `DepositSol`.
 async fn _build_reserve_deposit_ixs(
     payer: &Arc<Keypair>,
-    client: &Arc<RpcClient>,
     all_steward_accounts: &AllStewardAccounts,
     amount: u64,
 ) -> Result<Option<Vec<Instruction>>, JitoTransactionError> {
@@ -560,7 +559,7 @@ async fn _handle_adding_validators(
 
     let checks = check_stake_accounts(&accounts_to_check, epoch);
 
-    let good_vote_accounts = checks
+    let mut good_vote_accounts = checks
         .iter()
         .filter_map(|(vote_address, check)| {
             if check.has_history && !check.has_stake_account {
@@ -634,7 +633,7 @@ async fn _handle_adding_validators(
     let deposit_ixs = if total_cost > spendable_reserve {
         let shortfall = total_cost.saturating_sub(spendable_reserve);
 
-        match _build_reserve_deposit_ixs(payer, client, all_steward_accounts, shortfall).await? {
+        match _build_reserve_deposit_ixs(payer, all_steward_accounts, shortfall).await? {
             Some(ixs) => Some(ixs),
             None => {
                 let affordable = (spendable_reserve / cost_per_validator.max(1)) as usize;
