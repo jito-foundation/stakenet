@@ -10,6 +10,7 @@ use jito_steward::{
 };
 use log::{error, info};
 use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_program::borsh1::try_from_slice_unchecked;
 use solana_program::instruction::Instruction;
 use solana_pubkey::Pubkey as SolanaPubkey;
 #[allow(deprecated)]
@@ -26,7 +27,9 @@ use solana_sdk::{
     system_program,
 };
 use solana_vote_interface::state::VoteStateV4;
-use spl_associated_token_account::get_associated_token_address;
+use spl_associated_token_account::{
+    get_associated_token_address, instruction::create_associated_token_account_idempotent,
+};
 #[allow(deprecated)]
 use spl_stake_pool::{
     find_transient_stake_program_address, find_withdraw_authority_program_address,
@@ -34,6 +37,7 @@ use spl_stake_pool::{
     instruction::{
         cleanup_removed_validator_entries, update_stake_pool_balance, update_validator_list_balance,
     },
+    minimum_delegation, minimum_reserve_lamports,
     state::{StakeStatus, ValidatorStakeInfo},
     MAX_VALIDATORS_TO_UPDATE,
 };
@@ -385,6 +389,117 @@ async fn _handle_instant_removal_validators(
     Ok(stats)
 }
 
+/// Per-validator costs that the stake pool program charges against the reserve stake account.
+struct ReserveCosts {
+    /// Rent-exempt minimum for a stake account.
+    stake_rent: u64,
+
+    /// `minimum_delegation(get_minimum_delegation())` as the stake pool program computes it.
+    /// This is `max(cluster minimum delegation, MINIMUM_ACTIVE_STAKE)`, which is 1 SOL on
+    /// clusters that have raised the stake program minimum, not the 1_000_000 lamport floor.
+    minimum_delegation: u64,
+
+    /// Lamports the stake pool program refuses to let the reserve drop below, i.e. the reserve's
+    /// own rent-exempt reserve. See `minimum_reserve_lamports` in spl-stake-pool.
+    reserve_floor: u64,
+
+    /// Current reserve stake account balance.
+    reserve_lamports: u64,
+}
+
+impl ReserveCosts {
+    /// Cost of adding one validator to the pool, matching the check in
+    /// `spl_stake_pool::processor::process_add_validator_to_pool`:
+    /// `minimum_delegation(minimum) + rent.minimum_balance(stake_space)`.
+    fn add_validator_cost(&self) -> u64 {
+        self.minimum_delegation.saturating_add(self.stake_rent)
+    }
+
+    /// Reserve lamports that are actually spendable without tripping the pool's reserve floor.
+    fn spendable_reserve(&self) -> u64 {
+        self.reserve_lamports.saturating_sub(self.reserve_floor)
+    }
+}
+
+/// Reads the reserve stake account and the cluster's minimum delegation so that reserve funding
+/// can be sized the same way the stake pool program sizes its own checks.
+async fn _get_reserve_costs(
+    client: &Arc<RpcClient>,
+    all_steward_accounts: &AllStewardAccounts,
+) -> Result<ReserveCosts, JitoTransactionError> {
+    let reserve_stake_acc = client
+        .get_account(&all_steward_accounts.stake_pool_account.reserve_stake)
+        .await?;
+
+    let stake_rent = client
+        .get_minimum_balance_for_rent_exemption(StakeStateV2::size_of())
+        .await?;
+
+    let cluster_minimum_delegation = client.get_stake_minimum_delegation().await?;
+
+    let reserve_floor = match try_from_slice_unchecked::<StakeStateV2>(
+        reserve_stake_acc.data.as_slice(),
+    ) {
+        Ok(state) => match state.meta() {
+            Some(meta) => minimum_reserve_lamports(&meta),
+            None => {
+                error!("Reserve stake account has no Meta, falling back to stake rent as floor");
+                stake_rent
+            }
+        },
+        Err(e) => {
+            error!("Failed to deserialize reserve stake account: {e:?}, falling back to stake rent as floor");
+            stake_rent
+        }
+    };
+
+    Ok(ReserveCosts {
+        stake_rent,
+        minimum_delegation: minimum_delegation(cluster_minimum_delegation),
+        reserve_floor,
+        reserve_lamports: reserve_stake_acc.lamports,
+    })
+}
+
+/// Builds the instructions needed to top the reserve up by `amount` lamports via `DepositSol`.
+async fn _build_reserve_deposit_ixs(
+    payer: &Arc<Keypair>,
+    client: &Arc<RpcClient>,
+    all_steward_accounts: &AllStewardAccounts,
+    amount: u64,
+) -> Result<Option<Vec<Instruction>>, JitoTransactionError> {
+    if amount == 0 {
+        return Ok(None);
+    }
+
+    let acc_token_address = get_associated_token_address(
+        &payer.pubkey(),
+        &all_steward_accounts.stake_pool_account.pool_mint,
+    );
+
+    Ok(Some(vec![
+        create_associated_token_account_idempotent(
+            &payer.pubkey(),
+            &payer.pubkey(),
+            &all_steward_accounts.stake_pool_account.pool_mint,
+            &spl_token::id(),
+        ),
+        deposit_sol(
+            &spl_stake_pool::id(),
+            &all_steward_accounts.stake_pool_address,
+            &all_steward_accounts.stake_pool_withdraw_authority,
+            &all_steward_accounts.stake_pool_account.reserve_stake,
+            &payer.pubkey(),
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.manager_fee_account,
+            &acc_token_address,
+            &all_steward_accounts.stake_pool_account.pool_mint,
+            &spl_token::id(),
+            amount,
+        ),
+    ]))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn _handle_adding_validators(
     payer: &Arc<Keypair>,
@@ -506,6 +621,62 @@ async fn _handle_adding_validators(
         })
         .collect::<Vec<Pubkey>>();
 
+    if good_vote_accounts.is_empty() {
+        return Ok(SubmitStats::default());
+    }
+
+    let reserve_costs = _get_reserve_costs(client, all_steward_accounts).await?;
+    let cost_per_validator = reserve_costs.add_validator_cost();
+
+    let total_cost = cost_per_validator.saturating_mul(good_vote_accounts.len() as u64);
+    let spendable_reserve = reserve_costs.spendable_reserve();
+
+    let deposit_ixs = if total_cost > spendable_reserve {
+        let shortfall = total_cost.saturating_sub(spendable_reserve);
+
+        match _build_reserve_deposit_ixs(payer, client, all_steward_accounts, shortfall).await? {
+            Some(ixs) => Some(ixs),
+            None => {
+                let affordable = (spendable_reserve / cost_per_validator.max(1)) as usize;
+
+                if affordable == 0 {
+                    error!(
+                        "Skipping all validator adds, reserve cannot fund any step=auto_add_validators eligible={} cost_per_validator={cost_per_validator} spendable_reserve={spendable_reserve}",
+                        good_vote_accounts.len()
+                    );
+                    return Ok(SubmitStats::default());
+                }
+
+                info!(
+                    "Limiting validator adds to reserve capacity step=auto_add_validators eligible={} affordable={affordable} cost_per_validator={cost_per_validator} spendable_reserve={spendable_reserve}",
+                    good_vote_accounts.len()
+                );
+                good_vote_accounts.truncate(affordable);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Deposit once up front rather than per-transaction, so a single top-up covers the batch.
+    let mut return_stats = SubmitStats::default();
+    if let Some(deposit_ixs) = deposit_ixs {
+        info!(
+            "Funding stake pool reserve step=auto_add_validators validators={} cost_per_validator={cost_per_validator}",
+            good_vote_accounts.len()
+        );
+
+        let txs_to_run = package_instructions(&deposit_ixs, 2, priority_fee, Some(1_400_000), None);
+        let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(10), None).await?;
+        return_stats.combine(&stats);
+
+        if stats.errors > 0 {
+            error!("Failed to fund stake pool reserve, skipping validator adds this crank");
+            return Ok(return_stats);
+        }
+    }
+
     let ixs_to_run = good_vote_accounts
         .iter()
         .map(|vote_account| {
@@ -550,9 +721,9 @@ async fn _handle_adding_validators(
     );
 
     let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(50), None).await?;
-    // let stats = submit_packaged_transactions(client, txs_to_run, payer, Some(1), None).await?;
+    return_stats.combine(&stats);
 
-    Ok(stats)
+    Ok(return_stats)
 }
 
 async fn _handle_delinquent_validators(
