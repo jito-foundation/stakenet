@@ -37,6 +37,7 @@ use commands::{
         view_directed_stake_whitelist::command_view_directed_stake_whitelist,
         view_next_index_to_remove::command_view_next_index_to_remove,
         view_priority_fee_config::command_view_priority_fee_config, view_state::command_view_state,
+        view_validators_to_add::command_view_validators_to_add,
     },
     init::{init_steward::command_init_steward, realloc_state::command_realloc_state},
 };
@@ -148,6 +149,15 @@ async fn main() -> Result<()> {
         }
         Commands::ViewDirectedStakeMeta(args) => {
             command_view_directed_stake_meta(args, &client, steward_program_id).await
+        }
+        Commands::ViewValidatorsToAdd(args) => {
+            command_view_validators_to_add(
+                args,
+                &client,
+                steward_program_id,
+                validator_history_program_id,
+            )
+            .await
         }
         Commands::GetJitosolBalance(args) => {
             command_get_jitosol_balance(args, &client, steward_program_id).await

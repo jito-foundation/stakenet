@@ -366,6 +366,7 @@ pub enum Commands {
     ViewDirectedStakeTicket(ViewDirectedStakeTicket),
     ViewDirectedStakeWhitelist(ViewDirectedStakeWhitelist),
     ViewDirectedStakeMeta(ViewDirectedStakeMeta),
+    ViewValidatorsToAdd(ViewValidatorsToAdd),
     GetJitosolBalance(GetJitosolBalance),
 
     // Actions
@@ -464,6 +465,19 @@ pub struct ViewPriorityFeeConfig {
 pub struct ViewNextIndexToRemove {
     #[command(flatten)]
     pub view_parameters: ViewParameters,
+}
+
+#[derive(Parser)]
+#[command(
+    about = "List vote accounts eligible for `auto_add_validator_to_pool`, and the reserve funding they require"
+)]
+pub struct ViewValidatorsToAdd {
+    #[command(flatten)]
+    pub view_parameters: ViewParameters,
+
+    /// Also print candidates that were rejected, with the reason
+    #[arg(short, long)]
+    pub verbose: bool,
 }
 
 // ---------- ACTIONS ------------
@@ -816,6 +830,11 @@ pub struct AutoAddValidatorFromPool {
     /// Validator vote account to add
     #[arg(long, env)]
     pub vote_account: Pubkey,
+
+    /// Prepend a `DepositSol` instruction funding the pool reserve from the payer, covering any
+    /// shortfall the stake pool program requires to add this validator.
+    #[arg(long, env, default_value = "false")]
+    pub fund_reserve: bool,
 }
 
 #[derive(Parser)]
