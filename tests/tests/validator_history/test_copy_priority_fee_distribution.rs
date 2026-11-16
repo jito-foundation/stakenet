@@ -46,7 +46,7 @@ async fn test_priority_fee_distribution_account_does_not_exist() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -110,7 +110,7 @@ async fn test_priority_fee_commission_none_transferred() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -177,7 +177,7 @@ async fn test_priority_fee_commission_earned() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -227,7 +227,7 @@ async fn test_priority_fee_commission_fail() {
         .to_account_metas(None),
     };
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         ctx.borrow().last_blockhash,
@@ -281,7 +281,7 @@ async fn test_priority_fee_commission_fail_double_copy() {
 
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -294,7 +294,7 @@ async fn test_priority_fee_commission_fail_double_copy() {
     let blockhash = ctx.borrow_mut().get_new_latest_blockhash().await.unwrap();
 
     let transaction = Transaction::new_signed_with_payer(
-        &[instruction.clone()],
+        std::slice::from_ref(&instruction),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,

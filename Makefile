@@ -14,8 +14,8 @@ build-release:
 	cargo build --release --features idl-build
 
 build-sbf:
-	cargo-build-sbf --manifest-path programs/steward/Cargo.toml
-	cargo-build-sbf --manifest-path programs/validator-history/Cargo.toml
+	cargo build-sbf --manifest-path programs/steward/Cargo.toml --arch v3
+	cargo build-sbf --manifest-path programs/validator-history/Cargo.toml --arch v3
 
 # IDL Build
 build-idl:

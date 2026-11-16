@@ -180,7 +180,7 @@ async fn test_initialize_alpenglow_migration_counts_distinct_epochs() {
     );
 
     let transaction = Transaction::new_signed_with_payer(
-        &[init_ix.clone()],
+        std::slice::from_ref(&init_ix),
         Some(&test.keypair.pubkey()),
         &[&test.keypair],
         ctx.borrow().last_blockhash,
