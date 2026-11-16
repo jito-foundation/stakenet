@@ -138,7 +138,7 @@ pub fn run(
     let transaction = Transaction::new_signed_with_payer(
         &[instruction],
         Some(&keypair.pubkey()),
-        &[keypair.clone()],
+        std::slice::from_ref(&keypair),
         hash,
     );
     let signature = client.send_transaction(&transaction)?;
