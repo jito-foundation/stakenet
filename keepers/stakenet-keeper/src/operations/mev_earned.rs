@@ -10,6 +10,7 @@ use crate::{
 };
 use anchor_lang::AccountDeserialize;
 use jito_tip_distribution::state::TipDistributionAccount;
+use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_metrics::datapoint_error;
 use solana_sdk::{
@@ -19,7 +20,7 @@ use solana_sdk::{
 use stakenet_sdk::models::entries::UpdateInstruction;
 use stakenet_sdk::models::errors::JitoTransactionError;
 use stakenet_sdk::models::submit_stats::SubmitStats;
-use stakenet_sdk::utils::transactions::submit_instructions;
+use stakenet_sdk::utils::transactions::{get_multiple_accounts_batched, submit_instructions};
 use std::{collections::HashMap, sync::Arc};
 use validator_history::ValidatorHistory;
 use validator_history::ValidatorHistoryEntry;
@@ -43,6 +44,8 @@ async fn _process(
     priority_fee_in_microlamports: u64,
     retry_count: u16,
     confirmation_time: u64,
+    lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
     keeper_state: &KeeperState,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
@@ -54,6 +57,8 @@ async fn _process(
         retry_count,
         confirmation_time,
         tip_distribution_program_id,
+        lookback_epochs,
+        lookback_start_offset_epochs,
         keeper_state,
         no_pack,
     )
@@ -85,6 +90,8 @@ pub async fn fire(
             priority_fee_in_microlamports,
             keeper_config.tx_retry_count,
             keeper_config.tx_confirmation_seconds,
+            keeper_config.lookback_epochs,
+            keeper_config.lookback_start_offset_epochs,
             keeper_state,
             keeper_config.no_pack,
         )
@@ -124,51 +131,108 @@ pub async fn update_mev_earned(
     retry_count: u16,
     confirmation_time: u64,
     tip_distribution_program_id: &Pubkey,
+    lookback_epochs: u64,
+    lookback_start_offset_epochs: u64,
     keeper_state: &KeeperState,
     no_pack: bool,
 ) -> Result<SubmitStats, JitoTransactionError> {
     let epoch_info = &keeper_state.epoch_info;
+    let current_epoch = epoch_info.epoch;
     let validator_history_map = &keeper_state.validator_history_map;
     let previous_epoch_tip_distribution_map = &keeper_state.previous_epoch_tip_distribution_map;
 
-    let uploaded_merkleroot_entries = previous_epoch_tip_distribution_map
-        .iter()
-        .filter_map(|(address, account)| {
-            let account_data = account.as_ref()?;
-            let mut data: &[u8] = &account_data.data;
-            let tda = TipDistributionAccount::try_deserialize(&mut data).ok()?;
-            if tda.merkle_root.is_some() {
-                Some(*address)
-            } else {
-                None
+    let start_epoch = current_epoch.saturating_sub(lookback_epochs + lookback_start_offset_epochs);
+    let end_epoch = current_epoch.saturating_sub(lookback_start_offset_epochs);
+    let epoch_range = start_epoch..end_epoch;
+
+    let mut update_instructions = Vec::new();
+
+    for epoch in epoch_range {
+        if epoch == current_epoch.saturating_sub(1) {
+            let uploaded_merkleroot_entries = previous_epoch_tip_distribution_map
+                .iter()
+                .filter_map(|(address, account)| {
+                    let account_data = account.as_ref()?;
+                    let mut data: &[u8] = &account_data.data;
+                    let tda = TipDistributionAccount::try_deserialize(&mut data).ok()?;
+                    if tda.merkle_root.is_some() {
+                        Some(*address)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let entries = uploaded_merkleroot_entries
+                .into_iter()
+                .filter(|entry| {
+                    !mev_earned_uploaded(
+                        validator_history_map,
+                        entry,
+                        epoch,
+                    )
+                })
+                .map(|vote_account| {
+                    ValidatorMevCommissionEntry::new(
+                        &vote_account,
+                        epoch,
+                        program_id,
+                        tip_distribution_program_id,
+                        &keypair.pubkey(),
+                    )
+                    .update_instruction()
+                });
+            update_instructions.extend(entries);
+        } else {
+            let pending_vote_accounts: Vec<Pubkey> = validator_history_map
+                .keys()
+                .filter(|vote_account| {
+                    !mev_earned_uploaded(validator_history_map, vote_account, epoch)
+                })
+                .cloned()
+                .collect();
+
+            if pending_vote_accounts.is_empty() {
+                continue;
             }
-        })
-        .collect::<Vec<_>>();
 
-    let entries_to_update = uploaded_merkleroot_entries
-        .into_iter()
-        .filter(|entry| {
-            !mev_earned_uploaded(
-                validator_history_map,
-                entry,
-                epoch_info.epoch.saturating_sub(1),
-            )
-        })
-        .collect::<Vec<_>>();
+            let tda_addresses: Vec<Pubkey> = pending_vote_accounts
+                .iter()
+                .map(|vote_account| {
+                    derive_tip_distribution_account_address(
+                        tip_distribution_program_id,
+                        vote_account,
+                        epoch,
+                    )
+                    .0
+                })
+                .collect();
 
-    let update_instructions = entries_to_update
-        .iter()
-        .map(|vote_account| {
-            ValidatorMevCommissionEntry::new(
-                vote_account,
-                epoch_info.epoch.saturating_sub(1),
-                program_id,
-                tip_distribution_program_id,
-                &keypair.pubkey(),
-            )
-            .update_instruction()
-        })
-        .collect::<Vec<_>>();
+            if let Ok(accounts) = get_multiple_accounts_batched(&tda_addresses, client).await {
+                for (vote_account, account_opt) in pending_vote_accounts.iter().zip(accounts) {
+                    if let Some(account) = account_opt {
+                        if account.owner == *tip_distribution_program_id {
+                            let mut data: &[u8] = &account.data;
+                            if let Ok(tda) = TipDistributionAccount::try_deserialize(&mut data) {
+                                if tda.merkle_root.is_some() {
+                                    update_instructions.push(
+                                        ValidatorMevCommissionEntry::new(
+                                            vote_account,
+                                            epoch,
+                                            program_id,
+                                            tip_distribution_program_id,
+                                            &keypair.pubkey(),
+                                        )
+                                        .update_instruction(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let submit_result = submit_instructions(
         client,
@@ -191,13 +255,66 @@ fn mev_earned_uploaded(
     epoch: u64,
 ) -> bool {
     if let Some(validator_history) = validator_history_map.get(vote_account) {
-        if let Some(latest_entry) = validator_history
+        if let Some(Some(latest_entry)) = validator_history
             .history
-            .epoch_range(epoch as u16, epoch as u16)[0]
+            .epoch_range(epoch as u16, epoch as u16)
+            .first()
         {
             return latest_entry.epoch == epoch as u16
                 && latest_entry.mev_earned != ValidatorHistoryEntry::default().mev_earned;
         }
     };
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use validator_history::ValidatorHistory;
+
+    #[test]
+    fn test_mev_earned_uploaded_states() {
+        let vote_account = Pubkey::new_unique();
+        let mut validator_history_map = HashMap::new();
+        let mut validator_history = ValidatorHistory {
+            vote_account,
+            ..Default::default()
+        };
+
+        // Initially empty
+        assert!(!mev_earned_uploaded(&validator_history_map, &vote_account, 10));
+
+        // Entry with default mev_earned (e.g. from copy_tip_distribution_account before merkle root)
+        let mut entry = ValidatorHistoryEntry {
+            epoch: 10,
+            mev_commission: 500,
+            ..ValidatorHistoryEntry::default()
+        };
+        validator_history.history.push(entry);
+        validator_history_map.insert(vote_account, validator_history);
+
+        // Should return false because mev_earned is default (u32::MAX)
+        assert!(!mev_earned_uploaded(&validator_history_map, &vote_account, 10));
+
+        // When merkle root is uploaded and mev_earned is written
+        entry.mev_earned = 12345;
+        validator_history.history.arr[validator_history.history.idx as usize] = entry;
+        validator_history_map.insert(vote_account, validator_history);
+
+        // Now should return true
+        assert!(mev_earned_uploaded(&validator_history_map, &vote_account, 10));
+    }
+
+    #[test]
+    fn test_epoch_range_calculation() {
+        let current_epoch = 100u64;
+        let lookback_epochs = 3u64;
+        let lookback_start_offset_epochs = 0u64;
+
+        let start_epoch = current_epoch.saturating_sub(lookback_epochs + lookback_start_offset_epochs);
+        let end_epoch = current_epoch.saturating_sub(lookback_start_offset_epochs);
+        let epoch_range: Vec<u64> = (start_epoch..end_epoch).collect();
+
+        assert_eq!(epoch_range, vec![97, 98, 99]);
+    }
 }

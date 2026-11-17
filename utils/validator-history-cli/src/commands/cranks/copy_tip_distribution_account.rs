@@ -1,7 +1,9 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use anchor_lang::AccountDeserialize;
 use anyhow::anyhow;
 use clap::Parser;
+use jito_tip_distribution::state::TipDistributionAccount;
 use jito_tip_distribution_sdk::derive_tip_distribution_account_address;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{pubkey::Pubkey, signature::read_keypair_file, signer::Signer};
@@ -82,24 +84,31 @@ pub async fn run(
     let tip_distribution_accounts =
         get_multiple_accounts_batched(&tip_distribution_addresses, &client).await?;
 
-    let tip_distribution_map: HashMap<Pubkey, bool> = vote_accounts
+    let tip_distribution_map: HashMap<Pubkey, (bool, bool)> = vote_accounts
         .iter()
         .zip(tip_distribution_accounts)
         .map(|(vote_pubkey, account)| {
-            let is_valid_tda = account
+            let (is_valid, has_merkle_root) = account
                 .as_ref()
-                .map(|acc| acc.owner == args.tip_distribution_program_id)
-                .unwrap_or(false);
-            (*vote_pubkey, is_valid_tda)
+                .filter(|acc| acc.owner == args.tip_distribution_program_id)
+                .map(|acc| {
+                    let mut data: &[u8] = &acc.data;
+                    let has_root = TipDistributionAccount::try_deserialize(&mut data)
+                        .map(|tda| tda.merkle_root.is_some())
+                        .unwrap_or(false);
+                    (true, has_root)
+                })
+                .unwrap_or((false, false));
+            (*vote_pubkey, (is_valid, has_merkle_root))
         })
         .collect();
 
     // Filter to validators that have tip distribution accounts but haven't been updated
     let vote_accounts_to_update: Vec<&Pubkey> = tip_distribution_map
         .iter()
-        .filter_map(|(vote_account, has_tip_dist)| {
+        .filter_map(|(vote_account, (has_tip_dist, has_merkle_root))| {
             if *has_tip_dist
-                && !mev_commission_uploaded(&validator_history_map, vote_account, epoch)
+                && needs_update(&validator_history_map, vote_account, epoch, *has_merkle_root)
             {
                 Some(vote_account)
             } else {
@@ -169,16 +178,72 @@ pub async fn run(
     Ok(())
 }
 
-fn mev_commission_uploaded(
+fn needs_update(
     validator_history_map: &HashMap<Pubkey, ValidatorHistory>,
     vote_account: &Pubkey,
     epoch: u64,
+    has_merkle_root: bool,
 ) -> bool {
     if let Some(validator_history) = validator_history_map.get(vote_account) {
-        if let Some(latest_entry) = validator_history.history.last() {
-            return latest_entry.epoch == epoch as u16
-                && latest_entry.mev_commission != ValidatorHistoryEntry::default().mev_commission;
+        if let Some(Some(entry)) = validator_history
+            .history
+            .epoch_range(epoch as u16, epoch as u16)
+            .first()
+        {
+            if entry.epoch == epoch as u16 {
+                if entry.mev_commission == ValidatorHistoryEntry::default().mev_commission {
+                    return true;
+                }
+                if has_merkle_root
+                    && entry.mev_earned == ValidatorHistoryEntry::default().mev_earned
+                {
+                    return true;
+                }
+                return false;
+            }
         }
     }
-    false
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_needs_update() {
+        let vote_account = Pubkey::new_unique();
+        let mut validator_history_map = HashMap::new();
+        let mut validator_history = ValidatorHistory {
+            vote_account,
+            ..Default::default()
+        };
+
+        // Case 1: Account not in map -> needs update
+        assert!(needs_update(&validator_history_map, &vote_account, 10, false));
+
+        // Case 2: Entry exists with default mev_commission -> needs update
+        let mut entry = ValidatorHistoryEntry {
+            epoch: 10,
+            ..ValidatorHistoryEntry::default()
+        };
+        validator_history.history.push(entry);
+        validator_history_map.insert(vote_account, validator_history.clone());
+        assert!(needs_update(&validator_history_map, &vote_account, 10, false));
+
+        // Case 3: mev_commission set, mev_earned default, no merkle root yet -> no update
+        entry.mev_commission = 100;
+        validator_history.history.arr[validator_history.history.idx as usize] = entry;
+        validator_history_map.insert(vote_account, validator_history.clone());
+        assert!(!needs_update(&validator_history_map, &vote_account, 10, false));
+
+        // Case 4: mev_commission set, mev_earned default, merkle root uploaded -> needs update
+        assert!(needs_update(&validator_history_map, &vote_account, 10, true));
+
+        // Case 5: Both mev_commission and mev_earned set -> no update
+        entry.mev_earned = 5000;
+        validator_history.history.arr[validator_history.history.idx as usize] = entry;
+        validator_history_map.insert(vote_account, validator_history);
+        assert!(!needs_update(&validator_history_map, &vote_account, 10, true));
+    }
 }
