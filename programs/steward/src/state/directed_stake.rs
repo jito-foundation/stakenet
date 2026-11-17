@@ -33,6 +33,8 @@ pub struct DirectedStakeMeta {
     pub directed_stake_meta_indices: [u64; MAX_VALIDATORS],
 }
 
+// Off-chain only: building this ~480KB struct by value overflows the 4KB SBF stack frame
+#[cfg(not(target_os = "solana"))]
 impl Default for DirectedStakeMeta {
     fn default() -> Self {
         Self {

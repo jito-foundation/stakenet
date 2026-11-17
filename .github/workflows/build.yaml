@@ -92,18 +92,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
-      - name: Install solana-verify from crates.io
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: solana-verify
-          version: "0.4.11"
+      - name: Install solana-verify from git
+        run: cargo install solana-verify --git https://github.com/solana-foundation/solana-verifiable-build.git --tag v0.5.2 --locked
       - name: Install anchor-cli from crates.io
         uses: baptiste0928/cargo-install@v3
         with:
           crate: anchor-cli
           version: "0.32.1"
       - name: install solana toolsuite
-        run: sh -c "$(curl -sSfL https://release.anza.xyz/v3.0.8/install)"
+        run: sh -c "$(curl -sSfL https://release.anza.xyz/v4.3.0/install)"
       - name: add to path
         run: echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
       # build the program and IDL; exit if error
@@ -113,9 +110,9 @@ jobs:
 
       # run verified build
       - run: git checkout $(git rev-parse --abbrev-ref HEAD) -- Cargo.lock
-      - run: solana-verify build --library-name validator_history
+      - run: solana-verify build --library-name validator_history --arch v3
 
-      - run: solana-verify build --library-name jito_steward -- --features mainnet-beta
+      - run: solana-verify build --library-name jito_steward --arch v3 -- --features mainnet-beta
 
       # create build for tests
       - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test

@@ -119,7 +119,7 @@ pub async fn command_crank_update_stake_pool(
     {
         println!("=== Update Validator List Balance Instructions ===");
         for ix in &update_list_instructions {
-            print_base58_tx(&[ix.clone()]);
+            print_base58_tx(std::slice::from_ref(ix));
         }
         println!("\n=== Update Stake Pool Balance & Cleanup Instructions ===");
         print_base58_tx(&final_instructions);
