@@ -47,20 +47,25 @@ On-chain Steward accounts for JitoSOL:
 - **Rust**: 1.89.0
 - **Cargo**: 1.89.0
 - **Anchor CLI**: 0.32.1
-- **Solana CLI**: 3.0.8
+- **Solana CLI**: 4.3.0
 
 ## Build and Test
 
 ### Build
 
 `anchor build --program-name validator_history` (regular anchor build)
-`solana-verify build --library-name validator_history` (solana verified build)
+`solana-verify build --library-name validator_history --arch v3` (solana verified build)
+
+Programs are built for SBPF v3, so `--arch v3` is required to reproduce the
+released binaries. The verified build toolchain is pinned via
+`[workspace.metadata.cli]` in the root `Cargo.toml`, so no `--base-image` flag is
+needed.
 
 ### Verify
 
 Verify with [solana-verifiable-build](https://github.com/Ellipsis-Labs/solana-verifiable-build):
 
-`solana-verify verify-from-repo -um --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa https://github.com/jito-foundation/stakenet`
+`solana-verify verify-from-repo -um --arch v3 --program-id HistoryJTGbKQD2mRgLZ3XhqHnN811Qpez8X9kCcGHoa https://github.com/jito-foundation/stakenet`
 
 ### Test
 

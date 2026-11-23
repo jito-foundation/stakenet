@@ -2,6 +2,9 @@
 members = ["keepers/*", "programs/*", "sdk", "tests", "utils/*"]
 resolver = "2"
 
+[workspace.metadata.cli]
+solana = "4.3.0"
+
 [workspace.dependencies]
 anchor-lang = "0.31.1"
 anyhow = "1.0.86"
