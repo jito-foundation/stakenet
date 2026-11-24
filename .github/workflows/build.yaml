@@ -114,8 +114,8 @@ jobs:
 
       - run: solana-verify build --library-name jito_steward --arch v3 -- --features mainnet-beta
 
-      # create build for tests
-      - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test
+      - run: cargo build-sbf --manifest-path programs/steward/Cargo.toml --sbf-out-dir target/test --arch v0
+      - run: cargo build-sbf --manifest-path programs/validator-history/Cargo.toml --sbf-out-dir target/test --arch v0
 
       # upload the IDL and verified build
       - name: Upload validator_history.so
@@ -134,6 +134,11 @@ jobs:
         with:
           name: jito_steward_test.so
           path: target/test/jito_steward.so
+      - name: Upload test validator_history.so
+        uses: actions/upload-artifact@v4
+        with:
+          name: validator_history_test.so
+          path: target/test/validator_history.so
       - name: Upload Validator History IDL
         uses: actions/upload-artifact@v4
         with:
@@ -161,14 +166,17 @@ jobs:
           sudo apt-get install -y protobuf-compiler libudev-dev libclang-dev
       - uses: actions/download-artifact@v4
         with:
-          name: validator_history.so
-          path: target/deploy/
+          name: validator_history_test.so
+          path: target/test/
       - uses: actions/download-artifact@v4
         with:
           name: jito_steward_test.so
           path: target/test/
-      - name: Rename test artifact to jito_steward.so
-        run: mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
+      - name: Move test artifacts into SBF_OUT_DIR
+        run: |
+          mkdir -p ./target/deploy
+          mv ./target/test/jito_steward.so ./target/deploy/jito_steward.so
+          mv ./target/test/validator_history.so ./target/deploy/validator_history.so
         shell: bash
 
       - name: cargo unit tests
