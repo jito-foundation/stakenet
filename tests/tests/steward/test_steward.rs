@@ -234,7 +234,7 @@ async fn test_auto_remove() {
     };
 
     let tx = Transaction::new_signed_with_payer(
-        &[instant_remove_validator_ix.clone()],
+        std::slice::from_ref(&instant_remove_validator_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.ctx.borrow().last_blockhash,

@@ -2,6 +2,9 @@
 members = ["keepers/*", "programs/*", "sdk", "tests", "utils/*"]
 resolver = "2"
 
+[workspace.metadata.cli]
+solana = "4.3.0"
+
 [workspace.dependencies]
 anchor-lang = "0.31.1"
 anyhow = "1.0.86"
@@ -64,9 +67,6 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 uriparse = "0.6.4"
 validator-history = { path = "programs/validator-history", version = "0.4.0", features = ["no-entrypoint"] }
 validator-history-vote-state = { path = "utils/vote-state", version = "0.1.2" }
-
-[patch.crates-io]
-home = { git = "https://github.com/rust-lang/cargo", tag = "0.78.0" }
 
 [profile.release]
 overflow-checks = true

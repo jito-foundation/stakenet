@@ -801,7 +801,7 @@ async fn test_compute_instant_unstake() {
     };
 
     let tx = Transaction::new_signed_with_payer(
-        &[compute_instant_unstake_ix.clone()],
+        std::slice::from_ref(&compute_instant_unstake_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.get_latest_blockhash().await,
@@ -864,7 +864,7 @@ async fn test_compute_instant_unstake() {
 
     let blockhash = fixture.get_latest_blockhash().await;
     let tx = Transaction::new_signed_with_payer(
-        &[compute_instant_unstake_ix.clone()],
+        std::slice::from_ref(&compute_instant_unstake_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -936,7 +936,7 @@ async fn test_idle() {
         data: jito_steward::instruction::Idle {}.data(),
     };
     let tx = Transaction::new_signed_with_payer(
-        &[idle_ix.clone()],
+        std::slice::from_ref(&idle_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.get_latest_blockhash().await,
@@ -982,7 +982,7 @@ async fn test_idle() {
     );
     let blockhash = fixture.get_latest_blockhash().await;
     let tx = Transaction::new_signed_with_payer(
-        &[idle_ix.clone()],
+        std::slice::from_ref(&idle_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,
@@ -1770,7 +1770,7 @@ async fn test_rebalance_other_cases() {
         .data(),
     };
     let tx = Transaction::new_signed_with_payer(
-        &[rebalance_ix.clone()],
+        std::slice::from_ref(&rebalance_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         fixture.get_latest_blockhash().await,
@@ -1810,7 +1810,7 @@ async fn test_rebalance_other_cases() {
 
     let blockhash = fixture.get_latest_blockhash().await;
     let tx = Transaction::new_signed_with_payer(
-        &[rebalance_ix.clone()],
+        std::slice::from_ref(&rebalance_ix),
         Some(&fixture.keypair.pubkey()),
         &[&fixture.keypair],
         blockhash,

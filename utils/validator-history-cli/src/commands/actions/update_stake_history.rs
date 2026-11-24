@@ -73,7 +73,7 @@ pub async fn run(
         let transaction = Transaction::new_signed_with_payer(
             &[update_instruction],
             Some(&keypair.pubkey()),
-            &[keypair.clone()],
+            std::slice::from_ref(&keypair),
             hash,
         );
         let signature = client.send_transaction(&transaction).await?;
